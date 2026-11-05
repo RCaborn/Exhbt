@@ -196,6 +196,15 @@
   }
 }
 
+@keyframes indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
 @keyframes tick-in {
   from {
     background-color: var(--color-surface);

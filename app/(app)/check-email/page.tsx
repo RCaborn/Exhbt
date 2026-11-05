@@ -13,7 +13,7 @@ export default async function CheckEmail({
       <h1 className="text-[2.6rem] sm:text-[3.4rem]">Check your email</h1>
       <p className="mt-4 text-lg text-ink-2">
         We sent a sign-in link to <span className="text-ink">{email ?? "your inbox"}</span>. Open it on this device
-        and your roadmap will be ready. The link works for one hour.
+        to log in. The link works for one hour.
       </p>
       <p className="hint mt-6">Nothing there after a few minutes? Check spam, or go back and check the address.</p>
       {dev && dev.startsWith("/auth/dev") && (
