@@ -218,7 +218,7 @@ function Next({ emailedTo, signedIn, id }: { emailedTo: string | null; signedIn:
         <p className="mt-5 flex items-start gap-3 rounded-[var(--radius)] bg-sky px-5 py-4">
           <Mail aria-hidden size={20} strokeWidth={2} className="mt-0.5 shrink-0" />
           <span>
-            We&rsquo;ve emailed a copy to <span className="font-semibold">{emailedTo}</span>.
+            We&rsquo;ve emailed a copy to <span className="font-semibold [overflow-wrap:anywhere]">{emailedTo}</span>.
             {!signedIn && " The link in it saves this roadmap to your account, so you can open it on any device."}
           </span>
         </p>
