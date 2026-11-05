@@ -24,7 +24,7 @@ export default function UniversitiesPage() {
   return (
     <div className="mx-auto max-w-[76rem] px-4 pt-14 sm:px-8 lg:pt-20">
       <div className="max-w-3xl">
-        <h1 className="text-[2.6rem] sm:text-[3.4rem]">For universities</h1>
+        <h1 className="text-[2.8rem] sm:text-[4.4rem]">For universities</h1>
         <p className="mt-4 text-lg text-ink-2">
           Give every student a roadmap and the Custom plan, and see which courses are turning project work into
           evidence employers open. Licences run for a year and are invoiced, from £6,000 depending on cohort size.

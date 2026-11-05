@@ -38,7 +38,7 @@ export default function HowToRead() {
   return (
     <div className="mx-auto max-w-[76rem] px-4 pt-14 sm:px-8 lg:pt-20">
       <div className="max-w-2xl">
-        <h1 className="text-[2.6rem] sm:text-[3.4rem]">How to read a pack</h1>
+        <h1 className="text-[2.8rem] sm:text-[4.4rem]">How to read a pack</h1>
         <p className="mt-4 text-lg text-ink-2">
           For hiring managers and careers staff. Every pack uses the same layout and limits, about 200 words in
           all, so once you know the parts you can read any pack in about thirty seconds.
@@ -53,7 +53,7 @@ export default function HowToRead() {
           <dl className="divide-y divide-rule border-y border-rule">
             {FIELDS.map((f) => (
               <div key={f.name} className="py-6">
-                <dt className="font-display text-[1.35rem]">{f.name}</dt>
+                <dt className="text-[1.3rem] font-bold tracking-[-0.02em]">{f.name}</dt>
                 <dd className="mt-2">{f.body}</dd>
               </div>
             ))}

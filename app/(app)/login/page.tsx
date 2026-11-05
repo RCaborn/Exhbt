@@ -8,7 +8,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const { next } = await searchParams;
   return (
     <div className="mx-auto max-w-md px-4 pt-16 sm:px-8 lg:pt-24">
-      <h1 className="text-[2.4rem]">Log in</h1>
+      <h1 className="text-[2.6rem] sm:text-[3.4rem]">Log in</h1>
       <p className="mt-3 text-ink-2">We email you a link. No password to remember.</p>
       <div className="mt-8">
         <LoginForm next={next ?? "/roadmap"} />

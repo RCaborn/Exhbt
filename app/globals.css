@@ -1,30 +1,40 @@
 @import "tailwindcss";
 
 @theme {
-  --color-paper: #f1f2f0;
+  /* One hue family (blue, ~hue 240) built in OKLCH, per garden-skills guidance.
+     White and light blue lead; navy is ink; green is a rare single accent. */
+  --color-sky: oklch(0.965 0.018 240);
+  --color-sky-2: oklch(0.915 0.045 237);
+  --color-blue: oklch(0.84 0.09 234);
+  --color-blue-press: oklch(0.79 0.11 236);
+  --color-blue-edge: oklch(0.64 0.12 242);
   --color-surface: #ffffff;
-  --color-ink: #16161a;
-  --color-ink-2: #4f534d;
-  --color-rule: #d8dbd6;
-  --color-field: #a3a8a1;
-  --color-quiet: #646862;
-  --color-verify: #1e4d3b;
-  --color-verify-tint: #e4ece6;
-  --color-error: #8a2a1f;
+  --color-ink: oklch(0.25 0.06 258);
+  --color-ink-2: oklch(0.45 0.05 252);
+  --color-rule: oklch(0.89 0.025 245);
+  --color-field: oklch(0.7 0.05 245);
+  --color-quiet: oklch(0.52 0.04 250);
+  /* The accent: a fresh leaf green. One swirl per page, plus "checked" ticks. */
+  --color-green: oklch(0.78 0.17 150);
+  --color-error: #b42318;
+  /* Legacy alias. */
+  --color-paper: oklch(0.965 0.018 240);
 
-  --font-display: "Newsreader", Georgia, serif;
+  --font-display: "Schibsted Grotesk", system-ui, sans-serif;
   --font-sans: "Schibsted Grotesk", system-ui, sans-serif;
+  --font-serif: "Newsreader", Georgia, serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
-  --radius-sm: 2px;
-  --radius: 4px;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-doc: 4px;
 
-  --shadow-pack: 0 1px 2px rgb(22 22 26 / 0.06), 0 8px 24px rgb(22 22 26 / 0.06);
+  --shadow-pack: 0 1px 2px oklch(0.25 0.06 258 / 0.06), 0 14px 36px oklch(0.6 0.1 240 / 0.16);
 }
 
 @layer base {
   html {
-    background: var(--color-paper);
+    background: var(--color-surface);
     color: var(--color-ink);
     font-family: var(--font-sans);
     font-size: 17px;
@@ -33,43 +43,51 @@
     text-rendering: optimizeLegibility;
   }
   body {
-    background: var(--color-paper);
+    background: var(--color-surface);
     min-height: 100dvh;
   }
   h1,
   h2,
   h3 {
     font-family: var(--font-display);
-    font-weight: 400;
-    letter-spacing: -0.01em;
-    line-height: 1.12;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.02;
     text-wrap: balance;
+  }
+  h3 {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
   }
   p,
   li,
   dd {
     text-wrap: pretty;
   }
+  /* Mid-blue ring with a navy halo: visible on white, sky, blue buttons and navy. */
   :focus-visible {
-    outline: 2px solid var(--color-verify);
+    outline: 3px solid var(--color-blue-edge);
     outline-offset: 2px;
-    border-radius: 2px;
+    box-shadow: 0 0 0 5px var(--color-surface), 0 0 0 7px var(--color-ink);
+    border-radius: 6px;
   }
   ::selection {
-    background: var(--color-verify-tint);
+    background: var(--color-blue);
+    color: var(--color-ink);
   }
 }
 
 @layer components {
   .link {
     text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 3px;
-    text-decoration-color: var(--color-rule);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+    text-decoration-color: var(--color-sky-2);
     transition: text-decoration-color 160ms ease;
   }
   .link:hover {
-    text-decoration-color: currentColor;
+    text-decoration-color: var(--color-blue-edge);
   }
   .btn {
     display: inline-flex;
@@ -77,9 +95,9 @@
     justify-content: center;
     gap: 0.5rem;
     min-height: 44px;
-    padding: 0 1.15rem;
-    border-radius: var(--radius);
-    font-weight: 500;
+    padding: 0 1.3rem;
+    border-radius: 999px;
+    font-weight: 600;
     font-size: 0.95rem;
     line-height: 1;
     transition:
@@ -89,26 +107,37 @@
   .btn:active {
     transform: translateY(1px);
   }
+  /* Light-blue pill. The deeper blue edge keeps it visible on white. */
   .btn-primary {
-    background: var(--color-verify);
-    color: #fff;
+    background: var(--color-blue);
+    color: var(--color-ink);
+    border: 1.5px solid var(--color-blue-edge);
+    box-shadow: 0 6px 16px oklch(0.64 0.12 242 / 0.22);
   }
   .btn-primary:hover {
-    background: #173d2f;
+    background: var(--color-blue-press);
+  }
+  .btn-ink {
+    background: var(--color-ink);
+    color: #fff;
+  }
+  .btn-ink:hover {
+    background: oklch(0.32 0.07 258);
   }
   .btn-secondary {
-    border: 1px solid var(--color-ink);
+    border: 1.5px solid var(--color-ink);
     color: var(--color-ink);
+    background: var(--color-surface);
   }
   .btn-secondary:hover {
-    background: var(--color-surface);
+    background: var(--color-sky);
   }
   .field {
     width: 100%;
-    border: 1px solid var(--color-field);
+    border: 1.5px solid var(--color-field);
     border-radius: var(--radius);
     background: var(--color-surface);
-    padding: 0.65rem 0.8rem;
+    padding: 0.7rem 0.85rem;
     font: inherit;
     color: var(--color-ink);
   }
@@ -117,14 +146,49 @@
   }
   .label {
     display: block;
-    font-weight: 500;
+    font-weight: 600;
     font-size: 0.95rem;
-    margin-bottom: 0.35rem;
+    margin-bottom: 0.4rem;
   }
   .hint {
     font-size: 0.875rem;
     color: var(--color-ink-2);
   }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-sky-2);
+    color: var(--color-ink);
+    padding: 0.15rem 0.55rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  /* Highlighter: a flat light-blue stroke behind navy words. */
+  .highlight {
+    background-image: linear-gradient(var(--color-blue), var(--color-blue));
+    background-repeat: no-repeat;
+    background-position: 0 88%;
+    background-size: 100% 0.42em;
+    padding: 0 0.06em;
+    margin: 0 -0.06em;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  /* The one hand-drawn green swirl: draws itself once on load. */
+  .swirl-draw path {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: swirl-draw 1100ms cubic-bezier(0.3, 0.6, 0.2, 1) 200ms forwards;
+  }
+
+  /* Trust ticks fill in sequence after the swirl. */
+  .tick-in {
+    animation: tick-in 260ms ease-out both;
+  }
+
   .prose-read h2 {
     font-size: 1.6rem;
     margin: 2.5rem 0 0.75rem;
@@ -139,7 +203,27 @@
   }
 }
 
+@keyframes swirl-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes tick-in {
+  from {
+    background-color: var(--color-surface);
+    transform: scale(0.6);
+  }
+  to {
+    background-color: var(--color-green);
+    transform: scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .swirl-draw path {
+    stroke-dashoffset: 0;
+  }
   *,
   *::before,
   *::after {

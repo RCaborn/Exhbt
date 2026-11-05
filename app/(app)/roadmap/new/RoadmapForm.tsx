@@ -5,7 +5,7 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { startRoadmap, type FormState } from "../actions";
 
-export function RoadmapForm({ signedInEmail }: { signedInEmail: string | null }) {
+export function RoadmapForm({ signedInEmail, defaultRole = "" }: { signedInEmail: string | null; defaultRole?: string }) {
   const [state, action] = useActionState<FormState, FormData>(startRoadmap, undefined);
   const [mode, setMode] = useState<"upload" | "paste">("upload");
   const err = state?.fieldErrors ?? {};
@@ -24,7 +24,7 @@ export function RoadmapForm({ signedInEmail }: { signedInEmail: string | null })
           {(["upload", "paste"] as const).map((m) => (
             <label
               key={m}
-              className={`cursor-pointer rounded-sm px-3 py-1.5 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-verify ${
+              className={`cursor-pointer rounded-sm px-3 py-1.5 has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-blue-edge ${
                 mode === m ? "bg-ink text-white" : "text-ink-2 hover:text-ink"
               }`}
             >
@@ -48,9 +48,11 @@ export function RoadmapForm({ signedInEmail }: { signedInEmail: string | null })
               id="cvFile"
               name="cvFile"
               type="file"
+              // Arriving from the home page with a role: the CV is the next thing to do.
+              autoFocus={Boolean(defaultRole)}
               accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               aria-describedby="cv-hint cv-error"
-              className="field file:mr-4 file:rounded-sm file:border-0 file:bg-paper file:px-3 file:py-1.5 file:font-medium"
+              className="field file:mr-4 file:rounded-sm file:border-0 file:bg-sky file:px-3 file:py-1.5 file:font-medium"
             />
             <p id="cv-hint" className="hint mt-1.5">PDF or Word (.docx), up to 5 MB. We read the text only.</p>
           </div>
@@ -75,6 +77,7 @@ export function RoadmapForm({ signedInEmail }: { signedInEmail: string | null })
         <input
           id="targetRole"
           name="targetRole"
+          defaultValue={defaultRole}
           required
           maxLength={120}
           aria-describedby="targetRole-error"

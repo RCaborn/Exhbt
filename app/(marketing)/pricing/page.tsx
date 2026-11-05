@@ -27,7 +27,7 @@ export default function PricingPage() {
   return (
     <div className="mx-auto max-w-[76rem] px-4 pt-14 sm:px-8 lg:pt-20">
       <div className="max-w-2xl">
-        <h1 className="text-[2.6rem] sm:text-[3.4rem]">Pricing</h1>
+        <h1 className="text-[2.8rem] sm:text-[4.4rem]">Pricing</h1>
         <p className="mt-4 text-lg text-ink-2">
           The roadmap is free for everyone. Pay once a year when you have work worth showing, and cancel whenever
           you like.
@@ -35,7 +35,7 @@ export default function PricingPage() {
       </div>
 
       <div className="mt-12 overflow-x-auto">
-        <table className="w-full min-w-[40rem] border-t border-ink text-left">
+        <table className="w-full min-w-[40rem] rounded-[14px] bg-surface text-left">
           <caption className="sr-only">Plans compared</caption>
           <thead>
             <tr className="border-b border-rule align-bottom">
@@ -45,7 +45,7 @@ export default function PricingPage() {
               {PLANS.map((p) => (
                 <th key={p.key} scope="col" className="px-4 py-6 font-normal">
                   <span className="block font-medium">{p.name}</span>
-                  <span className="mt-1 block font-display text-[2.2rem] leading-none">{p.price}</span>
+                  <span className="mt-1 block text-[2.6rem] leading-none font-extrabold tracking-[-0.03em]">{p.price}</span>
                   <span className="mt-1.5 block text-sm text-ink-2">{p.note}</span>
                 </th>
               ))}
@@ -119,7 +119,12 @@ export default function PricingPage() {
 }
 
 function CellValue({ value }: { value: Cell }) {
-  if (value === true) return <Check aria-label="Included" size={18} strokeWidth={2} className="text-verify" />;
+  if (value === true)
+    return (
+      <span className="inline-flex size-5 items-center justify-center rounded-full border border-ink bg-green">
+        <Check aria-label="Included" size={12} strokeWidth={3} />
+      </span>
+    );
   if (value === false) return <Minus aria-label="Not included" size={18} strokeWidth={1.5} className="text-quiet" />;
   return <span>{value}</span>;
 }

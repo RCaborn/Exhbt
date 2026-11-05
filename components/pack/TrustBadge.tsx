@@ -2,14 +2,21 @@ import { Check } from "lucide-react";
 
 const CHECKS = ["Confirmed by author", "Source attached", "Originality checked"] as const;
 
-export function TrustBadge({ checkedOn }: { checkedOn: string }) {
+/**
+ * The system-generated trust line. Green fill with navy ticks: the accent colour
+ * marks "verified". With `animate`, ticks fill in sequence after the hero swirl.
+ */
+export function TrustBadge({ checkedOn, animate = false }: { checkedOn: string; animate?: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-      <ul className="flex flex-wrap gap-x-4 gap-y-1" aria-label="Checks passed">
-        {CHECKS.map((c) => (
-          <li key={c} className="inline-flex items-center gap-1.5 text-verify">
-            <span className="inline-flex size-4 items-center justify-center rounded-full bg-verify-tint">
-              <Check aria-hidden size={11} strokeWidth={2.5} />
+      <ul className="flex flex-wrap gap-x-4 gap-y-1.5" aria-label="Checks passed">
+        {CHECKS.map((c, i) => (
+          <li key={c} className="inline-flex items-center gap-1.5 font-medium text-ink">
+            <span
+              className={`inline-flex size-[18px] items-center justify-center rounded-full border border-ink bg-green ${animate ? "tick-in" : ""}`}
+              style={animate ? { animationDelay: `${850 + i * 180}ms` } : undefined}
+            >
+              <Check aria-hidden size={11} strokeWidth={3} />
             </span>
             {c}
           </li>

@@ -6,7 +6,7 @@ export default function NotFound() {
     <>
       <SiteHeader />
       <main id="main" className="mx-auto max-w-xl px-4 pt-20 sm:px-8">
-        <h1 className="text-[2.4rem]">Page not found</h1>
+        <h1 className="text-[2.6rem] sm:text-[3.4rem]">Page not found</h1>
         <p className="mt-4 text-ink-2">
           The link may be mistyped, or the page may have been removed. If someone sent you a pack, ask them for a new link.
         </p>

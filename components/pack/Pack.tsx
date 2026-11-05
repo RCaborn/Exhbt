@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { FileText, ExternalLink } from "lucide-react";
 import type { PackData } from "@/lib/pack";
 import { TrustBadge } from "./TrustBadge";
@@ -8,19 +9,31 @@ type Props = {
   example?: boolean;
   headingLevel?: "h2" | "h3";
   className?: string;
+  /** Play the trust-tick sequence once (hero only). */
+  animateChecks?: boolean;
+  /** "preview" shows the headline fields only, with a link to the full pack. */
+  variant?: "full" | "preview";
 };
 
 /**
  * The single fixed pack template. Home, the guide, public pack pages (R2) and the
  * editor preview (R2) all render this component, so every pack reads the same.
  */
-export function Pack({ pack, example, headingLevel = "h2", className = "" }: Props) {
+export function Pack({
+  pack,
+  example,
+  headingLevel = "h2",
+  className = "",
+  animateChecks = false,
+  variant = "full",
+}: Props) {
+  const full = variant === "full";
   const Heading = headingLevel;
   const EvidenceIcon = pack.evidence.kind === "file" ? FileText : ExternalLink;
 
   return (
     <article
-      className={`bg-surface shadow-pack rounded border border-rule text-[0.95rem] ${className}`}
+      className={`rounded-[var(--radius-doc)] border border-rule bg-surface text-[0.95rem] shadow-pack ${className}`}
       aria-label={`Evidence pack: ${pack.title}`}
     >
       <header className="border-b border-rule px-6 pt-5 pb-5 sm:px-8">
@@ -29,21 +42,25 @@ export function Pack({ pack, example, headingLevel = "h2", className = "" }: Pro
             <span className="font-medium text-ink">{pack.author}</span> · {pack.context}
           </p>
           {example && (
-            <span className="shrink-0 rounded-sm border border-rule px-1.5 py-0.5 text-xs">
+            <span className="shrink-0 rounded-[var(--radius-sm)] bg-sky px-2 py-0.5 text-xs font-medium text-ink-2">
               Example
             </span>
           )}
         </div>
-        <Heading className="mt-3 text-[1.55rem] sm:text-[1.75rem]">{pack.title}</Heading>
-        <p className="mt-3 font-display text-[1.2rem] leading-snug text-ink" data-field="outcome">
+        <Heading className="mt-3 font-serif text-[1.55rem] font-normal leading-tight tracking-[-0.01em] sm:text-[1.75rem]">
+          {pack.title}
+        </Heading>
+        <p className="mt-3 font-serif text-[1.2rem] leading-snug text-ink" data-field="outcome">
           {pack.outcome}
         </p>
       </header>
 
       <dl className="divide-y divide-rule px-6 sm:px-8">
-        <Row label="Method" field="method">
-          <p>{pack.method}</p>
-        </Row>
+        {full && (
+          <Row label="Method" field="method">
+            <p>{pack.method}</p>
+          </Row>
+        )}
         <Row label="Results" field="results">
           <ul className="space-y-1">
             {pack.results.filter(Boolean).map((r) => (
@@ -57,13 +74,24 @@ export function Pack({ pack, example, headingLevel = "h2", className = "" }: Pro
             {pack.evidence.label}
           </a>
         </Row>
-        <Row label="Reflection" field="reflection">
-          <p>{pack.reflection}</p>
-        </Row>
+        {full && (
+          <Row label="Reflection" field="reflection">
+            <p>{pack.reflection}</p>
+          </Row>
+        )}
       </dl>
+      {!full && (
+        <p className="mx-6 border-t border-rule py-3.5 text-sm text-ink-2 sm:mx-8">
+          Method and reflection are in the{" "}
+          <Link href="/how-to-read-a-pack" className="link font-medium text-ink">
+            full pack
+          </Link>
+          .
+        </p>
+      )}
 
       <footer className="border-t border-rule px-6 py-4 sm:px-8">
-        <TrustBadge checkedOn={pack.checkedOn} />
+        <TrustBadge checkedOn={pack.checkedOn} animate={animateChecks} />
       </footer>
     </article>
   );

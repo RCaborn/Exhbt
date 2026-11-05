@@ -46,7 +46,9 @@ function RoadmapView({ roadmap }: { roadmap: Roadmap }) {
   return (
     <div className="mx-auto max-w-[76rem] px-4 pt-12 sm:px-8 lg:pt-16">
       <div className="max-w-3xl">
-        <h1 className="text-[2.4rem] sm:text-[2.9rem]">Your roadmap to {roadmap.targetRole || "your target role"}</h1>
+        <h1 className="text-[2.6rem] sm:text-[3.6rem]">
+          Your roadmap to <span className="highlight">{roadmap.targetRole || "your target role"}</span>
+        </h1>
         {roadmap.summary && <p className="mt-4 text-lg text-ink-2">{roadmap.summary}</p>}
       </div>
 
@@ -55,7 +57,7 @@ function RoadmapView({ roadmap }: { roadmap: Roadmap }) {
         {gaps.length === 0 ? (
           <p className="mt-3 text-ink-2">Your CV already covers what this role usually asks for.</p>
         ) : (
-          <div className="mt-5 overflow-x-auto border-y border-rule">
+          <div className="mt-5 overflow-x-auto rounded-[14px] border border-rule bg-surface px-5">
             <table className="w-full min-w-[34rem] text-left text-[0.95rem]">
               <thead className="text-sm text-ink-2">
                 <tr className="border-b border-rule">
@@ -83,7 +85,7 @@ function RoadmapView({ roadmap }: { roadmap: Roadmap }) {
       {projects.length > 0 && (
         <section aria-labelledby="projects" className="mt-16">
           <h2 id="projects" className="text-[1.75rem]">Projects that would prove them</h2>
-          <ol className="mt-5 divide-y divide-rule border-y border-rule">
+          <ol className="mt-5 divide-y divide-rule rounded-[14px] border border-rule bg-surface px-6">
             {projects.map((p) => (
               <li key={p.title} className="grid gap-3 py-7 md:grid-cols-[1fr_16rem] md:gap-12">
                 <div>
@@ -103,7 +105,9 @@ function RoadmapView({ roadmap }: { roadmap: Roadmap }) {
                   )}
                   <div>
                     <dt className="text-sm text-ink-2">Time</dt>
-                    <dd className="font-mono text-sm">{p.weeks} {p.weeks === 1 ? "week" : "weeks"}</dd>
+                    <dd>
+                      <span className="chip font-mono">{p.weeks} {p.weeks === 1 ? "week" : "weeks"}</span>
+                    </dd>
                   </div>
                 </dl>
               </li>
@@ -125,10 +129,10 @@ function RoadmapView({ roadmap }: { roadmap: Roadmap }) {
         </section>
       )}
 
-      <section aria-labelledby="next" className="mt-20 grid gap-6 border-t border-ink pt-8 md:grid-cols-[1fr_auto] md:items-end">
+      <section aria-labelledby="next" className="mt-20 grid gap-6 rounded-[14px] bg-ink p-8 text-white md:grid-cols-[1fr_auto] md:items-end sm:p-10">
         <div className="max-w-2xl">
           <h2 id="next" className="text-[1.75rem]">When a project is done, make it count</h2>
-          <p className="mt-3 text-ink-2">
+          <p className="mt-3 text-[#c9d7e8]">
             Upload the report or repository and we draft a 200-word evidence pack you check and confirm. Employers
             open it from a link and see the outcome first. £9 a year.
           </p>

@@ -10,7 +10,7 @@ export default async function CheckEmail({
   const { email, dev } = await searchParams;
   return (
     <div className="mx-auto max-w-xl px-4 pt-16 sm:px-8 lg:pt-24">
-      <h1 className="text-[2.4rem]">Check your email</h1>
+      <h1 className="text-[2.6rem] sm:text-[3.4rem]">Check your email</h1>
       <p className="mt-4 text-lg text-ink-2">
         We sent a sign-in link to <span className="text-ink">{email ?? "your inbox"}</span>. Open it on this device
         and your roadmap will be ready. The link works for one hour.

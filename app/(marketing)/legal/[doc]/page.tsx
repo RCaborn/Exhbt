@@ -117,7 +117,7 @@ export default async function LegalPage({ params }: { params: Promise<{ doc: str
   if (!d) notFound();
   return (
     <div className="mx-auto max-w-[68ch] px-4 pt-14 sm:px-8 lg:pt-20">
-      <h1 className="text-[2.6rem]">{d.title}</h1>
+      <h1 className="text-[2.6rem] sm:text-[3.4rem]">{d.title}</h1>
       <p className="hint mt-3">Last updated {d.updated}. Draft pending legal review.</p>
       <div className="prose-read mt-8">{d.body}</div>
     </div>

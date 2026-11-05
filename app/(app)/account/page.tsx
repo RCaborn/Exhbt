@@ -9,7 +9,7 @@ export default async function AccountPage() {
   if (!user) redirect("/login?next=/account");
   return (
     <div className="mx-auto max-w-2xl px-4 pt-12 sm:px-8 lg:pt-16">
-      <h1 className="text-[2.4rem]">Account</h1>
+      <h1 className="text-[2.6rem] sm:text-[3.4rem]">Account</h1>
       <p className="mt-3 text-ink-2">Signed in as {user.email}. Plan: Free.</p>
 
       <section aria-labelledby="data" className="mt-12 border-t border-rule pt-8">
