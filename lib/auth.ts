@@ -33,10 +33,25 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   return email ? { id: `dev-${email}`, email } : null;
 }
 
-async function siteOrigin() {
-  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
+export async function siteOrigin() {
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
   const h = await headers();
   return `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
+}
+
+/**
+ * A sign-in link to put inside our own emails (e.g. the roadmap email), without
+ * Supabase sending a separate email. Production: Supabase admin generateLink, whose
+ * hashed token is verified by /auth/confirm. Development: the /auth/dev stand-in.
+ */
+export async function signInLinkFor(email: string, next: string): Promise<string> {
+  const origin = await siteOrigin();
+  const n = encodeURIComponent(next);
+  if (!isSupabaseConfigured()) return `${origin}/auth/dev?email=${encodeURIComponent(email)}&next=${n}`;
+  const { supabaseAdmin } = await import("./store");
+  const { data, error } = await supabaseAdmin().auth.admin.generateLink({ type: "magiclink", email });
+  if (error || !data.properties?.hashed_token) throw new Error(error?.message ?? "Could not create sign-in link");
+  return `${origin}/auth/confirm?token_hash=${data.properties.hashed_token}&type=magiclink&next=${n}`;
 }
 
 /**

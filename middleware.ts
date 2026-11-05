@@ -24,5 +24,5 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   // Only routes that read the session; marketing pages stay static and fast.
-  matcher: ["/roadmap/:path*", "/account/:path*", "/api/account/:path*", "/auth/:path*"],
+  matcher: ["/roadmap/:path*", "/account/:path*", "/api/account/:path*", "/api/roadmap/:path*", "/auth/:path*"],
 };

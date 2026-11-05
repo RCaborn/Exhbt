@@ -9,7 +9,16 @@ export type RoadmapRecord = {
   input: RoadmapInput;
   inputHash: string;
   output: Roadmap | null;
+  emailSentAt: string | null;
   createdAt: string;
+};
+
+export type NewRoadmap = {
+  email: string;
+  input: RoadmapInput;
+  inputHash: string;
+  ipHash: string;
+  marketingOptIn: boolean;
 };
 
 export type AICall = {
@@ -25,17 +34,29 @@ export type EventName =
   | "signup_started"
   | "signup_completed"
   | "roadmap_completed"
+  | "roadmap_failed"
+  | "roadmap_emailed"
   | "upgrade_clicked"
-  | "lead_submitted";
+  | "lead_submitted"
+  | "unsubscribed";
 
+/**
+ * Everything the app persists goes through this interface. Two implementations:
+ * Supabase (production) and in-memory (local development, tests). Add a method here
+ * first, then to both implementations.
+ */
 export interface Store {
-  createPendingRoadmap(email: string, input: RoadmapInput, inputHash: string): Promise<string>;
+  createRoadmap(r: NewRoadmap): Promise<string>;
   countRecentRoadmaps(email: string, hours: number): Promise<number>;
+  countRecentByIpHash(ipHash: string, hours: number): Promise<number>;
   claimPendingRoadmaps(email: string, userId: string): Promise<void>;
   getRoadmap(id: string): Promise<RoadmapRecord | null>;
   latestRoadmapFor(userId: string): Promise<RoadmapRecord | null>;
   findCachedOutput(inputHash: string): Promise<Roadmap | null>;
   saveRoadmapOutput(id: string, output: Roadmap): Promise<void>;
+  /** Atomically marks the roadmap email as sent. Returns false if it was already sent. */
+  markEmailSent(id: string): Promise<boolean>;
+  setMarketingOptIn(email: string, optIn: boolean): Promise<void>;
   logAICall(call: AICall): Promise<void>;
   logEvent(name: EventName, userId: string | null, props?: Record<string, unknown>): Promise<void>;
   createLead(lead: { name: string; email: string; institution: string; message: string }): Promise<void>;
@@ -52,7 +73,7 @@ export function getStore(): Store {
 
 /* ---------------- Supabase (production) ---------------- */
 
-function admin(): SupabaseClient {
+export function supabaseAdmin(): SupabaseClient {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: { persistSession: false },
   });
@@ -65,6 +86,7 @@ type RoadmapRow = {
   input_json: RoadmapInput;
   input_hash: string;
   output_json: Roadmap | null;
+  email_sent_at: string | null;
   created_at: string;
 };
 
@@ -75,6 +97,7 @@ const fromRow = (r: RoadmapRow): RoadmapRecord => ({
   input: r.input_json,
   inputHash: r.input_hash,
   output: r.output_json,
+  emailSentAt: r.email_sent_at,
   createdAt: r.created_at,
 });
 
@@ -84,45 +107,71 @@ function check<T>(res: { data: T; error: { message: string } | null }): T {
 }
 
 function supabaseStore(): Store {
-  const db = admin();
+  const db = supabaseAdmin();
+  const since = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
   return {
-    async createPendingRoadmap(email, input, inputHash) {
+    async createRoadmap(r) {
       const row = check(
         await db
           .from("roadmaps")
-          .insert({ pending_email: email, input_json: input, input_hash: inputHash })
+          .insert({
+            pending_email: r.email,
+            input_json: r.input,
+            input_hash: r.inputHash,
+            creator_ip_hash: r.ipHash,
+            pending_marketing_opt_in: r.marketingOptIn,
+          })
           .select("id")
           .single(),
       );
       return (row as { id: string }).id;
     },
     async countRecentRoadmaps(email, hours) {
-      const since = new Date(Date.now() - hours * 3_600_000).toISOString();
       const res = await db
         .from("roadmaps")
         .select("id", { count: "exact", head: true })
         .eq("pending_email", email)
-        .gte("created_at", since);
+        .gte("created_at", since(hours));
+      if (res.error) throw new Error(res.error.message);
+      return res.count ?? 0;
+    },
+    async countRecentByIpHash(ipHash, hours) {
+      const res = await db
+        .from("roadmaps")
+        .select("id", { count: "exact", head: true })
+        .eq("creator_ip_hash", ipHash)
+        .gte("created_at", since(hours));
       if (res.error) throw new Error(res.error.message);
       return res.count ?? 0;
     },
     async claimPendingRoadmaps(email, userId) {
+      const pending = check(
+        await db.from("roadmaps").select("pending_marketing_opt_in").eq("pending_email", email).is("user_id", null),
+      ) as { pending_marketing_opt_in: boolean }[];
       check(await db.from("roadmaps").update({ user_id: userId }).eq("pending_email", email).is("user_id", null));
+      if (pending.some((p) => p.pending_marketing_opt_in)) {
+        check(
+          await db
+            .from("profiles")
+            .update({ marketing_opt_in: true, marketing_opt_in_at: new Date().toISOString() })
+            .eq("id", userId),
+        );
+      }
     },
     async getRoadmap(id) {
-      const res = await db.from("roadmaps").select("*").eq("id", id).maybeSingle();
-      const row = check(res) as RoadmapRow | null;
+      const row = check(await db.from("roadmaps").select("*").eq("id", id).maybeSingle()) as RoadmapRow | null;
       return row ? fromRow(row) : null;
     },
     async latestRoadmapFor(userId) {
-      const res = await db
-        .from("roadmaps")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const row = check(res) as RoadmapRow | null;
+      const row = check(
+        await db
+          .from("roadmaps")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ) as RoadmapRow | null;
       return row ? fromRow(row) : null;
     },
     async findCachedOutput(inputHash) {
@@ -137,6 +186,27 @@ function supabaseStore(): Store {
     },
     async saveRoadmapOutput(id, output) {
       check(await db.from("roadmaps").update({ output_json: output }).eq("id", id));
+    },
+    async markEmailSent(id) {
+      // Conditional update: only one caller wins, so the email is sent once.
+      const rows = check(
+        await db
+          .from("roadmaps")
+          .update({ email_sent_at: new Date().toISOString() })
+          .eq("id", id)
+          .is("email_sent_at", null)
+          .select("id"),
+      ) as { id: string }[];
+      return rows.length === 1;
+    },
+    async setMarketingOptIn(email, optIn) {
+      const at = optIn ? new Date().toISOString() : null;
+      check(
+        await db.from("profiles").update({ marketing_opt_in: optIn, marketing_opt_in_at: at }).eq("email", email),
+      );
+      check(
+        await db.from("roadmaps").update({ pending_marketing_opt_in: optIn }).eq("pending_email", email).is("user_id", null),
+      );
     },
     async logAICall(c) {
       check(
@@ -183,15 +253,17 @@ function supabaseStore(): Store {
   };
 }
 
-/* ---------------- In-memory (local development only) ---------------- */
+/* ---------------- In-memory (local development and tests only) ---------------- */
 
+type MemRoadmap = RoadmapRecord & { ipHash: string; marketingOptIn: boolean };
 type Mem = {
-  roadmaps: Map<string, RoadmapRecord>;
+  roadmaps: Map<string, MemRoadmap>;
+  optIns: Map<string, boolean>;
   aiCalls: AICall[];
   events: { name: string; userId: string | null; props: Record<string, unknown>; at: string }[];
   leads: unknown[];
 };
-const newMem = (): Mem => ({ roadmaps: new Map(), aiCalls: [], events: [], leads: [] });
+const newMem = (): Mem => ({ roadmaps: new Map(), optIns: new Map(), aiCalls: [], events: [], leads: [] });
 const g = globalThis as unknown as { __exhbtMem?: Mem };
 
 function memoryStore(): Store {
@@ -199,25 +271,30 @@ function memoryStore(): Store {
     throw new Error("Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
   }
   const m = (g.__exhbtMem ??= newMem());
+  const recent = (hours: number, r: MemRoadmap) => Date.parse(r.createdAt) >= Date.now() - hours * 3_600_000;
   return {
-    async createPendingRoadmap(email, input, inputHash) {
+    async createRoadmap(r) {
       const id = crypto.randomUUID();
       m.roadmaps.set(id, {
         id,
         userId: null,
-        pendingEmail: email,
-        input,
-        inputHash,
+        pendingEmail: r.email,
+        input: r.input,
+        inputHash: r.inputHash,
         output: null,
+        emailSentAt: null,
         createdAt: new Date().toISOString(),
+        ipHash: r.ipHash,
+        marketingOptIn: r.marketingOptIn,
       });
+      if (r.marketingOptIn) m.optIns.set(r.email, true);
       return id;
     },
     async countRecentRoadmaps(email, hours) {
-      const since = Date.now() - hours * 3_600_000;
-      return [...m.roadmaps.values()].filter(
-        (r) => r.pendingEmail === email && Date.parse(r.createdAt) >= since,
-      ).length;
+      return [...m.roadmaps.values()].filter((r) => r.pendingEmail === email && recent(hours, r)).length;
+    },
+    async countRecentByIpHash(ipHash, hours) {
+      return [...m.roadmaps.values()].filter((r) => r.ipHash === ipHash && recent(hours, r)).length;
     },
     async claimPendingRoadmaps(email, userId) {
       for (const r of m.roadmaps.values()) if (r.pendingEmail === email && !r.userId) r.userId = userId;
@@ -239,6 +316,15 @@ function memoryStore(): Store {
       const r = m.roadmaps.get(id);
       if (r) r.output = output;
     },
+    async markEmailSent(id) {
+      const r = m.roadmaps.get(id);
+      if (!r || r.emailSentAt) return false;
+      r.emailSentAt = new Date().toISOString();
+      return true;
+    },
+    async setMarketingOptIn(email, optIn) {
+      m.optIns.set(email, optIn);
+    },
     async logAICall(c) {
       m.aiCalls.push(c);
     },
@@ -257,7 +343,7 @@ function memoryStore(): Store {
   };
 }
 
-/** Debug view for local tests only. */
+/** Read-only view of the in-memory store, for the dev pages and tests. */
 export function memorySnapshot() {
   return g.__exhbtMem;
 }
