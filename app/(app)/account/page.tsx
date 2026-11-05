@@ -1,0 +1,36 @@
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
+
+export const metadata: Metadata = { title: "Account", robots: { index: false } };
+
+export default async function AccountPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login?next=/account");
+  return (
+    <div className="mx-auto max-w-2xl px-4 pt-12 sm:px-8 lg:pt-16">
+      <h1 className="text-[2.4rem]">Account</h1>
+      <p className="mt-3 text-ink-2">Signed in as {user.email}. Plan: Free.</p>
+
+      <section aria-labelledby="data" className="mt-12 border-t border-rule pt-8">
+        <h2 id="data" className="text-[1.5rem]">Your data</h2>
+        <p className="mt-3">Download everything we hold about you as a JSON file.</p>
+        <a href="/api/account/export" className="btn btn-secondary mt-4">Download my data</a>
+      </section>
+
+      <section aria-labelledby="delete" className="mt-12 border-t border-rule pt-8">
+        <h2 id="delete" className="text-[1.5rem]">Delete account</h2>
+        <p className="mt-3">
+          This removes your account, your CV text and your roadmap straight away. It cannot be undone.
+        </p>
+        <form action="/api/account/delete" method="post" className="mt-4 space-y-4">
+          <label className="flex items-start gap-3">
+            <input type="checkbox" name="confirm" value="yes" required className="mt-1.5 size-4 accent-error" />
+            <span>I understand this deletes everything.</span>
+          </label>
+          <button className="btn border border-error text-error hover:bg-surface">Delete my account</button>
+        </form>
+      </section>
+    </div>
+  );
+}
