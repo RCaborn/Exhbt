@@ -4,7 +4,7 @@ const CHECKS = ["Confirmed by author", "Source attached", "Originality checked"]
 
 /**
  * The system-generated trust line. Green fill with navy ticks: the accent colour
- * marks "verified". With `animate`, ticks fill in sequence after the hero swirl.
+ * marks "verified". With `animate`, ticks fill in sequence on load.
  */
 export function TrustBadge({ checkedOn, animate = false }: { checkedOn: string; animate?: boolean }) {
   return (
@@ -14,7 +14,7 @@ export function TrustBadge({ checkedOn, animate = false }: { checkedOn: string; 
           <li key={c} className="inline-flex items-center gap-1.5 font-medium text-ink">
             <span
               className={`inline-flex size-[18px] items-center justify-center rounded-full border border-ink bg-green ${animate ? "tick-in" : ""}`}
-              style={animate ? { animationDelay: `${850 + i * 180}ms` } : undefined}
+              style={animate ? { animationDelay: `${400 + i * 180}ms` } : undefined}
             >
               <Check aria-hidden size={11} strokeWidth={3} />
             </span>

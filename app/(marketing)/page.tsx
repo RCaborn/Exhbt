@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Pack } from "@/components/pack/Pack";
 import { EditorExcerpt, LinkExcerpt, RoadmapExcerpt, TemplateSpec } from "@/components/home/Excerpts";
 import { StartForm } from "@/components/home/StartForm";
-import { Swirl } from "@/components/home/Swirl";
 import { examplePack } from "@/lib/pack";
 
 export default function Home() {
@@ -27,8 +26,6 @@ export default function Home() {
             <p className="mt-4 text-sm font-medium text-ink-2">Free. No card. Just an email.</p>
           </div>
           <div id="example-pack" className="relative scroll-mt-8">
-            {/* The page's one green moment, half-hidden behind the pack. */}
-            <Swirl className="absolute -top-[78px] -right-[64px] z-0 w-[13rem] sm:-top-[74px] sm:right-auto sm:-left-[196px] sm:w-[18rem]" />
             <Pack pack={examplePack} example animateChecks variant="preview" className="relative z-10" />
           </div>
         </div>
