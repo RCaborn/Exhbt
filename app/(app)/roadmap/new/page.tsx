@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
-import { RoadmapForm } from "./RoadmapForm";
+import { RoadmapWizard } from "./RoadmapWizard";
 
 export const metadata: Metadata = { title: "Your free roadmap" };
 
@@ -8,27 +8,11 @@ export default async function NewRoadmapPage({ searchParams }: { searchParams: P
   const user = await getCurrentUser();
   const role = (await searchParams).role?.trim().slice(0, 120) ?? "";
   return (
-    <div className="bg-sky pb-8">
-      <div className="mx-auto max-w-[44rem] px-4 pt-12 sm:px-8 lg:pt-16">
-        <h1 className="text-[2.6rem] sm:text-[3.6rem]">
-          {role ? (
-            <>
-              Your roadmap to <span className="highlight">{role}</span>
-            </>
-          ) : (
-            "Your free roadmap"
-          )}
-        </h1>
-        <p className="mt-4 text-lg text-ink-2">
-          Tell us where you are and where you want to be. You get the skills your target role asks for that your CV
-          does not show yet, and projects that would prove them.
-        </p>
-        <p className="mt-5 text-[0.95rem] text-ink-2">
-          Your CV is stored in the UK, encrypted. The AI is told to use only what you give it, and you can download
-          or delete everything at any time.
-        </p>
-        <div className="mt-9 rounded-[20px] border border-rule bg-surface p-6 shadow-pack sm:p-9">
-          <RoadmapForm signedInEmail={user?.email ?? null} defaultRole={role} />
+    <div className="min-h-[calc(100svh-4.75rem)] bg-sky px-4 pt-10 pb-16 sm:px-8 sm:pt-14">
+      <div className="mx-auto max-w-[40rem]">
+        <h1 className="text-[1.1rem] font-bold tracking-[-0.01em] text-ink-2">Your free roadmap</h1>
+        <div className="mt-4 rounded-[24px] border border-rule bg-surface p-6 shadow-pack sm:p-10">
+          <RoadmapWizard defaultRole={role} signedInEmail={user?.email ?? null} />
         </div>
       </div>
     </div>
