@@ -60,5 +60,14 @@ One signature moment: on Home the example pack's three ticks fill green in seque
 - `BrowserFrame`: adapted from garden-skills web-design-engineer; shows product screens as pages, not floating cards.
 - `Pack` / `TrustBadge`: the fixed template; green-filled ticks with navy marks. `variant="preview"` shows title, outcome, results and the work (hero only).
 
+## Flow patterns
+- **Click-through, not long pages**, for the roadmap builder and result. Marketing pages scroll normally.
+- **Builder:** one question per screen inside a white card on sky. "Step N of 4" with a four-segment progress bar; Back (secondary) on the left, Continue (primary) on the right; the step is in the URL (`?step=`). Validation messages sit under the field and are announced.
+- **Result:** five views (`?view=`) in a white card. Pill tabs on desktop, "N / 5 · Label" on mobile; the bottom bar has the previous view on the left and the next view as the primary button. Each view has its own `h1`.
+- **Waiting and failure:** the building screen has an indeterminate bar (static under reduced motion) and honest copy. Failure offers "Try again" and says the answers are saved.
+
+## Email
+Same palette in plain hex (email clients don't support OKLCH); table layout; one primary light-blue button. Every email has unsubscribe and privacy links. Template: `lib/email/templates/roadmap-ready.ts`; preview locally at `/dev/emails`.
+
 ## Banned
 Eyebrow labels; decorative 01/02/03 numbering; icon+heading+text card grids; hero stat strips; fabricated metrics, testimonials or logos; gradients (the highlighter is a flat stroke); glass; emoji icons; stock photos of people; carousels; three or more consecutive left/right zigzag sections (garden "zigzag monotony"); a large headline beside a small floating paragraph (garden "split-header filler"); different labels for the same action.

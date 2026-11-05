@@ -1,5 +1,7 @@
 # Exhbt — site plan (architecture for R1–R4, build R1)
 
+> **Status:** Phase 1 (everything up to the roadmap) is built. See [HANDOFF.md](../HANDOFF.md) for how it works now; where this plan and the code differ, the code and HANDOFF.md are current.
+
 ## Context
 Exhbt gives graduates a free skills-gap roadmap, then turns their project work into fixed-template "evidence packs" (~200 words) that a hiring manager can read in 30 seconds. The repo (`/home/user/Terna`) is empty apart from the design tooling installed earlier. The goal is to plan the architecture for all four releases in the dev brief, then build **Release 1** (marketing pages, pricing, sign-up, roadmap builder and result, legal pages, analytics). Constraints: fixed costs as close to £0 as possible for the first few hundred users, UK GDPR, WCAG 2.1 AA, and a look that does not read as AI-generated.
 
