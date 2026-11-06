@@ -1,6 +1,6 @@
 # Launch checklist: private preview
 
-This puts Exhbt live on a private Cloudflare address (`https://exhbt.<your-account>.workers.dev`), with the real database, AI and email. It stays **hidden from search engines** and shows a "Private preview" bar until you choose to go public (see the end).
+This puts Exhbt live on a private Cloudflare address (`https://terna.<your-account>.workers.dev`), with the real database, AI and email. It stays **hidden from search engines** and shows a "Private preview" bar until you choose to go public (see the end).
 
 About 30–45 minutes. You'll paste keys into each service's dashboard; **never paste keys into chat or commit them to GitHub.**
 
@@ -44,9 +44,9 @@ You'll come back to Supabase in step 5 once you know the site's address.
 1. **Upgrade to Workers Paid ($5/month)** under Workers & Pages > Plans. The free plan's per-request processing limit is likely too tight for this app. Pages can fail with error **1102** on it.
 2. **Workers & Pages > Create > Import a repository.** Connect GitHub and choose **`RCaborn/Terna`**.
 3. Settings on that screen:
-   - Project name: **`exhbt`** (must match `wrangler.jsonc`)
+   - Project name: **`terna`** (must match `"name"` in `wrangler.jsonc`)
    - Production branch: **`main`**
-   - Build command: `npx opennextjs-cloudflare build`
+   - Build command: `npx opennextjs-cloudflare build` (**not** the default `npm run build`, which fails at the deploy step with "Could not find compiled Open Next config")
    - Deploy command: `npx opennextjs-cloudflare deploy`
 4. Click **Deploy**. The first deploy will build but won't work yet (no keys). That's expected.
 5. In the new Worker, open **Settings**:
@@ -67,7 +67,7 @@ You'll come back to Supabase in step 5 once you know the site's address.
 
      For `EXHBT_COOKIE_SECRET`, on a Mac open Terminal and run `openssl rand -base64 32`, then paste the output. Or generate a 40+ character random password in your password manager.
 6. **Deployments > latest > Retry deployment** (or push any commit), so it rebuilds with the build variables.
-7. Note the address shown, e.g. `https://exhbt.yourname.workers.dev`.
+7. Note the address shown, e.g. `https://terna.yourname.workers.dev`.
 8. Optional: add `NEXT_PUBLIC_SITE_URL` = that address as both a build variable and a secret. This makes links in emails use it exactly.
 
 ## 5. Back to Supabase · ~2 min
@@ -75,8 +75,8 @@ You'll come back to Supabase in step 5 once you know the site's address.
 **Authentication > URL Configuration**:
 - Site URL: your `workers.dev` address
 - Redirect URLs: add both
-  - `https://exhbt.yourname.workers.dev/auth/callback`
-  - `https://exhbt.yourname.workers.dev/auth/confirm`
+  - `https://terna.yourname.workers.dev/auth/callback`
+  - `https://terna.yourname.workers.dev/auth/confirm`
 
 ## 6. Try it
 
