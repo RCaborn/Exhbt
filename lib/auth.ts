@@ -49,9 +49,18 @@ export async function signInLinkFor(email: string, next: string): Promise<string
   const n = encodeURIComponent(next);
   if (!isSupabaseConfigured()) return `${origin}/auth/dev?email=${encodeURIComponent(email)}&next=${n}`;
   const { supabaseAdmin } = await import("./store");
-  const { data, error } = await supabaseAdmin().auth.admin.generateLink({ type: "magiclink", email });
-  if (error || !data.properties?.hashed_token) throw new Error(error?.message ?? "Could not create sign-in link");
-  return `${origin}/auth/confirm?token_hash=${data.properties.hashed_token}&type=magiclink&next=${n}`;
+  const admin = supabaseAdmin().auth.admin;
+  let res = await admin.generateLink({ type: "magiclink", email });
+  if (res.error) {
+    // First contact: the visitor has no account yet. Create one (unconfirmed; clicking
+    // the link proves they own the address), then ask for the link again.
+    await admin.createUser({ email, email_confirm: false });
+    res = await admin.generateLink({ type: "magiclink", email });
+  }
+  const props = res.data?.properties;
+  if (res.error || !props?.hashed_token) throw new Error(res.error?.message ?? "Could not create sign-in link");
+  const type = props.verification_type ?? "magiclink";
+  return `${origin}/auth/confirm?token_hash=${props.hashed_token}&type=${type}&next=${n}`;
 }
 
 /**

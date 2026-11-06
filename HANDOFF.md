@@ -50,7 +50,7 @@ Useful dev-only pages:
 | Big role field + button | `components/home/StartForm.tsx` |
 | Builder questions, hints, step order | `app/(app)/roadmap/new/RoadmapWizard.tsx` (`STEPS` at the top) |
 | Builder validation and rate limits (server) | `app/(app)/roadmap/actions.ts` |
-| CV reading (in the browser) | `lib/cv-client.ts` (server fallback: `lib/cv.ts`) |
+| CV reading (in the browser) | `lib/cv-client.ts` |
 | "Building your roadmap" screen | `components/roadmap/Generating.tsx` |
 | Roadmap result screens | `components/roadmap/RoadmapViews.tsx` (`VIEWS` at the top) |
 | AI prompt and output shape | `lib/ai/roadmap.ts`, `lib/ai/schemas.ts` |
@@ -82,7 +82,9 @@ Supabase setup:
 3. Set Resend as Supabase's custom SMTP too (it sends the plain login emails from `/login`).
 4. Verify your sending domain in Resend.
 
-Then deploy with `npm run deploy` (Cloudflare Workers via OpenNext) and add the secrets with `npx wrangler secret put <NAME>`.
+Then deploy. The intended route is Cloudflare building from GitHub on every push to `main`; **[LAUNCH.md](LAUNCH.md)** has the click-by-click steps. Manual alternative: `npm run deploy`, with secrets set via `npx wrangler secret put <NAME>`.
+
+**Private preview vs public:** the site is private by default: `noindex` everywhere, `robots.txt` disallows all, and a preview bar shows. It only goes public when built with `EXHBT_PUBLIC=1` (`lib/site.ts`). In production a missing `ANTHROPIC_API_KEY` or `RESEND_API_KEY` fails loudly (logged); it never falls back to placeholder roadmaps or the dev outbox.
 
 ## Known limits and decisions
 
@@ -91,7 +93,7 @@ Then deploy with `npm run deploy` (Cloudflare Workers via OpenNext) and add the 
 - **Marketing consent** is an unticked opt-in at step 4, stored as `pending_marketing_opt_in` on the roadmap and copied to the profile on sign-in. Every email has an unsubscribe link (`/api/email/unsubscribe`, signed token, also one-click). Have the privacy policy reviewed before sending any marketing.
 - **Fake emails are accepted** (the roadmap shows without verifying the address). That was a product decision; rate limits contain abuse.
 - **Scanned-image PDFs** have no text to read; the builder asks people to paste instead. There's no OCR.
-- **JavaScript is required** for the builder (steps are client-side). The server action still accepts a plain form post and reads files server-side if needed.
+- **JavaScript is required** for the builder (steps and CV reading are client-side). Server-side file parsing was removed to keep the Worker small and fast.
 - **Pricing buttons** don't take payment yet; checkout is Release 2.
 
 ## Tests

@@ -3,7 +3,6 @@
 import { redirect } from "next/navigation";
 import { z } from "zod/v4";
 import { RoadmapInputSchema } from "@/lib/ai/schemas";
-import { extractCvText } from "@/lib/cv";
 import { getStore } from "@/lib/store";
 import { getCurrentUser } from "@/lib/auth";
 import { callerIpHash, grantBrowserAccess } from "@/lib/access";
@@ -22,16 +21,9 @@ const PER_IP_PER_DAY = 10;
  * Generation and the roadmap email happen on the result page (/api/roadmap/[id]/generate).
  */
 export async function startRoadmap(_prev: FormState, form: FormData): Promise<FormState> {
-  // The wizard extracts CV text in the browser. A file only arrives here without JavaScript.
-  let cvText = String(form.get("cvText") ?? "");
-  const file = form.get("cvFile");
-  if (!cvText && file instanceof File && file.size > 0) {
-    try {
-      cvText = await extractCvText(file);
-    } catch (e) {
-      return { fieldErrors: { cv: (e as Error).message }, step: 2 };
-    }
-  }
+  // CV files are read in the browser (lib/cv-client.ts); only the extracted text arrives here.
+  // Parsing files on the server was removed: it doubled the Worker size and its CPU use.
+  const cvText = String(form.get("cvText") ?? "");
 
   const parsed = RoadmapInputSchema.safeParse({
     cvText,

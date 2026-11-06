@@ -29,7 +29,11 @@ export type RoadmapResult = {
 };
 
 export async function generateRoadmap(input: RoadmapInput): Promise<RoadmapResult> {
-  if (!process.env.ANTHROPIC_API_KEY) return mockRoadmap(input);
+  if (!process.env.ANTHROPIC_API_KEY) {
+    // Never hand real visitors a placeholder roadmap.
+    if (process.env.NODE_ENV === "production") throw new Error("ANTHROPIC_API_KEY is not set.");
+    return mockRoadmap(input);
+  }
 
   const client = new Anthropic();
   const response = await client.messages.parse({

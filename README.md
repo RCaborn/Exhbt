@@ -2,7 +2,9 @@
 
 Free skills-gap roadmaps for graduates, then short, confirmed evidence packs of their project work that hiring managers can read in 30 seconds.
 
-**Phase 1 is complete:** marketing site, the click-through roadmap builder, instant roadmap results, and the roadmap email. **Start with [HANDOFF.md](HANDOFF.md)**: it covers how everything fits together, where to change things, and how to connect the real services.
+**Phase 1 is complete:** marketing site, the click-through roadmap builder, instant roadmap results, and the roadmap email. **Start with [HANDOFF.md](HANDOFF.md)**: it covers how everything fits together, where to change things, and how to connect the real services. To put it live, follow **[LAUNCH.md](LAUNCH.md)**.
+
+The site is a **private preview** (hidden from search engines, with a preview bar) unless it is built with `EXHBT_PUBLIC=1`.
 
 Also see: [DESIGN.md](DESIGN.md) (visual system and rules), [PRODUCT.md](PRODUCT.md) (product context), [docs/PLAN.md](docs/PLAN.md) (architecture for Releases 2–4).
 

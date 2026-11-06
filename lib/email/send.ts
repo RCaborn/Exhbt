@@ -29,6 +29,8 @@ export async function sendEmail(email: Email): Promise<OutboxEntry> {
   };
 
   if (!isEmailConfigured()) {
+    // A live site must not pretend to send email.
+    if (process.env.NODE_ENV === "production") throw new Error("RESEND_API_KEY is not set.");
     (g.__exhbtOutbox ??= []).unshift(entry);
     console.info(`[email:outbox] to=${email.to} subject="${email.subject}" (view at /dev/emails)`);
     return entry;
