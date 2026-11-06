@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Check, Minus } from "lucide-react";
 import { WaitlistForm } from "@/components/waitlist/WaitlistForm";
-import { ENTITLEMENTS, EXHBTS_PER_JOB_LINK, PLAN_NAMES, PRICES } from "@/lib/entitlements";
+import { ENTITLEMENTS, EXHBTS_PER_JOB_LINK, PLAN_NAMES, PRICES, planFeatures } from "@/lib/entitlements";
+import { FeatureList } from "@/components/site/FeatureList";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -10,24 +10,7 @@ export const metadata: Metadata = {
     "Free skills roadmap. Plus hosts 4 exhbts with your own link. Premium hosts 10, with a custom link for every job. Free for employers.",
 };
 
-type Cell = boolean | string;
 const { free, plus, premium } = ENTITLEMENTS;
-const refreshes = (n: number | null) => (n === null ? "Unlimited" : `${n} a month`);
-const count = (n: number) => (n === 0 ? false : `${n}`);
-
-const ROWS: { feature: string; free: Cell; plus: Cell; premium: Cell }[] = [
-  { feature: "Skills roadmap for the job you want", free: true, plus: true, premium: true },
-  { feature: "Roadmap refreshes", free: refreshes(free.roadmapsPer30Days), plus: refreshes(plus.roadmapsPer30Days), premium: refreshes(premium.roadmapsPer30Days) },
-  { feature: "Exhbts hosted", free: count(free.exhbts), plus: count(plus.exhbts), premium: `Up to ${premium.exhbts}` },
-  { feature: "Your own link to send employers (exhbt.co.uk/you)", free: free.personalLink, plus: plus.personalLink, premium: premium.personalLink },
-  {
-    feature: `A custom link for each job: upload the description, we pick your ${EXHBTS_PER_JOB_LINK} best-fit exhbts`,
-    free: free.jobLinks,
-    plus: plus.jobLinks,
-    premium: premium.jobLinks,
-  },
-  { feature: "AI drafting and originality check for each exhbt", free: false, plus: true, premium: true },
-];
 
 export default function PricingPage() {
   return (
@@ -44,9 +27,8 @@ export default function PricingPage() {
         <section aria-labelledby="tier-free" className="flex flex-col rounded-[20px] border border-rule bg-sky p-7">
           <h2 id="tier-free" className="text-[1.5rem]">{PLAN_NAMES.free}</h2>
           <p className="mt-2 text-[2.6rem] leading-none font-extrabold tracking-[-0.03em]">{PRICES.free}</p>
-          <p className="mt-3 text-ink-2">
-            Your skills roadmap, refreshed up to {free.roadmapsPer30Days} times a month as your plans change.
-          </p>
+          <p className="mt-3 text-ink-2">Start here. No card, nothing to install.</p>
+          <FeatureList items={planFeatures("free")} className="mt-5" />
           <div className="mt-auto pt-6">
             <Link href="/roadmap/new" className="btn btn-secondary">Build my roadmap</Link>
           </div>
@@ -55,38 +37,14 @@ export default function PricingPage() {
         <Tier
           id="plus"
           name={PLAN_NAMES.plus}
-          summary={`Host ${plus.exhbts} exhbts on your own link, exhbt.co.uk/you, and send it to any employer. Unlimited roadmap refreshes.`}
+          summary="Your best projects on one link you can send to any employer."
         />
         <Tier
           id="premium"
           name={PLAN_NAMES.premium}
           featured
-          summary={`Up to ${premium.exhbts} exhbts. Upload a job description and get a custom link with the ${EXHBTS_PER_JOB_LINK} that suit it best, one for every application.`}
+          summary="A tailored link for every application, built from the job description."
         />
-      </div>
-
-      <div className="mt-14 overflow-x-auto">
-        <table className="w-full min-w-[40rem] text-left">
-          <caption className="sr-only">What each plan includes</caption>
-          <thead>
-            <tr className="border-b border-ink text-sm">
-              <th scope="col" className="w-[52%] py-3 pr-6 font-semibold">Feature</th>
-              <th scope="col" className="px-3 py-3 font-semibold">{PLAN_NAMES.free}</th>
-              <th scope="col" className="px-3 py-3 font-semibold">{PLAN_NAMES.plus}</th>
-              <th scope="col" className="px-3 py-3 font-semibold">{PLAN_NAMES.premium}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-rule">
-            {ROWS.map((r) => (
-              <tr key={r.feature}>
-                <th scope="row" className="py-3.5 pr-6 font-normal">{r.feature}</th>
-                <td className="px-3 py-3.5"><CellValue value={r.free} /></td>
-                <td className="px-3 py-3.5"><CellValue value={r.plus} /></td>
-                <td className="px-3 py-3.5"><CellValue value={r.premium} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
 
       <section aria-labelledby="others" className="mt-16 grid gap-4 md:grid-cols-2">
@@ -152,21 +110,11 @@ function Tier({ id, name, summary, featured }: { id: "plus" | "premium"; name: s
         <span className="chip">Coming soon</span>
       </div>
       <p className="mt-3 text-ink-2">{summary}</p>
-      <div className="mt-auto pt-6">
+      <FeatureList items={planFeatures(id)} className="mt-5" />
+      <div className="mt-auto pt-7">
         <p className="mb-2 text-sm font-semibold">Join the waitlist</p>
         <WaitlistForm source={`pricing-${id}`} interest={id} />
       </div>
     </section>
   );
-}
-
-function CellValue({ value }: { value: Cell }) {
-  if (value === true)
-    return (
-      <span className="inline-flex size-5 items-center justify-center rounded-full border border-ink bg-green">
-        <Check aria-label="Included" size={12} strokeWidth={3} />
-      </span>
-    );
-  if (value === false) return <Minus aria-label="Not included" size={18} strokeWidth={1.5} className="text-quiet" />;
-  return <span>{value}</span>;
 }

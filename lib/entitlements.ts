@@ -39,3 +39,22 @@ export const EXHBTS_PER_JOB_LINK = 4;
 
 /** Paid tiers have no public price yet: the early release collects a waitlist. */
 export const PRICES: Partial<Record<Plan, string>> = { free: "£0" };
+
+/** What each tier includes, as short checklist lines (pricing page and home summary). */
+export function planFeatures(plan: "free" | "plus" | "premium"): string[] {
+  const e = ENTITLEMENTS[plan];
+  const refreshes = e.roadmapsPer30Days === null ? "Unlimited roadmap refreshes" : `${e.roadmapsPer30Days} roadmap refreshes a month`;
+  switch (plan) {
+    case "free":
+      return ["Skills roadmap for the job you want", refreshes, "Emailed to you to keep"];
+    case "plus":
+      return [`${e.exhbts} exhbts hosted`, "Your own link: exhbt.co.uk/you", "AI drafting and originality checks", refreshes];
+    case "premium":
+      return [
+        `Up to ${e.exhbts} exhbts hosted`,
+        `A custom link for every job: we pick your ${EXHBTS_PER_JOB_LINK} best fits`,
+        "Everything in Plus",
+        refreshes,
+      ];
+  }
+}

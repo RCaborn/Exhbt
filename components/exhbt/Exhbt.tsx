@@ -8,7 +8,7 @@ type Props = {
   exhbt: ExhbtData;
   /** Marks a demonstration exhbt so nobody mistakes it for a real person's work. */
   example?: boolean;
-  headingLevel?: "h2" | "h3";
+  headingLevel?: "h1" | "h2" | "h3";
   className?: string;
   /** Play the trust-tick sequence once when it first renders. */
   animateChecks?: boolean;

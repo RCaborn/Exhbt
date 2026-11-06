@@ -26,13 +26,22 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(page.getByText("No card")).toHaveCount(0);
     await expect(page.getByText(/A CV says .analytical.\. An exhbt/)).toHaveCount(0);
     await expect(page.getByText("The same layout, every time")).toHaveCount(0);
-    // The example sits below the hero, with its methodology as an ordered list.
-    const example = page.locator("#example-exhbt article");
-    await expect(example).toHaveCount(1);
+    // A portfolio of example tiles sits below the hero; each tile has its methodology strip.
+    const tiles = page.locator("#example-portfolio > li");
+    await expect(tiles).toHaveCount(4);
     const heroBottom = (await page.locator("form:has(#start-hero)").boundingBox())!;
-    expect((await example.boundingBox())!.y).toBeGreaterThan(heroBottom.y + heroBottom.height);
-    await expect(example.getByRole("list", { name: "Methodology" }).getByRole("listitem")).toHaveCount(6);
-    await expect(example.getByRole("list", { name: "Skills" })).toBeVisible();
+    expect((await tiles.first().boundingBox())!.y).toBeGreaterThan(heroBottom.y + heroBottom.height);
+    await expect(tiles.first().getByRole("list", { name: "Methodology" })).toBeVisible();
+  });
+
+  test("demo portfolio: header, tiles, and a tile opens the full exhbt with its flow diagram", async ({ page }) => {
+    await page.goto("/demo");
+    await expect(page.getByRole("heading", { level: 1, name: "Amara Okafor" })).toBeVisible();
+    await expect(page.getByText("exhbt.co.uk/amara")).toBeVisible();
+    await page.getByRole("link", { name: /Forecasting A&E waiting times/ }).click();
+    await expect(page).toHaveURL(/\/demo\/ae-forecast$/);
+    await expect(page.getByRole("heading", { level: 1, name: /Forecasting A&E/ })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Methodology" }).getByRole("listitem")).toHaveCount(5);
   });
 
   test("footer links to the quick-start page", async ({ page }) => {

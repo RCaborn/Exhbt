@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Exhbt } from "@/components/exhbt/Exhbt";
+import { ExhbtTile } from "@/components/exhbt/ExhbtTile";
+import { FeatureList } from "@/components/site/FeatureList";
 import { EditorExcerpt, LinkExcerpt, RoadmapExcerpt } from "@/components/home/Excerpts";
 import { StartForm } from "@/components/home/StartForm";
-import { exampleExhbt } from "@/lib/exhbt";
-import { ENTITLEMENTS, EXHBTS_PER_JOB_LINK, PLAN_NAMES, PRICES } from "@/lib/entitlements";
+import { demoExhbts } from "@/lib/exhbt";
+import { EXHBTS_PER_JOB_LINK, PLAN_NAMES, PRICES, planFeatures } from "@/lib/entitlements";
 import { SOURCING_LINE } from "@/lib/jobs/claim";
 
 export default function Home() {
@@ -56,17 +57,24 @@ export default function Home() {
         </div>
       </section>
 
-      {/* One full example, reached by scrolling. */}
+      {/* What an employer sees: a portfolio, reached by scrolling. */}
       <section aria-labelledby="example" className="bg-surface">
-        <div className="mx-auto max-w-[60rem] px-4 py-20 sm:px-8 lg:py-28">
-          <h2 id="example" className="text-[2.4rem] sm:text-[3.4rem]">What an employer sees</h2>
-          <p className="mt-4 max-w-[40rem] text-lg text-ink-2">
-            One project, start to finish. Every exhbt follows this layout, so employers can read yours quickly.{" "}
-            <Link href="/how-to-read-an-exhbt" className="link text-ink">How employers read them</Link>
-          </p>
-          <div id="example-exhbt" className="mt-10 scroll-mt-8">
-            <Exhbt exhbt={exampleExhbt} example animateChecks />
+        <div className="mx-auto max-w-[64rem] px-4 py-20 sm:px-8 lg:py-28">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <h2 id="example" className="text-[2.4rem] sm:text-[3.4rem]">What an employer sees</h2>
+            <Link href="/demo" className="btn btn-secondary">Open the demo portfolio</Link>
           </div>
+          <p className="mt-4 max-w-[40rem] text-lg text-ink-2">
+            Each project as one result, the method behind it and the skills it proves. Click any of them to see the
+            full exhbt.
+          </p>
+          <ul id="example-portfolio" className="mt-10 grid gap-4 md:grid-cols-2">
+            {demoExhbts.map((e) => (
+              <li key={e.slug}>
+                <ExhbtTile exhbt={e} href={`/demo/${e.slug}`} />
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
@@ -79,22 +87,12 @@ export default function Home() {
             <Link href="/pricing" className="link text-ink">Compare plans</Link>
           </p>
           <div className="mt-12 grid gap-4 md:grid-cols-3">
-            <Plan
-              name={PLAN_NAMES.free}
-              price={PRICES.free}
-              detail={`Your skills roadmap, with ${ENTITLEMENTS.free.roadmapsPer30Days} refreshes a month.`}
-            />
-            <Plan
-              name={PLAN_NAMES.plus}
-              badge="Coming soon"
-              detail={`${ENTITLEMENTS.plus.exhbts} exhbts on your own link to send employers. Unlimited refreshes.`}
-              href="/pricing#plus"
-              cta="Join the waitlist"
-            />
+            <Plan name={PLAN_NAMES.free} price={PRICES.free} features={planFeatures("free")} href="/roadmap/new" cta="Build my roadmap" />
+            <Plan name={PLAN_NAMES.plus} badge="Coming soon" features={planFeatures("plus")} href="/pricing#plus" cta="Join the waitlist" />
             <Plan
               name={PLAN_NAMES.premium}
               badge="Coming soon"
-              detail={`Up to ${ENTITLEMENTS.premium.exhbts} exhbts, and a custom link for every job you apply to.`}
+              features={planFeatures("premium")}
               href="/pricing#premium"
               cta="Join the waitlist"
               featured
@@ -135,7 +133,7 @@ function Plan({
   name,
   price,
   badge,
-  detail,
+  features,
   href,
   cta,
   featured,
@@ -143,7 +141,7 @@ function Plan({
   name: string;
   price?: string;
   badge?: string;
-  detail: string;
+  features: string[];
   href?: string;
   cta?: string;
   featured?: boolean;
@@ -154,7 +152,7 @@ function Plan({
         {name} {badge && <span className="chip">{badge}</span>}
       </p>
       {price && <p className="mt-2 text-[2.6rem] leading-none font-extrabold tracking-[-0.03em]">{price}</p>}
-      <p className="mt-3 text-ink-2">{detail}</p>
+      <FeatureList items={features} className="mt-4 text-[0.95rem]" />
       {href && cta && (
         <Link href={href} className="link mt-auto pt-4 font-semibold text-ink">
           {cta}
