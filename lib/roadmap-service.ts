@@ -1,5 +1,6 @@
 import "server-only";
 import { generateRoadmap } from "./ai/roadmap";
+import { findJobProfile } from "./jobs";
 import { getStore, type RoadmapRecord } from "./store";
 import { siteOrigin, signInLinkFor } from "./auth";
 import { sign } from "./access";
@@ -22,7 +23,8 @@ export async function ensureRoadmap(record: RoadmapRecord, userId: string | null
     const fromCache = roadmap !== null;
     if (!roadmap) {
       try {
-        const result = await generateRoadmap(record.input);
+        const job = await findJobProfile(record.input.targetRole);
+        const result = await generateRoadmap(record.input, job);
         roadmap = result.roadmap;
         await store.logAICall({
           userId,

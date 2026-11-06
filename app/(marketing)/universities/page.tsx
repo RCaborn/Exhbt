@@ -9,8 +9,8 @@ export const metadata: Metadata = {
 const USAGE = [
   ["Seats used", "1,284 of 2,000"],
   ["Roadmaps completed", "1,102"],
-  ["Students with a published pack", "617"],
-  ["Packs opened by employers, last 30 days", "2,940"],
+  ["Students with a published exhbt", "617"],
+  ["Exhbts opened by employers, last 30 days", "2,940"],
 ] as const;
 
 const COURSES = [
@@ -26,7 +26,7 @@ export default function UniversitiesPage() {
       <div className="max-w-3xl">
         <h1 className="text-[2.8rem] sm:text-[4.4rem]">For universities</h1>
         <p className="mt-4 text-lg text-ink-2">
-          Give every student a roadmap and the Custom plan, and see which courses are turning project work into
+          Give every student a roadmap and Premium, and see which courses are turning project work into
           evidence employers open. Licences run for a year and are invoiced, from £6,000 depending on cohort size.
         </p>
       </div>
@@ -50,7 +50,7 @@ export default function UniversitiesPage() {
               <tr className="border-b border-rule">
                 <th scope="col" className="px-5 py-2 font-normal">Course</th>
                 <th scope="col" className="px-5 py-2 text-right font-normal">Students</th>
-                <th scope="col" className="px-5 py-2 text-right font-normal">With a pack</th>
+                <th scope="col" className="px-5 py-2 text-right font-normal">With an exhbt</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-rule">
@@ -70,7 +70,7 @@ export default function UniversitiesPage() {
           <h2 id="view" className="text-[1.75rem]">What your team sees</h2>
           <p className="mt-3">
             Take-up by course, so careers staff know where to spend workshop time. You see counts, never the content
-            of a student&rsquo;s CV or packs.
+            of a student&rsquo;s CV or exhbts.
           </p>
           <p className="mt-3 text-sm text-ink-2">Numbers shown are illustrative.</p>
         </div>
@@ -88,7 +88,7 @@ export default function UniversitiesPage() {
           </div>
           <div>
             <dt className="font-medium">Accessibility</dt>
-            <dd className="mt-1.5 text-ink-2">Built to WCAG 2.1 AA, including the pack editor.</dd>
+            <dd className="mt-1.5 text-ink-2">Built to WCAG 2.1 AA, including the exhbt editor.</dd>
           </div>
           <div>
             <dt className="font-medium">Onboarding</dt>

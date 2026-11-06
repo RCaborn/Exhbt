@@ -5,7 +5,7 @@ import { BrowserFrame } from "./BrowserFrame";
 
 export function RoadmapExcerpt() {
   return (
-    <BrowserFrame url="exhbt/roadmap">
+    <BrowserFrame url="exhbt.co.uk/roadmap">
       <figure className="text-[0.9rem]" aria-label="Part of a roadmap">
         <p className="border-b border-rule px-5 py-3.5 text-[1.05rem] font-bold tracking-[-0.01em]">
           Your roadmap to junior data analyst
@@ -40,8 +40,8 @@ export function RoadmapExcerpt() {
 
 export function EditorExcerpt() {
   return (
-    <BrowserFrame url="exhbt/packs/new">
-      <figure className="text-[0.9rem]" aria-label="Part of the pack editor">
+    <BrowserFrame url="exhbt.co.uk/exhbts/new">
+      <figure className="text-[0.9rem]" aria-label="Part of the exhbt editor">
         <div className="px-5 pt-4">
           <div className="flex items-baseline justify-between">
             <p className="font-semibold">Outcome</p>
@@ -72,7 +72,7 @@ export function EditorExcerpt() {
   );
 }
 
-const LINK_PACKS = [
+const LINK_EXHBTS = [
   "Cutting missed GP appointments by changing when reminders are sent",
   "A ward-level bed occupancy dashboard in Power BI",
   "Cleaning 4 years of A&E wait-time data for a public report",
@@ -80,14 +80,14 @@ const LINK_PACKS = [
 
 export function LinkExcerpt() {
   return (
-    <BrowserFrame url="exhbt/l/7fQ2mZr9Kd…">
+    <BrowserFrame url="exhbt.co.uk/amara/northfield-health">
       <figure className="text-[0.9rem]" aria-label="A job-specific link">
         <div className="px-5 pt-4 pb-1">
           <p className="text-xs text-ink-2">Amara Okafor for</p>
           <p className="text-[1.05rem] font-bold tracking-[-0.01em]">Junior data analyst, Northfield Health</p>
         </div>
         <ol className="divide-y divide-rule px-5">
-          {LINK_PACKS.map((t) => (
+          {LINK_EXHBTS.map((t) => (
             <li key={t} className="flex items-start justify-between gap-4 py-2.5">
               <span className="font-serif">{t}</span>
               <span className="mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-ink bg-green">
@@ -104,8 +104,10 @@ export function LinkExcerpt() {
 const TEMPLATE = [
   ["Title", "80 characters"],
   ["Outcome", "1 sentence"],
-  ["Method", "2 sentences"],
-  ["Results", "3 lines"],
+  ["Key result", "before/after chart"],
+  ["Method", "3 bullets"],
+  ["Results", "3 bullets"],
+  ["Skills shown", "up to 6 tags"],
   ["The work", "1 link or file"],
   ["Reflection", "2 sentences"],
   ["Checks", "added by Exhbt"],
@@ -113,9 +115,9 @@ const TEMPLATE = [
 
 export function TemplateSpec() {
   return (
-    <figure className="rounded-[var(--radius)] border-[1.5px] border-ink bg-surface" aria-label="The fixed pack template">
+    <figure className="rounded-[var(--radius)] border-[1.5px] border-ink bg-surface" aria-label="The fixed exhbt template">
       <div className="flex items-center justify-between border-b-[1.5px] border-ink px-5 py-3.5">
-        <p className="text-[1.15rem] font-bold tracking-[-0.01em]">Every pack</p>
+        <p className="text-[1.15rem] font-bold tracking-[-0.01em]">Every exhbt</p>
         <span className="chip font-mono">≈ 200 words</span>
       </div>
       <dl className="divide-y divide-rule px-5 text-[0.95rem]">

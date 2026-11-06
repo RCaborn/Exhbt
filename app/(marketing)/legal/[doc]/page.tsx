@@ -11,13 +11,13 @@ const DOCS: Record<string, Doc> = {
       <>
         <p>
           Exhbt (&ldquo;we&rdquo;) is the controller of the personal data described here. Contact:{" "}
-          <a className="link" href="mailto:privacy@exhbt.example">privacy@exhbt.example</a>.
+          <a className="link" href="mailto:privacy@exhbt.co.uk">privacy@exhbt.co.uk</a>.
         </p>
         <h2>What we collect</h2>
         <ul>
           <li>Your email address, to create your account and send sign-in links.</li>
           <li>The text of your CV and anything you type into the roadmap form.</li>
-          <li>On paid plans, the files and text you add to evidence packs.</li>
+          <li>On Premium, the files and text you add to your exhbts.</li>
           <li>
             Product events such as &ldquo;roadmap completed&rdquo;, linked to your account. We do not use
             advertising or tracking cookies.
@@ -27,7 +27,7 @@ const DOCS: Record<string, Doc> = {
         <p>
           We process this data to provide the service you asked for (contract). We use aggregated, non-identifying
           counts to improve Exhbt (legitimate interests). If your university licenses Exhbt, it sees counts of
-          activity, never the content of your CV or packs.
+          activity, never the content of your CV or exhbts.
         </p>
         <h2>Who processes it for us</h2>
         <ul>
@@ -62,18 +62,18 @@ const DOCS: Record<string, Doc> = {
         <h2>Your content</h2>
         <p>
           You keep ownership of everything you upload. You give us permission to store it, process it to provide
-          the service, and show published packs to anyone with the link.
+          the service, and show published exhbts to anyone with the link.
         </p>
         <h2>Accuracy</h2>
         <p>
-          Before publishing a pack you confirm it is accurate and your own work. AI drafts are suggestions built
-          only from what you supplied; you are responsible for checking them. We may withdraw packs that fail an
+          Before publishing an exhbt you confirm it is accurate and your own work. AI drafts are suggestions built
+          only from what you supplied; you are responsible for checking them. We may withdraw exhbts that fail an
           originality check or that we believe are misleading.
         </p>
         <h2>Paid plans</h2>
         <p>
           Paid plans are annual and renew automatically; we remind you before renewal. You can cancel at any time
-          and keep access until the end of the period you paid for. If a plan lapses, published packs and links
+          and keep access until the end of the period you paid for. If a plan lapses, published exhbts and links
           stay readable but cannot be edited.
         </p>
         <h2>Acceptable use</h2>

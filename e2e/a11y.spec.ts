@@ -5,7 +5,7 @@ import { buildRoadmap, uniqueEmail, waitForResult } from "./helpers";
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
 test.describe("Accessibility (WCAG 2.1 AA, automated)", () => {
-  for (const path of ["/", "/pricing", "/universities", "/how-to-read-a-pack", "/legal/privacy", "/login", "/roadmap/new"]) {
+  for (const path of ["/", "/pricing", "/universities", "/how-to-read-an-exhbt", "/legal/privacy", "/login", "/roadmap/new"]) {
     test(`no violations on ${path}`, async ({ page }) => {
       await page.goto(path);
       const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();

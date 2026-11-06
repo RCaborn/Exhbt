@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Pack } from "@/components/pack/Pack";
+import { Exhbt } from "@/components/exhbt/Exhbt";
 import { EditorExcerpt, LinkExcerpt, RoadmapExcerpt, TemplateSpec } from "@/components/home/Excerpts";
 import { StartForm } from "@/components/home/StartForm";
-import { examplePack } from "@/lib/pack";
+import { exampleExhbt } from "@/lib/exhbt";
+import { ENTITLEMENTS } from "@/lib/entitlements";
 
 export default function Home() {
   return (
@@ -17,16 +18,16 @@ export default function Home() {
               Show employers what you <span className="highlight">actually did.</span>
             </h1>
             <p className="mt-6 max-w-[36rem] text-[1.15rem] text-ink-2 sm:text-[1.3rem]">
-              Tell us the job you want. We map the skills your CV doesn&rsquo;t prove yet, then help you turn your
-              projects into evidence a hiring manager can check in 30 seconds.
+              Describe the job you want. We map the skills you can&rsquo;t prove yet, then help you turn your
+              projects into a portfolio of exhbts a hiring manager can check in 30 seconds.
             </p>
             <div className="mt-9">
               <StartForm id="start-hero" />
             </div>
             <p className="mt-4 text-sm font-medium text-ink-2">Free. No card. Just an email.</p>
           </div>
-          <div id="example-pack" className="relative scroll-mt-8">
-            <Pack pack={examplePack} example animateChecks variant="preview" className="relative z-10" />
+          <div id="example-exhbt" className="relative scroll-mt-8">
+            <Exhbt exhbt={exampleExhbt} example animateChecks variant="preview" className="relative z-10" />
           </div>
         </div>
       </section>
@@ -45,17 +46,17 @@ export default function Home() {
             />
             <Stage
               title="Find the gaps"
-              body="Upload your CV and name the role. You get the skills that role asks for which your CV doesn't show yet, and projects small enough to finish in a few weeks."
+              body="Describe the job you want and where you are now. You get the skills that job asks for which you can't show yet, and projects small enough to finish in a few weeks."
               artifact={<RoadmapExcerpt />}
             />
             <Stage
-              title="Prove one, in 200 words"
-              body="Add the report, notes or results. We draft each field from what you gave us and nothing else; you edit it, confirm it's yours, and it passes an originality check."
+              title="Turn it into an exhbt"
+              body="Add the report, notes or results. We draft a short exhbt with a chart of your key result, from what you gave us and nothing else; you edit it, confirm it's yours, and it passes an originality check."
               artifact={<EditorExcerpt />}
             />
             <Stage
-              title="Send one link"
-              body="Every pack gets its own address. On Custom, paste a job advert and get one link with your three or four most relevant packs, in the order that suits that job."
+              title="Send each employer their own link"
+              body="Your exhbts live in one portfolio. Paste a job advert and get a custom link with the four that fit it best, in the order that suits that job."
               artifact={<LinkExcerpt />}
             />
           </ol>
@@ -66,8 +67,8 @@ export default function Home() {
       <section aria-label="Why evidence beats claims" className="bg-ink text-white">
         <div className="mx-auto max-w-[78rem] px-4 py-24 sm:px-8 lg:py-32">
           <p className="max-w-[16ch] text-[2.6rem] leading-[1.02] font-extrabold tracking-[-0.03em] sm:text-[4.6rem] lg:text-[5.6rem]">
-            A CV says &ldquo;analytical&rdquo;. A pack shows the{" "}
-            <a href="#example-pack" className="text-blue underline decoration-[3px] underline-offset-[10px] hover:decoration-white">
+            A CV says &ldquo;analytical&rdquo;. An exhbt shows the{" "}
+            <a href="#example-exhbt" className="text-blue underline decoration-[3px] underline-offset-[10px] hover:decoration-white">
               18%
             </a>
             .
@@ -83,18 +84,17 @@ export default function Home() {
       <section aria-labelledby="read" className="bg-sky">
         <div className="mx-auto grid max-w-[78rem] gap-12 px-4 py-20 sm:px-8 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-24 lg:py-28">
           <div className="max-w-2xl">
-            <h2 id="read" className="text-[2.4rem] sm:text-[3.4rem]">The same seven parts, every time</h2>
+            <h2 id="read" className="text-[2.4rem] sm:text-[3.4rem]">The same layout, every time</h2>
             <p className="mt-6 text-lg">
-              Hiring managers skim, so a pack puts the outcome first, in one sentence, where the point lands before
-              anything else does. Method and results sit underneath with hard limits; numbers go in results where
-              they are easy to find.
+              Hiring managers skim, so an exhbt puts the outcome first, in one sentence, then shows the key result as a
+              before-and-after chart. Method and results follow as short bullets, with the skills it proves as tags.
             </p>
             <p className="mt-4 text-lg">
               Below that is the work itself (the dissertation, the repository, the dataset) one click away, and a
               line of checks: the author confirmed it, the source is attached, the originality check passed. One
-              layout for every pack means a reader who has seen one can read the next in thirty seconds.
+              layout for every exhbt means a reader who has seen one can read the next in thirty seconds.
             </p>
-            <Link href="/how-to-read-a-pack" className="link mt-7 inline-block font-semibold">
+            <Link href="/how-to-read-an-exhbt" className="link mt-7 inline-block font-semibold">
               The guide for employers and careers staff
             </Link>
           </div>
@@ -105,26 +105,29 @@ export default function Home() {
       {/* Pricing summary */}
       <section aria-labelledby="pricing" className="bg-surface">
         <div className="mx-auto max-w-[78rem] px-4 py-20 sm:px-8 lg:py-28">
-          <h2 id="pricing" className="text-[2.4rem] sm:text-[3.4rem]">Less than a sandwich a month</h2>
+          <h2 id="pricing" className="text-[2.4rem] sm:text-[3.4rem]">Free to start</h2>
           <p className="mt-4 max-w-2xl text-lg text-ink-2">
-            The roadmap is free. Pay once a year when you have work worth showing.{" "}
+            Roadmaps are free. Premium hosts your exhbts when you have work worth showing.{" "}
             <Link href="/pricing" className="link text-ink">Compare plans</Link>
           </p>
           <div className="mt-12 grid gap-4 md:grid-cols-3">
-            <Plan name="Free" price="£0" detail="Your skills-gap roadmap." />
+            <Plan name="Free" price="£0" detail={`Your skills-gap roadmap, refreshed up to ${ENTITLEMENTS.free.roadmapsPer30Days} times a month.`} />
             <Plan
-              name="Basic"
-              price="£9"
-              per="a year"
-              detail="Unlimited evidence packs, each checked and published at its own link."
+              name="Premium"
+              badge="Coming soon"
+              detail={`Up to ${ENTITLEMENTS.premium.exhbts} exhbts in your portfolio, and a custom link for every employer.`}
+              href="/pricing#premium"
+              cta="Join the waitlist"
               featured
             />
-            <Plan name="Custom" price="£15" per="a year" detail="Everything in Basic, plus a tailored link for every job you apply to." />
+            <Plan
+              name="Universities"
+              badge="Annual licence"
+              detail="Every student gets Premium, with an admin view of take-up. Employers are always free."
+              href="/universities"
+              cta="How licences work"
+            />
           </div>
-          <p className="mt-10 max-w-2xl text-ink-2">
-            Universities can license Exhbt for every student, with an admin view of take-up.{" "}
-            <Link href="/universities" className="link text-ink">How institutional licences work</Link>
-          </p>
         </div>
       </section>
 
@@ -136,7 +139,7 @@ export default function Home() {
           </h2>
           <div>
             <StartForm id="start-close" tone="blue" />
-            <p className="mt-4 text-sm font-medium">One form. You&rsquo;ll get a sign-in link by email.</p>
+            <p className="mt-4 text-sm font-medium">Four quick steps. Your roadmap appears straight away.</p>
           </div>
         </div>
       </section>
@@ -161,28 +164,36 @@ function Stage({ title, body, artifact }: { title: string; body: string; artifac
 function Plan({
   name,
   price,
-  per,
+  badge,
   detail,
+  href,
+  cta,
   featured,
 }: {
   name: string;
-  price: string;
-  per?: string;
+  price?: string;
+  badge?: string;
   detail: string;
+  href?: string;
+  cta?: string;
   featured?: boolean;
 }) {
   return (
     <div
-      className={`rounded-[var(--radius)] p-6 ${
+      className={`flex flex-col rounded-[var(--radius)] p-6 ${
         featured ? "border-2 border-ink bg-surface" : "border border-rule bg-sky"
       }`}
     >
-      <p className="font-semibold">{name}</p>
-      <p className="mt-2 flex items-baseline gap-2">
-        <span className="text-[2.6rem] leading-none font-extrabold tracking-[-0.03em]">{price}</span>
-        {per && <span className="text-ink-2">{per}</span>}
+      <p className="flex flex-wrap items-center gap-2 font-semibold">
+        {name} {badge && <span className="chip">{badge}</span>}
       </p>
+      {price && <p className="mt-2 text-[2.6rem] leading-none font-extrabold tracking-[-0.03em]">{price}</p>}
       <p className="mt-3 text-ink-2">{detail}</p>
+      {href && cta && (
+        <Link href={href} className="link mt-auto pt-4 font-semibold text-ink">
+          {cta}
+        </Link>
+      )}
     </div>
   );
 }

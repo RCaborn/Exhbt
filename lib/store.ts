@@ -23,7 +23,7 @@ export type NewRoadmap = {
 
 export type AICall = {
   userId: string | null;
-  step: "roadmap" | "pack_draft" | "originality" | "link_ranking";
+  step: "roadmap" | "exhbt_draft" | "originality" | "link_ranking";
   model: string;
   inputTokens: number;
   outputTokens: number;
@@ -38,7 +38,10 @@ export type EventName =
   | "roadmap_emailed"
   | "upgrade_clicked"
   | "lead_submitted"
+  | "waitlist_joined"
   | "unsubscribed";
+
+export type WaitlistInterest = "premium" | "university";
 
 /**
  * Everything the app persists goes through this interface. Two implementations:
@@ -60,6 +63,8 @@ export interface Store {
   logAICall(call: AICall): Promise<void>;
   logEvent(name: EventName, userId: string | null, props?: Record<string, unknown>): Promise<void>;
   createLead(lead: { name: string; email: string; institution: string; message: string }): Promise<void>;
+  /** Idempotent: joining twice with the same email and interest is a no-op. */
+  joinWaitlist(entry: { email: string; interest: WaitlistInterest; source: string }): Promise<void>;
   exportUserData(userId: string): Promise<Record<string, unknown>>;
   deleteUserData(userId: string): Promise<void>;
 }
@@ -228,11 +233,14 @@ function supabaseStore(): Store {
     async createLead(lead) {
       check(await db.from("leads").insert(lead));
     },
+    async joinWaitlist(entry) {
+      check(await db.from("waitlist").upsert(entry, { onConflict: "email,interest", ignoreDuplicates: true }));
+    },
     async exportUserData(userId) {
-      const [profile, roadmaps, packs, links, subs] = await Promise.all([
+      const [profile, roadmaps, exhbts, links, subs] = await Promise.all([
         db.from("profiles").select("*").eq("id", userId).maybeSingle(),
         db.from("roadmaps").select("*").eq("user_id", userId),
-        db.from("packs").select("*").eq("user_id", userId),
+        db.from("exhbts").select("*").eq("user_id", userId),
         db.from("curated_links").select("*").eq("user_id", userId),
         db.from("subscriptions").select("*").eq("user_id", userId),
       ]);
@@ -240,7 +248,7 @@ function supabaseStore(): Store {
         exportedAt: new Date().toISOString(),
         profile: profile.data,
         roadmaps: roadmaps.data,
-        packs: packs.data,
+        exhbts: exhbts.data,
         curatedLinks: links.data,
         subscriptions: subs.data,
       };
@@ -262,8 +270,9 @@ type Mem = {
   aiCalls: AICall[];
   events: { name: string; userId: string | null; props: Record<string, unknown>; at: string }[];
   leads: unknown[];
+  waitlist: { email: string; interest: WaitlistInterest; source: string }[];
 };
-const newMem = (): Mem => ({ roadmaps: new Map(), optIns: new Map(), aiCalls: [], events: [], leads: [] });
+const newMem = (): Mem => ({ roadmaps: new Map(), optIns: new Map(), aiCalls: [], events: [], leads: [], waitlist: [] });
 const g = globalThis as unknown as { __exhbtMem?: Mem };
 
 function memoryStore(): Store {
@@ -333,6 +342,10 @@ function memoryStore(): Store {
     },
     async createLead(lead) {
       m.leads.push(lead);
+    },
+    async joinWaitlist(entry) {
+      m.waitlist ??= [];
+      if (!m.waitlist.some((w) => w.email === entry.email && w.interest === entry.interest)) m.waitlist.push(entry);
     },
     async exportUserData(userId) {
       return { roadmaps: [...m.roadmaps.values()].filter((r) => r.userId === userId) };

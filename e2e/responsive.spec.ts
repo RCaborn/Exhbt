@@ -11,7 +11,7 @@ test("home: the start form is fully visible without scrolling", async ({ page })
 });
 
 test("no page scrolls sideways", async ({ page }) => {
-  for (const path of ["/", "/pricing", "/universities", "/how-to-read-a-pack", "/roadmap/new"]) {
+  for (const path of ["/", "/pricing", "/universities", "/how-to-read-an-exhbt", "/roadmap/new"]) {
     await page.goto(path);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     expect(overflow, path).toBe(false);

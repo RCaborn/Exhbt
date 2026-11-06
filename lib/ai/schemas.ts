@@ -1,11 +1,32 @@
 import { z } from "zod/v4";
 
-export const RoadmapInputSchema = z.object({
-  cvText: z.string().trim().min(80, "Add a bit more of your CV (at least a few lines).").max(20_000),
-  skills: z.string().trim().max(1_000).default(""),
-  targetRole: z.string().trim().min(2, "Enter the role you are aiming for.").max(120),
-  ambitions: z.string().trim().max(1_000).default(""),
-});
+export const SITUATIONS = {
+  at_university: "At university",
+  recent_graduate: "Recently graduated",
+  working_switching: "Working, and want to switch",
+  other: "Something else",
+} as const;
+export type Situation = keyof typeof SITUATIONS;
+
+/** What the four-step builder collects (agreed order: job, situation, education & skills, email). */
+export const RoadmapInputSchema = z
+  .object({
+    /** Step 1: the job they want, in their own words. */
+    targetRole: z.string().trim().min(2, "Describe the job you want.").max(300),
+    /** Step 2: where they are now. */
+    situation: z.enum(Object.keys(SITUATIONS) as [Situation, ...Situation[]], {
+      error: "Choose the option closest to where you are now.",
+    }),
+    situationDetail: z.string().trim().max(200).default(""),
+    /** Step 3: education and skills; the CV is optional. */
+    education: z.string().trim().max(1_000).default(""),
+    skills: z.string().trim().max(1_000).default(""),
+    cvText: z.string().trim().max(20_000).default(""),
+  })
+  .refine((v) => (v.education + v.skills + v.cvText).replace(/\s/g, "").length >= 20, {
+    path: ["education"],
+    message: "Tell us a little about your education or skills, or add your CV.",
+  });
 export type RoadmapInput = z.infer<typeof RoadmapInputSchema>;
 
 /**

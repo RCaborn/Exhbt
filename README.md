@@ -1,6 +1,8 @@
 # Exhbt
 
-Free skills-gap roadmaps for graduates, then short, confirmed evidence packs of their project work that hiring managers can read in 30 seconds.
+Free skills-gap roadmaps for UK students and graduates, then a portfolio of **exhbts** (short, checked write-ups of their projects, with a chart of the key result) that hiring managers can read in 30 seconds. **exhbt.co.uk**
+
+Team workflow: [CONTRIBUTING.md](CONTRIBUTING.md). AI tools: [AGENTS.md](AGENTS.md).
 
 **Phase 1 is complete:** marketing site, the click-through roadmap builder, instant roadmap results, and the roadmap email. **Start with [HANDOFF.md](HANDOFF.md)**: it covers how everything fits together, where to change things, and how to connect the real services. To put it live, follow **[LAUNCH.md](LAUNCH.md)**.
 

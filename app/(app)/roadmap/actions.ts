@@ -7,12 +7,17 @@ import { getStore } from "@/lib/store";
 import { getCurrentUser } from "@/lib/auth";
 import { callerIpHash, grantBrowserAccess } from "@/lib/access";
 import { hashInput } from "@/lib/hash";
+import { ENTITLEMENTS } from "@/lib/entitlements";
 
-export type FormState =
-  | { error?: string; fieldErrors?: Partial<Record<"cv" | "targetRole" | "email", string>>; step?: number }
-  | undefined;
+type Field = "targetRole" | "situation" | "education" | "email";
+export type FormState = { error?: string; fieldErrors?: Partial<Record<Field, string>>; step?: number } | undefined;
 
-const PER_EMAIL_PER_DAY = 3;
+/** Which builder step each field lives on (order agreed 6 Nov: job, situation, education & skills, email). */
+const STEP_OF: Record<Field, number> = { targetRole: 1, situation: 2, education: 3, email: 4 };
+
+/** Free plan "refreshes": roadmaps per email in any 30 days (lib/entitlements.ts). */
+const FREE_PER_30_DAYS = ENTITLEMENTS.free.roadmapsPer30Days ?? Infinity;
+/** Abuse guard, independent of plan. */
 const PER_IP_PER_DAY = 10;
 
 /**
@@ -23,13 +28,13 @@ const PER_IP_PER_DAY = 10;
 export async function startRoadmap(_prev: FormState, form: FormData): Promise<FormState> {
   // CV files are read in the browser (lib/cv-client.ts); only the extracted text arrives here.
   // Parsing files on the server was removed: it doubled the Worker size and its CPU use.
-  const cvText = String(form.get("cvText") ?? "");
-
   const parsed = RoadmapInputSchema.safeParse({
-    cvText,
-    skills: form.get("skills") ?? "",
     targetRole: form.get("targetRole") ?? "",
-    ambitions: form.get("ambitions") ?? "",
+    situation: form.get("situation") ?? undefined,
+    situationDetail: form.get("situationDetail") ?? "",
+    education: form.get("education") ?? "",
+    skills: form.get("skills") ?? "",
+    cvText: form.get("cvText") ?? "",
   });
   const user = await getCurrentUser();
   const email = z.email().safeParse(user?.email ?? String(form.get("email") ?? "").trim().toLowerCase());
@@ -37,25 +42,26 @@ export async function startRoadmap(_prev: FormState, form: FormData): Promise<Fo
   if (!parsed.success || !email.success) {
     const fieldErrors: NonNullable<FormState>["fieldErrors"] = {};
     for (const issue of parsed.error?.issues ?? []) {
-      const key = issue.path[0] === "cvText" ? "cv" : issue.path[0] === "targetRole" ? "targetRole" : null;
+      const p = issue.path[0];
+      const key: Field | null = p === "targetRole" || p === "situation" ? p : p === "email" ? null : "education";
       if (key) fieldErrors[key] ??= issue.message;
     }
     if (!email.success) fieldErrors.email = "Enter a valid email address.";
     // Send the visitor back to the first step with a problem.
-    const step = fieldErrors.targetRole ? 1 : fieldErrors.cv ? 2 : 4;
+    const step = Math.min(...(Object.keys(fieldErrors) as Field[]).map((f) => STEP_OF[f]));
     return { fieldErrors, step };
   }
 
   const store = getStore();
   const ipHash = await callerIpHash();
-  if (
-    (await store.countRecentRoadmaps(email.data, 24)) >= PER_EMAIL_PER_DAY ||
-    (await store.countRecentByIpHash(ipHash, 24)) >= PER_IP_PER_DAY
-  ) {
+  if ((await store.countRecentRoadmaps(email.data, 24 * 30)) >= FREE_PER_30_DAYS) {
     return {
-      error: "You've made the most roadmaps we allow in a day. Please come back tomorrow.",
+      error: `You've used this month's ${FREE_PER_30_DAYS} free roadmaps. Premium will have unlimited refreshes: join the waitlist on the pricing page.`,
       step: 4,
     };
+  }
+  if ((await store.countRecentByIpHash(ipHash, 24)) >= PER_IP_PER_DAY) {
+    return { error: "Too many roadmaps from this connection today. Please try again tomorrow.", step: 4 };
   }
 
   const id = await store.createRoadmap({

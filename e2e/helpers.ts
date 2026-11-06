@@ -11,16 +11,21 @@ export async function waitForBuilder(page: Page) {
   await expect(page.locator("form[data-ready=true]")).toBeAttached();
 }
 
-/** Walks the four-step builder with pasted CV text. Leaves the page on the result URL. */
-export async function buildRoadmap(page: Page, opts: { role?: string; email: string; optIn?: boolean }) {
+/** Walks the four-step builder (job, situation, education & skills, email). Leaves the page on the result URL. */
+export async function buildRoadmap(page: Page, opts: { role?: string; email: string; optIn?: boolean; withCv?: boolean }) {
   await page.goto(`/roadmap/new?role=${encodeURIComponent(opts.role ?? "Junior data analyst")}`);
   await waitForBuilder(page);
   await expect(page.getByText("Step 2 of 4")).toBeVisible();
-  await page.getByText("Paste the text").click();
-  await page.locator("#cvPaste").fill(SAMPLE_CV);
+  await page.getByLabel("Recently graduated").check();
   await page.getByRole("button", { name: /Continue/ }).click();
   await expect(page.getByText("Step 3 of 4")).toBeVisible();
-  await page.getByRole("button", { name: /^Next/ }).click();
+  await page.locator("#education").fill("BSc Data Science, University of Example, 2026. Expected 2:1.");
+  if (opts.withCv) {
+    await page.getByRole("button", { name: /Add your CV/ }).click();
+    await page.getByText("Paste the text").click();
+    await page.locator("#cvPaste").fill(SAMPLE_CV);
+  }
+  await page.getByRole("button", { name: /Continue/ }).click();
   await expect(page.getByText("Step 4 of 4")).toBeVisible();
   await page.locator("#email").fill(opts.email);
   if (opts.optIn) await page.locator("input[name=marketingOptIn]").check();

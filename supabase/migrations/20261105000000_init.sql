@@ -5,8 +5,8 @@
 
 create extension if not exists pgcrypto;
 
-create type plan_tier as enum ('free', 'basic', 'custom', 'institutional');
-create type pack_status as enum ('draft', 'flagged', 'published', 'read_only');
+create type plan_tier as enum ('free', 'premium', 'institutional');
+create type exhbt_status as enum ('draft', 'flagged', 'published', 'read_only');
 create type user_role as enum ('user', 'institution_admin', 'exhbt_admin');
 
 create table institutions (
@@ -55,28 +55,30 @@ create index roadmaps_user_idx on roadmaps(user_id);
 create index roadmaps_hash_idx on roadmaps(input_hash) where output_json is not null;
 create index roadmaps_pending_idx on roadmaps(pending_email) where user_id is null;
 
-create table packs (
+create table exhbts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references profiles(id) on delete cascade,
   title text not null default '' check (char_length(title) <= 80),
   outcome text not null default '',
-  method text not null default '',
+  key_result jsonb,                   -- optional before/after chart (lib/exhbt.ts KeyResult)
+  method text[] not null default '{}' check (cardinality(method) <= 3),
   results text[] not null default '{}' check (cardinality(results) <= 3),
+  skills text[] not null default '{}' check (cardinality(skills) <= 6),
   reflection text not null default '',
   evidence_url text,
   evidence_file_path text,
-  status pack_status not null default 'draft',
+  status exhbt_status not null default 'draft',
   confirmed_at timestamptz,
-  public_slug text unique,            -- 22-char random, generated on publish
+  public_slug text unique,            -- URL segment under the owner's username
   published_at timestamptz,
   updated_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
-create index packs_user_idx on packs(user_id);
+create index exhbts_user_idx on exhbts(user_id);
 
 create table originality_checks (
   id uuid primary key default gen_random_uuid(),
-  pack_id uuid not null references packs(id) on delete cascade,
+  exhbt_id uuid not null references exhbts(id) on delete cascade,
   result text not null check (result in ('pass', 'flag', 'error')),
   score numeric,
   report_url text,
@@ -89,7 +91,7 @@ create table curated_links (
   name text not null,
   job_listing_text text,
   job_listing_url text,
-  pack_ids uuid[] not null default '{}' check (cardinality(pack_ids) <= 4),
+  exhbt_ids uuid[] not null default '{}' check (cardinality(exhbt_ids) <= 4),
   public_slug text unique not null,
   created_at timestamptz not null default now()
 );
@@ -97,7 +99,7 @@ create table curated_links (
 create table ai_call_logs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references profiles(id) on delete set null,
-  step text not null check (step in ('roadmap', 'pack_draft', 'originality', 'link_ranking')),
+  step text not null check (step in ('roadmap', 'exhbt_draft', 'originality', 'link_ranking')),
   model text not null,
   input_tokens int not null,
   output_tokens int not null,
@@ -140,7 +142,7 @@ alter table institutions enable row level security;
 alter table profiles enable row level security;
 alter table subscriptions enable row level security;
 alter table roadmaps enable row level security;
-alter table packs enable row level security;
+alter table exhbts enable row level security;
 alter table originality_checks enable row level security;
 alter table curated_links enable row level security;
 alter table ai_call_logs enable row level security;
@@ -150,9 +152,9 @@ alter table leads enable row level security;
 create policy "own profile" on profiles for select using (id = auth.uid());
 create policy "own subscriptions" on subscriptions for select using (user_id = auth.uid());
 create policy "own roadmaps" on roadmaps for select using (user_id = auth.uid());
-create policy "own packs" on packs for select using (user_id = auth.uid());
-create policy "published packs are public" on packs for select using (status in ('published', 'read_only'));
+create policy "own exhbts" on exhbts for select using (user_id = auth.uid());
+create policy "published exhbts are public" on exhbts for select using (status in ('published', 'read_only'));
 create policy "own originality checks" on originality_checks for select
-  using (exists (select 1 from packs p where p.id = pack_id and p.user_id = auth.uid()));
+  using (exists (select 1 from exhbts e where e.id = exhbt_id and e.user_id = auth.uid()));
 create policy "own curated links" on curated_links for select using (user_id = auth.uid());
 -- institutions, ai_call_logs, events, leads: no policies, so service role only.

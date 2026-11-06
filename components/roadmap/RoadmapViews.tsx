@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, Mail } from "lucide-react";
+import { WaitlistForm } from "@/components/waitlist/WaitlistForm";
 import type { Roadmap } from "@/lib/ai/schemas";
 
 export const VIEWS = [
@@ -232,11 +233,12 @@ function Next({ emailedTo, signedIn, id }: { emailedTo: string | null; signedIn:
       <div className="mt-10 rounded-[16px] bg-ink p-6 text-white sm:p-8">
         <h2 className="text-[1.6rem] sm:text-[2rem]">When a project is done, make it count</h2>
         <p className="mt-3 max-w-[34rem] text-[#c9d7e8]">
-          Turn the finished work into a 200-word evidence pack that employers can check in 30 seconds. From £9 a year.
+          Premium turns finished work into exhbts: short, checked, with a chart of your key result, in a portfolio
+          you can send to employers, with a custom link for each one. Opening soon.
         </p>
-        <Link href="/api/events/upgrade?from=roadmap" className="btn btn-primary mt-6">
-          See plans
-        </Link>
+        <div className="mt-6">
+          <WaitlistForm source="roadmap-next" defaultEmail={emailedTo ?? ""} tone="dark" />
+        </div>
       </div>
 
       <p className="mt-8 text-ink-2">

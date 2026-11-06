@@ -23,7 +23,8 @@ Dashboards change their wording from time to time. If a label below doesn't matc
    - Save the database password in your password manager. You won't need it for this checklist.
 2. When the project is ready, open **SQL Editor > New query**:
    - Open `supabase/migrations/20261105000000_init.sql` in this repo on GitHub, copy all of it, paste it, and press **Run**. It should say "Success".
-   - Do the same with `supabase/migrations/20261106000000_phase1.sql`.
+   - Do the same with each remaining file in that folder, **in date order**: `20261106000000_phase1.sql`, then `20261106120000_meeting_updates.sql`.
+   - Optional, when you have it: load the UK jobs dataset (see `HANDOFF.md`). Until then a small sample is used.
 3. **Project Settings > API (or API Keys)**. Copy three values:
    - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon` / publishable key → `NEXT_PUBLIC_SUPABASE_ANON_KEY` (safe to be public)
@@ -36,7 +37,8 @@ You'll come back to Supabase in step 5 once you know the site's address.
 1. Go to **resend.com**, sign up, then **API Keys > Create**, with "Sending access". → `RESEND_API_KEY`
 2. **Who can receive email:**
    - **Without your own domain**, Resend only delivers to the address you signed up with. Use `EMAIL_FROM` = `Exhbt <onboarding@resend.dev>`. Friends can still use the site and see their roadmap on screen; only their email copy won't arrive.
-   - **To email anyone**, buy a domain (about £10/year, e.g. `exhbt.co.uk`). Then in Resend use **Domains > Add domain** and add the DNS records it shows you (easiest if the domain is on Cloudflare). Then use `EMAIL_FROM` = `Exhbt <hello@your-domain>`.
+   - **To email anyone**, verify **exhbt.co.uk**: in Resend use **Domains > Add domain** and add the DNS records it shows you at your domain registrar or in Cloudflare DNS. Then use `EMAIL_FROM` = `Exhbt <hello@exhbt.co.uk>`.
+   - **Google Workspace is fine alongside this.** Resend sends from a subdomain it gives you (e.g. `send.exhbt.co.uk`), so your Workspace inboxes and MX records are untouched. Make sure `hello@` and `privacy@exhbt.co.uk` exist in Workspace (or as aliases), because the site tells people to email them.
 3. Optional, recommended once you have a domain: in Supabase, under **Authentication > Emails > SMTP settings**, enable custom SMTP with Resend's SMTP details. Without this, Supabase's built-in email only sends the `/login` emails to members of your Supabase team, so friends couldn't log in from another device. Roadmap emails don't depend on this.
 
 ## 4. Cloudflare (hosting) · ~10 min

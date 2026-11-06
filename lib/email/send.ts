@@ -43,7 +43,7 @@ export async function sendEmail(email: Email): Promise<OutboxEntry> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: process.env.EMAIL_FROM ?? "Exhbt <hello@exhbt.example>",
+      from: process.env.EMAIL_FROM ?? "Exhbt <hello@exhbt.co.uk>",
       to: [email.to],
       subject: email.subject,
       html: email.html,

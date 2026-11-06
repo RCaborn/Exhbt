@@ -2,6 +2,39 @@
 
 > **Status:** Phase 1 (everything up to the roadmap) is built. See [HANDOFF.md](../HANDOFF.md) for how it works now; where this plan and the code differ, the code and HANDOFF.md are current.
 
+## Decisions log: team meeting, 6 Nov 2026 (Rory, Alex)
+
+These replace anything below that conflicts:
+- **Name and domain:** Exhbt, at **exhbt.co.uk**. Portfolio pieces are called **exhbts** (previously "evidence packs").
+- **Timeline:** MVP in 7 days. The early-release goal is roadmap sign-ups plus a **waitlist**, and marketing.
+- **Two ways in:**
+  - organic visitors land on the home page
+  - directed traffic (ads, social, QR codes) goes to `/start`, straight into the builder
+- **Builder:** click-through, 4 steps, in this order:
+  1. describe the job
+  2. current situation
+  3. education and skills (CV optional)
+  4. email
+
+  Results follow.
+- **Plans:**
+  - **Free:** roadmaps, with limited refreshes (3 a month), no exhbts.
+  - **Premium:** hosted exhbts (up to 10) plus a custom link for each employer (the 4 best-fit exhbts for that advert). No price yet; waitlist.
+  - **Universities:** pay, and their students get Premium.
+  - **Recruiters and employers:** always free, no account.
+- **Exhbt format:** more visual than a text block. A before/after chart of the key result, bullets for method and results, and skill tags.
+- **Portfolio URLs:**
+  - `exhbt.co.uk/<username>` for the public portfolio
+  - `exhbt.co.uk/<username>/<collection>` for per-employer links
+
+  Collection slugs get a short random suffix, so they can't be guessed from an employer's name.
+- **Jobs data:** a dataset of ~3,000 UK roles with required skills will feed the roadmap (retrieval rather than fine-tuning). The slot is built (`job_profiles` table, `lib/jobs/`, `scripts/import-jobs.mjs`); the data is still to come.
+- **Hosting:** Cloudflare (not Base44), building from GitHub `main`.
+- **Workflow:**
+  - Rory leads architecture; Alex reviews.
+  - Branches and descriptive commits (`CONTRIBUTING.md`).
+  - AI tool context in `AGENTS.md` / `CLAUDE.md`.
+
 ## Context
 Exhbt gives graduates a free skills-gap roadmap, then turns their project work into fixed-template "evidence packs" (~200 words) that a hiring manager can read in 30 seconds. The repo (`/home/user/Terna`) is empty apart from the design tooling installed earlier. The goal is to plan the architecture for all four releases in the dev brief, then build **Release 1** (marketing pages, pricing, sign-up, roadmap builder and result, legal pages, analytics). Constraints: fixed costs as close to £0 as possible for the first few hundred users, UK GDPR, WCAG 2.1 AA, and a look that does not read as AI-generated.
 

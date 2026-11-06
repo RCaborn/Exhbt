@@ -3,7 +3,7 @@ import Link from "next/link";
 const LINKS = [
   ["/pricing", "Pricing"],
   ["/universities", "For universities"],
-  ["/how-to-read-a-pack", "How to read a pack"],
+  ["/how-to-read-an-exhbt", "For employers"],
   ["/legal/privacy", "Privacy"],
   ["/legal/terms", "Terms"],
   ["/legal/cookies", "Cookies"],
@@ -19,7 +19,7 @@ export function SiteFooter() {
             Exhbt
           </p>
           <p className="mt-3 max-w-sm text-[#c9d7e8]">
-            Turns graduates&rsquo; project work into short evidence packs that employers can check.
+            Turns graduates&rsquo; project work into a portfolio of exhbts that employers can check.
           </p>
         </div>
         <nav aria-label="Footer">

@@ -1,7 +1,7 @@
 # Exhbt design system
 
 ## Idea
-Proof, with warmth. A white and light-blue world, navy ink, light-blue pill buttons, and one fresh **green** used only for the ticks that mean "checked". The evidence pack itself stays a sober document (serif, square edges) so it reads as *evidence* inside a lively site.
+Proof, with warmth. A white and light-blue world, navy ink, light-blue pill buttons, and one fresh **green** used only for the ticks that mean "checked". Each exhbt stays a sober document (serif, square edges, one data chart) so it reads as *evidence* inside a lively site.
 
 ## Design read (garden-skills format)
 ```yaml
@@ -58,7 +58,20 @@ One signature moment: on Home the example pack's three ticks fill green in seque
 ## Components
 - `StartForm`: the role field + "Build my roadmap" button. GET to `/roadmap/new?role=`. Used in the hero and the closing band; the label never changes.
 - `BrowserFrame`: adapted from garden-skills web-design-engineer; shows product screens as pages, not floating cards.
-- `Pack` / `TrustBadge`: the fixed template; green-filled ticks with navy marks. `variant="preview"` shows title, outcome, results and the work (hero only).
+- `Exhbt` / `TrustBadge`: the fixed exhbt template. Order:
+  1. who
+  2. title
+  3. outcome
+  4. key-result chart
+  5. method bullets
+  6. results bullets (green ticks)
+  7. skill tags
+  8. the work
+  9. reflection
+  10. checks
+
+  `variant="preview"` (hero) shows the headline, chart, skills and checks.
+- `BeforeAfterChart`: a dumbbell for before-to-after per measure (1–3 rows), drawn in one hue with two shades (`#6aa6ea` before, `#1a56b8` after). Both passed the dataviz palette validator (lightness band, chroma, CVD). Every value is printed beside its dot (the light shade is below 3:1 on white); legend for the two series; a hidden data table; the change is shown as a % on the right. No other chart colours without re-running the validator.
 
 ## Flow patterns
 - **Click-through, not long pages**, for the roadmap builder and result. Marketing pages scroll normally.

@@ -30,7 +30,7 @@ export async function submitLead(_prev: LeadState, form: FormData): Promise<Lead
     await store.createLead(parsed.data);
     await store.logEvent("lead_submitted", null, { institution: parsed.data.institution });
   } catch {
-    return { error: "Something went wrong. Email us at hello@exhbt.example instead." };
+    return { error: "Something went wrong. Email us at hello@exhbt.co.uk instead." };
   }
   return { ok: true };
 }

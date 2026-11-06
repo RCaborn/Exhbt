@@ -9,7 +9,7 @@ export function StartForm({ id, tone = "white" }: { id: string; tone?: "white" |
   return (
     <form action="/roadmap/new" method="get" className="w-full max-w-[40rem]">
       <label htmlFor={id} className="sr-only">
-        Role you are aiming for
+        Describe the job you want
       </label>
       <div className="flex flex-col gap-2 rounded-[28px] border-[1.5px] border-blue-edge bg-surface p-2 shadow-[0_18px_44px_oklch(0.64_0.12_242_/_0.18)] has-[input:focus-visible]:outline-[3px] has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-solid has-[input:focus-visible]:outline-ink sm:flex-row sm:items-stretch sm:rounded-full">
         <input
@@ -18,7 +18,7 @@ export function StartForm({ id, tone = "white" }: { id: string; tone?: "white" |
           type="text"
           maxLength={120}
           autoComplete="organization-title"
-          placeholder="What role are you aiming for?"
+          placeholder="Describe the job you want"
           className="min-h-14 flex-1 rounded-full bg-transparent px-5 text-[1.15rem] font-medium text-ink placeholder:font-normal placeholder:text-quiet focus-visible:shadow-none focus-visible:outline-none sm:min-h-16 sm:text-[1.25rem]"
         />
         <button

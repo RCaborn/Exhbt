@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   // Fixed at build time so static pages and server code agree (see lib/site.ts).
   env: { EXHBT_PUBLIC: isPublicLaunch ? "1" : "" },
+  async redirects() {
+    return [{ source: "/how-to-read-a-pack", destination: "/how-to-read-an-exhbt", permanent: true }];
+  },
   async headers() {
     // Private preview: tell search engines not to index anything, including files and APIs.
     return isPublicLaunch

@@ -1,16 +1,24 @@
 # Exhbt: developer handoff (Phase 1)
 
-Phase 1 is everything up to a graduate receiving their free roadmap. It is complete and tested with **no external services connected**: every service has a working local stand-in, and connecting the real one is a matter of setting environment variables (below).
+Phase 1 is everything up to a student or graduate receiving their free roadmap, plus the Premium waitlist. It is complete and tested with **no external services connected**: every service has a working local stand-in, and connecting the real one is a matter of setting environment variables (below).
+
+Product decisions from the 6 Nov 2026 team meeting are reflected throughout. In short:
+- Domain **exhbt.co.uk**; portfolio pieces are **exhbts**.
+- Builder order: job, situation, education & skills, then email.
+- **Free** = roadmaps with limited refreshes. **Premium** = hosted exhbts plus per-employer links; waitlist for now.
+- Universities pay; employers are always free.
+- Portfolio URLs: `exhbt.co.uk/<username>`.
 
 ## What Phase 1 does
 
 ```
-Home: "What role are you aiming for?" ─► /roadmap/new?role=…  (starts at step 2)
+Organic traffic:  Home "Describe the job you want" ─► /roadmap/new?role=…  (starts at step 2)
+Directed traffic: /start (ads, social, QR) ─────────► /roadmap/new?step=1
 
 Builder, one question per screen (/roadmap/new?step=1..4)
-  1 Role ─► 2 CV (upload PDF/DOCX or paste) ─► 3 Extras (optional) ─► 4 Email + marketing opt-in
+  1 Describe the job ─► 2 Current situation ─► 3 Education & skills (CV optional) ─► 4 Email + opt-in
   └─ submit (server action startRoadmap)
-       ├─ validate, rate-limit (3/day per email, 10/day per IP)
+       ├─ validate; Free limit 3 roadmaps per email per 30 days; 10/day per connection
        ├─ store the roadmap request
        ├─ set a signed cookie: "this browser may view roadmap X"
        └─ redirect to /roadmap/[id]
@@ -18,10 +26,11 @@ Builder, one question per screen (/roadmap/new?step=1..4)
 /roadmap/[id]
   ├─ no output yet ─► "Building your roadmap" screen
   │     └─ POST /api/roadmap/[id]/generate  (idempotent)
+  │           ├─ match the job to the UK jobs dataset (lib/jobs) for its required skills
   │           ├─ cache hit for identical input, or call the AI (cost logged)
   │           └─ send the "Your roadmap to {role}" email once (copy + sign-in link)
   └─ output ready ─► five click-through views (?view=)
-        overview ─► gaps ─► projects ─► strengths ─► next
+        overview ─► gaps ─► projects ─► strengths ─► next (Premium waitlist)
 
 Email "See your full roadmap" ─► sign-in link ─► signed in on that device, roadmap claimed to the account
 ```
@@ -47,7 +56,8 @@ Useful dev-only pages:
 |---|---|
 | Colours, fonts, radius, focus ring | `app/globals.css` (`@theme` tokens) and the rules in `DESIGN.md` |
 | Home page | `app/(marketing)/page.tsx`; product snippets in `components/home/Excerpts.tsx` |
-| Big role field + button | `components/home/StartForm.tsx` |
+| Big "describe the job" field + button | `components/home/StartForm.tsx` |
+| Direct entry for ads and links | `app/start/page.tsx` |
 | Builder questions, hints, step order | `app/(app)/roadmap/new/RoadmapWizard.tsx` (`STEPS` at the top) |
 | Builder validation and rate limits (server) | `app/(app)/roadmap/actions.ts` |
 | CV reading (in the browser) | `lib/cv-client.ts` |
@@ -59,7 +69,10 @@ Useful dev-only pages:
 | Database access | `lib/store.ts` (one interface, Supabase + in-memory implementations) |
 | Database schema | `supabase/migrations/` |
 | Sign-in | `lib/auth.ts`, `app/auth/*` |
-| Example evidence pack | `lib/pack.ts`, rendered by `components/pack/Pack.tsx` |
+| The exhbt card (chart, bullets, skills) | `components/exhbt/Exhbt.tsx`, `components/exhbt/BeforeAfterChart.tsx`; data shape and example in `lib/exhbt.ts` |
+| Plans and limits (Free/Premium/Institutional) | `lib/entitlements.ts`; pricing page `app/(marketing)/pricing/page.tsx` |
+| Premium waitlist | `components/waitlist/` (form + server action), `waitlist` table |
+| UK jobs data (skills per role) | `lib/jobs/`; importer `scripts/import-jobs.mjs` |
 | Legal text (drafts, need a solicitor) | `app/(marketing)/legal/[doc]/page.tsx` |
 
 Copy lives next to the component that shows it. Follow the writing rules in `DESIGN.md` (plain British English, no hype words).
@@ -77,10 +90,11 @@ Each service switches on when its environment variables are set; until then the 
 | Public URL (used in email links) | `NEXT_PUBLIC_SITE_URL` | Taken from the request |
 
 Supabase setup:
-1. Create a project in **London (eu-west-2)** and run both files in `supabase/migrations/` in order.
+1. Create a project in **London (eu-west-2)** and run every file in `supabase/migrations/` in date order.
 2. Under Auth, enable email sign-in, set the Site URL, and add `https://<domain>/auth/callback` and `https://<domain>/auth/confirm` as redirect URLs.
 3. Set Resend as Supabase's custom SMTP too (it sends the plain login emails from `/login`).
-4. Verify your sending domain in Resend.
+4. Verify your sending domain (exhbt.co.uk) in Resend.
+5. When the UK jobs dataset is available, load it with `node scripts/import-jobs.mjs path/to/jobs.csv` (needs the Supabase URL and service-role key in the environment; see the header of the script for the expected columns). Until then a small sample of roles in `lib/jobs/seed.ts` is used.
 
 Then deploy. The intended route is Cloudflare building from GitHub on every push to `main`; **[LAUNCH.md](LAUNCH.md)** has the click-by-click steps. Manual alternative: `npm run deploy`, with secrets set via `npx wrangler secret put <NAME>`.
 
@@ -94,23 +108,27 @@ Then deploy. The intended route is Cloudflare building from GitHub on every push
 - **Fake emails are accepted** (the roadmap shows without verifying the address). That was a product decision; rate limits contain abuse.
 - **Scanned-image PDFs** have no text to read; the builder asks people to paste instead. There's no OCR.
 - **JavaScript is required** for the builder (steps and CV reading are client-side). Server-side file parsing was removed to keep the Worker small and fast.
-- **Pricing buttons** don't take payment yet; checkout is Release 2.
+- **Premium has no price yet:** the pricing page and the roadmap's last screen collect a waitlist (`waitlist` table). Checkout comes with Premium.
+- **The jobs seed is illustrative.** Its skills are placeholders until the real dataset is imported; confirm the dataset's licence allows this use before importing.
+- **Per-employer link URLs** are planned as `exhbt.co.uk/<username>/<employer>-<4 random chars>`. The random suffix stops people guessing other employers' links from a company name.
 
 ## Tests
 
 `e2e/` (Playwright, run by CI in `.github/workflows/ci.yml`):
 - `phase1.spec.ts`:
-  - role pre-fill, per-step validation, Back keeps answers
+  - job pre-fill, `/start` entry, per-step validation, Back keeps answers
+  - jobs data shapes the gaps; Premium waitlist
   - instant result through all five views
   - email in the outbox, with a working sign-in link
   - other-browser protection
   - email sent once
-  - rate limit, unsubscribe
+  - Free monthly limit, unsubscribe
 - `a11y.spec.ts`: axe WCAG 2.1 AA on every public page, every builder step and every result view.
 - `responsive.spec.ts`: the home CTA is above the fold on desktop and phone; no sideways scrolling.
+- `preview.spec.ts`: private-preview noindex, robots and banner.
 
 Tests run against the dev server with no services connected. They use the build folder `.next-e2e`, so they can run while `npm run dev` is up.
 
 ## What comes next
 
-Release 2 (payments, pack editor, AI drafting, originality check, public pack page) is planned in `docs/PLAN.md`. The schema for it already exists in `supabase/migrations/20261105000000_init.sql`, and plan rules live in `lib/entitlements.ts`.
+Premium (exhbt editor, AI drafting, originality check, public portfolio at `exhbt.co.uk/<username>`, per-employer links, payments) is planned in `docs/PLAN.md`. Its tables already exist (`exhbts`, `curated_links`, `profiles.username`), and the exhbt card renders today from `lib/exhbt.ts` data.
