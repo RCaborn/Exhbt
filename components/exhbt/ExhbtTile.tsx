@@ -1,32 +1,40 @@
 import Link from "next/link";
-import { ArrowUpRight, Check } from "lucide-react";
-import type { ExhbtData } from "@/lib/exhbt";
+import { ArrowUpRight } from "lucide-react";
+import { Seal } from "@/components/brand/Seal";
+import { catalogueNo, type ExhbtData } from "@/lib/exhbt";
 
 /**
  * Compact portfolio tile: what an employer scans before opening an exhbt.
  * One big result number, the methodology as a single strip, skills as boxes, and
- * the verification mark. The whole tile links to the full exhbt.
+ * the exhbt seal. `position` (1-based) gives its catalogue number. The whole tile
+ * links to the full exhbt.
  */
-export function ExhbtTile({ exhbt: e, href, maxSkills = 4 }: { exhbt: ExhbtData; href: string; maxSkills?: number }) {
+export function ExhbtTile({
+  exhbt: e,
+  href,
+  position,
+  maxSkills = 4,
+}: {
+  exhbt: ExhbtData;
+  href: string;
+  position: number;
+  maxSkills?: number;
+}) {
   const extra = e.skills.length - maxSkills;
   return (
     <Link
       href={href}
       className="group flex h-full flex-col rounded-[16px] border border-rule bg-surface p-5 shadow-pack transition-[transform,border-color] duration-150 hover:-translate-y-0.5 hover:border-blue-edge sm:p-6"
     >
-      <div className="flex items-start justify-between gap-3">
-        <p className="font-mono text-[0.72rem] text-quiet">{e.context}</p>
-        <span className="flex shrink-0 items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 text-[0.78rem] font-semibold">
-            <span className="inline-flex size-4 items-center justify-center rounded-full border border-ink bg-green">
-              <Check aria-hidden size={10} strokeWidth={3} />
-            </span>
-            Verified
-          </span>
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-mono text-[0.78rem] font-semibold" data-catalogue>{catalogueNo(position)}</span>
+        <span className="flex items-center gap-2.5">
+          <Seal asLink={false} compact />
           <ArrowUpRight aria-hidden size={18} strokeWidth={2} className="text-quiet group-hover:text-ink" />
         </span>
       </div>
-      <h3 className="mt-2 text-[1.2rem] leading-snug font-bold tracking-[-0.015em]">{e.title}</h3>
+      <p className="mt-3 font-mono text-[0.72rem] text-quiet">{e.context}</p>
+      <h3 className="mt-1 text-[1.2rem] leading-snug font-bold tracking-[-0.015em]">{e.title}</h3>
 
       <p className="mt-4 flex items-baseline gap-2">
         <span className="text-[2.4rem] leading-none font-extrabold tracking-[-0.03em]">{e.headline.value}</span>

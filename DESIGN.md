@@ -55,18 +55,27 @@ One signature moment: on Home the example pack's three ticks fill green in seque
 ## Focus
 3px mid-blue outline with a white gap and navy halo: visible on white, light blue, blue buttons and navy.
 
+## Identity
+Full rules, sizes and don'ts are in `docs/brand.md`. In short:
+- **Mark** (`components/brand/Logo.tsx`): an exhibit frame broken at the lower right by its label. Frame in `currentColor`; label always light blue with a navy edge. `app/icon.svg` is the favicon.
+- **Wordmark**: lower-case `exhbt`, Schibsted Grotesk 800. In running text the company is "Exhbt" and the pieces are "exhbts".
+- **Catalogue numbers**: `EX·01`, `EX·02`… on tiles and full exhbts, from the exhbt's position in its portfolio (`catalogueNo` in `lib/exhbt.ts`). They are references an employer can use, so they're allowed; numbering marketing sections is still banned.
+- **Seal** (`components/brand/Seal.tsx`): mark + "checked by exhbt" + date. Says the checks ran, not that results are true, so never "verified". Links to `/how-to-read-an-exhbt#checks` (except inside a tile, which is already a link).
+- **Brand band**: the portfolio header is the page's one navy surface (`PortfolioHeader`, slim `PortfolioBar` above a single exhbt). White, `#c9d7e8` and the light-blue token on it; all at least 7:1.
+- **Sign-off** (`MadeWith`): "Portfolio made with exhbt · Build your own roadmap" at the foot of every public portfolio and exhbt.
+
 ## Components
 - `StartForm`: the role field + "Build my roadmap" button. GET to `/roadmap/new?role=`. Used in the hero and the closing band; the label never changes.
 - `BrowserFrame`: adapted from garden-skills web-design-engineer; shows product screens as pages, not floating cards.
 - `Exhbt` / `TrustBadge`: the fixed exhbt template. Order:
-  1. who
+  1. catalogue number (when it sits in a portfolio), then who
   2. title (serif)
   3. one-line outcome
   4. **methodology flow**
   5. key-result chart
   6. skills as plain mono boxes, with no label
   7. the work, as an attachment row
-  8. verification
+  8. verification: the seal (with the date), then the three ticks
   9. reflection, small, in the footer
 
   The same card is used everywhere; there's no preview variant.
@@ -81,7 +90,7 @@ One signature moment: on Home the example pack's three ticks fill green in seque
 - **Waiting and failure:** the building screen has an indeterminate bar (static under reduced motion) and honest copy. Failure offers "Try again" and says the answers are saved.
 
 ## Email
-Same palette in plain hex (email clients don't support OKLCH); table layout; one primary light-blue button. Every email has unsubscribe and privacy links. Template: `lib/email/templates/roadmap-ready.ts`; preview locally at `/dev/emails`.
+Same palette in plain hex (email clients don't support OKLCH); table layout; one primary light-blue button. The header is the mark as a PNG (`public/brand/exhbt-mark.png`, since email clients strip SVG) beside the wordmark. Every email has unsubscribe and privacy links. Template: `lib/email/templates/roadmap-ready.ts`; preview locally at `/dev/emails`.
 
 ## Banned
 Eyebrow labels; decorative 01/02/03 numbering; icon+heading+text card grids; hero stat strips; fabricated metrics, testimonials or logos; gradients (the highlighter is a flat stroke); glass; emoji icons; stock photos of people; carousels; three or more consecutive left/right zigzag sections (garden "zigzag monotony"); a large headline beside a small floating paragraph (garden "split-header filler"); different labels for the same action.

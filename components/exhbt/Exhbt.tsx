@@ -1,5 +1,6 @@
 import { FileText, ExternalLink, ArrowUpRight } from "lucide-react";
-import type { ExhbtData } from "@/lib/exhbt";
+import { Seal } from "@/components/brand/Seal";
+import { catalogueNo, type ExhbtData } from "@/lib/exhbt";
 import { BeforeAfterChart } from "./BeforeAfterChart";
 import { MethodFlow } from "./MethodFlow";
 import { TrustBadge } from "./TrustBadge";
@@ -12,6 +13,8 @@ type Props = {
   className?: string;
   /** Play the trust-tick sequence once when it first renders. */
   animateChecks?: boolean;
+  /** 1-based place in the owner's portfolio; shows the catalogue number (EX·01). */
+  position?: number;
 };
 
 /**
@@ -20,7 +23,7 @@ type Props = {
  * who · title · outcome · methodology flow · key-result chart · skills · the work ·
  * verification · reflection.
  */
-export function Exhbt({ exhbt: e, example, headingLevel = "h2", className = "", animateChecks = false }: Props) {
+export function Exhbt({ exhbt: e, example, headingLevel = "h2", className = "", animateChecks = false, position }: Props) {
   const Heading = headingLevel;
   const EvidenceIcon = e.evidence.kind === "file" ? FileText : ExternalLink;
 
@@ -30,16 +33,23 @@ export function Exhbt({ exhbt: e, example, headingLevel = "h2", className = "", 
       aria-label={`Exhbt: ${e.title}`}
     >
       <header className="px-6 pt-5 pb-4 sm:px-8">
-        <div className="flex items-baseline justify-between gap-4 text-sm text-ink-2">
-          <p>
-            <span className="font-medium text-ink">{e.author}</span> · {e.context}
-          </p>
-          {example && (
-            <span className="shrink-0 rounded-[var(--radius-sm)] bg-sky px-2 py-0.5 text-xs font-medium text-ink-2">
-              Example
-            </span>
-          )}
-        </div>
+        {(position || example) && (
+          <div className="mb-2 flex items-center justify-between gap-4">
+            {position ? (
+              <span className="font-mono text-[0.8rem] font-semibold text-ink" data-catalogue>{catalogueNo(position)}</span>
+            ) : (
+              <span />
+            )}
+            {example && (
+              <span className="shrink-0 rounded-[var(--radius-sm)] bg-sky px-2 py-0.5 text-xs font-medium text-ink-2">
+                Example
+              </span>
+            )}
+          </div>
+        )}
+        <p className="text-sm text-ink-2">
+          <span className="font-medium text-ink">{e.author}</span> · {e.context}
+        </p>
         <Heading className="mt-3 font-serif text-[1.5rem] font-normal leading-tight tracking-[-0.01em] sm:text-[1.7rem]">
           {e.title}
         </Heading>
@@ -84,7 +94,10 @@ export function Exhbt({ exhbt: e, example, headingLevel = "h2", className = "", 
       </div>
 
       <footer className="border-t border-rule px-6 py-4 sm:px-8">
-        <TrustBadge checkedOn={e.checkedOn} animate={animateChecks} />
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
+          <Seal date={e.checkedOn} />
+          <TrustBadge animate={animateChecks} />
+        </div>
         <p className="mt-3 text-[0.85rem] text-ink-2" data-field="reflection">
           <span className="font-semibold text-ink">Reflection.</span> {e.reflection}
         </p>

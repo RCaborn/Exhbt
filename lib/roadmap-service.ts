@@ -66,6 +66,7 @@ async function sendRoadmapEmail(record: RoadmapRecord, roadmap: Roadmap) {
     viewUrl: `${origin}${path}`,
     unsubscribeUrl,
     privacyUrl: `${origin}/legal/privacy`,
+    logoUrl: `${origin}/brand/exhbt-mark.png`,
   });
   await sendEmail({ to, ...content, unsubscribeUrl });
 }

@@ -44,6 +44,22 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(page.getByRole("list", { name: "Methodology" }).getByRole("listitem")).toHaveCount(5);
   });
 
+  test("brand: logo in the header, catalogue numbers, seal links to the checks, sign-off", async ({ page }) => {
+    await page.goto("/demo");
+    await expect(page.getByRole("banner").getByRole("link", { name: "Exhbt home" })).toBeVisible();
+    await expect(page.locator("[data-catalogue]")).toHaveText(["EX·01", "EX·02", "EX·03", "EX·04"]);
+    const signOff = page.getByRole("complementary", { name: "Made with exhbt" });
+    await expect(signOff.getByRole("link", { name: /Build your own roadmap/ })).toHaveAttribute("href", "/start");
+
+    // The full exhbt keeps its number, and its seal explains itself on the employer guide.
+    await page.goto("/demo/ae-forecast");
+    await expect(page.locator("article [data-catalogue]")).toHaveText("EX·02");
+    await expect(page.getByRole("link", { name: /Amara Okafor’s portfolio/ })).toHaveAttribute("href", "/demo");
+    await page.getByRole("link", { name: /Checked by exhbt/ }).click();
+    await expect(page).toHaveURL(/\/how-to-read-an-exhbt#checks$/);
+    await expect(page.locator("#checks")).toBeInViewport();
+  });
+
   test("footer links to the quick-start page", async ({ page }) => {
     await page.goto("/pricing");
     await expect(page.getByRole("contentinfo").getByRole("link", { name: "Quick start" })).toHaveAttribute("href", "/start");

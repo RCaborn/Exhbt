@@ -69,9 +69,9 @@ export default function Home() {
             full exhbt.
           </p>
           <ul id="example-portfolio" className="mt-10 grid gap-4 md:grid-cols-2">
-            {demoExhbts.map((e) => (
+            {demoExhbts.map((e, i) => (
               <li key={e.slug}>
-                <ExhbtTile exhbt={e} href={`/demo/${e.slug}`} />
+                <ExhbtTile exhbt={e} href={`/demo/${e.slug}`} position={i + 1} />
               </li>
             ))}
           </ul>

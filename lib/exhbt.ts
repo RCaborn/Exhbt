@@ -168,3 +168,11 @@ export const demoExhbts: ExhbtData[] = [
     checkedOn: "8 May 2025",
   },
 ];
+
+/**
+ * Catalogue number for the exhbt at `position` (1-based) in a portfolio, like a
+ * museum accession number: EX·01, EX·02… Derived from order, never stored.
+ */
+export function catalogueNo(position: number): string {
+  return `EX·${String(position).padStart(2, "0")}`;
+}
