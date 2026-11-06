@@ -60,17 +60,18 @@ One signature moment: on Home the example pack's three ticks fill green in seque
 - `BrowserFrame`: adapted from garden-skills web-design-engineer; shows product screens as pages, not floating cards.
 - `Exhbt` / `TrustBadge`: the fixed exhbt template. Order:
   1. who
-  2. title
-  3. outcome
-  4. key-result chart
-  5. method bullets
-  6. results bullets (green ticks)
-  7. skill tags
-  8. the work
-  9. reflection
-  10. checks
+  2. title (serif)
+  3. one-line outcome
+  4. **methodology flow**
+  5. key-result chart
+  6. skills as plain mono boxes, with no label
+  7. the work, as an attachment row
+  8. verification
+  9. reflection, small, in the footer
 
-  `variant="preview"` (hero) shows the headline, chart, skills and checks.
+  The same card is used everywhere; there's no preview variant.
+- `MethodFlow`: the methodology as a pipeline of 3–6 step boxes joined by arrows. The last step (the result) is filled navy. It lays out by its container (`@container` on the card): a row at 42rem or wider, otherwise a vertical pipeline. Step numbers (01–06) are allowed here because the order carries meaning. Rendered as an `<ol>` labelled "Methodology".
+- **Monospace in the exhbt** is deliberate: tools, scales and skills are code-like, and it gives the card its technical feel. Don't spread mono to marketing copy.
 - `BeforeAfterChart`: a dumbbell for before-to-after per measure (1–3 rows), drawn in one hue with two shades (`#6aa6ea` before, `#1a56b8` after). Both passed the dataviz palette validator (lightness band, chroma, CVD). Every value is printed beside its dot (the light shade is below 3:1 on white); legend for the two series; a hidden data table; the change is shown as a % on the right. No other chart colours without re-running the validator.
 
 ## Flow patterns

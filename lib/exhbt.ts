@@ -24,10 +24,11 @@ export type ExhbtData = {
   outcome: string;
   /** Optional: shown as a before/after chart when the project has numbers. */
   keyResult?: KeyResult;
-  /** Up to 3 short bullets. */
-  method: string[];
-  /** Up to 3 short bullets, numbers first. */
-  results: string[];
+  /**
+   * The methodology as a flow diagram: 3-6 steps, each a short verb phrase with the
+   * tool or scale as detail. The last step is the result.
+   */
+  methodology: { step: string; detail?: string }[];
   /** Up to 6 skills shown, as tags. */
   skills: string[];
   evidence: { label: string; href: string; kind: "file" | "link" };
@@ -39,8 +40,7 @@ export type ExhbtData = {
 export const EXHBT_LIMITS = {
   titleChars: 80,
   outcomeSentences: 1,
-  methodBullets: 3,
-  resultBullets: 3,
+  methodologySteps: { min: 3, max: 6 },
   skills: 6,
   chartRows: 3,
   reflectionSentences: 2,
@@ -48,7 +48,7 @@ export const EXHBT_LIMITS = {
 } as const;
 
 export function exhbtWordCount(e: ExhbtData): number {
-  const text = [e.title, e.outcome, ...e.method, ...e.results, e.reflection].join(" ");
+  const text = [e.title, e.outcome, ...e.methodology.flatMap((m) => [m.step, m.detail ?? ""]), e.reflection].join(" ");
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
@@ -70,15 +70,13 @@ export const exampleExhbt: ExhbtData = {
       { label: "Under 30", before: 11.2, after: 8.4 },
     ],
   },
-  method: [
-    "Analysed 14,200 anonymised appointment records from two GP practices",
-    "Ran a six-week trial of reminder timing with both practice managers",
-    "Modelled the effect in Python with a logistic regression controlling for age",
-  ],
-  results: [
-    "Missed appointments down 18% (7.9% to 6.5%, p = 0.003)",
-    "Largest drop for patients under 30: 11.2% to 8.4%",
-    "Both practices kept the 3-hour timing after the trial",
+  methodology: [
+    { step: "Collected data", detail: "14,200 records" },
+    { step: "Cleaned in Python", detail: "pandas" },
+    { step: "Ran a trial", detail: "6 weeks, 2 practices" },
+    { step: "Regressed", detail: "logistic, statsmodels" },
+    { step: "Graphed", detail: "matplotlib" },
+    { step: "Result", detail: "−18% missed" },
   ],
   skills: ["Python", "pandas", "statsmodels", "Logistic regression", "Trial design", "Working with clinicians"],
   evidence: { label: "Dissertation, 42 pages (PDF)", href: "#", kind: "file" },

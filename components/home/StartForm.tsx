@@ -5,9 +5,21 @@ import { ArrowRight } from "lucide-react";
  * so it works without JavaScript and pre-fills the roadmap builder via ?role=.
  * On a light-blue band the button switches to navy so it doesn't disappear.
  */
-export function StartForm({ id, tone = "white" }: { id: string; tone?: "white" | "blue" }) {
+export function StartForm({
+  id,
+  tone = "white",
+  hidden = {},
+}: {
+  id: string;
+  tone?: "white" | "blue";
+  /** Extra values to carry into the builder, e.g. utm_* from an ad. */
+  hidden?: Record<string, string>;
+}) {
   return (
     <form action="/roadmap/new" method="get" className="w-full max-w-[40rem]">
+      {Object.entries(hidden).map(([k, v]) => (
+        <input key={k} type="hidden" name={k} value={v} />
+      ))}
       <label htmlFor={id} className="sr-only">
         Describe the job you want
       </label>

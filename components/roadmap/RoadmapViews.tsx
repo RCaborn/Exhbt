@@ -233,11 +233,11 @@ function Next({ emailedTo, signedIn, id }: { emailedTo: string | null; signedIn:
       <div className="mt-10 rounded-[16px] bg-ink p-6 text-white sm:p-8">
         <h2 className="text-[1.6rem] sm:text-[2rem]">When a project is done, make it count</h2>
         <p className="mt-3 max-w-[34rem] text-[#c9d7e8]">
-          Premium turns finished work into exhbts: short, checked, with a chart of your key result, in a portfolio
-          you can send to employers, with a custom link for each one. Opening soon.
+          Plus turns finished work into exhbts on your own link. Premium adds a custom link for each job you apply
+          to, with your best-fit projects. Both open soon, with unlimited roadmap refreshes.
         </p>
         <div className="mt-6">
-          <WaitlistForm source="roadmap-next" defaultEmail={emailedTo ?? ""} tone="dark" />
+          <WaitlistForm source="roadmap-next" interest="premium" defaultEmail={emailedTo ?? ""} tone="dark" />
         </div>
       </div>
 
