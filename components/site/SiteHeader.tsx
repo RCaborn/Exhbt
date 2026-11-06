@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/brand/Logo";
 
 const NAV = [
   { href: "/how-to-read-an-exhbt", label: "For employers" },
@@ -7,12 +8,7 @@ const NAV = [
 ];
 
 export function Wordmark() {
-  return (
-    <Link href="/" className="inline-flex items-center gap-2 text-[1.55rem] leading-none font-extrabold tracking-[-0.04em]" aria-label="Exhbt home">
-      <span aria-hidden className="inline-block size-3.5 rounded-[4px] border-2 border-ink bg-blue" />
-      Exhbt
-    </Link>
-  );
+  return <Logo href="/" />;
 }
 
 export function SiteHeader() {

@@ -8,6 +8,7 @@ import { ArrowLeft, ArrowRight, Check, FileText, Upload } from "lucide-react";
 import { startRoadmap, type FormState } from "../actions";
 import { CvError, extractCvTextInBrowser } from "@/lib/cv-client";
 import { SITUATIONS, type Situation } from "@/lib/ai/schemas";
+import { SOURCING_LINE } from "@/lib/jobs/claim";
 
 /** Agreed order (6 Nov): describe the job, current situation, education & skills, email. Results follow. */
 const STEPS = [
@@ -165,6 +166,7 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
                   className="field text-[1.1rem]"
                   autoFocus={step === 1}
                 />
+                <p className="mt-3 text-sm text-ink-2">{SOURCING_LINE}</p>
               </Field>
             )}
 

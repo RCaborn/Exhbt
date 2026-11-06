@@ -30,6 +30,20 @@ These replace anything below that conflicts:
   Collection slugs get a short random suffix, so they can't be guessed from an employer's name.
 - **Jobs data:** a dataset of ~3,000 UK roles with required skills will feed the roadmap (retrieval rather than fine-tuning). The slot is built (`job_profiles` table, `lib/jobs/`, `scripts/import-jobs.mjs`); the data is still to come.
 - **Hosting:** Cloudflare (not Base44), building from GitHub `main`.
+
+**Revised later on 6 Nov (Rory):**
+- **Tiers:**
+  - **Free:** £0, roadmap, 3 refreshes a month.
+  - **Plus:** 4 exhbts on a personal link, unlimited refreshes.
+  - **Premium:** up to 10 exhbts and a custom link per job (upload the description; we pick the 4 best fits), unlimited refreshes.
+
+  Prices are still to be set; there's a waitlist per tier.
+- **Home page:**
+  - search-first hero
+  - the "A CV says analytical" band and the "same layout" section removed
+  - one example exhbt further down
+- **Quick-start page:** `/start` is search-only, for ads, and is linked in the footer.
+- **Exhbt:** title, outcome, a methodology flow diagram, chart, skill boxes, the work, verification, reflection. The method and results bullets are dropped.
 - **Workflow:**
   - Rory leads architecture; Alex reviews.
   - Branches and descriptive commits (`CONTRIBUTING.md`).

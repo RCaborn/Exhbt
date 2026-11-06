@@ -56,7 +56,7 @@ export async function startRoadmap(_prev: FormState, form: FormData): Promise<Fo
   const ipHash = await callerIpHash();
   if ((await store.countRecentRoadmaps(email.data, 24 * 30)) >= FREE_PER_30_DAYS) {
     return {
-      error: `You've used this month's ${FREE_PER_30_DAYS} free roadmaps. Premium will have unlimited refreshes: join the waitlist on the pricing page.`,
+      error: `You've used this month's ${FREE_PER_30_DAYS} free roadmaps. Plus and Premium will have unlimited refreshes: join the waitlist on the pricing page.`,
       step: 4,
     };
   }

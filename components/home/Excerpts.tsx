@@ -100,34 +100,3 @@ export function LinkExcerpt() {
     </BrowserFrame>
   );
 }
-
-const TEMPLATE = [
-  ["Title", "80 characters"],
-  ["Outcome", "1 sentence"],
-  ["Key result", "before/after chart"],
-  ["Method", "3 bullets"],
-  ["Results", "3 bullets"],
-  ["Skills shown", "up to 6 tags"],
-  ["The work", "1 link or file"],
-  ["Reflection", "2 sentences"],
-  ["Checks", "added by Exhbt"],
-] as const;
-
-export function TemplateSpec() {
-  return (
-    <figure className="rounded-[var(--radius)] border-[1.5px] border-ink bg-surface" aria-label="The fixed exhbt template">
-      <div className="flex items-center justify-between border-b-[1.5px] border-ink px-5 py-3.5">
-        <p className="text-[1.15rem] font-bold tracking-[-0.01em]">Every exhbt</p>
-        <span className="chip font-mono">≈ 200 words</span>
-      </div>
-      <dl className="divide-y divide-rule px-5 text-[0.95rem]">
-        {TEMPLATE.map(([field, limit]) => (
-          <div key={field} className="flex justify-between gap-6 py-2.5">
-            <dt className="font-medium">{field}</dt>
-            <dd className="font-mono text-sm text-ink-2">{limit}</dd>
-          </div>
-        ))}
-      </dl>
-    </figure>
-  );
-}

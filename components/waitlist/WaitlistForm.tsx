@@ -8,7 +8,7 @@ import { joinWaitlist, type WaitlistState } from "./actions";
 type Props = {
   /** Where the form sits, for analytics (e.g. "pricing", "roadmap-next"). */
   source: string;
-  interest?: "premium" | "university";
+  interest?: "plus" | "premium" | "university";
   defaultEmail?: string;
   /** "dark" for use on the navy band. */
   tone?: "light" | "dark";
@@ -24,7 +24,7 @@ export function WaitlistForm({ source, interest = "premium", defaultEmail = "", 
         <span className="inline-flex size-5 items-center justify-center rounded-full border border-ink bg-green text-ink">
           <Check aria-hidden size={12} strokeWidth={3} />
         </span>
-        You&rsquo;re on the list. We&rsquo;ll email you when Premium opens.
+        You&rsquo;re on the list. We&rsquo;ll email you when it opens.
       </p>
     );
   }

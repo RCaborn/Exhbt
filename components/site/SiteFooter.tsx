@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/brand/Logo";
 
 const LINKS = [
   ["/pricing", "Pricing"],
@@ -7,6 +8,7 @@ const LINKS = [
   ["/legal/privacy", "Privacy"],
   ["/legal/terms", "Terms"],
   ["/legal/cookies", "Cookies"],
+  ["/start", "Quick start"],
 ] as const;
 
 export function SiteFooter() {
@@ -14,10 +16,7 @@ export function SiteFooter() {
     <footer className="bg-ink text-white">
       <div className="mx-auto grid max-w-[78rem] gap-8 px-4 py-12 text-sm sm:grid-cols-[1fr_auto] sm:px-8">
         <div>
-          <p className="inline-flex items-center gap-2 text-[1.3rem] font-extrabold tracking-[-0.04em]">
-            <span aria-hidden className="inline-block size-3 rounded-[3px] bg-blue" />
-            Exhbt
-          </p>
+          <Logo className="text-white" />
           <p className="mt-3 max-w-sm text-[#c9d7e8]">
             Turns graduates&rsquo; project work into a portfolio of exhbts that employers can check.
           </p>

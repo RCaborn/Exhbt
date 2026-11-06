@@ -41,7 +41,7 @@ export type EventName =
   | "waitlist_joined"
   | "unsubscribed";
 
-export type WaitlistInterest = "premium" | "university";
+export type WaitlistInterest = "plus" | "premium" | "university";
 
 /**
  * Everything the app persists goes through this interface. Two implementations:

@@ -24,8 +24,10 @@ export function roadmapReadyEmail(opts: {
   signInUrl: string;
   unsubscribeUrl: string;
   privacyUrl: string;
+  /** Absolute URL of public/brand/exhbt-mark.png. Without it the header is the wordmark alone. */
+  logoUrl?: string;
 }): { subject: string; html: string; text: string } {
-  const { roadmap: r, viewUrl, signInUrl, unsubscribeUrl, privacyUrl } = opts;
+  const { roadmap: r, viewUrl, signInUrl, unsubscribeUrl, privacyUrl, logoUrl } = opts;
   const role = r.targetRole || "your target role";
   const gaps = r.gaps.slice(0, 3);
   const projects = r.projects.slice(0, 2);
@@ -57,7 +59,7 @@ export function roadmapReadyEmail(opts: {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.sky}"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px">
 <tr><td style="padding:28px 32px 0;font:800 22px/1 Arial,sans-serif;color:${C.ink};letter-spacing:-0.5px">
-<span style="display:inline-block;width:12px;height:12px;border-radius:3px;border:2px solid ${C.ink};background:${C.blue};vertical-align:middle;margin-right:6px"></span>Exhbt</td></tr>
+${logoUrl ? `<img src="${esc(logoUrl)}" width="24" height="24" alt="" style="display:inline-block;vertical-align:middle;margin-right:7px;border:0">` : ""}<span style="vertical-align:middle;letter-spacing:-1px">exhbt</span></td></tr>
 <tr><td style="padding:24px 32px 0;font:800 30px/1.1 Arial,sans-serif;color:${C.ink};letter-spacing:-0.8px">Your roadmap to ${esc(role)}</td></tr>
 ${r.summary ? `<tr><td style="padding:12px 32px 0;font:400 16px/1.55 Arial,sans-serif;color:${C.ink2}">${esc(r.summary)}</td></tr>` : ""}
 <tr><td style="padding:24px 32px 0">${button(signInUrl, "See your full roadmap", true)}</td></tr>

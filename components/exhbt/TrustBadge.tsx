@@ -6,7 +6,7 @@ const CHECKS = ["Confirmed by author", "Source attached", "Originality checked"]
  * The system-generated trust line. Green fill with navy ticks: the accent colour
  * marks "verified". With `animate`, ticks fill in sequence on load.
  */
-export function TrustBadge({ checkedOn, animate = false }: { checkedOn: string; animate?: boolean }) {
+export function TrustBadge({ checkedOn, animate = false }: { checkedOn?: string; animate?: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
       <ul className="flex flex-wrap gap-x-4 gap-y-1.5" aria-label="Checks passed">
@@ -22,7 +22,7 @@ export function TrustBadge({ checkedOn, animate = false }: { checkedOn: string; 
           </li>
         ))}
       </ul>
-      <span className="font-mono text-xs text-ink-2">{checkedOn}</span>
+      {checkedOn && <span className="font-mono text-xs text-ink-2">{checkedOn}</span>}
     </div>
   );
 }

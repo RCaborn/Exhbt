@@ -9,7 +9,8 @@ export async function joinWaitlist(_prev: WaitlistState, form: FormData): Promis
   if (String(form.get("website") ?? "")) return { ok: true }; // honeypot: bots fill hidden fields
   const email = z.email().safeParse(String(form.get("email") ?? "").trim().toLowerCase());
   if (!email.success) return { error: "Enter a valid email address." };
-  const interest: WaitlistInterest = form.get("interest") === "university" ? "university" : "premium";
+  const raw = String(form.get("interest") ?? "");
+  const interest: WaitlistInterest = raw === "plus" || raw === "university" ? raw : "premium";
   const source = String(form.get("source") ?? "site").slice(0, 40);
   try {
     const store = getStore();

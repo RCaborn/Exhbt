@@ -57,7 +57,11 @@ for (let i = 0; i < rows.length; i += 500) {
   }
   console.log(`Upserted ${Math.min(i + batch.length, rows.length)} / ${rows.length}`);
 }
-console.log("Done.");
+const { count } = await db.from("job_profiles").select("id", { count: "exact", head: true }).neq("source", "seed");
+console.log(`Done. ${count} roles now in job_profiles.`);
+console.log(`To show the "we've read ${count} UK job profiles" line on the site, set the Cloudflare build variable`);
+console.log(`  NEXT_PUBLIC_JOBS_DATASET_ROLES=${count}`);
+console.log("and redeploy. (It only appears at 1,000 roles or more.)");
 
 /** Minimal RFC 4180 CSV parser (quoted fields, escaped quotes, commas and newlines in quotes). */
 function parseCsv(text) {

@@ -7,38 +7,39 @@ export const metadata: Metadata = {
   description: "A two-minute guide for hiring managers and careers staff to Exhbt portfolios. Free, no account needed.",
 };
 
-const FIELDS: { name: string; body: string }[] = [
+const FIELDS: { id?: string; name: string; body: string }[] = [
   {
-    name: "Title and outcome",
-    body: "The title names the project. The outcome is one sentence saying what was achieved, written as a result rather than an activity. If you read nothing else, read this line.",
+    name: "Catalogue number and title",
+    body: "EX·01, EX·02 and so on give each exhbt's place in the portfolio, so you can refer to one in an interview. The title names the project.",
+  },
+  {
+    name: "Outcome",
+    body: "One sentence saying what was achieved, written as a result rather than an activity. If you read nothing else, read this line.",
+  },
+  {
+    name: "Methodology",
+    body: "The steps the author took, in order, drawn as a flow. The dark final step is where the result came from. Useful for judging whether the way they work fits the job.",
   },
   {
     name: "Key result",
-    body: "When a project has numbers, the main one is shown as a before-and-after chart, with the change on the right. Every value is printed, so you never have to read it off an axis.",
+    body: "When a project has numbers, the main one is shown as a before-and-after chart, with the change on the right. Every value is printed, so you never have to read it off an axis. Our drafting tool only uses figures the author supplied, and the author confirms each one before publishing.",
   },
   {
-    name: "Method",
-    body: "Up to three bullets on how the work was done: the approach, the tools, the scale. Useful for judging whether the skills match the job.",
-  },
-  {
-    name: "Results",
-    body: "Up to three bullets, numbers first. Our drafting tool only uses figures the author supplied, and the author confirms each one before publishing.",
-  },
-  {
-    name: "Skills shown",
-    body: "The skills this project demonstrates, as tags. On a job-specific link, the exhbts are chosen and ordered by how well these match your advert.",
+    name: "Skills",
+    body: "The skills this project demonstrates, in boxes. On a job-specific link, the exhbts are chosen and ordered by how well these match your advert.",
   },
   {
     name: "The work",
     body: "A link to the thing itself: a report, repository, dataset or recording. Open it if a claim matters to your decision.",
   },
   {
-    name: "Reflection",
-    body: "Two sentences on what the author learned or would change. It tells you how they think about their own work, which a CV rarely does.",
+    id: "checks",
+    name: "Checked by exhbt",
+    body: "The seal and the three ticks are added by Exhbt, not the author. Confirmed by author: they declared it accurate and their own. Source attached: the underlying work is linked. Originality checked: the text and attached work passed a third-party originality check on the date on the seal.",
   },
   {
-    name: "Checks",
-    body: "Added by Exhbt, not the author. Confirmed by author: they declared it accurate and their own. Source attached: the underlying work is linked. Originality checked: the text and attached work passed a third-party originality check on the date shown.",
+    name: "Reflection",
+    body: "Two sentences on what the author learned or would change. It tells you how they think about their own work, which a CV rarely does.",
   },
 ];
 
@@ -56,12 +57,12 @@ export default function HowToRead() {
 
       <div className="mt-14 grid gap-14 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-20">
         <div className="lg:sticky lg:top-8 lg:self-start">
-          <Exhbt exhbt={exampleExhbt} example />
+          <Exhbt exhbt={exampleExhbt} example position={1} />
         </div>
         <div className="max-w-xl">
           <dl className="divide-y divide-rule border-y border-rule">
             {FIELDS.map((f) => (
-              <div key={f.name} className="py-6">
+              <div key={f.name} id={f.id} className="scroll-mt-8 py-6">
                 <dt className="text-[1.3rem] font-bold tracking-[-0.02em]">{f.name}</dt>
                 <dd className="mt-2">{f.body}</dd>
               </div>

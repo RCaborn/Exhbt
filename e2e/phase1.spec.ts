@@ -11,10 +11,58 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(page.getByRole("heading", { name: "Where are you now?" })).toBeVisible();
   });
 
-  test("/start opens the builder at the first question", async ({ page }) => {
-    await page.goto("/start?utm_source=test");
-    await expect(page).toHaveURL(/\/roadmap\/new\?.*step=1/);
-    await expect(page.getByRole("heading", { name: "Describe the job you want" })).toBeVisible();
+  test("/start is just the search bar, and carries ad tracking into the builder", async ({ page }) => {
+    await page.goto("/start?utm_source=test", { waitUntil: "networkidle" });
+    await expect(page.getByRole("heading", { level: 1, name: "What job do you want?" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Main" })).toHaveCount(0);
+    await page.locator("#start-direct").fill("Junior data analyst");
+    await page.locator("form:has(#start-direct) button[type=submit]").click();
+    await expect(page).toHaveURL(/\/roadmap\/new\?.*utm_source=test/);
+    await expect(page.getByText("Step 2 of 4")).toBeVisible();
+  });
+
+  test("home: search-first hero, example exhbt further down, no removed sections", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByText("No card")).toHaveCount(0);
+    await expect(page.getByText(/A CV says .analytical.\. An exhbt/)).toHaveCount(0);
+    await expect(page.getByText("The same layout, every time")).toHaveCount(0);
+    // A portfolio of example tiles sits below the hero; each tile has its methodology strip.
+    const tiles = page.locator("#example-portfolio > li");
+    await expect(tiles).toHaveCount(4);
+    const heroBottom = (await page.locator("form:has(#start-hero)").boundingBox())!;
+    expect((await tiles.first().boundingBox())!.y).toBeGreaterThan(heroBottom.y + heroBottom.height);
+    await expect(tiles.first().getByRole("list", { name: "Methodology" })).toBeVisible();
+  });
+
+  test("demo portfolio: header, tiles, and a tile opens the full exhbt with its flow diagram", async ({ page }) => {
+    await page.goto("/demo");
+    await expect(page.getByRole("heading", { level: 1, name: "Amara Okafor" })).toBeVisible();
+    await expect(page.getByText("exhbt.co.uk/amara")).toBeVisible();
+    await page.getByRole("link", { name: /Forecasting A&E waiting times/ }).click();
+    await expect(page).toHaveURL(/\/demo\/ae-forecast$/);
+    await expect(page.getByRole("heading", { level: 1, name: /Forecasting A&E/ })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Methodology" }).getByRole("listitem")).toHaveCount(5);
+  });
+
+  test("brand: logo in the header, catalogue numbers, seal links to the checks, sign-off", async ({ page }) => {
+    await page.goto("/demo");
+    await expect(page.getByRole("banner").getByRole("link", { name: "Exhbt home" })).toBeVisible();
+    await expect(page.locator("[data-catalogue]")).toHaveText(["EX·01", "EX·02", "EX·03", "EX·04"]);
+    const signOff = page.getByRole("complementary", { name: "Made with exhbt" });
+    await expect(signOff.getByRole("link", { name: /Build your own roadmap/ })).toHaveAttribute("href", "/start");
+
+    // The full exhbt keeps its number, and its seal explains itself on the employer guide.
+    await page.goto("/demo/ae-forecast");
+    await expect(page.locator("article [data-catalogue]")).toHaveText("EX·02");
+    await expect(page.getByRole("link", { name: /Amara Okafor’s portfolio/ })).toHaveAttribute("href", "/demo");
+    await page.getByRole("link", { name: /Checked by exhbt/ }).click();
+    await expect(page).toHaveURL(/\/how-to-read-an-exhbt#checks$/);
+    await expect(page.locator("#checks")).toBeInViewport();
+  });
+
+  test("footer links to the quick-start page", async ({ page }) => {
+    await page.goto("/pricing");
+    await expect(page.getByRole("contentinfo").getByRole("link", { name: "Quick start" })).toHaveAttribute("href", "/start");
   });
 
   test("builder validates each step and keeps answers on Back", async ({ page }) => {
@@ -69,11 +117,14 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(page.getByText("SQL", { exact: true })).toBeVisible();
   });
 
-  test("premium waitlist on the pricing page", async ({ page }) => {
+  test("pricing shows Free, Plus and Premium, each paid tier with its own waitlist", async ({ page }) => {
     await page.goto("/pricing", { waitUntil: "networkidle" });
-    await page.locator("#waitlist-pricing").fill(`wait+${Date.now()}@example.com`);
-    await page.getByRole("button", { name: "Join the waitlist" }).click();
-    await expect(page.getByText("You’re on the list.")).toBeVisible();
+    for (const tier of ["Free", "Plus", "Premium"]) {
+      await expect(page.getByRole("heading", { level: 2, name: tier, exact: true })).toBeVisible();
+    }
+    await page.locator("#waitlist-pricing-plus").fill(`wait+${Date.now()}@example.com`);
+    await page.locator("section#plus").getByRole("button", { name: "Join the waitlist" }).click();
+    await expect(page.locator("section#plus").getByText("You’re on the list.")).toBeVisible();
   });
 
   test("roadmap appears straight away, clicks through, and a copy is emailed", async ({ page, browser }) => {

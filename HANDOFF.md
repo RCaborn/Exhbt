@@ -5,7 +5,7 @@ Phase 1 is everything up to a student or graduate receiving their free roadmap, 
 Product decisions from the 6 Nov 2026 team meeting are reflected throughout. In short:
 - Domain **exhbt.co.uk**; portfolio pieces are **exhbts**.
 - Builder order: job, situation, education & skills, then email.
-- **Free** = roadmaps with limited refreshes. **Premium** = hosted exhbts plus per-employer links; waitlist for now.
+- **Free** = roadmap, 3 refreshes a month. **Plus** = 4 exhbts on your own link. **Premium** = up to 10 exhbts plus a custom link per job. Plus and Premium are waitlist-only for now.
 - Universities pay; employers are always free.
 - Portfolio URLs: `exhbt.co.uk/<username>`.
 
@@ -13,7 +13,7 @@ Product decisions from the 6 Nov 2026 team meeting are reflected throughout. In 
 
 ```
 Organic traffic:  Home "Describe the job you want" ─► /roadmap/new?role=…  (starts at step 2)
-Directed traffic: /start (ads, social, QR) ─────────► /roadmap/new?step=1
+Directed traffic: /start (ads, social, QR): search bar only ─► /roadmap/new?role=… (+ utm_*)
 
 Builder, one question per screen (/roadmap/new?step=1..4)
   1 Describe the job ─► 2 Current situation ─► 3 Education & skills (CV optional) ─► 4 Email + opt-in
@@ -57,7 +57,7 @@ Useful dev-only pages:
 | Colours, fonts, radius, focus ring | `app/globals.css` (`@theme` tokens) and the rules in `DESIGN.md` |
 | Home page | `app/(marketing)/page.tsx`; product snippets in `components/home/Excerpts.tsx` |
 | Big "describe the job" field + button | `components/home/StartForm.tsx` |
-| Direct entry for ads and links | `app/start/page.tsx` |
+| Search-only page for ads and links (`/start`, linked as "Quick start" in the footer) | `app/start/page.tsx` |
 | Builder questions, hints, step order | `app/(app)/roadmap/new/RoadmapWizard.tsx` (`STEPS` at the top) |
 | Builder validation and rate limits (server) | `app/(app)/roadmap/actions.ts` |
 | CV reading (in the browser) | `lib/cv-client.ts` |
@@ -69,8 +69,13 @@ Useful dev-only pages:
 | Database access | `lib/store.ts` (one interface, Supabase + in-memory implementations) |
 | Database schema | `supabase/migrations/` |
 | Sign-in | `lib/auth.ts`, `app/auth/*` |
-| The exhbt card (chart, bullets, skills) | `components/exhbt/Exhbt.tsx`, `components/exhbt/BeforeAfterChart.tsx`; data shape and example in `lib/exhbt.ts` |
-| Plans and limits (Free/Premium/Institutional) | `lib/entitlements.ts`; pricing page `app/(marketing)/pricing/page.tsx` |
+| Portfolio tiles and header (what employers scan first) | `components/exhbt/ExhbtTile.tsx`, `components/exhbt/PortfolioHeader.tsx` |
+| Logo, seal, "made with exhbt" sign-off, catalogue numbers | `components/brand/` (`Logo.tsx`, `Seal.tsx`, `MadeWith.tsx`), `catalogueNo()` in `lib/exhbt.ts`; rules in `docs/brand.md` |
+| Demo portfolio (`/demo`, fictional person, 4 projects) | `app/(marketing)/demo/`; data in `lib/exhbt.ts` (`demoOwner`, `demoExhbts`) |
+| Tier checklists (pricing page, home) | `planFeatures()` in `lib/entitlements.ts`, rendered by `components/site/FeatureList.tsx` |
+| The exhbt card (methodology flow, chart, skills) | `components/exhbt/Exhbt.tsx`, `MethodFlow.tsx`, `BeforeAfterChart.tsx`; data shape and example in `lib/exhbt.ts` |
+| Plans and limits (Free/Plus/Premium/Universities), tier names | `lib/entitlements.ts`; pricing page `app/(marketing)/pricing/page.tsx` |
+| "We've read N UK job profiles" line | `lib/jobs/claim.ts` (shows only when `NEXT_PUBLIC_JOBS_DATASET_ROLES` ≥ 1,000) |
 | Premium waitlist | `components/waitlist/` (form + server action), `waitlist` table |
 | UK jobs data (skills per role) | `lib/jobs/`; importer `scripts/import-jobs.mjs` |
 | Legal text (drafts, need a solicitor) | `app/(marketing)/legal/[doc]/page.tsx` |
