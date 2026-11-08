@@ -1,11 +1,12 @@
 import { Check } from "lucide-react";
+import { APP_HOST, portfolioUrl } from "@/lib/hosts";
 import { BrowserFrame } from "./BrowserFrame";
 
 /** Small, real-looking slices of the product used on the home page instead of illustrations. */
 
 export function RoadmapExcerpt() {
   return (
-    <BrowserFrame url="exhbt.co.uk/roadmap">
+    <BrowserFrame url={`${APP_HOST}/roadmap`}>
       <figure className="text-[0.9rem]" aria-label="Part of a roadmap">
         <p className="border-b border-rule px-5 py-3.5 text-[1.05rem] font-bold tracking-[-0.01em]">
           Your roadmap to junior data analyst
@@ -40,7 +41,7 @@ export function RoadmapExcerpt() {
 
 export function EditorExcerpt() {
   return (
-    <BrowserFrame url="exhbt.co.uk/exhbts/new">
+    <BrowserFrame url={`${APP_HOST}/exhbts/new`}>
       <figure className="text-[0.9rem]" aria-label="Part of the exhbt editor">
         <div className="px-5 pt-4">
           <div className="flex items-baseline justify-between">
@@ -80,7 +81,7 @@ const LINK_EXHBTS = [
 
 export function LinkExcerpt() {
   return (
-    <BrowserFrame url="exhbt.co.uk/amara/northfield-health">
+    <BrowserFrame url={portfolioUrl("amara", "northfield-health")}>
       <figure className="text-[0.9rem]" aria-label="A job-specific link">
         <div className="px-5 pt-4 pb-1">
           <p className="text-xs text-ink-2">Amara Okafor for</p>

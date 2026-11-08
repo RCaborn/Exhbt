@@ -6,8 +6,7 @@ import { FeatureList } from "@/components/site/FeatureList";
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description:
-    "Free skills roadmap. Plus hosts 4 exhbts with your own link. Premium hosts 10, with a custom link for every job. Free for employers.",
+  description: `Free includes the roadmap and a portfolio link. ${PLAN_NAMES.plus} and ${PLAN_NAMES.premium} raise the limits. Employers never pay.`,
 };
 
 const { free, plus, premium } = ENTITLEMENTS;
@@ -18,8 +17,8 @@ export default function PricingPage() {
       <div className="max-w-2xl">
         <h1 className="text-[2.8rem] sm:text-[4.4rem]">Pricing</h1>
         <p className="mt-4 text-lg text-ink-2">
-          The roadmap is free. Plus and Premium host your finished projects as exhbts and give you links to send
-          employers. Employers never pay.
+          The roadmap is free, and {PLAN_NAMES.free} includes a portfolio link. {PLAN_NAMES.plus} and {PLAN_NAMES.premium}{" "}
+          raise the limits. Employers never pay.
         </p>
       </div>
 
@@ -69,8 +68,9 @@ export default function PricingPage() {
           <div>
             <dt className="font-medium">What counts as a roadmap refresh?</dt>
             <dd className="mt-1.5 text-ink-2">
-              Building a new roadmap, for example for a different job or after your situation changes. Free accounts
-              can do this {free.roadmapsPer30Days} times in any 30 days; {PLAN_NAMES.plus} and {PLAN_NAMES.premium} have no limit.
+              Building a new roadmap, for example for a different job or after your situation changes. {PLAN_NAMES.free}{" "}
+              includes {free.roadmapsPer30Days} {free.roadmapsPer30Days === 1 ? "refresh" : "refreshes"} in any 30 days.{" "}
+              {PLAN_NAMES.plus} includes {plus.roadmapsPer30Days} refreshes, and {PLAN_NAMES.premium} includes {premium.roadmapsPer30Days} refreshes.
             </dd>
           </div>
           <div>

@@ -1,6 +1,6 @@
 # Exhbt — site plan (architecture for R1–R4, build R1)
 
-> **Status:** Phase 1 (everything up to the roadmap) is built. See [HANDOFF.md](../HANDOFF.md) for how it works now; where this plan and the code differ, the code and HANDOFF.md are current.
+> **Status:** Historical. Phase 1 is described in [HANDOFF.md](../HANDOFF.md). The current shape is [MAP.md](MAP.md). Plan figures are `lib/entitlements.ts`. Hosts are `lib/hosts.ts`. Decisions that replaced the tier and URL notes below are [0001](decisions/0001-portfolio-subdomains.md) and [0002](decisions/0002-plan-tiers.md). Do not copy counts or portfolio paths out of this file.
 
 ## Decisions log: team meeting, 6 Nov 2026 (Rory, Alex)
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, Mail } from "lucide-react";
 import { WaitlistForm } from "@/components/waitlist/WaitlistForm";
+import { PLAN_NAMES } from "@/lib/entitlements";
 import type { Roadmap } from "@/lib/ai/schemas";
 
 export const VIEWS = [
@@ -233,8 +234,9 @@ function Next({ emailedTo, signedIn, id }: { emailedTo: string | null; signedIn:
       <div className="mt-10 rounded-[16px] bg-ink p-6 text-white sm:p-8">
         <h2 className="text-[1.6rem] sm:text-[2rem]">When a project is done, make it count</h2>
         <p className="mt-3 max-w-[34rem] text-[#c9d7e8]">
-          Plus turns finished work into exhbts on your own link. Premium adds a custom link for each job you apply
-          to, with your best-fit projects. Both open soon, with unlimited roadmap refreshes.
+          {PLAN_NAMES.plus} hosts more exhbts on your own link, and helps draft them. {PLAN_NAMES.premium} adds a
+          custom link for each job you apply to, with your best-fit projects, and an originality check when you
+          publish. Both open soon.
         </p>
         <div className="mt-6">
           <WaitlistForm source="roadmap-next" interest="premium" defaultEmail={emailedTo ?? ""} tone="dark" />

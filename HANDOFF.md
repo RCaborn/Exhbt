@@ -1,13 +1,13 @@
 # Exhbt: developer handoff (Phase 1)
 
-Phase 1 is everything up to a student or graduate receiving their free roadmap, plus the Premium waitlist. It is complete and tested with **no external services connected**: every service has a working local stand-in, and connecting the real one is a matter of setting environment variables (below).
+Phase 1 is everything up to a student or graduate receiving their free roadmap, plus the Pro waitlist. It is complete and tested with **no external services connected**: every service has a working local stand-in, and connecting the real one is a matter of setting environment variables (below).
 
-Product decisions from the 6 Nov 2026 team meeting are reflected throughout. In short:
+The current shape is [docs/MAP.md](docs/MAP.md). Plan figures are `lib/entitlements.ts`. Hosts are `lib/hosts.ts`. In short:
 - Domain **exhbt.co.uk**; portfolio pieces are **exhbts**.
 - Builder order: job, situation, education & skills, then email.
-- **Free** = roadmap, 3 refreshes a month. **Plus** = 4 exhbts on your own link. **Premium** = up to 10 exhbts plus a custom link per job. Plus and Premium are waitlist-only for now.
+- Plus and Pro are waitlist-only. The public name Pro is stored as `premium`.
 - Universities pay; employers are always free.
-- Portfolio URLs: `exhbt.co.uk/<username>`.
+- A portfolio is a subdomain of the apex (`lib/hosts.ts`). That split is decided and not routed yet.
 
 ## What Phase 1 does
 
@@ -30,7 +30,7 @@ Builder, one question per screen (/roadmap/new?step=1..4)
   │           ├─ cache hit for identical input, or call the AI (cost logged)
   │           └─ send the "Your roadmap to {role}" email once (copy + sign-in link)
   └─ output ready ─► five click-through views (?view=)
-        overview ─► gaps ─► projects ─► strengths ─► next (Premium waitlist)
+        overview ─► gaps ─► projects ─► strengths ─► next (Pro waitlist)
 
 Email "See your full roadmap" ─► sign-in link ─► signed in on that device, roadmap claimed to the account
 ```
@@ -74,9 +74,9 @@ Useful dev-only pages:
 | Demo portfolio (`/demo`, fictional person, 4 projects) | `app/(marketing)/demo/`; data in `lib/exhbt.ts` (`demoOwner`, `demoExhbts`) |
 | Tier checklists (pricing page, home) | `planFeatures()` in `lib/entitlements.ts`, rendered by `components/site/FeatureList.tsx` |
 | The exhbt card (methodology flow, chart, skills) | `components/exhbt/Exhbt.tsx`, `MethodFlow.tsx`, `BeforeAfterChart.tsx`; data shape and example in `lib/exhbt.ts` |
-| Plans and limits (Free/Plus/Premium/Universities), tier names | `lib/entitlements.ts`; pricing page `app/(marketing)/pricing/page.tsx` |
+| Plans and limits (Free/Plus/Pro/Universities), tier names | `lib/entitlements.ts`; pricing page `app/(marketing)/pricing/page.tsx` |
 | "We've read N UK job profiles" line | `lib/jobs/claim.ts` (shows only when `NEXT_PUBLIC_JOBS_DATASET_ROLES` ≥ 1,000) |
-| Premium waitlist | `components/waitlist/` (form + server action), `waitlist` table |
+| Pro waitlist (interest value `premium`) | `components/waitlist/` (form + server action), `waitlist` table |
 | UK jobs data (skills per role) | `lib/jobs/`; importer `scripts/import-jobs.mjs` |
 | Legal text (drafts, need a solicitor) | `app/(marketing)/legal/[doc]/page.tsx` |
 
@@ -113,16 +113,16 @@ Then deploy. The intended route is Cloudflare building from GitHub on every push
 - **Fake emails are accepted** (the roadmap shows without verifying the address). That was a product decision; rate limits contain abuse.
 - **Scanned-image PDFs** have no text to read; the builder asks people to paste instead. There's no OCR.
 - **JavaScript is required** for the builder (steps and CV reading are client-side). Server-side file parsing was removed to keep the Worker small and fast.
-- **Premium has no price yet:** the pricing page and the roadmap's last screen collect a waitlist (`waitlist` table). Checkout comes with Premium.
+- **Pro has no price yet:** the pricing page and the roadmap's last screen collect a waitlist (`waitlist` table). Checkout comes with Pro.
 - **The jobs seed is illustrative.** Its skills are placeholders until the real dataset is imported; confirm the dataset's licence allows this use before importing.
-- **Per-employer link URLs** are planned as `exhbt.co.uk/<username>/<employer>-<4 random chars>`. The random suffix stops people guessing other employers' links from a company name.
+- **Per-employer links** are a path on the person's host, with a short random suffix so the company name cannot be guessed. See `lib/hosts.ts`.
 
 ## Tests
 
 `e2e/` (Playwright, run by CI in `.github/workflows/ci.yml`):
 - `phase1.spec.ts`:
   - job pre-fill, `/start` entry, per-step validation, Back keeps answers
-  - jobs data shapes the gaps; Premium waitlist
+  - jobs data shapes the gaps; Pro waitlist
   - instant result through all five views
   - email in the outbox, with a working sign-in link
   - other-browser protection
@@ -136,4 +136,4 @@ Tests run against the dev server with no services connected. They use the build 
 
 ## What comes next
 
-Premium (exhbt editor, AI drafting, originality check, public portfolio at `exhbt.co.uk/<username>`, per-employer links, payments) is planned in `docs/PLAN.md`. Its tables already exist (`exhbts`, `curated_links`, `profiles.username`), and the exhbt card renders today from `lib/exhbt.ts` data.
+Pro (exhbt editor, AI drafting, originality check, the public portfolio host, per-employer links, payments) is not built yet. The decisions are in `docs/decisions/`. The tables already exist (`exhbts`, `curated_links`, `profiles.username`), and the exhbt card renders today from `lib/exhbt.ts` data.
