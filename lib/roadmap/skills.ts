@@ -39,14 +39,43 @@ export function nowVersusAfter(skills: SkillLevel[], roadmap: Pick<Roadmap, "pro
   return skills.map((s) => ({ skill: s.skill, from: s.current, to: levelAfterProjects(s, closed) }));
 }
 
-/** The skills with the largest shortfall (needed minus current), largest first. Ties keep the job's order. */
-export function biggestGaps(skills: SkillLevel[], count = 2): SkillLevel[] {
+/** The same skills as they'd stand once the suggested projects are done. */
+export function skillsAfterProjects(skills: SkillLevel[], roadmap: Pick<Roadmap, "projects">): SkillLevel[] {
+  const closed = skillsClosedByProjects(roadmap);
+  return skills.map((s) => ({ ...s, current: levelAfterProjects(s, closed) }));
+}
+
+/** How many skills each highlight list names at most. */
+export const HIGHLIGHT_COUNT = 3;
+
+/** "Level up next": the largest shortfalls (needed minus current), largest first. Ties keep the job's order. */
+export function levelUpNext(skills: SkillLevel[], count = HIGHLIGHT_COUNT): SkillLevel[] {
   return skills
     .map((s, i) => ({ s, i, gap: s.needed - s.current }))
     .filter((x) => x.gap > 0)
     .sort((a, b) => b.gap - a.gap || a.i - b.i)
     .slice(0, count)
     .map((x) => x.s);
+}
+
+/** "In the bag": skills at or above what the job asks, biggest margin first. Ties keep the job's order. */
+export function inTheBag(skills: SkillLevel[], count = HIGHLIGHT_COUNT): SkillLevel[] {
+  return skills
+    .map((s, i) => ({ s, i, margin: s.current - s.needed }))
+    .filter((x) => x.margin >= 0)
+    .sort((a, b) => b.margin - a.margin || a.i - b.i)
+    .slice(0, count)
+    .map((x) => x.s);
+}
+
+/** Both highlight lists as skill names, for the radar markers and the lists under it. */
+export function highlights(skills: SkillLevel[]): { up: string[]; bag: string[] } {
+  return { up: levelUpNext(skills).map((s) => s.skill), bag: inTheBag(skills).map((s) => s.skill) };
+}
+
+/** Case-insensitive membership, matching how project "closes" lists are matched. */
+export function namedIn(skill: string, names: string[]): boolean {
+  return names.some((n) => key(n) === key(skill));
 }
 
 /**

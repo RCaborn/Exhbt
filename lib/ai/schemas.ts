@@ -32,7 +32,7 @@ export const RoadmapInputSchema = z
   })
   .refine((v) => (v.education + v.skills + v.cvText).replace(/\s/g, "").length >= 20, {
     path: ["education"],
-    message: "Tell us a little about your education or skills, or add your CV.",
+    message: "Add your education or skills, or go back and add your CV.",
   });
 export type RoadmapInput = z.infer<typeof RoadmapInputSchema>;
 

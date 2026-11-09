@@ -14,8 +14,8 @@ export const JOBS_DATASET_LOADED = roles >= 1000;
  * Once loaded, this can name the data; the wording then needs reviewing with the import.
  */
 export const SKILLS_SOURCE_NOTE = JOBS_DATASET_LOADED
-  ? `Skills from ${roles.toLocaleString("en-GB")} UK job profiles. Your levels are estimates from what you told us.`
-  : "Skills picked by AI from what this kind of job usually asks for. Your levels are estimates from what you told us.";
+  ? `Skills from ${roles.toLocaleString("en-GB")} UK job profiles. Levels estimated from what you told us.`
+  : "Skills picked by AI. Levels estimated from what you told us.";
 
 export const SOURCING_LINE = JOBS_DATASET_LOADED
   ? `We’ve read ${roles.toLocaleString("en-GB")} UK job profiles so you don’t have to.`

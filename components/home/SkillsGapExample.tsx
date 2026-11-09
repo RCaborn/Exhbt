@@ -1,6 +1,7 @@
+import { SkillHighlights } from "@/components/charts/SkillHighlights";
 import { SkillRadar } from "@/components/charts/SkillRadar";
 import type { SkillLevel } from "@/lib/ai/schemas";
-import { nowVersusAfter, nowVersusNeeded } from "@/lib/roadmap/skills";
+import { highlights, nowVersusAfter, nowVersusNeeded, skillsAfterProjects } from "@/lib/roadmap/skills";
 
 /**
  * Home page example of the skill radar, for the fictional demo graduate (Amara, junior data
@@ -23,9 +24,11 @@ const AMARA_PROJECTS = {
   ].map((p) => ({ title: "", brief: "", deliverable: "", weeks: 3, ...p })),
 };
 
-const NOTE = "Example: Amara is a fictional graduate.";
+const NOTE = "Example: Amara is fictional.";
 
 export function SkillsGapExample() {
+  const now = highlights(AMARA);
+  const after = highlights(skillsAfterProjects(AMARA, AMARA_PROJECTS));
   return (
     <section aria-labelledby="gaps-example" className="border-t border-rule bg-surface">
       <div className="mx-auto max-w-[72rem] px-4 py-20 sm:px-8 lg:py-28">
@@ -42,10 +45,11 @@ export function SkillsGapExample() {
               title="Amara now, against a junior data analyst job"
               fromLabel="Now"
               toLabel="What the job asks for"
-              valueWords={["now", "job"]}
               points={nowVersusNeeded(AMARA)}
               note={NOTE}
+              highlight={now}
             />
+            <SkillHighlights up={now.up} bag={now.bag} />
           </div>
           <div className="rounded-[var(--radius)] border border-rule p-5 sm:p-6">
             <SkillRadar
@@ -54,7 +58,9 @@ export function SkillsGapExample() {
               toLabel="After the projects"
               points={nowVersusAfter(AMARA, AMARA_PROJECTS)}
               note={NOTE}
+              highlight={after}
             />
+            <SkillHighlights up={after.up} bag={after.bag} />
           </div>
         </div>
       </div>

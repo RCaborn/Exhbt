@@ -15,7 +15,7 @@ Rules:
 - **Data access** goes through the `Store` interface in `lib/store.ts`; add a method to the interface and both implementations.
 - **The AI must only use facts the user supplied.** Keep that rule in prompts (`lib/ai/`).
 - **Exhbt layout:** title, outcome, methodology flow (`MethodFlow`), key-result chart, skill boxes, the work, verification, reflection.
-- **Charts:** one hue, two shades (`components/charts/series.ts`); values printed; a hidden data table (see `components/exhbt/BeforeAfterChart.tsx` and `components/charts/SkillRadar.tsx`).
+- **Charts:** one hue, two shades (`components/charts/series.ts`); values printed; a hidden data table (see `components/exhbt/BeforeAfterChart.tsx`). The skill radar (`components/charts/SkillRadar.tsx`) is the exception: no numbers on it. Its levels are AI estimates, so it marks and lists the skills to level up and the skills in the bag (`SkillHighlights`) and keeps every level in the hidden table.
 - **No marketing claims before they're true** (e.g. the jobs-data line is gated in `lib/jobs/claim.ts`).
 - **Tests:** run `npm run check` before committing. Update the e2e tests in `e2e/` when you change a flow.
 - **Never** commit secrets, edit applied migrations, or push straight to `main`.

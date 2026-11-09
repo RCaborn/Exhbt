@@ -2,10 +2,18 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, Mail } from "lucide-react";
 import { WaitlistForm } from "@/components/waitlist/WaitlistForm";
 import { PLAN_NAMES } from "@/lib/entitlements";
+import { SkillHighlights } from "@/components/charts/SkillHighlights";
 import { SkillRadar } from "@/components/charts/SkillRadar";
 import type { Roadmap } from "@/lib/ai/schemas";
 import { SKILLS_SOURCE_NOTE } from "@/lib/jobs/claim";
-import { biggestGaps, chartableSkills, nowVersusAfter, nowVersusNeeded, sortGapsByShortfall } from "@/lib/roadmap/skills";
+import {
+  chartableSkills,
+  highlights,
+  nowVersusAfter,
+  nowVersusNeeded,
+  skillsAfterProjects,
+  sortGapsByShortfall,
+} from "@/lib/roadmap/skills";
 
 export const VIEWS = [
   { key: "overview", label: "Overview" },
@@ -125,35 +133,24 @@ function SummaryRow({ href, label }: { href: string; label: string }) {
 
 function Gaps({ roadmap, role }: { roadmap: Roadmap; role: string }) {
   const skills = chartableSkills(roadmap);
-  const biggest = skills ? biggestGaps(skills) : [];
+  const marked = skills ? highlights(skills) : null;
   const gaps = skills ? sortGapsByShortfall(roadmap.gaps, skills) : roadmap.gaps;
   return (
     <>
       <Context role={role} />
       <h1 className="mt-2 text-[2.2rem] sm:text-[3rem]">Gaps to close</h1>
       <p className="mt-3 text-ink-2">Skills this role asks for that your CV doesn&rsquo;t show yet, or not enough.</p>
-      {skills && (
+      {skills && marked && (
         <div className="mt-8">
           <SkillRadar
             title="You now, against what the job asks for"
             fromLabel="You now"
             toLabel="What the job asks for"
-            valueWords={["you", "job"]}
             points={nowVersusNeeded(skills)}
             note={SKILLS_SOURCE_NOTE}
+            highlight={marked}
           />
-          {biggest.length > 0 && (
-            <p className="mt-5 text-[1.05rem]">
-              {biggest.length === 1 ? "Your biggest gap is " : "Your biggest gaps are "}
-              {biggest.map((s, i) => (
-                <span key={s.skill}>
-                  {i > 0 && " and "}
-                  <span className="font-semibold">{s.skill}</span>
-                </span>
-              ))}
-              .
-            </p>
-          )}
+          <SkillHighlights up={marked.up} bag={marked.bag} />
         </div>
       )}
       {roadmap.gaps.length === 0 ? (
@@ -223,12 +220,12 @@ function AfterProjects({ roadmap }: { roadmap: Roadmap }) {
   if (!skills) return null;
   const points = nowVersusAfter(skills, roadmap);
   if (!points.some((p) => p.to > p.from)) return null;
+  // The lists judge the after-projects levels against what the job asks for.
+  const marked = highlights(skillsAfterProjects(skills, roadmap));
   return (
     <section aria-labelledby="after-projects" className="mt-10 border-t border-rule pt-8">
       <h2 id="after-projects" className="text-[1.6rem] sm:text-[2rem]">When you&rsquo;ve finished these projects</h2>
-      <p className="mt-2 max-w-[38rem] text-ink-2">
-        A finished project counts as level 3 for each skill it closes: you used it, and you can show what you did.
-      </p>
+      <p className="mt-2 max-w-[38rem] text-ink-2">Where you&rsquo;d stand once they&rsquo;re done.</p>
       <div className="mt-6">
         <SkillRadar
           title="You now, against where the projects would take you"
@@ -236,7 +233,9 @@ function AfterProjects({ roadmap }: { roadmap: Roadmap }) {
           toLabel="After the projects"
           points={points}
           note={SKILLS_SOURCE_NOTE}
+          highlight={marked}
         />
+        <SkillHighlights up={marked.up} bag={marked.bag} />
       </div>
     </section>
   );

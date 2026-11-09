@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import { ENTITLEMENTS, PLAN_NAMES } from "../lib/entitlements";
 import { portfolioHost } from "../lib/hosts";
 import { buildRoadmap, SAMPLE_CV, uniqueEmail, waitForBuilder, waitForResult } from "./helpers";
@@ -40,13 +40,21 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await page.goto("/");
     const section = page.locator("section[aria-labelledby=gaps-example]");
     await expect(section.getByRole("heading", { level: 2 })).toBeVisible();
-    await expect(section.getByText("Example: Amara is a fictional graduate.").first()).toBeVisible();
+    await expect(section.getByText("Example: Amara is fictional.").first()).toBeVisible();
     const now = section.getByRole("table", { name: /Amara now/ });
     await expect(now.getByRole("row", { name: /Dashboards 0 of 4 3 of 4/ })).toBeAttached();
     const after = section.getByRole("table", { name: /After the two suggested projects/ });
     await expect(after.getByRole("row", { name: /Dashboards 0 of 4 3 of 4/ })).toBeAttached();
     // Excel isn't covered by a project, so it stays where it is.
     await expect(after.getByRole("row", { name: /Excel 2 of 4 2 of 4/ })).toBeAttached();
+
+    // The good and the bad, in words: biggest shortfalls first, then what already meets the job.
+    expect(await listItems(section.getByRole("list", { name: "Level up next" }).first())).toEqual(["Dashboards", "SQL", "Excel"]);
+    expect(await listItems(section.getByRole("list", { name: "In the bag" }).first())).toEqual(["Python", "Statistics"]);
+    // After the projects, only Excel is still short.
+    expect(await listItems(section.getByRole("list", { name: "Level up next" }).nth(1))).toEqual(["Excel"]);
+    // No numbers on the charts.
+    await expect(section.getByText(/\b(now|job|you) \d\b|\d → \d/)).toHaveCount(0);
   });
 
   test("demo portfolio: header, tiles, and a tile opens the full exhbt with its flow diagram", async ({ page }) => {
@@ -92,21 +100,21 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(page.getByRole("heading", { name: "Add your CV" })).toBeVisible();
 
     // The CV step can be skipped; then step 3 needs a situation and some education or skills.
-    await page.getByRole("button", { name: /Skip, I.ll type it in instead/ }).click();
+    await page.getByRole("button", { name: "Skip for now" }).click();
     await expect(page.getByText("Step 3 of 4")).toBeVisible();
     await page.getByRole("button", { name: /Continue/ }).click();
     await expect(page.getByText("Choose the option closest to where you are now.")).toBeVisible();
-    await expect(page.getByText("Tell us a little about your education or skills")).toBeVisible();
+    await expect(page.getByText("Add your education or skills, or go back and add your CV.")).toBeVisible();
 
     // Go back and add the CV instead: pasted text counts, and step 3 then only needs the situation.
     await page.getByRole("button", { name: /Back/ }).click();
     await expect(page.getByText("Step 2 of 4")).toBeVisible();
-    await page.getByText("Paste the text").click();
+    await page.getByText("Paste", { exact: true }).click();
     await page.locator("#cvPaste").fill(SAMPLE_CV);
-    await expect(page.getByRole("button", { name: /Skip, I.ll type it in instead/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Skip for now" })).toHaveCount(0);
     await page.getByRole("button", { name: /Continue/ }).click();
     await expect(page.getByText("Step 3 of 4")).toBeVisible();
-    await expect(page.getByText("We have your CV.")).toBeVisible();
+    await expect(page.getByText("Got your CV. Add anything it misses.")).toBeVisible();
     await page.getByLabel("At university").check();
     await page.getByRole("button", { name: /Continue/ }).click();
     await expect(page.getByText("Step 4 of 4")).toBeVisible();
@@ -148,8 +156,16 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     const now = page.getByRole("table", { name: "You now, against what the job asks for" });
     await expect(now.getByRole("row", { name: "SQL 1 of 4 3 of 4" })).toBeAttached();
     await expect(now.getByRole("row", { name: "Excel 0 of 4 3 of 4" })).toBeAttached();
-    await expect(page.getByText(/Your biggest gaps are/)).toBeVisible();
     await expect(page.getByText(/Skills picked by AI/).first()).toBeVisible();
+    // Biggest shortfalls first (Excel and Data visualisation at 0, SQL at 1), then the skills already at the level.
+    expect(await listItems(page.getByRole("list", { name: "Level up next" }))).toEqual(["Excel", "Data visualisation", "SQL"]);
+    expect(await listItems(page.getByRole("list", { name: "In the bag" }))).toEqual([
+      "Python or R",
+      "Statistics",
+      "Dashboards (Power BI or Tableau)",
+    ]);
+    // No numbers on the chart: the levels live in the hidden table only.
+    await expect(page.locator("figure").getByText(/\b(now|job|you) \d\b|\d → \d/)).toHaveCount(0);
 
     // The placeholder project closes SQL, so SQL rises to 3; Excel stays at 0.
     await page.goto(`${base}?view=projects`);
@@ -157,6 +173,9 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     const after = page.getByRole("table", { name: "You now, against where the projects would take you" });
     await expect(after.getByRole("row", { name: "SQL 1 of 4 3 of 4" })).toBeAttached();
     await expect(after.getByRole("row", { name: "Excel 0 of 4 0 of 4" })).toBeAttached();
+    // Judged on the after levels: SQL joins the bag; Excel and Data visualisation are still short.
+    expect(await listItems(page.getByRole("list", { name: "Level up next" }))).toEqual(["Excel", "Data visualisation"]);
+    expect(await listItems(page.getByRole("list", { name: "In the bag" }))).toEqual(["SQL", "Python or R", "Statistics"]);
 
     // Neither chart widens the page on a small phone.
     await page.setViewportSize({ width: 375, height: 812 });
@@ -244,3 +263,9 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(page.getByRole("heading", { name: "That link didn't work" })).toBeVisible();
   });
 });
+
+/** The text of each item in a list, in order, once the list is on screen. */
+async function listItems(list: Locator): Promise<string[]> {
+  await expect(list).toBeVisible();
+  return (await list.getByRole("listitem").allTextContents()).map((t) => t.trim());
+}

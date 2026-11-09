@@ -1,14 +1,17 @@
+import { BagMarker, UpMarker } from "@/components/charts/SkillHighlights";
 import { SERIES_DARK, SERIES_LIGHT } from "@/components/charts/series";
-import type { SkillPoint } from "@/lib/roadmap/skills";
+import { namedIn, type SkillPoint } from "@/lib/roadmap/skills";
 
 /**
  * Skill radar: one axis per skill (3-6), levels 0-4 from the centre out. Two series in the
  * shared chart shades: the light one filled ("from", usually where they are now), the dark
  * one as an outline ("to": what the job asks for, or where the projects would take them).
  *
- * Radars exaggerate: area grows faster than the values and the shape depends on axis order.
- * So the axis order is fixed (the job's order, most important first), every value is printed
- * beside its axis, and a visually hidden table carries the same data.
+ * No numbers are printed (Rory, 9 Nov 2026): the levels are AI estimates, and figures would
+ * suggest more precision than they have. The meaning is carried in words instead: the
+ * "Level up next" and "In the bag" skills are marked on their labels and listed under the chart
+ * (SkillHighlights), and a visually hidden table holds every level for screen readers.
+ * Radars exaggerate area and depend on axis order, so the order is fixed (the job's order).
  * SVG draws only the grid and the shapes; labels are HTML so they stay crisp and wrap on phones.
  */
 
@@ -25,15 +28,11 @@ type Props = {
   points: SkillPoint[];
   /** Where the skills and levels come from. Always shown. */
   note: string;
-  /**
-   * Short words for printing both values on their own lines, e.g. ["you", "job"]. Use this when
-   * "to" can be lower than "from" (a target), where an arrow would read as going backwards.
-   * Without it, values print as a change: "1 → 3", or one number when nothing changes.
-   */
-  valueWords?: [string, string];
+  /** Skills to mark on their labels: "Level up next" (up) and "In the bag" (bag). */
+  highlight?: { up: string[]; bag: string[] };
 };
 
-export function SkillRadar({ title, fromLabel, toLabel, points, note, valueWords }: Props) {
+export function SkillRadar({ title, fromLabel, toLabel, points, note, highlight }: Props) {
   const n = points.length;
   const angle = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
   // SVG space: centre (0,0), level 4 at radius 100.
@@ -126,35 +125,29 @@ export function SkillRadar({ title, fromLabel, toLabel, points, note, valueWords
                 : sin < 0
                   ? { left: "27%", width: "46%", bottom: `${100 - at(sin)}%` }
                   : { left: "27%", width: "46%", top: `${at(sin)}%` };
+          const up = highlight ? namedIn(p.skill, highlight.up) : false;
+          const bag = !up && highlight ? namedIn(p.skill, highlight.bag) : false;
           return (
             <div
               key={p.skill}
-              className={`absolute leading-tight [overflow-wrap:anywhere] hyphens-auto ${
-                side === "right" ? "text-left" : side === "left" ? "text-right" : "text-center"
+              className={`absolute flex flex-col gap-1 leading-tight [overflow-wrap:anywhere] hyphens-auto ${
+                side === "right" ? "items-start text-left" : side === "left" ? "items-end text-right" : "items-center text-center"
               }`}
               style={style}
-              title={`${p.skill}: ${fromLabel.toLowerCase()} ${p.from}, ${toLabel.toLowerCase()} ${p.to}, out of ${MAX_LEVEL}`}
             >
-              <span className="block text-[0.72rem] font-medium text-ink-2 sm:text-[0.85rem]">{p.skill}</span>
-              {/* Values in text ink, never the series colour. */}
-              {valueWords ? (
-                <span className="mt-0.5 block font-mono text-[0.7rem] text-ink sm:text-[0.72rem]">
-                  <span className="block">{valueWords[0]} {p.from}</span>
-                  <span className="block">{valueWords[1]} {p.to}</span>
-                </span>
-              ) : (
-                <span className="mt-0.5 block font-mono text-[0.7rem] text-ink sm:text-[0.72rem]">
-                  {p.from === p.to ? p.from : `${p.from} → ${p.to}`}
-                </span>
-              )}
+              {up && <UpMarker />}
+              {bag && <BagMarker />}
+              <span
+                className={`block text-[0.72rem] sm:text-[0.85rem] ${up || bag ? "font-semibold text-ink" : "font-medium text-ink-2"}`}
+              >
+                {p.skill}
+              </span>
             </div>
           );
         })}
       </div>
 
-      <p className="mt-2 text-xs text-ink-2">
-        Levels run from 0 (not shown) to {MAX_LEVEL} (used repeatedly, with results). {note}
-      </p>
+      <p className="mt-2 text-xs text-ink-2">{note}</p>
 
       {/* A table ignores the 1px width of sr-only and keeps its full width, which would widen
           the page on phones. The wrapper div is what clips it. */}

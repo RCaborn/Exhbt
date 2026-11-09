@@ -17,11 +17,11 @@ export async function buildRoadmap(page: Page, opts: { role?: string; email: str
   await waitForBuilder(page);
   await expect(page.getByText("Step 2 of 4")).toBeVisible();
   if (opts.withCv) {
-    await page.getByText("Paste the text").click();
+    await page.getByText("Paste", { exact: true }).click();
     await page.locator("#cvPaste").fill(SAMPLE_CV);
     await page.getByRole("button", { name: /Continue/ }).click();
   } else {
-    await page.getByRole("button", { name: /Skip, I.ll type it in instead/ }).click();
+    await page.getByRole("button", { name: "Skip for now" }).click();
   }
   await expect(page.getByText("Step 3 of 4")).toBeVisible();
   await page.getByLabel("Recently graduated").check();

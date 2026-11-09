@@ -8,20 +8,17 @@ import { ArrowLeft, ArrowRight, Check, FileText, Upload } from "lucide-react";
 import { startRoadmap, type FormState } from "../actions";
 import { CvError, extractCvTextInBrowser } from "@/lib/cv-client";
 import { SITUATIONS, type Situation } from "@/lib/ai/schemas";
-import { SOURCING_LINE } from "@/lib/jobs/claim";
 
 /**
  * Order (docs/decisions/0003-cv-step-and-skill-radar.md): the job, the CV (preferred, skippable),
  * where they are now with anything the CV doesn't cover, email. Results follow.
  */
+// Minimal words on every step (Rory, 9 Nov 2026): a title, the fields, at most one short line.
 const STEPS = [
-  { title: "Describe the job you want", hint: "A sentence is plenty, e.g. “Data analyst in the NHS, using Python”." },
-  {
-    title: "Add your CV",
-    hint: "This gives you the sharpest roadmap: we compare what your CV shows with what the job asks for. No CV to hand? Skip this and tell us on the next page.",
-  },
-  { title: "Where are you now?", hint: "So the projects we suggest fit your time and what you can already do." },
-  { title: "Where should we send it?", hint: "Your roadmap appears straight away, and we email you a copy so you can come back to it." },
+  { title: "What job do you want?", hint: "" },
+  { title: "Add your CV", hint: "It gives you the sharpest roadmap." },
+  { title: "Where are you now?", hint: "" },
+  { title: "Where should we send it?", hint: "We’ll email you a copy." },
 ] as const;
 const LAST = STEPS.length;
 
@@ -88,7 +85,7 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
     // Step 2 (the CV) can always be skipped.
     if (n === 3 && !situation) e.situation = "Choose the option closest to where you are now.";
     if (n === 3 && (education + skills + cvText).replace(/\s/g, "").length < 20)
-      e.education = "Tell us a little about your education or skills, or go back and add your CV.";
+      e.education = "Add your education or skills, or go back and add your CV.";
     if (n === LAST && !EMAIL_RE.test(email.trim())) e.email = "Enter a valid email address.";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -107,7 +104,7 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
       setCvText(await extractCvTextInBrowser(file));
     } catch (err) {
       setCvText("");
-      setErrors({ cv: err instanceof CvError ? err.message : "We couldn't read that file. Paste the text instead." });
+      setErrors({ cv: err instanceof CvError ? err.message : "We couldn't read that file. Paste it instead." });
     } finally {
       setReading(false);
     }
@@ -157,11 +154,11 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
           >
             {s.title}
           </h2>
-          <p className="mt-3 text-ink-2">{s.hint}</p>
+          {s.hint && <p className="mt-3 text-ink-2">{s.hint}</p>}
 
           <div className="mt-7">
             {i === 0 && (
-              <Field id="role" label="The job you want" error={errors.targetRole}>
+              <Field id="role" label="The job you want" hideLabel error={errors.targetRole}>
                 <textarea
                   id="role"
                   value={role}
@@ -173,7 +170,6 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
                   className="field text-[1.1rem]"
                   autoFocus={step === 1}
                 />
-                <p className="mt-3 text-sm text-ink-2">{SOURCING_LINE}</p>
               </Field>
             )}
 
@@ -188,7 +184,7 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
                       }`}
                     >
                       <input type="radio" name="cvMode" value={m} checked={cvMode === m} onChange={() => setCvMode(m)} className="sr-only" />
-                      {m === "upload" ? "Upload a file" : "Paste the text"}
+                      {m === "upload" ? "Upload" : "Paste"}
                     </label>
                   ))}
                 </div>
@@ -200,7 +196,7 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
                   >
                     <Upload aria-hidden size={26} strokeWidth={1.75} />
                     <span className="text-[1.05rem] font-semibold">{cvFileName ? "Choose a different file" : "Choose your CV"}</span>
-                    <span className="hint">PDF or Word (.docx), up to 5 MB. Read in your browser; the file never leaves your device.</span>
+                    <span className="hint">PDF or Word. Stays on your device.</span>
                     <input
                       id="cvFile"
                       type="file"
@@ -250,7 +246,7 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
 
                 {words === 0 && (
                   <button type="button" onClick={() => goTo(3)} disabled={!ready} className="link mt-2 font-semibold text-ink">
-                    Skip, I&rsquo;ll type it in instead
+                    Skip for now
                   </button>
                 )}
               </div>
@@ -284,7 +280,7 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
                   </fieldset>
                   <ErrorText id="situation-error" message={errors.situation} />
                 </div>
-                <Field id="situationDetail" label="Anything to add?" optional>
+                <Field id="situationDetail" label="Details" optional>
                   <input
                     id="situationDetail"
                     name="situationDetail"
@@ -295,10 +291,7 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
                 </Field>
 
                 {cvText && (
-                  <p className="rounded-[var(--radius)] bg-sky px-4 py-3 text-[0.95rem]">
-                    We have your CV. Only add what it doesn&rsquo;t cover, such as a recent course or a project you
-                    left off.
-                  </p>
+                  <p className="rounded-[var(--radius)] bg-sky px-4 py-3 text-[0.95rem]">Got your CV. Add anything it misses.</p>
                 )}
                 <Field id="education" label="Education" optional={!!cvText} error={errors.education}>
                   <textarea
@@ -350,10 +343,7 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
                 )}
                 <label className="flex items-start gap-3">
                   <input type="checkbox" name="marketingOptIn" value="yes" className="mt-1 size-5 shrink-0 accent-[var(--color-blue-edge)]" />
-                  <span>
-                    Email me when new Exhbt features launch.{" "}
-                    <span className="text-ink-2">Occasional, and you can unsubscribe in one click.</span>
-                  </span>
+                  <span>Email me about new features.</span>
                 </label>
                 <p className="hint">
                   By continuing you agree to the <Link href="/legal/terms" className="link">terms</Link> and{" "}
@@ -413,18 +403,21 @@ function Field({
   id,
   label,
   optional,
+  hideLabel,
   error,
   children,
 }: {
   id: string;
   label: string;
   optional?: boolean;
+  /** For a field whose step title already asks the question: the label stays for screen readers. */
+  hideLabel?: boolean;
   error?: string;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label htmlFor={id} className="label">
+      <label htmlFor={id} className={hideLabel ? "sr-only" : "label"}>
         {label} {optional && <span className="font-normal text-ink-2">(optional)</span>}
       </label>
       {children}

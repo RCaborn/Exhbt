@@ -1,8 +1,11 @@
 import { expect, test } from "@playwright/test";
 import {
-  biggestGaps,
   chartableSkills,
+  highlights,
+  inTheBag,
+  levelUpNext,
   nowVersusAfter,
+  skillsAfterProjects,
   sortGapsByShortfall,
 } from "../lib/roadmap/skills";
 
@@ -26,10 +29,23 @@ test.describe("skill radar rules", () => {
     ]);
   });
 
-  test("biggest gaps are the largest shortfalls, ties in the job's order, none when nothing is short", () => {
-    const skills = [skill("A", 2), skill("B", 0), skill("C", 0), skill("D", 3)];
-    expect(biggestGaps(skills).map((s) => s.skill)).toEqual(["B", "C"]);
-    expect(biggestGaps([skill("A", 3), skill("B", 4)])).toEqual([]);
+  test("level up next: the largest shortfalls, ties in the job's order, at most three, none when nothing is short", () => {
+    const skills = [skill("A", 2), skill("B", 0), skill("C", 0), skill("D", 3), skill("E", 1)];
+    expect(levelUpNext(skills).map((s) => s.skill)).toEqual(["B", "C", "E"]);
+    expect(levelUpNext([skill("A", 3), skill("B", 4)])).toEqual([]);
+  });
+
+  test("in the bag: at or above what the job asks, biggest margin first, at most three, none when all are short", () => {
+    const skills = [skill("A", 3), skill("B", 4), skill("C", 1), skill("D", 3, 2), skill("E", 3)];
+    // B and D are one above what the job asks (B first, in the job's order), then A, which just meets it.
+    expect(inTheBag(skills).map((s) => s.skill)).toEqual(["B", "D", "A"]);
+    expect(inTheBag([skill("A", 1), skill("B", 2)])).toEqual([]);
+  });
+
+  test("highlights after the projects judge the lifted levels against what the job asks", () => {
+    const skills = [skill("SQL", 1), skill("Excel", 0), skill("Python", 3)];
+    const after = skillsAfterProjects(skills, projects(["SQL"]));
+    expect(highlights(after)).toEqual({ up: ["Excel"], bag: ["SQL", "Python"] });
   });
 
   test("gap rows sort by shortfall, unmapped gaps last in their original order", () => {
