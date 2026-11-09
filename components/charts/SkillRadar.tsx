@@ -47,7 +47,7 @@ export function SkillRadar({ title, fromLabel, toLabel, points, note, highlight 
     <figure className="m-0">
       <figcaption className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <span className="text-sm font-semibold text-ink">{title}</span>
-        <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2" aria-hidden>
+        <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-graphite" aria-hidden>
           <span className="inline-flex items-center gap-1.5">
             <span className="inline-block size-2.5 rounded-[2px]" style={{ background: SERIES_LIGHT }} />
             {fromLabel}
@@ -71,21 +71,21 @@ export function SkillRadar({ title, fromLabel, toLabel, points, note, highlight 
               key={level}
               points={polygon(() => level)}
               fill="none"
-              stroke="var(--color-rule)"
+              stroke="var(--color-line)"
               strokeWidth={1}
               vectorEffect="non-scaling-stroke"
             />
           ))}
           {points.map((_, i) => {
             const [x, y] = xy(i, MAX_LEVEL);
-            return <line key={i} x1={0} y1={0} x2={x} y2={y} stroke="var(--color-rule)" strokeWidth={1} vectorEffect="non-scaling-stroke" />;
+            return <line key={i} x1={0} y1={0} x2={x} y2={y} stroke="var(--color-line)" strokeWidth={1} vectorEffect="non-scaling-stroke" />;
           })}
 
           {/* From: filled, light. To: outline, dark, drawn on top. */}
           <polygon
             points={polygon((i) => points[i].from)}
             fill={SERIES_LIGHT}
-            fillOpacity={0.35}
+            fillOpacity={0.45}
             stroke={SERIES_LIGHT}
             strokeWidth={2}
             strokeLinejoin="round"
@@ -138,7 +138,7 @@ export function SkillRadar({ title, fromLabel, toLabel, points, note, highlight 
               {up && <UpMarker />}
               {bag && <BagMarker />}
               <span
-                className={`block text-[0.72rem] sm:text-[0.85rem] ${up || bag ? "font-semibold text-ink" : "font-medium text-ink-2"}`}
+                className={`block text-[0.72rem] sm:text-[0.85rem] ${up || bag ? "font-semibold text-ink" : "font-medium text-graphite"}`}
               >
                 {p.skill}
               </span>
@@ -147,7 +147,7 @@ export function SkillRadar({ title, fromLabel, toLabel, points, note, highlight 
         })}
       </div>
 
-      <p className="mt-2 text-xs text-ink-2">{note}</p>
+      <p className="mt-2 text-xs text-graphite">{note}</p>
 
       {/* A table ignores the 1px width of sr-only and keeps its full width, which would widen
           the page on phones. The wrapper div is what clips it. */}

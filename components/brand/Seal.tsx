@@ -14,13 +14,13 @@ export function Seal({ date, asLink = true, compact = false }: { date?: string; 
     <>
       <Mark size={compact ? 14 : 16} />
       <span>{compact ? "checked" : "checked by exhbt"}</span>
-      {date && <span className="text-quiet">· {date}</span>}
+      {date && <span className="text-slate">· {date}</span>}
     </>
   );
   const cls =
-    "inline-flex items-center gap-1.5 rounded-full border border-rule bg-surface py-0.5 pr-2.5 pl-1.5 font-mono text-[0.72rem] text-ink";
+    "inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-0.5 pr-2.5 pl-1.5 font-mono text-[0.72rem] text-ink";
   return asLink ? (
-    <Link href={CHECKS_GUIDE} className={`${cls} hover:border-blue-edge`} aria-label="Checked by exhbt: what the checks mean">
+    <Link href={CHECKS_GUIDE} className={`${cls} hover:border-jade`} aria-label="Checked by exhbt: what the checks mean">
       {body}
     </Link>
   ) : (

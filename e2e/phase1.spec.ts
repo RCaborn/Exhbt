@@ -203,16 +203,16 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
 
     // Click through the free views with the Next button, up to the project-ideas gate.
     for (const heading of ["Gaps to close", "Already in your CV", "Your project ideas are ready"]) {
-      await page.locator("a.btn-primary").last().click();
+      await page.locator("a.next-view").click();
       await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
       await expect(page.getByRole("heading", { level: 1, name: heading })).toBeInViewport();
     }
     // The gate is the way on: no Next button past it.
-    await expect(page.locator("a.btn-primary", { hasText: "What next" })).toHaveCount(0);
+    await expect(page.locator("a.next-view")).toHaveCount(0);
 
     await unlockProjects(page, { email, name: "Amara Okafor", optIn: true });
     await expect(page.getByRole("heading", { level: 1, name: "Projects that would prove them" })).toBeVisible();
-    await page.locator("a.btn-primary").last().click();
+    await page.locator("a.next-view").click();
     await expect(page.getByRole("heading", { level: 1, name: "What next" })).toBeVisible();
     await expect(page.getByText(`We’ve emailed a copy to ${email}`)).toBeVisible();
 

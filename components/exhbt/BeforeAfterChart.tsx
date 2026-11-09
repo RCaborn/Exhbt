@@ -29,7 +29,7 @@ export function BeforeAfterChart({ data }: { data: KeyResult }) {
     <figure className="m-0">
       <figcaption className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <span className="text-sm font-semibold text-ink">{data.title}</span>
-        <span className="flex gap-4 text-xs text-ink-2" aria-hidden>
+        <span className="flex gap-4 text-xs text-graphite" aria-hidden>
           <Legend color={BEFORE} label={data.beforeLabel} />
           <Legend color={AFTER} label={data.afterLabel} />
         </span>
@@ -44,17 +44,17 @@ export function BeforeAfterChart({ data }: { data: KeyResult }) {
           const pct = r.before === 0 ? 0 : Math.round((Math.abs(change) / r.before) * 100);
           return (
             <div key={r.label} className="grid grid-cols-[5.5rem_1fr_3.5rem] items-center gap-3 sm:grid-cols-[6.5rem_1fr_4rem]">
-              <span className="text-[0.85rem] text-ink-2">{r.label}</span>
+              <span className="text-[0.85rem] text-graphite">{r.label}</span>
               <div className="relative h-7">
                 {/* Baseline: recessive. */}
-                <span className="absolute top-1/2 right-0 left-0 h-px bg-rule" />
+                <span className="absolute top-1/2 right-0 left-0 h-px bg-line" />
                 {/* Connector between the two values. */}
-                <span className="absolute top-1/2 h-[2px] -translate-y-1/2 rounded-full bg-[#9fb8d6]" style={{ left: x(lo), width: `calc(${x(hi)} - ${x(lo)})` }} />
+                <span className="absolute top-1/2 h-[2px] -translate-y-1/2 rounded-full bg-[#a5e6d0]" style={{ left: x(lo), width: `calc(${x(hi)} - ${x(lo)})` }} />
                 {/* Labels sit outside the pair (lower value left, higher right), so they never collide. */}
                 <Dot left={x(r.before)} side={r.before <= r.after ? "left" : "right"} color={BEFORE} title={`${data.beforeLabel}: ${fmt(r.before)}`} label={fmt(r.before)} />
                 <Dot left={x(r.after)} side={r.after < r.before ? "left" : "right"} color={AFTER} title={`${data.afterLabel}: ${fmt(r.after)}`} label={fmt(r.after)} />
               </div>
-              <span className={`text-right text-[0.8rem] font-semibold ${improved ? "text-ink" : "text-ink-2"}`}>
+              <span className={`text-right text-[0.8rem] font-semibold ${improved ? "text-ink" : "text-graphite"}`}>
                 {change < 0 ? "−" : "+"}
                 {pct}%
               </span>

@@ -1,36 +1,41 @@
 import Link from "next/link";
 
 /**
- * The exhbt mark: an exhibit frame, broken at the lower right by its label.
- * The frame takes `currentColor` (navy on light, white on navy); the label is
- * always light blue with a navy edge. Rules in docs/brand.md.
+ * The exhbt mark (brand kit v1, the Frame route): viewfinder brackets put one piece of work
+ * in focus, and the dot is the evidence. A mint tile with ink brackets on white and on ink;
+ * on a mint background pass `tone="on-mint"` and the colours flip so it never disappears.
+ * Rules in docs/brand.md.
  */
-export function Mark({ size = 24, className = "" }: { size?: number; className?: string }) {
+export function Mark({
+  size = 24,
+  tone = "default",
+  className = "",
+}: {
+  size?: number;
+  tone?: "default" | "on-mint";
+  className?: string;
+}) {
+  const tile = tone === "on-mint" ? "var(--color-ink)" : "var(--color-mint)";
+  const line = tone === "on-mint" ? "var(--color-mint)" : "var(--color-ink)";
   return (
-    <svg
-      aria-hidden
-      width={size}
-      height={size}
-      viewBox="0 0 32 32"
-      className={`shrink-0 ${className}`}
-      focusable="false"
-    >
+    <svg aria-hidden width={size} height={size} viewBox="0 0 220 220" className={`shrink-0 ${className}`} focusable="false">
+      <rect width="220" height="220" rx="55" fill={tile} />
       <path
-        d="M16.5 28.5H7.5a4 4 0 0 1-4-4v-17a4 4 0 0 1 4-4h17a4 4 0 0 1 4 4V15.5"
+        d="M50 100V65a15 15 0 0 1 15-15h35M170 120v35a15 15 0 0 1-15 15h-35"
         fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
+        stroke={line}
+        strokeWidth="20"
         strokeLinecap="round"
       />
-      <rect x="19.5" y="19.5" width="10.5" height="10.5" rx="2" fill="var(--color-blue)" stroke="var(--color-ink)" strokeWidth="2.5" />
+      <circle cx="110" cy="110" r="16" fill={line} />
     </svg>
   );
 }
 
 const SIZES = {
-  sm: { mark: 18, text: "text-[1.15rem]", gap: "gap-1.5" },
-  md: { mark: 24, text: "text-[1.6rem]", gap: "gap-2" },
-  lg: { mark: 34, text: "text-[2.3rem]", gap: "gap-2.5" },
+  sm: { mark: 20, text: "text-[1.2rem]", gap: "gap-1.5" },
+  md: { mark: 28, text: "text-[1.65rem]", gap: "gap-2" },
+  lg: { mark: 40, text: "text-[2.4rem]", gap: "gap-2.5" },
 } as const;
 
 /** Mark plus the lower-case wordmark. Pass `href` to make it a link home. */
@@ -50,7 +55,7 @@ export function Logo({
       <span className="translate-y-[-0.04em]">exhbt</span>
     </>
   );
-  const cls = `inline-flex items-center ${s.gap} ${s.text} leading-none font-extrabold tracking-[-0.045em] ${className}`;
+  const cls = `inline-flex items-center ${s.gap} ${s.text} font-[family-name:var(--font-display)] leading-none font-semibold tracking-[-0.04em] ${className}`;
   return href ? (
     <Link href={href} className={cls} aria-label="Exhbt home">
       {body}

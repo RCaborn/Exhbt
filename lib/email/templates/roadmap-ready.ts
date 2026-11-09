@@ -2,17 +2,17 @@ import type { Roadmap } from "@/lib/ai/schemas";
 
 /**
  * "Your roadmap is ready" email. Table layout and inline styles because email clients
- * ignore most CSS. Colours mirror DESIGN.md as plain hex (email clients don't do oklch).
+ * ignore most CSS. Colours are the brand kit's (docs/brand.md) as plain hex. The keys keep their old names.
  */
 
 const C = {
-  ink: "#0f2240",
-  ink2: "#4a5d78",
-  sky: "#eef5fc",
-  blue: "#a9d4f5",
-  edge: "#4f86c6",
-  rule: "#dbe5f0",
-  green: "#3fc46f",
+  ink: "#0e0f12",
+  ink2: "#3e4044",
+  sky: "#f6f7f8",
+  blue: "#4fe9b4",
+  edge: "#4fe9b4",
+  rule: "#e5e6e8",
+  green: "#4fe9b4",
 };
 
 const esc = (s: string) =>

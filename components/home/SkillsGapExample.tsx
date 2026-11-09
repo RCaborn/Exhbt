@@ -1,6 +1,7 @@
 import { SkillHighlights } from "@/components/charts/SkillHighlights";
 import { SkillRadar } from "@/components/charts/SkillRadar";
 import type { SkillLevel } from "@/lib/ai/schemas";
+import { SOURCING_LINE } from "@/lib/jobs/claim";
 import { highlights, nowVersusAfter, nowVersusNeeded, skillsAfterProjects } from "@/lib/roadmap/skills";
 
 /**
@@ -30,17 +31,17 @@ export function SkillsGapExample() {
   const now = highlights(AMARA);
   const after = highlights(skillsAfterProjects(AMARA, AMARA_PROJECTS));
   return (
-    <section aria-labelledby="gaps-example" className="border-t border-rule bg-surface">
+    <section aria-labelledby="gaps-example" className="border-t border-line bg-surface">
       <div className="mx-auto max-w-[72rem] px-4 py-20 sm:px-8 lg:py-28">
-        <h2 id="gaps-example" className="max-w-[20ch] text-[2.4rem] sm:text-[3.4rem]">
+        <h2 id="gaps-example" className="display-2 max-w-[20ch]">
           See where you fall short, and what fixes it
         </h2>
-        <p className="mt-4 max-w-[42rem] text-lg text-ink-2">
+        <p className="mt-4 max-w-[42rem] text-lg text-graphite">
           Upload your CV and say which job you want. We chart the skills that job asks for, where your CV puts you
-          on each, and where the suggested projects would take you.
+          on each, and where three small projects would take you. {SOURCING_LINE}
         </p>
         <div className="mt-12 grid gap-6 md:grid-cols-2">
-          <div className="rounded-[var(--radius)] border border-rule p-5 sm:p-6">
+          <div className="rounded-[var(--radius)] border border-line p-5 sm:p-6">
             <SkillRadar
               title="Amara now, against a junior data analyst job"
               fromLabel="Now"
@@ -51,7 +52,7 @@ export function SkillsGapExample() {
             />
             <SkillHighlights up={now.up} bag={now.bag} />
           </div>
-          <div className="rounded-[var(--radius)] border border-rule p-5 sm:p-6">
+          <div className="rounded-[var(--radius)] border border-line p-5 sm:p-6">
             <SkillRadar
               title="After the two suggested projects"
               fromLabel="Now"

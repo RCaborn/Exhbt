@@ -22,7 +22,7 @@ export default async function DemoExhbt({ params }: { params: Promise<{ slug: st
   if (index < 0) notFound();
   const e = demoExhbts[index];
   return (
-    <div className="bg-sky pb-16">
+    <div className="bg-mist pb-16">
       <PortfolioBar owner={demoOwner} backHref="/demo" />
       <div className="mx-auto max-w-[56rem] px-4 pt-8 sm:px-8 sm:pt-10">
         <Exhbt exhbt={e} example headingLevel="h1" animateChecks position={index + 1} />

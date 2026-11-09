@@ -8,6 +8,7 @@ import { ArrowLeft, ArrowRight, Check, FileText, Upload } from "lucide-react";
 import { startRoadmap, type FormState } from "../actions";
 import { CvError, extractCvTextInBrowser } from "@/lib/cv-client";
 import { SITUATIONS, type Situation } from "@/lib/ai/schemas";
+import { Button } from "@/components/ui/Button";
 
 /**
  * Order (docs/decisions/0003 and 0004): the job, the CV (preferred, skippable), where they are
@@ -150,7 +151,7 @@ export function RoadmapWizard({ defaultRole }: Props) {
           >
             {s.title}
           </h2>
-          {s.hint && <p className="mt-3 text-ink-2">{s.hint}</p>}
+          {s.hint && <p className="mt-3 text-graphite">{s.hint}</p>}
 
           <div className="mt-7">
             {i === 0 && (
@@ -171,12 +172,12 @@ export function RoadmapWizard({ defaultRole }: Props) {
 
             {i === 1 && (
               <div>
-                <div role="radiogroup" aria-label="How to add your CV" className="inline-flex rounded-full border border-rule bg-sky p-1 text-sm font-medium">
+                <div role="radiogroup" aria-label="How to add your CV" className="inline-flex rounded-full border border-line bg-mist p-1 text-sm font-medium">
                   {(["upload", "paste"] as const).map((m) => (
                     <label
                       key={m}
-                      className={`cursor-pointer rounded-full px-4 py-2 has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-blue-edge ${
-                        cvMode === m ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"
+                      className={`cursor-pointer rounded-full px-4 py-2 has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-jade ${
+                        cvMode === m ? "bg-surface text-ink shadow-sm" : "text-graphite hover:text-ink"
                       }`}
                     >
                       <input type="radio" name="cvMode" value={m} checked={cvMode === m} onChange={() => setCvMode(m)} className="sr-only" />
@@ -188,11 +189,11 @@ export function RoadmapWizard({ defaultRole }: Props) {
                 <div hidden={cvMode !== "upload"} className="mt-4">
                   <label
                     htmlFor="cvFile"
-                    className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-field bg-sky px-6 py-10 text-center hover:border-blue-edge has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-blue-edge"
+                    className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-field bg-mist px-6 py-10 text-center hover:border-jade has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-jade"
                   >
                     <Upload aria-hidden size={26} strokeWidth={1.75} />
                     <span className="text-[1.05rem] font-semibold">{cvFileName ? "Choose a different file" : "Choose your CV"}</span>
-                    <span className="hint">PDF or Word. Stays on your device.</span>
+                    <span className="hint text-graphite">PDF or Word. Stays on your device.</span>
                     <input
                       id="cvFile"
                       type="file"
@@ -225,7 +226,7 @@ export function RoadmapWizard({ defaultRole }: Props) {
                     "Reading your CV…"
                   ) : words > 0 ? (
                     <span className="inline-flex items-center gap-2 font-medium">
-                      <span className="inline-flex size-4 items-center justify-center rounded-full border border-ink bg-green">
+                      <span className="inline-flex size-4 items-center justify-center rounded-full border border-ink bg-mint">
                         <Check aria-hidden size={10} strokeWidth={3} />
                       </span>
                       {cvFileName ? (
@@ -257,8 +258,8 @@ export function RoadmapWizard({ defaultRole }: Props) {
                       {(Object.entries(SITUATIONS) as [Situation, string][]).map(([value, label]) => (
                         <label
                           key={value}
-                          className={`flex cursor-pointer items-center gap-3 rounded-[14px] border-[1.5px] px-4 py-3.5 font-semibold has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-blue-edge ${
-                            situation === value ? "border-blue-edge bg-sky" : "border-rule hover:border-field"
+                          className={`flex cursor-pointer items-center gap-3 rounded-[14px] border-[1.5px] px-4 py-3.5 font-semibold has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-jade ${
+                            situation === value ? "border-jade bg-mist" : "border-line hover:border-field"
                           }`}
                         >
                           <input
@@ -267,7 +268,7 @@ export function RoadmapWizard({ defaultRole }: Props) {
                             value={value}
                             checked={situation === value}
                             onChange={() => setSituation(value)}
-                            className="size-4 accent-[var(--color-blue-edge)]"
+                            className="size-4 accent-[var(--color-jade)]"
                           />
                           {label}
                         </label>
@@ -287,7 +288,7 @@ export function RoadmapWizard({ defaultRole }: Props) {
                 </Field>
 
                 {cvText && (
-                  <p className="rounded-[var(--radius)] bg-sky px-4 py-3 text-[0.95rem]">Got your CV. Add anything it misses.</p>
+                  <p className="rounded-[var(--radius)] bg-mist px-4 py-3 text-[0.95rem]">Got your CV. Add anything it misses.</p>
                 )}
                 <Field id="education" label="Education" optional={!!cvText} error={errors.education}>
                   <textarea
@@ -325,18 +326,18 @@ export function RoadmapWizard({ defaultRole }: Props) {
         </section>
       ))}
 
-      <div className="mt-10 flex items-center justify-between gap-4 border-t border-rule pt-6">
+      <div className="mt-10 flex items-center justify-between gap-4 border-t border-line pt-6">
         {step > 1 ? (
-          <button type="button" onClick={() => goTo(step - 1)} className="btn btn-secondary">
+          <Button label="Back" onClick={() => goTo(step - 1)}>
             <ArrowLeft aria-hidden size={18} strokeWidth={2.25} /> Back
-          </button>
+          </Button>
         ) : (
           <span />
         )}
         {step < LAST ? (
-          <button type="submit" className="btn btn-primary min-h-12 px-6 text-base" disabled={reading || !ready}>
+          <Button type="submit" variant="primary" size="lg" label="Continue" disabled={reading || !ready}>
             Continue <ArrowRight aria-hidden size={18} strokeWidth={2.5} />
-          </button>
+          </Button>
         ) : (
           <Submit />
         )}
@@ -348,12 +349,12 @@ export function RoadmapWizard({ defaultRole }: Props) {
 function Progress({ step }: { step: number }) {
   return (
     <div>
-      <p className="text-sm font-semibold text-ink-2">
+      <p className="text-sm font-semibold text-graphite">
         Step {step} of {STEPS.length}
       </p>
       <div className="mt-2 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${STEPS.length}, minmax(0, 1fr))` }} aria-hidden>
         {STEPS.map((s, i) => (
-          <span key={s.title} className={`h-1.5 rounded-full ${i < step ? "bg-blue-edge" : "bg-sky-2"}`} />
+          <span key={s.title} className={`h-1.5 rounded-full ${i < step ? "bg-jade" : "bg-wash"}`} />
         ))}
       </div>
     </div>
@@ -363,9 +364,9 @@ function Progress({ step }: { step: number }) {
 function Submit() {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className="btn btn-primary min-h-12 px-6 text-base" disabled={pending}>
+    <Button type="submit" variant="primary" size="lg" label="See my roadmap" loading={pending}>
       {pending ? "Starting…" : "See my roadmap"} <ArrowRight aria-hidden size={18} strokeWidth={2.5} />
-    </button>
+    </Button>
   );
 }
 
@@ -388,7 +389,7 @@ function Field({
   return (
     <div>
       <label htmlFor={id} className={hideLabel ? "sr-only" : "label"}>
-        {label} {optional && <span className="font-normal text-ink-2">(optional)</span>}
+        {label} {optional && <span className="font-normal text-graphite">(optional)</span>}
       </label>
       {children}
       <ErrorText id={`${id}-error`} message={error} />

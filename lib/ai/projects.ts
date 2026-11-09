@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
 import { ProjectSchema, SITUATIONS, type Project, type Roadmap, type RoadmapInput } from "./schemas";
-import { ROADMAP_MODEL } from "./roadmap";
+import { AI_MODEL, costUsd } from "./model";
 
 /**
  * Swapping one idea in the plan (docs/decisions/0004): a single new project that replaces the
@@ -11,10 +11,6 @@ import { ROADMAP_MODEL } from "./roadmap";
  * tweaks" note if they wrote one (e.g. "use more real data"). Same model and rules as the
  * roadmap's projects; the note steers the idea but never adds facts about the person.
  */
-
-/** USD per million tokens, as in lib/ai/roadmap.ts. */
-const PRICE_IN = 0.1;
-const PRICE_OUT = 0.5;
 
 const SwapSchema = z.object({ project: ProjectSchema });
 
@@ -57,7 +53,7 @@ export async function generateSwap(ctx: SwapContext): Promise<SwapResult> {
 
   const client = new Anthropic();
   const response = await client.messages.parse({
-    model: ROADMAP_MODEL,
+    model: AI_MODEL,
     max_tokens: 1000,
     output_config: { effort: "low", format: zodOutputFormat(SwapSchema) },
     system: SYSTEM,
@@ -88,7 +84,7 @@ export async function generateSwap(ctx: SwapContext): Promise<SwapResult> {
     model: response.model,
     inputTokens: input_tokens,
     outputTokens: output_tokens,
-    costUsd: (input_tokens * PRICE_IN + output_tokens * PRICE_OUT) / 1_000_000,
+    costUsd: costUsd(input_tokens, output_tokens),
   };
 }
 

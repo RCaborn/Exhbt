@@ -30,7 +30,18 @@ const bans = [
 // A handwritten plan count. Figures belong in lib/entitlements.ts, which is skipped.
 const countRe = /\b\d+\s+(?:roadmap refreshes|roadmap refresh|exhbts|exhbt)\b/i;
 
+// Haiku only (lib/ai/model.ts). Any other Claude model named in the app's code fails the check.
+const ONLY_MODEL = "claude-haiku-5-5";
+const modelRe = /claude-(?:opus|sonnet|haiku|fable|mythos)-[0-9][0-9a-z-]*/g;
+
 const problems = [];
+for (const file of files) {
+  if (/^(app|components|lib)\//.test(relative(root, file))) {
+    for (const id of readFileSync(file, "utf8").match(modelRe) ?? []) {
+      if (id !== ONLY_MODEL) problems.push(`${relative(root, file)}: names ${id}; the app uses ${ONLY_MODEL} only (lib/ai/model.ts)`);
+    }
+  }
+}
 for (const file of files) {
   const rel = relative(root, file);
   if (rel === "lib/entitlements.ts") continue;

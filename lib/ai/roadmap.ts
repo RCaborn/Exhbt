@@ -10,12 +10,7 @@ import {
   type RoadmapInput,
 } from "./schemas";
 import type { JobProfile } from "@/lib/jobs";
-
-/** Cheapest current model; roadmap generation is structured extraction, not deep reasoning. */
-export const ROADMAP_MODEL = "claude-haiku-5-5";
-/** USD per million tokens for claude-haiku-5-5 (prompts under 100K tokens). */
-const PRICE_IN = 0.1;
-const PRICE_OUT = 0.5;
+import { AI_MODEL, costUsd } from "./model";
 
 const SYSTEM = `You write skills-gap roadmaps for UK graduates.
 
@@ -56,7 +51,7 @@ export async function generateRoadmap(input: RoadmapInput, job: JobProfile | nul
 
   const client = new Anthropic();
   const response = await client.messages.parse({
-    model: ROADMAP_MODEL,
+    model: AI_MODEL,
     max_tokens: 4000,
     output_config: { effort: "low", format: zodOutputFormat(RoadmapSchema) },
     system: SYSTEM,
@@ -86,7 +81,7 @@ export async function generateRoadmap(input: RoadmapInput, job: JobProfile | nul
     model: response.model,
     inputTokens: input_tokens,
     outputTokens: output_tokens,
-    costUsd: (input_tokens * PRICE_IN + output_tokens * PRICE_OUT) / 1_000_000,
+    costUsd: costUsd(input_tokens, output_tokens),
   };
 }
 

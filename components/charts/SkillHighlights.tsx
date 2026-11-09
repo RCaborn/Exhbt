@@ -18,7 +18,7 @@ export function UpMarker() {
 /** The green tick used for strengths elsewhere in the roadmap: a skill in the bag. */
 export function BagMarker() {
   return (
-    <span aria-hidden className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-ink bg-green">
+    <span aria-hidden className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-ink bg-mint">
       <Check size={10} strokeWidth={3} />
     </span>
   );
@@ -36,7 +36,7 @@ export function SkillHighlights({ up, bag }: { up: string[]; bag: string[] }) {
 
 function Group({ title, marker, skills }: { title: string; marker: React.ReactNode; skills: string[] }) {
   return (
-    <div className="rounded-[var(--radius)] bg-sky px-4 py-3.5">
+    <div className="rounded-[var(--radius)] bg-mist px-4 py-3.5">
       <p className="flex items-center gap-2 font-semibold">
         {marker}
         {title}

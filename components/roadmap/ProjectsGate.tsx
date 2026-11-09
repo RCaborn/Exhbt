@@ -6,6 +6,7 @@ import { useFormStatus } from "react-dom";
 import { ArrowRight } from "lucide-react";
 import { unlockProjects, type GateState } from "@/app/(app)/roadmap/[id]/actions";
 import type { Contact } from "@/lib/cv-contact";
+import { Button } from "@/components/ui/Button";
 
 /**
  * The details asked for before the project ideas (docs/decisions/0004). Prefilled from the
@@ -23,7 +24,7 @@ export function ProjectsGate({ id, prefill, signedInEmail }: { id: string; prefi
   return (
     <form action={action} noValidate className="mt-8 max-w-[32rem] space-y-5">
       <input type="hidden" name="prefilled" value={fromCv ? "yes" : "no"} />
-      {fromCv && <p className="rounded-[var(--radius)] bg-sky px-4 py-3 text-[0.95rem]">From your CV. Change anything that&rsquo;s wrong.</p>}
+      {fromCv && <p className="rounded-[var(--radius)] bg-mist px-4 py-3 text-[0.95rem]">From your CV. Change anything that&rsquo;s wrong.</p>}
 
       <GateField id="gate-name" label="Name" error={errors.name}>
         <input
@@ -68,7 +69,7 @@ export function ProjectsGate({ id, prefill, signedInEmail }: { id: string; prefi
       </GateField>
 
       <label className="flex items-start gap-3">
-        <input type="checkbox" name="marketingOptIn" value="yes" className="mt-1 size-5 shrink-0 accent-[var(--color-blue-edge)]" />
+        <input type="checkbox" name="marketingOptIn" value="yes" className="mt-1 size-5 shrink-0 accent-[var(--color-jade)]" />
         <span>Email me about new features.</span>
       </label>
 
@@ -95,9 +96,9 @@ export function ProjectsGate({ id, prefill, signedInEmail }: { id: string; prefi
 function Submit() {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className="btn btn-primary min-h-12 px-6 text-base" disabled={pending}>
+    <Button type="submit" variant="primary" size="lg" label="Show my projects" loading={pending}>
       {pending ? "Opening…" : "Show my projects"} <ArrowRight aria-hidden size={18} strokeWidth={2.5} />
-    </button>
+    </Button>
   );
 }
 
@@ -117,7 +118,7 @@ function GateField({
   return (
     <div>
       <label htmlFor={id} className="label">
-        {label} {optional && <span className="font-normal text-ink-2">(optional)</span>}
+        {label} {optional && <span className="font-normal text-graphite">(optional)</span>}
       </label>
       {children}
       <p id={`${id}-error`} className="mt-1.5 min-h-5 text-sm text-error" aria-live="polite">

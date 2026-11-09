@@ -19,6 +19,7 @@ import {
   skillsAfterProjects,
   sortGapsByShortfall,
 } from "@/lib/roadmap/skills";
+import { Button } from "@/components/ui/Button";
 
 /**
  * Order: everything free first (overview, the radar, strengths), then the project ideas behind
@@ -61,20 +62,20 @@ export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn, projects 
   const role = roadmap.targetRole || "your target role";
 
   return (
-    <div className="min-h-[calc(100svh-4.75rem)] bg-sky px-4 pt-8 pb-16 sm:px-8 sm:pt-12">
+    <div className="min-h-[calc(100svh-4.75rem)] bg-mist px-4 pt-8 pb-16 sm:px-8 sm:pt-12">
       <div className="mx-auto max-w-[52rem]">
         <nav aria-label="Roadmap sections">
-          <p className="text-sm font-semibold text-ink-2 sm:hidden">
+          <p className="text-sm font-semibold text-graphite sm:hidden">
             {index + 1} / {VIEWS.length} · {VIEWS[index].label}
           </p>
-          <ol className="hidden gap-1 rounded-full border border-rule bg-surface p-1 sm:flex">
+          <ol className="hidden gap-1 rounded-full border border-line bg-surface p-1 sm:flex">
             {VIEWS.map((v) => (
               <li key={v.key} className="flex-1">
                 <Link
                   href={href(v.key)}
                   aria-current={v.key === view ? "page" : undefined}
                   className={`block rounded-full px-3 py-2 text-center text-sm font-semibold ${
-                    v.key === view ? "bg-blue text-ink" : "text-ink-2 hover:bg-sky hover:text-ink"
+                    v.key === view ? "bg-mint text-ink" : "text-graphite hover:bg-mist hover:text-ink"
                   }`}
                 >
                   {v.label}
@@ -84,25 +85,25 @@ export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn, projects 
           </ol>
         </nav>
 
-        <div className="mt-6 rounded-[24px] border border-rule bg-surface p-6 shadow-pack sm:p-10">
+        <div className="mt-6 rounded-[24px] border border-line bg-surface p-6 shadow-pack sm:p-10">
           {view === "overview" && <Overview roadmap={roadmap} role={role} href={href} />}
           {view === "gaps" && <Gaps roadmap={roadmap} role={role} />}
           {view === "projects" && <Projects id={id} roadmap={roadmap} role={role} state={projects} />}
           {view === "strengths" && <Strengths roadmap={roadmap} role={role} />}
           {view === "next" && <Next emailedTo={emailedTo} signedIn={signedIn} id={id} unlocked={projects.unlocked} />}
 
-          <div className="mt-10 flex items-center justify-between gap-4 border-t border-rule pt-6">
+          <div className="mt-10 flex items-center justify-between gap-4 border-t border-line pt-6">
             {prev ? (
-              <Link href={href(prev.key)} className="btn btn-secondary">
+              <Button href={href(prev.key)} label={prev.label}>
                 <ArrowLeft aria-hidden size={18} strokeWidth={2.25} /> {prev.label}
-              </Link>
+              </Button>
             ) : (
               <span />
             )}
             {next && (
-              <Link href={href(next.key)} className="btn btn-primary min-h-12 px-6 text-base">
+              <Button href={href(next.key)} variant="primary" size="lg" label={next.label} className="next-view">
                 {next.label} <ArrowRight aria-hidden size={18} strokeWidth={2.5} />
-              </Link>
+              </Button>
             )}
           </div>
         </div>
@@ -112,22 +113,22 @@ export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn, projects 
 }
 
 function Context({ role }: { role: string }) {
-  return <p className="text-sm font-semibold text-ink-2">Your roadmap to {role}</p>;
+  return <p className="text-sm font-semibold text-graphite">Your roadmap to {role}</p>;
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="mt-6 rounded-[var(--radius)] bg-sky px-5 py-4 text-ink-2">{children}</p>;
+  return <p className="mt-6 rounded-[var(--radius)] bg-mist px-5 py-4 text-graphite">{children}</p>;
 }
 
 function Overview({ roadmap, role, href }: { roadmap: Roadmap; role: string; href: (k: ViewKey) => string }) {
   const n = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
   return (
     <>
-      <h1 className="text-[2.2rem] sm:text-[3rem]">
+      <h1 className="">
         Your roadmap to <span className="highlight">{role}</span>
       </h1>
-      {roadmap.summary && <p className="mt-5 max-w-[38rem] text-lg text-ink-2">{roadmap.summary}</p>}
-      <ul className="mt-8 divide-y divide-rule border-y border-rule">
+      {roadmap.summary && <p className="mt-5 max-w-[38rem] text-lg text-graphite">{roadmap.summary}</p>}
+      <ul className="mt-8 divide-y divide-line border-y border-line">
         <SummaryRow href={href("gaps")} label={n(roadmap.gaps.length, "gap to close", "gaps to close")} />
         <SummaryRow href={href("projects")} label={n(roadmap.projects.length, "project to prove them", "projects to prove them")} />
         <SummaryRow href={href("strengths")} label={n(roadmap.strengths.length, "strength already in your CV", "strengths already in your CV")} />
@@ -139,7 +140,7 @@ function Overview({ roadmap, role, href }: { roadmap: Roadmap; role: string; hre
 function SummaryRow({ href, label }: { href: string; label: string }) {
   return (
     <li>
-      <Link href={href} className="flex items-center justify-between gap-4 py-4 text-[1.1rem] font-semibold hover:text-ink-2">
+      <Link href={href} className="flex items-center justify-between gap-4 py-4 text-[1.1rem] font-semibold hover:text-graphite">
         {label}
         <ArrowRight aria-hidden size={18} strokeWidth={2.25} />
       </Link>
@@ -154,8 +155,8 @@ function Gaps({ roadmap, role }: { roadmap: Roadmap; role: string }) {
   return (
     <>
       <Context role={role} />
-      <h1 className="mt-2 text-[2.2rem] sm:text-[3rem]">Gaps to close</h1>
-      <p className="mt-3 text-ink-2">Skills this role asks for that your CV doesn&rsquo;t show yet, or not enough.</p>
+      <h1 className="mt-2">Gaps to close</h1>
+      <p className="mt-3 text-graphite">Skills this role asks for that your CV doesn&rsquo;t show yet, or not enough.</p>
       {skills && marked && (
         <div className="mt-8">
           <SkillRadar
@@ -172,12 +173,12 @@ function Gaps({ roadmap, role }: { roadmap: Roadmap; role: string }) {
       {roadmap.gaps.length === 0 ? (
         <Empty>Your CV already covers what this role usually asks for. Look at the projects anyway: evidence beats claims.</Empty>
       ) : (
-        <ul aria-label="Gaps to close" className="mt-8 divide-y divide-rule border-y border-rule">
+        <ul aria-label="Gaps to close" className="mt-8 divide-y divide-line border-y border-line">
           {gaps.map((g) => (
             <li key={g.skill} className="grid gap-2 py-5 sm:grid-cols-[1fr_9rem] sm:gap-8">
               <div>
                 <p className="text-[1.15rem] font-bold tracking-[-0.01em]">{g.skill}</p>
-                <p className="mt-1 text-ink-2">{g.whyItMatters}</p>
+                <p className="mt-1 text-graphite">{g.whyItMatters}</p>
               </div>
               <p className="sm:text-right">
                 <span className="chip">{g.currentEvidence === "none" ? "Not in your CV" : "Some, not enough"}</span>
@@ -195,8 +196,8 @@ function Projects({ id, roadmap, role, state }: { id: string; roadmap: Roadmap; 
     return (
       <>
         <Context role={role} />
-        <h1 className="mt-2 text-[2.2rem] sm:text-[3rem]">Your project ideas are ready</h1>
-        <p className="mt-3 text-ink-2">Tell us who you are and we&rsquo;ll email you a copy.</p>
+        <h1 className="mt-2">Your project ideas are ready</h1>
+        <p className="mt-3 text-graphite">Tell us who you are and we&rsquo;ll email you a copy.</p>
         <ProjectsGate id={id} prefill={state.prefill} signedInEmail={state.signedInEmail} />
       </>
     );
@@ -205,8 +206,8 @@ function Projects({ id, roadmap, role, state }: { id: string; roadmap: Roadmap; 
   return (
     <>
       <Context role={role} />
-      <h1 className="mt-2 text-[2.2rem] sm:text-[3rem]">{done ? "Your plan" : "Projects that would prove them"}</h1>
-      <p className="mt-3 text-ink-2">
+      <h1 className="mt-2">{done ? "Your plan" : "Projects that would prove them"}</h1>
+      <p className="mt-3 text-graphite">
         {done ? "Each one ends with something real you can attach as evidence." : "Swap any that don’t fit, then keep your plan."}
       </p>
       {ideas.length === 0 ? (
@@ -237,11 +238,11 @@ function AfterProjects({ roadmap, ideas, done }: { roadmap: Roadmap; ideas: Proj
   // The lists judge the after-projects levels against what the job asks for.
   const marked = highlights(skillsAfterProjects(skills, chosen));
   return (
-    <section aria-labelledby="after-projects" className="mt-10 border-t border-rule pt-8">
-      <h2 id="after-projects" className="text-[1.6rem] sm:text-[2rem]">
+    <section aria-labelledby="after-projects" className="mt-10 border-t border-line pt-8">
+      <h2 id="after-projects" className="">
         {done ? "When you’ve finished your plan" : "When you’ve finished these projects"}
       </h2>
-      <p className="mt-2 max-w-[38rem] text-ink-2">Where you&rsquo;d stand once they&rsquo;re done.</p>
+      <p className="mt-2 max-w-[38rem] text-graphite">Where you&rsquo;d stand once they&rsquo;re done.</p>
       <div className="mt-6">
         <SkillRadar
           title="You now, against where the projects would take you"
@@ -261,19 +262,19 @@ function Strengths({ roadmap, role }: { roadmap: Roadmap; role: string }) {
   return (
     <>
       <Context role={role} />
-      <h1 className="mt-2 text-[2.2rem] sm:text-[3rem]">Already in your CV</h1>
-      <p className="mt-3 text-ink-2">What you can already point to, and where it shows.</p>
+      <h1 className="mt-2">Already in your CV</h1>
+      <p className="mt-3 text-graphite">What you can already point to, and where it shows.</p>
       {roadmap.strengths.length === 0 ? (
         <Empty>We couldn&rsquo;t match anything in your CV to this role yet. The projects are the place to start.</Empty>
       ) : (
         <ul className="mt-8 space-y-4">
           {roadmap.strengths.map((s) => (
             <li key={s.skill} className="flex gap-3">
-              <span className="mt-1 inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-ink bg-green">
+              <span className="mt-1 inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-ink bg-mint">
                 <Check aria-hidden size={12} strokeWidth={3} />
               </span>
               <p>
-                <span className="font-semibold">{s.skill}.</span> <span className="text-ink-2">{s.evidence}</span>
+                <span className="font-semibold">{s.skill}.</span> <span className="text-graphite">{s.evidence}</span>
               </p>
             </li>
           ))}
@@ -286,9 +287,9 @@ function Strengths({ roadmap, role }: { roadmap: Roadmap; role: string }) {
 function Next({ emailedTo, signedIn, id, unlocked }: { emailedTo: string | null; signedIn: boolean; id: string; unlocked: boolean }) {
   return (
     <>
-      <h1 className="text-[2.2rem] sm:text-[3rem]">What next</h1>
+      <h1 className="">What next</h1>
       {!unlocked && (
-        <p className="mt-5 rounded-[var(--radius)] bg-sky px-5 py-4">
+        <p className="mt-5 rounded-[var(--radius)] bg-mist px-5 py-4">
           Your project ideas are waiting.{" "}
           <Link href={`/roadmap/${id}?view=projects`} className="link font-semibold text-ink">
             See them
@@ -296,7 +297,7 @@ function Next({ emailedTo, signedIn, id, unlocked }: { emailedTo: string | null;
         </p>
       )}
       {emailedTo && (
-        <p className="mt-5 flex items-start gap-3 rounded-[var(--radius)] bg-sky px-5 py-4">
+        <p className="mt-5 flex items-start gap-3 rounded-[var(--radius)] bg-mist px-5 py-4">
           <Mail aria-hidden size={20} strokeWidth={2} className="mt-0.5 shrink-0" />
           <span>
             We&rsquo;ve emailed a copy to <span className="font-semibold [overflow-wrap:anywhere]">{emailedTo}</span>.
@@ -305,14 +306,14 @@ function Next({ emailedTo, signedIn, id, unlocked }: { emailedTo: string | null;
         </p>
       )}
       {!signedIn && !emailedTo && (
-        <p className="mt-5 text-ink-2">
+        <p className="mt-5 text-graphite">
           This roadmap is saved in this browser. <Link href={`/login?next=/roadmap/${id}`} className="link text-ink">Log in</Link> to keep it on any device.
         </p>
       )}
 
       <div className="mt-10 rounded-[16px] bg-ink p-6 text-white sm:p-8">
-        <h2 className="text-[1.6rem] sm:text-[2rem]">When a project is done, make it count</h2>
-        <p className="mt-3 max-w-[34rem] text-[#c9d7e8]">
+        <h2 className="">When a project is done, make it count</h2>
+        <p className="mt-3 max-w-[34rem] text-[#c9cbcf]">
           {PLAN_NAMES.plus} hosts more exhbts on your own link, and helps draft them. {PLAN_NAMES.premium} adds a
           custom link for each job you apply to, with your best-fit projects, and an originality check when you
           publish. Both open soon.
@@ -322,7 +323,7 @@ function Next({ emailedTo, signedIn, id, unlocked }: { emailedTo: string | null;
         </div>
       </div>
 
-      <p className="mt-8 text-ink-2">
+      <p className="mt-8 text-graphite">
         Aiming at a different role? <Link href="/roadmap/new" className="link text-ink">Build another roadmap</Link>
       </p>
     </>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
 
 type Status = "working" | "slow" | "failed";
 
@@ -28,29 +29,31 @@ export function Generating({ id, role }: { id: string; role: string }) {
   }, [id, attempt, router]);
 
   return (
-    <div className="min-h-[calc(100svh-4.75rem)] bg-sky px-4 py-16 sm:px-8 sm:py-24">
-      <div className="mx-auto max-w-[40rem] rounded-[24px] border border-rule bg-surface p-8 shadow-pack sm:p-12" aria-live="polite">
+    <div className="min-h-[calc(100svh-4.75rem)] bg-mist px-4 py-16 sm:px-8 sm:py-24">
+      <div className="mx-auto max-w-[40rem] rounded-[24px] border border-line bg-surface p-8 shadow-pack sm:p-12" aria-live="polite">
         {status === "failed" ? (
           <>
-            <h1 className="text-[2rem] sm:text-[2.6rem]">That didn&rsquo;t work</h1>
-            <p className="mt-4 text-ink-2">
+            <h1 className="">That didn&rsquo;t work</h1>
+            <p className="mt-4 text-graphite">
               We couldn&rsquo;t build your roadmap just now. Your answers are saved, so trying again only takes a
               moment.
             </p>
-            <button type="button" onClick={() => setAttempt((a) => a + 1)} className="btn btn-primary mt-8 min-h-12 px-6 text-base">
-              Try again
-            </button>
+            <div className="mt-8">
+              <Button variant="primary" size="lg" onClick={() => setAttempt((a) => a + 1)}>
+                Try again
+              </Button>
+            </div>
           </>
         ) : (
           <>
-            <p className="text-sm font-semibold text-ink-2">Building your roadmap</p>
-            <h1 className="mt-3 text-[2rem] sm:text-[2.6rem]">
+            <p className="text-sm font-semibold text-graphite">Building your roadmap</p>
+            <h1 className="mt-3">
               Mapping the road to <span className="highlight">{role.length > 70 ? `${role.slice(0, 67).trimEnd()}…` : role}</span>
             </h1>
-            <div className="mt-8 h-2 overflow-hidden rounded-full bg-sky-2" role="progressbar" aria-label="Building your roadmap" aria-busy="true">
-              <span className="block h-full w-1/3 rounded-full bg-blue-edge motion-safe:animate-[indeterminate_1.6s_ease-in-out_infinite]" />
+            <div className="mt-8 h-2 overflow-hidden rounded-full bg-wash" role="progressbar" aria-label="Building your roadmap" aria-busy="true">
+              <span className="block h-full w-1/3 rounded-full bg-jade motion-safe:animate-[indeterminate_1.6s_ease-in-out_infinite]" />
             </div>
-            <p className="mt-6 text-ink-2">
+            <p className="mt-6 text-graphite">
               {status === "slow"
                 ? "Still working. Longer answers take a little more time."
                 : "Reading your answers, comparing them with the job, and picking projects. Usually under a minute."}

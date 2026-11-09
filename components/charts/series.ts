@@ -1,8 +1,9 @@
 /**
- * The only chart colours: one hue, two shades. Validated with the dataviz palette checker
- * (lightness band, chroma floor, CVD separation pass). The light shade sits below 3:1 on
- * white, so charts print every value in text ink beside the mark and never rely on colour
- * alone. Don't add a colour without re-running the validator (DESIGN.md, Charts).
+ * The only chart colours: the brand's one hue in two shades, mint and jade (docs/brand.md).
+ * They differ strongly in lightness (3.7:1 against each other), so they stay apart for
+ * colour-blind readers. Mint is faint on white (1.5:1), so charts never rely on it alone:
+ * values are printed or listed in text ink, and a hidden table carries the data.
+ * Checked by contrast maths on 9 Nov 2026, not re-run through the dataviz palette validator.
  */
-export const SERIES_LIGHT = "#6aa6ea";
-export const SERIES_DARK = "#1a56b8";
+export const SERIES_LIGHT = "#4fe9b4";
+export const SERIES_DARK = "#00755d";

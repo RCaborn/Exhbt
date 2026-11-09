@@ -23,19 +23,19 @@ export default async function Start({ searchParams }: { searchParams: Promise<Re
   );
 
   return (
-    <div className="flex min-h-[calc(100svh-2rem)] flex-col bg-sky">
+    <div className="flex min-h-[calc(100svh-2rem)] flex-col bg-mist">
       <header className="px-4 py-5 sm:px-8">
         <Wordmark />
       </header>
       <main id="main" className="flex flex-1 items-center px-4 pb-16 sm:px-8">
         <div className="mx-auto w-full max-w-[44rem]">
-          <h1 className="text-[2.4rem] sm:text-[3.6rem]">What job do you want?</h1>
+          <h1 className="">What job do you want?</h1>
           <div className="mt-8">
             <StartForm id="start-direct" hidden={utm} />
           </div>
         </div>
       </main>
-      <footer className="px-4 py-5 text-sm text-ink-2 sm:px-8">
+      <footer className="px-4 py-5 text-sm text-graphite sm:px-8">
         <Link href="/legal/privacy" className="link">Privacy</Link>
         <span aria-hidden> · </span>
         <Link href="/legal/terms" className="link">Terms</Link>

@@ -6,6 +6,7 @@ import { RefreshCw } from "lucide-react";
 import { keepPlan, swapIdea, type SwapState } from "@/app/(app)/roadmap/[id]/actions";
 import { IdeaCard } from "@/components/roadmap/IdeaCard";
 import type { ProjectIdea } from "@/lib/store";
+import { Button } from "@/components/ui/Button";
 
 /**
  * The plan of three, before it's settled (docs/decisions/0004): an optional note that steers
@@ -23,7 +24,7 @@ export function PlanEditor({ id, ideas, swapsLeft }: { id: string; ideas: Projec
   return (
     <form action={action} className="mt-8">
       <label htmlFor="note" className="label">
-        Make some tweaks <span className="font-normal text-ink-2">(optional)</span>
+        Make some tweaks <span className="font-normal text-graphite">(optional)</span>
       </label>
       <textarea
         id="note"
@@ -46,7 +47,7 @@ export function PlanEditor({ id, ideas, swapsLeft }: { id: string; ideas: Projec
       </ol>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <p id="swap-status" className="text-sm text-ink-2" aria-live="polite">
+        <p id="swap-status" className="text-sm text-graphite" aria-live="polite">
           {state?.error ? (
             <span className="text-error">{state.error}</span>
           ) : (
@@ -65,25 +66,18 @@ function SwapButton({ ideaId, title }: { ideaId: string; title: string }) {
   const { pending, data } = useFormStatus();
   const mine = pending && data?.get("ideaId") === ideaId;
   return (
-    <button
-      type="submit"
-      name="ideaId"
-      value={ideaId}
-      disabled={pending}
-      aria-label={`Swap: ${title}`}
-      className="btn btn-secondary min-h-10 px-4 text-sm"
-    >
+    <Button type="submit" size="sm" name="ideaId" value={ideaId} disabled={pending} label={`Swap: ${title}`}>
       <RefreshCw aria-hidden size={15} strokeWidth={2.25} className={mine ? "motion-safe:animate-spin" : undefined} />
       {mine ? "Swapping…" : "Swap"}
-    </button>
+    </Button>
   );
 }
 
 function KeepButton({ id }: { id: string }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" formAction={keepPlan.bind(null, id)} disabled={pending} className="btn btn-primary min-h-11 px-5 text-sm">
+    <Button type="submit" variant="primary" formAction={keepPlan.bind(null, id)} disabled={pending}>
       Keep this plan
-    </button>
+    </Button>
   );
 }

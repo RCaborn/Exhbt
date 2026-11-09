@@ -13,14 +13,14 @@ export const metadata: Metadata = {
 /** A full demo of a public portfolio. The real host is portfolioHost() in lib/hosts.ts. */
 export default function DemoPortfolio() {
   return (
-    <div className="bg-sky pb-16">
+    <div className="bg-mist pb-16">
       <PortfolioHeader
         owner={demoOwner}
         exhbts={demoExhbts}
         note={
           <>
             Demo portfolio. The person and projects are fictional.{" "}
-            <Link href="/pricing" className="font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-blue">
+            <Link href="/pricing" className="font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-mint">
               Get your own
             </Link>
           </>
