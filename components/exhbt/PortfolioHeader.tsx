@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import type { ExhbtData, PortfolioOwner } from "@/lib/exhbt";
+import { portfolioHost } from "@/lib/hosts";
 
 /*
  * The portfolio's one navy brand band. Text on it: white (about 14:1), #c9d7e8 for
@@ -34,7 +35,7 @@ function Initials({ name, small }: { name: string; small?: boolean }) {
 function LinkChip({ username }: { username: string }) {
   return (
     <p className="rounded-full border border-white/25 px-3 py-1 font-mono text-[0.8rem] text-white">
-      exhbt.co.uk/{username}
+      {portfolioHost(username)}
     </p>
   );
 }

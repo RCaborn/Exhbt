@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: "What an Exhbt portfolio looks like to an employer. A fictional graduate with four projects.",
 };
 
-/** A full demo of a public portfolio (the real one lives at exhbt.co.uk/<username>). */
+/** A full demo of a public portfolio. The real host is portfolioHost() in lib/hosts.ts. */
 export default function DemoPortfolio() {
   return (
     <div className="bg-sky pb-16">

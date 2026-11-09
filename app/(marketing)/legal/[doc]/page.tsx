@@ -6,7 +6,7 @@ type Doc = { title: string; updated: string; body: React.ReactNode };
 const DOCS: Record<string, Doc> = {
   privacy: {
     title: "Privacy policy",
-    updated: "5 November 2026",
+    updated: "8 November 2026",
     body: (
       <>
         <p>
@@ -17,7 +17,7 @@ const DOCS: Record<string, Doc> = {
         <ul>
           <li>Your email address, to create your account and send sign-in links.</li>
           <li>The text of your CV and anything you type into the roadmap form.</li>
-          <li>On Premium, the files and text you add to your exhbts.</li>
+          <li>The files and text you add to an exhbt.</li>
           <li>
             Product events such as &ldquo;roadmap completed&rdquo;, linked to your account. We do not use
             advertising or tracking cookies.

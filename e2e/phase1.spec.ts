@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { ENTITLEMENTS, PLAN_NAMES } from "../lib/entitlements";
+import { portfolioHost } from "../lib/hosts";
 import { buildRoadmap, SAMPLE_CV, uniqueEmail, waitForBuilder, waitForResult } from "./helpers";
 
 test.describe("Phase 1: from the home page to a roadmap", () => {
@@ -37,7 +39,7 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
   test("demo portfolio: header, tiles, and a tile opens the full exhbt with its flow diagram", async ({ page }) => {
     await page.goto("/demo");
     await expect(page.getByRole("heading", { level: 1, name: "Amara Okafor" })).toBeVisible();
-    await expect(page.getByText("exhbt.co.uk/amara")).toBeVisible();
+    await expect(page.getByText(portfolioHost("amara"))).toBeVisible();
     await page.getByRole("link", { name: /Forecasting A&E waiting times/ }).click();
     await expect(page).toHaveURL(/\/demo\/ae-forecast$/);
     await expect(page.getByRole("heading", { level: 1, name: /Forecasting A&E/ })).toBeVisible();
@@ -117,9 +119,9 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(page.getByText("SQL", { exact: true })).toBeVisible();
   });
 
-  test("pricing shows Free, Plus and Premium, each paid tier with its own waitlist", async ({ page }) => {
+  test("pricing shows Free, Plus and Pro, each paid tier with its own waitlist", async ({ page }) => {
     await page.goto("/pricing", { waitUntil: "networkidle" });
-    for (const tier of ["Free", "Plus", "Premium"]) {
+    for (const tier of [PLAN_NAMES.free, PLAN_NAMES.plus, PLAN_NAMES.premium]) {
       await expect(page.getByRole("heading", { level: 2, name: tier, exact: true })).toBeVisible();
     }
     await page.locator("#waitlist-pricing-plus").fill(`wait+${Date.now()}@example.com`);
@@ -176,14 +178,16 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(page.getByRole("link", { name: new RegExp(`to ${email.replace("+", "\\+")}`) })).toHaveCount(1);
   });
 
-  test("free plan: a fourth roadmap for the same email in a month is refused", async ({ page }) => {
+  test("free plan: a roadmap past the monthly limit is refused", async ({ page }) => {
     const email = uniqueEmail("limit");
-    for (let i = 0; i < 3; i++) {
+    const limit = ENTITLEMENTS.free.roadmapsPer30Days;
+    for (let i = 0; i < limit; i++) {
       await buildRoadmap(page, { email, role: `Role ${i}` });
       await page.waitForURL(/\/roadmap\/[0-9a-f-]{36}/);
     }
-    await buildRoadmap(page, { email, role: "Role 4" });
-    await expect(page.getByText("You've used this month's 3 free roadmaps.")).toBeVisible();
+    await buildRoadmap(page, { email, role: "One more" });
+    const noun = limit === 1 ? "roadmap" : "roadmaps";
+    await expect(page.getByText(`You've used this month's ${limit} free ${noun}.`)).toBeVisible();
   });
 
   test("unsubscribe rejects a tampered token", async ({ page }) => {

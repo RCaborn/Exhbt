@@ -91,7 +91,7 @@ export const exampleExhbt: ExhbtData = {
   checkedOn: "12 March 2026",
 };
 
-/** The owner of a portfolio (exhbt.co.uk/<username>). */
+/** The owner of a portfolio. The public host is portfolioHost() in lib/hosts.ts. */
 export type PortfolioOwner = {
   username: string;
   name: string;

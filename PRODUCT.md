@@ -11,7 +11,7 @@
 
 **Tone:** Plain British English. Short sentences. Concrete nouns. No hype words.
 
-**Plans (6 Nov 2026):** Free (roadmaps, 3 refreshes a month, no exhbts) · Premium (up to 10 hosted exhbts + a custom link per employer; price TBC, waitlist) · Institutional (universities, £6,000–18,000/year; students get Premium) · Employers always free.
+**Plans:** Free, Plus, and Pro, plus a university licence whose students get Pro. Figures and what each tier includes: `lib/entitlements.ts`. Employers always free. Paid tiers are waitlist-only until a price exists.
 
 **Constraints:** UK GDPR, WCAG 2.1 AA, public pages fast on mobile, year-one fixed costs £300–500.
 

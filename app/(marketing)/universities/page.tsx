@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PLAN_NAMES } from "@/lib/entitlements";
 import { LeadForm } from "./LeadForm";
 
 export const metadata: Metadata = {
@@ -26,7 +27,7 @@ export default function UniversitiesPage() {
       <div className="max-w-3xl">
         <h1 className="text-[2.8rem] sm:text-[4.4rem]">For universities</h1>
         <p className="mt-4 text-lg text-ink-2">
-          Give every student a roadmap and Premium, and see which courses are turning project work into
+          Give every student a roadmap and {PLAN_NAMES.premium}, and see which courses are turning project work into
           evidence employers open. Licences run for a year and are invoiced, from £6,000 depending on cohort size.
         </p>
       </div>

@@ -45,7 +45,7 @@ export default function Home() {
             />
             <Stage
               title="Turn it into an exhbt"
-              body="Add the report, notes or results. We draft a short exhbt with the methodology as a flow and a chart of the key result, from what you gave us and nothing else. You confirm it's yours, and it passes an originality check."
+              body={`Add the report, notes or results. We draft a short exhbt with the methodology as a flow and a chart of the key result, from what you gave us and nothing else. You confirm it's yours. On ${PLAN_NAMES.premium}, publishing also runs an originality check.`}
               artifact={<EditorExcerpt />}
             />
             <Stage
@@ -83,7 +83,7 @@ export default function Home() {
         <div className="mx-auto max-w-[78rem] px-4 py-20 sm:px-8 lg:py-28">
           <h2 id="pricing" className="text-[2.4rem] sm:text-[3.4rem]">Free to start</h2>
           <p className="mt-4 max-w-2xl text-lg text-ink-2">
-            Your roadmap is free. When you have work worth showing, {PLAN_NAMES.plus} and {PLAN_NAMES.premium} host it.{" "}
+            Your roadmap is free, and {PLAN_NAMES.free} includes a portfolio link. {PLAN_NAMES.plus} and {PLAN_NAMES.premium} raise the limits.{" "}
             <Link href="/pricing" className="link text-ink">Compare plans</Link>
           </p>
           <div className="mt-12 grid gap-4 md:grid-cols-3">

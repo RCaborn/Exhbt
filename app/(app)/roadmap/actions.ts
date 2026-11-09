@@ -7,7 +7,7 @@ import { getStore } from "@/lib/store";
 import { getCurrentUser } from "@/lib/auth";
 import { callerIpHash, grantBrowserAccess } from "@/lib/access";
 import { hashInput } from "@/lib/hash";
-import { ENTITLEMENTS } from "@/lib/entitlements";
+import { ENTITLEMENTS, PLAN_NAMES } from "@/lib/entitlements";
 
 type Field = "targetRole" | "situation" | "education" | "email";
 export type FormState = { error?: string; fieldErrors?: Partial<Record<Field, string>>; step?: number } | undefined;
@@ -15,8 +15,8 @@ export type FormState = { error?: string; fieldErrors?: Partial<Record<Field, st
 /** Which builder step each field lives on (order agreed 6 Nov: job, situation, education & skills, email). */
 const STEP_OF: Record<Field, number> = { targetRole: 1, situation: 2, education: 3, email: 4 };
 
-/** Free plan "refreshes": roadmaps per email in any 30 days (lib/entitlements.ts). */
-const FREE_PER_30_DAYS = ENTITLEMENTS.free.roadmapsPer30Days ?? Infinity;
+/** Free plan refreshes: roadmaps per email in any 30 days (lib/entitlements.ts). */
+const FREE_PER_30_DAYS = ENTITLEMENTS.free.roadmapsPer30Days;
 /** Abuse guard, independent of plan. */
 const PER_IP_PER_DAY = 10;
 
@@ -56,7 +56,7 @@ export async function startRoadmap(_prev: FormState, form: FormData): Promise<Fo
   const ipHash = await callerIpHash();
   if ((await store.countRecentRoadmaps(email.data, 24 * 30)) >= FREE_PER_30_DAYS) {
     return {
-      error: `You've used this month's ${FREE_PER_30_DAYS} free roadmaps. Plus and Premium will have unlimited refreshes: join the waitlist on the pricing page.`,
+      error: `You've used this month's ${FREE_PER_30_DAYS} free ${FREE_PER_30_DAYS === 1 ? "roadmap" : "roadmaps"}. ${PLAN_NAMES.plus} and ${PLAN_NAMES.premium} include more: join the waitlist on the pricing page.`,
       step: 4,
     };
   }
