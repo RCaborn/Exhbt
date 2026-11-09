@@ -44,12 +44,13 @@ You'll come back to Supabase in step 5 once you know the site's address.
 ## 4. Cloudflare (hosting) · ~10 min
 
 1. **Upgrade to Workers Paid ($5/month)** under Workers & Pages > Plans. The free plan's per-request processing limit is likely too tight for this app. Pages can fail with error **1102** on it.
-2. **Workers & Pages > Create > Import a repository.** Connect GitHub and choose **`RCaborn/Terna`**.
+2. **Workers & Pages > Create > Import a repository.** Connect GitHub and choose **`RCaborn/Exhbt`** (it was called `RCaborn/Terna` before the rename).
 3. Settings on that screen:
    - Project name: **`terna`** (must match `"name"` in `wrangler.jsonc`)
    - Production branch: **`main`**
    - Build command: `npx opennextjs-cloudflare build` (**not** the default `npm run build`, which fails at the deploy step with "Could not find compiled Open Next config")
    - Deploy command: `npx opennextjs-cloudflare deploy`
+   - If an existing Worker fails with that error, fix the two commands under the Worker's **Settings > Build**, then retry the latest build under **Deployments**.
 4. Click **Deploy**. The first deploy will build but won't work yet (no keys). That's expected.
 5. In the new Worker, open **Settings**:
    - **Build > Variables and secrets** (used while building). Add:
