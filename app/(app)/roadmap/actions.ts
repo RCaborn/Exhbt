@@ -9,11 +9,11 @@ import { callerIpHash, grantBrowserAccess } from "@/lib/access";
 import { hashInput } from "@/lib/hash";
 import { ENTITLEMENTS, PLAN_NAMES } from "@/lib/entitlements";
 
-type Field = "targetRole" | "situation" | "education" | "email";
+type Field = "targetRole" | "cv" | "situation" | "education" | "email";
 export type FormState = { error?: string; fieldErrors?: Partial<Record<Field, string>>; step?: number } | undefined;
 
-/** Which builder step each field lives on (order agreed 6 Nov: job, situation, education & skills, email). */
-const STEP_OF: Record<Field, number> = { targetRole: 1, situation: 2, education: 3, email: 4 };
+/** Which builder step each field lives on (docs/decisions/0003: job, CV, situation with education and skills, email). */
+const STEP_OF: Record<Field, number> = { targetRole: 1, cv: 2, situation: 3, education: 3, email: 4 };
 
 /** Free plan refreshes: roadmaps per email in any 30 days (lib/entitlements.ts). */
 const FREE_PER_30_DAYS = ENTITLEMENTS.free.roadmapsPer30Days;
@@ -43,7 +43,8 @@ export async function startRoadmap(_prev: FormState, form: FormData): Promise<Fo
     const fieldErrors: NonNullable<FormState>["fieldErrors"] = {};
     for (const issue of parsed.error?.issues ?? []) {
       const p = issue.path[0];
-      const key: Field | null = p === "targetRole" || p === "situation" ? p : p === "email" ? null : "education";
+      const key: Field | null =
+        p === "targetRole" || p === "situation" ? p : p === "cvText" ? "cv" : p === "email" ? null : "education";
       if (key) fieldErrors[key] ??= issue.message;
     }
     if (!email.success) fieldErrors.email = "Enter a valid email address.";

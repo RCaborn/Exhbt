@@ -24,9 +24,9 @@ Plus and Pro are waitlist-only. They have no public price.
 
 ## What a person does
 
-Organic visits start on the home page. Ads, social, and QR codes use `/start`. Both ask for the job, then the builder: situation, education and skills, email. The roadmap shows straight away. The order is the `STEPS` array in `app/(app)/roadmap/new/RoadmapWizard.tsx`.
+Organic visits start on the home page. Ads, social, and QR codes use `/start`. Both ask for the job, then the builder: the CV (skippable), where you are now with education and skills, email. The roadmap shows straight away. The order is the `STEPS` array in `app/(app)/roadmap/new/RoadmapWizard.tsx`.
 
-The result is five screens, listed as `VIEWS` in `components/roadmap/RoadmapViews.tsx`.
+The result is five screens, listed as `VIEWS` in `components/roadmap/RoadmapViews.tsx`. Gaps opens with a skill radar (you now against what the job asks for), and Projects ends with the same radar after the projects. The skill map and its rules are in `docs/decisions/0003-cv-step-and-skill-radar.md`; the after-projects rule is `lib/roadmap/skills.ts`.
 
 An exhbt is title, outcome, methodology flow, key-result chart, skill boxes, the work, verification, reflection. The component is `components/exhbt/Exhbt.tsx`.
 

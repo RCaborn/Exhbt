@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ExhbtTile } from "@/components/exhbt/ExhbtTile";
 import { FeatureList } from "@/components/site/FeatureList";
 import { EditorExcerpt, LinkExcerpt, RoadmapExcerpt } from "@/components/home/Excerpts";
+import { SkillsGapExample } from "@/components/home/SkillsGapExample";
 import { StartForm } from "@/components/home/StartForm";
 import { demoExhbts } from "@/lib/exhbt";
 import { EXHBTS_PER_JOB_LINK, PLAN_NAMES, PRICES, planFeatures } from "@/lib/entitlements";
@@ -25,6 +26,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* The skills-gap chart, shown with the fictional demo graduate. */}
+      <SkillsGapExample />
 
       {/* The journey: one rail, three real artifacts. */}
       <section aria-labelledby="how" className="bg-sky">

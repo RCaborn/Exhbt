@@ -2,7 +2,10 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, Mail } from "lucide-react";
 import { WaitlistForm } from "@/components/waitlist/WaitlistForm";
 import { PLAN_NAMES } from "@/lib/entitlements";
+import { SkillRadar } from "@/components/charts/SkillRadar";
 import type { Roadmap } from "@/lib/ai/schemas";
+import { SKILLS_SOURCE_NOTE } from "@/lib/jobs/claim";
+import { biggestGaps, chartableSkills, nowVersusAfter, nowVersusNeeded, sortGapsByShortfall } from "@/lib/roadmap/skills";
 
 export const VIEWS = [
   { key: "overview", label: "Overview" },
@@ -121,16 +124,42 @@ function SummaryRow({ href, label }: { href: string; label: string }) {
 }
 
 function Gaps({ roadmap, role }: { roadmap: Roadmap; role: string }) {
+  const skills = chartableSkills(roadmap);
+  const biggest = skills ? biggestGaps(skills) : [];
+  const gaps = skills ? sortGapsByShortfall(roadmap.gaps, skills) : roadmap.gaps;
   return (
     <>
       <Context role={role} />
       <h1 className="mt-2 text-[2.2rem] sm:text-[3rem]">Gaps to close</h1>
       <p className="mt-3 text-ink-2">Skills this role asks for that your CV doesn&rsquo;t show yet, or not enough.</p>
+      {skills && (
+        <div className="mt-8">
+          <SkillRadar
+            title="You now, against what the job asks for"
+            fromLabel="You now"
+            toLabel="What the job asks for"
+            points={nowVersusNeeded(skills)}
+            note={SKILLS_SOURCE_NOTE}
+          />
+          {biggest.length > 0 && (
+            <p className="mt-5 text-[1.05rem]">
+              {biggest.length === 1 ? "Your biggest gap is " : "Your biggest gaps are "}
+              {biggest.map((s, i) => (
+                <span key={s.skill}>
+                  {i > 0 && " and "}
+                  <span className="font-semibold">{s.skill}</span>
+                </span>
+              ))}
+              .
+            </p>
+          )}
+        </div>
+      )}
       {roadmap.gaps.length === 0 ? (
         <Empty>Your CV already covers what this role usually asks for. Look at the projects anyway: evidence beats claims.</Empty>
       ) : (
         <ul className="mt-8 divide-y divide-rule border-y border-rule">
-          {roadmap.gaps.map((g) => (
+          {gaps.map((g) => (
             <li key={g.skill} className="grid gap-2 py-5 sm:grid-cols-[1fr_9rem] sm:gap-8">
               <div>
                 <p className="text-[1.15rem] font-bold tracking-[-0.01em]">{g.skill}</p>
@@ -182,7 +211,33 @@ function Projects({ roadmap, role }: { roadmap: Roadmap; role: string }) {
           ))}
         </ol>
       )}
+      <AfterProjects roadmap={roadmap} />
     </>
+  );
+}
+
+/** The same radar again, showing where finishing the projects would take them. */
+function AfterProjects({ roadmap }: { roadmap: Roadmap }) {
+  const skills = chartableSkills(roadmap);
+  if (!skills) return null;
+  const points = nowVersusAfter(skills, roadmap);
+  if (!points.some((p) => p.to > p.from)) return null;
+  return (
+    <section aria-labelledby="after-projects" className="mt-10 border-t border-rule pt-8">
+      <h2 id="after-projects" className="text-[1.6rem] sm:text-[2rem]">When you&rsquo;ve finished these projects</h2>
+      <p className="mt-2 max-w-[38rem] text-ink-2">
+        A finished project counts as level 3 for each skill it closes: you used it, and you can show what you did.
+      </p>
+      <div className="mt-6">
+        <SkillRadar
+          title="You now, against where the projects would take you"
+          fromLabel="You now"
+          toLabel="After the projects"
+          points={points}
+          note={SKILLS_SOURCE_NOTE}
+        />
+      </div>
+    </section>
   );
 }
 

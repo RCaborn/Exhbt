@@ -4,13 +4,13 @@ import { portfolioHost } from "../lib/hosts";
 import { buildRoadmap, SAMPLE_CV, uniqueEmail, waitForBuilder, waitForResult } from "./helpers";
 
 test.describe("Phase 1: from the home page to a roadmap", () => {
-  test("home job field pre-fills the builder and starts at the situation step", async ({ page }) => {
+  test("home job field pre-fills the builder and starts at the CV step", async ({ page }) => {
     await page.goto("/");
     await page.locator("#start-hero").fill("Junior data analyst");
     await page.locator("form:has(#start-hero) button[type=submit]").click();
     await page.waitForURL(/\/roadmap\/new\?role=/);
     await expect(page.getByText("Step 2 of 4")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Where are you now?" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Add your CV" })).toBeVisible();
   });
 
   test("/start is just the search bar, and carries ad tracking into the builder", async ({ page }) => {
@@ -34,6 +34,19 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     const heroBottom = (await page.locator("form:has(#start-hero)").boundingBox())!;
     expect((await tiles.first().boundingBox())!.y).toBeGreaterThan(heroBottom.y + heroBottom.height);
     await expect(tiles.first().getByRole("list", { name: "Methodology" })).toBeVisible();
+  });
+
+  test("home: an example skills chart, labelled as fictional, with its data in a table", async ({ page }) => {
+    await page.goto("/");
+    const section = page.locator("section[aria-labelledby=gaps-example]");
+    await expect(section.getByRole("heading", { level: 2 })).toBeVisible();
+    await expect(section.getByText("Example: Amara is a fictional graduate.").first()).toBeVisible();
+    const now = section.getByRole("table", { name: /Amara now/ });
+    await expect(now.getByRole("row", { name: /Dashboards 0 of 4 3 of 4/ })).toBeAttached();
+    const after = section.getByRole("table", { name: /After the two suggested projects/ });
+    await expect(after.getByRole("row", { name: /Dashboards 0 of 4 3 of 4/ })).toBeAttached();
+    // Excel isn't covered by a project, so it stays where it is.
+    await expect(after.getByRole("row", { name: /Excel 2 of 4 2 of 4/ })).toBeAttached();
   });
 
   test("demo portfolio: header, tiles, and a tile opens the full exhbt with its flow diagram", async ({ page }) => {
@@ -76,28 +89,34 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await page.locator("#role").fill("UX researcher in a health tech company");
     await page.getByRole("button", { name: /Continue/ }).click();
     await expect(page.getByText("Step 2 of 4")).toBeVisible();
-    await page.getByRole("button", { name: /Continue/ }).click();
-    await expect(page.getByText("Choose the option closest to where you are now.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Add your CV" })).toBeVisible();
 
-    await page.getByLabel("At university").check();
-    await page.getByRole("button", { name: /Continue/ }).click();
+    // The CV step can be skipped; then step 3 needs a situation and some education or skills.
+    await page.getByRole("button", { name: /Skip, I.ll type it in instead/ }).click();
     await expect(page.getByText("Step 3 of 4")).toBeVisible();
     await page.getByRole("button", { name: /Continue/ }).click();
+    await expect(page.getByText("Choose the option closest to where you are now.")).toBeVisible();
     await expect(page.getByText("Tell us a little about your education or skills")).toBeVisible();
 
-    // The CV is optional and lives behind a toggle; pasted text counts.
-    await page.getByRole("button", { name: /Add your CV/ }).click();
+    // Go back and add the CV instead: pasted text counts, and step 3 then only needs the situation.
+    await page.getByRole("button", { name: /Back/ }).click();
+    await expect(page.getByText("Step 2 of 4")).toBeVisible();
     await page.getByText("Paste the text").click();
     await page.locator("#cvPaste").fill(SAMPLE_CV);
+    await expect(page.getByRole("button", { name: /Skip, I.ll type it in instead/ })).toHaveCount(0);
+    await page.getByRole("button", { name: /Continue/ }).click();
+    await expect(page.getByText("Step 3 of 4")).toBeVisible();
+    await expect(page.getByText("We have your CV.")).toBeVisible();
+    await page.getByLabel("At university").check();
     await page.getByRole("button", { name: /Continue/ }).click();
     await expect(page.getByText("Step 4 of 4")).toBeVisible();
 
     await page.getByRole("button", { name: /Back/ }).click();
     await expect(page.getByText("Step 3 of 4")).toBeVisible();
-    await expect(page.locator("#cvPaste")).toHaveValue(SAMPLE_CV);
+    await expect(page.getByLabel("At university")).toBeChecked();
     await page.getByRole("button", { name: /Back/ }).click();
     await expect(page.getByText("Step 2 of 4")).toBeVisible();
-    await expect(page.getByLabel("At university")).toBeChecked();
+    await expect(page.locator("#cvPaste")).toHaveValue(SAMPLE_CV);
     await page.getByRole("button", { name: /Back/ }).click();
     await expect(page.getByText("Step 1 of 4")).toBeVisible();
     await expect(page.locator("#role")).toHaveValue("UX researcher in a health tech company");
@@ -116,7 +135,28 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await buildRoadmap(page, { email: uniqueEmail("jobs"), role: "Junior data analyst in the NHS" });
     await waitForResult(page);
     await page.goto(`${page.url().split("?")[0]}?view=gaps`);
-    await expect(page.getByText("SQL", { exact: true })).toBeVisible();
+    await expect(page.getByRole("listitem").getByText("SQL", { exact: true })).toBeVisible();
+  });
+
+  test("the skills radar shows the gaps, then where the projects would take you", async ({ page }) => {
+    await buildRoadmap(page, { email: uniqueEmail("radar"), role: "Junior data analyst", withCv: true });
+    await waitForResult(page);
+    const base = page.url().split("?")[0];
+
+    // Development placeholder roadmap: SQL shows some evidence (1), Excel none, needed level 3.
+    await page.goto(`${base}?view=gaps`);
+    const now = page.getByRole("table", { name: "You now, against what the job asks for" });
+    await expect(now.getByRole("row", { name: "SQL 1 of 4 3 of 4" })).toBeAttached();
+    await expect(now.getByRole("row", { name: "Excel 0 of 4 3 of 4" })).toBeAttached();
+    await expect(page.getByText(/Your biggest gaps are/)).toBeVisible();
+    await expect(page.getByText(/Skills picked by AI/).first()).toBeVisible();
+
+    // The placeholder project closes SQL, so SQL rises to 3; Excel stays at 0.
+    await page.goto(`${base}?view=projects`);
+    await expect(page.getByRole("heading", { level: 2, name: "When you’ve finished these projects" })).toBeVisible();
+    const after = page.getByRole("table", { name: "You now, against where the projects would take you" });
+    await expect(after.getByRole("row", { name: "SQL 1 of 4 3 of 4" })).toBeAttached();
+    await expect(after.getByRole("row", { name: "Excel 0 of 4 0 of 4" })).toBeAttached();
   });
 
   test("pricing shows Free, Plus and Pro, each paid tier with its own waitlist", async ({ page }) => {

@@ -1,15 +1,16 @@
 import type { KeyResult } from "@/lib/exhbt";
+import { SERIES_DARK, SERIES_LIGHT } from "@/components/charts/series";
 
 /**
  * Before/after dumbbell: one row per measure, a light dot (before) joined to a dark dot
- * (after). One hue, two shades: validated with the dataviz palette checker (lightness band,
- * chroma floor, CVD separation pass). The light shade sits below 3:1 on white, so every
- * value is printed beside its dot, and a visually hidden table carries the same data.
+ * (after). One hue, two shades (components/charts/series.ts). The light shade sits below
+ * 3:1 on white, so every value is printed beside its dot, and a visually hidden table
+ * carries the same data.
  * Built in HTML rather than SVG so text stays crisp and the layout reflows on phones.
  */
 
-const BEFORE = "#6aa6ea";
-const AFTER = "#1a56b8";
+const BEFORE = SERIES_LIGHT;
+const AFTER = SERIES_DARK;
 
 export function BeforeAfterChart({ data }: { data: KeyResult }) {
   const unit = data.unit ?? "";

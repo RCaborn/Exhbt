@@ -4,7 +4,7 @@ Phase 1 is everything up to a student or graduate receiving their free roadmap, 
 
 The current shape is [docs/MAP.md](docs/MAP.md). Plan figures are `lib/entitlements.ts`. Hosts are `lib/hosts.ts`. In short:
 - Domain **exhbt.co.uk**; portfolio pieces are **exhbts**.
-- Builder order: job, situation, education & skills, then email.
+- Builder order: job, CV (skippable), situation with education & skills, then email.
 - Plus and Pro are waitlist-only. The public name Pro is stored as `premium`.
 - Universities pay; employers are always free.
 - A portfolio is a subdomain of the apex (`lib/hosts.ts`). That split is decided and not routed yet.
@@ -16,7 +16,7 @@ Organic traffic:  Home "Describe the job you want" ─► /roadmap/new?role=… 
 Directed traffic: /start (ads, social, QR): search bar only ─► /roadmap/new?role=… (+ utm_*)
 
 Builder, one question per screen (/roadmap/new?step=1..4)
-  1 Describe the job ─► 2 Current situation ─► 3 Education & skills (CV optional) ─► 4 Email + opt-in
+  1 Describe the job ─► 2 CV (skippable) ─► 3 Situation, education & skills ─► 4 Email + opt-in
   └─ submit (server action startRoadmap)
        ├─ validate; Free limit 3 roadmaps per email per 30 days; 10/day per connection
        ├─ store the roadmap request
@@ -74,6 +74,7 @@ Useful dev-only pages:
 | Demo portfolio (`/demo`, fictional person, 4 projects) | `app/(marketing)/demo/`; data in `lib/exhbt.ts` (`demoOwner`, `demoExhbts`) |
 | Tier checklists (pricing page, home) | `planFeatures()` in `lib/entitlements.ts`, rendered by `components/site/FeatureList.tsx` |
 | The exhbt card (methodology flow, chart, skills) | `components/exhbt/Exhbt.tsx`, `MethodFlow.tsx`, `BeforeAfterChart.tsx`; data shape and example in `lib/exhbt.ts` |
+| The skill radar (roadmap Gaps and Projects screens, home example) | `components/charts/SkillRadar.tsx`; levels and the after-projects rule in `lib/roadmap/skills.ts`; home data in `components/home/SkillsGapExample.tsx` |
 | Plans and limits (Free/Plus/Pro/Universities), tier names | `lib/entitlements.ts`; pricing page `app/(marketing)/pricing/page.tsx` |
 | "We've read N UK job profiles" line | `lib/jobs/claim.ts` (shows only when `NEXT_PUBLIC_JOBS_DATASET_ROLES` ≥ 1,000) |
 | Pro waitlist (interest value `premium`) | `components/waitlist/` (form + server action), `waitlist` table |
