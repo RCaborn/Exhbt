@@ -11,8 +11,9 @@ import type { Roadmap } from "./ai/schemas";
 export class GenerationError extends Error {}
 
 /**
- * Makes sure a roadmap has output (cache first, then the model) and that its email has
- * gone out once. Safe to call repeatedly: a second call does no AI work and sends nothing.
+ * Makes sure a roadmap has output (cache first, then the model) and, if its email is known,
+ * that the email has gone out once. Safe to call repeatedly: a second call does no AI work
+ * and sends nothing.
  */
 export async function ensureRoadmap(record: RoadmapRecord, userId: string | null): Promise<Roadmap> {
   const store = getStore();
@@ -43,16 +44,25 @@ export async function ensureRoadmap(record: RoadmapRecord, userId: string | null
     await store.logEvent("roadmap_completed", userId, { cached: fromCache });
   }
 
-  if (record.pendingEmail && (await store.markEmailSent(record.id))) {
-    try {
-      await sendRoadmapEmail(record, roadmap);
-      await store.logEvent("roadmap_emailed", userId);
-    } catch (e) {
-      // The roadmap is already on screen; a failed email must not break that.
-      console.error("roadmap email failed", (e as Error).message);
-    }
-  }
+  await emailRoadmapOnce(record, roadmap, userId);
   return roadmap;
+}
+
+/**
+ * Sends the roadmap email the first time it's possible: when the roadmap has output and an
+ * email. That's straight after generation for someone signed in, and at the project-ideas
+ * gate for everyone else (docs/decisions/0004). Safe to call repeatedly.
+ */
+export async function emailRoadmapOnce(record: RoadmapRecord, roadmap: Roadmap, userId: string | null) {
+  const store = getStore();
+  if (!record.pendingEmail || !(await store.markEmailSent(record.id))) return;
+  try {
+    await sendRoadmapEmail(record, roadmap);
+    await store.logEvent("roadmap_emailed", userId);
+  } catch (e) {
+    // The roadmap is already on screen; a failed email must not break that.
+    console.error("roadmap email failed", (e as Error).message);
+  }
 }
 
 async function sendRoadmapEmail(record: RoadmapRecord, roadmap: Roadmap) {

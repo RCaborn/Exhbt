@@ -3,12 +3,13 @@
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { submitLead, type LeadState } from "./actions";
+import { Button } from "@/components/ui/Button";
 
 export function LeadForm() {
   const [state, action] = useActionState<LeadState, FormData>(submitLead, undefined);
   if (state?.ok) {
     return (
-      <p role="status" className="rounded border border-rule bg-surface px-5 py-4">
+      <p role="status" className="rounded border border-line bg-surface px-5 py-4">
         Thanks. We will be in touch within two working days.
       </p>
     );
@@ -25,7 +26,7 @@ export function LeadForm() {
       <Field id="institution" label="University or college" error={err.institution} autoComplete="organization" />
       <div>
         <label htmlFor="message" className="label">
-          Anything we should know <span className="font-normal text-ink-2">(optional)</span>
+          Anything we should know <span className="font-normal text-graphite">(optional)</span>
         </label>
         <textarea id="message" name="message" rows={4} maxLength={2000} className="field" placeholder="Cohort size, timing, questions" />
       </div>
@@ -60,8 +61,8 @@ function Field({
 function Submit() {
   const { pending } = useFormStatus();
   return (
-    <button className="btn btn-primary" disabled={pending}>
+    <Button type="submit" variant="primary" label="Send" loading={pending}>
       {pending ? "Sending…" : "Send"}
-    </button>
+    </Button>
   );
 }

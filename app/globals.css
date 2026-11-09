@@ -1,35 +1,43 @@
+/* Layer order first: Astryx's reset lowest, its components and theme in the middle, and the
+   site's own classes and Tailwind utilities on top (astryx docs styling-libraries/tailwind). */
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
+
 @import "tailwindcss";
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
+@import "../themes/exhbt/exhbt.css";
 
 @theme {
-  /* One hue family (blue, ~hue 240) built in OKLCH, per garden-skills guidance.
-     White and light blue lead; navy is ink; green is a rare single accent. */
-  --color-sky: oklch(0.965 0.018 240);
-  --color-sky-2: oklch(0.915 0.045 237);
-  --color-blue: oklch(0.84 0.09 234);
-  --color-blue-press: oklch(0.79 0.11 236);
-  --color-blue-edge: oklch(0.64 0.12 242);
+  /* Brand kit v1 (docs/brand.md). Mint leads, jade is mint's text-safe partner, ink is the
+     text, the canvas is white, and the greys are neutral with no blue cast.
+     The same values feed the Astryx theme in themes/exhbt/exhbtTheme.ts: change both together. */
+  --color-mint: #4fe9b4;
+  --color-mint-press: #36dda4;
+  --color-jade: #00755d;
+  --color-ink: #0e0f12;
   --color-surface: #ffffff;
-  --color-ink: oklch(0.25 0.06 258);
-  --color-ink-2: oklch(0.45 0.05 252);
-  --color-rule: oklch(0.89 0.025 245);
-  --color-field: oklch(0.7 0.05 245);
-  --color-quiet: oklch(0.52 0.04 250);
-  /* The accent: a fresh leaf green, used only for "checked" ticks. */
-  --color-green: oklch(0.78 0.17 150);
-  --color-error: #b42318;
-  /* Legacy alias. */
-  --color-paper: oklch(0.965 0.018 240);
+  --color-wash: #e3fcf0;
+  --color-graphite: #3e4044;
+  --color-slate: #6f7278;
+  --color-line: #e5e6e8;
+  --color-mist: #f6f7f8;
+  --color-error: #c92324;
+  /* Input borders: 3.5:1 on white, so the control's edge is visible. Not in the kit. */
+  --color-field: #85888e;
+  /* Light text on ink bands (9.9:1). */
+  --color-on-ink: #c9cbcf;
 
-  --font-display: "Schibsted Grotesk", system-ui, sans-serif;
-  --font-sans: "Schibsted Grotesk", system-ui, sans-serif;
-  --font-serif: "Newsreader", Georgia, serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  /* Two typefaces only: Bricolage Grotesque for display, Inter for everything else.
+     Figures use Inter with tabular numbers (.font-mono below). */
+  --font-display: "Bricolage Grotesque Variable", "Inter", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "Inter", system-ui, sans-serif;
 
-  --radius-sm: 6px;
-  --radius: 10px;
-  --radius-doc: 4px;
+  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-doc: 8px;
 
-  --shadow-pack: 0 1px 2px oklch(0.25 0.06 258 / 0.06), 0 14px 36px oklch(0.6 0.1 240 / 0.16);
+  --shadow-pack: 0 1px 2px rgb(14 15 18 / 0.05), 0 12px 32px rgb(14 15 18 / 0.08);
 }
 
 @layer base {
@@ -37,7 +45,7 @@
     background: var(--color-surface);
     color: var(--color-ink);
     font-family: var(--font-sans);
-    font-size: 17px;
+    font-size: 16px;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -46,91 +54,94 @@
     background: var(--color-surface);
     min-height: 100dvh;
   }
+  /* The kit's web scale: 48, 32, 22, 16, 13 px. Headings take their size from here, not from
+     per-page classes, so there is one heading scale. Phones step h1 and h2 down. */
   h1,
   h2,
   h3 {
     font-family: var(--font-display);
-    font-weight: 800;
+    font-weight: 600;
     letter-spacing: -0.03em;
-    line-height: 1.02;
+    line-height: 1.05;
     text-wrap: balance;
+    color: var(--color-ink);
+  }
+  h1 {
+    font-size: 2.25rem;
+  }
+  h2 {
+    font-size: 1.75rem;
+    line-height: 1.1;
   }
   h3 {
-    font-weight: 700;
+    font-size: 1.375rem;
     letter-spacing: -0.02em;
     line-height: 1.15;
+  }
+  @media (min-width: 640px) {
+    h1 {
+      font-size: 3rem;
+    }
+    h2 {
+      font-size: 2rem;
+    }
+  }
+  /* Two display steps for marketing pages only: the page's opening line and section titles. */
+  .display {
+    font-size: clamp(2.75rem, 7.2vw, 4.75rem);
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
+  .display-2 {
+    font-size: 2rem;
+    line-height: 1.05;
+  }
+  @media (min-width: 640px) {
+    .display-2 {
+      font-size: 2.75rem;
+    }
   }
   p,
   li,
   dd {
     text-wrap: pretty;
   }
-  /* Mid-blue ring with a navy halo: visible on white, sky, blue buttons and navy. */
+  /* Jade ring with an ink halo: visible on white, mist, mint and ink. */
   :focus-visible {
-    outline: 3px solid var(--color-blue-edge);
+    outline: 3px solid var(--color-jade);
     outline-offset: 2px;
     box-shadow: 0 0 0 5px var(--color-surface), 0 0 0 7px var(--color-ink);
     border-radius: 6px;
   }
   ::selection {
-    background: var(--color-blue);
+    background: var(--color-mint);
     color: var(--color-ink);
   }
 }
 
 @layer components {
+  /* Links: an underline that draws darker on hover. Jade where the text itself is the link colour. */
   .link {
     text-decoration: underline;
     text-decoration-thickness: 2px;
     text-underline-offset: 4px;
-    text-decoration-color: var(--color-sky-2);
+    text-decoration-color: color-mix(in srgb, var(--color-jade) 40%, transparent);
     transition: text-decoration-color 160ms ease;
   }
   .link:hover {
-    text-decoration-color: var(--color-blue-edge);
+    text-decoration-color: var(--color-jade);
   }
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    min-height: 44px;
-    padding: 0 1.3rem;
-    border-radius: 999px;
-    font-weight: 600;
-    font-size: 0.95rem;
-    line-height: 1;
-    transition:
-      background-color 160ms ease,
-      transform 80ms ease;
+  /* Buttons are Astryx Buttons (components/ui/Button.tsx); the theme makes them pills.
+     These size steps sit on top of Astryx's own sizes. */
+  .btn-lg {
+    min-height: 48px;
+    padding-inline: 1.5rem;
+    font-size: 1rem;
   }
-  .btn:active {
-    transform: translateY(1px);
-  }
-  /* Light-blue pill. The deeper blue edge keeps it visible on white. */
-  .btn-primary {
-    background: var(--color-blue);
-    color: var(--color-ink);
-    border: 1.5px solid var(--color-blue-edge);
-    box-shadow: 0 6px 16px oklch(0.64 0.12 242 / 0.22);
-  }
-  .btn-primary:hover {
-    background: var(--color-blue-press);
-  }
-  .btn-ink {
-    background: var(--color-ink);
-    color: #fff;
-  }
-  .btn-ink:hover {
-    background: oklch(0.32 0.07 258);
-  }
-  .btn-secondary {
-    border: 1.5px solid var(--color-ink);
-    color: var(--color-ink);
-    background: var(--color-surface);
-  }
-  .btn-secondary:hover {
-    background: var(--color-sky);
+  .btn-xl {
+    min-height: 56px;
+    padding-inline: 1.75rem;
+    font-size: 1.1rem;
   }
   .field {
     width: 100%;
@@ -140,9 +151,13 @@
     padding: 0.7rem 0.85rem;
     font: inherit;
     color: var(--color-ink);
+    transition: border-color 160ms ease;
+  }
+  .field:hover {
+    border-color: var(--color-ink);
   }
   .field::placeholder {
-    color: var(--color-quiet);
+    color: var(--color-slate);
   }
   .label {
     display: block;
@@ -151,24 +166,30 @@
     margin-bottom: 0.4rem;
   }
   .hint {
-    font-size: 0.875rem;
-    color: var(--color-ink-2);
+    font-size: 0.8125rem;
+    color: var(--color-slate);
   }
+  /* Tags: jade on wash (5.2:1). */
   .chip {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    border-radius: var(--radius-sm);
-    background: var(--color-sky-2);
-    color: var(--color-ink);
-    padding: 0.15rem 0.55rem;
-    font-size: 0.8rem;
+    border-radius: 999px;
+    background: var(--color-wash);
+    color: var(--color-jade);
+    padding: 0.2rem 0.65rem;
+    font-size: 0.8125rem;
     font-weight: 600;
   }
+  /* Figures: Inter with tabular numbers (the kit has no mono face). */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
 
-  /* Highlighter: a flat light-blue stroke behind navy words. */
+  /* Highlighter: a flat mint stroke behind ink words. */
   .highlight {
-    background-image: linear-gradient(var(--color-blue), var(--color-blue));
+    background-image: linear-gradient(var(--color-mint), var(--color-mint));
     background-repeat: no-repeat;
     background-position: 0 88%;
     background-size: 100% 0.42em;
@@ -176,6 +197,17 @@
     margin: 0 -0.06em;
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone;
+  }
+  /* A linked card lifts 2px on hover (the one card motion). */
+  .card-link {
+    transition:
+      transform 160ms ease,
+      box-shadow 160ms ease,
+      border-color 160ms ease;
+  }
+  .card-link:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-ink);
   }
   /* Trust ticks fill in sequence on load (hero pack only). */
   .tick-in {
@@ -211,7 +243,7 @@
     transform: scale(0.6);
   }
   to {
-    background-color: var(--color-green);
+    background-color: var(--color-mint);
     transform: scale(1);
   }
 }

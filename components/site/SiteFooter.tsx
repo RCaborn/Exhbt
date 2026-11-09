@@ -17,7 +17,7 @@ export function SiteFooter() {
       <div className="mx-auto grid max-w-[78rem] gap-8 px-4 py-12 text-sm sm:grid-cols-[1fr_auto] sm:px-8">
         <div>
           <Logo className="text-white" />
-          <p className="mt-3 max-w-sm text-[#c9d7e8]">
+          <p className="mt-3 max-w-sm text-[#c9cbcf]">
             Turns graduates&rsquo; project work into a portfolio of exhbts that employers can check.
           </p>
         </div>
@@ -25,7 +25,7 @@ export function SiteFooter() {
           <ul className="flex flex-wrap gap-x-6 gap-y-2">
             {LINKS.map(([href, label]) => (
               <li key={href}>
-                <Link className="underline decoration-[#3e5573] underline-offset-4 hover:decoration-blue" href={href}>
+                <Link className="underline decoration-[#3e4044] underline-offset-4 hover:decoration-mint" href={href}>
                   {label}
                 </Link>
               </li>

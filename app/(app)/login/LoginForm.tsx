@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { login, type LoginState } from "./actions";
+import { Button } from "@/components/ui/Button";
 
 export function LoginForm({ next }: { next: string }) {
   const [state, action] = useActionState<LoginState, FormData>(login, undefined);
@@ -22,8 +23,8 @@ export function LoginForm({ next }: { next: string }) {
 function Submit() {
   const { pending } = useFormStatus();
   return (
-    <button className="btn btn-primary w-full" disabled={pending}>
+    <Button type="submit" variant="primary" label="Email me a link" loading={pending} className="w-full">
       {pending ? "Sending…" : "Email me a link"}
-    </button>
+    </Button>
   );
 }

@@ -13,7 +13,7 @@ export function TrustBadge({ checkedOn, animate = false }: { checkedOn?: string;
         {CHECKS.map((c, i) => (
           <li key={c} className="inline-flex items-center gap-1.5 font-medium text-ink">
             <span
-              className={`inline-flex size-[18px] items-center justify-center rounded-full border border-ink bg-green ${animate ? "tick-in" : ""}`}
+              className={`inline-flex size-[18px] items-center justify-center rounded-full border border-ink bg-mint ${animate ? "tick-in" : ""}`}
               style={animate ? { animationDelay: `${400 + i * 180}ms` } : undefined}
             >
               <Check aria-hidden size={11} strokeWidth={3} />
@@ -22,7 +22,7 @@ export function TrustBadge({ checkedOn, animate = false }: { checkedOn?: string;
           </li>
         ))}
       </ul>
-      {checkedOn && <span className="font-mono text-xs text-ink-2">{checkedOn}</span>}
+      {checkedOn && <span className="font-mono text-xs text-graphite">{checkedOn}</span>}
     </div>
   );
 }

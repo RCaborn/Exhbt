@@ -22,13 +22,18 @@ type Entitlements = {
   drafting: boolean;
   /** A paid originality check when an exhbt is published. */
   originalityCheck: boolean;
+  /**
+   * Swaps (regenerating one idea) in a roadmap's plan of three. Placeholder figures
+   * (Rory, 9 Nov 2026: "will change later"); see docs/decisions/0004.
+   */
+  projectSwapsPerRoadmap: number;
 };
 
 export const ENTITLEMENTS: Record<Plan, Entitlements> = {
-  free: { roadmapsPer30Days: 1, exhbts: 1, personalLink: true, jobLinks: false, drafting: false, originalityCheck: false },
-  plus: { roadmapsPer30Days: 8, exhbts: 4, personalLink: true, jobLinks: false, drafting: true, originalityCheck: false },
-  premium: { roadmapsPer30Days: 30, exhbts: 10, personalLink: true, jobLinks: true, drafting: true, originalityCheck: true },
-  institutional: { roadmapsPer30Days: 30, exhbts: 10, personalLink: true, jobLinks: true, drafting: true, originalityCheck: true },
+  free: { roadmapsPer30Days: 1, exhbts: 1, personalLink: true, jobLinks: false, drafting: false, originalityCheck: false, projectSwapsPerRoadmap: 3 },
+  plus: { roadmapsPer30Days: 8, exhbts: 4, personalLink: true, jobLinks: false, drafting: true, originalityCheck: false, projectSwapsPerRoadmap: 10 },
+  premium: { roadmapsPer30Days: 30, exhbts: 10, personalLink: true, jobLinks: true, drafting: true, originalityCheck: true, projectSwapsPerRoadmap: 25 },
+  institutional: { roadmapsPer30Days: 30, exhbts: 10, personalLink: true, jobLinks: true, drafting: true, originalityCheck: true, projectSwapsPerRoadmap: 25 },
 };
 
 /** Display names. The site reads these. The stored key for Pro stays `premium`. */
@@ -41,6 +46,12 @@ export const PLAN_NAMES: Record<Plan, string> = {
 
 /** Exhbts picked for a job-specific link. */
 export const EXHBTS_PER_JOB_LINK = 4;
+
+/** Shown when a free account has used its roadmaps for the month (builder or project-ideas gate). */
+export function freeRoadmapLimitMessage(): string {
+  const n = ENTITLEMENTS.free.roadmapsPer30Days;
+  return `You've used this month's ${n} free ${n === 1 ? "roadmap" : "roadmaps"}. ${PLAN_NAMES.plus} and ${PLAN_NAMES.premium} include more: join the waitlist on the pricing page.`;
+}
 
 /** Paid tiers have no public price yet: the early release collects a waitlist. */
 export const PRICES: Partial<Record<Plan, string>> = { free: "£0" };

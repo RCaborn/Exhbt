@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
+import { Button } from "@/components/ui/Button";
 
 const NAV = [
   { href: "/how-to-read-an-exhbt", label: "For employers" },
@@ -13,11 +14,11 @@ export function Wordmark() {
 
 export function SiteHeader() {
   return (
-    <header className="border-b border-rule bg-surface">
+    <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-[78rem] flex-wrap items-center justify-between gap-x-8 gap-y-3 px-4 py-4 sm:px-8">
         <Wordmark />
         <nav aria-label="Main" className="order-3 w-full sm:order-none sm:w-auto">
-          <ul className="flex gap-5 overflow-x-auto text-[0.95rem] font-medium text-ink-2 sm:gap-7">
+          <ul className="flex gap-5 overflow-x-auto text-[0.95rem] font-medium text-graphite sm:gap-7">
             {NAV.map((n) => (
               <li key={n.href} className="shrink-0">
                 <Link href={n.href} className="hover:text-ink">
@@ -31,9 +32,11 @@ export function SiteHeader() {
           <Link href="/login" className="link font-medium">
             Log in
           </Link>
-          <Link href="/roadmap/new" className="btn btn-primary hidden min-h-10 sm:inline-flex">
-            Build my roadmap
-          </Link>
+          <span className="hidden sm:inline-flex">
+            <Button href="/roadmap/new" variant="primary">
+              Build my roadmap
+            </Button>
+          </span>
         </div>
       </div>
     </header>

@@ -12,13 +12,18 @@
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "test:e2e": "playwright test",
     "check:docs": "node scripts/check-docs.mjs",
-    "check": "npm run check:docs && npm run typecheck && npm run lint && npm run build && npm run test:e2e"
+    "check": "npm run check:docs && npm run check:theme && npm run typecheck && npm run lint && npm run build && npm run test:e2e",
+    "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs",
+    "theme": "npm run astryx -- theme build themes/exhbt/exhbtTheme.ts",
+    "check:theme": "npm run astryx -- theme build themes/exhbt/exhbtTheme.ts --check"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
-    "@fontsource/ibm-plex-mono": "^5.3.0",
-    "@fontsource/newsreader": "^5.3.0",
-    "@fontsource/schibsted-grotesk": "^5.3.0",
+    "@astryxdesign/core": "^0.7.11",
+    "@astryxdesign/theme-neutral": "^0.7.11",
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@stylexjs/stylex": "^0.19.1",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.119.0",
     "lucide-react": "^1.69.0",
@@ -31,6 +36,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@astryxdesign/cli": "^0.7.11",
     "@axe-core/playwright": "^4.10.2",
     "@eslint/eslintrc": "^3",
     "@opennextjs/cloudflare": "^1.20.16",

@@ -47,8 +47,8 @@ export default function HowToRead() {
   return (
     <div className="mx-auto max-w-[76rem] px-4 pt-14 pb-24 sm:px-8 lg:pt-20">
       <div className="max-w-2xl">
-        <h1 className="text-[2.8rem] sm:text-[4.4rem]">How to read an exhbt</h1>
-        <p className="mt-4 text-lg text-ink-2">
+        <h1 className="display">How to read an exhbt</h1>
+        <p className="mt-4 text-lg text-graphite">
           For hiring managers and careers staff. An exhbt is one project from a graduate&rsquo;s portfolio. Every
           one uses the same layout and limits, about 200 words plus a chart, so once you know the parts you can
           read any of them in about thirty seconds. Free, and you never need an account.
@@ -60,7 +60,7 @@ export default function HowToRead() {
           <Exhbt exhbt={exampleExhbt} example position={1} />
         </div>
         <div className="max-w-xl">
-          <dl className="divide-y divide-rule border-y border-rule">
+          <dl className="divide-y divide-line border-y border-line">
             {FIELDS.map((f) => (
               <div key={f.name} id={f.id} className="scroll-mt-8 py-6">
                 <dt className="text-[1.3rem] font-bold tracking-[-0.02em]">{f.name}</dt>
@@ -70,7 +70,7 @@ export default function HowToRead() {
           </dl>
 
           <section aria-labelledby="not" className="mt-12">
-            <h2 id="not" className="text-[1.6rem]">What an exhbt does not tell you</h2>
+            <h2 id="not">What an exhbt does not tell you</h2>
             <p className="mt-3">
               The checks confirm that the author stands behind it and that the work is attached and original. They
               do not grade the work or verify results with a third party such as a supervisor. Treat an exhbt as

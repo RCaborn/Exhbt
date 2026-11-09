@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Check } from "lucide-react";
 import { joinWaitlist, type WaitlistState } from "./actions";
+import { Button } from "@/components/ui/Button";
 
 type Props = {
   /** Where the form sits, for analytics (e.g. "pricing", "roadmap-next"). */
@@ -21,7 +22,7 @@ export function WaitlistForm({ source, interest = "premium", defaultEmail = "", 
   if (state?.ok) {
     return (
       <p role="status" className="inline-flex items-center gap-2 font-semibold">
-        <span className="inline-flex size-5 items-center justify-center rounded-full border border-ink bg-green text-ink">
+        <span className="inline-flex size-5 items-center justify-center rounded-full border border-ink bg-mint text-ink">
           <Check aria-hidden size={12} strokeWidth={3} />
         </span>
         You&rsquo;re on the list. We&rsquo;ll email you when it opens.
@@ -63,8 +64,8 @@ export function WaitlistForm({ source, interest = "premium", defaultEmail = "", 
 function Submit() {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending} className="btn btn-primary min-h-12 px-6">
+    <Button type="submit" variant="primary" size="lg" label="Join the waitlist" loading={pending}>
       {pending ? "Joining…" : "Join the waitlist"}
-    </button>
+    </Button>
   );
 }

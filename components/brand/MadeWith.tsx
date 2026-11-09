@@ -10,7 +10,7 @@ export function MadeWith() {
   return (
     <aside
       aria-label="Made with exhbt"
-      className="mt-14 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 border-t border-rule pt-6 text-sm text-ink-2"
+      className="mt-14 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 border-t border-line pt-6 text-sm text-graphite"
     >
       <span className="inline-flex items-center gap-2">
         Portfolio made with <Logo size="sm" className="text-ink" />
