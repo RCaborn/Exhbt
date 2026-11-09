@@ -16,6 +16,7 @@ const DOCS: Record<string, Doc> = {
         <h2>What we collect</h2>
         <ul>
           <li>Your email address, to create your account and send sign-in links.</li>
+          <li>Your name, and your LinkedIn profile address if you give it, for your account and, later, your portfolio.</li>
           <li>The text of your CV and anything you type into the roadmap form.</li>
           <li>The files and text you add to an exhbt.</li>
           <li>

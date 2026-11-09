@@ -10,28 +10,26 @@ import { CvError, extractCvTextInBrowser } from "@/lib/cv-client";
 import { SITUATIONS, type Situation } from "@/lib/ai/schemas";
 
 /**
- * Order (docs/decisions/0003-cv-step-and-skill-radar.md): the job, the CV (preferred, skippable),
- * where they are now with anything the CV doesn't cover, email. Results follow.
+ * Order (docs/decisions/0003 and 0004): the job, the CV (preferred, skippable), where they are
+ * now with anything the CV doesn't cover. Results follow straight away; the email is asked for
+ * at the project-ideas gate, after the radar.
  */
 // Minimal words on every step (Rory, 9 Nov 2026): a title, the fields, at most one short line.
 const STEPS = [
   { title: "What job do you want?", hint: "" },
   { title: "Add your CV", hint: "It gives you the sharpest roadmap." },
   { title: "Where are you now?", hint: "" },
-  { title: "Where should we send it?", hint: "We’ll email you a copy." },
 ] as const;
 const LAST = STEPS.length;
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-type Props = { defaultRole: string; signedInEmail: string | null };
+type Props = { defaultRole: string };
 
 /**
  * The click-through roadmap builder. All steps stay mounted (inactive ones are hidden)
  * so answers survive Back/Next; the step lives in ?step= so the browser Back button
  * works. One server action submits everything at the end.
  */
-export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
+export function RoadmapWizard({ defaultRole }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -48,7 +46,6 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
   const [cvText, setCvText] = useState("");
   const [cvFileName, setCvFileName] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
-  const [email, setEmail] = useState(signedInEmail ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const headingRefs = useRef<(HTMLHeadingElement | null)[]>([]);
   const first = useRef(true);
@@ -86,7 +83,6 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
     if (n === 3 && !situation) e.situation = "Choose the option closest to where you are now.";
     if (n === 3 && (education + skills + cvText).replace(/\s/g, "").length < 20)
       e.education = "Add your education or skills, or go back and add your CV.";
-    if (n === LAST && !EMAIL_RE.test(email.trim())) e.email = "Enter a valid email address.";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -318,39 +314,13 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
                     className="field"
                   />
                 </Field>
-              </div>
-            )}
-
-            {i === 3 && (
-              <div className="space-y-6">
-                {signedInEmail ? (
-                  <p>
-                    We&rsquo;ll send it to <span className="font-semibold">{signedInEmail}</span>.
-                  </p>
-                ) : (
-                  <Field id="email" label="Email address" error={errors.email}>
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      autoComplete="email"
-                      aria-describedby="email-error"
-                      className="field min-h-14 text-[1.15rem]"
-                    />
-                  </Field>
-                )}
-                <label className="flex items-start gap-3">
-                  <input type="checkbox" name="marketingOptIn" value="yes" className="mt-1 size-5 shrink-0 accent-[var(--color-blue-edge)]" />
-                  <span>Email me about new features.</span>
-                </label>
                 <p className="hint">
                   By continuing you agree to the <Link href="/legal/terms" className="link">terms</Link> and{" "}
                   <Link href="/legal/privacy" className="link">privacy policy</Link>.
                 </p>
               </div>
             )}
+
           </div>
         </section>
       ))}
@@ -394,7 +364,7 @@ function Submit() {
   const { pending } = useFormStatus();
   return (
     <button type="submit" className="btn btn-primary min-h-12 px-6 text-base" disabled={pending}>
-      {pending ? "Starting…" : "Build my roadmap"} <ArrowRight aria-hidden size={18} strokeWidth={2.5} />
+      {pending ? "Starting…" : "See my roadmap"} <ArrowRight aria-hidden size={18} strokeWidth={2.5} />
     </button>
   );
 }

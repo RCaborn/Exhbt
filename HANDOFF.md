@@ -4,7 +4,7 @@ Phase 1 is everything up to a student or graduate receiving their free roadmap, 
 
 The current shape is [docs/MAP.md](docs/MAP.md). Plan figures are `lib/entitlements.ts`. Hosts are `lib/hosts.ts`. In short:
 - Domain **exhbt.co.uk**; portfolio pieces are **exhbts**.
-- Builder order: job, CV (skippable), situation with education & skills, then email.
+- Builder order: job, CV (skippable), situation with education & skills. The email is asked for at the gate before the project ideas (decision 0004).
 - Plus and Pro are waitlist-only. The public name Pro is stored as `premium`.
 - Universities pay; employers are always free.
 - A portfolio is a subdomain of the apex (`lib/hosts.ts`). That split is decided and not routed yet.
@@ -15,10 +15,10 @@ The current shape is [docs/MAP.md](docs/MAP.md). Plan figures are `lib/entitleme
 Organic traffic:  Home "Describe the job you want" ─► /roadmap/new?role=…  (starts at step 2)
 Directed traffic: /start (ads, social, QR): search bar only ─► /roadmap/new?role=… (+ utm_*)
 
-Builder, one question per screen (/roadmap/new?step=1..4)
-  1 Describe the job ─► 2 CV (skippable) ─► 3 Situation, education & skills ─► 4 Email + opt-in
+Builder, one question per screen (/roadmap/new?step=1..3)
+  1 Describe the job ─► 2 CV (skippable) ─► 3 Situation, education & skills
   └─ submit (server action startRoadmap)
-       ├─ validate; Free limit 3 roadmaps per email per 30 days; 10/day per connection
+       ├─ validate; a per-connection daily cap; the Free monthly limit only if signed in (lib/entitlements.ts)
        ├─ store the roadmap request
        ├─ set a signed cookie: "this browser may view roadmap X"
        └─ redirect to /roadmap/[id]
@@ -28,9 +28,13 @@ Builder, one question per screen (/roadmap/new?step=1..4)
   │     └─ POST /api/roadmap/[id]/generate  (idempotent)
   │           ├─ match the job to the UK jobs dataset (lib/jobs) for its required skills
   │           ├─ cache hit for identical input, or call the AI (cost logged)
-  │           └─ send the "Your roadmap to {role}" email once (copy + sign-in link)
+  │           └─ signed in only: send the "Your roadmap to {role}" email once (copy + sign-in link)
   └─ output ready ─► five click-through views (?view=)
-        overview ─► gaps ─► projects ─► strengths ─► next (Pro waitlist)
+        overview ─► gaps (radar) ─► strengths ─► projects ─► next (Pro waitlist)
+        projects, no email yet ─► gate: name, email, LinkedIn (optional), prefilled from the CV
+          └─ server action unlockProjects: Free monthly limit, store the details, send the email once
+        projects, unlocked ─► the plan: three ideas, Swap each (AI, cost logged), "Keep this plan"
+          └─ swaps run out or kept ─► "Your plan"
 
 Email "See your full roadmap" ─► sign-in link ─► signed in on that device, roadmap claimed to the account
 ```
@@ -110,7 +114,7 @@ Then deploy. The intended route is Cloudflare building from GitHub on every push
 
 - **Hosting plan:** Cloudflare's free Workers plan allows about 10 ms of CPU per request, and server rendering can exceed that. Budget for **Workers Paid ($5/month)**. CV parsing already happens in the browser to keep server work light.
 - **Email links expire** (Supabase default: 1 hour). After that, the email tells people to open the roadmap URL and log in with their email, which works.
-- **Marketing consent** is an unticked opt-in at step 4, stored as `pending_marketing_opt_in` on the roadmap and copied to the profile on sign-in. Every email has an unsubscribe link (`/api/email/unsubscribe`, signed token, also one-click). Have the privacy policy reviewed before sending any marketing.
+- **Marketing consent** is an unticked opt-in at the project-ideas gate, stored as `pending_marketing_opt_in` on the roadmap and copied to the profile on sign-in. Every email has an unsubscribe link (`/api/email/unsubscribe`, signed token, also one-click). Have the privacy policy reviewed before sending any marketing.
 - **Fake emails are accepted** (the roadmap shows without verifying the address). That was a product decision; rate limits contain abuse.
 - **Scanned-image PDFs** have no text to read; the builder asks people to paste instead. There's no OCR.
 - **JavaScript is required** for the builder (steps and CV reading are client-side). Server-side file parsing was removed to keep the Worker small and fast.
@@ -124,7 +128,8 @@ Then deploy. The intended route is Cloudflare building from GitHub on every push
 - `phase1.spec.ts`:
   - job pre-fill, `/start` entry, per-step validation, Back keeps answers
   - jobs data shapes the gaps; Pro waitlist
-  - instant result through all five views
+  - instant result through the free views to the project-ideas gate, then the plan
+  - the gate's CV prefill and validation; swapping ideas until it's your plan
   - email in the outbox, with a working sign-in link
   - other-browser protection
   - email sent once

@@ -1,7 +1,7 @@
 import { expect, test, type Locator } from "@playwright/test";
 import { ENTITLEMENTS, PLAN_NAMES } from "../lib/entitlements";
 import { portfolioHost } from "../lib/hosts";
-import { buildRoadmap, SAMPLE_CV, uniqueEmail, waitForBuilder, waitForResult } from "./helpers";
+import { buildRoadmap, CV_WITH_CONTACT, SAMPLE_CV, uniqueEmail, unlockProjects, waitForBuilder, waitForResult } from "./helpers";
 
 test.describe("Phase 1: from the home page to a roadmap", () => {
   test("home job field pre-fills the builder and starts at the CV step", async ({ page }) => {
@@ -9,7 +9,7 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await page.locator("#start-hero").fill("Junior data analyst");
     await page.locator("form:has(#start-hero) button[type=submit]").click();
     await page.waitForURL(/\/roadmap\/new\?role=/);
-    await expect(page.getByText("Step 2 of 4")).toBeVisible();
+    await expect(page.getByText("Step 2 of 3")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Add your CV" })).toBeVisible();
   });
 
@@ -20,7 +20,7 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await page.locator("#start-direct").fill("Junior data analyst");
     await page.locator("form:has(#start-direct) button[type=submit]").click();
     await expect(page).toHaveURL(/\/roadmap\/new\?.*utm_source=test/);
-    await expect(page.getByText("Step 2 of 4")).toBeVisible();
+    await expect(page.getByText("Step 2 of 3")).toBeVisible();
   });
 
   test("home: search-first hero, example exhbt further down, no removed sections", async ({ page }) => {
@@ -96,58 +96,53 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
 
     await page.locator("#role").fill("UX researcher in a health tech company");
     await page.getByRole("button", { name: /Continue/ }).click();
-    await expect(page.getByText("Step 2 of 4")).toBeVisible();
+    await expect(page.getByText("Step 2 of 3")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Add your CV" })).toBeVisible();
 
     // The CV step can be skipped; then step 3 needs a situation and some education or skills.
     await page.getByRole("button", { name: "Skip for now" }).click();
-    await expect(page.getByText("Step 3 of 4")).toBeVisible();
-    await page.getByRole("button", { name: /Continue/ }).click();
+    await expect(page.getByText("Step 3 of 3")).toBeVisible();
+    await page.getByRole("button", { name: /See my roadmap/ }).click();
     await expect(page.getByText("Choose the option closest to where you are now.")).toBeVisible();
     await expect(page.getByText("Add your education or skills, or go back and add your CV.")).toBeVisible();
+    // No email in the builder: it's asked for at the project ideas.
+    await expect(page.locator("input[type=email]")).toHaveCount(0);
 
     // Go back and add the CV instead: pasted text counts, and step 3 then only needs the situation.
     await page.getByRole("button", { name: /Back/ }).click();
-    await expect(page.getByText("Step 2 of 4")).toBeVisible();
+    await expect(page.getByText("Step 2 of 3")).toBeVisible();
     await page.getByText("Paste", { exact: true }).click();
     await page.locator("#cvPaste").fill(SAMPLE_CV);
     await expect(page.getByRole("button", { name: "Skip for now" })).toHaveCount(0);
     await page.getByRole("button", { name: /Continue/ }).click();
-    await expect(page.getByText("Step 3 of 4")).toBeVisible();
+    await expect(page.getByText("Step 3 of 3")).toBeVisible();
     await expect(page.getByText("Got your CV. Add anything it misses.")).toBeVisible();
     await page.getByLabel("At university").check();
-    await page.getByRole("button", { name: /Continue/ }).click();
-    await expect(page.getByText("Step 4 of 4")).toBeVisible();
 
     await page.getByRole("button", { name: /Back/ }).click();
-    await expect(page.getByText("Step 3 of 4")).toBeVisible();
-    await expect(page.getByLabel("At university")).toBeChecked();
-    await page.getByRole("button", { name: /Back/ }).click();
-    await expect(page.getByText("Step 2 of 4")).toBeVisible();
+    await expect(page.getByText("Step 2 of 3")).toBeVisible();
     await expect(page.locator("#cvPaste")).toHaveValue(SAMPLE_CV);
     await page.getByRole("button", { name: /Back/ }).click();
-    await expect(page.getByText("Step 1 of 4")).toBeVisible();
+    await expect(page.getByText("Step 1 of 3")).toBeVisible();
     await expect(page.locator("#role")).toHaveValue("UX researcher in a health tech company");
 
-    // Forward again to the email step and check its validation.
-    for (const n of [2, 3, 4]) {
+    // Forward again: answers are still there.
+    for (const n of [2, 3]) {
       await page.getByRole("button", { name: /Continue/ }).click();
-      await expect(page.getByText(`Step ${n} of 4`)).toBeVisible();
+      await expect(page.getByText(`Step ${n} of 3`)).toBeVisible();
     }
-    await page.locator("#email").fill("not-an-email");
-    await page.getByRole("button", { name: /Build my roadmap/ }).click();
-    await expect(page.getByText("Enter a valid email address.")).toBeVisible();
+    await expect(page.getByLabel("At university")).toBeChecked();
   });
 
   test("the jobs dataset shapes the gaps (seed data in development)", async ({ page }) => {
-    await buildRoadmap(page, { email: uniqueEmail("jobs"), role: "Junior data analyst in the NHS" });
+    await buildRoadmap(page, { role: "Junior data analyst in the NHS" });
     await waitForResult(page);
     await page.goto(`${page.url().split("?")[0]}?view=gaps`);
     await expect(page.getByRole("list", { name: "Gaps to close" }).getByText("SQL", { exact: true })).toBeVisible();
   });
 
   test("the skills radar shows the gaps, then where the projects would take you", async ({ page }) => {
-    await buildRoadmap(page, { email: uniqueEmail("radar"), role: "Junior data analyst", withCv: true });
+    await buildRoadmap(page, { role: "Junior data analyst", withCv: true });
     await waitForResult(page);
     const base = page.url().split("?")[0];
 
@@ -167,15 +162,16 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     // No numbers on the chart: the levels live in the hidden table only.
     await expect(page.locator("figure").getByText(/\b(now|job|you) \d\b|\d → \d/)).toHaveCount(0);
 
-    // The placeholder project closes SQL, so SQL rises to 3; Excel stays at 0.
-    await page.goto(`${base}?view=projects`);
+    // The placeholder projects close SQL and Excel, so both rise to 3; Data visualisation stays at 0.
+    await unlockProjects(page, { email: uniqueEmail("radar") });
     await expect(page.getByRole("heading", { level: 2, name: "When you’ve finished these projects" })).toBeVisible();
     const after = page.getByRole("table", { name: "You now, against where the projects would take you" });
     await expect(after.getByRole("row", { name: "SQL 1 of 4 3 of 4" })).toBeAttached();
-    await expect(after.getByRole("row", { name: "Excel 0 of 4 0 of 4" })).toBeAttached();
-    // Judged on the after levels: SQL joins the bag; Excel and Data visualisation are still short.
-    expect(await listItems(page.getByRole("list", { name: "Level up next" }))).toEqual(["Excel", "Data visualisation"]);
-    expect(await listItems(page.getByRole("list", { name: "In the bag" }))).toEqual(["SQL", "Python or R", "Statistics"]);
+    await expect(after.getByRole("row", { name: "Excel 0 of 4 3 of 4" })).toBeAttached();
+    await expect(after.getByRole("row", { name: "Data visualisation 0 of 4 0 of 4" })).toBeAttached();
+    // Judged on the after levels: SQL and Excel join the bag; Data visualisation is still short.
+    expect(await listItems(page.getByRole("list", { name: "Level up next" }))).toEqual(["Data visualisation"]);
+    expect(await listItems(page.getByRole("list", { name: "In the bag" }))).toEqual(["SQL", "Excel", "Python or R"]);
 
     // Neither chart widens the page on a small phone.
     await page.setViewportSize({ width: 375, height: 812 });
@@ -197,20 +193,27 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(page.locator("section#plus").getByText("You’re on the list.")).toBeVisible();
   });
 
-  test("roadmap appears straight away, clicks through, and a copy is emailed", async ({ page, browser }) => {
+  test("roadmap appears straight away, clicks through to the gate, and a copy is emailed", async ({ page, browser }) => {
     const email = uniqueEmail("flow");
-    await buildRoadmap(page, { email, optIn: true });
+    await buildRoadmap(page);
 
-    // The building screen shows first, then the result.
+    // The building screen shows first, then the result, with no email asked for yet.
     await waitForResult(page);
     const resultUrl = page.url().split("?")[0];
 
-    // Click through every view with the Next button.
-    for (const heading of ["Gaps to close", "Projects that would prove them", "Already in your CV", "What next"]) {
+    // Click through the free views with the Next button, up to the project-ideas gate.
+    for (const heading of ["Gaps to close", "Already in your CV", "Your project ideas are ready"]) {
       await page.locator("a.btn-primary").last().click();
       await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
       await expect(page.getByRole("heading", { level: 1, name: heading })).toBeInViewport();
     }
+    // The gate is the way on: no Next button past it.
+    await expect(page.locator("a.btn-primary", { hasText: "What next" })).toHaveCount(0);
+
+    await unlockProjects(page, { email, name: "Amara Okafor", optIn: true });
+    await expect(page.getByRole("heading", { level: 1, name: "Projects that would prove them" })).toBeVisible();
+    await page.locator("a.btn-primary").last().click();
+    await expect(page.getByRole("heading", { level: 1, name: "What next" })).toBeVisible();
     await expect(page.getByText(`We’ve emailed a copy to ${email}`)).toBeVisible();
 
     // The email is in the dev outbox, with a sign-in link back to this roadmap.
@@ -230,32 +233,107 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await otherPage.goto(resultUrl);
     await expect(otherPage).toHaveURL(/\/login\?next=/);
 
-    // Following the email link in that browser signs in and opens the roadmap.
+    // Following the email link in that browser signs in and opens the roadmap, ideas included.
     await otherPage.goto(signIn!);
     await expect(otherPage.getByRole("heading", { level: 1, name: /Your roadmap to/ })).toBeVisible();
+    await otherPage.goto(`${resultUrl}?view=projects`);
+    await expect(otherPage.getByRole("heading", { level: 1, name: "Projects that would prove them" })).toBeVisible();
     await other.close();
   });
 
   test("the roadmap email is sent once, however many times the page loads", async ({ page }) => {
     const email = uniqueEmail("once");
-    await buildRoadmap(page, { email });
+    await buildRoadmap(page);
     await waitForResult(page);
+    await unlockProjects(page, { email });
+    await expect(page.getByRole("heading", { level: 1, name: "Projects that would prove them" })).toBeVisible();
     await page.reload();
     await page.reload();
     await page.goto("/dev/emails");
     await expect(page.getByRole("link", { name: new RegExp(`to ${email.replace("+", "\\+")}`) })).toHaveCount(1);
   });
 
-  test("free plan: a roadmap past the monthly limit is refused", async ({ page }) => {
+  test("free plan: past the monthly limit, the gate refuses the ideas", async ({ page }) => {
     const email = uniqueEmail("limit");
     const limit = ENTITLEMENTS.free.roadmapsPer30Days;
     for (let i = 0; i < limit; i++) {
-      await buildRoadmap(page, { email, role: `Role ${i}` });
-      await page.waitForURL(/\/roadmap\/[0-9a-f-]{36}/);
+      await buildRoadmap(page, { role: `Role ${i}` });
+      await waitForResult(page);
+      await unlockProjects(page, { email });
+      await expect(page.getByRole("heading", { level: 1, name: "Projects that would prove them" })).toBeVisible();
     }
-    await buildRoadmap(page, { email, role: "One more" });
+    await buildRoadmap(page, { role: "One more" });
+    await waitForResult(page);
+    await unlockProjects(page, { email });
     const noun = limit === 1 ? "roadmap" : "roadmaps";
     await expect(page.getByText(`You've used this month's ${limit} free ${noun}.`)).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Your project ideas are ready" })).toBeVisible();
+  });
+
+  test("the gate prefills name, email and LinkedIn from the CV, and keeps what's typed on an error", async ({ page }) => {
+    await buildRoadmap(page, { cv: CV_WITH_CONTACT });
+    await waitForResult(page);
+    await page.goto(`${page.url().split("?")[0]}?view=projects`);
+    await expect(page.getByText("From your CV. Change anything that’s wrong.")).toBeVisible();
+    await expect(page.getByLabel("Name")).toHaveValue("Amara Okafor");
+    await expect(page.getByLabel("Email", { exact: true })).toHaveValue("amara.okafor@example.com");
+    await expect(page.getByLabel(/LinkedIn/)).toHaveValue("https://www.linkedin.com/in/amara-okafor");
+
+    await page.getByLabel("Name").fill("");
+    await page.getByLabel(/LinkedIn/).fill("not a profile");
+    await page.getByRole("button", { name: "Show my projects" }).click();
+    await expect(page.getByText("Enter your name.")).toBeVisible();
+    await expect(page.getByText(/Use your LinkedIn profile address/)).toBeVisible();
+    await expect(page.getByLabel(/LinkedIn/)).toHaveValue("not a profile");
+
+    await page.getByLabel("Name").fill("Amara Okafor");
+    await page.getByLabel("Email", { exact: true }).fill(uniqueEmail("gate"));
+    await page.getByLabel(/LinkedIn/).fill("linkedin.com/in/amara-okafor");
+    await page.getByRole("button", { name: "Show my projects" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Projects that would prove them" })).toBeVisible();
+  });
+
+  test("the plan: swap ideas one at a time, steered by a note, until it's your plan", async ({ page }) => {
+    await buildRoadmap(page, { withCv: true });
+    await waitForResult(page);
+    await unlockProjects(page, { email: uniqueEmail("plan") });
+    const ideas = page.getByRole("list", { name: "Project ideas" });
+    await expect(ideas.getByRole("listitem")).toHaveCount(3);
+    const status = page.locator("#swap-status");
+    const limit = ENTITLEMENTS.free.projectSwapsPerRoadmap;
+    await expect(status).toHaveText(`${limit} swaps left`);
+
+    // Swap the second idea with a note: only that one changes, and the note clears.
+    await page.getByLabel(/Make some tweaks/).fill("use more real data");
+    await page.getByRole("button", { name: "Swap: Placeholder project 2" }).click();
+    await expect(ideas.getByRole("listitem").nth(1)).toContainText("Swapped idea 1: use more real data");
+    await expect(ideas.getByRole("listitem").nth(0)).toContainText("Placeholder project 1");
+    await expect(ideas.getByRole("listitem").nth(2)).toContainText("Placeholder project 3");
+    await expect(status).toHaveText(`${limit - 1} swaps left`);
+    await expect(page.getByLabel(/Make some tweaks/)).toHaveValue("");
+
+    // Swaps without a note; the last one settles the plan.
+    const order = ["Placeholder project 1", "Placeholder project 3"];
+    for (let round = 2; round <= limit; round++) {
+      await page.getByRole("button", { name: `Swap: ${order[round - 2]}` }).click();
+      if (round < limit) await expect(ideas.getByText(`Swapped idea ${round}`, { exact: true })).toBeVisible();
+    }
+    await expect(page.getByRole("heading", { level: 1, name: "Your plan" })).toBeVisible();
+    const plan = page.getByRole("list", { name: "Your plan" });
+    await expect(plan.getByRole("listitem")).toHaveCount(3);
+    await expect(plan.getByText(`Swapped idea ${limit}`, { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Swap/ })).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 2, name: "When you’ve finished your plan" })).toBeVisible();
+  });
+
+  test("the plan: keeping it early ends the swaps", async ({ page }) => {
+    await buildRoadmap(page);
+    await waitForResult(page);
+    await unlockProjects(page, { email: uniqueEmail("keep") });
+    await page.getByRole("button", { name: "Keep this plan" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Your plan" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Your plan" }).getByRole("listitem")).toHaveCount(3);
+    await expect(page.getByRole("button", { name: /^Swap/ })).toHaveCount(0);
   });
 
   test("unsubscribe rejects a tampered token", async ({ page }) => {

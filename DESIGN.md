@@ -86,8 +86,10 @@ Full rules, sizes and don'ts are in `docs/brand.md`. In short:
 
 ## Flow patterns
 - **Click-through, not long pages**, for the roadmap builder and result. Marketing pages scroll normally.
-- **Builder:** one question per screen inside a white card on sky. "Step N of 4" with a four-segment progress bar; Back (secondary) on the left, Continue (primary) on the right; the step is in the URL (`?step=`). Validation messages sit under the field and are announced. Step 2 (the CV) has a text button, "Skip for now", under the upload; it goes once a CV is in. Minimal words on every step: a title, the fields, at most one short line.
-- **Result:** five views (`?view=`) in a white card. Pill tabs on desktop, "N / 5 · Label" on mobile; the bottom bar has the previous view on the left and the next view as the primary button. Each view has its own `h1`.
+- **Builder:** one question per screen inside a white card on sky. "Step N of 3" with a progress bar segment per step; Back (secondary) on the left, Continue (primary) on the right; the step is in the URL (`?step=`). Validation messages sit under the field and are announced. Step 2 (the CV) has a text button, "Skip for now", under the upload; it goes once a CV is in. Minimal words on every step: a title, the fields, at most one short line.
+- **Result:** five views (`?view=`) in a white card: Overview, Gaps, Already strong, Projects, What next. Pill tabs on desktop, "N / 5 · Label" on mobile; the bottom bar has the previous view on the left and the next view as the primary button. Each view has its own `h1`.
+- **Project-ideas gate:** Projects asks for name, email and LinkedIn (optional) before showing ideas, prefilled from the CV with "From your CV. Change anything that's wrong." There's no Next button past it.
+- **The plan:** three idea cards, each with a secondary "Swap" button; the optional "Make some tweaks" note sits above them and steers swaps; "N swaps left" and "Keep this plan" (primary) sit below. Settled, the page reads "Your plan" with no controls.
 - **Waiting and failure:** the building screen has an indeterminate bar (static under reduced motion) and honest copy. Failure offers "Try again" and says the answers are saved.
 
 ## Email

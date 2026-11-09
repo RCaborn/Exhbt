@@ -10,7 +10,7 @@ Read before changing things:
 
 Rules:
 - **One owner per fact.** Plan figures live only in `lib/entitlements.ts`. Hosts live only in `lib/hosts.ts`. Decisions live in `docs/decisions/`. If prose disagrees with the code, the code wins. `docs/PLAN.md` is the old plan and is not current.
-- **Builder order:** describe the job, the CV (preferred, skippable), where you are now with education and skills, email. The `STEPS` array in `RoadmapWizard.tsx` is the source (`docs/decisions/0003`).
+- **Builder order:** describe the job, the CV (preferred, skippable), where you are now with education and skills. No email in the builder: it's asked for at the gate before the project ideas, after the radar. The `STEPS` array in `RoadmapWizard.tsx` is the source (`docs/decisions/0003`, `0004`).
 - **Words:** "exhbt"/"exhbts" (lower case in running text). Plain British English, no hype words (see the anti-AI-slop writing skill in `.claude/skills/`). `npm run check:docs` rejects the retired name and any plan count copied into prose.
 - **Data access** goes through the `Store` interface in `lib/store.ts`; add a method to the interface and both implementations.
 - **The AI must only use facts the user supplied.** Keep that rule in prompts (`lib/ai/`).

@@ -4,7 +4,12 @@ import { WaitlistForm } from "@/components/waitlist/WaitlistForm";
 import { PLAN_NAMES } from "@/lib/entitlements";
 import { SkillHighlights } from "@/components/charts/SkillHighlights";
 import { SkillRadar } from "@/components/charts/SkillRadar";
+import { IdeaCard } from "@/components/roadmap/IdeaCard";
+import { PlanEditor } from "@/components/roadmap/PlanEditor";
+import { ProjectsGate } from "@/components/roadmap/ProjectsGate";
 import type { Roadmap } from "@/lib/ai/schemas";
+import type { Contact } from "@/lib/cv-contact";
+import type { ProjectIdea } from "@/lib/store";
 import { SKILLS_SOURCE_NOTE } from "@/lib/jobs/claim";
 import {
   chartableSkills,
@@ -15,11 +20,15 @@ import {
   sortGapsByShortfall,
 } from "@/lib/roadmap/skills";
 
+/**
+ * Order: everything free first (overview, the radar, strengths), then the project ideas behind
+ * the details gate, then what next (docs/decisions/0004).
+ */
 export const VIEWS = [
   { key: "overview", label: "Overview" },
   { key: "gaps", label: "Gaps" },
-  { key: "projects", label: "Projects" },
   { key: "strengths", label: "Already strong" },
+  { key: "projects", label: "Projects" },
   { key: "next", label: "What next" },
 ] as const;
 export type ViewKey = (typeof VIEWS)[number]["key"];
@@ -28,20 +37,27 @@ export function parseView(v: string | undefined): ViewKey {
   return VIEWS.some((x) => x.key === v) ? (v as ViewKey) : "overview";
 }
 
+/** The Projects page: the gate (no email yet), the plan being shaped, or the settled plan. */
+export type ProjectsState =
+  | { unlocked: false; prefill: Contact; signedInEmail: string | null }
+  | { unlocked: true; ideas: ProjectIdea[]; swapsLeft: number; done: boolean };
+
 type Props = {
   id: string;
   roadmap: Roadmap;
   view: ViewKey;
   emailedTo: string | null;
   signedIn: boolean;
+  projects: ProjectsState;
 };
 
 /** The roadmap as five short click-through screens. Each view is its own URL (?view=). */
-export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn }: Props) {
+export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn, projects }: Props) {
   const index = VIEWS.findIndex((v) => v.key === view);
   const href = (k: ViewKey) => `/roadmap/${id}?view=${k}`;
   const prev = VIEWS[index - 1];
-  const next = VIEWS[index + 1];
+  // The gate is the way on from Projects until it's filled in.
+  const next = view === "projects" && !projects.unlocked ? undefined : VIEWS[index + 1];
   const role = roadmap.targetRole || "your target role";
 
   return (
@@ -71,9 +87,9 @@ export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn }: Props) 
         <div className="mt-6 rounded-[24px] border border-rule bg-surface p-6 shadow-pack sm:p-10">
           {view === "overview" && <Overview roadmap={roadmap} role={role} href={href} />}
           {view === "gaps" && <Gaps roadmap={roadmap} role={role} />}
-          {view === "projects" && <Projects roadmap={roadmap} role={role} />}
+          {view === "projects" && <Projects id={id} roadmap={roadmap} role={role} state={projects} />}
           {view === "strengths" && <Strengths roadmap={roadmap} role={role} />}
-          {view === "next" && <Next emailedTo={emailedTo} signedIn={signedIn} id={id} />}
+          {view === "next" && <Next emailedTo={emailedTo} signedIn={signedIn} id={id} unlocked={projects.unlocked} />}
 
           <div className="mt-10 flex items-center justify-between gap-4 border-t border-rule pt-6">
             {prev ? (
@@ -174,57 +190,57 @@ function Gaps({ roadmap, role }: { roadmap: Roadmap; role: string }) {
   );
 }
 
-function Projects({ roadmap, role }: { roadmap: Roadmap; role: string }) {
+function Projects({ id, roadmap, role, state }: { id: string; roadmap: Roadmap; role: string; state: ProjectsState }) {
+  if (!state.unlocked) {
+    return (
+      <>
+        <Context role={role} />
+        <h1 className="mt-2 text-[2.2rem] sm:text-[3rem]">Your project ideas are ready</h1>
+        <p className="mt-3 text-ink-2">Tell us who you are and we&rsquo;ll email you a copy.</p>
+        <ProjectsGate id={id} prefill={state.prefill} signedInEmail={state.signedInEmail} />
+      </>
+    );
+  }
+  const { ideas, swapsLeft, done } = state;
   return (
     <>
       <Context role={role} />
-      <h1 className="mt-2 text-[2.2rem] sm:text-[3rem]">Projects that would prove them</h1>
-      <p className="mt-3 text-ink-2">Each one ends with something real you can attach as evidence.</p>
-      {roadmap.projects.length === 0 ? (
+      <h1 className="mt-2 text-[2.2rem] sm:text-[3rem]">{done ? "Your plan" : "Projects that would prove them"}</h1>
+      <p className="mt-3 text-ink-2">
+        {done ? "Each one ends with something real you can attach as evidence." : "Swap any that don’t fit, then keep your plan."}
+      </p>
+      {ideas.length === 0 ? (
         <Empty>We didn&rsquo;t have enough to suggest projects. Try again with more detail about your experience.</Empty>
-      ) : (
-        <ol className="mt-8 space-y-4">
-          {roadmap.projects.map((p) => (
-            <li key={p.title} className="rounded-[16px] border border-rule p-5 sm:p-6">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <h2 className="text-[1.35rem]">{p.title}</h2>
-                <span className="chip font-mono">
-                  {p.weeks} {p.weeks === 1 ? "week" : "weeks"}
-                </span>
-              </div>
-              <p className="mt-2 text-ink-2">{p.brief}</p>
-              <dl className="mt-4 grid gap-3 text-[0.95rem] sm:grid-cols-2">
-                <div>
-                  <dt className="text-sm text-ink-2">You end up with</dt>
-                  <dd className="font-medium">{p.deliverable}</dd>
-                </div>
-                {p.closesGaps.length > 0 && (
-                  <div>
-                    <dt className="text-sm text-ink-2">Closes</dt>
-                    <dd className="font-medium">{p.closesGaps.join(", ")}</dd>
-                  </div>
-                )}
-              </dl>
+      ) : done ? (
+        <ol aria-label="Your plan" className="mt-8 space-y-4">
+          {ideas.map((p) => (
+            <li key={p.id}>
+              <IdeaCard idea={p} />
             </li>
           ))}
         </ol>
+      ) : (
+        <PlanEditor id={id} ideas={ideas} swapsLeft={swapsLeft} />
       )}
-      <AfterProjects roadmap={roadmap} />
+      <AfterProjects roadmap={roadmap} ideas={ideas} done={done} />
     </>
   );
 }
 
-/** The same radar again, showing where finishing the projects would take them. */
-function AfterProjects({ roadmap }: { roadmap: Roadmap }) {
+/** The same radar again, showing where finishing the plan's projects would take them. */
+function AfterProjects({ roadmap, ideas, done }: { roadmap: Roadmap; ideas: ProjectIdea[]; done: boolean }) {
   const skills = chartableSkills(roadmap);
   if (!skills) return null;
-  const points = nowVersusAfter(skills, roadmap);
+  const chosen = { projects: ideas };
+  const points = nowVersusAfter(skills, chosen);
   if (!points.some((p) => p.to > p.from)) return null;
   // The lists judge the after-projects levels against what the job asks for.
-  const marked = highlights(skillsAfterProjects(skills, roadmap));
+  const marked = highlights(skillsAfterProjects(skills, chosen));
   return (
     <section aria-labelledby="after-projects" className="mt-10 border-t border-rule pt-8">
-      <h2 id="after-projects" className="text-[1.6rem] sm:text-[2rem]">When you&rsquo;ve finished these projects</h2>
+      <h2 id="after-projects" className="text-[1.6rem] sm:text-[2rem]">
+        {done ? "When you’ve finished your plan" : "When you’ve finished these projects"}
+      </h2>
       <p className="mt-2 max-w-[38rem] text-ink-2">Where you&rsquo;d stand once they&rsquo;re done.</p>
       <div className="mt-6">
         <SkillRadar
@@ -267,10 +283,18 @@ function Strengths({ roadmap, role }: { roadmap: Roadmap; role: string }) {
   );
 }
 
-function Next({ emailedTo, signedIn, id }: { emailedTo: string | null; signedIn: boolean; id: string }) {
+function Next({ emailedTo, signedIn, id, unlocked }: { emailedTo: string | null; signedIn: boolean; id: string; unlocked: boolean }) {
   return (
     <>
       <h1 className="text-[2.2rem] sm:text-[3rem]">What next</h1>
+      {!unlocked && (
+        <p className="mt-5 rounded-[var(--radius)] bg-sky px-5 py-4">
+          Your project ideas are waiting.{" "}
+          <Link href={`/roadmap/${id}?view=projects`} className="link font-semibold text-ink">
+            See them
+          </Link>
+        </p>
+      )}
       {emailedTo && (
         <p className="mt-5 flex items-start gap-3 rounded-[var(--radius)] bg-sky px-5 py-4">
           <Mail aria-hidden size={20} strokeWidth={2} className="mt-0.5 shrink-0" />

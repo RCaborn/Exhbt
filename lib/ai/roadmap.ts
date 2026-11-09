@@ -33,6 +33,7 @@ Rules:
   4 = used repeatedly, with results described
   Score "current" from their input only. Put where it shows in "evidence"; when current is 0, evidence is empty.
 - Every gap's "skill" and every name in a project's "closesGaps" must be one of the skillMap names, spelt exactly the same.
+- Suggest exactly 3 projects: their plan of three. Between them, cover the biggest gaps, each project closing different ones where possible.
 - Fit the projects to their situation (e.g. a current student can use coursework; someone working can use their job).
 - Each suggested project must produce a concrete deliverable the graduate can later attach as evidence (a report, repository, dataset, prototype, recording).
 - Projects must be doable by one person without paid tools, in 1-12 weeks.
@@ -121,15 +122,15 @@ function mockRoadmap(input: RoadmapInput, job: JobProfile | null): RoadmapResult
       summary: "Development preview: no API key is configured, so this roadmap is placeholder content.",
       strengths: [{ skill: "Placeholder strength", evidence: "Set ANTHROPIC_API_KEY to generate a real roadmap." }],
       gaps,
-      projects: [
-        {
-          title: "Placeholder project",
-          brief: "A sample project so the result page renders.",
-          closesGaps: [gaps[0].skill],
-          deliverable: "A short report",
-          weeks: 3,
-        },
-      ],
+      // Three, as the prompt asks. The third repeats the first gap, so one gap stays open
+      // and the after-projects chart shows both highlight lists.
+      projects: [gaps[0], gaps[1] ?? gaps[0], gaps[0]].map((g, i) => ({
+        title: `Placeholder project ${i + 1}`,
+        brief: "A sample project so the result page renders.",
+        closesGaps: [g.skill],
+        deliverable: "A short report",
+        weeks: 3,
+      })),
       skillMap,
     },
   };

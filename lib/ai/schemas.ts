@@ -36,6 +36,16 @@ export const RoadmapInputSchema = z
   });
 export type RoadmapInput = z.infer<typeof RoadmapInputSchema>;
 
+/** One suggested project. Also the shape the project-ideas regeneration returns (lib/ai/projects.ts). */
+export const ProjectSchema = z.object({
+  title: z.string(),
+  brief: z.string().describe("Two sentences: what to build or study and for whom."),
+  closesGaps: z.array(z.string()),
+  deliverable: z.string().describe("The concrete thing that becomes the evidence."),
+  weeks: z.number().int().min(1).max(12),
+});
+export type Project = z.infer<typeof ProjectSchema>;
+
 /**
  * Model output. Every field may be empty: the prompt tells the model to leave a field
  * empty rather than guess, so the UI must handle empty arrays and strings.
@@ -60,17 +70,7 @@ export const RoadmapSchema = z.object({
       }),
     )
     .max(6),
-  projects: z
-    .array(
-      z.object({
-        title: z.string(),
-        brief: z.string().describe("Two sentences: what to build or study and for whom."),
-        closesGaps: z.array(z.string()),
-        deliverable: z.string().describe("The concrete thing that becomes the evidence."),
-        weeks: z.number().int().min(1).max(12),
-      }),
-    )
-    .max(4),
+  projects: z.array(ProjectSchema).max(4),
   skillMap: z
     .array(
       z.object({

@@ -1,6 +1,7 @@
 Status: accepted
 Date: 9 Nov 2026
 Supersedes: the builder order in `docs/decisions/0002-plan-tiers.md` ("The roadmap builder is unchanged") and the 6 Nov order
+Partly superseded by: `docs/decisions/0004-email-gate-and-plan.md` (the email step moved out of the builder)
 
 # The CV gets its own step, and the roadmap charts the skills gap
 
