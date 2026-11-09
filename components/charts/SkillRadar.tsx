@@ -13,10 +13,10 @@ import type { SkillPoint } from "@/lib/roadmap/skills";
  */
 
 const MAX_LEVEL = 4;
-/** Radius of the plot, as a share of the box, leaving the rest for labels. */
-const PLOT = 0.3;
-/** Where labels are anchored, as a share of the box. */
-const LABEL_AT = 0.36;
+/** Radius of the plot, as a share of the box width, leaving the rest for labels. */
+const PLOT = 0.235;
+/** Where labels start, as a share of the box width from the centre. */
+const LABEL_AT = 0.275;
 
 type Props = {
   title: string;
@@ -25,9 +25,15 @@ type Props = {
   points: SkillPoint[];
   /** Where the skills and levels come from. Always shown. */
   note: string;
+  /**
+   * Short words for printing both values on their own lines, e.g. ["you", "job"]. Use this when
+   * "to" can be lower than "from" (a target), where an arrow would read as going backwards.
+   * Without it, values print as a change: "1 → 3", or one number when nothing changes.
+   */
+  valueWords?: [string, string];
 };
 
-export function SkillRadar({ title, fromLabel, toLabel, points, note }: Props) {
+export function SkillRadar({ title, fromLabel, toLabel, points, note, valueWords }: Props) {
   const n = points.length;
   const angle = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
   // SVG space: centre (0,0), level 4 at radius 100.
@@ -54,7 +60,7 @@ export function SkillRadar({ title, fromLabel, toLabel, points, note }: Props) {
         </span>
       </figcaption>
 
-      <div className="relative mx-auto mt-2 aspect-square w-full max-w-[30rem]" aria-hidden>
+      <div className="relative mx-auto mt-4 aspect-square w-full max-w-[30rem]" aria-hidden>
         <svg
           viewBox="-100 -100 200 200"
           className="absolute overflow-visible"
@@ -109,26 +115,38 @@ export function SkillRadar({ title, fromLabel, toLabel, points, note }: Props) {
         {points.map((p, i) => {
           const cos = Math.cos(angle(i));
           const sin = Math.sin(angle(i));
+          // Each label is sized from where it starts, so it always ends inside the box.
+          const at = (v: number) => 50 + v * LABEL_AT * 100;
           const side = cos > 0.25 ? "right" : cos < -0.25 ? "left" : "centre";
-          const tx = side === "right" ? "0" : side === "left" ? "-100%" : "-50%";
-          const ty = side !== "centre" ? "-50%" : sin < 0 ? "-100%" : "0";
+          const style: React.CSSProperties =
+            side === "right"
+              ? { left: `${at(cos)}%`, width: `${99 - at(cos)}%`, top: `${at(sin)}%`, transform: "translateY(-50%)" }
+              : side === "left"
+                ? { right: `${100 - at(cos)}%`, width: `${at(cos) - 1}%`, top: `${at(sin)}%`, transform: "translateY(-50%)" }
+                : sin < 0
+                  ? { left: "27%", width: "46%", bottom: `${100 - at(sin)}%` }
+                  : { left: "27%", width: "46%", top: `${at(sin)}%` };
           return (
             <div
               key={p.skill}
-              className={`absolute leading-tight ${side === "right" ? "text-left" : side === "left" ? "text-right" : "text-center"}`}
-              style={{
-                left: `${50 + cos * LABEL_AT * 100}%`,
-                top: `${50 + sin * LABEL_AT * 100}%`,
-                width: side === "centre" ? "44%" : "26%",
-                transform: `translate(${tx}, ${ty})`,
-              }}
+              className={`absolute leading-tight [overflow-wrap:anywhere] hyphens-auto ${
+                side === "right" ? "text-left" : side === "left" ? "text-right" : "text-center"
+              }`}
+              style={style}
               title={`${p.skill}: ${fromLabel.toLowerCase()} ${p.from}, ${toLabel.toLowerCase()} ${p.to}, out of ${MAX_LEVEL}`}
             >
-              <span className="block text-[0.78rem] font-medium text-ink-2 sm:text-[0.85rem]">{p.skill}</span>
+              <span className="block text-[0.72rem] font-medium text-ink-2 sm:text-[0.85rem]">{p.skill}</span>
               {/* Values in text ink, never the series colour. */}
-              <span className="mt-0.5 block font-mono text-[0.72rem] text-ink">
-                {p.from === p.to ? p.from : `${p.from} → ${p.to}`}
-              </span>
+              {valueWords ? (
+                <span className="mt-0.5 block font-mono text-[0.7rem] text-ink sm:text-[0.72rem]">
+                  <span className="block">{valueWords[0]} {p.from}</span>
+                  <span className="block">{valueWords[1]} {p.to}</span>
+                </span>
+              ) : (
+                <span className="mt-0.5 block font-mono text-[0.7rem] text-ink sm:text-[0.72rem]">
+                  {p.from === p.to ? p.from : `${p.from} → ${p.to}`}
+                </span>
+              )}
             </div>
           );
         })}
@@ -138,25 +156,29 @@ export function SkillRadar({ title, fromLabel, toLabel, points, note }: Props) {
         Levels run from 0 (not shown) to {MAX_LEVEL} (used repeatedly, with results). {note}
       </p>
 
-      <table className="sr-only">
-        <caption>{title}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Skill</th>
-            <th scope="col">{fromLabel}</th>
-            <th scope="col">{toLabel}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {points.map((p) => (
-            <tr key={p.skill}>
-              <th scope="row">{p.skill}</th>
-              <td>{p.from} of {MAX_LEVEL}</td>
-              <td>{p.to} of {MAX_LEVEL}</td>
+      {/* A table ignores the 1px width of sr-only and keeps its full width, which would widen
+          the page on phones. The wrapper div is what clips it. */}
+      <div className="sr-only">
+        <table>
+          <caption>{title}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Skill</th>
+              <th scope="col">{fromLabel}</th>
+              <th scope="col">{toLabel}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {points.map((p) => (
+              <tr key={p.skill}>
+                <th scope="row">{p.skill}</th>
+                <td>{p.from} of {MAX_LEVEL}</td>
+                <td>{p.to} of {MAX_LEVEL}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }

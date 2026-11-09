@@ -157,6 +157,15 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     const after = page.getByRole("table", { name: "You now, against where the projects would take you" });
     await expect(after.getByRole("row", { name: "SQL 1 of 4 3 of 4" })).toBeAttached();
     await expect(after.getByRole("row", { name: "Excel 0 of 4 0 of 4" })).toBeAttached();
+
+    // Neither chart widens the page on a small phone.
+    await page.setViewportSize({ width: 375, height: 812 });
+    for (const view of ["gaps", "projects"]) {
+      await page.goto(`${base}?view=${view}`);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+      expect(overflow, view).toBe(false);
+    }
   });
 
   test("pricing shows Free, Plus and Pro, each paid tier with its own waitlist", async ({ page }) => {

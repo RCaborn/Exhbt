@@ -63,25 +63,28 @@ export function BeforeAfterChart({ data }: { data: KeyResult }) {
         })}
       </div>
 
-      <table className="sr-only">
-        <caption>{data.title}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Group</th>
-            <th scope="col">{data.beforeLabel}</th>
-            <th scope="col">{data.afterLabel}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.rows.map((r) => (
-            <tr key={r.label}>
-              <th scope="row">{r.label}</th>
-              <td>{fmt(r.before)}</td>
-              <td>{fmt(r.after)}</td>
+      {/* The wrapper clips the table: a table ignores sr-only's 1px width and would widen the page. */}
+      <div className="sr-only">
+        <table>
+          <caption>{data.title}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Group</th>
+              <th scope="col">{data.beforeLabel}</th>
+              <th scope="col">{data.afterLabel}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data.rows.map((r) => (
+              <tr key={r.label}>
+                <th scope="row">{r.label}</th>
+                <td>{fmt(r.before)}</td>
+                <td>{fmt(r.after)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }

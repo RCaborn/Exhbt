@@ -42,6 +42,7 @@ export function SkillsGapExample() {
               title="Amara now, against a junior data analyst job"
               fromLabel="Now"
               toLabel="What the job asks for"
+              valueWords={["now", "job"]}
               points={nowVersusNeeded(AMARA)}
               note={NOTE}
             />

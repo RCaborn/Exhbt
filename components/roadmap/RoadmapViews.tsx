@@ -138,6 +138,7 @@ function Gaps({ roadmap, role }: { roadmap: Roadmap; role: string }) {
             title="You now, against what the job asks for"
             fromLabel="You now"
             toLabel="What the job asks for"
+            valueWords={["you", "job"]}
             points={nowVersusNeeded(skills)}
             note={SKILLS_SOURCE_NOTE}
           />
