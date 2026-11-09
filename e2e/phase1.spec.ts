@@ -143,7 +143,7 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await buildRoadmap(page, { email: uniqueEmail("jobs"), role: "Junior data analyst in the NHS" });
     await waitForResult(page);
     await page.goto(`${page.url().split("?")[0]}?view=gaps`);
-    await expect(page.getByRole("listitem").getByText("SQL", { exact: true })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Gaps to close" }).getByText("SQL", { exact: true })).toBeVisible();
   });
 
   test("the skills radar shows the gaps, then where the projects would take you", async ({ page }) => {

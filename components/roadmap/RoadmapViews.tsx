@@ -156,7 +156,7 @@ function Gaps({ roadmap, role }: { roadmap: Roadmap; role: string }) {
       {roadmap.gaps.length === 0 ? (
         <Empty>Your CV already covers what this role usually asks for. Look at the projects anyway: evidence beats claims.</Empty>
       ) : (
-        <ul className="mt-8 divide-y divide-rule border-y border-rule">
+        <ul aria-label="Gaps to close" className="mt-8 divide-y divide-rule border-y border-rule">
           {gaps.map((g) => (
             <li key={g.skill} className="grid gap-2 py-5 sm:grid-cols-[1fr_9rem] sm:gap-8">
               <div>
