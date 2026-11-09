@@ -12,7 +12,9 @@ export function BrowserFrame({ url, children }: { url: string; children: React.R
           <span className="size-2.5 rounded-full bg-sky-2" />
           <span className="size-2.5 rounded-full bg-sky-2" />
         </div>
-        <p className="flex-1 truncate rounded-[var(--radius-sm)] bg-surface px-3 py-1 font-mono text-xs text-ink-2">
+        {/* w-0 + flex-1: the URL fills the bar but adds nothing to its minimum width, so a long
+            address truncates instead of widening the page on phones. */}
+        <p className="w-0 min-w-0 flex-1 truncate rounded-[var(--radius-sm)] bg-surface px-3 py-1 font-mono text-xs text-ink-2">
           {url}
         </p>
       </div>
