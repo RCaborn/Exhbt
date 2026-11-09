@@ -22,6 +22,14 @@ alter table profiles
 alter table curated_links add column collection_slug text;
 create unique index curated_links_user_slug_idx on curated_links(user_id, collection_slug);
 
+-- array_to_string is only STABLE, and a stored generated column needs an IMMUTABLE expression,
+-- so this file failed on every Postgres ("generation expression is not immutable") until
+-- 10 Nov 2026, when this wrapper was added. For text[] the result never changes, so IMMUTABLE
+-- is safe. Fixing the file in place was right: it could never have been applied anywhere.
+create function immutable_array_to_string(text[], text) returns text
+  language sql immutable parallel safe
+  as $$ select array_to_string($1, $2) $$;
+
 -- UK job profiles with required skills (~3,000 roles), loaded by scripts/import-jobs.ts.
 create table job_profiles (
   id text primary key,                 -- stable id from the source dataset
@@ -31,7 +39,7 @@ create table job_profiles (
   summary text,
   source text not null,
   search tsvector generated always as (
-    to_tsvector('english', title || ' ' || array_to_string(alt_titles, ' '))
+    to_tsvector('english', title || ' ' || immutable_array_to_string(alt_titles, ' '))
   ) stored
 );
 create index job_profiles_search_idx on job_profiles using gin(search);

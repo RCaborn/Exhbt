@@ -32,7 +32,7 @@ export async function extractCvTextInBrowser(file: File): Promise<string> {
 
   const cleaned = text.replace(/\u0000/g, "").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim().slice(0, 20_000);
   if (cleaned.length < 80) {
-    throw new CvError("We couldn't read much text from that file (it may be a scanned image). Paste the text instead.");
+    throw new CvError("We couldn't read much text from that file (it may be a scanned image). Paste it instead.");
   }
   return cleaned;
 }

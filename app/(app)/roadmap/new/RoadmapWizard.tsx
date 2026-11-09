@@ -8,44 +8,45 @@ import { ArrowLeft, ArrowRight, Check, FileText, Upload } from "lucide-react";
 import { startRoadmap, type FormState } from "../actions";
 import { CvError, extractCvTextInBrowser } from "@/lib/cv-client";
 import { SITUATIONS, type Situation } from "@/lib/ai/schemas";
-import { SOURCING_LINE } from "@/lib/jobs/claim";
+import { Button } from "@/components/ui/Button";
 
-/** Agreed order (6 Nov): describe the job, current situation, education & skills, email. Results follow. */
+/**
+ * Order (docs/decisions/0003 and 0004): the job, the CV (preferred, skippable), where they are
+ * now with anything the CV doesn't cover. Results follow straight away; the email is asked for
+ * at the project-ideas gate, after the radar.
+ */
+// Minimal words on every step (Rory, 9 Nov 2026): a title, the fields, at most one short line.
 const STEPS = [
-  { title: "Describe the job you want", hint: "A sentence is plenty, e.g. “Data analyst in the NHS, using Python”." },
-  { title: "Where are you now?", hint: "So the projects we suggest fit your time and what you can use." },
-  { title: "Your education and skills", hint: "Your course, anything you're good at, or your CV. More detail gives a better roadmap." },
-  { title: "Where should we send it?", hint: "Your roadmap appears straight away, and we email you a copy so you can come back to it." },
+  { title: "What job do you want?", hint: "" },
+  { title: "Add your CV", hint: "It gives you the sharpest roadmap." },
+  { title: "Where are you now?", hint: "" },
 ] as const;
+const LAST = STEPS.length;
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-type Props = { defaultRole: string; signedInEmail: string | null };
+type Props = { defaultRole: string };
 
 /**
  * The click-through roadmap builder. All steps stay mounted (inactive ones are hidden)
  * so answers survive Back/Next; the step lives in ?step= so the browser Back button
  * works. One server action submits everything at the end.
  */
-export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
+export function RoadmapWizard({ defaultRole }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const [state, action] = useActionState<FormState, FormData>(startRoadmap, undefined);
 
   const urlStep = Number(params.get("step"));
-  const step = urlStep >= 1 && urlStep <= 4 ? urlStep : defaultRole ? 2 : 1;
+  const step = urlStep >= 1 && urlStep <= LAST ? urlStep : defaultRole ? 2 : 1;
 
   const [role, setRole] = useState(defaultRole);
   const [situation, setSituation] = useState<Situation | "">("");
   const [education, setEducation] = useState("");
   const [skills, setSkills] = useState("");
-  const [cvOpen, setCvOpen] = useState(false);
   const [cvMode, setCvMode] = useState<"upload" | "paste">("upload");
   const [cvText, setCvText] = useState("");
   const [cvFileName, setCvFileName] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
-  const [email, setEmail] = useState(signedInEmail ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const headingRefs = useRef<(HTMLHeadingElement | null)[]>([]);
   const first = useRef(true);
@@ -79,10 +80,10 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
   function validate(n: number): boolean {
     const e: Record<string, string> = {};
     if (n === 1 && role.trim().length < 2) e.targetRole = "Describe the job you want.";
-    if (n === 2 && !situation) e.situation = "Choose the option closest to where you are now.";
+    // Step 2 (the CV) can always be skipped.
+    if (n === 3 && !situation) e.situation = "Choose the option closest to where you are now.";
     if (n === 3 && (education + skills + cvText).replace(/\s/g, "").length < 20)
-      e.education = "Tell us a little about your education or skills, or add your CV.";
-    if (n === 4 && !EMAIL_RE.test(email.trim())) e.email = "Enter a valid email address.";
+      e.education = "Add your education or skills, or go back and add your CV.";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -100,7 +101,7 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
       setCvText(await extractCvTextInBrowser(file));
     } catch (err) {
       setCvText("");
-      setErrors({ cv: err instanceof CvError ? err.message : "We couldn't read that file. Paste the text instead." });
+      setErrors({ cv: err instanceof CvError ? err.message : "We couldn't read that file. Paste it instead." });
     } finally {
       setReading(false);
     }
@@ -114,11 +115,11 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
       noValidate
       data-ready={ready ? "true" : undefined}
       onSubmit={(e) => {
-        // Enter on steps 1-3 moves forward; only step 4 actually submits.
-        if (step < 4) {
+        // Enter on earlier steps moves forward; only the last step actually submits.
+        if (step < LAST) {
           e.preventDefault();
           next();
-        } else if (!validate(4)) {
+        } else if (!validate(LAST)) {
           e.preventDefault();
         }
       }}
@@ -150,11 +151,11 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
           >
             {s.title}
           </h2>
-          <p className="mt-3 text-ink-2">{s.hint}</p>
+          {s.hint && <p className="mt-3 text-graphite">{s.hint}</p>}
 
           <div className="mt-7">
             {i === 0 && (
-              <Field id="role" label="The job you want" error={errors.targetRole}>
+              <Field id="role" label="The job you want" hideLabel error={errors.targetRole}>
                 <textarea
                   id="role"
                   value={role}
@@ -166,53 +167,130 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
                   className="field text-[1.1rem]"
                   autoFocus={step === 1}
                 />
-                <p className="mt-3 text-sm text-ink-2">{SOURCING_LINE}</p>
               </Field>
             )}
 
             {i === 1 && (
               <div>
-                <fieldset aria-describedby="situation-error">
-                  <legend className="sr-only">Where you are now</legend>
-                  <div className="grid gap-2.5 sm:grid-cols-2">
-                    {(Object.entries(SITUATIONS) as [Situation, string][]).map(([value, label]) => (
-                      <label
-                        key={value}
-                        className={`flex cursor-pointer items-center gap-3 rounded-[14px] border-[1.5px] px-4 py-3.5 font-semibold has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-blue-edge ${
-                          situation === value ? "border-blue-edge bg-sky" : "border-rule hover:border-field"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="situation"
-                          value={value}
-                          checked={situation === value}
-                          onChange={() => setSituation(value)}
-                          className="size-4 accent-[var(--color-blue-edge)]"
-                        />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-                <ErrorText id="situation-error" message={errors.situation} />
-                <div className="mt-4">
-                  <Field id="situationDetail" label="Anything to add?" optional>
-                    <input
-                      id="situationDetail"
-                      name="situationDetail"
-                      maxLength={200}
-                      placeholder="e.g. Second year, Economics at Leeds"
-                      className="field"
-                    />
-                  </Field>
+                <div role="radiogroup" aria-label="How to add your CV" className="inline-flex rounded-full border border-line bg-mist p-1 text-sm font-medium">
+                  {(["upload", "paste"] as const).map((m) => (
+                    <label
+                      key={m}
+                      className={`cursor-pointer rounded-full px-4 py-2 has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-jade ${
+                        cvMode === m ? "bg-surface text-ink shadow-sm" : "text-graphite hover:text-ink"
+                      }`}
+                    >
+                      <input type="radio" name="cvMode" value={m} checked={cvMode === m} onChange={() => setCvMode(m)} className="sr-only" />
+                      {m === "upload" ? "Upload" : "Paste"}
+                    </label>
+                  ))}
                 </div>
+
+                <div hidden={cvMode !== "upload"} className="mt-4">
+                  <label
+                    htmlFor="cvFile"
+                    className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-field bg-mist px-6 py-10 text-center hover:border-jade has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-jade"
+                  >
+                    <Upload aria-hidden size={26} strokeWidth={1.75} />
+                    <span className="text-[1.05rem] font-semibold">{cvFileName ? "Choose a different file" : "Choose your CV"}</span>
+                    <span className="hint text-graphite">PDF or Word. Stays on your device.</span>
+                    <input
+                      id="cvFile"
+                      type="file"
+                      accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      className="sr-only"
+                      aria-describedby="cv-status cv-error"
+                      onChange={(e) => onFile(e.target.files?.[0])}
+                    />
+                  </label>
+                </div>
+
+                <div hidden={cvMode !== "paste"} className="mt-4">
+                  <label htmlFor="cvPaste" className="sr-only">CV text</label>
+                  <textarea
+                    id="cvPaste"
+                    rows={8}
+                    value={cvText}
+                    onChange={(e) => {
+                      setCvText(e.target.value);
+                      setCvFileName(null);
+                    }}
+                    placeholder="Paste your CV here"
+                    aria-describedby="cv-status cv-error"
+                    className="field"
+                  />
+                </div>
+
+                <p id="cv-status" className="mt-3 min-h-6 text-sm" aria-live="polite">
+                  {reading ? (
+                    "Reading your CV…"
+                  ) : words > 0 ? (
+                    <span className="inline-flex items-center gap-2 font-medium">
+                      <span className="inline-flex size-4 items-center justify-center rounded-full border border-ink bg-mint">
+                        <Check aria-hidden size={10} strokeWidth={3} />
+                      </span>
+                      {cvFileName ? (
+                        <>
+                          <FileText aria-hidden size={14} /> Read {words.toLocaleString("en-GB")} words from {cvFileName}
+                        </>
+                      ) : (
+                        <>{words.toLocaleString("en-GB")} words</>
+                      )}
+                    </span>
+                  ) : null}
+                </p>
+                <ErrorText id="cv-error" message={errors.cv} />
+
+                {words === 0 && (
+                  <button type="button" onClick={() => goTo(3)} disabled={!ready} className="link mt-2 font-semibold text-ink">
+                    Skip for now
+                  </button>
+                )}
               </div>
             )}
 
             {i === 2 && (
               <div className="space-y-5">
-                <Field id="education" label="Education" error={errors.education}>
+                <div>
+                  <fieldset aria-describedby="situation-error">
+                    <legend className="sr-only">Where you are now</legend>
+                    <div className="grid gap-2.5 sm:grid-cols-2">
+                      {(Object.entries(SITUATIONS) as [Situation, string][]).map(([value, label]) => (
+                        <label
+                          key={value}
+                          className={`flex cursor-pointer items-center gap-3 rounded-[14px] border-[1.5px] px-4 py-3.5 font-semibold has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-jade ${
+                            situation === value ? "border-jade bg-mist" : "border-line hover:border-field"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="situation"
+                            value={value}
+                            checked={situation === value}
+                            onChange={() => setSituation(value)}
+                            className="size-4 accent-[var(--color-jade)]"
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                  <ErrorText id="situation-error" message={errors.situation} />
+                </div>
+                <Field id="situationDetail" label="Details" optional>
+                  <input
+                    id="situationDetail"
+                    name="situationDetail"
+                    maxLength={200}
+                    placeholder="e.g. Second year, Economics at Leeds"
+                    className="field"
+                  />
+                </Field>
+
+                {cvText && (
+                  <p className="rounded-[var(--radius)] bg-mist px-4 py-3 text-[0.95rem]">Got your CV. Add anything it misses.</p>
+                )}
+                <Field id="education" label="Education" optional={!!cvText} error={errors.education}>
                   <textarea
                     id="education"
                     name="education"
@@ -237,143 +315,29 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
                     className="field"
                   />
                 </Field>
-
-                <div className="rounded-[14px] border border-rule">
-                  <button
-                    type="button"
-                    aria-expanded={cvOpen}
-                    aria-controls="cv-panel"
-                    onClick={() => setCvOpen((o) => !o)}
-                    className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left font-semibold"
-                  >
-                    <span>
-                      Add your CV <span className="font-normal text-ink-2">(optional, gives a sharper roadmap)</span>
-                    </span>
-                    <span aria-hidden className="text-xl leading-none">{cvOpen ? "−" : "+"}</span>
-                  </button>
-                  <div id="cv-panel" hidden={!cvOpen} className="border-t border-rule px-4 pt-4 pb-3">
-                    <div role="radiogroup" aria-label="How to add your CV" className="inline-flex rounded-full border border-rule bg-sky p-1 text-sm font-medium">
-                      {(["upload", "paste"] as const).map((m) => (
-                        <label
-                          key={m}
-                          className={`cursor-pointer rounded-full px-4 py-2 has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-blue-edge ${
-                            cvMode === m ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"
-                          }`}
-                        >
-                          <input type="radio" name="cvMode" value={m} checked={cvMode === m} onChange={() => setCvMode(m)} className="sr-only" />
-                          {m === "upload" ? "Upload a file" : "Paste the text"}
-                        </label>
-                      ))}
-                    </div>
-
-                    <div hidden={cvMode !== "upload"} className="mt-4">
-                      <label
-                        htmlFor="cvFile"
-                        className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-field bg-sky px-6 py-8 text-center hover:border-blue-edge has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-blue-edge"
-                      >
-                        <Upload aria-hidden size={24} strokeWidth={1.75} />
-                        <span className="font-semibold">{cvFileName ? "Choose a different file" : "Choose your CV"}</span>
-                        <span className="hint">PDF or Word (.docx), up to 5 MB. Read in your browser; the file never leaves your device.</span>
-                        <input
-                          id="cvFile"
-                          type="file"
-                          accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                          className="sr-only"
-                          aria-describedby="cv-status cv-error"
-                          onChange={(e) => onFile(e.target.files?.[0])}
-                        />
-                      </label>
-                    </div>
-
-                    <div hidden={cvMode !== "paste"} className="mt-4">
-                      <label htmlFor="cvPaste" className="sr-only">CV text</label>
-                      <textarea
-                        id="cvPaste"
-                        rows={8}
-                        value={cvText}
-                        onChange={(e) => {
-                          setCvText(e.target.value);
-                          setCvFileName(null);
-                        }}
-                        placeholder="Paste your CV here"
-                        aria-describedby="cv-status cv-error"
-                        className="field"
-                      />
-                    </div>
-
-                    <p id="cv-status" className="mt-3 min-h-6 text-sm" aria-live="polite">
-                      {reading ? (
-                        "Reading your CV…"
-                      ) : words > 0 ? (
-                        <span className="inline-flex items-center gap-2 font-medium">
-                          <span className="inline-flex size-4 items-center justify-center rounded-full border border-ink bg-green">
-                            <Check aria-hidden size={10} strokeWidth={3} />
-                          </span>
-                          {cvFileName ? (
-                            <>
-                              <FileText aria-hidden size={14} /> Read {words.toLocaleString("en-GB")} words from {cvFileName}
-                            </>
-                          ) : (
-                            <>{words.toLocaleString("en-GB")} words</>
-                          )}
-                        </span>
-                      ) : null}
-                    </p>
-                    <ErrorText id="cv-error" message={errors.cv} />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {i === 3 && (
-              <div className="space-y-6">
-                {signedInEmail ? (
-                  <p>
-                    We&rsquo;ll send it to <span className="font-semibold">{signedInEmail}</span>.
-                  </p>
-                ) : (
-                  <Field id="email" label="Email address" error={errors.email}>
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      autoComplete="email"
-                      aria-describedby="email-error"
-                      className="field min-h-14 text-[1.15rem]"
-                    />
-                  </Field>
-                )}
-                <label className="flex items-start gap-3">
-                  <input type="checkbox" name="marketingOptIn" value="yes" className="mt-1 size-5 shrink-0 accent-[var(--color-blue-edge)]" />
-                  <span>
-                    Email me when new Exhbt features launch.{" "}
-                    <span className="text-ink-2">Occasional, and you can unsubscribe in one click.</span>
-                  </span>
-                </label>
                 <p className="hint">
                   By continuing you agree to the <Link href="/legal/terms" className="link">terms</Link> and{" "}
                   <Link href="/legal/privacy" className="link">privacy policy</Link>.
                 </p>
               </div>
             )}
+
           </div>
         </section>
       ))}
 
-      <div className="mt-10 flex items-center justify-between gap-4 border-t border-rule pt-6">
+      <div className="mt-10 flex items-center justify-between gap-4 border-t border-line pt-6">
         {step > 1 ? (
-          <button type="button" onClick={() => goTo(step - 1)} className="btn btn-secondary">
+          <Button label="Back" onClick={() => goTo(step - 1)}>
             <ArrowLeft aria-hidden size={18} strokeWidth={2.25} /> Back
-          </button>
+          </Button>
         ) : (
           <span />
         )}
-        {step < 4 ? (
-          <button type="submit" className="btn btn-primary min-h-12 px-6 text-base" disabled={reading || !ready}>
+        {step < LAST ? (
+          <Button type="submit" variant="primary" size="lg" label="Continue" disabled={reading || !ready}>
             Continue <ArrowRight aria-hidden size={18} strokeWidth={2.5} />
-          </button>
+          </Button>
         ) : (
           <Submit />
         )}
@@ -385,12 +349,12 @@ export function RoadmapWizard({ defaultRole, signedInEmail }: Props) {
 function Progress({ step }: { step: number }) {
   return (
     <div>
-      <p className="text-sm font-semibold text-ink-2">
+      <p className="text-sm font-semibold text-graphite">
         Step {step} of {STEPS.length}
       </p>
-      <div className="mt-2 grid grid-cols-4 gap-1.5" aria-hidden>
+      <div className="mt-2 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${STEPS.length}, minmax(0, 1fr))` }} aria-hidden>
         {STEPS.map((s, i) => (
-          <span key={s.title} className={`h-1.5 rounded-full ${i < step ? "bg-blue-edge" : "bg-sky-2"}`} />
+          <span key={s.title} className={`h-1.5 rounded-full ${i < step ? "bg-jade" : "bg-wash"}`} />
         ))}
       </div>
     </div>
@@ -400,9 +364,9 @@ function Progress({ step }: { step: number }) {
 function Submit() {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className="btn btn-primary min-h-12 px-6 text-base" disabled={pending}>
-      {pending ? "Starting…" : "Build my roadmap"} <ArrowRight aria-hidden size={18} strokeWidth={2.5} />
-    </button>
+    <Button type="submit" variant="primary" size="lg" label="See my roadmap" loading={pending}>
+      {pending ? "Starting…" : "See my roadmap"} <ArrowRight aria-hidden size={18} strokeWidth={2.5} />
+    </Button>
   );
 }
 
@@ -410,19 +374,22 @@ function Field({
   id,
   label,
   optional,
+  hideLabel,
   error,
   children,
 }: {
   id: string;
   label: string;
   optional?: boolean;
+  /** For a field whose step title already asks the question: the label stays for screen readers. */
+  hideLabel?: boolean;
   error?: string;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label htmlFor={id} className="label">
-        {label} {optional && <span className="font-normal text-ink-2">(optional)</span>}
+      <label htmlFor={id} className={hideLabel ? "sr-only" : "label"}>
+        {label} {optional && <span className="font-normal text-graphite">(optional)</span>}
       </label>
       {children}
       <ErrorText id={`${id}-error`} message={error} />

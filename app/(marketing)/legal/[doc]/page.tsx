@@ -6,7 +6,7 @@ type Doc = { title: string; updated: string; body: React.ReactNode };
 const DOCS: Record<string, Doc> = {
   privacy: {
     title: "Privacy policy",
-    updated: "5 November 2026",
+    updated: "8 November 2026",
     body: (
       <>
         <p>
@@ -16,8 +16,9 @@ const DOCS: Record<string, Doc> = {
         <h2>What we collect</h2>
         <ul>
           <li>Your email address, to create your account and send sign-in links.</li>
+          <li>Your name, and your LinkedIn profile address if you give it, for your account and, later, your portfolio.</li>
           <li>The text of your CV and anything you type into the roadmap form.</li>
-          <li>On Premium, the files and text you add to your exhbts.</li>
+          <li>The files and text you add to an exhbt.</li>
           <li>
             Product events such as &ldquo;roadmap completed&rdquo;, linked to your account. We do not use
             advertising or tracking cookies.
@@ -117,7 +118,7 @@ export default async function LegalPage({ params }: { params: Promise<{ doc: str
   if (!d) notFound();
   return (
     <div className="mx-auto max-w-[68ch] px-4 pt-14 sm:px-8 lg:pt-20">
-      <h1 className="text-[2.6rem] sm:text-[3.4rem]">{d.title}</h1>
+      <h1>{d.title}</h1>
       <p className="hint mt-3">Last updated {d.updated}. Draft pending legal review.</p>
       <div className="prose-read mt-8">{d.body}</div>
     </div>

@@ -30,6 +30,7 @@ export default defineConfig({
     timeout: 180_000,
     // A fresh server per run: the in-memory store (and its rate limits) starts empty.
     reuseExistingServer: false,
-    env: { NEXT_TELEMETRY_DISABLED: "1", NEXT_DIST_DIR: ".next-e2e" },
+    // The suite builds many roadmaps from one address, more than the production per-connection cap.
+    env: { NEXT_TELEMETRY_DISABLED: "1", NEXT_DIST_DIR: ".next-e2e", EXHBT_PER_IP_PER_DAY: "100" },
   },
 });

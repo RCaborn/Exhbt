@@ -18,16 +18,16 @@ export function MethodFlow({ steps }: { steps: Step[] }) {
           <li key={`${i}-${s.step}`} className="flex flex-col items-stretch @2xl:flex-1 @2xl:flex-row @2xl:items-center">
             <div
               className={`flex items-baseline gap-3 rounded-[8px] border px-3 py-2.5 @2xl:h-full @2xl:flex-1 @2xl:flex-col @2xl:items-start @2xl:gap-1 ${
-                last ? "border-ink bg-ink text-white" : "border-rule bg-surface"
+                last ? "border-ink bg-ink text-white" : "border-line bg-surface"
               }`}
             >
-              <span className={`font-mono text-[0.68rem] ${last ? "text-blue" : "text-quiet"}`} aria-hidden>
+              <span className={`font-mono text-[0.68rem] ${last ? "text-mint" : "text-slate"}`} aria-hidden>
                 {String(i + 1).padStart(2, "0")}
               </span>
               <span className="min-w-0">
                 <span className="block text-[0.86rem] leading-tight font-semibold">{s.step}</span>
                 {s.detail && (
-                  <span className={`mt-0.5 block font-mono text-[0.72rem] leading-snug ${last ? "text-sky-2" : "text-ink-2"}`}>
+                  <span className={`mt-0.5 block font-mono text-[0.72rem] leading-snug ${last ? "text-wash" : "text-graphite"}`}>
                     {s.detail}
                   </span>
                 )}

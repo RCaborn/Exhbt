@@ -2,19 +2,22 @@
 
 The product is named after what it makes: an exhibit. The identity borrows from how a museum treats an object. Each piece is framed, labelled, numbered and checked. Everything below follows from that, so if you're unsure about a new use, ask whether a museum would do it.
 
+## Colour and type
+Brand kit v1 (9 Nov 2026). Mint `#4FE9B4`, jade `#00755D`, ink `#0E0F12` on a white canvas, with neutral greys. Bricolage Grotesque for display, Inter for everything else. The tokens, ratios and rules are in `DESIGN.md`. Rory's rule: the colours are fixed; the rest can be improved.
+
 ## Mark
-An exhibit frame, broken at the lower right by its label.
+The kit's **Frame** route: viewfinder brackets put one piece of work in focus, the way a hiring manager scans an exhbt. The dot is the evidence. (The kit also sketched a Stack route; Frame is the one in use because the kit's own in-use example shows it. Swapping is one component.)
 
 - Source: `components/brand/Logo.tsx` (`<Mark />` and `<Logo />`). Favicon: `app/icon.svg`. Apple touch icon: `app/apple-icon.png`. Email: `public/brand/exhbt-mark.png`.
-- The frame uses `currentColor`: navy on white or light blue, white on navy. The label is always the light-blue token with a navy edge. On navy the edge disappears into the background, which is intended.
-- Minimum size 14px. Below that the gap in the frame closes up.
-- Clear space: at least half the mark's width on every side.
-- Don't rotate it, recolour the label, add a shadow, or put it in a circle or tile.
+- Three colourways: a mint tile with ink brackets on white and on ink; on mint, `tone="on-mint"` flips it to an ink tile with mint brackets.
+- Smallest size 16px as an icon. Clear space: the tile's corner radius on every side.
+- Never stretch it, recolour it, add a shadow, or set mint on a mint background.
+- The logo is still a sketch. Before paying for final artwork, run a UKIPO search for EXHBT and EXHIBIT in classes 9, 35, 41 and 42.
 
-If the PNGs need regenerating after a change to the mark, render `app/icon.svg` at 96px (email, transparent) and 180px (Apple, white background with 16% padding).
+If the PNGs need regenerating after a change to the mark, render `app/icon.svg` at 96px (email, transparent) and 180px (Apple, on mint).
 
 ## Wordmark
-`exhbt`, lower case, Schibsted Grotesk 800, tracking −0.045em, always to the right of the mark. Sizes: `sm` (footers and sign-offs), `md` (site header), `lg` (rare).
+`exhbt`, lower case, Bricolage Grotesque 600, tracking −0.04em, always to the right of the mark. Sizes: `sm` (footers and sign-offs), `md` (site header), `lg` (rare).
 
 Lower case because it reads as a product and as the URL people will type. In sentences, the company is "Exhbt" and the pieces of work are "exhbts".
 
@@ -22,7 +25,7 @@ Lower case because it reads as a product and as the URL people will type. In sen
 Every exhbt in a portfolio has a number like a museum accession number: `EX·01`, `EX·02`.
 
 - Derived from its position in the owner's portfolio (`catalogueNo(position)` in `lib/exhbt.ts`). Never stored and never typed by hand.
-- IBM Plex Mono, semibold, ink. On a tile it sits top left; on a full exhbt it sits above the author line.
+- Inter with tabular numbers, semibold, ink. On a tile it sits top left; on a full exhbt it sits above the author line.
 - Use them only for exhbts. Don't number marketing sections, features or steps with them; DESIGN.md still bans decorative numbering.
 - On a job-specific link, the numbers follow that link's order.
 
@@ -31,13 +34,13 @@ Every exhbt in a portfolio has a number like a museum accession number: `EX·01`
 
 - Wording is "checked", never "verified" or "certified". The checks confirm the author stands behind the work, the work is attached, and it passed an originality check. They don't confirm the results, and the employer guide says so.
 - On the full exhbt the seal is a link to `/how-to-read-an-exhbt#checks`. On a tile it's plain (`asLink={false}`, `compact`), because the tile is already a link.
-- The three green ticks stay next to it on the full exhbt. Green is used for ticks only.
+- The three mint ticks stay next to it on the full exhbt.
 
 ## Brand band
-One navy surface per portfolio page, at the top: `PortfolioHeader` on the portfolio, the slim `PortfolioBar` above a single exhbt.
+One ink surface per portfolio page, at the top: `PortfolioHeader` on the portfolio, the slim `PortfolioBar` above a single exhbt.
 
-- Text on navy is white (about 14:1), `#c9d7e8` for secondary text, or the light-blue token for labels (both above 9:1). Keep everything on the band at 7:1 or more.
-- No other navy blocks on those pages apart from the site footer.
+- Text on ink is white, or `#C9CBCF` for secondary text. Keep everything on the band at 7:1 or more.
+- No other ink blocks on those pages apart from the site footer.
 
 ## Sign-off
 `components/brand/MadeWith.tsx`: "Portfolio made with exhbt · Build your own roadmap →", at the foot of every public portfolio and exhbt. Employers read these pages, and it's how the next student finds us. Keep it to one quiet line; no banners or pop-ups.
