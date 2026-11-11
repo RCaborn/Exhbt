@@ -41,7 +41,7 @@ export type ProjectIdea = Project & {
 
 export type AICall = {
   userId: string | null;
-  step: "roadmap" | "exhbt_draft" | "originality" | "link_ranking" | "project_ideas";
+  step: "roadmap" | "exhbt_draft" | "originality" | "link_ranking" | "project_ideas" | "cv_read";
   model: string;
   inputTokens: number;
   outputTokens: number;
@@ -61,7 +61,9 @@ export type EventName =
   | "projects_gate_viewed"
   | "projects_unlocked"
   | "project_swapped"
-  | "plan_kept";
+  | "plan_kept"
+  | "cv_read_ai"
+  | "cv_read_failed";
 
 export type WaitlistInterest = "plus" | "premium" | "university";
 
@@ -98,6 +100,8 @@ export interface Store {
   confirmPlan(roadmapId: string): Promise<void>;
   logAICall(call: AICall): Promise<void>;
   logEvent(name: EventName, userId: string | null, props?: Record<string, unknown>): Promise<void>;
+  /** How many events with this name carried this ipHash in their props in the last `hours`. For rate limits. */
+  countRecentEvents(name: EventName, ipHash: string, hours: number): Promise<number>;
   createLead(lead: { name: string; email: string; institution: string; message: string }): Promise<void>;
   /** Idempotent: joining twice with the same email and interest is a no-op. */
   joinWaitlist(entry: { email: string; interest: WaitlistInterest; source: string }): Promise<void>;
@@ -380,6 +384,16 @@ function supabaseStore(): Store {
       const { error } = await db.from("events").insert({ name, user_id: userId, props });
       if (error) console.error("event log failed", error.message);
     },
+    async countRecentEvents(name, ipHash, hours) {
+      const res = await db
+        .from("events")
+        .select("id", { count: "exact", head: true })
+        .eq("name", name)
+        .eq("props->>ipHash", ipHash)
+        .gte("created_at", since(hours));
+      if (res.error) throw new Error(res.error.message);
+      return res.count ?? 0;
+    },
     async createLead(lead) {
       check(await db.from("leads").insert(lead));
     },
@@ -540,6 +554,10 @@ function memoryStore(): Store {
     },
     async logEvent(name, userId, props = {}) {
       m.events.push({ name, userId, props, at: new Date().toISOString() });
+    },
+    async countRecentEvents(name, ipHash, hours) {
+      const after = Date.now() - hours * 3_600_000;
+      return m.events.filter((e) => e.name === name && e.props.ipHash === ipHash && Date.parse(e.at) >= after).length;
     },
     async createLead(lead) {
       m.leads.push(lead);
