@@ -37,7 +37,12 @@ export type ProjectIdea = Project & {
   /** The slot in the plan, 0-2. */
   position: number;
   source: "roadmap" | "swap";
+  /** How many times this slot has been regenerated. */
+  swapsUsed: number;
 };
+
+/** Outcome of trying to start AI generation for a roadmap. */
+export type GenerationClaim = "run" | "ready" | "busy";
 
 export type AICall = {
   userId: string | null;
@@ -79,6 +84,14 @@ export interface Store {
   latestRoadmapFor(userId: string): Promise<RoadmapRecord | null>;
   findCachedOutput(inputHash: string): Promise<Roadmap | null>;
   saveRoadmapOutput(id: string, output: Roadmap): Promise<void>;
+  /**
+   * Claims the right to generate for this roadmap. `run` = this caller should call the model;
+   * `ready` = output is already saved; `busy` = another caller is generating (retry shortly).
+   * Stale claims older than two minutes can be taken over.
+   */
+  claimGeneration(id: string): Promise<GenerationClaim>;
+  /** Clears a generation claim after a failed attempt so a retry can run. */
+  clearGenerationClaim(id: string): Promise<void>;
   /** Atomically marks the roadmap email as sent. Returns false if it was already sent. */
   markEmailSent(id: string): Promise<boolean>;
   setMarketingOptIn(email: string, optIn: boolean): Promise<void>;
@@ -89,11 +102,10 @@ export interface Store {
   /** Adds a roadmap's first ideas (up to three), once: does nothing if it already has some. */
   seedProjectIdeas(roadmapId: string, ideas: Project[]): Promise<void>;
   /**
-   * Replaces one idea in place and counts the swap. The last allowed swap also confirms the
-   * plan. Returns false, changing nothing, when `limit` swaps have been used (or another swap
-   * won a race).
+   * Replaces one idea in place and counts that idea's swap. Returns false when that idea has
+   * already used `perIdeaLimit` swaps, the plan is confirmed, or another swap won a race.
    */
-  swapProjectIdea(roadmapId: string, ideaId: string, idea: Project, limit: number): Promise<boolean>;
+  swapProjectIdea(roadmapId: string, ideaId: string, idea: Project, perIdeaLimit: number): Promise<boolean>;
   /** Keeps the plan as it is: no more swaps. */
   confirmPlan(roadmapId: string): Promise<void>;
   logAICall(call: AICall): Promise<void>;
@@ -101,6 +113,11 @@ export interface Store {
   createLead(lead: { name: string; email: string; institution: string; message: string }): Promise<void>;
   /** Idempotent: joining twice with the same email and interest is a no-op. */
   joinWaitlist(entry: { email: string; interest: WaitlistInterest; source: string }): Promise<void>;
+  /**
+   * Shared sliding-window limiter. Records this attempt and returns true when it is still
+   * under `limit` inside `windowSeconds`; false when the window is full.
+   */
+  takeRateLimit(key: string, limit: number, windowSeconds: number): Promise<boolean>;
   exportUserData(userId: string): Promise<Record<string, unknown>>;
   deleteUserData(userId: string): Promise<void>;
 }
@@ -111,6 +128,9 @@ export const isSupabaseConfigured = () =>
 export function getStore(): Store {
   return isSupabaseConfigured() ? supabaseStore() : memoryStore();
 }
+
+/** Claims older than this can be stolen after a crashed Worker. */
+const GENERATION_STALE_MS = 2 * 60_000;
 
 /* ---------------- Supabase (production) ---------------- */
 
@@ -161,6 +181,7 @@ type IdeaRow = {
   deliverable: string;
   weeks: number;
   source: "roadmap" | "swap";
+  swaps_used: number | null;
 };
 
 const ideaFromRow = (r: IdeaRow): ProjectIdea => ({
@@ -172,6 +193,7 @@ const ideaFromRow = (r: IdeaRow): ProjectIdea => ({
   deliverable: r.deliverable,
   weeks: r.weeks,
   source: r.source,
+  swapsUsed: r.swaps_used ?? 0,
 });
 
 /** The plan has three slots. */
@@ -278,7 +300,41 @@ function supabaseStore(): Store {
       return (check(res) as { output_json: Roadmap } | null)?.output_json ?? null;
     },
     async saveRoadmapOutput(id, output) {
-      check(await db.from("roadmaps").update({ output_json: output }).eq("id", id));
+      check(
+        await db
+          .from("roadmaps")
+          .update({ output_json: output, generation_started_at: null })
+          .eq("id", id),
+      );
+    },
+    async claimGeneration(id) {
+      const row = check(
+        await db.from("roadmaps").select("output_json, generation_started_at").eq("id", id).maybeSingle(),
+      ) as { output_json: Roadmap | null; generation_started_at: string | null } | null;
+      if (!row) return "ready";
+      if (row.output_json) return "ready";
+      const staleBefore = new Date(Date.now() - GENERATION_STALE_MS).toISOString();
+      const now = new Date().toISOString();
+      let q = db
+        .from("roadmaps")
+        .update({ generation_started_at: now })
+        .eq("id", id)
+        .is("output_json", null);
+      // Fresh claim, or take over a stuck one.
+      if (row.generation_started_at) {
+        q = q.lt("generation_started_at", staleBefore);
+      } else {
+        q = q.is("generation_started_at", null);
+      }
+      const won = check(await q.select("id")) as { id: string }[];
+      if (won.length === 1) return "run";
+      const again = check(
+        await db.from("roadmaps").select("output_json").eq("id", id).maybeSingle(),
+      ) as { output_json: Roadmap | null } | null;
+      return again?.output_json ? "ready" : "busy";
+    },
+    async clearGenerationClaim(id) {
+      check(await db.from("roadmaps").update({ generation_started_at: null }).eq("id", id).is("output_json", null));
     },
     async markEmailSent(id) {
       // Conditional update: only one caller wins, so the email is sent once.
@@ -329,29 +385,34 @@ function supabaseStore(): Store {
       // Positions are unique per roadmap, so two first visits at once can't seed twice.
       check(await db.from("project_ideas").upsert(rows, { onConflict: "roadmap_id,position", ignoreDuplicates: true }));
     },
-    async swapProjectIdea(roadmapId, ideaId, idea, limit) {
+    async swapProjectIdea(roadmapId, ideaId, idea, perIdeaLimit) {
       const row = check(
         await db.from("roadmaps").select("project_swaps_used, plan_confirmed_at").eq("id", roadmapId).maybeSingle(),
       ) as { project_swaps_used: number; plan_confirmed_at: string | null } | null;
-      if (!row || row.plan_confirmed_at || row.project_swaps_used >= limit) return false;
-      const used = row.project_swaps_used + 1;
-      // Count the swap first, conditionally, so two at once can't both pass the limit.
-      const won = check(
-        await db
-          .from("roadmaps")
-          .update({ project_swaps_used: used, ...(used >= limit ? { plan_confirmed_at: new Date().toISOString() } : {}) })
-          .eq("id", roadmapId)
-          .eq("project_swaps_used", row.project_swaps_used)
-          .select("id"),
-      ) as { id: string }[];
-      if (won.length !== 1) return false;
-      check(
+      if (!row || row.plan_confirmed_at) return false;
+      const ideaRow = check(
+        await db.from("project_ideas").select("swaps_used").eq("id", ideaId).eq("roadmap_id", roadmapId).maybeSingle(),
+      ) as { swaps_used: number } | null;
+      if (!ideaRow || ideaRow.swaps_used >= perIdeaLimit) return false;
+      const nextIdeaSwaps = ideaRow.swaps_used + 1;
+      // Count on the idea first so two parallel swaps of the same slot can't both pass.
+      const wonIdea = check(
         await db
           .from("project_ideas")
-          .update({ ...ideaFields(idea), source: "swap", updated_at: new Date().toISOString() })
+          .update({
+            ...ideaFields(idea),
+            source: "swap",
+            swaps_used: nextIdeaSwaps,
+            updated_at: new Date().toISOString(),
+          })
           .eq("id", ideaId)
-          .eq("roadmap_id", roadmapId),
-      );
+          .eq("roadmap_id", roadmapId)
+          .eq("swaps_used", ideaRow.swaps_used)
+          .select("id"),
+      ) as { id: string }[];
+      if (wonIdea.length !== 1) return false;
+      const used = row.project_swaps_used + 1;
+      check(await db.from("roadmaps").update({ project_swaps_used: used }).eq("id", roadmapId));
       return true;
     },
     async confirmPlan(roadmapId) {
@@ -386,6 +447,19 @@ function supabaseStore(): Store {
     async joinWaitlist(entry) {
       check(await db.from("waitlist").upsert(entry, { onConflict: "email,interest", ignoreDuplicates: true }));
     },
+    async takeRateLimit(key, limit, windowSeconds) {
+      const sinceIso = new Date(Date.now() - windowSeconds * 1000).toISOString();
+      const counted = await db
+        .from("rate_limit_hits")
+        .select("id", { count: "exact", head: true })
+        .eq("key", key)
+        .gte("created_at", sinceIso);
+      if (counted.error) throw new Error(counted.error.message);
+      if ((counted.count ?? 0) >= limit) return false;
+      const { error } = await db.from("rate_limit_hits").insert({ key });
+      if (error) throw new Error(error.message);
+      return true;
+    },
     async exportUserData(userId) {
       const [profile, roadmaps, exhbts, links, subs] = await Promise.all([
         db.from("profiles").select("*").eq("id", userId).maybeSingle(),
@@ -416,7 +490,7 @@ function supabaseStore(): Store {
 
 /* ---------------- In-memory (local development and tests only) ---------------- */
 
-type MemRoadmap = RoadmapRecord & { ipHash: string; marketingOptIn: boolean };
+type MemRoadmap = RoadmapRecord & { ipHash: string; marketingOptIn: boolean; generationStartedAt: string | null };
 type Mem = {
   roadmaps: Map<string, MemRoadmap>;
   ideas: Map<string, ProjectIdea[]>;
@@ -425,6 +499,7 @@ type Mem = {
   events: { name: string; userId: string | null; props: Record<string, unknown>; at: string }[];
   leads: unknown[];
   waitlist: { email: string; interest: WaitlistInterest; source: string }[];
+  rateHits: { key: string; at: number }[];
 };
 const newMem = (): Mem => ({
   roadmaps: new Map(),
@@ -434,16 +509,34 @@ const newMem = (): Mem => ({
   events: [],
   leads: [],
   waitlist: [],
+  rateHits: [],
 });
 const g = globalThis as unknown as { __exhbtMem?: Mem };
 
 function memoryStore(): Store {
-  if (process.env.NODE_ENV === "production" && !process.env.EXHBT_ALLOW_MEMORY_STORE) {
+  // Production always needs Supabase. The in-memory store is for local development and e2e only.
+  if (process.env.NODE_ENV === "production") {
     throw new Error("Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
   }
   const m = (g.__exhbtMem ??= newMem());
   m.ideas ??= new Map(); // a store created before ideas existed (hot reload in development)
+  m.rateHits ??= [];
   const recent = (hours: number, r: MemRoadmap) => Date.parse(r.createdAt) >= Date.now() - hours * 3_600_000;
+  const asRecord = (r: MemRoadmap): RoadmapRecord => ({
+    id: r.id,
+    userId: r.userId,
+    pendingEmail: r.pendingEmail,
+    pendingName: r.pendingName,
+    pendingLinkedin: r.pendingLinkedin,
+    input: r.input,
+    inputHash: r.inputHash,
+    output: r.output,
+    emailSentAt: r.emailSentAt,
+    projectsUnlockedAt: r.projectsUnlockedAt,
+    projectSwapsUsed: r.projectSwapsUsed,
+    planConfirmedAt: r.planConfirmedAt,
+    createdAt: r.createdAt,
+  });
   return {
     async createRoadmap(r) {
       const id = crypto.randomUUID();
@@ -463,6 +556,7 @@ function memoryStore(): Store {
         createdAt: new Date().toISOString(),
         ipHash: r.ipHash,
         marketingOptIn: false,
+        generationStartedAt: null,
       });
       return id;
     },
@@ -476,21 +570,37 @@ function memoryStore(): Store {
       for (const r of m.roadmaps.values()) if (r.pendingEmail === email && !r.userId) r.userId = userId;
     },
     async getRoadmap(id) {
-      return m.roadmaps.get(id) ?? null;
+      const r = m.roadmaps.get(id);
+      return r ? asRecord(r) : null;
     },
     async latestRoadmapFor(userId) {
-      return (
+      const r =
         [...m.roadmaps.values()]
-          .filter((r) => r.userId === userId)
-          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null
-      );
+          .filter((x) => x.userId === userId)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
+      return r ? asRecord(r) : null;
     },
     async findCachedOutput(inputHash) {
       return [...m.roadmaps.values()].find((r) => r.inputHash === inputHash && r.output)?.output ?? null;
     },
     async saveRoadmapOutput(id, output) {
       const r = m.roadmaps.get(id);
-      if (r) r.output = output;
+      if (r) {
+        r.output = output;
+        r.generationStartedAt = null;
+      }
+    },
+    async claimGeneration(id) {
+      const r = m.roadmaps.get(id);
+      if (!r || r.output) return "ready";
+      const started = r.generationStartedAt ? Date.parse(r.generationStartedAt) : 0;
+      if (started && Date.now() - started < GENERATION_STALE_MS) return "busy";
+      r.generationStartedAt = new Date().toISOString();
+      return "run";
+    },
+    async clearGenerationClaim(id) {
+      const r = m.roadmaps.get(id);
+      if (r && !r.output) r.generationStartedAt = null;
     },
     async markEmailSent(id) {
       const r = m.roadmaps.get(id);
@@ -518,17 +628,30 @@ function memoryStore(): Store {
       if (ideas.length === 0 || (m.ideas.get(roadmapId)?.length ?? 0) > 0) return;
       m.ideas.set(
         roadmapId,
-        ideas.slice(0, PLAN_SIZE).map((p, i) => ({ ...p, id: crypto.randomUUID(), position: i, source: "roadmap" as const })),
+        ideas.slice(0, PLAN_SIZE).map((p, i) => ({
+          ...p,
+          id: crypto.randomUUID(),
+          position: i,
+          source: "roadmap" as const,
+          swapsUsed: 0,
+        })),
       );
     },
-    async swapProjectIdea(roadmapId, ideaId, idea, limit) {
+    async swapProjectIdea(roadmapId, ideaId, idea, perIdeaLimit) {
       const r = m.roadmaps.get(roadmapId);
       const list = m.ideas.get(roadmapId) ?? [];
       const i = list.findIndex((x) => x.id === ideaId);
-      if (!r || r.planConfirmedAt || r.projectSwapsUsed >= limit || i === -1) return false;
+      if (!r || r.planConfirmedAt || i === -1) return false;
+      const current = list[i]!;
+      if (current.swapsUsed >= perIdeaLimit) return false;
       r.projectSwapsUsed += 1;
-      if (r.projectSwapsUsed >= limit) r.planConfirmedAt = new Date().toISOString();
-      list[i] = { ...idea, id: list[i].id, position: list[i].position, source: "swap" };
+      list[i] = {
+        ...idea,
+        id: current.id,
+        position: current.position,
+        source: "swap",
+        swapsUsed: current.swapsUsed + 1,
+      };
       return true;
     },
     async confirmPlan(roadmapId) {
@@ -547,6 +670,14 @@ function memoryStore(): Store {
     async joinWaitlist(entry) {
       m.waitlist ??= [];
       if (!m.waitlist.some((w) => w.email === entry.email && w.interest === entry.interest)) m.waitlist.push(entry);
+    },
+    async takeRateLimit(key, limit, windowSeconds) {
+      const cut = Date.now() - windowSeconds * 1000;
+      m.rateHits = m.rateHits.filter((h) => h.at >= cut);
+      const n = m.rateHits.filter((h) => h.key === key).length;
+      if (n >= limit) return false;
+      m.rateHits.push({ key, at: Date.now() });
+      return true;
     },
     async exportUserData(userId) {
       const roadmaps = [...m.roadmaps.values()].filter((r) => r.userId === userId);

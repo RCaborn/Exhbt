@@ -39,8 +39,6 @@ export async function startRoadmap(_prev: FormState, form: FormData): Promise<Fo
     skills: form.get("skills") ?? "",
     cvText: form.get("cvText") ?? "",
   });
-  const user = await getCurrentUser();
-
   if (!parsed.success) {
     const fieldErrors: NonNullable<FormState>["fieldErrors"] = {};
     for (const issue of parsed.error.issues) {
@@ -53,25 +51,35 @@ export async function startRoadmap(_prev: FormState, form: FormData): Promise<Fo
     return { fieldErrors, step };
   }
 
-  const store = getStore();
-  const ipHash = await callerIpHash();
-  // Signed in: the email is known now, so the free limit applies here. Signed out: at the gate.
-  if (user && (await store.countRecentRoadmaps(user.email, 24 * 30)) >= FREE_PER_30_DAYS) {
-    return { error: freeRoadmapLimitMessage(), step: LAST_STEP };
-  }
-  if ((await store.countRecentByIpHash(ipHash, 24)) >= PER_IP_PER_DAY) {
-    return { error: "Too many roadmaps from this connection today. Please try again tomorrow.", step: LAST_STEP };
-  }
+  let id: string;
+  try {
+    const user = await getCurrentUser();
+    const store = getStore();
+    const ipHash = await callerIpHash();
+    // Signed in: the email is known now, so the free limit applies here. Signed out: at the gate.
+    if (user && (await store.countRecentRoadmaps(user.email, 24 * 30)) >= FREE_PER_30_DAYS) {
+      return { error: freeRoadmapLimitMessage(), step: LAST_STEP };
+    }
+    if ((await store.countRecentByIpHash(ipHash, 24)) >= PER_IP_PER_DAY) {
+      return { error: "Too many roadmaps from this connection today. Please try again tomorrow.", step: LAST_STEP };
+    }
 
-  const id = await store.createRoadmap({
-    email: user?.email ?? null,
-    input: parsed.data,
-    inputHash: await hashInput(parsed.data),
-    ipHash,
-  });
-  await grantBrowserAccess(id);
-  if (user) await store.claimPendingRoadmaps(user.email, user.id);
-  await store.logEvent("signup_started", user?.id ?? null, { source: "roadmap" });
+    id = await store.createRoadmap({
+      email: user?.email ?? null,
+      input: parsed.data,
+      inputHash: await hashInput(parsed.data),
+      ipHash,
+    });
+    await grantBrowserAccess(id);
+    if (user) await store.claimPendingRoadmaps(user.email, user.id);
+    await store.logEvent("signup_started", user?.id ?? null, { source: "roadmap" });
+  } catch (e) {
+    console.error("startRoadmap failed", (e as Error).message);
+    return {
+      error: "We couldn't start your roadmap just now. Please try again in a minute.",
+      step: LAST_STEP,
+    };
+  }
 
   redirect(`/roadmap/${id}`);
 }

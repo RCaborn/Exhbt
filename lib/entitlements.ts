@@ -23,17 +23,17 @@ type Entitlements = {
   /** A paid originality check when an exhbt is published. */
   originalityCheck: boolean;
   /**
-   * Swaps (regenerating one idea) in a roadmap's plan of three. Placeholder figures
-   * (Rory, 9 Nov 2026: "will change later"); see docs/decisions/0004.
+   * How many times each of the three project ideas can be regenerated. Free launch
+   * figure is 5 per idea (Rory, 11 Nov 2026); see docs/decisions/0004.
    */
-  projectSwapsPerRoadmap: number;
+  projectSwapsPerIdea: number;
 };
 
 export const ENTITLEMENTS: Record<Plan, Entitlements> = {
-  free: { roadmapsPer30Days: 1, exhbts: 1, personalLink: true, jobLinks: false, drafting: false, originalityCheck: false, projectSwapsPerRoadmap: 3 },
-  plus: { roadmapsPer30Days: 8, exhbts: 4, personalLink: true, jobLinks: false, drafting: true, originalityCheck: false, projectSwapsPerRoadmap: 10 },
-  premium: { roadmapsPer30Days: 30, exhbts: 10, personalLink: true, jobLinks: true, drafting: true, originalityCheck: true, projectSwapsPerRoadmap: 25 },
-  institutional: { roadmapsPer30Days: 30, exhbts: 10, personalLink: true, jobLinks: true, drafting: true, originalityCheck: true, projectSwapsPerRoadmap: 25 },
+  free: { roadmapsPer30Days: 1, exhbts: 1, personalLink: true, jobLinks: false, drafting: false, originalityCheck: false, projectSwapsPerIdea: 5 },
+  plus: { roadmapsPer30Days: 8, exhbts: 4, personalLink: true, jobLinks: false, drafting: true, originalityCheck: false, projectSwapsPerIdea: 10 },
+  premium: { roadmapsPer30Days: 30, exhbts: 10, personalLink: true, jobLinks: true, drafting: true, originalityCheck: true, projectSwapsPerIdea: 25 },
+  institutional: { roadmapsPer30Days: 30, exhbts: 10, personalLink: true, jobLinks: true, drafting: true, originalityCheck: true, projectSwapsPerIdea: 25 },
 };
 
 /** Display names. The site reads these. The stored key for Pro stays `premium`. */

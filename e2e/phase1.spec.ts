@@ -293,15 +293,16 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Projects that would prove them" })).toBeVisible();
   });
 
-  test("the plan: swap ideas one at a time, steered by a note, until it's your plan", async ({ page }) => {
+  test("the plan: swap ideas one at a time, steered by a note; five regenerations per idea", async ({ page }) => {
     await buildRoadmap(page, { withCv: true });
     await waitForResult(page);
     await unlockProjects(page, { email: uniqueEmail("plan") });
     const ideas = page.getByRole("list", { name: "Project ideas" });
     await expect(ideas.getByRole("listitem")).toHaveCount(3);
     const status = page.locator("#swap-status");
-    const limit = ENTITLEMENTS.free.projectSwapsPerRoadmap;
-    await expect(status).toHaveText(`${limit} swaps left`);
+    const perIdea = ENTITLEMENTS.free.projectSwapsPerIdea;
+    const total = perIdea * 3;
+    await expect(status).toHaveText(`${total} swaps left`);
 
     // Swap the second idea with a note: only that one changes, and the note clears.
     await page.getByLabel(/Make some tweaks/).fill("use more real data");
@@ -309,19 +310,20 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(ideas.getByRole("listitem").nth(1)).toContainText("Swapped idea 1: use more real data");
     await expect(ideas.getByRole("listitem").nth(0)).toContainText("Placeholder project 1");
     await expect(ideas.getByRole("listitem").nth(2)).toContainText("Placeholder project 3");
-    await expect(status).toHaveText(`${limit - 1} swaps left`);
+    await expect(status).toHaveText(`${total - 1} swaps left`);
     await expect(page.getByLabel(/Make some tweaks/)).toHaveValue("");
 
-    // Swaps without a note; the last one settles the plan.
-    const order = ["Placeholder project 1", "Placeholder project 3"];
-    for (let round = 2; round <= limit; round++) {
-      await page.getByRole("button", { name: `Swap: ${order[round - 2]}` }).click();
-      if (round < limit) await expect(ideas.getByText(`Swapped idea ${round}`, { exact: true })).toBeVisible();
+    // Use up that idea's regenerations; the other two stay swappable.
+    for (let round = 2; round <= perIdea; round++) {
+      await page.getByRole("button", { name: `Swap: Swapped idea ${round - 1}` }).click();
+      await expect(status).toHaveText(`${total - round} swaps left`);
     }
+    await expect(page.getByRole("button", { name: /^Swap: Swapped idea/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Swap: Placeholder project 1" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Swap: Placeholder project 3" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Keep this plan" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Your plan" })).toBeVisible();
-    const plan = page.getByRole("list", { name: "Your plan" });
-    await expect(plan.getByRole("listitem")).toHaveCount(3);
-    await expect(plan.getByText(`Swapped idea ${limit}`, { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /^Swap/ })).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 2, name: "When you’ve finished your plan" })).toBeVisible();
   });

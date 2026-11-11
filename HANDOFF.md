@@ -52,7 +52,7 @@ npm run test:e2e       # e2e only (starts its own server on :3200)
 
 Useful dev-only pages:
 - **`/dev/emails`**: every email the app sent while no email provider is configured. Use it to see and restyle emails.
-- The roadmap you get locally is a labelled placeholder until `ANTHROPIC_API_KEY` is set.
+- The roadmap you get locally is a labelled placeholder until `ANTHROPIC_API_KEYS` is set.
 
 ## Where things live
 
@@ -94,7 +94,7 @@ Each service switches on when its environment variables are set; until then the 
 | Service | Variables | Without it |
 |---|---|---|
 | **Supabase** (database, sign-in, files), London region | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | In-memory store (lost on restart) and a dev sign-in link. **Production refuses to start without it.** |
-| **Anthropic** (roadmap generation, `claude-haiku-5-5`) | `ANTHROPIC_API_KEY` | Labelled placeholder roadmap |
+| **Anthropic** (roadmap generation, `claude-haiku-5-5`) | `ANTHROPIC_API_KEYS` | Labelled placeholder roadmap |
 | **Resend** (roadmap email) | `RESEND_API_KEY`, `EMAIL_FROM` | Emails go to `/dev/emails` |
 | Cookie and link signing | `EXHBT_COOKIE_SECRET` | Dev default; **required in production** |
 | Public URL (used in email links) | `NEXT_PUBLIC_SITE_URL` | Taken from the request |
@@ -108,7 +108,7 @@ Supabase setup:
 
 Then deploy. The intended route is Cloudflare building from GitHub on every push to `main`; **[LAUNCH.md](LAUNCH.md)** has the click-by-click steps. Manual alternative: `npm run deploy`, with secrets set via `npx wrangler secret put <NAME>`.
 
-**Private preview vs public:** the site is private by default: `noindex` everywhere, `robots.txt` disallows all, and a preview bar shows. It only goes public when built with `EXHBT_PUBLIC=1` (`lib/site.ts`). In production a missing `ANTHROPIC_API_KEY` or `RESEND_API_KEY` fails loudly (logged); it never falls back to placeholder roadmaps or the dev outbox.
+**Private preview vs public:** the site is private by default: `noindex` everywhere, `robots.txt` disallows all, and a preview bar shows. It only goes public when built with `EXHBT_PUBLIC=1` (`lib/site.ts`). In production a missing `ANTHROPIC_API_KEYS` or `RESEND_API_KEY` fails loudly (logged); it never falls back to placeholder roadmaps or the dev outbox.
 
 ## Known limits and decisions
 

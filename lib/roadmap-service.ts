@@ -9,39 +9,50 @@ import { roadmapReadyEmail } from "./email/templates/roadmap-ready";
 import type { Roadmap } from "./ai/schemas";
 
 export class GenerationError extends Error {}
+/** Another request is already generating this roadmap; the client should retry shortly. */
+export class GenerationBusyError extends Error {}
 
 /**
  * Makes sure a roadmap has output (cache first, then the model) and, if its email is known,
  * that the email has gone out once. Safe to call repeatedly: a second call does no AI work
- * and sends nothing.
+ * and sends nothing. Concurrent callers: only one runs the model; others get busy or ready.
  */
 export async function ensureRoadmap(record: RoadmapRecord, userId: string | null): Promise<Roadmap> {
   const store = getStore();
   let roadmap = record.output;
 
   if (!roadmap) {
-    roadmap = await store.findCachedOutput(record.inputHash);
-    const fromCache = roadmap !== null;
-    if (!roadmap) {
-      try {
-        const job = await findJobProfile(record.input.targetRole);
-        const result = await generateRoadmap(record.input, job);
-        roadmap = result.roadmap;
-        await store.logAICall({
-          userId,
-          step: "roadmap",
-          model: result.model,
-          inputTokens: result.inputTokens,
-          outputTokens: result.outputTokens,
-          costUsd: result.costUsd,
-        });
-      } catch (e) {
-        await store.logEvent("roadmap_failed", userId, { message: (e as Error).message.slice(0, 200) });
-        throw new GenerationError((e as Error).message);
+    const claim = await store.claimGeneration(record.id);
+    if (claim === "busy") throw new GenerationBusyError("Generation already in progress");
+    if (claim === "ready") {
+      const fresh = await store.getRoadmap(record.id);
+      roadmap = fresh?.output ?? null;
+      if (!roadmap) throw new GenerationError("Roadmap output missing after claim");
+    } else {
+      roadmap = await store.findCachedOutput(record.inputHash);
+      const fromCache = roadmap !== null;
+      if (!roadmap) {
+        try {
+          const job = await findJobProfile(record.input.targetRole);
+          const result = await generateRoadmap(record.input, job);
+          roadmap = result.roadmap;
+          await store.logAICall({
+            userId,
+            step: "roadmap",
+            model: result.model,
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+            costUsd: result.costUsd,
+          });
+        } catch (e) {
+          await store.clearGenerationClaim(record.id);
+          await store.logEvent("roadmap_failed", userId, { message: (e as Error).message.slice(0, 200) });
+          throw new GenerationError((e as Error).message);
+        }
       }
+      await store.saveRoadmapOutput(record.id, roadmap);
+      await store.logEvent("roadmap_completed", userId, { cached: fromCache });
     }
-    await store.saveRoadmapOutput(record.id, roadmap);
-    await store.logEvent("roadmap_completed", userId, { cached: fromCache });
   }
 
   await emailRoadmapOnce(record, roadmap, userId);

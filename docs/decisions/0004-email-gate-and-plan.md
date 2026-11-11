@@ -24,7 +24,7 @@ Why this order: the radar is the first thing that's about them. Asking after it 
 - A roadmap starts with three project ideas, its plan. The roadmap prompt asks for exactly three.
 - Each idea has a **Swap** button that replaces that one idea and leaves the other two. The new idea is asked to differ from the two being kept, so the mix stays varied.
 - The optional "Make some tweaks" note (e.g. "use more real data") steers each swap. It's a preference about the projects, never a fact about the person. The facts-only rule still holds (`lib/ai/projects.ts`).
-- Swaps per roadmap come from `projectSwapsPerRoadmap` in `lib/entitlements.ts`. Rory set these as placeholders on 9 Nov; they will change.
+- Swaps per idea come from `projectSwapsPerIdea` in `lib/entitlements.ts`. Free launch: 5 regenerations of each of the three suggestions (Rory, 11 Nov).
 - When the swaps run out, or they press "Keep this plan", the page becomes **Your plan** and stops changing. The after-projects radar follows the plan.
 - Ideas live in their own table (`project_ideas`), not in the roadmap output, because roadmap outputs are shared between identical requests by the cache. A swap is one person's.
 

@@ -7,7 +7,7 @@ import { Generating } from "@/components/roadmap/Generating";
 import { RoadmapViews, parseView, type ProjectsState } from "@/components/roadmap/RoadmapViews";
 import { extractContact } from "@/lib/cv-contact";
 import { ENTITLEMENTS } from "@/lib/entitlements";
-import { ideasFor, planDone, projectsUnlocked } from "@/lib/roadmap/ideas";
+import { ideasFor, planDone, projectsUnlocked, swapsLeft } from "@/lib/roadmap/ideas";
 
 export const metadata: Metadata = { title: "Your roadmap", robots: { index: false } };
 
@@ -35,13 +35,15 @@ export default async function RoadmapPage({
   const current = parseView(view);
   let projects: ProjectsState;
   if (projectsUnlocked(record)) {
-    const allowed = ENTITLEMENTS.free.projectSwapsPerRoadmap;
+    const perIdea = ENTITLEMENTS.free.projectSwapsPerIdea;
+    // Ideas are only read (and seeded on first use) where they're shown.
+    const ideas = current === "projects" ? await ideasFor(record) : [];
     projects = {
       unlocked: true,
-      // Ideas are only read (and seeded on first use) where they're shown.
-      ideas: current === "projects" ? await ideasFor(record) : [],
-      swapsLeft: Math.max(0, allowed - record.projectSwapsUsed),
-      done: planDone(record, allowed),
+      ideas,
+      swapsLeft: ideas.length ? swapsLeft(ideas, perIdea) : Math.max(0, perIdea * 3 - record.projectSwapsUsed),
+      perIdeaLimit: perIdea,
+      done: ideas.length ? planDone(record, ideas, perIdea) : Boolean(record.planConfirmedAt),
     };
   } else {
     projects = { unlocked: false, prefill: extractContact(record.input.cvText), signedInEmail: user?.email ?? null };

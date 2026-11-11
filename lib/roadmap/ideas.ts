@@ -19,7 +19,12 @@ export async function ideasFor(record: RoadmapRecord): Promise<ProjectIdea[]> {
   return store.listProjectIdeas(record.id);
 }
 
-/** The plan is settled once they keep it or use their last swap: no more swaps after that. */
-export function planDone(record: RoadmapRecord, swapsAllowed: number): boolean {
-  return Boolean(record.planConfirmedAt) || record.projectSwapsUsed >= swapsAllowed;
+/** Remaining regenerations across all three ideas. */
+export function swapsLeft(ideas: ProjectIdea[], perIdeaLimit: number): number {
+  return ideas.reduce((n, idea) => n + Math.max(0, perIdeaLimit - idea.swapsUsed), 0);
+}
+
+/** The plan is settled once they keep it, or every idea has used its regenerations. */
+export function planDone(record: RoadmapRecord, ideas: ProjectIdea[], perIdeaLimit: number): boolean {
+  return Boolean(record.planConfirmedAt) || (ideas.length > 0 && swapsLeft(ideas, perIdeaLimit) === 0);
 }
