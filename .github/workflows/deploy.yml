@@ -1,6 +1,9 @@
 # Deploy Worker terna when main moves. Needs repo secrets:
-#   CLOUDFLARE_API_TOKEN  — Workers Scripts Edit (+ Account Settings Read)
-#   CLOUDFLARE_ACCOUNT_ID — Cloudflare account id
+#   CLOUDFLARE_API_TOKEN        — Workers Scripts Edit (+ Account Settings Read)
+#   CLOUDFLARE_ACCOUNT_ID       — Cloudflare account id
+#   NEXT_PUBLIC_SUPABASE_URL    — baked into the Worker at build time
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY
+# Runtime secrets (Anthropic, service role, cookie, Resend) stay on the Worker in Cloudflare.
 name: Deploy
 
 on:
@@ -13,15 +16,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - name: Require Cloudflare secrets
+      - name: Require deploy secrets
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "::error::Add GitHub Actions secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID (account 113568df45c4acffa5900a3fd6245dbb), then re-run this workflow."
+          missing=
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY; do
+            eval "val=\${$name}"
+            if [ -z "$val" ]; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Add GitHub Actions secrets:$missing (account id 113568df45c4acffa5900a3fd6245dbb), then re-run Deploy."
             exit 1
           fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -33,3 +45,5 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
