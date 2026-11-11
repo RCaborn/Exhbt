@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
 import { ProjectSchema, SITUATIONS, type Project, type Roadmap, type RoadmapInput } from "./schemas";
-import { AI_MODEL, costUsd, anthropicApiKey } from "./model";
+import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
 
 /**
  * Swapping one idea in the plan (docs/decisions/0004): a single new project that replaces the
@@ -44,7 +44,7 @@ export type SwapContext = {
 export async function generateSwap(ctx: SwapContext): Promise<SwapResult> {
   const apiKey = anthropicApiKey();
   if (!apiKey) {
-    if (process.env.NODE_ENV === "production") throw new Error("ANTHROPIC_API_KEY is not set.");
+    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
     return mockSwap(ctx);
   }
 

@@ -6,6 +6,17 @@
  */
 export const AI_MODEL = "claude-haiku-5-5";
 
+/** Preferred env name for the Anthropic key (Cloudflare / .env). Not the Anthropic console label. */
+export const ANTHROPIC_API_KEYS_ENV = "ANTHROPIC_API_KEYS";
+
+/** The Anthropic API key from the environment, or undefined if unset.
+ * Prefer `ANTHROPIC_API_KEYS`; still accept the older singular name so a Worker
+ * that already has that secret keeps working until it is renamed. */
+export function anthropicApiKey(): string | undefined {
+  const key = process.env.ANTHROPIC_API_KEYS?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
+  return key || undefined;
+}
+
 /** USD per million tokens for AI_MODEL (prompts under 100K tokens), for the cost log. */
 export const AI_PRICE_IN = 0.1;
 export const AI_PRICE_OUT = 0.5;
@@ -13,12 +24,4 @@ export const AI_PRICE_OUT = 0.5;
 /** What a call cost, from the token counts the API reports. */
 export function costUsd(inputTokens: number, outputTokens: number): number {
   return (inputTokens * AI_PRICE_IN + outputTokens * AI_PRICE_OUT) / 1_000_000;
-}
-
-/**
- * The Anthropic API key. ANTHROPIC_API_KEY is the name to use; ANTHROPIC_API_KEYS is also read
- * because production was once set up with that name (11 Nov 2026). /api/health says which is set.
- */
-export function anthropicApiKey(): string | undefined {
-  return process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEYS || undefined;
 }

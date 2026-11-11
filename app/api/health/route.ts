@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { AI_MODEL, anthropicApiKey } from "@/lib/ai/model";
+import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey } from "@/lib/ai/model";
 import { isSupabaseConfigured, supabaseAdmin } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,6 @@ const REQUIRED = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
-  "ANTHROPIC_API_KEY",
   "EXHBT_COOKIE_SECRET",
   "RESEND_API_KEY",
   "EMAIL_FROM",
@@ -24,9 +23,8 @@ const REQUIRED = [
 
 /** Near-miss names someone might type instead of a required one. */
 const MISNAMED: Record<string, string> = {
-  ANTHROPIC_API_KEYS: "ANTHROPIC_API_KEY (it works for now, but rename it when you can)",
-  ANTHROPIC_KEY: "ANTHROPIC_API_KEY",
-  CLAUDE_API_KEY: "ANTHROPIC_API_KEY",
+  ANTHROPIC_KEY: ANTHROPIC_API_KEYS_ENV,
+  CLAUDE_API_KEY: ANTHROPIC_API_KEYS_ENV,
   SUPABASE_SERVICE_KEY: "SUPABASE_SERVICE_ROLE_KEY",
   SUPABASE_URL: "NEXT_PUBLIC_SUPABASE_URL",
   SUPABASE_ANON_KEY: "NEXT_PUBLIC_SUPABASE_ANON_KEY",
@@ -55,7 +53,7 @@ async function checkDatabase(): Promise<Check> {
 
 async function checkAI(): Promise<Check> {
   const apiKey = anthropicApiKey();
-  if (!apiKey) return { ok: false, detail: "ANTHROPIC_API_KEY is not set" };
+  if (!apiKey) return { ok: false, detail: `${ANTHROPIC_API_KEYS_ENV} is not set` };
   try {
     // Free call: confirms the key is valid and the model is available to it.
     await new Anthropic({ apiKey }).models.retrieve(AI_MODEL);
@@ -70,8 +68,8 @@ async function checkAI(): Promise<Check> {
 
 export async function GET() {
   const settings: Record<string, boolean> = Object.fromEntries(REQUIRED.map((k) => [k, Boolean(process.env[k])]));
-  // The key also works under the old name (lib/ai/model.ts); the rename is reported below.
-  settings.ANTHROPIC_API_KEY = Boolean(anthropicApiKey());
+  // Read under either name (lib/ai/model.ts).
+  settings[ANTHROPIC_API_KEYS_ENV] = Boolean(anthropicApiKey());
   const misnamed = Object.entries(MISNAMED)
     .filter(([wrong]) => process.env[wrong])
     .map(([wrong, right]) => `Rename ${wrong} to ${right}`);
