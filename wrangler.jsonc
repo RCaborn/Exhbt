@@ -5,5 +5,9 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // Keep variables set in the Cloudflare dashboard when deploying from GitHub Actions.
+  "keep_vars": true,
+  // Not secret: the project URL is public. Keys stay as Worker secrets.
+  "vars": { "NEXT_PUBLIC_SUPABASE_URL": "https://jbrcseklzigdcrgqbclx.supabase.co" }
 }
