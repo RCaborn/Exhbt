@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
 import { ProjectSchema, SITUATIONS, type Project, type Roadmap, type RoadmapInput } from "./schemas";
-import { AI_MODEL, costUsd } from "./model";
+import { AI_MODEL, costUsd, anthropicApiKey } from "./model";
 
 /**
  * Swapping one idea in the plan (docs/decisions/0004): a single new project that replaces the
@@ -42,7 +42,8 @@ export type SwapContext = {
 };
 
 export async function generateSwap(ctx: SwapContext): Promise<SwapResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const apiKey = anthropicApiKey();
+  if (!apiKey) {
     if (process.env.NODE_ENV === "production") throw new Error("ANTHROPIC_API_KEY is not set.");
     return mockSwap(ctx);
   }
@@ -51,7 +52,7 @@ export async function generateSwap(ctx: SwapContext): Promise<SwapResult> {
   const skills = (roadmap.skillMap ?? []).map((s) => `${s.skill} (needed ${s.needed}, current ${s.current})`);
   const describe = (p: Project) => `- ${p.title}: ${p.brief} (closes: ${p.closesGaps.join(", ") || "none"})`;
 
-  const client = new Anthropic();
+  const client = new Anthropic({ apiKey });
   const response = await client.messages.parse({
     model: AI_MODEL,
     max_tokens: 1000,

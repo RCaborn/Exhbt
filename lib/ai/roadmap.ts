@@ -10,7 +10,7 @@ import {
   type RoadmapInput,
 } from "./schemas";
 import type { JobProfile } from "@/lib/jobs";
-import { AI_MODEL, costUsd } from "./model";
+import { AI_MODEL, costUsd, anthropicApiKey } from "./model";
 
 const SYSTEM = `You write skills-gap roadmaps for UK graduates.
 
@@ -43,13 +43,14 @@ export type RoadmapResult = {
 };
 
 export async function generateRoadmap(input: RoadmapInput, job: JobProfile | null = null): Promise<RoadmapResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const apiKey = anthropicApiKey();
+  if (!apiKey) {
     // Never hand real visitors a placeholder roadmap.
     if (process.env.NODE_ENV === "production") throw new Error("ANTHROPIC_API_KEY is not set.");
     return mockRoadmap(input, job);
   }
 
-  const client = new Anthropic();
+  const client = new Anthropic({ apiKey });
   const response = await client.messages.parse({
     model: AI_MODEL,
     max_tokens: 4000,

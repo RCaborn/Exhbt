@@ -14,3 +14,11 @@ export const AI_PRICE_OUT = 0.5;
 export function costUsd(inputTokens: number, outputTokens: number): number {
   return (inputTokens * AI_PRICE_IN + outputTokens * AI_PRICE_OUT) / 1_000_000;
 }
+
+/**
+ * The Anthropic API key. ANTHROPIC_API_KEY is the name to use; ANTHROPIC_API_KEYS is also read
+ * because production was once set up with that name (11 Nov 2026). /api/health says which is set.
+ */
+export function anthropicApiKey(): string | undefined {
+  return process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEYS || undefined;
+}
