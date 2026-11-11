@@ -49,10 +49,10 @@ You'll come back to Supabase in step 5 once you know the site's address.
 3. Settings on that screen:
    - Project name: **`terna`** (must match `"name"` in `wrangler.jsonc`)
    - Production branch: **`main`**
-   - Build command: `npm run build` (this runs OpenNext for Workers) or `npx opennextjs-cloudflare build`
+   - Build command: `npx opennextjs-cloudflare build` (**not** plain `npm run build` — OpenNext calls that itself for the Next step; pointing both at OpenNext recurses until the job is killed)
    - Deploy command: `npx opennextjs-cloudflare deploy`
-   - If an existing Worker fails with "Could not find compiled Open Next config", the Build command was still a plain Next build: set it to one of the two above under **Settings > Build**, then retry under **Deployments**.
-   - Backup path: GitHub Actions workflow **Deploy** on `main` (needs repo secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`).
+   - If an existing Worker fails with "Could not find compiled Open Next config", fix the Build command under **Settings > Build**, then retry under **Deployments**.
+   - Backup path: GitHub Actions workflow **Deploy** on `main` (needs repo secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; runs `npm run deploy`).
 4. Click **Deploy**. The first deploy will build but won't work yet (no keys). That's expected.
 5. In the new Worker, open **Settings**:
    - **Build > Variables and secrets** (used while building). Add:
