@@ -6,12 +6,14 @@
  */
 export const AI_MODEL = "claude-haiku-5-5";
 
-/** Env name for the Anthropic key (Cloudflare / .env). Not the Anthropic console label. */
+/** Preferred env name for the Anthropic key (Cloudflare / .env). Not the Anthropic console label. */
 export const ANTHROPIC_API_KEYS_ENV = "ANTHROPIC_API_KEYS";
 
-/** The Anthropic API key from the environment, or undefined if unset. */
+/** The Anthropic API key from the environment, or undefined if unset.
+ * Prefer `ANTHROPIC_API_KEYS`; still accept the older singular name so a Worker
+ * that already has that secret keeps working until it is renamed. */
 export function anthropicApiKey(): string | undefined {
-  const key = process.env.ANTHROPIC_API_KEYS?.trim();
+  const key = process.env.ANTHROPIC_API_KEYS?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
   return key || undefined;
 }
 
