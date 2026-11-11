@@ -41,7 +41,7 @@ export function parseView(v: string | undefined): ViewKey {
 /** The Projects page: the gate (no email yet), the plan being shaped, or the settled plan. */
 export type ProjectsState =
   | { unlocked: false; prefill: Contact; signedInEmail: string | null }
-  | { unlocked: true; ideas: ProjectIdea[]; swapsLeft: number; done: boolean };
+  | { unlocked: true; ideas: ProjectIdea[]; swapsLeft: number; perIdeaLimit: number; done: boolean };
 
 type Props = {
   id: string;
@@ -202,7 +202,7 @@ function Projects({ id, roadmap, role, state }: { id: string; roadmap: Roadmap; 
       </>
     );
   }
-  const { ideas, swapsLeft, done } = state;
+  const { ideas, swapsLeft, perIdeaLimit, done } = state;
   return (
     <>
       <Context role={role} />
@@ -221,7 +221,7 @@ function Projects({ id, roadmap, role, state }: { id: string; roadmap: Roadmap; 
           ))}
         </ol>
       ) : (
-        <PlanEditor id={id} ideas={ideas} swapsLeft={swapsLeft} />
+        <PlanEditor id={id} ideas={ideas} swapsLeft={swapsLeft} perIdeaLimit={perIdeaLimit} />
       )}
       <AfterProjects roadmap={roadmap} ideas={ideas} done={done} />
     </>

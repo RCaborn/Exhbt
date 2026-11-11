@@ -73,12 +73,13 @@ export async function swapIdea(roadmapId: string, _prev: SwapState, form: FormDa
 
   const { user, record } = await viewable(roadmapId);
   if (!record?.output || !projectsUnlocked(record)) return { error: "We couldn't find that roadmap. Try opening it again." };
-  const limit = ENTITLEMENTS.free.projectSwapsPerRoadmap;
-  if (planDone(record, limit)) return { error: "Your plan is set. No more swaps." };
-
+  const perIdea = ENTITLEMENTS.free.projectSwapsPerIdea;
   const ideas = await ideasFor(record);
+  if (planDone(record, ideas, perIdea)) return { error: "Your plan is set. No more swaps." };
+
   const replacing = ideas.find((i) => i.id === String(form.get("ideaId") ?? ""));
   if (!replacing) return { error: "We couldn't find that idea. Refresh the page and try again." };
+  if (replacing.swapsUsed >= perIdea) return { error: "That idea has used all its swaps. Try another, or keep this plan." };
 
   const store = getStore();
   let result;
@@ -103,7 +104,7 @@ export async function swapIdea(roadmapId: string, _prev: SwapState, form: FormDa
     outputTokens: result.outputTokens,
     costUsd: result.costUsd,
   });
-  if (!(await store.swapProjectIdea(roadmapId, replacing.id, result.project, limit))) {
+  if (!(await store.swapProjectIdea(roadmapId, replacing.id, result.project, perIdea))) {
     return { error: "Your plan is set. No more swaps." };
   }
   await store.logEvent("project_swapped", user?.id ?? null, { round: record.projectSwapsUsed + 1, withNote: note.length > 0 });

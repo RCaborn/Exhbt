@@ -13,7 +13,17 @@ import { Button } from "@/components/ui/Button";
  * new ideas, a Swap button on each idea, and "Keep this plan". One form, so a Swap sends the
  * note with it.
  */
-export function PlanEditor({ id, ideas, swapsLeft }: { id: string; ideas: ProjectIdea[]; swapsLeft: number }) {
+export function PlanEditor({
+  id,
+  ideas,
+  swapsLeft,
+  perIdeaLimit,
+}: {
+  id: string;
+  ideas: ProjectIdea[];
+  swapsLeft: number;
+  perIdeaLimit: number;
+}) {
   const [state, action] = useActionState<SwapState, FormData>(swapIdea.bind(null, id), undefined);
   const [note, setNote] = useState("");
   // A finished swap clears the note for the next one.
@@ -41,7 +51,12 @@ export function PlanEditor({ id, ideas, swapsLeft }: { id: string; ideas: Projec
       <ol aria-label="Project ideas" className="mt-6 space-y-4">
         {ideas.map((p) => (
           <li key={p.id}>
-            <IdeaCard idea={p} control={<SwapButton ideaId={p.id} title={p.title} />} />
+            <IdeaCard
+              idea={p}
+              control={
+                p.swapsUsed >= perIdeaLimit ? undefined : <SwapButton ideaId={p.id} title={p.title} />
+              }
+            />
           </li>
         ))}
       </ol>

@@ -21,11 +21,26 @@ export function Generating({ id, role }: { id: string; role: string }) {
     started.current = attempt;
     setStatus("working");
     const slow = setTimeout(() => setStatus((s) => (s === "working" ? "slow" : s)), 20_000);
+    let retry: ReturnType<typeof setTimeout> | undefined;
     fetch(`/api/roadmap/${id}/generate`, { method: "POST" })
-      .then((res) => (res.ok ? router.refresh() : setStatus("failed")))
+      .then((res) => {
+        if (res.ok) {
+          router.refresh();
+          return;
+        }
+        // Another tab/request is generating — wait and try again.
+        if (res.status === 409) {
+          retry = setTimeout(() => setAttempt((a) => a + 1), 1500);
+          return;
+        }
+        setStatus("failed");
+      })
       .catch(() => setStatus("failed"))
       .finally(() => clearTimeout(slow));
-    return () => clearTimeout(slow);
+    return () => {
+      clearTimeout(slow);
+      if (retry) clearTimeout(retry);
+    };
   }, [id, attempt, router]);
 
   return (
