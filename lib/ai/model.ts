@@ -6,6 +6,15 @@
  */
 export const AI_MODEL = "claude-haiku-5-5";
 
+/** Env name for the Anthropic key (Cloudflare / .env). Not the Anthropic console label. */
+export const ANTHROPIC_API_KEYS_ENV = "ANTHROPIC_API_KEYS";
+
+/** The Anthropic API key from the environment, or undefined if unset. */
+export function anthropicApiKey(): string | undefined {
+  const key = process.env.ANTHROPIC_API_KEYS?.trim();
+  return key || undefined;
+}
+
 /** USD per million tokens for AI_MODEL (prompts under 100K tokens), for the cost log. */
 export const AI_PRICE_IN = 0.1;
 export const AI_PRICE_OUT = 0.5;
