@@ -1,12 +1,18 @@
 "use server";
 
 import { z } from "zod/v4";
+import { HOUR, rateLimited } from "@/lib/rate-limit";
 import { getStore, type WaitlistInterest } from "@/lib/store";
 
 export type WaitlistState = { ok?: boolean; error?: string } | undefined;
 
+const WAITLIST_PER_IP_PER_HOUR = 10;
+
 export async function joinWaitlist(_prev: WaitlistState, form: FormData): Promise<WaitlistState> {
   if (String(form.get("website") ?? "")) return { ok: true }; // honeypot: bots fill hidden fields
+  if (await rateLimited("waitlist", WAITLIST_PER_IP_PER_HOUR, HOUR)) {
+    return { error: "Too many attempts from this network. Try again in an hour." };
+  }
   const email = z.email().safeParse(String(form.get("email") ?? "").trim().toLowerCase());
   if (!email.success) return { error: "Enter a valid email address." };
   const raw = String(form.get("interest") ?? "");

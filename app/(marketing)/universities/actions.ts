@@ -1,9 +1,12 @@
 "use server";
 
 import { z } from "zod/v4";
+import { HOUR, rateLimited } from "@/lib/rate-limit";
 import { getStore } from "@/lib/store";
 
 export type LeadState = { ok?: boolean; error?: string; fieldErrors?: Record<string, string> } | undefined;
+
+const LEAD_PER_IP_PER_HOUR = 5;
 
 const Lead = z.object({
   name: z.string().trim().min(1, "Enter your name.").max(200),
@@ -14,6 +17,9 @@ const Lead = z.object({
 
 export async function submitLead(_prev: LeadState, form: FormData): Promise<LeadState> {
   if (String(form.get("website") ?? "")) return { ok: true }; // bot: pretend success
+  if (await rateLimited("lead", LEAD_PER_IP_PER_HOUR, HOUR)) {
+    return { error: "Too many attempts from this network. Try again in an hour." };
+  }
   const parsed = Lead.safeParse({
     name: form.get("name"),
     email: String(form.get("email") ?? "").trim().toLowerCase(),
