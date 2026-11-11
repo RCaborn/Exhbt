@@ -10,7 +10,7 @@ import {
   type RoadmapInput,
 } from "./schemas";
 import type { JobProfile } from "@/lib/jobs";
-import { AI_MODEL, costUsd } from "./model";
+import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
 
 const SYSTEM = `You write skills-gap roadmaps for UK graduates.
 
@@ -43,13 +43,14 @@ export type RoadmapResult = {
 };
 
 export async function generateRoadmap(input: RoadmapInput, job: JobProfile | null = null): Promise<RoadmapResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const apiKey = anthropicApiKey();
+  if (!apiKey) {
     // Never hand real visitors a placeholder roadmap.
-    if (process.env.NODE_ENV === "production") throw new Error("ANTHROPIC_API_KEY is not set.");
+    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
     return mockRoadmap(input, job);
   }
 
-  const client = new Anthropic();
+  const client = new Anthropic({ apiKey });
   const response = await client.messages.parse({
     model: AI_MODEL,
     max_tokens: 4000,
@@ -115,7 +116,7 @@ function mockRoadmap(input: RoadmapInput, job: JobProfile | null): RoadmapResult
     roadmap: {
       targetRole: job?.title ?? input.targetRole.slice(0, 80),
       summary: "Development preview: no API key is configured, so this roadmap is placeholder content.",
-      strengths: [{ skill: "Placeholder strength", evidence: "Set ANTHROPIC_API_KEY to generate a real roadmap." }],
+      strengths: [{ skill: "Placeholder strength", evidence: `Set ${ANTHROPIC_API_KEYS_ENV} to generate a real roadmap.` }],
       gaps,
       // Three, as the prompt asks. The third repeats the first gap, so one gap stays open
       // and the after-projects chart shows both highlight lists.

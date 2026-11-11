@@ -13,7 +13,7 @@ Dashboards change their wording from time to time. If a label below doesn't matc
 1. Go to **console.anthropic.com** and sign up.
 2. **Billing:** add $5–10 of credit. A roadmap costs roughly $0.001, so this lasts a long time.
 3. Optional: **Limits:** set a monthly spend limit (e.g. $10).
-4. **API keys > Create key**, name it `exhbt`. Copy it somewhere safe for step 4. → this is `ANTHROPIC_API_KEY`
+4. **API keys > Create key**, name it anything you like (e.g. `exhbt`). Copy it somewhere safe for step 4. → this is `ANTHROPIC_API_KEYS`
 
 ## 2. Supabase (database and sign-in) · ~10 min
 
@@ -23,7 +23,7 @@ Dashboards change their wording from time to time. If a label below doesn't matc
    - Save the database password in your password manager. You won't need it for this checklist.
 2. When the project is ready, open **SQL Editor > New query**:
    - Open `supabase/migrations/20261105000000_init.sql` in this repo on GitHub, copy all of it, paste it, and press **Run**. It should say "Success".
-   - Do the same with each remaining file in that folder, **in date order**: `20261106000000_phase1.sql`, then `20261106120000_meeting_updates.sql`, then `20261106150000_tiers_and_methodology.sql`, then `20261110000000_project_ideas.sql`.
+   - Do the same with each remaining file in that folder, **in date order**: `20261106000000_phase1.sql`, then `20261106120000_meeting_updates.sql`, then `20261106150000_tiers_and_methodology.sql`, then `20261110000000_project_ideas.sql`, then `20261111200000_generation_lock_and_rate_limits.sql`.
    - If a file fails with `relation "roadmaps" does not exist`, an earlier file hasn't been run in this project: start again from `20261105000000_init.sql`. A failed file changes nothing, so it's safe to run again once fixed.
    - Optional, when you have it: load the UK jobs dataset (see `HANDOFF.md`). Until then a small sample is used.
 3. **Project Settings > API (or API Keys)**. Copy three values:
@@ -64,7 +64,7 @@ You'll come back to Supabase in step 5 once you know the site's address.
      | `NEXT_PUBLIC_SUPABASE_URL` | same as above |
      | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | same as above |
      | `SUPABASE_SERVICE_ROLE_KEY` | from step 2 |
-     | `ANTHROPIC_API_KEY` | from step 1 |
+     | `ANTHROPIC_API_KEYS` | from step 1 |
      | `RESEND_API_KEY` | from step 3 |
      | `EMAIL_FROM` | from step 3 |
      | `EXHBT_COOKIE_SECRET` | a long random string, see below |
@@ -93,7 +93,7 @@ You'll come back to Supabase in step 5 once you know the site's address.
 
 Then tell Claude the address. It can run a fuller automated check against the live site.
 
-**If something's wrong:** in Cloudflare open the Worker's **Logs**. A missing key shows a clear message such as `ANTHROPIC_API_KEY is not set.`
+**If something's wrong:** in Cloudflare open the Worker's **Logs**. A missing key shows a clear message such as `ANTHROPIC_API_KEYS is not set.`
 
 ---
 
