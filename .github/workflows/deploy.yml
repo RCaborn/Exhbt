@@ -1,9 +1,9 @@
 # Deploy Worker terna when main moves. Needs repo secrets:
 #   CLOUDFLARE_API_TOKEN        — Workers Scripts Edit (+ Account Settings Read)
 #   CLOUDFLARE_ACCOUNT_ID       — Cloudflare account id
-#   NEXT_PUBLIC_SUPABASE_URL    — baked into the Worker at build time
-#   NEXT_PUBLIC_SUPABASE_ANON_KEY
-# Runtime secrets (Anthropic, service role, cookie, Resend) stay on the Worker in Cloudflare.
+# Supabase settings are read at runtime: the URL from wrangler.jsonc "vars", the keys from
+# Worker secrets in Cloudflare (with Anthropic, cookie and Resend). keep_vars stops a deploy
+# from wiping variables set in the Cloudflare dashboard.
 name: Deploy
 
 on:
@@ -19,7 +19,7 @@ jobs:
       - name: Require deploy secrets
         run: |
           missing=
-          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY; do
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
             eval "val=\${$name}"
             if [ -z "$val" ]; then
               missing="$missing $name"
@@ -32,8 +32,6 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -45,5 +43,3 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}

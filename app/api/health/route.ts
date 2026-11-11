@@ -61,7 +61,7 @@ async function checkAI(): Promise<Check> {
   } catch (e) {
     if (e instanceof Anthropic.AuthenticationError) return { ok: false, detail: "The API key was rejected" };
     if (e instanceof Anthropic.NotFoundError) return { ok: false, detail: `Model ${AI_MODEL} is not available to this key` };
-    if (e instanceof Anthropic.APIError) return { ok: false, detail: `Anthropic API error ${e.status}` };
+    if (e instanceof Anthropic.APIError) return { ok: false, detail: `Anthropic API error ${e.status}: ${e.message.slice(0, 300)}` };
     return { ok: false, detail: "Could not reach the Anthropic API" };
   }
 }

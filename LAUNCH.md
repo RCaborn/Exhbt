@@ -52,7 +52,7 @@ You'll come back to Supabase in step 5 once you know the site's address.
    - Build command: `npx opennextjs-cloudflare build` (**not** plain `npm run build` — OpenNext calls that itself for the Next step; pointing both at OpenNext recurses until the job is killed)
    - Deploy command: `npx opennextjs-cloudflare deploy`
    - If an existing Worker fails with "Could not find compiled Open Next config", fix the Build command under **Settings > Build**, then retry under **Deployments**.
-   - Backup path: GitHub Actions workflow **Deploy** on `main` (runs `npm run deploy`). Repo secrets needed: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The last two must be present at **build** time or the Worker thinks Supabase is off and submit crashes.
+   - Backup path: GitHub Actions workflow **Deploy** on `main` (runs `npm run deploy`). Repo secrets needed: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`. The Supabase URL is set in `wrangler.jsonc` and the keys are read at runtime from the Worker's secrets, and `keep_vars` stops a deploy from wiping variables set in the dashboard. Open `/api/health` after any deploy: it lists any setting that's missing.
 4. Click **Deploy**. The first deploy will build but won't work yet (no keys). That's expected.
 5. In the new Worker, open **Settings**:
    - **Build > Variables and secrets** (used while building). Add:
