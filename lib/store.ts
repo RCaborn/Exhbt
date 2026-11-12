@@ -518,10 +518,14 @@ function supabaseStore(): Store {
       check(await db.from("waitlist").upsert(entry, { onConflict: "email,interest", ignoreDuplicates: true }));
     },
     async exportUserData(userId) {
-      const [profile, roadmaps, exhbts, links, subs] = await Promise.all([
+      // Rows as stored. Profiles include the portfolio fields; exhbts carry both the working copy
+      // (blocks) and the published one (published_blocks). Files are metadata only, never the bytes.
+      // Subscriptions hold Stripe ids and status; card details never reach us.
+      const [profile, roadmaps, exhbts, files, links, subs] = await Promise.all([
         db.from("profiles").select("*").eq("id", userId).maybeSingle(),
         db.from("roadmaps").select("*").eq("user_id", userId),
         db.from("exhbts").select("*").eq("user_id", userId),
+        db.from("exhbt_files").select("id, exhbt_id, bucket, path, mime, bytes, kind, created_at").eq("user_id", userId),
         db.from("curated_links").select("*").eq("user_id", userId),
         db.from("subscriptions").select("*").eq("user_id", userId),
       ]);
@@ -533,6 +537,7 @@ function supabaseStore(): Store {
         roadmaps: roadmaps.data,
         projectIdeas: ideas.data,
         exhbts: exhbts.data,
+        files: files.data,
         curatedLinks: links.data,
         subscriptions: subs.data,
       };
@@ -997,8 +1002,22 @@ function memoryStore(): Store {
       if (!m.waitlist.some((w) => w.email === entry.email && w.interest === entry.interest)) m.waitlist.push(entry);
     },
     async exportUserData(userId) {
+      // The same parts as the Supabase export: profile (portfolio fields), exhbts with both copies,
+      // file metadata (no bytes) and subscriptions (no card data; we never hold any).
       const roadmaps = [...m.roadmaps.values()].filter((r) => r.userId === userId);
-      return { roadmaps, projectIdeas: roadmaps.flatMap((r) => m.ideas.get(r.id) ?? []) };
+      const p = m.profiles.get(userId);
+      return {
+        exportedAt: new Date().toISOString(),
+        profile: p ? { ...p } : null,
+        roadmaps,
+        projectIdeas: roadmaps.flatMap((r) => m.ideas.get(r.id) ?? []),
+        exhbts: [...m.exhbts.values()]
+          .filter((e) => e.userId === userId)
+          .sort((a, b) => a.position - b.position)
+          .map((e) => structuredClone(e)),
+        files: [...m.files.values()].filter((f) => f.userId === userId).map((f) => ({ ...f })),
+        subscriptions: [...m.subscriptions.values()].filter((x) => x.userId === userId).map((x) => ({ ...x })),
+      };
     },
     async deleteUserData(userId) {
       for (const [id, r] of m.roadmaps) {
