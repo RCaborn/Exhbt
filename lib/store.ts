@@ -1,6 +1,8 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Project, Roadmap, RoadmapInput } from "./ai/schemas";
+import type { ExhbtDoc } from "./exhbt/blocks";
+import type { Plan } from "./entitlements";
 
 export type RoadmapRecord = {
   id: string;
@@ -39,9 +41,56 @@ export type ProjectIdea = Project & {
   source: "roadmap" | "swap";
 };
 
+/** The public face of a person: their portfolio header (docs/phase-2.md section 4). */
+export type PortfolioProfile = {
+  userId: string;
+  username: string | null;
+  name: string | null;
+  /** One line, about 12 words. */
+  headline: string | null;
+  /** About 40 words. */
+  bio: string | null;
+  /** exhbt_files.id of the profile photo, or null for initials. */
+  photoFileId: string | null;
+  linkedin: string | null;
+  hideFromSearch: boolean;
+};
+
+/**
+ * An exhbt. `doc` is the working copy (always saved, may break limits); `published` is what
+ * employers see, replaced only by a successful publish, so live pages never show half-finished edits.
+ */
+export type ExhbtRecord = {
+  id: string;
+  userId: string;
+  doc: ExhbtDoc;
+  published: ExhbtDoc | null;
+  status: "draft" | "published";
+  /** URL segment on the owner's portfolio, set on first publish. */
+  slug: string | null;
+  /** Order on the portfolio, lowest first. */
+  position: number;
+  confirmedAt: string | null;
+  publishedAt: string | null;
+  updatedAt: string;
+};
+
+/** A stored file (exhbt_files): project material, evidence, an image on an exhbt, or a profile photo. */
+export type StoredFile = {
+  id: string;
+  userId: string;
+  bucket: "sources" | "evidence";
+  path: string;
+  mime: string;
+  bytes: number;
+  kind: "source" | "evidence" | "image" | "photo";
+};
+
+export type UsernameLookup = { userId: string; username: string } | { redirectTo: string } | null;
+
 export type AICall = {
   userId: string | null;
-  step: "roadmap" | "exhbt_draft" | "originality" | "link_ranking" | "project_ideas" | "cv_read";
+  step: "roadmap" | "exhbt_draft" | "exhbt_rewrite" | "originality" | "link_ranking" | "project_ideas" | "cv_read";
   model: string;
   inputTokens: number;
   outputTokens: number;
@@ -108,6 +157,35 @@ export interface Store {
   joinWaitlist(entry: { email: string; interest: WaitlistInterest; source: string }): Promise<void>;
   exportUserData(userId: string): Promise<Record<string, unknown>>;
   deleteUserData(userId: string): Promise<void>;
+
+  /* Phase 2: portfolios and exhbts (docs/phase-2.md) */
+  /** The plan that applies now: an active subscription, else an institution licence, else free. */
+  planFor(userId: string): Promise<Plan>;
+  getPortfolioProfile(userId: string): Promise<PortfolioProfile>;
+  /** A username to its owner, or to the name it now redirects to (for 30 days after a change). */
+  lookupUsername(username: string): Promise<UsernameLookup>;
+  /** Sets or changes the username; the old one redirects for 30 days. "taken" if someone else has it. */
+  claimUsername(userId: string, username: string): Promise<"ok" | "taken">;
+  updatePortfolioProfile(
+    userId: string,
+    fields: Partial<Pick<PortfolioProfile, "name" | "headline" | "bio" | "photoFileId" | "linkedin" | "hideFromSearch">>,
+  ): Promise<void>;
+  createExhbt(userId: string, doc: ExhbtDoc): Promise<string>;
+  getExhbt(id: string): Promise<ExhbtRecord | null>;
+  /** All of a person's exhbts, drafts included, in portfolio order. */
+  listExhbts(userId: string): Promise<ExhbtRecord[]>;
+  /** Saves the working copy. Never blocked by limits. False if it isn't theirs. */
+  saveExhbtDraft(id: string, userId: string, doc: ExhbtDoc): Promise<boolean>;
+  /**
+   * Copies the working copy to the live one and marks it published with this slug.
+   * Limits and plan checks happen before this is called (lib/plan.ts, validateForPublish).
+   */
+  publishExhbt(id: string, userId: string, slug: string): Promise<boolean>;
+  unpublishExhbt(id: string, userId: string): Promise<boolean>;
+  /** Sets portfolio order to the order of `ids`. */
+  reorderExhbts(userId: string, ids: string[]): Promise<void>;
+  deleteExhbt(id: string, userId: string): Promise<boolean>;
+  getFile(id: string): Promise<StoredFile | null>;
 }
 
 export const isSupabaseConfigured = () =>
@@ -423,11 +501,202 @@ function supabaseStore(): Store {
     },
     async deleteUserData(userId) {
       // Deleting the auth user cascades to profiles and everything owned by it.
+      // Storage objects under the user's folder are removed by lib/files.ts before this runs.
       const { error } = await db.auth.admin.deleteUser(userId);
       if (error) throw new Error(error.message);
     },
+
+    async planFor(userId) {
+      const sub = check(
+        await db
+          .from("subscriptions")
+          .select("plan")
+          .eq("user_id", userId)
+          .in("status", ["active", "trialing", "past_due"])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ) as { plan: Plan } | null;
+      if (sub?.plan) return sub.plan;
+      const prof = check(
+        await db.from("profiles").select("institution_id, institutions(licence_end)").eq("id", userId).maybeSingle(),
+      ) as { institution_id: string | null; institutions: { licence_end: string | null } | null } | null;
+      const end = prof?.institutions?.licence_end;
+      if (prof?.institution_id && (!end || Date.parse(end) >= Date.now())) return "institutional";
+      return "free";
+    },
+    async getPortfolioProfile(userId) {
+      const row = check(
+        await db
+          .from("profiles")
+          .select("id, username, name, headline, bio, photo_file_id, linkedin_url, hide_from_search")
+          .eq("id", userId)
+          .maybeSingle(),
+      ) as ProfileRow | null;
+      return row ? fromProfileRow(row) : emptyProfile(userId);
+    },
+    async lookupUsername(username) {
+      const row = check(await db.from("profiles").select("id, username").eq("username", username).maybeSingle()) as
+        | { id: string; username: string }
+        | null;
+      if (row) return { userId: row.id, username: row.username };
+      const red = check(
+        await db
+          .from("username_redirects")
+          .select("user_id, profiles(username)")
+          .eq("old_username", username)
+          .gt("expires_at", new Date().toISOString())
+          .maybeSingle(),
+      ) as { user_id: string; profiles: { username: string | null } | null } | null;
+      return red?.profiles?.username ? { redirectTo: red.profiles.username } : null;
+    },
+    async claimUsername(userId, username) {
+      const current = check(await db.from("profiles").select("username").eq("id", userId).maybeSingle()) as { username: string | null } | null;
+      if (current?.username === username) return "ok";
+      const res = await db.rpc("claim_username", { p_user: userId, p_username: username });
+      if (res.error) {
+        if (/taken|duplicate|unique/i.test(res.error.message)) return "taken";
+        throw new Error(res.error.message);
+      }
+      return "ok";
+    },
+    async updatePortfolioProfile(userId, f) {
+      const row: Record<string, unknown> = {};
+      if (f.name !== undefined) row.name = f.name;
+      if (f.headline !== undefined) row.headline = f.headline;
+      if (f.bio !== undefined) row.bio = f.bio;
+      if (f.photoFileId !== undefined) row.photo_file_id = f.photoFileId;
+      if (f.linkedin !== undefined) row.linkedin_url = f.linkedin;
+      if (f.hideFromSearch !== undefined) row.hide_from_search = f.hideFromSearch;
+      if (Object.keys(row).length) check(await db.from("profiles").update(row).eq("id", userId));
+    },
+    async createExhbt(userId, doc) {
+      const last = check(
+        await db.from("exhbts").select("position").eq("user_id", userId).order("position", { ascending: false }).limit(1).maybeSingle(),
+      ) as { position: number } | null;
+      const row = check(
+        await db
+          .from("exhbts")
+          .insert({ user_id: userId, title: doc.title.slice(0, 80), blocks: doc, position: (last?.position ?? -1) + 1 })
+          .select("id")
+          .single(),
+      ) as { id: string };
+      return row.id;
+    },
+    async getExhbt(id) {
+      const row = check(await db.from("exhbts").select(EXHBT_COLS).eq("id", id).maybeSingle()) as ExhbtRow | null;
+      return row ? fromExhbtRow(row) : null;
+    },
+    async listExhbts(userId) {
+      const rows = check(
+        await db.from("exhbts").select(EXHBT_COLS).eq("user_id", userId).order("position", { ascending: true }),
+      ) as ExhbtRow[];
+      return rows.map(fromExhbtRow);
+    },
+    async saveExhbtDraft(id, userId, doc) {
+      const rows = check(
+        await db
+          .from("exhbts")
+          .update({ blocks: doc, title: doc.title.slice(0, 80), updated_at: new Date().toISOString() })
+          .eq("id", id)
+          .eq("user_id", userId)
+          .select("id"),
+      ) as { id: string }[];
+      return rows.length > 0;
+    },
+    async publishExhbt(id, userId, slug) {
+      const cur = check(await db.from("exhbts").select("blocks").eq("id", id).eq("user_id", userId).maybeSingle()) as {
+        blocks: ExhbtDoc;
+      } | null;
+      if (!cur) return false;
+      const now = new Date().toISOString();
+      check(
+        await db
+          .from("exhbts")
+          .update({ published_blocks: cur.blocks, status: "published", public_slug: slug, confirmed_at: now, published_at: now })
+          .eq("id", id)
+          .eq("user_id", userId),
+      );
+      return true;
+    },
+    async unpublishExhbt(id, userId) {
+      const rows = check(
+        await db.from("exhbts").update({ status: "draft" }).eq("id", id).eq("user_id", userId).select("id"),
+      ) as { id: string }[];
+      return rows.length > 0;
+    },
+    async reorderExhbts(userId, ids) {
+      await Promise.all(ids.map((id, position) => db.from("exhbts").update({ position }).eq("id", id).eq("user_id", userId)));
+    },
+    async deleteExhbt(id, userId) {
+      const rows = check(await db.from("exhbts").delete().eq("id", id).eq("user_id", userId).select("id")) as { id: string }[];
+      return rows.length > 0;
+    },
+    async getFile(id) {
+      const r = check(
+        await db.from("exhbt_files").select("id, user_id, bucket, path, mime, bytes, kind").eq("id", id).maybeSingle(),
+      ) as { id: string; user_id: string; bucket: StoredFile["bucket"]; path: string; mime: string; bytes: number; kind: StoredFile["kind"] } | null;
+      return r ? { id: r.id, userId: r.user_id, bucket: r.bucket, path: r.path, mime: r.mime, bytes: r.bytes, kind: r.kind } : null;
+    },
   };
 }
+
+type ProfileRow = {
+  id: string;
+  username: string | null;
+  name: string | null;
+  headline: string | null;
+  bio: string | null;
+  photo_file_id: string | null;
+  linkedin_url: string | null;
+  hide_from_search: boolean | null;
+};
+const fromProfileRow = (r: ProfileRow): PortfolioProfile => ({
+  userId: r.id,
+  username: r.username,
+  name: r.name,
+  headline: r.headline,
+  bio: r.bio,
+  photoFileId: r.photo_file_id,
+  linkedin: r.linkedin_url,
+  hideFromSearch: Boolean(r.hide_from_search),
+});
+const emptyProfile = (userId: string): PortfolioProfile => ({
+  userId,
+  username: null,
+  name: null,
+  headline: null,
+  bio: null,
+  photoFileId: null,
+  linkedin: null,
+  hideFromSearch: false,
+});
+
+const EXHBT_COLS = "id, user_id, blocks, published_blocks, status, public_slug, position, confirmed_at, published_at, updated_at";
+type ExhbtRow = {
+  id: string;
+  user_id: string;
+  blocks: ExhbtDoc;
+  published_blocks: ExhbtDoc | null;
+  status: string;
+  public_slug: string | null;
+  position: number;
+  confirmed_at: string | null;
+  published_at: string | null;
+  updated_at: string;
+};
+const fromExhbtRow = (r: ExhbtRow): ExhbtRecord => ({
+  id: r.id,
+  userId: r.user_id,
+  doc: r.blocks,
+  published: r.published_blocks,
+  status: r.status === "published" ? "published" : "draft",
+  slug: r.public_slug,
+  position: r.position,
+  confirmedAt: r.confirmed_at,
+  publishedAt: r.published_at,
+  updatedAt: r.updated_at,
+});
 
 /* ---------------- In-memory (local development and tests only) ---------------- */
 
@@ -440,6 +709,12 @@ type Mem = {
   events: { name: string; userId: string | null; props: Record<string, unknown>; at: string }[];
   leads: unknown[];
   waitlist: { email: string; interest: WaitlistInterest; source: string }[];
+  profiles: Map<string, PortfolioProfile>;
+  usernameRedirects: Map<string, { userId: string; expiresAt: number }>;
+  exhbts: Map<string, ExhbtRecord>;
+  files: Map<string, StoredFile>;
+  /** Development and tests only: a plan per user, set from /dev/plan. */
+  plans: Map<string, Plan>;
 };
 const newMem = (): Mem => ({
   roadmaps: new Map(),
@@ -449,6 +724,11 @@ const newMem = (): Mem => ({
   events: [],
   leads: [],
   waitlist: [],
+  profiles: new Map(),
+  usernameRedirects: new Map(),
+  exhbts: new Map(),
+  files: new Map(),
+  plans: new Map(),
 });
 const g = globalThis as unknown as { __exhbtMem?: Mem };
 
@@ -458,6 +738,16 @@ function memoryStore(): Store {
   }
   const m = (g.__exhbtMem ??= newMem());
   m.ideas ??= new Map(); // a store created before ideas existed (hot reload in development)
+  m.profiles ??= new Map();
+  m.usernameRedirects ??= new Map();
+  m.exhbts ??= new Map();
+  m.files ??= new Map();
+  m.plans ??= new Map();
+  const profile = (userId: string) => m.profiles.get(userId) ?? emptyProfile(userId);
+  const own = (id: string, userId: string) => {
+    const e = m.exhbts.get(id);
+    return e && e.userId === userId ? e : null;
+  };
   const recent = (hours: number, r: MemRoadmap) => Date.parse(r.createdAt) >= Date.now() - hours * 3_600_000;
   return {
     async createRoadmap(r) {
@@ -578,8 +868,106 @@ function memoryStore(): Store {
           m.ideas.delete(id);
         }
       }
+      for (const [id, e] of m.exhbts) if (e.userId === userId) m.exhbts.delete(id);
+      m.profiles.delete(userId);
+      m.plans.delete(userId);
+    },
+
+    async planFor(userId) {
+      return m.plans.get(userId) ?? "free";
+    },
+    async getPortfolioProfile(userId) {
+      return { ...profile(userId) };
+    },
+    async lookupUsername(username) {
+      for (const p of m.profiles.values()) if (p.username === username) return { userId: p.userId, username };
+      const red = m.usernameRedirects.get(username);
+      if (red && red.expiresAt > Date.now()) {
+        const now = m.profiles.get(red.userId)?.username;
+        if (now) return { redirectTo: now };
+      }
+      return null;
+    },
+    async claimUsername(userId, username) {
+      const mine = profile(userId);
+      if (mine.username === username) return "ok";
+      for (const p of m.profiles.values()) if (p.username === username) return "taken";
+      const red = m.usernameRedirects.get(username);
+      if (red && red.expiresAt > Date.now() && red.userId !== userId) return "taken";
+      if (mine.username) m.usernameRedirects.set(mine.username, { userId, expiresAt: Date.now() + 30 * 86_400_000 });
+      m.usernameRedirects.delete(username);
+      m.profiles.set(userId, { ...mine, username });
+      return "ok";
+    },
+    async updatePortfolioProfile(userId, f) {
+      const next = { ...profile(userId) };
+      for (const [k, v] of Object.entries(f)) if (v !== undefined) (next as Record<string, unknown>)[k] = v;
+      m.profiles.set(userId, next);
+    },
+    async createExhbt(userId, doc) {
+      const id = crypto.randomUUID();
+      const mine = [...m.exhbts.values()].filter((e) => e.userId === userId);
+      m.exhbts.set(id, {
+        id,
+        userId,
+        doc: structuredClone(doc),
+        published: null,
+        status: "draft",
+        slug: null,
+        position: mine.length ? Math.max(...mine.map((e) => e.position)) + 1 : 0,
+        confirmedAt: null,
+        publishedAt: null,
+        updatedAt: new Date().toISOString(),
+      });
+      return id;
+    },
+    async getExhbt(id) {
+      const e = m.exhbts.get(id);
+      return e ? structuredClone(e) : null;
+    },
+    async listExhbts(userId) {
+      return [...m.exhbts.values()].filter((e) => e.userId === userId).sort((a, b) => a.position - b.position).map((e) => structuredClone(e));
+    },
+    async saveExhbtDraft(id, userId, doc) {
+      const e = own(id, userId);
+      if (!e) return false;
+      e.doc = structuredClone(doc);
+      e.updatedAt = new Date().toISOString();
+      return true;
+    },
+    async publishExhbt(id, userId, slug) {
+      const e = own(id, userId);
+      if (!e) return false;
+      const now = new Date().toISOString();
+      Object.assign(e, { published: structuredClone(e.doc), status: "published", slug, confirmedAt: now, publishedAt: now });
+      return true;
+    },
+    async unpublishExhbt(id, userId) {
+      const e = own(id, userId);
+      if (!e) return false;
+      e.status = "draft";
+      return true;
+    },
+    async reorderExhbts(userId, ids) {
+      ids.forEach((id, position) => {
+        const e = own(id, userId);
+        if (e) e.position = position;
+      });
+    },
+    async deleteExhbt(id, userId) {
+      return own(id, userId) ? m.exhbts.delete(id) : false;
+    },
+    async getFile(id) {
+      return m.files.get(id) ?? null;
     },
   };
+}
+
+/** Development and tests only: give a user a plan without Stripe (app/dev/plan). */
+export function setPlanForDevelopment(userId: string, plan: Plan) {
+  if (process.env.NODE_ENV === "production") throw new Error("Development only.");
+  (g.__exhbtMem ??= newMem()).plans ??= new Map();
+  g.__exhbtMem!.plans.set(userId, plan);
 }
 
 /** Read-only view of the in-memory store, for the dev pages and tests. */

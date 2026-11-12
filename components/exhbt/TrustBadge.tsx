@@ -10,13 +10,17 @@ export function TrustBadge({
   checkedOn,
   animate = false,
   originalityPassed = false,
+  sourceAttached = true,
 }: {
   checkedOn?: string;
   animate?: boolean;
   /** Only true when this exhbt actually passed an originality check (recorded in originality_checks). Never assumed. */
   originalityPassed?: boolean;
+  /** False when the exhbt links no work, so the badge doesn't claim one. */
+  sourceAttached?: boolean;
 }) {
-  const checks: readonly string[] = originalityPassed ? [...CHECKS, "Originality checked"] : CHECKS;
+  const checks: string[] = CHECKS.filter((c) => sourceAttached || c !== "Source attached");
+  if (originalityPassed) checks.push("Originality checked");
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
       <ul className="flex flex-wrap gap-x-4 gap-y-1.5" aria-label="Checks passed">
