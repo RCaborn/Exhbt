@@ -30,7 +30,7 @@ type Entitlements = {
   /** All stored files together, in MB. Placeholder (12 Nov 2026), to be confirmed. */
   storageMbTotal: number;
   /**
-   * An originality check when an exhbt is published. Part of Max; not built yet (Rory, 12 Nov 2026:
+   * An originality check when an exhbt is published. Part of Premium and Max; not built yet (Rory, 12 Nov 2026:
    * "will be there, just not sorting it now"). Until ORIGINALITY_CHECK_LIVE, it's sold as coming soon
    * and no exhbt shows the tick.
    */
@@ -83,7 +83,7 @@ export const ENTITLEMENTS: Record<Plan, Entitlements> = {
     blockRegenerations: 10,
     uploadMbPerFile: 20,
     storageMbTotal: 200,
-    originalityCheck: false,
+    originalityCheck: true,
     projectSwapsPerRoadmap: 10,
   },
   max: MAX,
@@ -144,6 +144,9 @@ export function planFeatures(plan: "free" | "premium" | "max"): string[] {
       return [
         `${exhbtCount(e.exhbts, true)} on ${link}`,
         ...(e.drafting ? ["Drafted for you from your files, then yours to edit"] : []),
+        ...(e.originalityCheck
+          ? [ORIGINALITY_CHECK_LIVE ? "An originality check when you publish" : "An originality check when you publish (coming soon)"]
+          : []),
         refreshes(e.roadmapsPer30Days),
       ];
     case "max":

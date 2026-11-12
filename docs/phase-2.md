@@ -27,7 +27,7 @@ Already in the repo:
 
 Phase 2 builds on all of this rather than starting again.
 
-**Layout:** Rory's description of 12 Nov 2026, in section 6 (Blocks). Prices: Premium £9, Max £15, assumed monthly; a launch or new-joiner discount would be a Stripe promotion code. Free gets one AI draft. The originality check stays in Max as "coming soon" and is built later.
+**Layout:** Rory's description of 12 Nov 2026, in section 6 (Blocks). Prices: Premium £9, Max £15, assumed monthly; a launch or new-joiner discount would be a Stripe promotion code. Free gets one AI draft. The originality check is in Premium and Max as "coming soon" and is built later.
 
 ---
 
@@ -150,7 +150,7 @@ Footer, small: "See the work" (the original file or link, one click away) and th
   - every flagged number is checked or removed
   - "This is my work, and the numbers are true" ticked (`confirmed_by_user_at`)
   - the plan allows another public exhbt
-- Originality check: part of Max, but not built in this release (Rory, 12 Nov 2026: "will be there, just not sorting it now"). Until `ORIGINALITY_CHECK_LIVE` is true, it's sold as "coming soon". The badge's originality tick appears only for an exhbt with a passing row in `originality_checks`.
+- Originality check: part of Premium and Max, but not built in this release (Rory, 12 Nov 2026: "will be there, just not sorting it now"). Until `ORIGINALITY_CHECK_LIVE` is true, it's sold as "coming soon". The badge's originality tick appears only for an exhbt with a passing row in `originality_checks`.
 
 ## 7. Public portfolio (`alex.exhbt.co.uk`, Premium and Max)
 - `/` is the **at-a-glance page**, and every shared link lands here. `PortfolioHeader` (photo, name, headline, bio, LinkedIn), then a grid of `ExhbtTile`s in the user's order: title, headline number, top skills.
@@ -226,7 +226,7 @@ Docs:
 ## Decided (12 Nov 2026) and still open
 - Decided: Premium £9, Max £15. A new-joiner discount is possible later, as a Stripe promotion code.
 - Decided: Free gets one AI draft.
-- Decided: the originality check stays in Max, marked "coming soon" until it's built later. The provider is chosen then.
+- Decided: the originality check is in Premium and Max, marked "coming soon" until it's built later. The provider is chosen then.
 - Decided: the layout (section 6).
 - Open: monthly, annual or both? (Assumed monthly; milestone 6.)
 - Open: the placeholder figures in `lib/entitlements.ts` (drafts per month, rewrites per exhbt, file and storage caps, active job links).
