@@ -35,12 +35,17 @@ const TYPES: Record<string, string> = {
   webp: "image/webp",
   gif: "image/gif",
 };
+/** Extra types allowed as "the work" on an exhbt (kind evidence), not as project material or pictures. */
+const EVIDENCE_ONLY_TYPES: Record<string, string> = {
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  zip: "application/zip",
+};
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
 /** The stored content type for a file, from its name (the browser's type is only a hint). Null if we don't store it. */
-export function storedType(name: string, mime: string): string | null {
+export function storedType(name: string, mime: string, kind?: UploadKind): string | null {
   const ext = name.toLowerCase().split(".").pop() ?? "";
-  const byExt = TYPES[ext];
+  const byExt = TYPES[ext] ?? (kind === "evidence" ? EVIDENCE_ONLY_TYPES[ext] : undefined);
   if (byExt) return byExt;
   return Object.values(TYPES).includes(mime) ? mime : null;
 }
@@ -67,7 +72,7 @@ const safeName = (name: string) =>
 export async function createUpload(userId: string, req: UploadRequest): Promise<UploadResult> {
   const plan = await getPlan(userId);
   const caps = limitsFor(plan);
-  const type = storedType(req.name, req.mime);
+  const type = storedType(req.name, req.mime, req.kind);
   if (!type) return refuse(415, "We can't store that type of file. Upload a PDF, Word, OpenDocument, text, CSV or Excel file, or an image.");
   if ((req.kind === "image" || req.kind === "photo") && !IMAGE_TYPES.has(type)) {
     return refuse(415, "Only images can be used as a picture.");

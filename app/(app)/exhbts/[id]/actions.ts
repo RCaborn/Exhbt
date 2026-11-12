@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import { unverifiedOf } from "@/components/editor/model";
+import { canView } from "@/lib/access";
 import { getCurrentUser } from "@/lib/auth";
-import { emptyDoc, ExhbtDocSchema, validateForPublish, type ExhbtDoc } from "@/lib/exhbt/blocks";
+import { emptyDoc, ExhbtDocSchema, LIMITS, text, validateForPublish, type ExhbtDoc } from "@/lib/exhbt/blocks";
 import { slugify, uniqueSlug } from "@/lib/exhbt/slug";
 import { canCreateExhbt, canPublish, getPlan } from "@/lib/plan";
 import { isPhase2Enabled } from "@/lib/site";
@@ -40,6 +41,45 @@ export async function createFromScratch() {
   const verdict = canCreateExhbt(await getPlan(user.id), await store.listExhbts(user.id));
   if (!verdict.ok) redirect("/exhbts?full=1");
   const id = await store.createExhbt(user.id, emptyDoc());
+  redirect(`/exhbts/${id}/edit`);
+}
+
+/** Skill boxes from a roadmap idea's gaps: a few words each, no repeats, no more than the limit. */
+function skillsFromGaps(gaps: string[]): string[] {
+  const out: string[] = [];
+  for (const g of gaps) {
+    const s = g.trim().split(/\s+/).slice(0, LIMITS.skills.wordsEach).join(" ").slice(0, LIMITS.skills.charsEach).trim();
+    if (s && !out.some((k) => k.toLowerCase() === s.toLowerCase())) out.push(s);
+    if (out.length >= LIMITS.skills.max) break;
+  }
+  return out;
+}
+
+/**
+ * "Build this as an exhbt" on a roadmap's Projects view: an exhbt prefilled from the idea
+ * (title, the brief as the question, the gaps as skills, three empty process boxes), if the
+ * plan has room. Reads the idea from the store, never from the page.
+ */
+export async function createFromIdea(roadmapId: string, ideaId: string) {
+  if (!isPhase2Enabled()) notFound();
+  const back = `/roadmap/${roadmapId}?view=projects`;
+  const user = await getCurrentUser();
+  if (!user) redirect(`/login?next=${encodeURIComponent(back)}`);
+  const store = getStore();
+  const record = await store.getRoadmap(roadmapId);
+  if (!record || !(await canView(record, user))) notFound();
+  const idea = (await store.listProjectIdeas(roadmapId)).find((i) => i.id === ideaId);
+  if (!idea) redirect(back);
+  // Refused: the Projects page shows the reason and a link to billing.
+  if (!canCreateExhbt(await getPlan(user.id), await store.listExhbts(user.id)).ok) redirect(back);
+  const doc: ExhbtDoc = {
+    ...emptyDoc(),
+    title: idea.title.slice(0, LIMITS.titleChars),
+    context: "Project from my Exhbt roadmap",
+    skills: skillsFromGaps(idea.closesGaps),
+    gap: text(idea.brief),
+  };
+  const id = await store.createExhbt(user.id, doc);
   redirect(`/exhbts/${id}/edit`);
 }
 

@@ -1,7 +1,7 @@
 import type { Project } from "@/lib/ai/schemas";
 
 /** One project idea: title, length, brief, what you end up with, and the gaps it closes. */
-export function IdeaCard({ idea, control }: { idea: Project; control?: React.ReactNode }) {
+export function IdeaCard({ idea, control, footer }: { idea: Project; control?: React.ReactNode; footer?: React.ReactNode }) {
   return (
     <div className="rounded-[16px] border border-line p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -26,6 +26,7 @@ export function IdeaCard({ idea, control }: { idea: Project; control?: React.Rea
           </div>
         )}
       </dl>
+      {footer && <div className="mt-4">{footer}</div>}
     </div>
   );
 }

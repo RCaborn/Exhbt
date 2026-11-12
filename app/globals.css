@@ -256,3 +256,12 @@
     animation: none !important;
   }
 }
+
+/* The editor on a phone: buttons are at least 44px square (WCAG target size, the audit's E7). */
+@media (pointer: coarse) {
+  .editor-touch button,
+  .editor-touch a[data-astryx-button] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

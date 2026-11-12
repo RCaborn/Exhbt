@@ -130,8 +130,10 @@ test.describe("the exhbt editor", () => {
     const editor = page.url();
 
     // Free can build and preview, not publish.
-    await page.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(page.getByText(/comes with Premium/).last()).toBeVisible();
+    await expect(page.getByText("Preview only")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Publish with Premium" })).toBeVisible();
+    await expect(page.getByText(/comes with Premium/)).toBeVisible();
     await expect(page.getByText("It's live.")).toHaveCount(0);
 
     // On Premium it still waits for the confirmation.

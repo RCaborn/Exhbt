@@ -32,12 +32,15 @@ export function RichTextField({
   onChange,
   labelId,
   describedBy,
+  placeholder,
 }: {
   value: RichText;
   onChange: (runs: RichText) => void;
   /** id of the visible label, read out as the field's name. */
   labelId: string;
   describedBy?: string;
+  /** A teaching example shown while the field is empty. */
+  placeholder?: string;
 }) {
   const [linkError, setLinkError] = useState<string | null>(null);
   const editor = useEditor({
@@ -66,6 +69,7 @@ export function RichTextField({
         "aria-multiline": "true",
         "aria-labelledby": labelId,
         ...(describedBy ? { "aria-describedby": describedBy } : {}),
+        ...(placeholder ? { "aria-placeholder": placeholder } : {}),
         class: "field min-h-[2.9rem] leading-relaxed whitespace-pre-wrap",
       },
     },
@@ -116,7 +120,14 @@ export function RichTextField({
           {active?.link ? <Unlink aria-hidden size={14} strokeWidth={2.5} /> : <Link2 aria-hidden size={14} strokeWidth={2.5} />}
         </Button>
       </div>
-      <EditorContent editor={editor} />
+      <div className="relative">
+        <EditorContent editor={editor} />
+        {placeholder && value.length === 0 && (
+          <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 px-[0.85rem] py-[0.7rem] leading-relaxed text-slate">
+            {placeholder}
+          </span>
+        )}
+      </div>
       {linkError && (
         <p role="alert" className="mt-1 text-sm text-error">
           {linkError}

@@ -3,6 +3,8 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { Editor } from "@/components/editor/Editor";
 import { getCurrentUser } from "@/lib/auth";
+import { fileIdsOf } from "@/components/editor/media";
+import { ENTITLEMENTS } from "@/lib/entitlements";
 import { signedFileUrl } from "@/lib/files";
 import { parseHost, portfolioHost } from "@/lib/hosts";
 import { canPublish, getPlan } from "@/lib/plan";
@@ -42,6 +44,10 @@ export default async function EditExhbtPage({ params }: Params) {
       imageUrls={imageUrls}
       fileEvidenceUrl={record.doc.evidence?.kind === "file" ? evidenceUrl : null}
       planBlock={verdict.ok ? null : verdict.reason}
+      updatedAt={record.updatedAt}
+      canGoLive={ENTITLEMENTS[plan].publicPortfolio}
+      maxFileMb={ENTITLEMENTS[plan].uploadMbPerFile}
+      liveFileIds={record.status === "published" && record.published ? fileIdsOf(record.published) : []}
     />
   );
 }

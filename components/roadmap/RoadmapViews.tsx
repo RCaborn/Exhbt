@@ -4,6 +4,7 @@ import { WaitlistForm } from "@/components/waitlist/WaitlistForm";
 import { PLAN_NAMES } from "@/lib/entitlements";
 import { SkillHighlights } from "@/components/charts/SkillHighlights";
 import { SkillRadar } from "@/components/charts/SkillRadar";
+import { BuildThis, type BuildState } from "@/components/roadmap/BuildThis";
 import { IdeaCard } from "@/components/roadmap/IdeaCard";
 import { PlanEditor } from "@/components/roadmap/PlanEditor";
 import { ProjectsGate } from "@/components/roadmap/ProjectsGate";
@@ -50,10 +51,12 @@ type Props = {
   emailedTo: string | null;
   signedIn: boolean;
   projects: ProjectsState;
+  /** Building an idea as an exhbt (Phase 2 only; left out when it's off). */
+  build?: BuildState;
 };
 
 /** The roadmap as five short click-through screens. Each view is its own URL (?view=). */
-export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn, projects }: Props) {
+export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn, projects, build }: Props) {
   const index = VIEWS.findIndex((v) => v.key === view);
   const href = (k: ViewKey) => `/roadmap/${id}?view=${k}`;
   const prev = VIEWS[index - 1];
@@ -88,7 +91,7 @@ export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn, projects 
         <div className="mt-6 rounded-[24px] border border-line bg-surface p-6 shadow-pack sm:p-10">
           {view === "overview" && <Overview roadmap={roadmap} role={role} href={href} />}
           {view === "gaps" && <Gaps roadmap={roadmap} role={role} />}
-          {view === "projects" && <Projects id={id} roadmap={roadmap} role={role} state={projects} />}
+          {view === "projects" && <Projects id={id} roadmap={roadmap} role={role} state={projects} build={build} />}
           {view === "strengths" && <Strengths roadmap={roadmap} role={role} />}
           {view === "next" && <Next emailedTo={emailedTo} signedIn={signedIn} id={id} unlocked={projects.unlocked} />}
 
@@ -191,7 +194,7 @@ function Gaps({ roadmap, role }: { roadmap: Roadmap; role: string }) {
   );
 }
 
-function Projects({ id, roadmap, role, state }: { id: string; roadmap: Roadmap; role: string; state: ProjectsState }) {
+function Projects({ id, roadmap, role, state, build }: { id: string; roadmap: Roadmap; role: string; state: ProjectsState; build?: BuildState }) {
   if (!state.unlocked) {
     return (
       <>
@@ -216,12 +219,12 @@ function Projects({ id, roadmap, role, state }: { id: string; roadmap: Roadmap; 
         <ol aria-label="Your plan" className="mt-8 space-y-4">
           {ideas.map((p) => (
             <li key={p.id}>
-              <IdeaCard idea={p} />
+              <IdeaCard idea={p} footer={build && <BuildThis build={build} roadmapId={id} ideaId={p.id} title={p.title} />} />
             </li>
           ))}
         </ol>
       ) : (
-        <PlanEditor id={id} ideas={ideas} swapsLeft={swapsLeft} />
+        <PlanEditor id={id} ideas={ideas} swapsLeft={swapsLeft} build={build} />
       )}
       <AfterProjects roadmap={roadmap} ideas={ideas} done={done} />
     </>

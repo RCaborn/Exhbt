@@ -8,6 +8,9 @@ import { RoadmapViews, parseView, type ProjectsState } from "@/components/roadma
 import { extractContact } from "@/lib/cv-contact";
 import { ENTITLEMENTS } from "@/lib/entitlements";
 import { ideasFor, planDone, projectsUnlocked } from "@/lib/roadmap/ideas";
+import type { BuildState } from "@/components/roadmap/BuildThis";
+import { canCreateExhbt, getPlan } from "@/lib/plan";
+import { isPhase2Enabled } from "@/lib/site";
 
 export const metadata: Metadata = { title: "Your roadmap", robots: { index: false } };
 
@@ -48,6 +51,16 @@ export default async function RoadmapPage({
     if (current === "projects") await getStore().logEvent("projects_gate_viewed", user?.id ?? null);
   }
 
+  // "Build this as an exhbt" (Phase 2): who can, and why not.
+  let build: BuildState | undefined;
+  if (isPhase2Enabled() && current === "projects" && projects.unlocked) {
+    if (!user) build = { state: "signed-out" };
+    else {
+      const verdict = canCreateExhbt(await getPlan(user.id), await getStore().listExhbts(user.id));
+      build = verdict.ok ? { state: "ok" } : { state: "full", reason: verdict.reason };
+    }
+  }
+
   return (
     <RoadmapViews
       id={id}
@@ -56,6 +69,7 @@ export default async function RoadmapPage({
       emailedTo={record.emailSentAt ? record.pendingEmail : null}
       signedIn={Boolean(user)}
       projects={projects}
+      build={build}
     />
   );
 }
