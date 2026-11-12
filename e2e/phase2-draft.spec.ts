@@ -128,7 +128,8 @@ test.describe("Draft an exhbt", () => {
     await expect(page.locator("#allowance")).toContainText(`0 of ${ENTITLEMENTS.free.draftsPer30Days} AI`);
     const alert = page.getByRole("alert").filter({ hasText: "AI draft" });
     await expect(alert).toContainText("You've used your");
-    await expect(alert.getByRole("link", { name: "See plans" })).toHaveAttribute("href", "/pricing");
+    await expect(alert.getByRole("link", { name: /^Upgrade to Premium/ })).toHaveAttribute("href", "/account/billing");
+    await expect(alert.getByRole("link", { name: "Compare plans" })).toHaveAttribute("href", "/pricing");
     await expect(page.getByRole("button", { name: "Draft my exhbt" })).toHaveCount(0);
   });
 

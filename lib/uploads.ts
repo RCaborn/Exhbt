@@ -1,6 +1,7 @@
 import "server-only";
 import { getPlan, limitsFor } from "./plan";
 import { devBlobs, devStorageEnabled } from "./files";
+import type { ExhbtDoc } from "./exhbt/blocks";
 import { getStore, isSupabaseConfigured, supabaseAdmin, type StoredFile } from "./store";
 
 /**
@@ -115,4 +116,74 @@ export async function deleteFile(userId: string, fileId: string): Promise<boolea
     devBlobs().delete(fileId);
   }
   return (await store.deleteFile(fileId, userId)) !== null;
+}
+
+/* ---------------- Clean-up: an exhbt's files, and every file on account deletion ---------------- */
+
+/** Supabase removes up to 1,000 paths per call; smaller batches keep each request quick. */
+const REMOVE_BATCH = 100;
+
+/** Removes the stored objects (not the records), bucket by bucket in batches. Logs and carries on if one fails. */
+async function removeStoredObjects(files: StoredFile[]): Promise<void> {
+  if (!files.length) return;
+  if (!isSupabaseConfigured()) {
+    if (devStorageEnabled()) for (const f of files) devBlobs().delete(f.id);
+    return;
+  }
+  const storage = supabaseAdmin().storage;
+  for (const bucket of ["sources", "evidence"] as const) {
+    const paths = files.filter((f) => f.bucket === bucket).map((f) => f.path);
+    for (let i = 0; i < paths.length; i += REMOVE_BATCH) {
+      const { error } = await storage.from(bucket).remove(paths.slice(i, i + REMOVE_BATCH));
+      if (error) console.error("storage remove failed", bucket, error.message);
+    }
+  }
+}
+
+/** The file ids an exhbt's working or live copy points at (images and a file as the work). */
+function fileIdsIn(doc: ExhbtDoc | null | undefined): string[] {
+  if (!doc) return [];
+  const ids = (doc.images ?? []).map((im) => im.fileId);
+  if (doc.evidence?.kind === "file") ids.push(doc.evidence.fileId);
+  return ids;
+}
+
+/**
+ * Deletes an exhbt and its files: the ones attached to it, and the images or evidence its
+ * pages point at unless another of the person's exhbts or their profile photo uses them too.
+ * Storage objects go first, then the records, then the exhbt. False if it isn't theirs.
+ */
+export async function deleteExhbtWithFiles(userId: string, exhbtId: string): Promise<boolean> {
+  const store = getStore();
+  const [exhbt, all, profile, attached] = await Promise.all([
+    store.getExhbt(exhbtId),
+    store.listExhbts(userId),
+    store.getPortfolioProfile(userId),
+    store.listFiles(userId, exhbtId),
+  ]);
+  if (!exhbt || exhbt.userId !== userId) return false;
+
+  const usedElsewhere = new Set([
+    ...all.filter((e) => e.id !== exhbtId).flatMap((e) => [...fileIdsIn(e.doc), ...fileIdsIn(e.published)]),
+    ...(profile.photoFileId ? [profile.photoFileId] : []),
+  ]);
+  const files = new Map(attached.map((f) => [f.id, f]));
+  for (const id of new Set([...fileIdsIn(exhbt.doc), ...fileIdsIn(exhbt.published)])) {
+    if (files.has(id) || usedElsewhere.has(id)) continue;
+    const f = await store.getFile(id);
+    if (f && f.userId === userId) files.set(id, f);
+  }
+
+  const doomed = [...files.values()];
+  await removeStoredObjects(doomed);
+  for (const f of doomed) await store.deleteFile(f.id, userId);
+  return store.deleteExhbt(exhbtId, userId);
+}
+
+/**
+ * Removes every stored object a person has, before their account is deleted. The records go
+ * with the account (the database cascade, or the in-memory store's deleteUserData).
+ */
+export async function deleteAllFiles(userId: string): Promise<void> {
+  await removeStoredObjects(await getStore().listFiles(userId));
 }
