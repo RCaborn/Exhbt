@@ -6,7 +6,7 @@ import { useFormStatus } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, FileText, Upload } from "lucide-react";
 import { startRoadmap, type FormState } from "../actions";
-import { CvError, extractCvTextInBrowser } from "@/lib/cv-client";
+import { CV_ACCEPT, CvError, CvNeedsServer, extractCvTextInBrowser, readCvOnServer } from "@/lib/cv-client";
 import { SITUATIONS, type Situation } from "@/lib/ai/schemas";
 import { Button } from "@/components/ui/Button";
 
@@ -46,7 +46,9 @@ export function RoadmapWizard({ defaultRole }: Props) {
   const [cvMode, setCvMode] = useState<"upload" | "paste">("upload");
   const [cvText, setCvText] = useState("");
   const [cvFileName, setCvFileName] = useState<string | null>(null);
-  const [reading, setReading] = useState(false);
+  const [reading, setReading] = useState<false | "device" | "server">(false);
+  // A scan or photo the browser couldn't read: held until the visitor chooses to send it or paste.
+  const [pendingFile, setPendingFile] = useState<{ file: File; kind: "scan" | "image" } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const headingRefs = useRef<(HTMLHeadingElement | null)[]>([]);
   const first = useRef(true);
@@ -94,13 +96,30 @@ export function RoadmapWizard({ defaultRole }: Props) {
 
   async function onFile(file: File | undefined) {
     if (!file) return;
-    setReading(true);
+    setReading("device");
     setErrors({});
+    setPendingFile(null);
     setCvFileName(file.name);
     try {
       setCvText(await extractCvTextInBrowser(file));
     } catch (err) {
       setCvText("");
+      if (err instanceof CvNeedsServer) setPendingFile({ file, kind: err.kind });
+      else setErrors({ cv: err instanceof CvError ? err.message : "We couldn't read that file. Paste it instead." });
+    } finally {
+      setReading(false);
+    }
+  }
+
+  /** The visitor agreed to send a scan or photo to be read by the AI. */
+  async function readPendingOnServer() {
+    if (!pendingFile) return;
+    setReading("server");
+    setErrors({});
+    try {
+      setCvText(await readCvOnServer(pendingFile.file));
+      setPendingFile(null);
+    } catch (err) {
       setErrors({ cv: err instanceof CvError ? err.message : "We couldn't read that file. Paste it instead." });
     } finally {
       setReading(false);
@@ -193,11 +212,11 @@ export function RoadmapWizard({ defaultRole }: Props) {
                   >
                     <Upload aria-hidden size={26} strokeWidth={1.75} />
                     <span className="text-[1.05rem] font-semibold">{cvFileName ? "Choose a different file" : "Choose your CV"}</span>
-                    <span className="hint text-graphite">PDF or Word. Stays on your device.</span>
+                    <span className="hint text-graphite">PDF, Word, text file or a photo of it.</span>
                     <input
                       id="cvFile"
                       type="file"
-                      accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      accept={CV_ACCEPT}
                       className="sr-only"
                       aria-describedby="cv-status cv-error"
                       onChange={(e) => onFile(e.target.files?.[0])}
@@ -222,8 +241,10 @@ export function RoadmapWizard({ defaultRole }: Props) {
                 </div>
 
                 <p id="cv-status" className="mt-3 min-h-6 text-sm" aria-live="polite">
-                  {reading ? (
+                  {reading === "device" ? (
                     "Reading your CV…"
+                  ) : reading === "server" ? (
+                    "Reading your CV. Scans can take up to 30 seconds…"
                   ) : words > 0 ? (
                     <span className="inline-flex items-center gap-2 font-medium">
                       <span className="inline-flex size-4 items-center justify-center rounded-full border border-ink bg-mint">
@@ -240,6 +261,35 @@ export function RoadmapWizard({ defaultRole }: Props) {
                   ) : null}
                 </p>
                 <ErrorText id="cv-error" message={errors.cv} />
+
+                {pendingFile && !reading && (
+                  <div role="group" aria-labelledby="cv-scan-title" className="mt-4 rounded-[14px] border border-line bg-mist p-5">
+                    <p id="cv-scan-title" className="font-semibold">
+                      {pendingFile.kind === "image" ? "That's a photo, so we can't read it on your device." : "That PDF looks like a scan, so we can't read it on your device."}
+                    </p>
+                    <p className="mt-1 text-sm text-graphite">
+                      We can send it to our AI reader to turn it into text. We don&rsquo;t keep the file.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <Button variant="primary" onClick={readPendingOnServer}>Read it for me</Button>
+                      <Button
+                        onClick={() => {
+                          setPendingFile(null);
+                          setCvFileName(null);
+                          setCvMode("paste");
+                        }}
+                      >
+                        Paste the text instead
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {cvFileName && words > 0 && !reading && cvMode === "upload" && (
+                  <button type="button" onClick={() => setCvMode("paste")} className="link mt-2 mr-4 text-sm text-ink">
+                    Check or edit what we read
+                  </button>
+                )}
 
                 {words === 0 && (
                   <button type="button" onClick={() => goTo(3)} disabled={!ready} className="link mt-2 font-semibold text-ink">
@@ -335,7 +385,7 @@ export function RoadmapWizard({ defaultRole }: Props) {
           <span />
         )}
         {step < LAST ? (
-          <Button type="submit" variant="primary" size="lg" label="Continue" disabled={reading || !ready}>
+          <Button type="submit" variant="primary" size="lg" label="Continue" disabled={Boolean(reading) || !ready}>
             Continue <ArrowRight aria-hidden size={18} strokeWidth={2.5} />
           </Button>
         ) : (

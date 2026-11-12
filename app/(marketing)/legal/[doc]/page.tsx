@@ -17,7 +17,11 @@ const DOCS: Record<string, Doc> = {
         <ul>
           <li>Your email address, to create your account and send sign-in links.</li>
           <li>Your name, and your LinkedIn profile address if you give it, for your account and, later, your portfolio.</li>
-          <li>The text of your CV and anything you type into the roadmap form.</li>
+          <li>
+            The text of your CV and anything you type into the roadmap form. Your browser reads the CV file
+            itself. If it can&rsquo;t (a scan or a photo) and you choose to send it, Anthropic reads the file to
+            turn it into text; we keep the text, not the file.
+          </li>
           <li>The files and text you add to an exhbt.</li>
           <li>
             Product events such as &ldquo;roadmap completed&rdquo;, linked to your account. We do not use
