@@ -118,7 +118,8 @@ export type EventName =
   | "username_claimed"
   | "exhbt_drafted"
   | "file_uploaded"
-  | "file_read_ai";
+  | "file_read_ai"
+  | "exhbt_rewritten";
 
 /** A Stripe subscription as we keep it (the `subscriptions` table). No amounts or card details. */
 export type SubscriptionRecord = {
@@ -224,6 +225,12 @@ export interface Store {
   attachFiles(userId: string, exhbtId: string, fileIds: string[]): Promise<number>;
   /** Removes the record, if it's theirs, and returns it so the caller can remove the stored object. */
   deleteFile(id: string, userId: string): Promise<StoredFile | null>;
+
+  /* draft tools */
+  /** Every file attached to one of the user's exhbts (the kept source text, the AI version, uploads). */
+  listExhbtFiles(exhbtId: string, userId: string): Promise<StoredFile[]>;
+  /** Events with this name for one exhbt (props.exhbtId), all time. Counts rewrites against the plan's limit. */
+  countEventsForExhbt(name: EventName, userId: string, exhbtId: string): Promise<number>;
 }
 
 export const isSupabaseConfigured = () =>
@@ -767,6 +774,24 @@ function supabaseStore(): Store {
       ) as { id: string; user_id: string; bucket: StoredFile["bucket"]; path: string; mime: string; bytes: number; kind: StoredFile["kind"] } | null;
       return r ? { id: r.id, userId: r.user_id, bucket: r.bucket, path: r.path, mime: r.mime, bytes: r.bytes, kind: r.kind } : null;
     },
+
+    /* draft tools */
+    async listExhbtFiles(exhbtId, userId) {
+      const rows = check(
+        await db.from("exhbt_files").select("id, user_id, bucket, path, mime, bytes, kind").eq("exhbt_id", exhbtId).eq("user_id", userId),
+      ) as { id: string; user_id: string; bucket: StoredFile["bucket"]; path: string; mime: string; bytes: number; kind: StoredFile["kind"] }[];
+      return rows.map((r) => ({ id: r.id, userId: r.user_id, bucket: r.bucket, path: r.path, mime: r.mime, bytes: r.bytes, kind: r.kind }));
+    },
+    async countEventsForExhbt(name, userId, exhbtId) {
+      const res = await db
+        .from("events")
+        .select("id", { count: "exact", head: true })
+        .eq("name", name)
+        .eq("user_id", userId)
+        .eq("props->>exhbtId", exhbtId);
+      if (res.error) throw new Error(res.error.message);
+      return res.count ?? 0;
+    },
   };
 }
 
@@ -1138,6 +1163,14 @@ function memoryStore(): Store {
       if (!f || f.userId !== userId) return null;
       m.files.delete(id);
       return f;
+    },
+
+    /* draft tools */
+    async listExhbtFiles(exhbtId, userId) {
+      return [...m.files.values()].filter((f) => f.userId === userId && (f as StoredFile & { exhbtId?: string | null }).exhbtId === exhbtId).map((f) => ({ ...f }));
+    },
+    async countEventsForExhbt(name, userId, exhbtId) {
+      return m.events.filter((e) => e.name === name && e.userId === userId && e.props.exhbtId === exhbtId).length;
     },
   };
 }

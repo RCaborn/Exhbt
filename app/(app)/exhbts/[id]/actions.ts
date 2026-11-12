@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import { unverifiedOf } from "@/components/editor/model";
 import { getCurrentUser } from "@/lib/auth";
+import { deleteExhbtFiles } from "@/lib/draft-tools";
 import { emptyDoc, ExhbtDocSchema, validateForPublish, type ExhbtDoc } from "@/lib/exhbt/blocks";
 import { slugify, uniqueSlug } from "@/lib/exhbt/slug";
 import { canCreateExhbt, canPublish, getPlan } from "@/lib/plan";
@@ -58,7 +59,10 @@ export async function moveExhbt(id: string, by: -1 | 1) {
 
 export async function deleteExhbt(id: string) {
   const user = await signedIn();
-  await getStore().deleteExhbt(id, user.id);
+  const store = getStore();
+  // The kept source text and AI version go with it (stored objects first; the rows cascade).
+  if ((await store.getExhbt(id))?.userId === user.id) await deleteExhbtFiles(user.id, id);
+  await store.deleteExhbt(id, user.id);
   revalidatePath("/exhbts");
   redirect("/exhbts");
 }

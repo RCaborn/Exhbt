@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { draftExhbt, materialText, MAX_MATERIAL_CHARS } from "@/lib/ai/exhbt-draft";
 import { getCurrentUser } from "@/lib/auth";
+import { saveAiVersion, saveDraftSource } from "@/lib/draft-tools";
 import { draftVerdict } from "@/lib/drafting";
+import { aiVersionOf } from "@/lib/exhbt/draft-blocks";
 import { safeHref } from "@/lib/exhbt/blocks";
 import { normaliseNumber, unverifiedNumbers } from "@/lib/exhbt/verify";
 import { isPhase2Enabled } from "@/lib/site";
@@ -83,6 +85,14 @@ export async function POST(req: Request) {
   };
   const id = await store.createExhbt(user.id, doc);
   if (fileIds.length) await store.attachFiles(user.id, id, fileIds);
+  // Keep the source text and the AI's version with the exhbt, for "Rewrite" and "Back to the AI version".
+  // The draft is already saved, so a failure here costs only those two helpers.
+  try {
+    await saveDraftSource(user.id, id, source);
+    await saveAiVersion(user.id, id, aiVersionOf(result.doc, source, badQuotes));
+  } catch (e) {
+    console.error("draft source save failed", (e as Error).message);
+  }
   await store.logEvent("exhbt_drafted", user.id, { exhbtId: id, model: result.model, unverified: unverified.length, files: fileIds.length });
 
   return NextResponse.json({ id, unverified });
