@@ -110,7 +110,7 @@ Phase 2 builds on all of this rather than starting again.
 - Uploaded images are offered as figure candidates. A chart is only proposed when the numbers came from the files.
 - Cost: around 10–30k input tokens per draft, under $0.01 at Haiku's price (estimate). Each draft is logged in `ai_call_logs` with step `exhbt_draft`, which is already allowed.
 
-**Layout and blocks** (`lib/exhbt/blocks.ts`, zod). Rory, 12 Nov 2026: a recruiter skims, so every part is short and snappy, mostly bullets. **150–200 words in all**: 200 is the hard limit on publish, and the editor's guide aims at 150.
+**Layout and blocks** (`lib/exhbt/blocks.ts`, zod). Rory, 12 Nov 2026: a recruiter skims, so every part is short and snappy, mostly bullets. **150–200 words in all**: 200 is the hard limit on publish and covers every word on the page (header, skills, headline, graph titles and labels included; only image alt text is left out), and the editor's guide aims at 150.
 
 Header, fixed, from the profile and the exhbt:
 - **Top left:** the person's profile photo and name, so it feels like their page.

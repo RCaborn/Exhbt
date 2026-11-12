@@ -26,7 +26,7 @@ export const LIMITS = {
   charts: { max: 2, rows: 3 },
   images: { max: 2, captionWords: 15 },
   evidenceCaptionWords: 15,
-  /** Across every word a reader reads. 150 is what the editor aims for; 200 is the limit. */
+  /** Every word on the page (see wordCount). 150 is what the editor aims for; 200 is the limit. */
   totalWords: 200,
   targetWords: 150,
 } as const;
@@ -108,13 +108,22 @@ export function emptyDoc(): ExhbtDoc {
 export const plain = (rt: RichText): string => rt.map((r) => r.t).join("");
 export const words = (s: string): number => s.trim().split(/\s+/).filter(Boolean).length;
 
-/** Every word a reader reads, for the 150-200 word rule. Chart labels and alt text don't count. */
+/**
+ * Every word on the page, for the 200-word cap (Rory, 12 Nov 2026: "200 should cap everything"):
+ * header, skills, headline, the gap, the flowchart, findings, graph titles and labels, image
+ * captions and the evidence label. Only image alt text is left out: it isn't shown on the page.
+ */
 export function wordCount(d: ExhbtDoc): number {
   return [
     d.title,
+    d.context,
+    ...d.skills,
+    d.headline?.value ?? "",
+    d.headline?.label ?? "",
     plain(d.gap),
     ...d.flow.flatMap((s) => [s.step, s.detail ?? ""]),
     ...d.findings.map(plain),
+    ...d.charts.flatMap((c) => [c.title, c.beforeLabel, c.afterLabel, c.unit ?? "", ...c.rows.map((r) => r.label)]),
     ...d.images.map((im) => plain(im.caption)),
     d.evidence?.label ?? "",
   ].reduce((n, s) => n + words(s), 0);

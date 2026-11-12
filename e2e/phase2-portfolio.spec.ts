@@ -51,10 +51,14 @@ test.describe("Exhbt blocks", () => {
     expect(paths(long)).toEqual([""]);
   });
 
-  test("the word count covers what a reader reads, not chart labels or alt text", () => {
+  test("the word count covers everything on the page except alt text", () => {
     const d: ExhbtDoc = {
       ...doc({}),
       title: "One two",
+      context: "",
+      skills: [],
+      headline: undefined,
+      charts: [],
       gap: [{ t: "three " }, { t: "four", b: true }],
       flow: [{ step: "five six", detail: "seven" }, { step: "eight" }, { step: "nine" }],
       findings: [text("ten eleven"), text("twelve")],
@@ -62,8 +66,11 @@ test.describe("Exhbt blocks", () => {
       evidence: { kind: "link", href: "https://example.com/x", label: "fifteen" },
     };
     expect(wordCount(d)).toBe(15);
-    const withLongChart = { ...d, charts: [{ ...GP.charts[0]!, title: "Many many words in this chart title", beforeLabel: "a b c d", afterLabel: "e f g h" }] };
-    expect(wordCount(withLongChart)).toBe(15);
+    // Header, skills and headline count (Rory, 12 Nov 2026: the cap covers everything).
+    expect(wordCount({ ...d, context: "a b", skills: ["Python", "Regression analysis"], headline: { value: "−18%", label: "missed appointments" } })).toBe(15 + 2 + 3 + 3);
+    // So do graph titles and labels.
+    const chart = { title: "Missed appointments", beforeLabel: "Before", afterLabel: "After change", lowerIsBetter: true, rows: [{ label: "All patients", before: 1, after: 2 }] };
+    expect(wordCount({ ...d, charts: [chart] })).toBe(15 + 2 + 1 + 2 + 2);
   });
 
   test("links must be https", () => {
