@@ -29,7 +29,11 @@ type Entitlements = {
   uploadMbPerFile: number;
   /** All stored files together, in MB. Placeholder (12 Nov 2026), to be confirmed. */
   storageMbTotal: number;
-  /** A paid originality check when an exhbt is published. Off for every plan until a provider is chosen (Rory, 12 Nov 2026). */
+  /**
+   * An originality check when an exhbt is published. Part of Max; not built yet (Rory, 12 Nov 2026:
+   * "will be there, just not sorting it now"). Until ORIGINALITY_CHECK_LIVE, it's sold as coming soon
+   * and no exhbt shows the tick.
+   */
   originalityCheck: boolean;
   /**
    * Swaps (regenerating one idea) in a roadmap's plan of three. Placeholder figures
@@ -49,7 +53,7 @@ const MAX: Entitlements = {
   blockRegenerations: 10,
   uploadMbPerFile: 20,
   storageMbTotal: 500,
-  originalityCheck: false,
+  originalityCheck: true,
   projectSwapsPerRoadmap: 25,
 };
 
@@ -93,6 +97,9 @@ export const PLAN_NAMES: Record<Plan, string> = {
   max: "Max",
   institutional: "Universities",
 };
+
+/** Flip to true once the originality check runs on publish. Until then, copy says "coming soon". */
+export const ORIGINALITY_CHECK_LIVE = false;
 
 /** Exhbts picked for a job-specific link. */
 export const EXHBTS_PER_JOB_LINK = 4;
@@ -144,7 +151,9 @@ export function planFeatures(plan: "free" | "premium" | "max"): string[] {
         `${exhbtCount(e.exhbts, true)} on ${link}`,
         ...(e.jobLinks ? [`A custom link for every job: we pick your ${EXHBTS_PER_JOB_LINK} best fits`] : []),
         ...(e.drafting ? ["Drafted for you from your files, then yours to edit"] : []),
-        ...(e.originalityCheck ? ["An originality check when you publish"] : []),
+        ...(e.originalityCheck
+          ? [ORIGINALITY_CHECK_LIVE ? "An originality check when you publish" : "An originality check when you publish (coming soon)"]
+          : []),
         refreshes(e.roadmapsPer30Days),
       ];
   }
