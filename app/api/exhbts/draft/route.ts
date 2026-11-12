@@ -45,7 +45,7 @@ export async function POST(req: Request) {
 
   const store = getStore();
   const verdict = await draftVerdict(user.id);
-  if (!verdict.ok) return fail(verdict.reason, verdict.status, { upgrade: true });
+  if (!verdict.ok) return fail(verdict.reason, verdict.status, { upgradeTo: verdict.upgradeTo ?? null });
 
   let result;
   try {
@@ -82,8 +82,18 @@ export async function POST(req: Request) {
     unverified,
   };
   const id = await store.createExhbt(user.id, doc);
-  if (fileIds.length) await store.attachFiles(user.id, id, fileIds);
   await store.logEvent("exhbt_drafted", user.id, { exhbtId: id, model: result.model, unverified: unverified.length, files: fileIds.length });
+
+  // The draft limit race: two requests can both pass the check above while the AI works. Now
+  // this draft is saved and counted, check again and, if it went over (drafts or exhbts), take
+  // it back. Fail closed: when two race at the limit, both are refused and the person tries
+  // again. Files are attached only after this, so a refusal leaves their uploads for the retry.
+  const after = await draftVerdict(user.id, id);
+  if (!after.ok) {
+    await store.deleteExhbt(id, user.id);
+    return fail(after.reason, after.status, { upgradeTo: after.upgradeTo ?? null });
+  }
+  if (fileIds.length) await store.attachFiles(user.id, id, fileIds);
 
   return NextResponse.json({ id, unverified });
 }

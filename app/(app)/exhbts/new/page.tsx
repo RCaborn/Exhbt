@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { getCurrentUser } from "@/lib/auth";
 import { draftVerdict } from "@/lib/drafting";
 import { isPhase2Enabled } from "@/lib/site";
@@ -32,12 +32,7 @@ export default async function NewExhbtPage() {
           {v.ok ? (
             <DraftForm maxFileMb={v.uploadMbPerFile} />
           ) : (
-            <p role="alert" className="mt-6 rounded-[var(--radius)] border border-error/40 bg-surface px-4 py-3 text-error">
-              {v.reason}{" "}
-              <Link href="/pricing" className="link font-semibold">
-                See plans
-              </Link>
-            </p>
+            <UpgradePrompt reason={v.reason} upgradeTo={v.upgradeTo} tone="alert" className="mt-6" />
           )}
         </div>
       </div>

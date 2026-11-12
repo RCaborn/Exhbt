@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { createFromScratch, deleteExhbt, moveExhbt } from "./[id]/actions";
 import { ConfirmAction } from "@/components/editor/ConfirmAction";
+import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { getCurrentUser } from "@/lib/auth";
 import { PLAN_NAMES } from "@/lib/entitlements";
@@ -52,12 +53,7 @@ export default async function ExhbtsPage() {
               </div>
             </>
           ) : (
-            <p className="mt-2" role="status">
-              {room.reason}{" "}
-              <Link href="/pricing" className="link font-semibold">
-                See plans
-              </Link>
-            </p>
+            <UpgradePrompt reason={room.reason} upgradeTo={room.upgradeTo} className="mt-3" />
           )}
         </section>
 
