@@ -77,3 +77,7 @@ playwright-report/
 # Extra Next.js build folders (NEXT_DIST_DIR) and agent worktrees
 /.next-*/
 /.claude/worktrees/
+
+# exhbt draft eval runs (evals/exhbt-draft/README.md)
+/evals/exhbt-draft/runs/*
+!/evals/exhbt-draft/runs/.gitkeep

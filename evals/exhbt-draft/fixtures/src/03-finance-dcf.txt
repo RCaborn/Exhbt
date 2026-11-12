@@ -1,0 +1,56 @@
+AF2210 Corporate Finance: Individual Valuation Coursework
+BSc Accounting and Finance, Year 2, University of Wessex Marches
+Worth 40% of the module mark. Word limit 2,000.
+
+Valuation of Harrowgate Outdoor plc (a fictional listed retailer created for this coursework)
+
+1. Introduction
+
+Harrowgate Outdoor plc sells walking, camping and cycling equipment through 86 UK stores and a website that now makes up 31% of sales. The brief was to value the company's shares using a discounted cash flow (DCF) model built from its published accounts, to compare the result with the market price, and to make a recommendation.
+
+2. Starting point
+
+Revenue in the year to 31 January 2025 was £412.6m and operating profit (EBIT) was £45.4m, an EBIT margin of 11.0%. Capital expenditure was £18.2m against depreciation of £14.9m. Net debt at the year end was £96.0m, excluding leases. There are 120 million shares in issue, and the share price on the valuation date (14 March 2025) was £3.10.
+
+3. Forecast assumptions
+
+I forecast free cash flow for five years (FY2026 to FY2030):
+- Revenue growth of 6% a year for the first three years, as the online share keeps rising and four new stores open, then 4% in years four and five.
+- EBIT margin rising from 11.0% to 11.5% by FY2028 because online sales carry lower store costs, then held at 11.5%.
+- Corporation tax at 25%.
+- Capital expenditure at 4.5% of revenue, and depreciation at 3.6% of revenue.
+- Working capital investment equal to 10% of the increase in revenue.
+
+4. Discount rate
+
+I used a weighted average cost of capital (WACC) of 9.2%. The cost of equity of 10.6% comes from the CAPM with a risk-free rate of 4.4% (the 10-year gilt yield on the valuation date), an equity risk premium of 5.0% and a beta of 1.24, the average of four listed UK leisure retailers. The pre-tax cost of debt is 6.8%, giving 5.1% after tax, and the target debt weighting is 25%.
+
+5. Terminal value
+
+Terminal value uses the Gordon growth model with long-run growth of 2.0%, in line with the Bank of England inflation target. Terminal value makes up 68% of the enterprise value, which is normal for a mature retailer but means the result is sensitive to the WACC and the growth assumption.
+
+6. Result
+
+Enterprise value: £538.0m
+Less net debt: £96.0m
+Equity value: £442.0m
+Shares in issue: 120 million
+Value per share: £3.68
+
+The DCF value of £3.68 per share is 18.7% above the market price of £3.10.
+
+7. Sensitivity
+
+Changing the WACC by one percentage point either way gives a value per share of £4.31 (WACC 8.2%) and £3.21 (WACC 10.2%). With terminal growth of 1.5% instead of 2.0%, the value falls to £3.47. In every case I tested the value stays above the market price, but the margin of safety at a 10.2% WACC is small.
+
+7.1 Cross-check
+
+As a cross-check, the implied EV/EBIT multiple is 11.9x, against a peer median of 10.4x, so the DCF is slightly generous relative to the market's pricing of similar firms.
+
+8. Recommendation
+
+On these assumptions the shares look undervalued, and I would rate them a cautious buy. The main risks are that online growth slows, that the four new stores take longer to break even, and that a wet summer hits camping sales, which made up 22% of revenue last year.
+
+9. Reflection
+
+Building the model in Excel taught me how much the answer depends on two or three inputs. My first draft used a 3% terminal growth rate, which pushed the value above £4.50; my tutor's feedback made me justify every assumption against a source. The final mark for the coursework was 72%.

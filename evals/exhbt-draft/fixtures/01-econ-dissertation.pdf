@@ -1,0 +1,43 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R 6 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 5 0 R /Resources << /Font << /F1 3 0 R >> >> >>
+endobj
+5 0 obj
+<< /Length 3960 >>
+stream
+BT /F1 10 Tf 50 800 Td 13 TL (University of Brackenford, School of Economics) Tj T* (BSc Economics, final-year dissertation \(EC3990\), 2025-26) Tj T* (Distance to campus and the decision to go to university: evidence from the Brackenford) Tj T* (Household Panel) Tj T* (Candidate number: B204117. Supervisor: Dr H. Lowther. Word count: 9,870.) Tj T* () Tj T* (Extract: Chapter 1 \(Question\), Chapter 3 \(Data\), Chapter 4 \(Method\), Chapter 5 \(Results\) and) Tj T* (Chapter 6 \(Conclusion\)) Tj T* () Tj T* (1. The question) Tj T* () Tj T* (Widening participation policy in England has mostly focused on fees, maintenance support and) Tj T* (contextual offers. Much less attention has gone to geography. A young person who lives a short) Tj T* (bus ride from a university can study while living at home, keep a part-time job and avoid the) Tj T* (cost of halls. A young person who lives an hour or more away faces a very different decision.) Tj T* (This dissertation asks a narrow question: does living further from the nearest university) Tj T* (campus lower the probability that a young person in England enters higher education by age 19,) Tj T* (once family background and school results are held constant? A second question is whether the) Tj T* (effect is larger for pupils who were eligible for free school meals.) Tj T* () Tj T* (The answer matters for where new campuses and satellite sites are placed. If distance has a) Tj T* (real effect on participation, and that effect falls hardest on poorer pupils, then the location) Tj T* (of provision is itself a widening participation tool.) Tj T* () Tj T* (3. Data) Tj T* () Tj T* (The data come from the Brackenford Household Panel, a fictional longitudinal survey used for) Tj T* (teaching in the School of Economics. The sample is every panel member who turned 19 between) Tj T* (2016 and 2022 and who lived in England at age 16. After dropping 337 cases with missing school) Tj T* (results or postcodes, the analysis sample has 4,812 young people living in 312 local areas.) Tj T* () Tj T* (The outcome is a binary indicator equal to 1 if the young person had started a degree course by) Tj T* (age 19. Overall, 41.6% of the sample had done so. The key explanatory variable is the) Tj T* (straight-line distance in kilometres from the home postcode at age 16 to the nearest university) Tj T* (campus, measured in units of 10 km. Mean distance is 18.4 km and the median is 12.7 km; 9% of) Tj T* (the sample live more than 50 km from a campus.) Tj T* () Tj T* (Controls are: Key Stage 4 attainment \(average point score\), free school meals eligibility at) Tj T* (age 16 \(23.5% of the sample\), parental education \(whether either parent has a degree\),) Tj T* (household income band, sex, ethnicity and the year the young person turned 19.) Tj T* () Tj T* (4. Method) Tj T* () Tj T* (The main model is a linear probability model estimated by ordinary least squares, with standard) Tj T* (errors clustered at the local area level. I estimate three specifications. Model 1 includes) Tj T* (distance only. Model 2 adds the individual and family controls. Model 3 adds local authority) Tj T* (fixed effects, so that distance is identified only from differences within the same local) Tj T* (authority. This guards against the worry that areas far from universities differ in other ways,) Tj T* (such as the local labour market for school leavers.) Tj T* () Tj T* (I chose a linear probability model over a probit because the coefficients can be read directly) Tj T* (as percentage point changes and because the predicted probabilities for 98% of the sample lie) Tj T* (between 0 and 1. As a robustness check I also estimate probit models and report average) Tj T* (marginal effects, which are within 0.002 of the linear estimates in every specification.) Tj T* () Tj T* (To test the second question, Model 4 interacts distance with free school meals eligibility.) Tj T* () Tj T* (5. Results) Tj T* ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 7 0 R /Resources << /Font << /F1 3 0 R >> >> >>
+endobj
+7 0 obj
+<< /Length 3124 >>
+stream
+BT /F1 10 Tf 50 800 Td 13 TL () Tj T* (Table 5.1: Effect of distance to the nearest campus \(per 10 km\) on entering higher education by) Tj T* (age 19) Tj T* () Tj T* (                                 Model 1     Model 2     Model 3     Model 4) Tj T* (Distance \(per 10 km\)             -0.031      -0.024      -0.019      -0.017) Tj T* (                                 \(0.009\)     \(0.008\)     \(0.010\)     \(0.009\)) Tj T* (Distance x FSM eligible                                              -0.024) Tj T* (                                                                     \(0.011\)) Tj T* (Controls                         No          Yes         Yes         Yes) Tj T* (Local authority fixed effects    No          No          Yes         Yes) Tj T* (Observations                     4,812       4,812       4,812       4,812) Tj T* (R-squared                        0.02        0.21        0.26        0.26) Tj T* () Tj T* (Standard errors clustered by local area in brackets.) Tj T* () Tj T* (In Model 1, each extra 10 km between home and the nearest campus is associated with a 3.1) Tj T* (percentage point lower probability of entering higher education. Adding controls reduces this) Tj T* (to 2.4 percentage points, which shows that part of the raw gap reflects family background and) Tj T* (attainment. With local authority fixed effects the estimate falls to 1.9 percentage points and) Tj T* (is significant at the 10% level only.) Tj T* () Tj T* (Model 4 shows the effect is concentrated among poorer pupils. For pupils not eligible for free) Tj T* (school meals, an extra 10 km lowers the probability by 1.7 percentage points. For eligible) Tj T* (pupils the combined effect is 4.1 percentage points \(-0.017 plus -0.024\), more than twice as) Tj T* (large. Put another way, for a free school meals pupil living 30 km from a campus rather than) Tj T* (next to it, the predicted probability of entering higher education is about 12 percentage) Tj T* (points lower.) Tj T* () Tj T* (Attainment remains by far the strongest predictor. A one standard deviation increase in the Key) Tj T* (Stage 4 average point score raises the probability by 17.8 percentage points in Model 3.) Tj T* () Tj T* (6. Conclusion) Tj T* () Tj T* (Distance to the nearest campus has a modest but real association with whether young people in) Tj T* (England go to university, and the association is more than twice as strong for pupils eligible) Tj T* (for free school meals. The estimates shrink as better controls are added, so I do not claim) Tj T* (that they are fully causal: families may choose where to live partly on the basis of education.) Tj T* (Even so, the pattern is consistent with distance acting as a cost that bites hardest on poorer) Tj T* (households.) Tj T* () Tj T* (The main policy implication is that satellite campuses, part-time routes and travel support) Tj T* (could be aimed at areas that are both far from a university and have high rates of free school) Tj T* (meals eligibility. A natural next step would be to use the opening of new campuses as a natural) Tj T* (experiment.) Tj T* () Tj T* ET
+endstream
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000218 00000 n 
+0000000344 00000 n 
+0000004356 00000 n 
+0000004482 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+7658
+%%EOF
