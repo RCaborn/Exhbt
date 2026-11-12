@@ -35,7 +35,7 @@ const FIELDS: { id?: string; name: string; body: string }[] = [
   {
     id: "checks",
     name: "Checked by exhbt",
-    body: "The seal and the three ticks are added by Exhbt, not the author. Confirmed by author: they declared it accurate and their own. Source attached: the underlying work is linked. Originality checked: the text and attached work passed a third-party originality check on the date on the seal.",
+    body: "The seal and the ticks are added by Exhbt, not the author. Confirmed by author: they declared it accurate and their own. Source attached: the underlying work is linked.",
   },
   {
     name: "Reflection",

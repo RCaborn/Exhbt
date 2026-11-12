@@ -29,7 +29,7 @@ type Entitlements = {
   uploadMbPerFile: number;
   /** All stored files together, in MB. Placeholder (12 Nov 2026), to be confirmed. */
   storageMbTotal: number;
-  /** A paid originality check when an exhbt is published. */
+  /** A paid originality check when an exhbt is published. Off for every plan until a provider is chosen (Rory, 12 Nov 2026). */
   originalityCheck: boolean;
   /**
    * Swaps (regenerating one idea) in a roadmap's plan of three. Placeholder figures
@@ -49,7 +49,7 @@ const MAX: Entitlements = {
   blockRegenerations: 10,
   uploadMbPerFile: 20,
   storageMbTotal: 500,
-  originalityCheck: true,
+  originalityCheck: false,
   projectSwapsPerRoadmap: 25,
 };
 
@@ -103,8 +103,13 @@ export function freeRoadmapLimitMessage(): string {
   return `You've used this month's ${n} free ${n === 1 ? "roadmap" : "roadmaps"}. ${PLAN_NAMES.premium} and ${PLAN_NAMES.max} include more: join the waitlist on the pricing page.`;
 }
 
-/** Paid tiers have no public price yet: the early release collects a waitlist. */
-export const PRICES: Partial<Record<Plan, string>> = { free: "£0" };
+/**
+ * Prices (Rory, 12 Nov 2026: £9 and £15). A launch or new-joiner discount would be a Stripe
+ * promotion code on top of these, not a different figure here. Billed per BILLING_PERIOD.
+ */
+export const PRICES: Partial<Record<Plan, string>> = { free: "£0", premium: "£9", max: "£15" };
+/** Assumed monthly until Rory confirms. */
+export const BILLING_PERIOD = "month";
 
 function refreshes(n: number): string {
   return n === 1 ? "1 roadmap refresh a month" : `${n} roadmap refreshes a month`;

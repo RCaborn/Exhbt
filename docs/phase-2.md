@@ -27,7 +27,7 @@ Already in the repo:
 
 Phase 2 builds on all of this rather than starting again.
 
-**Waiting on:** Rory's layout picture. The block list below follows the current exhbt layout plus Grok's additions. If the picture differs, only the block schema and the renderer change.
+**Layout:** Rory's description of 12 Nov 2026, in section 6 (Blocks). Prices: Premium £9, Max £15, assumed monthly; a launch or new-joiner discount would be a Stripe promotion code. Free gets one AI draft. Originality checking is out of Phase 2.
 
 ---
 
@@ -110,32 +110,27 @@ Phase 2 builds on all of this rather than starting again.
 - Uploaded images are offered as figure candidates. A chart is only proposed when the numbers came from the files.
 - Cost: around 10–30k input tokens per draft, under $0.01 at Haiku's price (estimate). Each draft is logged in `ai_call_logs` with step `exhbt_draft`, which is already allowed.
 
-**Blocks** (`lib/exhbt/blocks.ts`, zod; final shapes depend on the layout picture):
-- **Fixed core, always present:**
-  1. Outcome: 1 sentence
-  2. **Process flowchart (Method):** always present, drawn as a flow diagram by `components/exhbt/MethodFlow.tsx`.
-     - 3–6 nodes, each a short verb phrase ("Collected data", ≤ 5 words) with an optional detail (tool or scale, "14,200 records", ≤ 6 words). The last node is the result.
-     - The AI drafts it from the user's material, with the same no-made-up-facts rule.
-     - Edited on the diagram itself, wherever it appears in edit mode (the editor card and the portfolio edit mode below):
-       - click a node to edit its words in place
-       - "+" between nodes to insert one; × to remove one
-       - drag, or ←/→ buttons, to reorder
-     - The diagram redraws as you type.
-     - Can't be removed; publishing needs at least 3 nodes.
-     - Laid out left to right on wide screens, top to bottom on phones (as `MethodFlow` already does). Every node's text sits in the page for screen readers.
-  3. Key result: a before/after chart (`BeforeAfterChart`, chart rules in AGENTS) **or** a figure (image and caption)
-  4. Skills: up to 6 tags
-  5. The work / evidence: a file or link, with a caption of 25 words at most
-  6. Reflection: up to 2 sentences
-- **Optional, at most 2 per exhbt:**
-  - bullet list (≤ 4 items)
-  - callout (≤ 25 words)
-  - extra figure (image and caption)
-  - second flowchart (3–5 nodes) for something other than the process, such as a system or data pipeline. It reuses the `MethodFlow` component and its editor card. No Mermaid: it's heavy and renders untrusted text.
-- Title (≤ 80 characters), context line and headline number sit in the header, not in a block.
-- Verification (`TrustBadge`: confirmed by the author, originality checked, date) is added by the system and can't be edited.
-- **Ordering:** Outcome is always first and Reflection always last. Everything between can be reordered.
-- **Overall limit:** 200 words across the editable text, from `EXHBT_LIMITS`, which grows to cover the new blocks.
+**Layout and blocks** (`lib/exhbt/blocks.ts`, zod). Rory, 12 Nov 2026: a recruiter skims, so every part is short and snappy, mostly bullets. **150–200 words in all**: 200 is the hard limit on publish, and the editor's guide aims at 150.
+
+Header, fixed, from the profile and the exhbt:
+- **Top left:** the person's profile photo and name, so it feels like their page.
+- **Top right:** skill boxes, quick-fire tags (Python, SQL, regression analysis, accounting principles), up to 6, each ≤ 3 words.
+- **Title:** ≤ 80 characters.
+
+Body, in this order:
+1. **Context and the gap:** what the question was and why it mattered. ≤ 2 short sentences, or ≤ 3 bullets; ≤ 40 words.
+2. **Process flowchart:** straight after the context, drawn by `components/exhbt/MethodFlow.tsx`.
+   - 3–6 boxes, each a short phrase (≤ 8 words), documenting the process. The AI drafts it from the material.
+   - Edited on the diagram itself, wherever it appears in edit mode (the editor and the portfolio edit mode): type in a box; "+" between boxes to add one, × to remove one; drag or ←/→ to reorder. It redraws as you type.
+   - Left to right on wide screens, top to bottom on phones. Every box's text is in the page for screen readers.
+3. **Findings:** 2–4 bullets, ≤ 20 words each. Every number must come from the uploaded material, or it's flagged.
+4. **Graphs:** 1 or 2 charts (`BeforeAfterChart` and the chart rules in AGENTS), built only from numbers in the material. Can be removed if the project has no numbers.
+5. **Images:** up to 2 (a screenshot, a figure from the report), each with a caption ≤ 15 words.
+
+Footer, small: "See the work" (the original file or link, one click away) and the trust badge (confirmed by the author, source attached).
+
+- The order is fixed, matching the layout. Editorial control means editing every word, adding or removing boxes, findings, graphs and images within the limits, and swapping graphs or images.
+- Removed from the earlier block list: the separate outcome, skills and reflection blocks. Skills moved to the header. Callouts and a second flowchart are not in the layout.
 
 **Editor** (`app./exhbts/[id]/edit`, the halfway approach):
 - One card per block in a vertical list. Reorder with a drag handle and with up/down buttons (keyboard and screen-reader friendly).
@@ -155,11 +150,11 @@ Phase 2 builds on all of this rather than starting again.
   - every flagged number is checked or removed
   - "This is my work, and the numbers are true" ticked (`confirmed_by_user_at`)
   - the plan allows another public exhbt
-- Originality check on publish (`originalityCheck` entitlement, `originality_checks` table exists). **The provider is an open question.** Until one is chosen, publishing records the user's confirmation only and the badge doesn't claim a check.
+- No originality check in Phase 2 (Rory, 12 Nov 2026). `originalityCheck` is off for every plan, and the badge never claims one.
 
 ## 7. Public portfolio (`alex.exhbt.co.uk`, Premium and Max)
-- `/`: `PortfolioHeader` (name, headline, bio, LinkedIn), then up to the plan's count of `ExhbtTile`s in the user's order.
-- `/<exhbt-slug>`: the full `Exhbt` component, with evidence one click away (signed URL; images inline, other files as downloads with `Content-Disposition: attachment`).
+- `/` is the **at-a-glance page**, and every shared link lands here. `PortfolioHeader` (photo, name, headline, bio, LinkedIn), then a grid of `ExhbtTile`s in the user's order: title, headline number, top skills.
+- `/<exhbt-slug>`: click into one project, with "← All projects" back to the glance and previous/next between projects. The full `Exhbt` component, with evidence one click away (signed URL; images inline, other files as downloads with `Content-Disposition: attachment`).
 - Edge-cached; the cache is cleared on publish or edit. Open Graph image per exhbt (`next/og`). Indexed unless the user hides it, and a per-user sitemap when indexed.
 - No sign-in cookies on portfolio hosts, a strict CSP, and all user text escaped by our renderer.
 - Free users see the same page in a preview on `app.` with "Publish with Premium".
@@ -228,12 +223,13 @@ Docs:
 - Stripe: account, Premium and Max products and prices, and webhook endpoint `https://app.exhbt.co.uk/api/stripe/webhook`.
 - Supabase: add `https://app.exhbt.co.uk/**` to Redirect URLs.
 
-## Open questions (decide before the milestones that need them)
-1. Prices for Premium and Max, and whether there are monthly and/or annual options (milestone 6).
-2. Does Free get the AI draft for its one exhbt? I'd say yes (1 draft): it shows the product working, at under $0.01.
-3. The originality-check provider and its budget (milestone 5; until then, confirmation only).
-4. The layout picture (milestone 3).
-5. The placeholder figures: drafts per month, rewrites per exhbt, file and storage caps, active job links.
+## Decided (12 Nov 2026) and still open
+- Decided: Premium £9, Max £15. A new-joiner discount is possible later, as a Stripe promotion code.
+- Decided: Free gets one AI draft.
+- Decided: no originality check in Phase 2.
+- Decided: the layout (section 6).
+- Open: monthly, annual or both? (Assumed monthly; milestone 6.)
+- Open: the placeholder figures in `lib/entitlements.ts` (drafts per month, rewrites per exhbt, file and storage caps, active job links).
 
 ## Verification
 - **Tests:**

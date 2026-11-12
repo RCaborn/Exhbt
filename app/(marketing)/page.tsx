@@ -5,7 +5,7 @@ import { EditorExcerpt, LinkExcerpt } from "@/components/home/Excerpts";
 import { SkillsGapExample } from "@/components/home/SkillsGapExample";
 import { StartForm } from "@/components/home/StartForm";
 import { demoExhbts } from "@/lib/exhbt";
-import { EXHBTS_PER_JOB_LINK, PLAN_NAMES, PRICES, planFeatures } from "@/lib/entitlements";
+import { BILLING_PERIOD, EXHBTS_PER_JOB_LINK, PLAN_NAMES, PRICES, planFeatures } from "@/lib/entitlements";
 import { Button } from "@/components/ui/Button";
 
 export default function Home() {
@@ -35,7 +35,7 @@ export default function Home() {
         id="draft"
         ground="bg-mist"
         title="Turn a finished project into an exhbt"
-        body={`Add the report, notes or results. We draft a short exhbt with the methodology as a flow and a chart of the key result, from what you gave us and nothing else. You confirm it's yours. On ${PLAN_NAMES.max}, publishing also runs an originality check.`}
+        body={`Add the report, notes or results. We draft a short exhbt with the methodology as a flow and a chart of the key result, from what you gave us and nothing else. You confirm it's yours.`}
         artifact={<EditorExcerpt />}
       />
       <Step
@@ -77,9 +77,11 @@ export default function Home() {
           </p>
           <div className="mt-12 grid gap-4 md:grid-cols-3">
             <Plan name={PLAN_NAMES.free} price={PRICES.free} features={planFeatures("free")} href="/roadmap/new" cta="Build my roadmap" />
-            <Plan name={PLAN_NAMES.premium} badge="Coming soon" features={planFeatures("premium")} href="/pricing#premium" cta="Join the waitlist" />
+            <Plan name={PLAN_NAMES.premium} price={PRICES.premium} per={BILLING_PERIOD} badge="Coming soon" features={planFeatures("premium")} href="/pricing#premium" cta="Join the waitlist" />
             <Plan
               name={PLAN_NAMES.max}
+              price={PRICES.max}
+              per={BILLING_PERIOD}
               badge="Coming soon"
               features={planFeatures("max")}
               href="/pricing#max"
@@ -125,6 +127,7 @@ function Step({ id, ground, title, body, artifact }: { id: string; ground: strin
 function Plan({
   name,
   price,
+  per,
   badge,
   features,
   href,
@@ -133,6 +136,8 @@ function Plan({
 }: {
   name: string;
   price?: string;
+  /** Billing period shown after a paid price, e.g. "month". */
+  per?: string;
   badge?: string;
   features: string[];
   href?: string;
@@ -144,7 +149,12 @@ function Plan({
       <p className="flex flex-wrap items-center gap-2 font-semibold">
         {name} {badge && <span className="chip">{badge}</span>}
       </p>
-      {price && <p className="mt-2 text-[2.6rem] leading-none font-extrabold tracking-[-0.03em]">{price}</p>}
+      {price && (
+        <p className="mt-2 text-[2.6rem] leading-none font-extrabold tracking-[-0.03em]">
+          {price}
+          {per && <span className="ml-1 text-base font-semibold tracking-normal text-graphite">a {per}</span>}
+        </p>
+      )}
       <FeatureList items={features} className="mt-4 text-[0.95rem]" />
       {href && cta && (
         <Link href={href} className="link mt-auto pt-4 font-semibold text-ink">

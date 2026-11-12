@@ -1,6 +1,7 @@
 import { Check } from "lucide-react";
 
-const CHECKS = ["Confirmed by author", "Source attached", "Originality checked"] as const;
+// An originality check joins these once a provider is chosen; until then the badge never claims one.
+const CHECKS = ["Confirmed by author", "Source attached"] as const;
 
 /**
  * The system-generated trust line. Green fill with navy ticks: the accent colour

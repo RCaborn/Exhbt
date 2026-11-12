@@ -72,8 +72,8 @@ const DOCS: Record<string, Doc> = {
         <h2>Accuracy</h2>
         <p>
           Before publishing an exhbt you confirm it is accurate and your own work. AI drafts are suggestions built
-          only from what you supplied; you are responsible for checking them. We may withdraw exhbts that fail an
-          originality check or that we believe are misleading.
+          only from what you supplied; you are responsible for checking them. We may withdraw exhbts that we believe are
+          copied or misleading.
         </p>
         <h2>Paid plans</h2>
         <p>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { WaitlistForm } from "@/components/waitlist/WaitlistForm";
-import { ENTITLEMENTS, EXHBTS_PER_JOB_LINK, PLAN_NAMES, PRICES, planFeatures } from "@/lib/entitlements";
+import { BILLING_PERIOD, ENTITLEMENTS, EXHBTS_PER_JOB_LINK, PLAN_NAMES, PRICES, planFeatures } from "@/lib/entitlements";
 import { FeatureList } from "@/components/site/FeatureList";
 import { Button } from "@/components/ui/Button";
 
@@ -110,6 +110,10 @@ function Tier({ id, name, summary, featured }: { id: "premium" | "max"; name: st
         <h2 id={`tier-${id}`} className="text-[1.375rem]">{name}</h2>
         <span className="chip">Coming soon</span>
       </div>
+      <p className="mt-2 text-[2.6rem] leading-none font-extrabold tracking-[-0.03em]">
+        {PRICES[id]}
+        <span className="ml-1 text-base font-semibold tracking-normal text-graphite">a {BILLING_PERIOD}</span>
+      </p>
       <p className="mt-3 text-graphite">{summary}</p>
       <FeatureList items={planFeatures(id)} className="mt-5" />
       <div className="mt-auto pt-7">

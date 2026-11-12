@@ -315,8 +315,7 @@ function Next({ emailedTo, signedIn, id, unlocked }: { emailedTo: string | null;
         <h2 className="">When a project is done, make it count</h2>
         <p className="mt-3 max-w-[34rem] text-[#c9cbcf]">
           {PLAN_NAMES.premium} drafts your exhbts from your files and puts them on your own link. {PLAN_NAMES.max} adds a
-          custom link for each job you apply to, with your best-fit projects, and an originality check when you
-          publish. Both open soon.
+          custom link for each job you apply to, with your best-fit projects. Both open soon.
         </p>
         <div className="mt-6">
           <WaitlistForm source="roadmap-next" interest="max" defaultEmail={emailedTo ?? ""} tone="dark" />
