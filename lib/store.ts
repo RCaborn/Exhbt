@@ -114,7 +114,8 @@ export type EventName =
   | "cv_read_ai"
   | "cv_read_failed"
   | "login_link_sent"
-  | "subscription_changed";
+  | "subscription_changed"
+  | "username_claimed";
 
 /** A Stripe subscription as we keep it (the `subscriptions` table). No amounts or card details. */
 export type SubscriptionRecord = {
