@@ -1,0 +1,71 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { getCurrentUser } from "@/lib/auth";
+import { usernameProblem } from "@/lib/hosts";
+import { isPhase2Enabled } from "@/lib/site";
+import { getStore } from "@/lib/store";
+import { profileSchema, USERNAME_CLAIMS_PER_HOUR, type ProfileField } from "./rules";
+
+export type UsernameState = { name?: string; error?: string; saved?: boolean } | undefined;
+export type ProfileState = { error?: string; fieldErrors?: Partial<Record<ProfileField, string>>; saved?: boolean } | undefined;
+
+const SIGNED_OUT = "Your session has ended. Sign in again to save.";
+
+/** Claims or changes the username. The old one redirects for 30 days (the store keeps it). */
+export async function claimUsernameAction(_prev: UsernameState, form: FormData): Promise<UsernameState> {
+  if (!isPhase2Enabled()) return { error: "This isn't available yet." };
+  const user = await getCurrentUser();
+  if (!user) return { error: SIGNED_OUT };
+
+  const name = String(form.get("username") ?? "").trim().toLowerCase();
+  const problem = usernameProblem(name);
+  if (problem) return { name, error: problem };
+
+  const store = getStore();
+  const current = (await store.getPortfolioProfile(user.id)).username;
+  if (current === name) return { name, saved: true };
+
+  // Rate limit: the user id stands in for the ipHash the event counter matches on.
+  if ((await store.countRecentEvents("username_claimed", user.id, 1)) >= USERNAME_CLAIMS_PER_HOUR) {
+    return { name, error: "You've changed your username several times in the last hour. Try again later." };
+  }
+  if ((await store.claimUsername(user.id, name)) === "taken") return { name, error: "That name is taken. Try another." };
+  await store.logEvent("username_claimed", user.id, { ipHash: user.id, changed: Boolean(current) });
+  revalidatePath("/account/portfolio");
+  return { name, saved: true };
+}
+
+/** Name, headline, bio, LinkedIn and the search-engine setting. */
+export async function saveProfileAction(_prev: ProfileState, form: FormData): Promise<ProfileState> {
+  if (!isPhase2Enabled()) return { error: "This isn't available yet." };
+  const user = await getCurrentUser();
+  if (!user) return { error: SIGNED_OUT };
+
+  const parsed = profileSchema.safeParse({
+    name: String(form.get("name") ?? ""),
+    headline: String(form.get("headline") ?? ""),
+    bio: String(form.get("bio") ?? ""),
+    linkedin: String(form.get("linkedin") ?? ""),
+    hideFromSearch: form.get("hideFromSearch") === "yes",
+  });
+  if (!parsed.success) {
+    const fieldErrors: Partial<Record<ProfileField, string>> = {};
+    for (const issue of parsed.error.issues) {
+      const key = issue.path[0] as ProfileField;
+      fieldErrors[key] ??= issue.message;
+    }
+    return { fieldErrors };
+  }
+
+  const p = parsed.data;
+  await getStore().updatePortfolioProfile(user.id, {
+    name: p.name || null,
+    headline: p.headline || null,
+    bio: p.bio || null,
+    linkedin: p.linkedin,
+    hideFromSearch: p.hideFromSearch,
+  });
+  revalidatePath("/account/portfolio");
+  return { saved: true };
+}

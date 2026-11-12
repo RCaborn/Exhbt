@@ -113,7 +113,8 @@ export type EventName =
   | "plan_kept"
   | "cv_read_ai"
   | "cv_read_failed"
-  | "login_link_sent";
+  | "login_link_sent"
+  | "username_claimed";
 
 export type WaitlistInterest = "premium" | "max" | "university";
 
