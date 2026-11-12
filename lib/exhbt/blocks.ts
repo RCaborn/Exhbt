@@ -86,6 +86,8 @@ export const ExhbtDocSchema = z.object({
   charts: z.array(ChartSchema),
   images: z.array(ImageSchema),
   evidence: EvidenceSchema.optional(),
+  /** Numbers the AI wrote that weren't found in the uploaded material (lib/exhbt/verify.ts); the editor flags each one. */
+  unverified: z.array(z.string()).optional(),
 });
 export type ExhbtDoc = z.infer<typeof ExhbtDocSchema>;
 export type FlowStep = z.infer<typeof FlowStepSchema>;

@@ -9,6 +9,9 @@
 
 export const MIN_CV_CHARS = 80;
 
+/** Characters kept from one file of project material (CVs keep 20,000). Here so server code can read it without the browser readers. */
+export const MAX_DOC_CHARS = 60_000;
+
 /** Common words in English CVs. Real CV text always contains several of them. */
 const COMMON = new Set(
   (
@@ -22,7 +25,8 @@ const COMMON = new Set(
 
 export type CvTextCheck = { ok: boolean; reason?: "too_short" | "garbled" };
 
-export function cleanCvText(text: string): string {
+/** Tidies extracted text. `max` caps its length: a CV needs 20,000 characters; project material gets more. */
+export function cleanCvText(text: string, max = 20_000): string {
   return text
     .replace(/\u0000/g, "")
     .replace(/\r\n?/g, "\n")
@@ -30,7 +34,7 @@ export function cleanCvText(text: string): string {
     .replace(/ *\n */g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim()
-    .slice(0, 20_000);
+    .slice(0, max);
 }
 
 export function checkCvText(text: string): CvTextCheck {

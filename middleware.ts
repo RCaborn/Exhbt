@@ -11,7 +11,7 @@ import { isPhase2Enabled as phase2 } from "@/lib/site";
  */
 
 /** Routes that read the session. Marketing pages stay static and fast. */
-const SESSION_PATHS = ["/roadmap", "/account", "/api/account", "/api/roadmap", "/auth", "/login"];
+const SESSION_PATHS = ["/roadmap", "/account", "/api/account", "/api/roadmap", "/auth", "/login", "/exhbts", "/api/exhbts", "/api/files", "/api/username"];
 
 const notFound = () => new NextResponse("Not found", { status: 404, headers: { "Content-Type": "text/plain" } });
 
