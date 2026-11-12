@@ -113,7 +113,10 @@ export type EventName =
   | "plan_kept"
   | "cv_read_ai"
   | "cv_read_failed"
-  | "login_link_sent";
+  | "login_link_sent"
+  | "exhbt_drafted"
+  | "file_uploaded"
+  | "file_read_ai";
 
 export type WaitlistInterest = "premium" | "max" | "university";
 
@@ -186,6 +189,18 @@ export interface Store {
   reorderExhbts(userId: string, ids: string[]): Promise<void>;
   deleteExhbt(id: string, userId: string): Promise<boolean>;
   getFile(id: string): Promise<StoredFile | null>;
+
+  /* uploads and drafts */
+  /** How many events with this name this user had in the last `hours`. For per-user limits (AI drafts). */
+  countRecentEventsForUser(name: EventName, userId: string, hours: number): Promise<number>;
+  /** Records an uploaded (or about-to-be-uploaded) file. The id is chosen by the caller, as it is part of the path. */
+  createFile(file: StoredFile & { exhbtId?: string | null }): Promise<void>;
+  /** Bytes of every file this user has stored, for the plan's storage cap. */
+  storageBytesUsed(userId: string): Promise<number>;
+  /** Links the user's unattached files to one of their exhbts. Returns how many were attached. */
+  attachFiles(userId: string, exhbtId: string, fileIds: string[]): Promise<number>;
+  /** Removes the record, if it's theirs, and returns it so the caller can remove the stored object. */
+  deleteFile(id: string, userId: string): Promise<StoredFile | null>;
 }
 
 export const isSupabaseConfigured = () =>
@@ -638,6 +653,55 @@ function supabaseStore(): Store {
       ) as { id: string; user_id: string; bucket: StoredFile["bucket"]; path: string; mime: string; bytes: number; kind: StoredFile["kind"] } | null;
       return r ? { id: r.id, userId: r.user_id, bucket: r.bucket, path: r.path, mime: r.mime, bytes: r.bytes, kind: r.kind } : null;
     },
+
+    /* uploads and drafts */
+    async countRecentEventsForUser(name, userId, hours) {
+      const res = await db
+        .from("events")
+        .select("id", { count: "exact", head: true })
+        .eq("name", name)
+        .eq("user_id", userId)
+        .gte("created_at", since(hours));
+      if (res.error) throw new Error(res.error.message);
+      return res.count ?? 0;
+    },
+    async createFile(f) {
+      check(
+        await db.from("exhbt_files").insert({
+          id: f.id,
+          user_id: f.userId,
+          exhbt_id: f.exhbtId ?? null,
+          bucket: f.bucket,
+          path: f.path,
+          mime: f.mime,
+          bytes: f.bytes,
+          kind: f.kind,
+        }),
+      );
+    },
+    async storageBytesUsed(userId) {
+      const rows = check(await db.from("exhbt_files").select("bytes").eq("user_id", userId)) as { bytes: number }[];
+      return rows.reduce((n, r) => n + r.bytes, 0);
+    },
+    async attachFiles(userId, exhbtId, fileIds) {
+      if (!fileIds.length) return 0;
+      const rows = check(
+        await db
+          .from("exhbt_files")
+          .update({ exhbt_id: exhbtId })
+          .in("id", fileIds)
+          .eq("user_id", userId)
+          .is("exhbt_id", null)
+          .select("id"),
+      ) as { id: string }[];
+      return rows.length;
+    },
+    async deleteFile(id, userId) {
+      const r = check(
+        await db.from("exhbt_files").delete().eq("id", id).eq("user_id", userId).select("id, user_id, bucket, path, mime, bytes, kind").maybeSingle(),
+      ) as { id: string; user_id: string; bucket: StoredFile["bucket"]; path: string; mime: string; bytes: number; kind: StoredFile["kind"] } | null;
+      return r ? { id: r.id, userId: r.user_id, bucket: r.bucket, path: r.path, mime: r.mime, bytes: r.bytes, kind: r.kind } : null;
+    },
   };
 }
 
@@ -959,6 +1023,35 @@ function memoryStore(): Store {
     },
     async getFile(id) {
       return m.files.get(id) ?? null;
+    },
+
+    /* uploads and drafts */
+    async countRecentEventsForUser(name, userId, hours) {
+      const after = Date.now() - hours * 3_600_000;
+      return m.events.filter((e) => e.name === name && e.userId === userId && Date.parse(e.at) >= after).length;
+    },
+    async createFile(f) {
+      m.files.set(f.id, { ...f, exhbtId: f.exhbtId ?? null } as StoredFile);
+    },
+    async storageBytesUsed(userId) {
+      return [...m.files.values()].filter((f) => f.userId === userId).reduce((n, f) => n + f.bytes, 0);
+    },
+    async attachFiles(userId, exhbtId, fileIds) {
+      let n = 0;
+      for (const id of fileIds) {
+        const f = m.files.get(id) as (StoredFile & { exhbtId?: string | null }) | undefined;
+        if (f && f.userId === userId && !f.exhbtId) {
+          f.exhbtId = exhbtId;
+          n++;
+        }
+      }
+      return n;
+    },
+    async deleteFile(id, userId) {
+      const f = m.files.get(id);
+      if (!f || f.userId !== userId) return null;
+      m.files.delete(id);
+      return f;
     },
   };
 }
