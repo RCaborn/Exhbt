@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 3200;
+// E2E_PORT lets several suites run side by side (parallel agents, worktrees).
+const PORT = Number(process.env.E2E_PORT) || 3200;
 
 /**
  * End-to-end tests run against the dev server with no external services:

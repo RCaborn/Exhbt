@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { APEX, parseHost } from "@/lib/hosts";
+import { isPhase2Enabled as phase2 } from "@/lib/site";
 
 /**
  * 1. Hosts (docs/decisions/0001): alex.exhbt.co.uk is rewritten to the portfolio route group
@@ -8,9 +9,6 @@ import { APEX, parseHost } from "@/lib/hosts";
  * 2. Keeps the Supabase session cookie fresh on the routes that read it. A no-op when
  *    Supabase is not configured (local dev).
  */
-
-/** Phase 2 pages are on in development; in production only once EXHBT_PHASE2=1 (docs/phase-2.md section 10). */
-const phase2 = () => process.env.NODE_ENV !== "production" || process.env.EXHBT_PHASE2 === "1";
 
 /** Routes that read the session. Marketing pages stay static and fast. */
 const SESSION_PATHS = ["/roadmap", "/account", "/api/account", "/api/roadmap", "/auth", "/login"];
