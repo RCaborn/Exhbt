@@ -1,0 +1,72 @@
+# Runs the exhbt draft eval (evals/exhbt-draft/README.md) against the real model.
+# Manual only: Actions tab > "Exhbt draft eval" > Run workflow. Never on push or pull request,
+# because every run makes paid API calls.
+name: Exhbt draft eval
+
+on:
+  workflow_dispatch:
+    inputs:
+      judge:
+        description: "Also ask Haiku to score the rubric (AI-judged scores)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Check the API key secret is set
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::The repository secret ANTHROPIC_API_KEY is not set. Add it under Settings > Secrets and variables > Actions, then run this workflow again."
+            exit 1
+          fi
+
+      - name: Run the eval
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          JUDGE: ${{ inputs.judge }}
+        run: |
+          if [ "$JUDGE" = "true" ]; then
+            npm run eval:drafts -- --model-judge
+          else
+            npm run eval:drafts
+          fi
+
+      - name: Find the run folder
+        id: run
+        if: always()
+        run: |
+          dir=$(ls -1d evals/exhbt-draft/runs/*/ 2>/dev/null | sort | tail -n 1)
+          echo "dir=${dir%/}" >> "$GITHUB_OUTPUT"
+
+      - name: Add the summary to the job page
+        if: always() && steps.run.outputs.dir != ''
+        env:
+          RUN_DIR: ${{ steps.run.outputs.dir }}
+        run: |
+          if [ -f "$RUN_DIR/SUMMARY.md" ]; then
+            cat "$RUN_DIR/SUMMARY.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "The eval stopped before writing SUMMARY.md; see the run log and the uploaded files." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.run.outputs.dir != ''
+        with:
+          name: exhbt-draft-eval
+          path: ${{ steps.run.outputs.dir }}
+          retention-days: 30

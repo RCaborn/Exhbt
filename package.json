@@ -16,7 +16,9 @@
     "check": "npm run check:docs && npm run check:theme && npm run typecheck && npm run lint && npm run build && npm run test:e2e",
     "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs",
     "theme": "npm run astryx -- theme build themes/exhbt/exhbtTheme.ts",
-    "check:theme": "npm run astryx -- theme build themes/exhbt/exhbtTheme.ts --check"
+    "check:theme": "npm run astryx -- theme build themes/exhbt/exhbtTheme.ts --check",
+    "eval:drafts": "tsx --conditions=react-server scripts/eval-drafts.ts",
+    "eval:fixtures": "tsx evals/exhbt-draft/fixtures/build.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
@@ -61,6 +63,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.29",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "wrangler": "^4.158.0"
   },
