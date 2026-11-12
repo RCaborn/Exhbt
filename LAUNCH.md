@@ -40,7 +40,7 @@ You'll come back to Supabase in step 5 once you know the site's address.
    - **Without your own domain**, Resend only delivers to the address you signed up with. Use `EMAIL_FROM` = `Exhbt <onboarding@resend.dev>`. Friends can still use the site and see their roadmap on screen; only their email copy won't arrive.
    - **To email anyone**, verify **exhbt.co.uk**: in Resend use **Domains > Add domain** and add the DNS records it shows you at your domain registrar or in Cloudflare DNS. The sender, `EMAIL_FROM` = `Exhbt <hello@exhbt.co.uk>`, is already set in `wrangler.jsonc`, so don't add it in Cloudflare.
    - **Google Workspace is fine alongside this.** Resend sends from a subdomain it gives you (e.g. `send.exhbt.co.uk`), so your Workspace inboxes and MX records are untouched. Make sure `hello@` and `privacy@exhbt.co.uk` exist in Workspace (or as aliases), because the site tells people to email them.
-3. Optional, recommended once you have a domain: in Supabase, under **Authentication > Emails > SMTP settings**, enable custom SMTP with Resend's SMTP details. Without this, Supabase's built-in email only sends the `/login` emails to members of your Supabase team, so friends couldn't log in from another device. Roadmap emails don't depend on this.
+3. Sign-in emails from `/login` go through Resend too, sent by the app, so Supabase's own SMTP settings aren't needed. Their links work on any device.
 
 ## 4. Cloudflare (hosting) · ~10 min
 
