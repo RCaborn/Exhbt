@@ -102,7 +102,7 @@ Each service switches on when its environment variables are set; until then the 
 Supabase setup:
 1. Create a project in **London (eu-west-2)** and run every file in `supabase/migrations/` in date order.
 2. Under Auth, enable email sign-in, set the Site URL, and add `https://<domain>/auth/callback` and `https://<domain>/auth/confirm` as redirect URLs.
-3. Set Resend as Supabase's custom SMTP too (it sends the plain login emails from `/login`).
+3. Sign-in emails from `/login` are sent by the app through Resend, like the roadmap email (`sendMagicLink` in `lib/auth.ts`), so they don't depend on Supabase's SMTP or email templates. Their links go to `/auth/confirm` and work on any device.
 4. Verify your sending domain (exhbt.co.uk) in Resend.
 5. When the UK jobs dataset is available, load it with `node scripts/import-jobs.mjs path/to/jobs.csv` (needs the Supabase URL and service-role key in the environment; see the header of the script for the expected columns). Until then a small sample of roles in `lib/jobs/seed.ts` is used.
 

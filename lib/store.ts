@@ -63,7 +63,8 @@ export type EventName =
   | "project_swapped"
   | "plan_kept"
   | "cv_read_ai"
-  | "cv_read_failed";
+  | "cv_read_failed"
+  | "login_link_sent";
 
 export type WaitlistInterest = "plus" | "premium" | "university";
 

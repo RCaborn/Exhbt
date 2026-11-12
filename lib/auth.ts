@@ -44,7 +44,7 @@ export async function siteOrigin() {
  * Supabase sending a separate email. Production: Supabase admin generateLink, whose
  * hashed token is verified by /auth/confirm. Development: the /auth/dev stand-in.
  */
-export async function signInLinkFor(email: string, next: string): Promise<string> {
+export async function signInLinkFor(email: string, next: string, via = "roadmap_email"): Promise<string> {
   const origin = await siteOrigin();
   const n = encodeURIComponent(next);
   if (!isSupabaseConfigured()) return `${origin}/auth/dev?email=${encodeURIComponent(email)}&next=${n}`;
@@ -60,20 +60,27 @@ export async function signInLinkFor(email: string, next: string): Promise<string
   const props = res.data?.properties;
   if (res.error || !props?.hashed_token) throw new Error(res.error?.message ?? "Could not create sign-in link");
   const type = props.verification_type ?? "magiclink";
-  return `${origin}/auth/confirm?token_hash=${props.hashed_token}&type=${type}&next=${n}`;
+  return `${origin}/auth/confirm?token_hash=${props.hashed_token}&type=${type}&next=${n}&via=${encodeURIComponent(via)}`;
 }
 
 /**
- * Sends a magic link. Returns a dev-only link when Supabase is not configured,
- * so the whole flow can be exercised locally without an email provider.
+ * Sends the /login sign-in email. We build the link ourselves (signInLinkFor) and send it
+ * through Resend, rather than using Supabase's signInWithOtp: that one is a PKCE link, which
+ * only works in the browser that asked for it, and it depends on Supabase's Site URL and SMTP
+ * settings. Returns a dev-only link when Supabase is not configured, so the whole flow can be
+ * exercised locally without an email provider.
  */
 export async function sendMagicLink(email: string, next: string): Promise<{ devLink?: string }> {
-  const origin = await siteOrigin();
-  const callback = `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
   if (isSupabaseConfigured()) {
-    const sb = await supabaseServer();
-    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: callback } });
-    if (error) throw new Error(error.message);
+    const origin = await siteOrigin();
+    const { sendEmail } = await import("./email/send");
+    const { signInEmail } = await import("./email/templates/sign-in");
+    const content = signInEmail({
+      signInUrl: await signInLinkFor(email, next, "login"),
+      privacyUrl: `${origin}/legal/privacy`,
+      logoUrl: `${origin}/brand/exhbt-mark.png`,
+    });
+    await sendEmail({ to: email, ...content });
     return {};
   }
   return { devLink: `/auth/dev?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}` };
