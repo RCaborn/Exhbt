@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description: `Free includes the roadmap and a portfolio link. ${PLAN_NAMES.plus} and ${PLAN_NAMES.premium} raise the limits. Employers never pay.`,
+  description: `Free includes the roadmap and an exhbt to try. ${PLAN_NAMES.premium} puts your exhbts on your own link, and ${PLAN_NAMES.max} adds a link for every job. Employers never pay.`,
 };
 
-const { free, plus, premium } = ENTITLEMENTS;
+const { free, premium, max } = ENTITLEMENTS;
 
 export default function PricingPage() {
   return (
@@ -18,8 +18,8 @@ export default function PricingPage() {
       <div className="max-w-2xl">
         <h1 className="display">Pricing</h1>
         <p className="mt-4 text-lg text-graphite">
-          The roadmap is free, and {PLAN_NAMES.free} includes a portfolio link. {PLAN_NAMES.plus} and {PLAN_NAMES.premium}{" "}
-          raise the limits. Employers never pay.
+          The roadmap is free, and so is trying an exhbt. {PLAN_NAMES.premium} puts your exhbts on your own link, and{" "}
+          {PLAN_NAMES.max} adds a link for every job. Employers never pay.
         </p>
       </div>
 
@@ -35,13 +35,13 @@ export default function PricingPage() {
         </section>
 
         <Tier
-          id="plus"
-          name={PLAN_NAMES.plus}
+          id="premium"
+          name={PLAN_NAMES.premium}
           summary="Your best projects on one link you can send to any employer."
         />
         <Tier
-          id="premium"
-          name={PLAN_NAMES.premium}
+          id="max"
+          name={PLAN_NAMES.max}
           featured
           summary="A tailored link for every application, built from the job description."
         />
@@ -51,7 +51,7 @@ export default function PricingPage() {
         <div className="rounded-[20px] border border-line p-7">
           <h2 id="others" className="text-[1.375rem]">Universities</h2>
           <p className="mt-2 text-graphite">
-            License Exhbt for your students and they all get {PLAN_NAMES.premium}, with an admin view of take-up.
+            License Exhbt for your students and they all get {PLAN_NAMES.max}, with an admin view of take-up.
             Annual invoice.
           </p>
           <Link href="/universities" className="link mt-4 inline-block font-semibold">How licences work</Link>
@@ -71,14 +71,14 @@ export default function PricingPage() {
             <dd className="mt-1.5 text-graphite">
               Building a new roadmap, for example for a different job or after your situation changes. {PLAN_NAMES.free}{" "}
               includes {free.roadmapsPer30Days} {free.roadmapsPer30Days === 1 ? "refresh" : "refreshes"} in any 30 days.{" "}
-              {PLAN_NAMES.plus} includes {plus.roadmapsPer30Days} refreshes, and {PLAN_NAMES.premium} includes {premium.roadmapsPer30Days} refreshes.
+              {PLAN_NAMES.premium} includes {premium.roadmapsPer30Days} refreshes, and {PLAN_NAMES.max} includes {max.roadmapsPer30Days} refreshes.
             </dd>
           </div>
           <div>
-            <dt className="font-medium">What&rsquo;s the difference between {PLAN_NAMES.plus} and {PLAN_NAMES.premium}?</dt>
+            <dt className="font-medium">What&rsquo;s the difference between {PLAN_NAMES.premium} and {PLAN_NAMES.max}?</dt>
             <dd className="mt-1.5 text-graphite">
-              {PLAN_NAMES.plus} gives you one portfolio link with {plus.exhbts} exhbts. {PLAN_NAMES.premium} holds up to{" "}
-              {premium.exhbts}, and makes a separate link for each job you apply to, showing the {EXHBTS_PER_JOB_LINK} that
+              {PLAN_NAMES.premium} gives you your own portfolio link with up to {premium.exhbts} exhbts. {PLAN_NAMES.max} holds up to{" "}
+              {max.exhbts}, and makes a separate link for each job you apply to, showing the {EXHBTS_PER_JOB_LINK} that
               fit that job description best.
             </dd>
           </div>
@@ -91,7 +91,7 @@ export default function PricingPage() {
           </div>
           <div>
             <dt className="font-medium">My university has a licence. Do I need to pay?</dt>
-            <dd className="mt-1.5 text-graphite">No. Sign up with your university email address and you get {PLAN_NAMES.premium}.</dd>
+            <dd className="mt-1.5 text-graphite">No. Sign up with your university email address and you get {PLAN_NAMES.max}.</dd>
           </div>
         </dl>
       </section>
@@ -99,7 +99,7 @@ export default function PricingPage() {
   );
 }
 
-function Tier({ id, name, summary, featured }: { id: "plus" | "premium"; name: string; summary: string; featured?: boolean }) {
+function Tier({ id, name, summary, featured }: { id: "premium" | "max"; name: string; summary: string; featured?: boolean }) {
   return (
     <section
       id={id}

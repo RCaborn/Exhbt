@@ -66,7 +66,7 @@ export type EventName =
   | "cv_read_failed"
   | "login_link_sent";
 
-export type WaitlistInterest = "plus" | "premium" | "university";
+export type WaitlistInterest = "premium" | "max" | "university";
 
 /**
  * Everything the app persists goes through this interface. Two implementations:

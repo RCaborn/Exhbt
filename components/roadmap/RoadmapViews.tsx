@@ -314,12 +314,12 @@ function Next({ emailedTo, signedIn, id, unlocked }: { emailedTo: string | null;
       <div className="mt-10 rounded-[16px] bg-ink p-6 text-white sm:p-8">
         <h2 className="">When a project is done, make it count</h2>
         <p className="mt-3 max-w-[34rem] text-[#c9cbcf]">
-          {PLAN_NAMES.plus} hosts more exhbts on your own link, and helps draft them. {PLAN_NAMES.premium} adds a
+          {PLAN_NAMES.premium} drafts your exhbts from your files and puts them on your own link. {PLAN_NAMES.max} adds a
           custom link for each job you apply to, with your best-fit projects, and an originality check when you
           publish. Both open soon.
         </p>
         <div className="mt-6">
-          <WaitlistForm source="roadmap-next" interest="premium" defaultEmail={emailedTo ?? ""} tone="dark" />
+          <WaitlistForm source="roadmap-next" interest="max" defaultEmail={emailedTo ?? ""} tone="dark" />
         </div>
       </div>
 

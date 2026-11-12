@@ -149,7 +149,7 @@ export function RoadmapWizard({ defaultRole }: Props) {
         <p role="alert" className="mt-6 rounded-[var(--radius)] border border-error/40 bg-surface px-4 py-3 text-error">
           {state.error}{" "}
           {state.error.includes("waitlist") && (
-            <Link href="/pricing#premium" className="link font-semibold">Go to pricing</Link>
+            <Link href="/pricing#max" className="link font-semibold">Go to pricing</Link>
           )}
         </p>
       )}

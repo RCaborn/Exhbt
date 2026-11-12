@@ -185,12 +185,12 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
 
   test("pricing shows Free, Plus and Pro, each paid tier with its own waitlist", async ({ page }) => {
     await page.goto("/pricing", { waitUntil: "networkidle" });
-    for (const tier of [PLAN_NAMES.free, PLAN_NAMES.plus, PLAN_NAMES.premium]) {
+    for (const tier of [PLAN_NAMES.free, PLAN_NAMES.premium, PLAN_NAMES.max]) {
       await expect(page.getByRole("heading", { level: 2, name: tier, exact: true })).toBeVisible();
     }
-    await page.locator("#waitlist-pricing-plus").fill(`wait+${Date.now()}@example.com`);
-    await page.locator("section#plus").getByRole("button", { name: "Join the waitlist" }).click();
-    await expect(page.locator("section#plus").getByText("You’re on the list.")).toBeVisible();
+    await page.locator("#waitlist-pricing-premium").fill(`wait+${Date.now()}@example.com`);
+    await page.locator("section#premium").getByRole("button", { name: "Join the waitlist" }).click();
+    await expect(page.locator("section#premium").getByText("You’re on the list.")).toBeVisible();
   });
 
   test("roadmap appears straight away, clicks through to the gate, and a copy is emailed", async ({ page, browser }) => {

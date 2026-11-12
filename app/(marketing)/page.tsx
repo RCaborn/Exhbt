@@ -35,14 +35,14 @@ export default function Home() {
         id="draft"
         ground="bg-mist"
         title="Turn a finished project into an exhbt"
-        body={`Add the report, notes or results. We draft a short exhbt with the methodology as a flow and a chart of the key result, from what you gave us and nothing else. You confirm it's yours. On ${PLAN_NAMES.premium}, publishing also runs an originality check.`}
+        body={`Add the report, notes or results. We draft a short exhbt with the methodology as a flow and a chart of the key result, from what you gave us and nothing else. You confirm it's yours. On ${PLAN_NAMES.max}, publishing also runs an originality check.`}
         artifact={<EditorExcerpt />}
       />
       <Step
         id="send"
         ground="bg-surface"
         title="Send each employer their own link"
-        body={`Your exhbts live on your own link. On ${PLAN_NAMES.premium}, upload a job description and get a custom link with the ${EXHBTS_PER_JOB_LINK} that fit it best.`}
+        body={`On ${PLAN_NAMES.premium}, your exhbts live on your own link. On ${PLAN_NAMES.max}, upload a job description and get a custom link with the ${EXHBTS_PER_JOB_LINK} that fit it best.`}
         artifact={<LinkExcerpt />}
       />
 
@@ -72,23 +72,23 @@ export default function Home() {
         <div className="mx-auto max-w-[72rem] px-4 sm:px-8 py-20 lg:py-28">
           <h2 id="pricing" className="display-2">Free to start</h2>
           <p className="mt-4 max-w-2xl text-lg text-graphite">
-            Your roadmap is free, and {PLAN_NAMES.free} includes a portfolio link. {PLAN_NAMES.plus} and {PLAN_NAMES.premium} raise the limits.{" "}
+            Your roadmap is free, and so is trying an exhbt. {PLAN_NAMES.premium} puts your exhbts on your own link, and {PLAN_NAMES.max} adds a link for every job.{" "}
             <Link href="/pricing" className="link text-ink">Compare plans</Link>
           </p>
           <div className="mt-12 grid gap-4 md:grid-cols-3">
             <Plan name={PLAN_NAMES.free} price={PRICES.free} features={planFeatures("free")} href="/roadmap/new" cta="Build my roadmap" />
-            <Plan name={PLAN_NAMES.plus} badge="Coming soon" features={planFeatures("plus")} href="/pricing#plus" cta="Join the waitlist" />
+            <Plan name={PLAN_NAMES.premium} badge="Coming soon" features={planFeatures("premium")} href="/pricing#premium" cta="Join the waitlist" />
             <Plan
-              name={PLAN_NAMES.premium}
+              name={PLAN_NAMES.max}
               badge="Coming soon"
-              features={planFeatures("premium")}
-              href="/pricing#premium"
+              features={planFeatures("max")}
+              href="/pricing#max"
               cta="Join the waitlist"
               featured
             />
           </div>
           <p className="mt-8 text-graphite">
-            Universities can give every student {PLAN_NAMES.premium}.{" "}
+            Universities can give every student {PLAN_NAMES.max}.{" "}
             <Link href="/universities" className="link text-ink">How licences work</Link>
           </p>
         </div>

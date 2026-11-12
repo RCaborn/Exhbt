@@ -2,24 +2,33 @@ import { portfolioHost } from "@/lib/hosts";
 
 /**
  * What each plan includes. This file is the only copy of the figures.
- * Public names are PLAN_NAMES. The key `premium` is the stored value (database,
- * waitlist interest, pricing anchor); the name on the site is Pro.
- * Why these figures: docs/decisions/0002-plan-tiers.md.
+ * Free, Premium (the first paid tier) and Max; universities get Max.
+ * Why these figures: docs/decisions/0006-plan-names-premium-max.md (and 0002 before it).
  */
 
-export type Plan = "free" | "plus" | "premium" | "institutional";
+export type Plan = "free" | "premium" | "max" | "institutional";
 
 type Entitlements = {
   /** Roadmaps a person can build per rolling 30 days. */
   roadmapsPer30Days: number;
-  /** How many exhbts can be hosted. */
+  /** How many exhbts a person can have. On Free they can be built and previewed, not published. */
   exhbts: number;
-  /** A personal portfolio link: {username}.exhbt.co.uk */
-  personalLink: boolean;
-  /** Custom links per job: upload the description, we pick the best-fit exhbts. */
+  /** A public portfolio at {username}.exhbt.co.uk. */
+  publicPortfolio: boolean;
+  /** Custom links per job: paste or link the description, we pick the best-fit exhbts. */
   jobLinks: boolean;
-  /** Help drafting an exhbt from what the person supplied. */
+  /** Per-job links live at once. Placeholder (12 Nov 2026), to be confirmed. */
+  jobLinksActive: number;
+  /** The AI drafts an exhbt from what the person uploaded. */
   drafting: boolean;
+  /** AI drafts per rolling 30 days. Placeholder (12 Nov 2026), to be confirmed. */
+  draftsPer30Days: number;
+  /** "Rewrite this block" turns per exhbt. Placeholder (12 Nov 2026), to be confirmed. */
+  blockRegenerations: number;
+  /** Largest file that can be uploaded, in MB. Placeholder (12 Nov 2026), to be confirmed. */
+  uploadMbPerFile: number;
+  /** All stored files together, in MB. Placeholder (12 Nov 2026), to be confirmed. */
+  storageMbTotal: number;
   /** A paid originality check when an exhbt is published. */
   originalityCheck: boolean;
   /**
@@ -29,18 +38,59 @@ type Entitlements = {
   projectSwapsPerRoadmap: number;
 };
 
-export const ENTITLEMENTS: Record<Plan, Entitlements> = {
-  free: { roadmapsPer30Days: 1, exhbts: 1, personalLink: true, jobLinks: false, drafting: false, originalityCheck: false, projectSwapsPerRoadmap: 3 },
-  plus: { roadmapsPer30Days: 8, exhbts: 4, personalLink: true, jobLinks: false, drafting: true, originalityCheck: false, projectSwapsPerRoadmap: 10 },
-  premium: { roadmapsPer30Days: 30, exhbts: 10, personalLink: true, jobLinks: true, drafting: true, originalityCheck: true, projectSwapsPerRoadmap: 25 },
-  institutional: { roadmapsPer30Days: 30, exhbts: 10, personalLink: true, jobLinks: true, drafting: true, originalityCheck: true, projectSwapsPerRoadmap: 25 },
+const MAX: Entitlements = {
+  roadmapsPer30Days: 30,
+  exhbts: 10,
+  publicPortfolio: true,
+  jobLinks: true,
+  jobLinksActive: 20,
+  drafting: true,
+  draftsPer30Days: 20,
+  blockRegenerations: 10,
+  uploadMbPerFile: 20,
+  storageMbTotal: 500,
+  originalityCheck: true,
+  projectSwapsPerRoadmap: 25,
 };
 
-/** Display names. The site reads these. The stored key for Pro stays `premium`. */
+export const ENTITLEMENTS: Record<Plan, Entitlements> = {
+  free: {
+    roadmapsPer30Days: 1,
+    exhbts: 1,
+    publicPortfolio: false,
+    jobLinks: false,
+    jobLinksActive: 0,
+    drafting: true,
+    draftsPer30Days: 1,
+    blockRegenerations: 3,
+    uploadMbPerFile: 10,
+    storageMbTotal: 25,
+    originalityCheck: false,
+    projectSwapsPerRoadmap: 3,
+  },
+  premium: {
+    roadmapsPer30Days: 8,
+    exhbts: 4,
+    publicPortfolio: true,
+    jobLinks: false,
+    jobLinksActive: 0,
+    drafting: true,
+    draftsPer30Days: 8,
+    blockRegenerations: 10,
+    uploadMbPerFile: 20,
+    storageMbTotal: 200,
+    originalityCheck: false,
+    projectSwapsPerRoadmap: 10,
+  },
+  max: MAX,
+  institutional: MAX,
+};
+
+/** Display names. The site reads these. */
 export const PLAN_NAMES: Record<Plan, string> = {
   free: "Free",
-  plus: "Plus",
-  premium: "Pro",
+  premium: "Premium",
+  max: "Max",
   institutional: "Universities",
 };
 
@@ -50,7 +100,7 @@ export const EXHBTS_PER_JOB_LINK = 4;
 /** Shown when a free account has used its roadmaps for the month (builder or project-ideas gate). */
 export function freeRoadmapLimitMessage(): string {
   const n = ENTITLEMENTS.free.roadmapsPer30Days;
-  return `You've used this month's ${n} free ${n === 1 ? "roadmap" : "roadmaps"}. ${PLAN_NAMES.plus} and ${PLAN_NAMES.premium} include more: join the waitlist on the pricing page.`;
+  return `You've used this month's ${n} free ${n === 1 ? "roadmap" : "roadmaps"}. ${PLAN_NAMES.premium} and ${PLAN_NAMES.max} include more: join the waitlist on the pricing page.`;
 }
 
 /** Paid tiers have no public price yet: the early release collects a waitlist. */
@@ -67,27 +117,28 @@ function exhbtCount(n: number, hosted: boolean): string {
 }
 
 /** What each tier includes, as short checklist lines (pricing page and home summary). */
-export function planFeatures(plan: "free" | "plus" | "premium"): string[] {
+export function planFeatures(plan: "free" | "premium" | "max"): string[] {
   const e = ENTITLEMENTS[plan];
   const link = portfolioHost("you");
   switch (plan) {
-    case "free": {
-      const lines = ["Skills roadmap for the job you want", refreshes(e.roadmapsPer30Days)];
-      if (e.personalLink) lines.push(`${exhbtCount(e.exhbts, false)} on ${link}`);
-      lines.push("Emailed to you to keep");
-      return lines;
-    }
-    case "plus":
+    case "free":
       return [
-        e.personalLink ? `${exhbtCount(e.exhbts, false)} hosted on ${link}` : `${exhbtCount(e.exhbts, false)} hosted`,
-        ...(e.drafting ? ["Drafting help for each exhbt"] : []),
+        "Skills roadmap for the job you want",
         refreshes(e.roadmapsPer30Days),
+        `Build and preview ${exhbtCount(e.exhbts, false)}`,
+        "Emailed to you to keep",
       ];
     case "premium":
       return [
-        e.personalLink ? `${exhbtCount(e.exhbts, true)} on ${link}` : exhbtCount(e.exhbts, true),
+        `${exhbtCount(e.exhbts, true)} on ${link}`,
+        ...(e.drafting ? ["Drafted for you from your files, then yours to edit"] : []),
+        refreshes(e.roadmapsPer30Days),
+      ];
+    case "max":
+      return [
+        `${exhbtCount(e.exhbts, true)} on ${link}`,
         ...(e.jobLinks ? [`A custom link for every job: we pick your ${EXHBTS_PER_JOB_LINK} best fits`] : []),
-        ...(e.drafting ? ["Drafting help for each exhbt"] : []),
+        ...(e.drafting ? ["Drafted for you from your files, then yours to edit"] : []),
         ...(e.originalityCheck ? ["An originality check when you publish"] : []),
         refreshes(e.roadmapsPer30Days),
       ];
