@@ -1,0 +1,21 @@
+{
+  "fixture": "02-ds-notebook",
+  "shape": "Data-science project exported from a Jupyter notebook (markdown with code cells, printed outputs and a results table).",
+  "tests": "Reads results out of code output rather than code, and offers a before/after chart only from values the material gives (baseline vs LightGBM).",
+  "files": ["02-ds-notebook.md"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":true,"chart":true,"noNumbers":false},
+  "keyFacts": [
+    {"id":"problem","fact":"Predict which grocery orders will be delivered late, at the time of ordering.","match":["late deliver","late order","delivered late","lateness","arrive late"]},
+    {"id":"data","fact":"48,219 orders (47,807 after cleaning), 11.6% late.","match":["48,219","47,807","11.6%"]},
+    {"id":"models","fact":"Logistic regression baseline against LightGBM gradient boosting.","match":["LightGBM","gradient boost"]},
+    {"id":"recall","fact":"Recall on late orders rose from 0.62 to 0.79.","match":[["0.62","0.79"],"0.79"]},
+    {"id":"auc","fact":"AUC rose from 0.71 to 0.84.","match":[["0.71","0.84"],"0.84"]},
+    {"id":"driver","fact":"Drops per van run is the biggest driver; recommended capping evening runs at 18 drops.","match":["drops","van run"]}
+  ],
+  "forbidden": [
+    {"id":"deployed","why":"The model has not been tested live.","match":["deployed","in production","rolled out"]}
+  ],
+  "sourceNumbers": ["1","2","48219","23","3","0","0.884","0.116","11.6%","48,219","2024","412","47,807","47807","14","0.2","42","0.01","4","1000","0.71","0.62","600","0.03","31","0.84","0.79","0.21","0.34","5","36","40","18","27%","8%","10","17","00","6","7"]
+}
