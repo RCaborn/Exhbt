@@ -73,3 +73,7 @@ next-env.d.ts
 .next-e2e/
 test-results/
 playwright-report/
+
+# Extra Next.js build folders (NEXT_DIST_DIR) and agent worktrees
+/.next-*/
+/.claude/worktrees/
