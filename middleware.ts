@@ -56,5 +56,5 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   // Every page and route except static files, so hosts can be routed.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png|brand/|robots.txt).*)"],
+  matcher: ["/((?!_next/|favicon.ico|icon.svg|apple-icon.png|brand/|robots.txt).*)"],
 };
