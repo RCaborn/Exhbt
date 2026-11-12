@@ -97,6 +97,37 @@ Then tell Claude the address. It can run a fuller automated check against the li
 
 ---
 
+## Stripe (payments, Phase 2) · ~20 min
+
+Payments stay off until Phase 2 is switched on. Do all of this in Stripe's **test mode** first (the toggle at the top of the dashboard), try it, then repeat in live mode with the live keys and ids.
+
+1. Go to **stripe.com** and create an account for the business. Set the account's currency to **GBP**.
+2. **Product catalogue > Add product**, twice:
+   - **Premium**: one recurring price, **monthly**, in GBP.
+   - **Max**: one recurring price, **monthly**, in GBP.
+   The amounts must match `PRICES` in `lib/entitlements.ts` (that is what the site shows; Stripe is what actually charges).
+3. Open each price and copy its id (starts `price_`). In `wrangler.jsonc` under `vars`, replace the placeholders:
+   - `STRIPE_PRICE_PREMIUM` = the Premium price id
+   - `STRIPE_PRICE_MAX` = the Max price id
+   Commit that change on a branch. These ids aren't secret.
+4. **Developers > API keys**: copy the **Secret key** (starts `sk_test_` in test mode).
+5. **Developers > Webhooks > Add endpoint**:
+   - URL: `https://app.exhbt.co.uk/api/stripe/webhook`
+   - Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+   - After saving, reveal the **Signing secret** (starts `whsec_`).
+6. Add both as Worker secrets, either in Cloudflare (Worker > **Settings > Variables and Secrets**, type **Secret**) or from a terminal:
+   ```
+   npx wrangler secret put STRIPE_SECRET_KEY
+   npx wrangler secret put STRIPE_WEBHOOK_SECRET
+   ```
+   Never put either in `wrangler.jsonc` or in chat.
+7. **Settings > Billing > Customer portal**: turn it on, and allow customers to update payment methods, see invoices, cancel, and **switch plans** between Premium and Max (add both products). The "Manage billing" and "Switch to" buttons on `/account/billing` open this page.
+8. Optional, for a new-joiner discount later: **Product catalogue > Coupons**, then add a **promotion code**. Checkout already shows a box for codes.
+9. Open `/api/health`. Under `phase2`, every setting should be `true` and `stripe.ok` should be `true`. (This section doesn't change the overall `ok` until payments are meant to be live.)
+10. Try it in test mode: sign in, open `/account/billing`, choose Premium and pay with card `4242 4242 4242 4242`, any future date and any CVC. Back on the billing page the plan should read Premium within a minute. **Manage billing** should open Stripe's page, where you can cancel; the plan should go back to Free when the subscription ends.
+
+---
+
 ## Going public later
 
 Do these first:

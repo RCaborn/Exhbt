@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey } from "@/lib/ai/model";
 import { isSupabaseConfigured, supabaseAdmin } from "@/lib/store";
+import { isStripeConfigured, priceForPlan, stripe, PAID_PLANS } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,26 @@ async function checkAI(): Promise<Check> {
   }
 }
 
+/** Phase 2 settings (docs/phase-2.md section 2): Stripe keys and the two price ids. Presence only. */
+const PHASE2_SETTINGS = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_PREMIUM", "STRIPE_PRICE_MAX"] as const;
+
+async function checkStripe(): Promise<Check> {
+  if (!isStripeConfigured()) return { ok: false, detail: "Stripe keys not set" };
+  const missing = PAID_PLANS.filter((p) => !priceForPlan(p));
+  if (missing.length) return { ok: false, detail: `No price id for ${missing.join(", ")}` };
+  try {
+    // Read-only: confirms the key works and both price ids exist in the same Stripe mode.
+    const client = stripe();
+    await Promise.all(PAID_PLANS.map((p) => client.prices.retrieve(priceForPlan(p)!)));
+    return { ok: true };
+  } catch (e) {
+    const status = (e as { statusCode?: number }).statusCode;
+    if (status === 401) return { ok: false, detail: "The Stripe key was rejected" };
+    if (status === 404) return { ok: false, detail: "A price id was not found (check test mode against live mode)" };
+    return { ok: false, detail: status ? `Stripe API error ${status}` : "Could not reach Stripe" };
+  }
+}
+
 export async function GET() {
   const settings: Record<string, boolean> = Object.fromEntries(REQUIRED.map((k) => [k, Boolean(process.env[k])]));
   // Read under either name (lib/ai/model.ts).
@@ -73,10 +94,16 @@ export async function GET() {
   const misnamed = Object.entries(MISNAMED)
     .filter(([wrong]) => process.env[wrong])
     .map(([wrong, right]) => `Rename ${wrong} to ${right}`);
-  const [database, ai] = await Promise.all([checkDatabase(), checkAI()]);
+  const [database, ai, stripeCheck] = await Promise.all([checkDatabase(), checkAI(), checkStripe()]);
   const ok = Object.values(settings).every(Boolean) && database.ok && ai.ok;
+  // Phase 2 is reported but does NOT affect `ok` (or the 503) until payments are meant to be live:
+  // when they are, fold phase2 into `ok` here.
+  const phase2 = {
+    settings: Object.fromEntries(PHASE2_SETTINGS.map((k) => [k, Boolean(process.env[k])])),
+    stripe: stripeCheck,
+  };
   return NextResponse.json(
-    { ok, settings, misnamed, database, ai },
+    { ok, settings, misnamed, database, ai, phase2 },
     { status: ok ? 200 : 503, headers: { "Cache-Control": "no-store" } },
   );
 }

@@ -11,6 +11,10 @@
   // Not secret, so set here where a deploy can't remove them. Keys stay as Worker secrets.
   "vars": {
     "NEXT_PUBLIC_SUPABASE_URL": "https://jbrcseklzigdcrgqbclx.supabase.co",
-    "EMAIL_FROM": "Exhbt <hello@exhbt.co.uk>"
+    "EMAIL_FROM": "Exhbt <hello@exhbt.co.uk>",
+    // Stripe price ids for Premium and Max (not secret). Placeholders: replace with the real
+    // price_... ids from the Stripe dashboard (LAUNCH.md, Stripe). Keys stay Worker secrets.
+    "STRIPE_PRICE_PREMIUM": "price_REPLACE_WITH_PREMIUM",
+    "STRIPE_PRICE_MAX": "price_REPLACE_WITH_MAX"
   }
 }

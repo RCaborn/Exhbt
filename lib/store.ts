@@ -113,7 +113,23 @@ export type EventName =
   | "plan_kept"
   | "cv_read_ai"
   | "cv_read_failed"
-  | "login_link_sent";
+  | "login_link_sent"
+  | "subscription_changed";
+
+/** A Stripe subscription as we keep it (the `subscriptions` table). No amounts or card details. */
+export type SubscriptionRecord = {
+  userId: string;
+  plan: Plan;
+  /** Stripe's status: active, trialing, past_due, canceled, unpaid, incomplete, ... */
+  status: string;
+  customerId: string | null;
+  subscriptionId: string;
+  /** End of the current period (ISO), when it renews or, if cancelled, ends. */
+  renewsAt: string | null;
+};
+
+/** Statuses that keep a paid plan. past_due keeps it while Stripe retries the card. */
+export const LIVE_SUBSCRIPTION_STATUSES = ["active", "trialing", "past_due"];
 
 export type WaitlistInterest = "premium" | "max" | "university";
 
@@ -186,6 +202,12 @@ export interface Store {
   reorderExhbts(userId: string, ids: string[]): Promise<void>;
   deleteExhbt(id: string, userId: string): Promise<boolean>;
   getFile(id: string): Promise<StoredFile | null>;
+
+  /* billing */
+  /** Creates or updates the row for this Stripe subscription (keyed on its id). Safe to repeat. */
+  upsertSubscription(sub: SubscriptionRecord): Promise<void>;
+  /** The person's current subscription (a live one first, else the latest), or null. */
+  getSubscription(userId: string): Promise<SubscriptionRecord | null>;
 }
 
 export const isSupabaseConfigured = () =>
@@ -638,6 +660,49 @@ function supabaseStore(): Store {
       ) as { id: string; user_id: string; bucket: StoredFile["bucket"]; path: string; mime: string; bytes: number; kind: StoredFile["kind"] } | null;
       return r ? { id: r.id, userId: r.user_id, bucket: r.bucket, path: r.path, mime: r.mime, bytes: r.bytes, kind: r.kind } : null;
     },
+
+    /* billing */
+    async upsertSubscription(sub) {
+      check(
+        await db.from("subscriptions").upsert(
+          {
+            user_id: sub.userId,
+            plan: sub.plan,
+            status: sub.status,
+            provider_customer_id: sub.customerId,
+            provider_subscription_id: sub.subscriptionId,
+            renews_at: sub.renewsAt,
+          },
+          { onConflict: "provider_subscription_id" },
+        ),
+      );
+    },
+    async getSubscription(userId) {
+      const rows = check(
+        await db
+          .from("subscriptions")
+          .select("user_id, plan, status, provider_customer_id, provider_subscription_id, renews_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false }),
+      ) as {
+        user_id: string;
+        plan: Plan;
+        status: string;
+        provider_customer_id: string | null;
+        provider_subscription_id: string | null;
+        renews_at: string | null;
+      }[];
+      const r = rows.find((x) => LIVE_SUBSCRIPTION_STATUSES.includes(x.status)) ?? rows[0];
+      if (!r?.provider_subscription_id) return null;
+      return {
+        userId: r.user_id,
+        plan: r.plan,
+        status: r.status,
+        customerId: r.provider_customer_id,
+        subscriptionId: r.provider_subscription_id,
+        renewsAt: r.renews_at,
+      };
+    },
   };
 }
 
@@ -715,6 +780,8 @@ type Mem = {
   files: Map<string, StoredFile>;
   /** Development and tests only: a plan per user, set from /dev/plan. */
   plans: Map<string, Plan>;
+  /** Stripe subscriptions by subscription id (billing). */
+  subscriptions: Map<string, SubscriptionRecord>;
 };
 const newMem = (): Mem => ({
   roadmaps: new Map(),
@@ -729,6 +796,7 @@ const newMem = (): Mem => ({
   exhbts: new Map(),
   files: new Map(),
   plans: new Map(),
+  subscriptions: new Map(),
 });
 const g = globalThis as unknown as { __exhbtMem?: Mem };
 
@@ -743,6 +811,13 @@ function memoryStore(): Store {
   m.exhbts ??= new Map();
   m.files ??= new Map();
   m.plans ??= new Map();
+  m.subscriptions ??= new Map();
+  const liveSubscription = (userId: string): SubscriptionRecord | null => {
+    // Newest last in insertion order, so look from the end.
+    const mine = [...m.subscriptions.values()].filter((x) => x.userId === userId).reverse();
+    const s = mine.find((x) => LIVE_SUBSCRIPTION_STATUSES.includes(x.status)) ?? mine[0];
+    return s ? { ...s } : null;
+  };
   const profile = (userId: string) => m.profiles.get(userId) ?? emptyProfile(userId);
   const own = (id: string, userId: string) => {
     const e = m.exhbts.get(id);
@@ -874,7 +949,11 @@ function memoryStore(): Store {
     },
 
     async planFor(userId) {
-      return m.plans.get(userId) ?? "free";
+      // The development override wins, then a live subscription, then free.
+      const dev = m.plans.get(userId);
+      if (dev) return dev;
+      const sub = liveSubscription(userId);
+      return sub && LIVE_SUBSCRIPTION_STATUSES.includes(sub.status) ? sub.plan : "free";
     },
     async getPortfolioProfile(userId) {
       return { ...profile(userId) };
@@ -959,6 +1038,14 @@ function memoryStore(): Store {
     },
     async getFile(id) {
       return m.files.get(id) ?? null;
+    },
+
+    /* billing */
+    async upsertSubscription(sub) {
+      m.subscriptions.set(sub.subscriptionId, { ...sub });
+    },
+    async getSubscription(userId) {
+      return liveSubscription(userId);
     },
   };
 }

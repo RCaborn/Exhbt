@@ -32,6 +32,7 @@ export default defineConfig({
     // A fresh server per run: the in-memory store (and its rate limits) starts empty.
     reuseExistingServer: false,
     // The suite builds many roadmaps from one address, more than the production per-connection cap.
-    env: { NEXT_TELEMETRY_DISABLED: "1", NEXT_DIST_DIR: ".next-e2e", EXHBT_PER_IP_PER_DAY: "100", EXHBT_LOGINS_PER_HOUR: "100" },
+    env: { NEXT_TELEMETRY_DISABLED: "1", NEXT_DIST_DIR: ".next-e2e", EXHBT_PER_IP_PER_DAY: "100", EXHBT_LOGINS_PER_HOUR: "100",
+      STRIPE_SECRET_KEY: "sk_test_dummy", STRIPE_WEBHOOK_SECRET: "whsec_test", STRIPE_PRICE_PREMIUM: "price_test_premium", STRIPE_PRICE_MAX: "price_test_max" },
   },
 });
