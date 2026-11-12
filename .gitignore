@@ -73,3 +73,7 @@ next-env.d.ts
 .next-e2e/
 test-results/
 playwright-report/
+
+# exhbt draft eval runs (evals/exhbt-draft/README.md)
+/evals/exhbt-draft/runs/*
+!/evals/exhbt-draft/runs/.gitkeep
