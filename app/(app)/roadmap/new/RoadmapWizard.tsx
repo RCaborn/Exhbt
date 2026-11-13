@@ -7,7 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, FileText, Upload } from "lucide-react";
 import { startRoadmap, type FormState } from "../actions";
 import { CV_ACCEPT, CvError, CvNeedsServer, extractCvTextInBrowser, readCvOnServer } from "@/lib/cv-client";
-import { SITUATIONS, type Situation } from "@/lib/ai/schemas";
+import { SITUATIONS, type RoadmapInput, type Situation } from "@/lib/ai/schemas";
 import { Button } from "@/components/ui/Button";
 
 /**
@@ -23,14 +23,18 @@ const STEPS = [
 ] as const;
 const LAST = STEPS.length;
 
-type Props = { defaultRole: string };
+type Props = {
+  defaultRole: string;
+  /** The details of an earlier roadmap, to start from when someone builds one for a different job. */
+  initial?: Pick<RoadmapInput, "situation" | "situationDetail" | "education" | "skills" | "cvText">;
+};
 
 /**
  * The click-through roadmap builder. All steps stay mounted (inactive ones are hidden)
  * so answers survive Back/Next; the step lives in ?step= so the browser Back button
  * works. One server action submits everything at the end.
  */
-export function RoadmapWizard({ defaultRole }: Props) {
+export function RoadmapWizard({ defaultRole, initial }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -40,11 +44,11 @@ export function RoadmapWizard({ defaultRole }: Props) {
   const step = urlStep >= 1 && urlStep <= LAST ? urlStep : defaultRole ? 2 : 1;
 
   const [role, setRole] = useState(defaultRole);
-  const [situation, setSituation] = useState<Situation | "">("");
-  const [education, setEducation] = useState("");
-  const [skills, setSkills] = useState("");
-  const [cvMode, setCvMode] = useState<"upload" | "paste">("upload");
-  const [cvText, setCvText] = useState("");
+  const [situation, setSituation] = useState<Situation | "">(initial?.situation ?? "");
+  const [education, setEducation] = useState(initial?.education ?? "");
+  const [skills, setSkills] = useState(initial?.skills ?? "");
+  const [cvMode, setCvMode] = useState<"upload" | "paste">(initial?.cvText ? "paste" : "upload");
+  const [cvText, setCvText] = useState(initial?.cvText ?? "");
   const [cvFileName, setCvFileName] = useState<string | null>(null);
   const [reading, setReading] = useState<false | "device" | "server">(false);
   // A scan or photo the browser couldn't read: held until the visitor chooses to send it or paste.
@@ -331,6 +335,7 @@ export function RoadmapWizard({ defaultRole }: Props) {
                   <input
                     id="situationDetail"
                     name="situationDetail"
+                    defaultValue={initial?.situationDetail ?? ""}
                     maxLength={200}
                     placeholder="e.g. Second year, Economics at Leeds"
                     className="field"

@@ -1,4 +1,4 @@
-import { ENTITLEMENTS, PLAN_NAMES, type Plan } from "./entitlements";
+import { ENTITLEMENTS, PLAN_NAMES, roadmapLimitMessage, type Plan } from "./entitlements";
 import type { ExhbtRecord } from "./store";
 
 /**
@@ -64,4 +64,16 @@ export function visibleOnPortfolio(plan: Plan, exhbts: ExhbtRecord[]): ExhbtReco
     .filter((x) => x.status === "published" && x.published && x.slug)
     .sort((a, b) => a.position - b.position)
     .slice(0, e.exhbts);
+}
+
+/** Can they start another roadmap? `recent` is how many they made in the last 30 days. */
+export function canStartRoadmap(plan: Plan, recent: number): Verdict {
+  if (recent < ENTITLEMENTS[plan].roadmapsPer30Days) return { ok: true };
+  return { ok: false, reason: roadmapLimitMessage(plan), upgradeTo: nextPlan(plan) };
+}
+
+/** Saved ideas (a list kept across roadmaps) come with the paid plans. */
+export function canSaveIdeas(plan: Plan): Verdict {
+  if (ENTITLEMENTS[plan].savedIdeas) return { ok: true };
+  return { ok: false, reason: `Saving ideas to a list you keep comes with ${PLAN_NAMES.premium}.`, upgradeTo: "premium" };
 }

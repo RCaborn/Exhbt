@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { RefreshCw } from "lucide-react";
 import { keepPlan, swapIdea, type SwapState } from "@/app/(app)/roadmap/[id]/actions";
 import { BuildThis, type BuildState } from "@/components/roadmap/BuildThis";
+import { SaveIdea, type SaveState } from "@/components/roadmap/SaveIdea";
 import { IdeaCard } from "@/components/roadmap/IdeaCard";
 import type { ProjectIdea } from "@/lib/store";
 import { Button } from "@/components/ui/Button";
@@ -14,7 +15,7 @@ import { Button } from "@/components/ui/Button";
  * new ideas, a Swap button on each idea, and "Keep this plan". One form, so a Swap sends the
  * note with it.
  */
-export function PlanEditor({ id, ideas, swapsLeft, build }: { id: string; ideas: ProjectIdea[]; swapsLeft: number; build?: BuildState }) {
+export function PlanEditor({ id, ideas, swapsLeft, build, save }: { id: string; ideas: ProjectIdea[]; swapsLeft: number; build?: BuildState; save?: SaveState }) {
   const [state, action] = useActionState<SwapState, FormData>(swapIdea.bind(null, id), undefined);
   const [note, setNote] = useState("");
   // A finished swap clears the note for the next one.
@@ -45,7 +46,14 @@ export function PlanEditor({ id, ideas, swapsLeft, build }: { id: string; ideas:
             <IdeaCard
               idea={p}
               control={<SwapButton ideaId={p.id} title={p.title} />}
-              footer={build && <BuildThis build={build} roadmapId={id} ideaId={p.id} title={p.title} inForm />}
+              footer={
+                (build || save) && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    {build && <BuildThis build={build} roadmapId={id} ideaId={p.id} title={p.title} inForm />}
+                    {save && <SaveIdea save={save} roadmapId={id} ideaId={p.id} title={p.title} inForm />}
+                  </div>
+                )
+              }
             />
           </li>
         ))}

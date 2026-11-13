@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createFromIdea } from "@/app/(app)/exhbts/[id]/actions";
+import { createFromIdea, createFromSavedIdea } from "@/app/(app)/exhbts/[id]/actions";
 import { Button } from "@/components/ui/Button";
 
 /** What the Projects view knows about building an idea as an exhbt (null when Phase 2 is off). */
@@ -14,9 +14,25 @@ export type BuildState =
  * it gives the reason and a way to upgrade. `inForm` is for ideas drawn inside another form
  * (the plan editor), where a nested form isn't allowed.
  */
-export function BuildThis({ build, roadmapId, ideaId, title, inForm = false }: { build: BuildState; roadmapId: string; ideaId: string; title: string; inForm?: boolean }) {
+export function BuildThis({
+  build,
+  roadmapId,
+  ideaId,
+  savedId,
+  title,
+  inForm = false,
+}: {
+  build: BuildState;
+  /** The idea's roadmap and its id there; left out when building from the saved list. */
+  roadmapId?: string;
+  ideaId?: string;
+  /** A saved idea's id (the saved list), instead of a roadmap's idea. */
+  savedId?: string;
+  title: string;
+  inForm?: boolean;
+}) {
   if (build.state === "signed-out") {
-    const next = encodeURIComponent(`/roadmap/${roadmapId}?view=projects`);
+    const next = encodeURIComponent(savedId ? "/roadmap/saved" : `/roadmap/${roadmapId}?view=projects`);
     return (
       <Button href={`/login?next=${next}`} size="sm" label={`Sign in to build this: ${title}`}>
         Sign in to build this
@@ -33,7 +49,7 @@ export function BuildThis({ build, roadmapId, ideaId, title, inForm = false }: {
       </p>
     );
   }
-  const action = createFromIdea.bind(null, roadmapId, ideaId);
+  const action = savedId ? createFromSavedIdea.bind(null, savedId) : createFromIdea.bind(null, roadmapId ?? "", ideaId ?? "");
   const label = `Build this as an exhbt: ${title}`;
   if (inForm) {
     return (
