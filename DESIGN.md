@@ -93,6 +93,18 @@ Full rules, sizes and don'ts are in `docs/brand.md`. In short:
 - `BeforeAfterChart`: a dumbbell for before-to-after per measure (1–3 rows), drawn in the brand's one hue in two shades (mint before, jade after; `components/charts/series.ts`). They are 3.7:1 apart, so they stay distinct for colour-blind readers; checked by contrast maths, not yet re-run through the dataviz validator. Every value is printed beside its dot (mint is 1.5:1 on white); legend for the two series; a hidden data table; the change is shown as a % on the right. No other chart colours without re-running the validator. The pair lives in `components/charts/series.ts`.
 - `SkillRadar`: one axis per skill (3–6, fixed in the job's order), levels 0–4 from the centre. The same pair: "from" as a light fill, "to" as a dark outline. Grid in `line`. Labels are HTML over the SVG and show skill names only: **no numbers** (the levels are AI estimates; Rory, 9 Nov 2026). The meaning is carried in words instead. "Level up next" skills get an ink arrow-up marker, and "In the bag" skills get the same green tick as the strengths screen; both are set in ink semibold. Under the chart, `SkillHighlights` lists the two groups (up to three skills each). One line gives where the skills came from (`SKILLS_SOURCE_NOTE`). A hidden data table holds every level. No animation. Radars exaggerate area, so don't add shading, gradients or a third series.
 
+## The exhbt in Phase 2
+Phase 2 swaps the card above for a fixed block layout (decision 0007), drawn by `components/portfolio/ProjectView.tsx`. A recruiter skims it, so every part is short and mostly bullets. Top to bottom:
+- the person's photo and name top left, skill boxes top right
+- the title, then a one-line context
+- the question: what the gap was and why it mattered
+- the process flowchart (`MethodFlow`), straight after the question
+- findings, as bullets
+- up to two graphs (`BeforeAfterChart`, with the chart rules above) and up to two images with captions
+- the work, one click away, and the trust badge
+
+150–200 words, and every word on the page counts, graph labels and captions included; only image alt text is left out (decision 0009). The order never changes. Limits are `LIMITS` in `lib/exhbt/blocks.ts`.
+
 ## Flow patterns
 - **Click-through, not long pages**, for the roadmap builder and result. Marketing pages scroll normally.
 - **Builder:** one question per screen inside a white card on mist. "Step N of 3" with a progress bar segment per step; Back (secondary) on the left, Continue (primary) on the right; the step is in the URL (`?step=`). Validation messages sit under the field and are announced. Step 2 (the CV) has a text button, "Skip for now", under the upload; it goes once a CV is in. Minimal words on every step: a title, the fields, at most one short line.

@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { BILLING_PERIOD, PLAN_NAMES } from "@/lib/entitlements";
+
+const PAID = `${PLAN_NAMES.premium} and ${PLAN_NAMES.max}`;
 
 type Doc = { title: string; updated: string; body: React.ReactNode };
 
 const DOCS: Record<string, Doc> = {
   privacy: {
     title: "Privacy policy",
-    updated: "8 November 2026",
+    updated: "12 November 2026",
     body: (
       <>
         <p>
@@ -22,12 +25,58 @@ const DOCS: Record<string, Doc> = {
             itself. If it can&rsquo;t (a scan or a photo) and you choose to send it, Anthropic reads the file to
             turn it into text; we keep the text, not the file.
           </li>
-          <li>The files and text you add to an exhbt.</li>
+          <li>
+            What you put on your portfolio if you set one up: a username, a headline, a short bio and, if you add
+            one, a profile photo.
+          </li>
+          <li>The files you upload for an exhbt, the text read from them, and everything you write in the editor.</li>
+          <li>
+            If you pay for a plan: which plan, its status and renewal date, and Stripe&rsquo;s reference for you and
+            your subscription. Not your card details.
+          </li>
           <li>
             Product events such as &ldquo;roadmap completed&rdquo;, linked to your account. We do not use
             advertising or tracking cookies.
           </li>
         </ul>
+        <h2>Public portfolios</h2>
+        <p>
+          On {PAID} you can publish exhbts to your own portfolio address. Anyone with the link can see your name,
+          headline, bio and profile photo, your LinkedIn link if you added it, and the exhbts you have published,
+          including their images and any evidence file you attached. Drafts, and edits you haven&rsquo;t published,
+          are never shown. Free accounts don&rsquo;t have a public page.
+        </p>
+        <p>
+          Search engines can list your portfolio unless you tick &ldquo;Hide my portfolio from search
+          engines&rdquo; in Portfolio settings; we then ask them not to index it. That can&rsquo;t pull back copies
+          other people or search engines have already made.
+        </p>
+        <p>
+          To take an exhbt down, open it and choose Unpublish. It leaves your portfolio straight away. A file link
+          someone opened just before can keep working for up to an hour.
+        </p>
+        <h2>Project files</h2>
+        <p>
+          Uploaded files sit in private storage with Supabase in London. They have no public address: when your
+          portfolio shows an image or an evidence file, we make a link to it that expires after an hour. We keep the
+          project material you upload with the exhbt it belongs to, and delete it when you delete that exhbt or your
+          account. We plan to delete project material automatically 30 days after upload, but that isn&rsquo;t
+          switched on yet.
+        </p>
+        <h2>AI drafting</h2>
+        <p>
+          When you ask for a draft, the text read from your files goes to Anthropic, with your notes and any link
+          address you gave, and its model writes the draft. Your browser reads most files itself; a scan or a photo
+          goes to Anthropic only if you choose to send it. The model is told to use only the facts in your material.
+          We then check every number in the draft against your material and flag any we can&rsquo;t find, so you
+          check or remove it before you publish.
+        </p>
+        <h2>Job matching (coming soon)</h2>
+        <p>
+          Links for each job, on {PLAN_NAMES.max}, aren&rsquo;t available yet. When they are, the job description
+          you give and your published exhbts will go to Anthropic so it can pick the exhbts that fit the job best.
+          We&rsquo;ll update this policy before it starts.
+        </p>
         <h2>Why, and on what lawful basis</h2>
         <p>
           We process this data to provide the service you asked for (contract). We use aggregated, non-identifying
@@ -39,11 +88,15 @@ const DOCS: Record<string, Doc> = {
           <li>Supabase: database, file storage and sign-in. Data stored in London, UK.</li>
           <li>Cloudflare: hosting and delivery of the website.</li>
           <li>
-            Anthropic: an AI model reads your CV and inputs to write your roadmap. Processing may take place
-            outside the UK under appropriate safeguards; inputs are not used to train models.
+            Anthropic: an AI model reads your CV and inputs to write your roadmap, and your project material to
+            draft an exhbt. Processing may take place outside the UK under appropriate safeguards; inputs are not
+            used to train models.
           </li>
           <li>Resend: sending sign-in emails.</li>
-          <li>Stripe (paid plans): payments. Card details go directly to Stripe.</li>
+          <li>
+            Stripe (paid plans): payments. You pay on Stripe&rsquo;s own page, so your card details go straight to
+            Stripe and never reach us.
+          </li>
         </ul>
         <h2>How long we keep it</h2>
         <p>
@@ -61,7 +114,7 @@ const DOCS: Record<string, Doc> = {
   },
   terms: {
     title: "Terms of use",
-    updated: "5 November 2026",
+    updated: "12 November 2026",
     body: (
       <>
         <h2>Your content</h2>
@@ -72,14 +125,21 @@ const DOCS: Record<string, Doc> = {
         <h2>Accuracy</h2>
         <p>
           Before publishing an exhbt you confirm it is accurate and your own work. AI drafts are suggestions built
-          only from what you supplied; you are responsible for checking them. We may withdraw exhbts that we believe are
-          copied or misleading.
+          only from what you supplied; you are responsible for checking them. We may remove exhbts that we believe
+          are copied or misleading.
+        </p>
+        <h2>Confidential information</h2>
+        <p>
+          Don&rsquo;t publish anything an employer, client or university gave you in confidence: internal figures,
+          client names, unreleased work. If a project used confidential data, describe the method and leave the
+          numbers out, or get permission first. We may remove an exhbt that appears to break this.
         </p>
         <h2>Paid plans</h2>
         <p>
-          Paid plans are annual and renew automatically; we remind you before renewal. You can cancel at any time
-          and keep access until the end of the period you paid for. If a plan lapses, published exhbts and links
-          stay readable but cannot be edited.
+          {PAID} are billed each {BILLING_PERIOD} through Stripe and renew automatically. You can cancel at any time
+          from the Billing page and keep the plan until the end of the period you paid for. If you move to a smaller
+          plan, nothing is deleted: your portfolio shows as many published exhbts as the new plan allows, in your
+          order, and on Free your portfolio is no longer public.
         </p>
         <h2>Acceptable use</h2>
         <p>
