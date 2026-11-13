@@ -1,4 +1,5 @@
 import { portfolioHost } from "@/lib/hosts";
+import { isPhase2Enabled } from "@/lib/site";
 
 /**
  * What each plan includes. This file is the only copy of the figures.
@@ -101,13 +102,22 @@ export const PLAN_NAMES: Record<Plan, string> = {
 /** Flip to true once the originality check runs on publish. Until then, copy says "coming soon". */
 export const ORIGINALITY_CHECK_LIVE = false;
 
+/**
+ * Flip to true once per-job links are built (docs/phase-2.md section 8). Until then, while Phase 2
+ * sells Max for real, the Max line says "coming soon". With Phase 2 off the whole tier is a
+ * waitlist marked "Coming soon", so the line stays as it was.
+ */
+export const JOB_LINKS_LIVE = false;
+
 /** Exhbts picked for a job-specific link. */
 export const EXHBTS_PER_JOB_LINK = 4;
 
 /** Shown when a free account has used its roadmaps for the month (builder or project-ideas gate). */
 export function freeRoadmapLimitMessage(): string {
   const n = ENTITLEMENTS.free.roadmapsPer30Days;
-  return `You've used this month's ${n} free ${n === 1 ? "roadmap" : "roadmaps"}. ${PLAN_NAMES.premium} and ${PLAN_NAMES.max} include more: join the waitlist on the pricing page.`;
+  return `You've used this month's ${n} free ${n === 1 ? "roadmap" : "roadmaps"}. ${PLAN_NAMES.premium} and ${PLAN_NAMES.max} include more: ${
+    isPhase2Enabled() ? "compare plans on the pricing page" : "join the waitlist on the pricing page"
+  }.`;
 }
 
 /**
@@ -126,6 +136,11 @@ function exhbtCount(n: number, hosted: boolean): string {
   const noun = n === 1 ? "exhbt" : "exhbts";
   const prefix = hosted ? "Up to " : "";
   return `${prefix}${n} ${noun}${hosted ? " hosted" : ""}`;
+}
+
+function jobLinksLine(): string {
+  const line = `A custom link for every job: we pick your ${EXHBTS_PER_JOB_LINK} best fits`;
+  return JOB_LINKS_LIVE || !isPhase2Enabled() ? line : `${line} (coming soon)`;
 }
 
 /** What each tier includes, as short checklist lines (pricing page and home summary). */
@@ -152,7 +167,7 @@ export function planFeatures(plan: "free" | "premium" | "max"): string[] {
     case "max":
       return [
         `${exhbtCount(e.exhbts, true)} on ${link}`,
-        ...(e.jobLinks ? [`A custom link for every job: we pick your ${EXHBTS_PER_JOB_LINK} best fits`] : []),
+        ...(e.jobLinks ? [jobLinksLine()] : []),
         ...(e.drafting ? ["Drafted for you from your files, then yours to edit"] : []),
         ...(e.originalityCheck
           ? [ORIGINALITY_CHECK_LIVE ? "An originality check when you publish" : "An originality check when you publish (coming soon)"]

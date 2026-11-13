@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
  * - Bad or missing signature: 400.
  * - Events we don't use: 200, ignored, so Stripe doesn't retry them.
  * - Repeats are harmless: rows are keyed on the Stripe subscription id.
+ * - Order is handled: each row keeps the newest event's time, and an older event arriving late is ignored.
  * Nothing about amounts or cards is stored or logged.
  */
 export async function POST(req: NextRequest) {
@@ -31,14 +32,14 @@ export async function POST(req: NextRequest) {
         const id = typeof session.subscription === "string" ? session.subscription : session.subscription.id;
         // The session doesn't carry the subscription's period or price, so fetch it.
         const sub = await stripe().subscriptions.retrieve(id);
-        await save(sub, session.client_reference_id);
+        await save(sub, session.client_reference_id, event.created);
         break;
       }
       case "customer.subscription.updated":
-        await save(event.data.object, null);
+        await save(event.data.object, null, event.created);
         break;
       case "customer.subscription.deleted":
-        await save(event.data.object, null, "canceled");
+        await save(event.data.object, null, event.created, "canceled");
         break;
       default:
         break;
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
 }
 
 /** Writes a subscription to our table and logs the change. */
-async function save(sub: Stripe.Subscription, clientReferenceId: string | null, forceStatus?: string) {
+async function save(sub: Stripe.Subscription, clientReferenceId: string | null, eventCreated: number, forceStatus?: string) {
   // Checkout puts our user id on the session and on the subscription's metadata (billing/actions.ts).
   const userId = clientReferenceId || sub.metadata?.user_id;
   if (!userId) {
@@ -75,8 +76,13 @@ async function save(sub: Stripe.Subscription, clientReferenceId: string | null, 
     customerId: typeof sub.customer === "string" ? sub.customer : (sub.customer?.id ?? null),
     subscriptionId: sub.id,
     renewsAt: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+    // When Stripe created the event (seconds), so an older event delivered late can't undo a newer one.
+    lastEventAt: new Date(eventCreated * 1000).toISOString(),
   };
   const store = getStore();
-  await store.upsertSubscription(record);
+  if (!(await store.upsertSubscription(record))) {
+    console.warn(`[stripe] event older than the one already applied, ignored`);
+    return;
+  }
   await store.logEvent("subscription_changed", userId, { plan: record.plan, status: record.status });
 }

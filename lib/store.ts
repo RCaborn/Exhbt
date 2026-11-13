@@ -90,7 +90,7 @@ export type UsernameLookup = { userId: string; username: string } | { redirectTo
 
 export type AICall = {
   userId: string | null;
-  step: "roadmap" | "exhbt_draft" | "exhbt_rewrite" | "originality" | "link_ranking" | "project_ideas" | "cv_read";
+  step: "roadmap" | "exhbt_draft" | "exhbt_rewrite" | "originality" | "link_ranking" | "project_ideas" | "cv_read" | "file_transcribe";
   model: string;
   inputTokens: number;
   outputTokens: number;
@@ -130,6 +130,11 @@ export type SubscriptionRecord = {
   subscriptionId: string;
   /** End of the current period (ISO), when it renews or, if cancelled, ends. */
   renewsAt: string | null;
+  /**
+   * When Stripe created the event this came from (ISO). Stripe may deliver events out of order,
+   * so an event older than the one already applied is ignored. Null for writes not from an event.
+   */
+  lastEventAt?: string | null;
 };
 
 /** Statuses that keep a paid plan. past_due keeps it while Stripe retries the card. */
@@ -208,8 +213,12 @@ export interface Store {
   getFile(id: string): Promise<StoredFile | null>;
 
   /* billing */
-  /** Creates or updates the row for this Stripe subscription (keyed on its id). Safe to repeat. */
-  upsertSubscription(sub: SubscriptionRecord): Promise<void>;
+  /**
+   * Creates or updates the row for this Stripe subscription (keyed on its id). Safe to repeat.
+   * With `lastEventAt`, an event older than the one already stored changes nothing. Returns
+   * whether the row was written.
+   */
+  upsertSubscription(sub: SubscriptionRecord): Promise<boolean>;
   /** The person's current subscription (a live one first, else the latest), or null. */
   getSubscription(userId: string): Promise<SubscriptionRecord | null>;
 
@@ -224,6 +233,10 @@ export interface Store {
   attachFiles(userId: string, exhbtId: string, fileIds: string[]): Promise<number>;
   /** Removes the record, if it's theirs, and returns it so the caller can remove the stored object. */
   deleteFile(id: string, userId: string): Promise<StoredFile | null>;
+
+  /* billing polish */
+  /** A person's stored files; with `exhbtId`, only those attached to that exhbt. */
+  listFiles(userId: string, exhbtId?: string): Promise<StoredFile[]>;
 }
 
 export const isSupabaseConfigured = () =>
@@ -544,7 +557,7 @@ function supabaseStore(): Store {
     },
     async deleteUserData(userId) {
       // Deleting the auth user cascades to profiles and everything owned by it.
-      // Storage objects under the user's folder are removed by lib/files.ts before this runs.
+      // Storage objects are removed first, by deleteAllFiles in lib/uploads.ts (app/api/account/delete).
       const { error } = await db.auth.admin.deleteUser(userId);
       if (error) throw new Error(error.message);
     },
@@ -684,19 +697,42 @@ function supabaseStore(): Store {
 
     /* billing */
     async upsertSubscription(sub) {
-      check(
-        await db.from("subscriptions").upsert(
-          {
-            user_id: sub.userId,
-            plan: sub.plan,
-            status: sub.status,
-            provider_customer_id: sub.customerId,
-            provider_subscription_id: sub.subscriptionId,
-            renews_at: sub.renewsAt,
-          },
-          { onConflict: "provider_subscription_id" },
-        ),
-      );
+      const row = {
+        user_id: sub.userId,
+        plan: sub.plan,
+        status: sub.status,
+        provider_customer_id: sub.customerId,
+        provider_subscription_id: sub.subscriptionId,
+        renews_at: sub.renewsAt,
+        ...(sub.lastEventAt ? { last_event_at: sub.lastEventAt } : {}),
+      };
+      if (!sub.lastEventAt) {
+        check(await db.from("subscriptions").upsert(row, { onConflict: "provider_subscription_id" }));
+        return true;
+      }
+      // Out-of-order events: update only when this event is as new as the stored one or newer.
+      // One conditional update, so two deliveries racing can't let the older one win.
+      const newer = async () =>
+        (
+          check(
+            await db
+              .from("subscriptions")
+              .update(row)
+              .eq("provider_subscription_id", sub.subscriptionId)
+              .or(`last_event_at.is.null,last_event_at.lte."${sub.lastEventAt}"`)
+              .select("id"),
+          ) as { id: string }[]
+        ).length > 0;
+      if (await newer()) return true;
+      const exists = check(
+        await db.from("subscriptions").select("id").eq("provider_subscription_id", sub.subscriptionId).maybeSingle(),
+      ) as { id: string } | null;
+      if (exists) return false; // a newer event has already been applied
+      const ins = await db.from("subscriptions").insert(row);
+      if (!ins.error) return true;
+      // Another delivery inserted the row first: compare against it.
+      if (ins.error.code === "23505") return newer();
+      throw new Error(ins.error.message);
     },
     async getSubscription(userId) {
       const rows = check(
@@ -771,6 +807,22 @@ function supabaseStore(): Store {
         await db.from("exhbt_files").delete().eq("id", id).eq("user_id", userId).select("id, user_id, bucket, path, mime, bytes, kind").maybeSingle(),
       ) as { id: string; user_id: string; bucket: StoredFile["bucket"]; path: string; mime: string; bytes: number; kind: StoredFile["kind"] } | null;
       return r ? { id: r.id, userId: r.user_id, bucket: r.bucket, path: r.path, mime: r.mime, bytes: r.bytes, kind: r.kind } : null;
+    },
+
+    /* billing polish */
+    async listFiles(userId, exhbtId) {
+      let q = db.from("exhbt_files").select("id, user_id, bucket, path, mime, bytes, kind").eq("user_id", userId);
+      if (exhbtId) q = q.eq("exhbt_id", exhbtId);
+      const rows = check(await q) as {
+        id: string;
+        user_id: string;
+        bucket: StoredFile["bucket"];
+        path: string;
+        mime: string;
+        bytes: number;
+        kind: StoredFile["kind"];
+      }[];
+      return rows.map((r) => ({ id: r.id, userId: r.user_id, bucket: r.bucket, path: r.path, mime: r.mime, bytes: r.bytes, kind: r.kind }));
     },
   };
 }
@@ -1027,6 +1079,9 @@ function memoryStore(): Store {
         }
       }
       for (const [id, e] of m.exhbts) if (e.userId === userId) m.exhbts.delete(id);
+      // As the database cascade does: subscriptions and file records go with the account.
+      for (const [id, s] of m.subscriptions) if (s.userId === userId) m.subscriptions.delete(id);
+      for (const [id, f] of m.files) if (f.userId === userId) m.files.delete(id);
       m.profiles.delete(userId);
       m.plans.delete(userId);
     },
@@ -1125,7 +1180,10 @@ function memoryStore(): Store {
 
     /* billing */
     async upsertSubscription(sub) {
-      m.subscriptions.set(sub.subscriptionId, { ...sub });
+      const cur = m.subscriptions.get(sub.subscriptionId);
+      if (cur?.lastEventAt && sub.lastEventAt && Date.parse(sub.lastEventAt) < Date.parse(cur.lastEventAt)) return false;
+      m.subscriptions.set(sub.subscriptionId, { ...sub, lastEventAt: sub.lastEventAt ?? cur?.lastEventAt ?? null });
+      return true;
     },
     async getSubscription(userId) {
       return liveSubscription(userId);
@@ -1157,6 +1215,13 @@ function memoryStore(): Store {
       if (!f || f.userId !== userId) return null;
       m.files.delete(id);
       return f;
+    },
+
+    /* billing polish */
+    async listFiles(userId, exhbtId) {
+      return [...m.files.values()]
+        .filter((f) => f.userId === userId && (!exhbtId || (f as StoredFile & { exhbtId?: string | null }).exhbtId === exhbtId))
+        .map((f) => ({ ...f }));
     },
   };
 }
