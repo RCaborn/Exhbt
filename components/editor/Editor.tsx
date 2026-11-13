@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { CopyLink } from "@/components/ui/CopyLink";
 import type { Plan } from "@/lib/entitlements";
 import { LIMITS, plain, safeHref, validateForPublish, wordCount, words, type ExhbtDoc, type Issue } from "@/lib/exhbt/blocks";
+import { BlockTools, useDraftTools, type DraftToolsInit } from "./BlockTools";
 import { ChartEditor, newChart } from "./ChartEditor";
 import { ConfirmAction } from "./ConfirmAction";
 import { FieldIssues } from "./FieldIssues";
@@ -50,6 +51,8 @@ export type EditorProps = {
   maxFileMb: number;
   /** Files the live (published) copy uses, so removing one from the draft doesn't break the live page before the next publish. */
   liveFileIds: string[];
+  /** Rewrite and "Back to the AI version"; null or missing when the exhbt has no kept source text. */
+  draftTools?: DraftToolsInit;
 };
 
 const LABELS: Record<string, string> = { title: "Title", context: "Context line", skills: "Skills", headline: "Headline number", gap: "The question", evidence: "The work" };
@@ -153,6 +156,7 @@ export function Editor(props: EditorProps) {
   const heaviest = over ? (Object.entries(cw).sort((a, b) => b[1] - a[1])[0]?.[0] as CardKey | undefined) : undefined;
   const flaggedBy = (card: CardKey) => issues.some((i) => cardOf(i.path) === card) || heaviest === card;
 
+  const dt = useDraftTools(id, props.draftTools, doc, setDoc);
   const update = (patch: Partial<ExhbtDoc>) => setDoc((d) => ({ ...d, ...patch }));
 
   async function publish() {
@@ -389,6 +393,7 @@ export function Editor(props: EditorProps) {
                   ))}
                 </ul>
               )}
+              <BlockTools dt={dt} block="header" />
               <div className="space-y-4">
                 <TextInput id="title" label="Title" value={doc.title} max={LIMITS.titleChars} onChange={(title) => update({ title })} issues={issuesAt(issues, "title")} placeholder="What you did, and what changed. e.g. Cut cafe queues from 11 to 4 minutes" />
                 <TextInput id="context" label="Context line" value={doc.context} max={LIMITS.contextChars} onChange={(context) => update({ context })} issues={issuesAt(issues, "context")} placeholder="e.g. BSc Economics, final-year project" />
@@ -416,10 +421,12 @@ export function Editor(props: EditorProps) {
                   </div>
                 </fieldset>
                 <SkillsInput skills={doc.skills} onChange={(skills) => update({ skills })} issues={issues} />
+                <BlockTools dt={dt} block="skills" />
               </div>
             </Card>
 
             <Card id="card-gap" title="The question" words={cw.gap} limit={LIMITS.gapWords} hint="What the question was and why it mattered. Two short sentences." flagged={flaggedBy("gap")} heaviest={heaviest === "gap"}>
+              <BlockTools dt={dt} block="gap" />
               <RichTextField
                 labelId="card-gap"
                 describedBy="gap-issues"
@@ -431,11 +438,13 @@ export function Editor(props: EditorProps) {
             </Card>
 
             <Card id="card-flow" title="Process" words={cw.flow} hint="How you did it, as a flowchart. Type in the boxes." flagged={flaggedBy("flow")} heaviest={heaviest === "flow"}>
+              <BlockTools dt={dt} block="flow" />
               <FlowEditor steps={doc.flow} onChange={(flow) => update({ flow })} issues={issues} />
               <FieldIssues id="flow-issues" issues={issuesAt(issues, "flow")} />
             </Card>
 
             <Card id="card-findings" title="Findings" words={cw.findings} hint={`${LIMITS.findings.min} to ${LIMITS.findings.max} bullets, up to ${LIMITS.findings.wordsEach} words each.`} flagged={flaggedBy("findings")} heaviest={heaviest === "findings"}>
+              <BlockTools dt={dt} block="findings" />
               <ol className="space-y-4">
                 {doc.findings.map((f, i) => (
                   <li key={i}>

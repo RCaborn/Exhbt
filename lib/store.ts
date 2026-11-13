@@ -118,7 +118,8 @@ export type EventName =
   | "username_claimed"
   | "exhbt_drafted"
   | "file_uploaded"
-  | "file_read_ai";
+  | "file_read_ai"
+  | "exhbt_rewritten";
 
 /** A Stripe subscription as we keep it (the `subscriptions` table). No amounts or card details. */
 export type SubscriptionRecord = {
@@ -237,6 +238,10 @@ export interface Store {
   /* billing polish */
   /** A person's stored files; with `exhbtId`, only those attached to that exhbt. */
   listFiles(userId: string, exhbtId?: string): Promise<StoredFile[]>;
+
+  /* draft tools */
+  /** Events with this name for one exhbt (props.exhbtId), all time. Counts rewrites against the plan's limit. */
+  countEventsForExhbt(name: EventName, userId: string, exhbtId: string): Promise<number>;
 }
 
 export const isSupabaseConfigured = () =>
@@ -824,6 +829,18 @@ function supabaseStore(): Store {
       }[];
       return rows.map((r) => ({ id: r.id, userId: r.user_id, bucket: r.bucket, path: r.path, mime: r.mime, bytes: r.bytes, kind: r.kind }));
     },
+
+    /* draft tools */
+    async countEventsForExhbt(name, userId, exhbtId) {
+      const res = await db
+        .from("events")
+        .select("id", { count: "exact", head: true })
+        .eq("name", name)
+        .eq("user_id", userId)
+        .eq("props->>exhbtId", exhbtId);
+      if (res.error) throw new Error(res.error.message);
+      return res.count ?? 0;
+    },
   };
 }
 
@@ -1222,6 +1239,11 @@ function memoryStore(): Store {
       return [...m.files.values()]
         .filter((f) => f.userId === userId && (!exhbtId || (f as StoredFile & { exhbtId?: string | null }).exhbtId === exhbtId))
         .map((f) => ({ ...f }));
+    },
+
+    /* draft tools */
+    async countEventsForExhbt(name, userId, exhbtId) {
+      return m.events.filter((e) => e.name === name && e.userId === userId && e.props.exhbtId === exhbtId).length;
     },
   };
 }
