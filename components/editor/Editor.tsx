@@ -405,7 +405,7 @@ export function Editor(props: EditorProps) {
 
           <section aria-label="Preview" className={view === "edit" ? "hidden lg:block" : ""}>
             <p className="mb-2 text-sm font-semibold text-graphite">Preview</p>
-            <ProjectView doc={previewDoc} owner={owner} imageUrls={imageUrls} evidenceUrl={evidenceHref} headingLevel="h2" />
+            <ProjectView doc={previewDoc} owner={owner} imageUrls={imageUrls} evidenceUrl={evidenceHref} headingLevel="h2" confirmed={confirmed} />
           </section>
         </div>
       </div>
