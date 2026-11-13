@@ -17,6 +17,9 @@ export default async function AccountPage() {
     <div className="mx-auto max-w-2xl px-4 pt-12 sm:px-8 lg:pt-16">
       <h1 className="">Account</h1>
       <p className="mt-3 text-graphite">Signed in as {user.email}. Plan: {PLAN_NAMES[plan]}.</p>
+      <p className="mt-3">
+        <Link href="/login/password" className="link">Set or change your password</Link>
+      </p>
 
       {isPhase2Enabled() && (
         <nav aria-label="Account settings" className="mt-6">

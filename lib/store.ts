@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { forgetDevPassword } from "./passwords";
 import type { Project, Roadmap, RoadmapInput } from "./ai/schemas";
 import type { ExhbtDoc } from "./exhbt/blocks";
 import type { Plan } from "./entitlements";
@@ -114,6 +115,7 @@ export type EventName =
   | "cv_read_ai"
   | "cv_read_failed"
   | "login_link_sent"
+  | "login_attempt"
   | "subscription_changed"
   | "username_claimed"
   | "exhbt_drafted"
@@ -223,6 +225,8 @@ export interface Store {
   getPortfolioProfile(userId: string): Promise<PortfolioProfile>;
   /** A username to its owner, or to the name it now redirects to (for 30 days after a change). */
   lookupUsername(username: string): Promise<UsernameLookup>;
+  /** The account email for a username, including one that still redirects. Null if nobody has that name. */
+  loginEmailForUsername(username: string): Promise<string | null>;
   /** Sets or changes the username; the old one redirects for 30 days. "taken" if someone else has it. */
   claimUsername(userId: string, username: string): Promise<"ok" | "taken">;
   updatePortfolioProfile(
@@ -657,6 +661,21 @@ function supabaseStore(): Store {
           .maybeSingle(),
       ) as { user_id: string; profiles: { username: string | null } | null } | null;
       return red?.profiles?.username ? { redirectTo: red.profiles.username } : null;
+    },
+    async loginEmailForUsername(username) {
+      const row = check(await db.from("profiles").select("email").eq("username", username).maybeSingle()) as { email: string } | null;
+      if (row?.email) return row.email;
+      const red = check(
+        await db
+          .from("username_redirects")
+          .select("user_id")
+          .eq("old_username", username)
+          .gt("expires_at", new Date().toISOString())
+          .maybeSingle(),
+      ) as { user_id: string } | null;
+      if (!red) return null;
+      const owner = check(await db.from("profiles").select("email").eq("id", red.user_id).maybeSingle()) as { email: string } | null;
+      return owner?.email ?? null;
     },
     async claimUsername(userId, username) {
       const current = check(await db.from("profiles").select("username").eq("id", userId).maybeSingle()) as { username: string | null } | null;
@@ -1096,6 +1115,11 @@ const newMem = (): Mem => ({
 });
 const g = globalThis as unknown as { __exhbtMem?: Mem };
 
+function emailFromDevUser(userId: string): string | null {
+  if (!userId.startsWith("dev-") || !userId.includes("@")) return null;
+  return userId.slice(4);
+}
+
 function memoryStore(): Store {
   if (process.env.NODE_ENV === "production" && !process.env.EXHBT_ALLOW_MEMORY_STORE) {
     throw new Error("Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
@@ -1261,6 +1285,7 @@ function memoryStore(): Store {
       for (const [id, f] of m.files) if (f.userId === userId) m.files.delete(id);
       m.profiles.delete(userId);
       m.plans.delete(userId);
+      if (userId.startsWith("dev-") && userId.includes("@")) forgetDevPassword(userId.slice(4));
     },
 
     async planFor(userId) {
@@ -1280,6 +1305,12 @@ function memoryStore(): Store {
         const now = m.profiles.get(red.userId)?.username;
         if (now) return { redirectTo: now };
       }
+      return null;
+    },
+    async loginEmailForUsername(username) {
+      for (const p of m.profiles.values()) if (p.username === username) return emailFromDevUser(p.userId);
+      const red = m.usernameRedirects.get(username);
+      if (red && red.expiresAt > Date.now()) return emailFromDevUser(red.userId);
       return null;
     },
     async claimUsername(userId, username) {

@@ -5,7 +5,7 @@ import { buildRoadmap, uniqueEmail, unlockProjects, waitForResult } from "./help
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
 test.describe("Accessibility (WCAG 2.1 AA, automated)", () => {
-  for (const path of ["/", "/pricing", "/universities", "/how-to-read-an-exhbt", "/legal/privacy", "/login", "/roadmap/new", "/start", "/demo", "/demo/gp-reminders"]) {
+  for (const path of ["/", "/pricing", "/universities", "/how-to-read-an-exhbt", "/legal/privacy", "/login", "/login/new", "/login/reset", "/login/password", "/roadmap/new", "/start", "/demo", "/demo/gp-reminders"]) {
     test(`no violations on ${path}`, async ({ page }) => {
       await page.goto(path);
       // The builder's buttons are inert (greyed) until the page is interactive; scan the ready page,
