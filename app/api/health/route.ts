@@ -87,6 +87,20 @@ async function checkStripe(): Promise<Check> {
   }
 }
 
+/** The two private Storage buckets Phase 2 uses (lib/uploads.ts). Created by 20261114000000_phase2_schema.sql. */
+const BUCKETS = ["sources", "evidence"] as const;
+
+async function checkStorage(): Promise<Check> {
+  if (!isSupabaseConfigured()) return { ok: false, detail: "Supabase settings missing" };
+  const storage = supabaseAdmin().storage;
+  const results = await Promise.all(BUCKETS.map(async (b) => ({ b, res: await storage.getBucket(b) })));
+  const missing = results.filter(({ res }) => res.error || !res.data).map(({ b }) => b);
+  if (missing.length) return { ok: false, detail: `Bucket ${missing.join(" and ")} not found (run the Phase 2 migration)` };
+  const open = results.filter(({ res }) => res.data?.public).map(({ b }) => b);
+  if (open.length) return { ok: false, detail: `Bucket ${open.join(" and ")} is public; it must be private` };
+  return { ok: true };
+}
+
 export async function GET() {
   const settings: Record<string, boolean> = Object.fromEntries(REQUIRED.map((k) => [k, Boolean(process.env[k])]));
   // Read under either name (lib/ai/model.ts).
@@ -94,13 +108,19 @@ export async function GET() {
   const misnamed = Object.entries(MISNAMED)
     .filter(([wrong]) => process.env[wrong])
     .map(([wrong, right]) => `Rename ${wrong} to ${right}`);
-  const [database, ai, stripeCheck] = await Promise.all([checkDatabase(), checkAI(), checkStripe()]);
+  const [database, ai, stripeCheck, storage] = await Promise.all([
+    checkDatabase(),
+    checkAI(),
+    checkStripe(),
+    checkStorage().catch((): Check => ({ ok: false, detail: "Could not reach Supabase Storage" })),
+  ]);
   const ok = Object.values(settings).every(Boolean) && database.ok && ai.ok;
   // Phase 2 is reported but does NOT affect `ok` (or the 503) until payments are meant to be live:
   // when they are, fold phase2 into `ok` here.
   const phase2 = {
     settings: Object.fromEntries(PHASE2_SETTINGS.map((k) => [k, Boolean(process.env[k])])),
     stripe: stripeCheck,
+    storage,
   };
   return NextResponse.json(
     { ok, settings, misnamed, database, ai, phase2 },

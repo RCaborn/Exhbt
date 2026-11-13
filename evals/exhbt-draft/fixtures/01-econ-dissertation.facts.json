@@ -1,0 +1,21 @@
+{
+  "fixture": "01-econ-dissertation",
+  "shape": "Economics dissertation extract, PDF over two pages: question, data, regression method, results table, conclusion.",
+  "tests": "Picks the main estimates out of a regression table and states the method in order without inflating a correlational result into a causal claim.",
+  "files": ["01-econ-dissertation.pdf"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":true,"chart":false,"noNumbers":false},
+  "keyFacts": [
+    {"id":"question","fact":"Asks whether living further from a university campus lowers the chance of entering higher education by 19.","match":["distance","further from","km from"]},
+    {"id":"data","fact":"4,812 young people in 312 local areas from the (fictional) Brackenford Household Panel.","match":["4,812","Brackenford Household Panel"]},
+    {"id":"method","fact":"Linear probability model by OLS, adding controls and then local authority fixed effects.","match":["linear probability","OLS","least squares","fixed effects","regression"]},
+    {"id":"main-result","fact":"Each extra 10 km lowers the probability by 3.1 points raw, 2.4 with controls, 1.9 with fixed effects.","match":["3.1","2.4","1.9","-0.031","-0.019"]},
+    {"id":"fsm","fact":"The effect is more than twice as large for free school meals pupils: 4.1 points against 1.7.","match":["4.1",["free school meals","twice"]]},
+    {"id":"context","fact":"BSc Economics final-year dissertation, University of Brackenford.","match":["BSc Economics","dissertation"]}
+  ],
+  "forbidden": [
+    {"id":"causal-claim","why":"The author says the estimates are not fully causal.","match":["proves","causes a","caused a"]}
+  ],
+  "sourceNumbers": ["2025","26","9,870","1","3","4","5","6","19","2016","2022","16","337","4,812","312","41.6%","10","18.4","12.7","9%","50","23.5%","2","98%","0","0.002","5.1","-0.031","-0.024","-0.019","-0.017","0.009","0.008","0.010","0.011","0.02","0.21","0.26","3.1","2.4","1.9","10%","1.7","4.1","30","12","17.8"]
+}

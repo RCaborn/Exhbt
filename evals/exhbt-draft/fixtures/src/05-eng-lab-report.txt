@@ -1,0 +1,59 @@
+Kestrel Valley University, Department of Mechanical Engineering
+MEng Mechanical Engineering, Year 2. Module ME2104 Solid Mechanics Laboratory
+Lab report 3: Young's modulus of an aluminium alloy by cantilever deflection
+Lab group C7 (4 students). This report is my individual write-up. Date of experiment: 21 October 2025.
+
+1. Aim
+
+To measure the Young's modulus (E) of a 6082 aluminium alloy bar by loading it as a cantilever and measuring the tip deflection, and to compare the result with the reference value of 69 GPa given in the module data sheet.
+
+2. Theory
+
+For a cantilever of length L with a point load F at the free end, simple beam theory gives the tip deflection as delta = F L^3 / (3 E I), where I is the second moment of area. For a rectangular section of width b and thickness h, I = b h^3 / 12. A plot of deflection against load should be a straight line through the origin with gradient L^3 / (3 E I), so E can be found from the gradient.
+
+3. Apparatus and method
+
+The bar was clamped in a rigid bench vice with a free length of 300 mm, measured with a steel rule (resolution 1 mm). Its width (25.0 mm) and thickness (3.00 mm) were measured with a digital micrometer at five points along the bar and averaged. Tip deflection was read from a dial gauge with a resolution of 0.01 mm, placed 5 mm in from the free end.
+
+Loads were added from 0 N to 5.0 N in steps of 0.5 N using slotted masses on a hanger, then removed in the same steps, so each run gave 11 loading and 11 unloading readings. The group did three runs, re-zeroing the dial gauge before each one. Before the first run the bar was loaded to 5.0 N and unloaded twice to settle it in the clamp.
+
+4. Results
+
+Table 1: Mean tip deflection over three runs (loading)
+
+Load (N)    Deflection (mm)
+0.0         0.00
+1.0         2.41
+2.0         4.79
+3.0         7.21
+4.0         9.62
+5.0         12.00
+
+(Readings at the half-newton steps are in Appendix A.)
+
+A least-squares straight line through all 33 loading readings gives a gradient of 2.40 mm/N with an intercept of 0.01 mm and R^2 = 0.9996. The unloading readings were on average 0.04 mm higher than the loading readings at the same load, a small hysteresis that most likely comes from slip in the clamp rather than from the material.
+
+With I = 25.0 x 3.00^3 / 12 = 56.25 mm^4 and L = 300 mm:
+
+E = L^3 / (3 I x gradient) = 27,000,000 / (3 x 56.25 x 2.40) = 66,700 N/mm^2 = 66.7 GPa.
+
+5. Error analysis
+
+The uncertainty in E was found by combining the fractional uncertainties of each measured quantity in quadrature, with each raised to the power it appears with in the formula.
+
+Thickness h: +/- 0.02 mm on 3.00 mm, cubed: 2.0%
+Length L: +/- 1 mm on 300 mm, cubed: 1.0%
+Width b: +/- 0.05 mm on 25.0 mm: 0.2%
+Gradient: +/- 0.08 mm/N from the spread between the three runs: 3.3%
+
+Combined uncertainty: 4.0%, so E = 66.7 +/- 2.7 GPa.
+
+The gradient and the thickness dominate. The thickness enters cubed, so a 0.02 mm error in a 3 mm bar matters more than a 1 mm error in its length. The clamp is the other weak point: if the bar rotates slightly in the vice, the effective length is longer than 300 mm and the measured deflection is too large, which would make E come out too low.
+
+6. Discussion
+
+The measured value of 66.7 GPa is 3.3% below the reference value of 69 GPa, and the reference lies inside the uncertainty range of 64.0 to 69.4 GPa. The direction of the difference is what clamp rotation would produce. The deflection-load graph is straight to within the reading resolution, so the bar stayed within its elastic range up to 5.0 N, as expected: the peak bending stress at 5.0 N is about 40 MPa, well below the alloy's yield strength of about 250 MPa.
+
+7. Conclusion
+
+The cantilever method gave E = 66.7 +/- 2.7 GPa for the 6082 aluminium bar, consistent with the reference value of 69 GPa. The two improvements that would most reduce the uncertainty are measuring the thickness with a more precise instrument at more points, and using a clamp that grips the bar along a longer length to stop it rotating.
