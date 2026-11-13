@@ -168,7 +168,7 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
   });
 
   need(words(plain(d.gap)) > 0, "gap", "Say what the question was.");
-  need(words(plain(d.gap)) <= L.gapWords, "gap", `Keep the context to ${L.gapWords} words.`);
+  need(words(plain(d.gap)) <= L.gapWords, "gap", `Keep the question to ${L.gapWords} words.`);
 
   need(d.flow.length >= L.flow.min, "flow", `The flowchart needs at least ${L.flow.min} boxes.`);
   need(d.flow.length <= L.flow.max, "flow", `Up to ${L.flow.max} boxes in the flowchart.`);

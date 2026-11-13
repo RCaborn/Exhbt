@@ -42,13 +42,13 @@ export function FlowEditor({ steps, onChange, issues }: { steps: FlowStep[]; onC
           const stepIssues = issuesAt(issues, `flow.${i}.step`);
           const detailIssues = issuesAt(issues, `flow.${i}.detail`);
           const issueId = `flow-${i}-issues`;
-          const input = `w-full resize-none bg-transparent [field-sizing:content] focus-visible:outline-none ${
+          const input = `w-full resize-none border-b border-dashed bg-transparent [field-sizing:content] ${last ? "border-white/30" : "border-field"} focus-visible:!outline-none focus-visible:!shadow-none ${
             last ? "placeholder:text-on-ink" : "placeholder:text-slate"
           }`;
           return (
             <li key={i} className="flex flex-col items-stretch @4xl:flex-1 @4xl:flex-row @4xl:items-center">
               <div
-                className={`flex flex-col gap-1.5 rounded-[8px] border px-3 py-2.5 focus-within:border-jade @4xl:h-full @4xl:flex-1 ${
+                className={`flex flex-col gap-1.5 rounded-[8px] border px-3 py-2.5 focus-within:border-jade focus-within:outline-[3px] focus-within:outline-jade focus-within:outline-offset-2 focus-within:shadow-[0_0_0_5px_var(--color-surface),0_0_0_7px_var(--color-ink)] @4xl:h-full @4xl:flex-1 ${
                   last ? "border-ink bg-ink text-white" : "border-line bg-surface"
                 }`}
               >
@@ -57,11 +57,12 @@ export function FlowEditor({ steps, onChange, issues }: { steps: FlowStep[]; onC
                 </span>
                 <textarea
                   rows={1}
+                  id={`flow-box-${i}`}
                   aria-label={`Box ${n}`}
                   aria-describedby={stepIssues.length || detailIssues.length ? issueId : undefined}
                   aria-invalid={stepIssues.length > 0 || undefined}
                   value={s.step}
-                  placeholder={last ? "The result" : "A short step"}
+                  placeholder={last ? "The result, e.g. Waits fell to four minutes" : i === 0 ? "e.g. Timed the queue for two weeks" : "e.g. Moved drinks to a second till"}
                   onChange={(e) => set(i, { step: e.target.value.replace(/\n/g, " ") })}
                   className={`${input} text-[0.86rem] leading-tight font-semibold`}
                 />
@@ -74,7 +75,7 @@ export function FlowEditor({ steps, onChange, issues }: { steps: FlowStep[]; onC
                   className={`${input} font-mono text-[0.75rem] leading-snug ${last ? "text-wash" : "text-graphite"}`}
                 />
                 <FieldIssues id={issueId} issues={[...stepIssues, ...detailIssues]} onInk={last} />
-                <div className="mt-1 flex flex-wrap gap-1">
+                <div className={`mt-1 flex flex-wrap gap-1.5 ${last ? "[&_button:disabled]:border-white/30 [&_button:disabled]:bg-transparent [&_button:disabled]:text-white/40" : ""}`}>
                   <Button size="sm" variant="secondary" label={`Move box ${n} earlier`} disabled={i === 0} onClick={() => move(i, -1)}>
                     <ArrowLeft aria-hidden size={14} strokeWidth={2.25} />
                   </Button>

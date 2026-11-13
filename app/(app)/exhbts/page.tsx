@@ -7,7 +7,7 @@ import { ConfirmAction } from "@/components/editor/ConfirmAction";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { getCurrentUser } from "@/lib/auth";
-import { PLAN_NAMES } from "@/lib/entitlements";
+import { ENTITLEMENTS, PLAN_NAMES } from "@/lib/entitlements";
 import { canCreateExhbt, getPlan, limitsFor } from "@/lib/plan";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
@@ -27,6 +27,7 @@ export default async function ExhbtsPage() {
   const [plan, exhbts] = await Promise.all([getPlan(user.id), store.listExhbts(user.id)]);
   const max = limitsFor(plan).exhbts;
   const room = canCreateExhbt(plan, exhbts);
+  const canGoLive = ENTITLEMENTS[plan].publicPortfolio;
 
   return (
     <div className="bg-mist">
@@ -34,9 +35,26 @@ export default async function ExhbtsPage() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h1>Your exhbts</h1>
           <p className="text-sm text-graphite">
-            <span className="font-mono text-ink">{exhbts.length}</span> of <span className="font-mono text-ink">{max}</span> used on {PLAN_NAMES[plan]}
+            {exhbts.length > max ? (
+              <>
+                <span className="font-mono text-ink">{exhbts.length}</span> exhbts · {PLAN_NAMES[plan]} holds <span className="font-mono text-ink">{max}</span>
+              </>
+            ) : (
+              <>
+                <span className="font-mono text-ink">{exhbts.length}</span> of <span className="font-mono text-ink">{max}</span> used on {PLAN_NAMES[plan]}
+              </>
+            )}
           </p>
         </div>
+
+        {!canGoLive && (
+          <section aria-labelledby="preview-only" className="mt-6 rounded-[20px] border border-line bg-surface p-5 sm:p-6">
+            <h2 id="preview-only" className="text-[1.375rem]">Preview only on {PLAN_NAMES[plan]}</h2>
+            <p className="mt-2 text-graphite">Build and preview your exhbts here. Publishing them to your own link comes with {PLAN_NAMES.premium}.</p>
+            {/* When the plan is full, the New exhbt card below carries the upgrade prompt. */}
+            {room.ok && <UpgradePrompt className="mt-3" reason={`Ready to share them? ${PLAN_NAMES.premium} publishes to your own link.`} upgradeTo="premium" />}
+          </section>
+        )}
 
         <section aria-labelledby="new" className="mt-8 rounded-[20px] border border-line bg-surface p-5 sm:p-6">
           <h2 id="new" className="text-[1.375rem]">New exhbt</h2>
@@ -66,7 +84,9 @@ export default async function ExhbtsPage() {
               return (
                 <li key={e.id} className="flex flex-col gap-3 rounded-[16px] border border-line bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
-                    <span className={e.status === "published" ? "chip" : "chip bg-mist text-graphite"}>{e.status === "published" ? "Live" : "Draft"}</span>
+                    <span className={canGoLive && e.status === "published" ? "chip" : "chip bg-mist text-graphite"}>
+                      {!canGoLive ? "Preview only" : e.status === "published" ? "Live" : "Draft"}
+                    </span>
                     <Link href={`/exhbts/${e.id}/edit`} className="link mt-1.5 block font-semibold break-words">
                       {title}
                     </Link>

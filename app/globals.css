@@ -257,6 +257,15 @@
   }
 }
 
+/* The editor on a phone: buttons are at least 44px square (WCAG target size, the audit's E7). */
+@media (pointer: coarse) {
+  .editor-touch button,
+  .editor-touch a[data-astryx-button] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
 /* Print and "Save as PDF" (the project page's button): one A4 page, the exhbt alone. The page
    chrome hides itself with print:hidden; this sets the paper, a slightly smaller rem so a full
    200-word exhbt with a graph fits, and keeps the brand fills (ink step, mint ticks and dots). */
