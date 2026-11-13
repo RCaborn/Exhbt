@@ -19,7 +19,7 @@ const DOCS: Record<string, Doc> = {
 
         <h2>What we collect</h2>
         <ul>
-          <li>Your email address, to create your account and send sign-in links.</li>
+          <li>Your email address, and a password you choose, to create your account and sign you in. Supabase stores the password in a form that cannot be read back. We also send you sign-in and password-reset links.</li>
           <li>Your name, and your LinkedIn profile address if you give it.</li>
           <li>
             The text of your CV and what you type into the roadmap form: the job you want, your education and your
@@ -151,10 +151,8 @@ const DOCS: Record<string, Doc> = {
           <li>Supabase: database, sign-in and file storage. Your data is stored in the European Union (Paris, France).</li>
           <li>Cloudflare: hosting and delivery of the website, and Web Analytics, which sets no cookies.</li>
           <li>Anthropic: the AI steps above.</li>
-          <li>Resend: sending sign-in links, roadmap emails and teammate invites.</li>
+          <li>Resend: sending sign-in and password-reset emails, roadmap emails and teammate invites.</li>
           <li>
-            Stripe, when you buy a paid plan: payments. You pay on Stripe&rsquo;s own page, so your card details go
-            straight to Stripe and never reach us.
           </li>
         </ul>
         <p>
@@ -241,12 +239,6 @@ const DOCS: Record<string, Doc> = {
   },
   cookies: {
     title: "Cookie policy",
-    updated: "16 November 2026",
-    body: (
-      <>
-        <p>
-          We only use cookies that are strictly necessary to run the service. These don&rsquo;t need consent, so you
-          won&rsquo;t see a cookie banner.
         </p>
         <h2>Cookies we set</h2>
         <ul>

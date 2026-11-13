@@ -21,8 +21,10 @@ export async function GET(req: NextRequest) {
 
   const store = getStore();
   await store.claimPendingRoadmaps(data.user.email, data.user.id);
-  // Which email the link came from: the roadmap email or the /login email (signInLinkFor).
-  const via = url.searchParams.get("via") === "login" ? "login" : "roadmap_email";
-  await store.logEvent("signup_completed", data.user.id, { via });
+  const via = url.searchParams.get("via");
+  if (via !== "password") {
+    const source = via === "signup" || via === "login" ? via : "roadmap_email";
+    await store.logEvent("signup_completed", data.user.id, { via: source });
+  }
   return NextResponse.redirect(new URL(next, url.origin));
 }
