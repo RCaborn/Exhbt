@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { emptyDoc, ExhbtDocSchema, validateForPublish, type ExhbtDoc } from "@/lib/exhbt/blocks";
 import { slugify, uniqueSlug } from "@/lib/exhbt/slug";
 import { canCreateExhbt, canPublish, getPlan } from "@/lib/plan";
+import { takenSlugs } from "@/lib/slugs";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
 import { deleteExhbtWithFiles } from "@/lib/uploads";
@@ -108,7 +109,8 @@ export async function publishExhbt(id: string, raw: unknown, confirmed: boolean)
   if (reasons.length) return { ok: false, reasons };
 
   const me = all.find((e) => e.id === id)!;
-  const slug = me.slug ?? uniqueSlug(slugify(doc.title), all.filter((e) => e.id !== id && e.slug).map((e) => e.slug!));
+  // One slug space per person: a new exhbt slug also misses their job links (lib/slugs.ts).
+  const slug = me.slug ?? uniqueSlug(slugify(doc.title), await takenSlugs(user.id, { exceptExhbtId: id }));
   if (!(await store.publishExhbt(id, user.id, slug))) return { ok: false, reasons: ["This exhbt isn't yours to publish."] };
   revalidatePath("/exhbts");
   revalidatePath(`/exhbts/${id}/edit`);
