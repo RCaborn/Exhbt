@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { usernameProblem } from "@/lib/hosts";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
+import { deleteFile } from "@/lib/uploads";
 import { profileSchema, USERNAME_CLAIMS_PER_HOUR, type ProfileField } from "./rules";
 
 export type UsernameState = { name?: string; error?: string; saved?: boolean } | undefined;
@@ -66,6 +67,41 @@ export async function saveProfileAction(_prev: ProfileState, form: FormData): Pr
     linkedin: p.linkedin,
     hideFromSearch: p.hideFromSearch,
   });
+  revalidatePath("/account/portfolio");
+  return { saved: true };
+}
+
+export type PhotoState = { error?: string; saved?: boolean };
+
+/**
+ * Sets the profile photo to a file the person has just uploaded (kind "photo", through
+ * /api/files/upload-url). The old photo's file is deleted, so replacing never leaves one behind.
+ */
+export async function savePhotoAction(fileId: string): Promise<PhotoState> {
+  if (!isPhase2Enabled()) return { error: "This isn't available yet." };
+  const user = await getCurrentUser();
+  if (!user) return { error: SIGNED_OUT };
+  const store = getStore();
+  const file = await store.getFile(fileId);
+  if (!file || file.userId !== user.id || file.kind !== "photo" || !file.mime.startsWith("image/")) {
+    return { error: "We couldn't find that photo. Try uploading it again." };
+  }
+  const old = (await store.getPortfolioProfile(user.id)).photoFileId;
+  await store.updatePortfolioProfile(user.id, { photoFileId: fileId });
+  if (old && old !== fileId) await deleteFile(user.id, old);
+  revalidatePath("/account/portfolio");
+  return { saved: true };
+}
+
+/** Takes the photo off the profile and deletes its file. Initials show instead. */
+export async function removePhotoAction(): Promise<PhotoState> {
+  if (!isPhase2Enabled()) return { error: "This isn't available yet." };
+  const user = await getCurrentUser();
+  if (!user) return { error: SIGNED_OUT };
+  const store = getStore();
+  const old = (await store.getPortfolioProfile(user.id)).photoFileId;
+  await store.updatePortfolioProfile(user.id, { photoFileId: null });
+  if (old) await deleteFile(user.id, old);
   revalidatePath("/account/portfolio");
   return { saved: true };
 }
