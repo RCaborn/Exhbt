@@ -1,0 +1,56 @@
+University of Brackenford, School of Economics
+BSc Economics, final-year dissertation (EC3990), 2025-26
+Distance to campus and the decision to go to university: evidence from the Brackenford Household Panel
+Candidate number: B204117. Supervisor: Dr H. Lowther. Word count: 9,870.
+
+Extract: Chapter 1 (Question), Chapter 3 (Data), Chapter 4 (Method), Chapter 5 (Results) and Chapter 6 (Conclusion)
+
+1. The question
+
+Widening participation policy in England has mostly focused on fees, maintenance support and contextual offers. Much less attention has gone to geography. A young person who lives a short bus ride from a university can study while living at home, keep a part-time job and avoid the cost of halls. A young person who lives an hour or more away faces a very different decision. This dissertation asks a narrow question: does living further from the nearest university campus lower the probability that a young person in England enters higher education by age 19, once family background and school results are held constant? A second question is whether the effect is larger for pupils who were eligible for free school meals.
+
+The answer matters for where new campuses and satellite sites are placed. If distance has a real effect on participation, and that effect falls hardest on poorer pupils, then the location of provision is itself a widening participation tool.
+
+3. Data
+
+The data come from the Brackenford Household Panel, a fictional longitudinal survey used for teaching in the School of Economics. The sample is every panel member who turned 19 between 2016 and 2022 and who lived in England at age 16. After dropping 337 cases with missing school results or postcodes, the analysis sample has 4,812 young people living in 312 local areas.
+
+The outcome is a binary indicator equal to 1 if the young person had started a degree course by age 19. Overall, 41.6% of the sample had done so. The key explanatory variable is the straight-line distance in kilometres from the home postcode at age 16 to the nearest university campus, measured in units of 10 km. Mean distance is 18.4 km and the median is 12.7 km; 9% of the sample live more than 50 km from a campus.
+
+Controls are: Key Stage 4 attainment (average point score), free school meals eligibility at age 16 (23.5% of the sample), parental education (whether either parent has a degree), household income band, sex, ethnicity and the year the young person turned 19.
+
+4. Method
+
+The main model is a linear probability model estimated by ordinary least squares, with standard errors clustered at the local area level. I estimate three specifications. Model 1 includes distance only. Model 2 adds the individual and family controls. Model 3 adds local authority fixed effects, so that distance is identified only from differences within the same local authority. This guards against the worry that areas far from universities differ in other ways, such as the local labour market for school leavers.
+
+I chose a linear probability model over a probit because the coefficients can be read directly as percentage point changes and because the predicted probabilities for 98% of the sample lie between 0 and 1. As a robustness check I also estimate probit models and report average marginal effects, which are within 0.002 of the linear estimates in every specification.
+
+To test the second question, Model 4 interacts distance with free school meals eligibility.
+
+5. Results
+
+Table 5.1: Effect of distance to the nearest campus (per 10 km) on entering higher education by age 19
+
+                                 Model 1     Model 2     Model 3     Model 4
+Distance (per 10 km)             -0.031      -0.024      -0.019      -0.017
+                                 (0.009)     (0.008)     (0.010)     (0.009)
+Distance x FSM eligible                                              -0.024
+                                                                     (0.011)
+Controls                         No          Yes         Yes         Yes
+Local authority fixed effects    No          No          Yes         Yes
+Observations                     4,812       4,812       4,812       4,812
+R-squared                        0.02        0.21        0.26        0.26
+
+Standard errors clustered by local area in brackets.
+
+In Model 1, each extra 10 km between home and the nearest campus is associated with a 3.1 percentage point lower probability of entering higher education. Adding controls reduces this to 2.4 percentage points, which shows that part of the raw gap reflects family background and attainment. With local authority fixed effects the estimate falls to 1.9 percentage points and is significant at the 10% level only.
+
+Model 4 shows the effect is concentrated among poorer pupils. For pupils not eligible for free school meals, an extra 10 km lowers the probability by 1.7 percentage points. For eligible pupils the combined effect is 4.1 percentage points (-0.017 plus -0.024), more than twice as large. Put another way, for a free school meals pupil living 30 km from a campus rather than next to it, the predicted probability of entering higher education is about 12 percentage points lower.
+
+Attainment remains by far the strongest predictor. A one standard deviation increase in the Key Stage 4 average point score raises the probability by 17.8 percentage points in Model 3.
+
+6. Conclusion
+
+Distance to the nearest campus has a modest but real association with whether young people in England go to university, and the association is more than twice as strong for pupils eligible for free school meals. The estimates shrink as better controls are added, so I do not claim that they are fully causal: families may choose where to live partly on the basis of education. Even so, the pattern is consistent with distance acting as a cost that bites hardest on poorer households.
+
+The main policy implication is that satellite campuses, part-time routes and travel support could be aimed at areas that are both far from a university and have high rates of free school meals eligibility. A natural next step would be to use the opening of new campuses as a natural experiment.

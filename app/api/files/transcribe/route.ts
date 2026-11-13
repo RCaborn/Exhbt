@@ -54,10 +54,12 @@ export async function POST(req: Request) {
 
   try {
     const result = await transcribe(bytes, mediaType, "project");
-    // ai_call_logs allows a fixed set of steps; reading material is part of drafting an exhbt.
+    // Its own step, so reading files is costed apart from drafting. ai_call_logs only accepts
+    // 'file_transcribe' once supabase/migrations/20261115000000_billing_and_files.sql is applied:
+    // apply that migration before this code reaches a Supabase database.
     await store.logAICall({
       userId: user.id,
-      step: "exhbt_draft",
+      step: "file_transcribe",
       model: result.model,
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,

@@ -10,6 +10,7 @@ import { canCreateExhbt, canPublish, getPlan } from "@/lib/plan";
 import { takenSlugs } from "@/lib/slugs";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
+import { deleteExhbtWithFiles } from "@/lib/uploads";
 
 /**
  * Everything that changes an exhbt from the list (/exhbts) and the editor (/exhbts/[id]/edit).
@@ -41,6 +42,12 @@ export async function createFromScratch() {
   const verdict = canCreateExhbt(await getPlan(user.id), await store.listExhbts(user.id));
   if (!verdict.ok) redirect("/exhbts?full=1");
   const id = await store.createExhbt(user.id, emptyDoc());
+  // Two quick clicks can both pass the check above; look again now this one exists (as drafting does).
+  const after = canCreateExhbt(await getPlan(user.id), (await store.listExhbts(user.id)).filter((e) => e.id !== id));
+  if (!after.ok) {
+    await store.deleteExhbt(id, user.id);
+    redirect("/exhbts?full=1");
+  }
   redirect(`/exhbts/${id}/edit`);
 }
 
@@ -59,7 +66,8 @@ export async function moveExhbt(id: string, by: -1 | 1) {
 
 export async function deleteExhbt(id: string) {
   const user = await signedIn();
-  await getStore().deleteExhbt(id, user.id);
+  // Its files too, records and stored objects (lib/uploads.ts).
+  await deleteExhbtWithFiles(user.id, id);
   revalidatePath("/exhbts");
   redirect("/exhbts");
 }

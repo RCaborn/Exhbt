@@ -184,7 +184,8 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
   });
 
   test("pricing shows Free, Plus and Pro, each paid tier with its own waitlist", async ({ page }) => {
-    await page.goto("/pricing", { waitUntil: "networkidle" });
+    // The live site's waitlist version (Phase 2 off); in development ?preview=waitlist shows it.
+    await page.goto("/pricing?preview=waitlist", { waitUntil: "networkidle" });
     for (const tier of [PLAN_NAMES.free, PLAN_NAMES.premium, PLAN_NAMES.max]) {
       await expect(page.getByRole("heading", { level: 2, name: tier, exact: true })).toBeVisible();
     }
