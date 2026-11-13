@@ -11,6 +11,7 @@ import { isPhase2Enabled } from "@/lib/site";
 import { signedFileUrl } from "@/lib/files";
 import { getStore } from "@/lib/store";
 import { Button } from "@/components/ui/Button";
+import { CopyLink } from "@/components/ui/CopyLink";
 import { PhotoField } from "./PhotoField";
 import { ProfileForm } from "./ProfileForm";
 import { UsernameForm } from "./UsernameForm";
@@ -46,7 +47,10 @@ export default async function PortfolioSettingsPage() {
         {username && (
           <>
             <dt className="font-semibold">Address</dt>
-            <dd className="break-all">{portfolioHost(username)}</dd>
+            <dd className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <a href={portfolioHref(username, host)} className="link break-all">{portfolioHost(username)}</a>
+              <CopyLink href={portfolioHref(username, host)} size="sm" />
+            </dd>
             <dt className="font-semibold">Public</dt>
             <dd>{isPublic ? "Yes" : "No"}</dd>
           </>

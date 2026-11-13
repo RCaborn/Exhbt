@@ -71,7 +71,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
 
       {plan !== "institutional" && (
         <section aria-labelledby="change" className="mt-12 border-t border-line pt-8">
-          <h2 id="change" className="text-[1.375rem]">{paidByStripe ? "Change or cancel" : "Upgrade"}</h2>
+          <h2 id="change" className="text-[1.375rem]">{paidByStripe ? "Change or cancel" : plan === "free" ? "Upgrade" : "Change plan"}</h2>
           {!stripeOn ? (
             <p className="mt-3">
               Payments aren&rsquo;t open yet. See what each plan includes on the <Link href="/pricing" className="link">pricing page</Link>.

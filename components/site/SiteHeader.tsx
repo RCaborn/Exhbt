@@ -11,6 +11,7 @@ const NAV = [
 /** What a signed-in person needs from the header: their own exhbts, portfolio and account. */
 const OWN_NAV = [
   { href: "/exhbts", label: "Your exhbts" },
+  { href: "/job-links", label: "Job links" },
   { href: "/account/portfolio", label: "Portfolio" },
   { href: "/account", label: "Account" },
 ];
@@ -24,9 +25,14 @@ export function Wordmark() {
  * (app/(app)/layout.tsx) reads the session on the server and passes `signedIn`, which swaps
  * the marketing links and "Log in" for the person's own links: no flash, no extra request.
  * With Phase 2 off (`phase2` false) there are no exhbts or portfolio yet, so only Account shows.
+ * Job links show only for plans that include them (`jobLinks`).
  */
-export function SiteHeader({ signedIn = false, phase2 = false }: { signedIn?: boolean; phase2?: boolean } = {}) {
-  const nav = signedIn ? OWN_NAV.filter((n) => phase2 || n.href === "/account") : NAV;
+export function SiteHeader({
+  signedIn = false,
+  phase2 = false,
+  jobLinks = false,
+}: { signedIn?: boolean; phase2?: boolean; jobLinks?: boolean } = {}) {
+  const nav = signedIn ? OWN_NAV.filter((n) => (n.href === "/job-links" ? phase2 && jobLinks : phase2 || n.href === "/account")) : NAV;
   return (
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-[78rem] flex-wrap items-center justify-between gap-x-8 gap-y-3 px-4 py-4 sm:px-8">

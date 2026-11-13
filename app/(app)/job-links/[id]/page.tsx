@@ -22,6 +22,7 @@ import {
   setJobLinkStatus,
   swapJobLinkPick,
 } from "../actions";
+import { IntroForm } from "./IntroForm";
 
 export const metadata: Metadata = { title: "Edit job link", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -203,24 +204,14 @@ export default async function JobLinkEditPage({ params, searchParams }: Props) {
 
         <section aria-labelledby="intro-h" className="mt-6 rounded-[20px] border border-line bg-surface p-5 sm:p-6">
           <h2 id="intro-h" className="text-[1.375rem]">Intro</h2>
-          <form action={saveJobLinkIntro.bind(null, link.id)} className="mt-2">
-            <label htmlFor="intro" className="hint block">
-              A line or two to the employer, in your words. About {INTRO_WORDS} words. We suggested this from the advert and your exhbts.
-            </label>
-            <textarea id="intro" name="intro" rows={3} maxLength={INTRO_MAX_CHARS} defaultValue={link.intro} disabled={!canEdit} className="field mt-2" />
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              {canEdit && (
-                <Button type="submit" size="sm">
-                  Save intro
-                </Button>
-              )}
-              {saved === "intro" && (
-                <span role="status" className="text-sm font-semibold">
-                  Saved
-                </span>
-              )}
-            </div>
-          </form>
+          <IntroForm
+            action={saveJobLinkIntro.bind(null, link.id)}
+            initial={link.intro}
+            words={INTRO_WORDS}
+            maxChars={INTRO_MAX_CHARS}
+            canEdit={canEdit}
+            saved={saved === "intro"}
+          />
         </section>
 
         <section aria-labelledby="delete-h" className="mt-6 rounded-[20px] border border-line bg-surface p-5 sm:p-6">

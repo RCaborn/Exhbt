@@ -23,7 +23,7 @@ Dashboards change their wording from time to time. If a label below doesn't matc
    - Save the database password in your password manager. You won't need it for this checklist.
 2. When the project is ready, open **SQL Editor > New query**:
    - Open `supabase/migrations/20261105000000_init.sql` in this repo on GitHub, copy all of it, paste it, and press **Run**. It should say "Success".
-   - Do the same with each remaining file in that folder, **in date order**: `20261106000000_phase1.sql`, then `20261106120000_meeting_updates.sql`, then `20261106150000_tiers_and_methodology.sql`, then `20261110000000_project_ideas.sql`, then `20261111200000_generation_lock_and_rate_limits.sql`.
+   - Do the same with each remaining file in that folder, **in date order**: `20261106000000_phase1.sql`, then `20261106120000_meeting_updates.sql`, then `20261106150000_tiers_and_methodology.sql`, then `20261110000000_project_ideas.sql`, then `20261112000000_cv_read.sql`.
    - If a file fails with `relation "roadmaps" does not exist`, an earlier file hasn't been run in this project: start again from `20261105000000_init.sql`. A failed file changes nothing, so it's safe to run again once fixed.
    - Optional, when you have it: load the UK jobs dataset (see `HANDOFF.md`). Until then a small sample is used.
 3. **Project Settings > API (or API Keys)**. Copy three values:
@@ -138,8 +138,10 @@ Before the day: the Stripe section above done and tried in test mode, a full cli
 2. **Apply the migrations**, in Supabase **SQL Editor > New query**, one file at a time, **in date order**:
    - `supabase/migrations/20261113000000_plan_names.sql`
    - `supabase/migrations/20261114000000_phase2_schema.sql`
-   - then any later file in that folder on the `phase-2` branch, by the date at the start of its name. Run only files that aren't already applied; never edit one that is.
-3. **Check Storage.** Under **Storage**, there should be two buckets, `sources` and `evidence`, both **private** (the second migration creates them). If one is missing, run the `insert into storage.buckets` lines from `20261114000000_phase2_schema.sql` again; they're safe to repeat. Never make either bucket public.
+   - `supabase/migrations/20261115000000_billing_and_files.sql`
+   - `supabase/migrations/20261116000000_job_links.sql`
+   - If the `phase-2` branch has any file in that folder after these, run it too, by the date at the start of its name. Run only files that aren't already applied; never edit one that is.
+3. **Check Storage.** Under **Storage**, there should be two buckets, `sources` and `evidence`, both **private** (the `phase2_schema` migration creates them). If one is missing, run the `insert into storage.buckets` lines from `20261114000000_phase2_schema.sql` again; they're safe to repeat. Never make either bucket public.
 4. **Stripe live mode.** Switch the Stripe dashboard to live mode and repeat steps 2–7 of the Stripe section with live products and prices:
    - replace `STRIPE_PRICE_PREMIUM` and `STRIPE_PRICE_MAX` in `wrangler.jsonc` with the **live** price ids, on the `phase-2` branch
    - set the Worker secrets `STRIPE_SECRET_KEY` (starts `sk_live_`) and `STRIPE_WEBHOOK_SECRET` (from the live webhook endpoint)

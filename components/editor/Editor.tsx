@@ -254,7 +254,7 @@ export function Editor(props: EditorProps) {
   const chip = !canGoLive ? "Preview only" : status === "published" ? "Live" : "Draft";
 
   return (
-    <div className="editor-touch bg-mist" data-ready={ready || undefined} onBlur={() => void autosave.flush()}>
+    <div className="editor-touch bg-mist" data-ready={ready || undefined} inert={!ready || undefined} onBlur={() => void autosave.flush()}>
       <div className="mx-auto max-w-[78rem] px-4 pt-8 pb-16 sm:px-8">
         <Link href="/exhbts" className="inline-flex items-center gap-1.5 text-sm font-semibold hover:text-graphite">
           <ArrowLeft aria-hidden size={15} strokeWidth={2.25} /> Your exhbts
