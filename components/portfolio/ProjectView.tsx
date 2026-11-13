@@ -31,6 +31,7 @@ export function ProjectView({
   headingLevel = "h1",
   position,
   confirmed = true,
+  checksHref,
 }: {
   doc: ExhbtDoc;
   owner: Owner;
@@ -45,6 +46,8 @@ export function ProjectView({
   position?: number;
   /** The author's "this is my own work" tick. Published exhbts are always confirmed. */
   confirmed?: boolean;
+  /** Where the seal explains the checks (see Seal). */
+  checksHref?: string;
 }) {
   const H = headingLevel;
   const Sub = headingLevel === "h1" ? "h2" : "h3";
@@ -156,7 +159,7 @@ export function ProjectView({
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <TrustBadge sourceAttached={Boolean(doc.evidence)} confirmed={confirmed} />
-          {checkedOn && <Seal date={checkedOn} />}
+          {checkedOn && <Seal date={checkedOn} href={checksHref} />}
         </div>
       </footer>
     </article>

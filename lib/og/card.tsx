@@ -39,7 +39,16 @@ function imageType(bytes: Uint8Array): string | null {
   return null;
 }
 
-/** This request's origin, to resolve the relative /dev/files links used in development. */
+/**
+ * The preview image, absolute on the host the page was asked for (alex.exhbt.co.uk, or /p/alex in
+ * development), for generateMetadata's openGraph.images and twitter.images. `path` is the page's
+ * own path, as links on it are built (loadPortfolio's `base`, plus "/<slug>" for a project).
+ */
+export async function previewImage(path: string, alt: string) {
+  return { url: `${await origin()}${path}/preview.png`, ...OG_SIZE, type: OG_TYPE, alt };
+}
+
+/** This request's origin: for the preview's absolute address, and the relative /dev/files links used in development. */
 async function origin(): Promise<string> {
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost";
@@ -134,7 +143,7 @@ export function portfolioCard({ name, headline, photo, host }: { name: string; h
   return new ImageResponse(
     (
       <Frame host={host}>
-        <div style={{ display: "flex", alignItems: "center", gap: 48, marginTop: 40 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 48, flex: 1, paddingBottom: 24 }}>
           <Face name={name} photo={photo} size={220} />
           <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
             <div style={{ fontFamily: "Bricolage", fontWeight: 600, fontSize: 84, lineHeight: 1.02, letterSpacing: "-0.03em" }}>{clip(name, 40)}</div>

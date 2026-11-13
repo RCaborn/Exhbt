@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import { CHECKS_GUIDE } from "@/components/brand/Seal";
 import { ProjectView } from "@/components/portfolio/ProjectView";
 import { PrintAddress, ProjectPager, ProjectTopNav } from "@/components/portfolio/ProjectNav";
 import { headlineFor } from "@/lib/exhbt/headline";
-import { portfolioHost } from "@/lib/hosts";
+import { MARKETING_HOST, portfolioHost } from "@/lib/hosts";
+import { previewImage } from "@/lib/og/card";
 import { checkedOnLabel, loadPortfolio, mediaFor } from "@/lib/portfolio";
 
 type Params = { params: Promise<{ username: string; slug: string }> };
@@ -16,12 +18,13 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const title = `${it.doc.title} · ${p.displayName}`;
   const h = headlineFor(it.doc);
   const description = [h && `${h.value} ${h.label}.`, it.doc.context].filter(Boolean).join(" ") || undefined;
+  const image = await previewImage(`${p.base}/${slug}`, it.doc.title);
   return {
     title: { absolute: title },
     description,
-    // Link previews (opengraph-image.tsx beside this page) show whatever the search setting; it only stops indexing.
-    openGraph: { type: "article", title, description, siteName: "exhbt" },
-    twitter: { card: "summary_large_image", title, description },
+    // The link preview (preview.png beside this page) shows whatever the search setting; that only stops indexing.
+    openGraph: { type: "article", title, description, siteName: "exhbt", images: [image] },
+    twitter: { card: "summary_large_image", title, description, images: [image] },
     ...(p.profile.hideFromSearch ? { robots: { index: false, follow: false } } : {}),
   };
 }
@@ -47,6 +50,8 @@ export default async function PortfolioProject({ params }: Params) {
         evidenceUrl={evidenceUrl}
         checkedOn={checkedOnLabel(it.publishedAt)}
         position={i + 1}
+        // On alex.exhbt.co.uk a relative guide link would stay on the portfolio host.
+        checksHref={p.base ? undefined : `https://${MARKETING_HOST}${CHECKS_GUIDE}`}
       />
       <PrintAddress address={`${portfolioHost(p.profile.username)}/${slug}`} />
       <ProjectPager base={p.base} prev={p.items[i - 1]} next={p.items[i + 1]} />

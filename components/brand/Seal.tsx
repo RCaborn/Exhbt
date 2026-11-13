@@ -9,7 +9,18 @@ export const CHECKS_GUIDE = "/how-to-read-an-exhbt#checks";
  * As a link it explains itself on the employer guide. Inside another link (a
  * tile), pass `asLink={false}` so links don't nest.
  */
-export function Seal({ date, asLink = true, compact = false }: { date?: string; asLink?: boolean; compact?: boolean }) {
+export function Seal({
+  date,
+  asLink = true,
+  compact = false,
+  href = CHECKS_GUIDE,
+}: {
+  date?: string;
+  asLink?: boolean;
+  compact?: boolean;
+  /** The guide. On a portfolio host pass the marketing site's full address: a relative link would stay on the person's host. */
+  href?: string;
+}) {
   const body = (
     <>
       <Mark size={compact ? 14 : 16} />
@@ -20,7 +31,7 @@ export function Seal({ date, asLink = true, compact = false }: { date?: string; 
   const cls =
     "inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-0.5 pr-2.5 pl-1.5 font-mono text-[0.72rem] text-ink";
   return asLink ? (
-    <Link href={CHECKS_GUIDE} className={`${cls} hover:border-jade`} aria-label="Checked by exhbt: what the checks mean">
+    <Link href={href} className={`${cls} hover:border-jade`} aria-label="Checked by exhbt: what the checks mean">
       {body}
     </Link>
   ) : (

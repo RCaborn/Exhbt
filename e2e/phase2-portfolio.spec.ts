@@ -176,12 +176,12 @@ test.describe("Public portfolio", () => {
     await page.goto("/p/amara");
     await expect(page.getByRole("heading", { level: 1, name: "Amara Okafor" })).toBeVisible();
     await expect(page.getByText("Data analyst, health and public services")).toBeVisible();
-    await expect(page.getByRole("link", { name: /Open project/ })).toHaveCount(2);
+    await expect(page.locator("[data-catalogue]")).toHaveText(["EX·01", "EX·02"]);
 
     await page.getByRole("link", { name: new RegExp(GP.title) }).click();
     await page.waitForURL(/\/p\/amara\/gp-reminders$/);
     await expect(page.getByRole("heading", { level: 1, name: GP.title })).toBeVisible();
-    await expect(page.getByText("1 of 2")).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Portfolio" })).toContainText("EX·01");
     await expect(page.getByRole("list", { name: "Methodology" }).getByRole("listitem")).toHaveCount(GP.flow.length);
     const findings = page.getByRole("region", { name: "findings" }).getByRole("listitem");
     await expect(findings).toHaveCount(GP.findings.length);
@@ -200,7 +200,7 @@ test.describe("Public portfolio", () => {
     await page.getByRole("navigation", { name: "Other projects" }).getByRole("link", { name: /Next/ }).click();
     await page.waitForURL(/\/p\/amara\/library-footfall$/);
     await expect(page.getByRole("heading", { level: 1, name: LIBRARY.title })).toBeVisible();
-    await expect(page.getByText("2 of 2")).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Portfolio" })).toContainText("EX·02");
     // No work linked, so the badge doesn't claim a source.
     await expect(page.getByRole("list", { name: "Checks passed" })).toContainText("Confirmed by author");
     await expect(page.getByRole("list", { name: "Checks passed" })).not.toContainText("Source attached");

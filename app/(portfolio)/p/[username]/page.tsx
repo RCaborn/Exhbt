@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { GlanceView } from "@/components/portfolio/GlanceView";
+import { previewImage } from "@/lib/og/card";
 import { loadPortfolio } from "@/lib/portfolio";
 
 type Params = { params: Promise<{ username: string }> };
@@ -10,12 +11,13 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (p.status !== "ok") return { title: "Portfolio not found", robots: { index: false } };
   const title = `${p.displayName} · Portfolio`;
   const description = p.profile.headline ?? `Projects by ${p.displayName}.`;
+  const image = await previewImage(p.base, `${p.displayName}'s portfolio`);
   return {
     title: { absolute: title },
     description,
-    // Link previews (opengraph-image.tsx beside this page) show whatever the search setting; it only stops indexing.
-    openGraph: { type: "profile", title, description, siteName: "exhbt" },
-    twitter: { card: "summary_large_image", title, description },
+    // The link preview (preview.png beside this page) shows whatever the search setting; that only stops indexing.
+    openGraph: { type: "profile", title, description, siteName: "exhbt", images: [image] },
+    twitter: { card: "summary_large_image", title, description, images: [image] },
     ...(p.profile.hideFromSearch ? { robots: { index: false, follow: false } } : {}),
   };
 }
