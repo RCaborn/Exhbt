@@ -56,7 +56,7 @@ export default async function NewJobLinkPage() {
         ) : (
           <>
             <h1 className="mt-3">New job link</h1>
-            <UpgradeNote username={profile.username} />
+            <UpgradeNote username={profile.username} reason={room.reason} upgradeTo={room.upgradeTo} />
           </>
         )}
       </div>

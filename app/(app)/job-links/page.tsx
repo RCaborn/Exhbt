@@ -44,7 +44,7 @@ export default async function JobLinksPage() {
         </div>
 
         {!e.jobLinks ? (
-          <UpgradeNote username={profile.username} />
+          <UpgradeNote username={profile.username} reason={room.ok ? "" : room.reason} upgradeTo={room.ok ? undefined : room.upgradeTo} />
         ) : (
           <section aria-labelledby="new" className="mt-8 rounded-[20px] border border-line bg-surface p-5 sm:p-6">
             <h2 id="new" className="text-[1.375rem]">New job link</h2>

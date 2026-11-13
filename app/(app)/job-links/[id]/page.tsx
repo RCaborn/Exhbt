@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowDown, ArrowLeft, ArrowUp } from "lucide-react";
 import { ConfirmAction } from "@/components/editor/ConfirmAction";
+import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { getCurrentUser } from "@/lib/auth";
 import { EXHBTS_PER_JOB_LINK, PLAN_NAMES } from "@/lib/entitlements";
@@ -64,14 +65,7 @@ export default async function JobLinkEditPage({ params, searchParams }: Props) {
         <p className="mt-2 text-sm text-graphite">{link.viewCount === 1 ? "1 view" : `${link.viewCount.toLocaleString("en-GB")} views`}. Views are counted without cookies.</p>
 
         {error && ERRORS[error] && (
-          <p role="alert" className="mt-6 rounded-[var(--radius)] border border-error/40 bg-surface px-4 py-3 text-error">
-            {ERRORS[error]}{" "}
-            {error === "plan" && (
-              <Link href="/account/billing" className="link font-semibold">
-                See plans
-              </Link>
-            )}
-          </p>
+          <UpgradePrompt reason={ERRORS[error]} upgradeTo={error === "plan" ? "max" : undefined} tone="alert" className="mt-6" />
         )}
 
         <section aria-labelledby="address" className="mt-8 rounded-[20px] border border-line bg-surface p-5 sm:p-6">

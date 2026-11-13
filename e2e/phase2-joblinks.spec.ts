@@ -218,11 +218,11 @@ test.describe("job link pages", () => {
 
   test("Premium sees what job links are and where to upgrade", async ({ page }) => {
     await signInAs(page, "jlprem", "premium", 1);
-    await expect(page.getByText(/Job links come with Max/)).toBeVisible();
-    await expect(page.getByRole("link", { name: "See Max" })).toHaveAttribute("href", "/account/billing");
+    await expect(page.getByTestId("upgrade-prompt")).toContainText("Links for each job come with Max.");
+    await expect(page.getByRole("link", { name: /^Upgrade to Max/ })).toHaveAttribute("href", "/account/billing");
     await expect(page.getByRole("link", { name: "New job link" })).toHaveCount(0);
     await page.goto("/job-links/new");
-    await expect(page.getByText(/Job links come with Max/)).toBeVisible();
+    await expect(page.getByTestId("upgrade-prompt")).toContainText("Links for each job come with Max.");
     await expect(page.getByLabel("Company", { exact: true })).toHaveCount(0);
   });
 
