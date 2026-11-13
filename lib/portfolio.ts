@@ -3,8 +3,8 @@ import { headers } from "next/headers";
 import type { ExhbtDoc } from "./exhbt/blocks";
 import { signedFileUrl } from "./files";
 import { parseHost, portfolioHost } from "./hosts";
-import { visibleOnPortfolio } from "./plan-rules";
-import { getStore, type ExhbtRecord, type PortfolioProfile } from "./store";
+import { limitsFor, visibleOnPortfolio } from "./plan-rules";
+import { getStore, type ExhbtRecord, type JobLink, type PortfolioProfile } from "./store";
 
 /**
  * Everything a public portfolio page needs, loaded the same way for the at-a-glance page and
@@ -63,6 +63,37 @@ export async function loadPortfolio(username: string, rest = ""): Promise<Loaded
 }
 
 const toItem = (e: ExhbtRecord): PortfolioItem => ({ id: e.id, slug: e.slug!, doc: e.published!, publishedAt: e.publishedAt });
+
+export type LoadedJobLink =
+  | { status: "ok"; link: JobLink; items: PortfolioItem[]; base: string; displayName: string }
+  | { status: "missing" };
+
+/**
+ * A live per-job page. Off links, unknown paths, and any plan that doesn't include job links
+ * (including after a downgrade) are missing, so the page 404s. The picks stay in the order
+ * the person set, and only exhbts still on the public portfolio are shown.
+ */
+export async function loadPublicJobLink(username: string, slug: string): Promise<LoadedJobLink> {
+  const store = getStore();
+  const found = await store.lookupUsername(username);
+  if (!found || "redirectTo" in found) return { status: "missing" };
+  const plan = await store.planFor(found.userId);
+  if (!limitsFor(plan).jobLinks) return { status: "missing" };
+  const link = await store.getLiveJobLink(found.userId, slug);
+  if (!link) return { status: "missing" };
+  const byId = new Map(visibleOnPortfolio(plan, await store.listExhbts(found.userId)).map((e) => [e.id, e]));
+  const profile = await store.getPortfolioProfile(found.userId);
+  return {
+    status: "ok",
+    link,
+    items: link.picks.flatMap((p) => {
+      const e = byId.get(p.exhbtId);
+      return e ? [toItem(e)] : [];
+    }),
+    base: await basePath(found.username),
+    displayName: profile.name?.trim() || found.username,
+  };
+}
 
 /** Signed URLs for one exhbt's images and its evidence file (links pass through). */
 export async function mediaFor(doc: ExhbtDoc): Promise<{ imageUrls: Record<string, string | null>; evidenceUrl: string | null }> {

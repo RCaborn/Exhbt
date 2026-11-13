@@ -103,11 +103,10 @@ export const PLAN_NAMES: Record<Plan, string> = {
 export const ORIGINALITY_CHECK_LIVE = false;
 
 /**
- * Flip to true once per-job links are built (docs/phase-2.md section 8). Until then, while Phase 2
- * sells Max for real, the Max line says "coming soon". With Phase 2 off the whole tier is a
- * waitlist marked "Coming soon", so the line stays as it was.
+ * Per-job links are built (paste a description, rank, a noindex page). Pricing copy follows this.
+ * With Phase 2 off, the whole tier is a waitlist marked "Coming soon", so the line stays as it was.
  */
-export const JOB_LINKS_LIVE = false;
+export const JOB_LINKS_LIVE = true;
 
 /** Exhbts picked for a job-specific link. */
 export const EXHBTS_PER_JOB_LINK = 4;

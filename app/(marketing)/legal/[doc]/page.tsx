@@ -9,7 +9,7 @@ type Doc = { title: string; updated: string; body: React.ReactNode };
 const DOCS: Record<string, Doc> = {
   privacy: {
     title: "Privacy policy",
-    updated: "12 November 2026",
+    updated: "13 November 2026",
     body: (
       <>
         <p>
@@ -30,6 +30,10 @@ const DOCS: Record<string, Doc> = {
             one, a profile photo.
           </li>
           <li>The files you upload for an exhbt, the text read from them, and everything you write in the editor.</li>
+          <li>
+            If you make a link for a job: the company, the role, the job description you paste, which exhbts the
+            link shows, and how many times the page is opened. The count has no cookie and no record of who opened it.
+          </li>
           <li>
             If you pay for a plan: which plan, its status and renewal date, and Stripe&rsquo;s reference for you and
             your subscription. Not your card details.
@@ -71,11 +75,13 @@ const DOCS: Record<string, Doc> = {
           We then check every number in the draft against your material and flag any we can&rsquo;t find, so you
           check or remove it before you publish.
         </p>
-        <h2>Job matching (coming soon)</h2>
+        <h2>Job matching</h2>
         <p>
-          Links for each job, on {PLAN_NAMES.max}, aren&rsquo;t available yet. When they are, the job description
-          you give and your published exhbts will go to Anthropic so it can pick the exhbts that fit the job best.
-          We&rsquo;ll update this policy before it starts.
+          On {PLAN_NAMES.max}, you can make a link for one job. You paste the job description. That text and your
+          published exhbts go to Anthropic, which suggests which exhbts to show and a short introduction. You can
+          change both before anyone sees the page. We don&rsquo;t fetch the advert from a web address. The page is
+          not listed by search engines. We count how many times it is opened, without a cookie and without
+          recording who opened it.
         </p>
         <h2>Why, and on what lawful basis</h2>
         <p>
@@ -88,8 +94,9 @@ const DOCS: Record<string, Doc> = {
           <li>Supabase: database, file storage and sign-in. Data stored in London, UK.</li>
           <li>Cloudflare: hosting and delivery of the website.</li>
           <li>
-            Anthropic: an AI model reads your CV and inputs to write your roadmap, and your project material to
-            draft an exhbt. Processing may take place outside the UK under appropriate safeguards; inputs are not
+            Anthropic: an AI model reads your CV and inputs to write your roadmap, your project material to
+            draft an exhbt, and, when you make a link for a job, the job description you pasted and your
+            published exhbts. Processing may take place outside the UK under appropriate safeguards; inputs are not
             used to train models.
           </li>
           <li>Resend: sending sign-in emails.</li>

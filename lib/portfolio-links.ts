@@ -6,8 +6,9 @@ import { APEX, portfolioHost } from "./hosts";
  * subdomains don't resolve, it's the /p/<username> path the same deployment serves.
  * Safe to import from client components.
  */
-export function portfolioHref(username: string, currentHost: string | null | undefined): string {
+export function portfolioHref(username: string, currentHost: string | null | undefined, path = ""): string {
   const host = (currentHost ?? "").toLowerCase().replace(/:\d+$/, "");
   const live = host === APEX || host.endsWith(`.${APEX}`);
-  return live ? `https://${portfolioHost(username)}` : `/p/${username}`;
+  const suffix = path ? `/${path.replace(/^\/+/, "")}` : "";
+  return live ? `https://${portfolioHost(username)}${suffix}` : `/p/${username}${suffix}`;
 }

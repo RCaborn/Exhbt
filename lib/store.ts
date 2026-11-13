@@ -88,6 +88,49 @@ export type StoredFile = {
 
 export type UsernameLookup = { userId: string; username: string } | { redirectTo: string } | null;
 
+/** One published exhbt chosen for a job link, with the one-line reason shown to the owner. */
+export type JobLinkPick = { exhbtId: string; reason: string };
+
+/**
+ * A per-job link (curated_links). `slug` is the path on the person's host (collection_slug).
+ * The table's public_slug is stored as the row id so it stays globally unique; the path is per person.
+ */
+export type JobLink = {
+  id: string;
+  userId: string;
+  company: string;
+  roleTitle: string;
+  slug: string;
+  slugStyle: "clean" | "suffix";
+  intro: string;
+  /** The job description the person pasted. */
+  description: string;
+  picks: JobLinkPick[];
+  status: "live" | "off";
+  viewCount: number;
+  createdAt: string;
+};
+
+export type NewJobLink = {
+  id: string;
+  userId: string;
+  company: string;
+  roleTitle: string;
+  slug: string;
+  slugStyle: "clean" | "suffix";
+  intro: string;
+  description: string;
+  picks: JobLinkPick[];
+};
+
+export type JobLinkPatch = {
+  intro?: string;
+  picks?: JobLinkPick[];
+  status?: "live" | "off";
+  slug?: string;
+  slugStyle?: "clean" | "suffix";
+};
+
 export type AICall = {
   userId: string | null;
   step: "roadmap" | "exhbt_draft" | "exhbt_rewrite" | "originality" | "link_ranking" | "project_ideas" | "cv_read" | "file_transcribe";
@@ -118,7 +161,8 @@ export type EventName =
   | "username_claimed"
   | "exhbt_drafted"
   | "file_uploaded"
-  | "file_read_ai";
+  | "file_read_ai"
+  | "job_link_created";
 
 /** A Stripe subscription as we keep it (the `subscriptions` table). No amounts or card details. */
 export type SubscriptionRecord = {
@@ -237,6 +281,18 @@ export interface Store {
   /* billing polish */
   /** A person's stored files; with `exhbtId`, only those attached to that exhbt. */
   listFiles(userId: string, exhbtId?: string): Promise<StoredFile[]>;
+
+  /* per-job links (docs/phase-2.md section 8, decision 0008) */
+  listJobLinks(userId: string): Promise<JobLink[]>;
+  getJobLink(id: string): Promise<JobLink | null>;
+  /** A live link at this path on this person's host, or null when it is off or missing. */
+  getLiveJobLink(userId: string, slug: string): Promise<JobLink | null>;
+  createJobLink(link: NewJobLink): Promise<void>;
+  /** False when the row is missing or isn't theirs. */
+  updateJobLink(id: string, userId: string, patch: JobLinkPatch): Promise<boolean>;
+  deleteJobLink(id: string, userId: string): Promise<boolean>;
+  /** Counts one opening of a live link. No cookies, and an off link is left as it is. */
+  recordJobLinkView(id: string): Promise<void>;
 }
 
 export const isSupabaseConfigured = () =>
@@ -824,6 +880,80 @@ function supabaseStore(): Store {
       }[];
       return rows.map((r) => ({ id: r.id, userId: r.user_id, bucket: r.bucket, path: r.path, mime: r.mime, bytes: r.bytes, kind: r.kind }));
     },
+
+    async listJobLinks(userId) {
+      const rows = check(
+        await db.from("curated_links").select(JOB_LINK_COLS).eq("user_id", userId).order("created_at", { ascending: false }),
+      ) as JobLinkRow[];
+      return rows.map(fromJobLinkRow);
+    },
+    async getJobLink(id) {
+      const row = check(await db.from("curated_links").select(JOB_LINK_COLS).eq("id", id).maybeSingle()) as JobLinkRow | null;
+      return row ? fromJobLinkRow(row) : null;
+    },
+    async getLiveJobLink(userId, slug) {
+      const row = check(
+        await db
+          .from("curated_links")
+          .select(JOB_LINK_COLS)
+          .eq("user_id", userId)
+          .eq("collection_slug", slug)
+          .eq("status", "live")
+          .maybeSingle(),
+      ) as JobLinkRow | null;
+      return row ? fromJobLinkRow(row) : null;
+    },
+    async createJobLink(link) {
+      const picks = link.picks.slice(0, 4);
+      check(
+        await db.from("curated_links").insert({
+          id: link.id,
+          user_id: link.userId,
+          name: jobLinkName(link.company, link.roleTitle),
+          job_listing_text: link.description,
+          exhbt_ids: picks.map((p) => p.exhbtId),
+          public_slug: link.id,
+          collection_slug: link.slug,
+          company: link.company,
+          role_title: link.roleTitle,
+          slug_style: link.slugStyle,
+          intro: link.intro,
+          ranking: picks,
+          status: "live",
+          view_count: 0,
+        }),
+      );
+    },
+    async updateJobLink(id, userId, patch) {
+      const row: Record<string, unknown> = {};
+      if (patch.intro !== undefined) row.intro = patch.intro;
+      if (patch.status) row.status = patch.status;
+      if (patch.slug) row.collection_slug = patch.slug;
+      if (patch.slugStyle) row.slug_style = patch.slugStyle;
+      if (patch.picks) {
+        const picks = patch.picks.slice(0, 4);
+        row.ranking = picks;
+        row.exhbt_ids = picks.map((p) => p.exhbtId);
+      }
+      if (Object.keys(row).length === 0) return true;
+      const updated = check(
+        await db.from("curated_links").update(row).eq("id", id).eq("user_id", userId).select("id").maybeSingle(),
+      ) as { id: string } | null;
+      return Boolean(updated);
+    },
+    async deleteJobLink(id, userId) {
+      const deleted = check(
+        await db.from("curated_links").delete().eq("id", id).eq("user_id", userId).select("id").maybeSingle(),
+      ) as { id: string } | null;
+      return Boolean(deleted);
+    },
+    async recordJobLinkView(id) {
+      const row = check(
+        await db.from("curated_links").select("view_count").eq("id", id).eq("status", "live").maybeSingle(),
+      ) as { view_count: number } | null;
+      if (!row) return;
+      check(await db.from("curated_links").update({ view_count: row.view_count + 1 }).eq("id", id).eq("status", "live"));
+    },
   };
 }
 
@@ -871,6 +1001,52 @@ type ExhbtRow = {
   published_at: string | null;
   updated_at: string;
 };
+const JOB_LINK_COLS =
+  "id, user_id, company, role_title, collection_slug, slug_style, intro, job_listing_text, ranking, exhbt_ids, status, view_count, created_at";
+type JobLinkRow = {
+  id: string;
+  user_id: string;
+  company: string | null;
+  role_title: string | null;
+  collection_slug: string | null;
+  slug_style: string | null;
+  intro: string | null;
+  job_listing_text: string | null;
+  ranking: unknown;
+  exhbt_ids: string[] | null;
+  status: string | null;
+  view_count: number | null;
+  created_at: string;
+};
+const jobLinkName = (company: string, role: string) => `${company} · ${role}`.slice(0, 200);
+function picksFromRow(ranking: unknown, ids: string[] | null): JobLinkPick[] {
+  if (Array.isArray(ranking)) {
+    const picks: JobLinkPick[] = [];
+    for (const row of ranking) {
+      if (!row || typeof row !== "object") continue;
+      const exhbtId = "exhbtId" in row ? String((row as { exhbtId: unknown }).exhbtId) : "";
+      const reason = "reason" in row && typeof (row as { reason: unknown }).reason === "string" ? (row as { reason: string }).reason : "";
+      if (exhbtId) picks.push({ exhbtId, reason });
+    }
+    if (picks.length) return picks.slice(0, 4);
+  }
+  return (ids ?? []).slice(0, 4).map((exhbtId) => ({ exhbtId, reason: "" }));
+}
+const fromJobLinkRow = (r: JobLinkRow): JobLink => ({
+  id: r.id,
+  userId: r.user_id,
+  company: r.company ?? "",
+  roleTitle: r.role_title ?? "",
+  slug: r.collection_slug ?? "",
+  slugStyle: r.slug_style === "clean" ? "clean" : "suffix",
+  intro: r.intro ?? "",
+  description: r.job_listing_text ?? "",
+  picks: picksFromRow(r.ranking, r.exhbt_ids),
+  status: r.status === "off" ? "off" : "live",
+  viewCount: r.view_count ?? 0,
+  createdAt: r.created_at,
+});
+
 const fromExhbtRow = (r: ExhbtRow): ExhbtRecord => ({
   id: r.id,
   userId: r.user_id,
@@ -903,6 +1079,7 @@ type Mem = {
   plans: Map<string, Plan>;
   /** Stripe subscriptions by subscription id (billing). */
   subscriptions: Map<string, SubscriptionRecord>;
+  jobLinks: Map<string, JobLink>;
 };
 const newMem = (): Mem => ({
   roadmaps: new Map(),
@@ -918,6 +1095,7 @@ const newMem = (): Mem => ({
   files: new Map(),
   plans: new Map(),
   subscriptions: new Map(),
+  jobLinks: new Map(),
 });
 const g = globalThis as unknown as { __exhbtMem?: Mem };
 
@@ -933,6 +1111,7 @@ function memoryStore(): Store {
   m.files ??= new Map();
   m.plans ??= new Map();
   m.subscriptions ??= new Map();
+  m.jobLinks ??= new Map();
   const liveSubscription = (userId: string): SubscriptionRecord | null => {
     // Newest last in insertion order, so look from the end.
     const mine = [...m.subscriptions.values()].filter((x) => x.userId === userId).reverse();
@@ -1069,6 +1248,7 @@ function memoryStore(): Store {
           .map((e) => structuredClone(e)),
         files: [...m.files.values()].filter((f) => f.userId === userId).map((f) => ({ ...f })),
         subscriptions: [...m.subscriptions.values()].filter((x) => x.userId === userId).map((x) => ({ ...x })),
+        curatedLinks: [...m.jobLinks.values()].filter((l) => l.userId === userId).map((l) => ({ ...l, picks: l.picks.map((p) => ({ ...p })) })),
       };
     },
     async deleteUserData(userId) {
@@ -1082,6 +1262,7 @@ function memoryStore(): Store {
       // As the database cascade does: subscriptions and file records go with the account.
       for (const [id, s] of m.subscriptions) if (s.userId === userId) m.subscriptions.delete(id);
       for (const [id, f] of m.files) if (f.userId === userId) m.files.delete(id);
+      for (const [id, l] of m.jobLinks) if (l.userId === userId) m.jobLinks.delete(id);
       m.profiles.delete(userId);
       m.plans.delete(userId);
     },
@@ -1222,6 +1403,50 @@ function memoryStore(): Store {
       return [...m.files.values()]
         .filter((f) => f.userId === userId && (!exhbtId || (f as StoredFile & { exhbtId?: string | null }).exhbtId === exhbtId))
         .map((f) => ({ ...f }));
+    },
+
+    async listJobLinks(userId) {
+      return [...m.jobLinks.values()]
+        .filter((l) => l.userId === userId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map((l) => ({ ...l, picks: l.picks.map((p) => ({ ...p })) }));
+    },
+    async getJobLink(id) {
+      const l = m.jobLinks.get(id);
+      return l ? { ...l, picks: l.picks.map((p) => ({ ...p })) } : null;
+    },
+    async getLiveJobLink(userId, slug) {
+      const l = [...m.jobLinks.values()].find((x) => x.userId === userId && x.slug === slug && x.status === "live");
+      return l ? { ...l, picks: l.picks.map((p) => ({ ...p })) } : null;
+    },
+    async createJobLink(link) {
+      m.jobLinks.set(link.id, {
+        ...link,
+        picks: link.picks.slice(0, 4).map((p) => ({ ...p })),
+        status: "live",
+        viewCount: 0,
+        createdAt: new Date().toISOString(),
+      });
+    },
+    async updateJobLink(id, userId, patch) {
+      const l = m.jobLinks.get(id);
+      if (!l || l.userId !== userId) return false;
+      if (patch.intro !== undefined) l.intro = patch.intro;
+      if (patch.status) l.status = patch.status;
+      if (patch.slug) l.slug = patch.slug;
+      if (patch.slugStyle) l.slugStyle = patch.slugStyle;
+      if (patch.picks) l.picks = patch.picks.slice(0, 4).map((p) => ({ ...p }));
+      return true;
+    },
+    async deleteJobLink(id, userId) {
+      const l = m.jobLinks.get(id);
+      if (!l || l.userId !== userId) return false;
+      m.jobLinks.delete(id);
+      return true;
+    },
+    async recordJobLinkView(id) {
+      const l = m.jobLinks.get(id);
+      if (l && l.status === "live") l.viewCount += 1;
     },
   };
 }

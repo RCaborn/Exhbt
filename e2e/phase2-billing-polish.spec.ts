@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import Stripe from "stripe";
-import { BILLING_PERIOD, ENTITLEMENTS, PLAN_NAMES, PRICES } from "../lib/entitlements";
+import { BILLING_PERIOD, ENTITLEMENTS, EXHBTS_PER_JOB_LINK, PLAN_NAMES, PRICES } from "../lib/entitlements";
 
 // Billing polish: Stripe events out of order, the upgrade offer where a limit stops something,
 // the pricing page selling for real with Phase 2 on, and files removed with their exhbt.
@@ -121,7 +121,8 @@ test.describe("Pricing with Phase 2 on", () => {
       await expect(card.getByText("An originality check when you publish (coming soon)")).toBeVisible();
       await expect(card.getByText("Join the waitlist")).toHaveCount(0);
     }
-    await expect(page.locator("section#max").getByText(/best fits \(coming soon\)$/)).toBeVisible();
+    await expect(page.locator("section#max").getByText(`we pick your ${EXHBTS_PER_JOB_LINK} best fits`)).toBeVisible();
+    await expect(page.locator("section#max").getByText(/best fits \(coming soon\)/)).toHaveCount(0);
     await expect(page.getByText("Coming soon", { exact: true })).toHaveCount(0);
 
     // Signed out, Choose goes through sign-in first.
