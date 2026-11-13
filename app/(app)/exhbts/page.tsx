@@ -50,11 +50,9 @@ export default async function ExhbtsPage() {
         {!canGoLive && (
           <section aria-labelledby="preview-only" className="mt-6 rounded-[20px] border border-line bg-surface p-5 sm:p-6">
             <h2 id="preview-only" className="text-[1.375rem]">Preview only on {PLAN_NAMES[plan]}</h2>
-            <UpgradePrompt
-              className="mt-3"
-              reason={`Build and preview your exhbts here. Publishing them to your own link comes with ${PLAN_NAMES.premium}.`}
-              upgradeTo="premium"
-            />
+            <p className="mt-2 text-graphite">Build and preview your exhbts here. Publishing them to your own link comes with {PLAN_NAMES.premium}.</p>
+            {/* When the plan is full, the New exhbt card below carries the upgrade prompt. */}
+            {room.ok && <UpgradePrompt className="mt-3" reason={`Ready to share them? ${PLAN_NAMES.premium} publishes to your own link.`} upgradeTo="premium" />}
           </section>
         )}
 
