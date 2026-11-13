@@ -3,10 +3,12 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { Editor } from "@/components/editor/Editor";
 import { getCurrentUser } from "@/lib/auth";
+import { loadAiVersion, loadDraftSource } from "@/lib/draft-tools";
 import { signedFileUrl } from "@/lib/files";
 import { parseHost, portfolioHost } from "@/lib/hosts";
 import { canPublish, getPlan } from "@/lib/plan";
 import { mediaFor } from "@/lib/portfolio";
+import { rewriteAllowance } from "@/lib/rewriting";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
 
@@ -31,8 +33,14 @@ export default async function EditExhbtPage({ params }: Params) {
   const onAppHost = parseHost((await headers()).get("host")).kind === "app";
   const liveBase = profile.username ? (onAppHost ? `https://${portfolioHost(profile.username)}` : `/p/${profile.username}`) : null;
 
+  // Rewrite and "Back to the AI version" need the source text kept from the draft.
+  const hasSource = (await loadDraftSource(user.id, id)) !== null;
+  const allowance = await rewriteAllowance(user.id, id);
+  const aiVersion = hasSource ? await loadAiVersion(user.id, id) : null;
+
   return (
     <Editor
+      draftTools={hasSource && aiVersion ? { aiVersion, rewritesLeft: allowance.left, rewritesLimit: allowance.limit } : null}
       id={record.id}
       initialDoc={record.doc}
       status={record.status}
