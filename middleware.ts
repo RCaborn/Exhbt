@@ -1,17 +1,30 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { APEX, parseHost } from "@/lib/hosts";
+import { APEX, parseHost, toolRedirectUrl } from "@/lib/hosts";
 import { isPhase2Enabled as phase2 } from "@/lib/site";
 
 /**
  * 1. Hosts (docs/decisions/0001): alex.exhbt.co.uk is rewritten to the portfolio route group
  *    (/p/alex/...), with no sign-in cookies on that host. Reserved or malformed names 404.
+ *    www and the apex send /login, /roadmap and /auth to app.exhbt.co.uk (docs/phase-2.md).
  * 2. Keeps the Supabase session cookie fresh on the routes that read it. A no-op when
  *    Supabase is not configured (local dev).
  */
 
 /** Routes that read the session. Marketing pages stay static and fast. */
-const SESSION_PATHS = ["/roadmap", "/account", "/api/account", "/api/roadmap", "/auth", "/login", "/exhbts", "/api/exhbts", "/api/files", "/api/username"];
+const SESSION_PATHS = [
+  "/roadmap",
+  "/account",
+  "/api/account",
+  "/api/roadmap",
+  "/auth",
+  "/login",
+  "/exhbts",
+  "/api/exhbts",
+  "/api/files",
+  "/api/username",
+  "/job-links",
+];
 
 const notFound = () => new NextResponse("Not found", { status: 404, headers: { "Content-Type": "text/plain" } });
 
@@ -32,6 +45,9 @@ export async function middleware(req: NextRequest) {
   // On our real domains, portfolios are only reachable on their own host, never as /p/<name>.
   if (pathname.startsWith("/p/") && (rawHost ?? "").replace(/:\d+$/, "").endsWith(APEX)) return notFound();
   if (pathname.startsWith("/p/") && !phase2()) return notFound();
+
+  const tool = toolRedirectUrl(rawHost, pathname, req.nextUrl.search);
+  if (tool) return NextResponse.redirect(tool, 301);
 
   if (!SESSION_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return NextResponse.next();
 

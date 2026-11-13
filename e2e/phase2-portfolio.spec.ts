@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { ENTITLEMENTS } from "../lib/entitlements";
 import { LIMITS, safeHref, text, validateForPublish, wordCount, type ExhbtDoc } from "../lib/exhbt/blocks";
 import { sampleDocs } from "../lib/exhbt/sample";
-import { MARKETING_HOST, parseHost, usernameProblem } from "../lib/hosts";
+import { APP_HOST, MARKETING_HOST, parseHost, toolRedirectUrl, usernameProblem } from "../lib/hosts";
 import { canCreateExhbt, canMakeJobLinks, canPublish, visibleOnPortfolio } from "../lib/plan-rules";
 import type { ExhbtRecord } from "../lib/store";
 
@@ -100,6 +100,22 @@ test.describe("Hosts", () => {
     ];
     for (const [host, kind] of cases) expect(parseHost(host), host).toEqual(kind);
     expect(parseHost(null)).toEqual({ kind: "marketing" });
+  });
+
+  test("www and the apex send sign-in and the builder to the app host", () => {
+    const go = (host: string, path: string, search = "") => toolRedirectUrl(host, path, search);
+    for (const host of ["www.exhbt.co.uk", "exhbt.co.uk", "WWW.exhbt.co.uk:443"]) {
+      expect(go(host, "/login"), host).toBe(`https://${APP_HOST}/login`);
+      expect(go(host, "/roadmap/new", "?role=analyst"), host).toBe(`https://${APP_HOST}/roadmap/new?role=analyst`);
+      expect(go(host, "/auth/confirm", "?token_hash=abc"), host).toBe(`https://${APP_HOST}/auth/confirm?token_hash=abc`);
+    }
+    for (const host of ["localhost:3200", "something.workers.dev", "app.exhbt.co.uk", "alex.exhbt.co.uk"]) {
+      expect(go(host, "/login"), host).toBeNull();
+    }
+    expect(go("www.exhbt.co.uk", "/pricing")).toBeNull();
+    expect(go("www.exhbt.co.uk", "/account")).toBeNull();
+    expect(go("www.exhbt.co.uk", "/exhbts")).toBeNull();
+    expect(go("www.exhbt.co.uk", "/start")).toBeNull();
   });
 
   test("usernames: shape, single hyphens, and reserved names", () => {

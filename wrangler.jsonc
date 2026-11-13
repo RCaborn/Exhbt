@@ -8,6 +8,15 @@
   "observability": { "enabled": true },
   // Keep variables set in the Cloudflare dashboard when deploying from GitHub Actions.
   "keep_vars": true,
+  // Docs/phase-2.md section 3. Most specific wins, so www and app are not swallowed by the
+  // wildcard. The apex is listed on its own because *.exhbt.co.uk does not match exhbt.co.uk.
+  // A deploy cannot attach these until the zone is on this Cloudflare account.
+  "routes": [
+    { "pattern": "exhbt.co.uk/*", "zone_name": "exhbt.co.uk" },
+    { "pattern": "www.exhbt.co.uk/*", "zone_name": "exhbt.co.uk" },
+    { "pattern": "app.exhbt.co.uk/*", "zone_name": "exhbt.co.uk" },
+    { "pattern": "*.exhbt.co.uk/*", "zone_name": "exhbt.co.uk" }
+  ],
   // Not secret, so set here where a deploy can't remove them. Keys stay as Worker secrets.
   "vars": {
     "NEXT_PUBLIC_SUPABASE_URL": "https://jbrcseklzigdcrgqbclx.supabase.co",
