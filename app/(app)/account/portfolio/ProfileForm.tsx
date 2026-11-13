@@ -10,7 +10,7 @@ export type ProfileValues = { name: string; headline: string; bio: string; linke
 
 /**
  * The portfolio header: name, headline, bio, LinkedIn, and whether search engines may list it.
- * Controlled fields, so an error doesn't wipe what was typed. The photo comes later, with uploads.
+ * Controlled fields, so an error doesn't wipe what was typed. The photo has its own control (PhotoField).
  */
 export function ProfileForm({ initial }: { initial: ProfileValues }) {
   const [state, action] = useActionState<ProfileState, FormData>(saveProfileAction, undefined);

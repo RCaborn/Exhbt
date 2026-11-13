@@ -265,3 +265,33 @@
     min-width: 44px;
   }
 }
+
+/* Print and "Save as PDF" (the project page's button): one A4 page, the exhbt alone. The page
+   chrome hides itself with print:hidden; this sets the paper, a slightly smaller rem so a full
+   200-word exhbt with a graph fits, and keeps the brand fills (ink step, mint ticks and dots). */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  html {
+    font-size: 13px;
+  }
+  html,
+  body {
+    background: var(--color-surface) !important;
+  }
+  * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  /* The portfolio layout's mist page and padding (app/(portfolio)/layout.tsx). */
+  div:has(> main#main) {
+    background: none !important;
+    min-height: 0 !important;
+  }
+  main#main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+}

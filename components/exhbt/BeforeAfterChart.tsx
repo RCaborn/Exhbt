@@ -35,7 +35,7 @@ export function BeforeAfterChart({ data }: { data: KeyResult }) {
         </span>
       </figcaption>
 
-      <div className="mt-3 space-y-3" aria-hidden>
+      <div className="@container mt-3 space-y-3" aria-hidden>
         {data.rows.map((r) => {
           const lo = Math.min(r.before, r.after);
           const hi = Math.max(r.before, r.after);
@@ -43,8 +43,8 @@ export function BeforeAfterChart({ data }: { data: KeyResult }) {
           const improved = data.lowerIsBetter ? change < 0 : change > 0;
           const pct = r.before === 0 ? 0 : Math.round((Math.abs(change) / r.before) * 100);
           return (
-            <div key={r.label} className="grid grid-cols-[5.5rem_1fr_3.5rem] items-center gap-3 sm:grid-cols-[6.5rem_1fr_4rem]">
-              <span className="text-[0.85rem] text-graphite">{r.label}</span>
+            <div key={r.label} className="grid grid-cols-[1fr_3.5rem] items-center gap-x-3 gap-y-0.5 @md:grid-cols-[6.5rem_1fr_4rem]">
+              <span className="col-span-2 text-[0.85rem] text-graphite @md:col-span-1">{r.label}</span>
               <div className="relative h-7">
                 {/* Baseline: recessive. */}
                 <span className="absolute top-1/2 right-0 left-0 h-px bg-line" />

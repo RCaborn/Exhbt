@@ -8,9 +8,10 @@ import { portfolioHost } from "@/lib/hosts";
 import { getPlan } from "@/lib/plan";
 import { portfolioHref } from "@/lib/portfolio-links";
 import { isPhase2Enabled } from "@/lib/site";
+import { signedFileUrl } from "@/lib/files";
 import { getStore } from "@/lib/store";
-import { Avatar } from "@/components/portfolio/Avatar";
 import { Button } from "@/components/ui/Button";
+import { PhotoField } from "./PhotoField";
 import { ProfileForm } from "./ProfileForm";
 import { UsernameForm } from "./UsernameForm";
 
@@ -29,6 +30,7 @@ export default async function PortfolioSettingsPage() {
     headers().then((h) => h.get("x-forwarded-host") ?? h.get("host")),
   ]);
   const isPublic = ENTITLEMENTS[plan].publicPortfolio;
+  const photoUrl = await signedFileUrl(profile.photoFileId);
   const { username } = profile;
 
   return (
@@ -72,10 +74,7 @@ export default async function PortfolioSettingsPage() {
 
       <section aria-labelledby="profile-heading" className="mt-12 border-t border-line pt-8">
         <h2 id="profile-heading" className="text-[1.375rem]">Profile</h2>
-        <div className="mt-4 flex items-center gap-4">
-          <Avatar name={profile.name ?? username ?? user.email} size={64} />
-          <p className="text-sm text-graphite">Your initials show until photos arrive.</p>
-        </div>
+        <PhotoField name={profile.name ?? username ?? user.email} photoUrl={photoUrl} maxMb={ENTITLEMENTS[plan].uploadMbPerFile} />
         <ProfileForm
           initial={{
             name: profile.name ?? "",

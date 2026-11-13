@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { CHECKS_GUIDE } from "@/components/brand/Seal";
 import { ProjectView } from "@/components/portfolio/ProjectView";
+import { PrintAddress, ProjectPager, ProjectTopNav } from "@/components/portfolio/ProjectNav";
+import { headlineFor } from "@/lib/exhbt/headline";
+import { MARKETING_HOST, portfolioHost } from "@/lib/hosts";
+import { previewImage } from "@/lib/og/card";
 import { checkedOnLabel, loadPortfolio, mediaFor } from "@/lib/portfolio";
 
 type Params = { params: Promise<{ username: string; slug: string }> };
@@ -12,9 +15,16 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const p = await loadPortfolio(username, `/${slug}`);
   const it = p.status === "ok" ? p.items.find((x) => x.slug === slug) : undefined;
   if (p.status !== "ok" || !it) return { title: "Project not found", robots: { index: false } };
+  const title = `${it.doc.title} · ${p.displayName}`;
+  const h = headlineFor(it.doc);
+  const description = [h && `${h.value} ${h.label}.`, it.doc.context].filter(Boolean).join(" ") || undefined;
+  const image = await previewImage(`${p.base}/${slug}`, it.doc.title);
   return {
-    title: { absolute: `${it.doc.title} · ${p.displayName}` },
-    description: it.doc.context || undefined,
+    title: { absolute: title },
+    description,
+    // The link preview (preview.png beside this page) shows whatever the search setting; that only stops indexing.
+    openGraph: { type: "article", title, description, siteName: "exhbt", images: [image] },
+    twitter: { card: "summary_large_image", title, description, images: [image] },
     ...(p.profile.hideFromSearch ? { robots: { index: false, follow: false } } : {}),
   };
 }
@@ -28,48 +38,23 @@ export default async function PortfolioProject({ params }: Params) {
   const i = p.items.findIndex((x) => x.slug === slug);
   if (i < 0) notFound();
   const it = p.items[i]!;
-  const prev = p.items[i - 1];
-  const next = p.items[i + 1];
-  const home = p.base || "/";
   const { imageUrls, evidenceUrl } = await mediaFor(it.doc);
 
   return (
     <>
-      <nav aria-label="Portfolio" className="mb-5 flex flex-wrap items-center justify-between gap-3 text-sm font-semibold">
-        <Link href={home} className="inline-flex items-center gap-1.5 hover:text-graphite">
-          <ArrowLeft aria-hidden size={15} strokeWidth={2.25} /> All projects
-        </Link>
-        <span className="font-mono text-xs font-normal text-graphite">
-          {i + 1} of {p.items.length}
-        </span>
-      </nav>
-
+      <ProjectTopNav home={p.base || "/"} position={i + 1} />
       <ProjectView
         doc={it.doc}
         owner={{ name: p.displayName, photoUrl: p.photoUrl }}
         imageUrls={imageUrls}
         evidenceUrl={evidenceUrl}
         checkedOn={checkedOnLabel(it.publishedAt)}
+        position={i + 1}
+        // On alex.exhbt.co.uk a relative guide link would stay on the portfolio host.
+        checksHref={p.base ? undefined : `https://${MARKETING_HOST}${CHECKS_GUIDE}`}
       />
-
-      {(prev || next) && (
-        <nav aria-label="Other projects" className="mt-6 grid gap-3 sm:grid-cols-2">
-          {prev ? (
-            <Link href={`${p.base}/${prev.slug}`} className="rounded-[14px] border border-line bg-surface p-4 hover:border-ink">
-              <span className="inline-flex items-center gap-1 text-xs text-graphite"><ArrowLeft aria-hidden size={13} /> Previous</span>
-              <span className="mt-1 block font-semibold">{prev.doc.title}</span>
-            </Link>
-          ) : (
-            <span />
-          )}
-          {next && (
-            <Link href={`${p.base}/${next.slug}`} className="rounded-[14px] border border-line bg-surface p-4 text-right hover:border-ink">
-              <span className="inline-flex items-center gap-1 text-xs text-graphite">Next <ArrowRight aria-hidden size={13} /></span>
-              <span className="mt-1 block font-semibold">{next.doc.title}</span>
-            </Link>
-          )}
-        </nav>
-      )}
+      <PrintAddress address={`${portfolioHost(p.profile.username)}/${slug}`} />
+      <ProjectPager base={p.base} prev={p.items[i - 1]} next={p.items[i + 1]} />
     </>
   );
 }

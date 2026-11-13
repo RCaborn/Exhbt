@@ -6,7 +6,6 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, ImageIcon, Plus, X } from "lucide-react";
 import { deleteExhbt, publishExhbt, saveDraft, unpublishExhbt } from "@/app/(app)/exhbts/[id]/actions";
-import { TrustPreview } from "@/components/exhbt/TrustBadge";
 import { ProjectView, type Owner } from "@/components/portfolio/ProjectView";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
@@ -716,9 +715,7 @@ export function Editor(props: EditorProps) {
             className={`min-w-0 lg:sticky lg:top-20 lg:max-h-[calc(100svh-6rem)] lg:self-start lg:overflow-y-auto ${view === "edit" ? "hidden lg:block" : ""}`}
           >
             <p className="mb-2 text-sm font-semibold text-graphite">Preview</p>
-            <TrustPreview confirmed={confirmed}>
-              <ProjectView doc={previewDoc} owner={owner} imageUrls={imageUrls} evidenceUrl={evidenceHref} headingLevel="h2" />
-            </TrustPreview>
+            <ProjectView doc={previewDoc} owner={owner} imageUrls={imageUrls} evidenceUrl={evidenceHref} headingLevel="h2" confirmed={confirmed} />
           </section>
         </div>
       </div>

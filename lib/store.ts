@@ -119,6 +119,8 @@ export type EventName =
   | "exhbt_drafted"
   | "file_uploaded"
   | "file_read_ai"
+  | "job_link_created"
+  | "job_link_fetched"
   | "exhbt_rewritten";
 
 /** A Stripe subscription as we keep it (the `subscriptions` table). No amounts or card details. */
@@ -142,6 +144,37 @@ export type SubscriptionRecord = {
 export const LIVE_SUBSCRIPTION_STATUSES = ["active", "trialing", "past_due"];
 
 export type WaitlistInterest = "premium" | "max" | "university";
+
+/** One exhbt picked for a job link, with the one-line reason it fits. */
+export type JobLinkPick = { exhbtId: string; reason: string };
+
+/**
+ * A per-job link (curated_links; docs/phase-2.md section 8, decision 0008): a page on the
+ * person's portfolio host for one job, showing their best-fitting exhbts in the order they chose.
+ */
+export type JobLink = {
+  id: string;
+  userId: string;
+  company: string;
+  roleTitle: string;
+  /** The path after the person's host, unique among their exhbt and job-link slugs (lib/slugs.ts). */
+  slug: string;
+  slugStyle: "clean" | "suffix";
+  intro: string;
+  /** In the order shown, at most EXHBTS_PER_JOB_LINK. */
+  picks: JobLinkPick[];
+  listingText: string | null;
+  listingUrl: string | null;
+  status: "live" | "off";
+  viewCount: number;
+  createdAt: string;
+};
+
+export type NewJobLink = Omit<JobLink, "id" | "status" | "viewCount" | "createdAt">;
+
+export type JobLinkChanges = Partial<
+  Pick<JobLink, "company" | "roleTitle" | "slug" | "slugStyle" | "intro" | "picks" | "status" | "listingText" | "listingUrl">
+>;
 
 /**
  * Everything the app persists goes through this interface. Two implementations:
@@ -242,6 +275,20 @@ export interface Store {
   /* draft tools */
   /** Events with this name for one exhbt (props.exhbtId), all time. Counts rewrites against the plan's limit. */
   countEventsForExhbt(name: EventName, userId: string, exhbtId: string): Promise<number>;
+
+  /* job links */
+  createJobLink(link: NewJobLink): Promise<string>;
+  /** A person's job links, newest first. */
+  listJobLinks(userId: string): Promise<JobLink[]>;
+  getJobLink(id: string): Promise<JobLink | null>;
+  getJobLinkBySlug(userId: string, slug: string): Promise<JobLink | null>;
+  /** Changes the fields given. False if the link isn't theirs. */
+  updateJobLink(id: string, userId: string, changes: JobLinkChanges): Promise<boolean>;
+  deleteJobLink(id: string, userId: string): Promise<boolean>;
+  /** Links that are switched on, for the plan's jobLinksActive cap. */
+  countActiveJobLinks(userId: string): Promise<number>;
+  /** One more view of a live link. A count only: no cookie, no visitor record. */
+  incrementJobLinkViews(id: string): Promise<void>;
 }
 
 export const isSupabaseConfigured = () =>
@@ -841,6 +888,115 @@ function supabaseStore(): Store {
       if (res.error) throw new Error(res.error.message);
       return res.count ?? 0;
     },
+
+    /* job links */
+    async createJobLink(l) {
+      const row = check(
+        await db
+          .from("curated_links")
+          .insert({ user_id: l.userId, ...jobLinkColumns(l) })
+          .select("id")
+          .single(),
+      ) as { id: string };
+      return row.id;
+    },
+    async listJobLinks(userId) {
+      const rows = check(
+        await db.from("curated_links").select(JOB_LINK_COLS).eq("user_id", userId).order("created_at", { ascending: false }),
+      ) as JobLinkRow[];
+      return rows.map(fromJobLinkRow);
+    },
+    async getJobLink(id) {
+      const row = check(await db.from("curated_links").select(JOB_LINK_COLS).eq("id", id).maybeSingle()) as JobLinkRow | null;
+      return row ? fromJobLinkRow(row) : null;
+    },
+    async getJobLinkBySlug(userId, slug) {
+      const row = check(
+        await db.from("curated_links").select(JOB_LINK_COLS).eq("user_id", userId).eq("collection_slug", slug).maybeSingle(),
+      ) as JobLinkRow | null;
+      return row ? fromJobLinkRow(row) : null;
+    },
+    async updateJobLink(id, userId, changes) {
+      const cur = check(
+        await db.from("curated_links").select(JOB_LINK_COLS).eq("id", id).eq("user_id", userId).maybeSingle(),
+      ) as JobLinkRow | null;
+      if (!cur) return false;
+      const next = { ...fromJobLinkRow(cur), ...changes };
+      const rows = check(
+        await db.from("curated_links").update(jobLinkColumns(next)).eq("id", id).eq("user_id", userId).select("id"),
+      ) as { id: string }[];
+      return rows.length > 0;
+    },
+    async deleteJobLink(id, userId) {
+      const rows = check(await db.from("curated_links").delete().eq("id", id).eq("user_id", userId).select("id")) as { id: string }[];
+      return rows.length > 0;
+    },
+    async countActiveJobLinks(userId) {
+      const res = await db.from("curated_links").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("status", "live");
+      if (res.error) throw new Error(res.error.message);
+      return res.count ?? 0;
+    },
+    async incrementJobLinkViews(id) {
+      // Atomic in the database (20261116000000_job_links.sql). A failed count never breaks the page.
+      const { error } = await db.rpc("increment_job_link_views", { link_id: id });
+      if (error) console.error("job link view count failed", error.message);
+    },
+  };
+}
+
+type JobLinkRow = {
+  id: string;
+  user_id: string;
+  company: string | null;
+  role_title: string | null;
+  collection_slug: string | null;
+  slug_style: "clean" | "suffix";
+  intro: string | null;
+  exhbt_ids: string[] | null;
+  ranking: JobLinkPick[] | null;
+  job_listing_text: string | null;
+  job_listing_url: string | null;
+  status: "live" | "off";
+  view_count: number | null;
+  created_at: string;
+};
+const JOB_LINK_COLS =
+  "id, user_id, company, role_title, collection_slug, slug_style, intro, exhbt_ids, ranking, job_listing_text, job_listing_url, status, view_count, created_at";
+
+const fromJobLinkRow = (r: JobLinkRow): JobLink => {
+  // `ranking` holds the picks with their reasons; exhbt_ids keeps the same order for the database's own check (at most 4).
+  const reasons = new Map((r.ranking ?? []).map((p) => [p.exhbtId, p.reason]));
+  return {
+    id: r.id,
+    userId: r.user_id,
+    company: r.company ?? "",
+    roleTitle: r.role_title ?? "",
+    slug: r.collection_slug ?? r.id,
+    slugStyle: r.slug_style === "clean" ? "clean" : "suffix",
+    intro: r.intro ?? "",
+    picks: (r.exhbt_ids ?? []).map((exhbtId) => ({ exhbtId, reason: reasons.get(exhbtId) ?? "" })),
+    listingText: r.job_listing_text,
+    listingUrl: r.job_listing_url,
+    status: r.status === "off" ? "off" : "live",
+    viewCount: r.view_count ?? 0,
+    createdAt: r.created_at,
+  };
+};
+
+/** A job link's fields as curated_links columns (everything but user_id). */
+function jobLinkColumns(l: Omit<NewJobLink, "userId"> & { status?: JobLink["status"] }) {
+  return {
+    name: `${l.company} · ${l.roleTitle}`.slice(0, 250),
+    company: l.company.slice(0, 120),
+    role_title: l.roleTitle.slice(0, 120),
+    collection_slug: l.slug,
+    slug_style: l.slugStyle,
+    intro: l.intro.slice(0, 400),
+    exhbt_ids: l.picks.map((p) => p.exhbtId),
+    ranking: l.picks,
+    job_listing_text: l.listingText,
+    job_listing_url: l.listingUrl,
+    ...(l.status ? { status: l.status } : {}),
   };
 }
 
@@ -920,6 +1076,7 @@ type Mem = {
   plans: Map<string, Plan>;
   /** Stripe subscriptions by subscription id (billing). */
   subscriptions: Map<string, SubscriptionRecord>;
+  jobLinks: Map<string, JobLink>;
 };
 const newMem = (): Mem => ({
   roadmaps: new Map(),
@@ -935,6 +1092,7 @@ const newMem = (): Mem => ({
   files: new Map(),
   plans: new Map(),
   subscriptions: new Map(),
+  jobLinks: new Map(),
 });
 const g = globalThis as unknown as { __exhbtMem?: Mem };
 
@@ -950,6 +1108,7 @@ function memoryStore(): Store {
   m.files ??= new Map();
   m.plans ??= new Map();
   m.subscriptions ??= new Map();
+  m.jobLinks ??= new Map();
   const liveSubscription = (userId: string): SubscriptionRecord | null => {
     // Newest last in insertion order, so look from the end.
     const mine = [...m.subscriptions.values()].filter((x) => x.userId === userId).reverse();
@@ -1096,6 +1255,7 @@ function memoryStore(): Store {
         }
       }
       for (const [id, e] of m.exhbts) if (e.userId === userId) m.exhbts.delete(id);
+      for (const [id, l] of m.jobLinks) if (l.userId === userId) m.jobLinks.delete(id);
       // As the database cascade does: subscriptions and file records go with the account.
       for (const [id, s] of m.subscriptions) if (s.userId === userId) m.subscriptions.delete(id);
       for (const [id, f] of m.files) if (f.userId === userId) m.files.delete(id);
@@ -1244,6 +1404,44 @@ function memoryStore(): Store {
     /* draft tools */
     async countEventsForExhbt(name, userId, exhbtId) {
       return m.events.filter((e) => e.name === name && e.userId === userId && e.props.exhbtId === exhbtId).length;
+    },
+
+    /* job links */
+    async createJobLink(l) {
+      const id = crypto.randomUUID();
+      m.jobLinks.set(id, { ...structuredClone(l), id, status: "live", viewCount: 0, createdAt: new Date().toISOString() });
+      return id;
+    },
+    async listJobLinks(userId) {
+      return [...m.jobLinks.values()]
+        .filter((l) => l.userId === userId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map((l) => structuredClone(l));
+    },
+    async getJobLink(id) {
+      const l = m.jobLinks.get(id);
+      return l ? structuredClone(l) : null;
+    },
+    async getJobLinkBySlug(userId, slug) {
+      const l = [...m.jobLinks.values()].find((x) => x.userId === userId && x.slug === slug);
+      return l ? structuredClone(l) : null;
+    },
+    async updateJobLink(id, userId, changes) {
+      const l = m.jobLinks.get(id);
+      if (!l || l.userId !== userId) return false;
+      for (const [k, v] of Object.entries(changes)) if (v !== undefined) (l as Record<string, unknown>)[k] = structuredClone(v);
+      return true;
+    },
+    async deleteJobLink(id, userId) {
+      const l = m.jobLinks.get(id);
+      return l && l.userId === userId ? m.jobLinks.delete(id) : false;
+    },
+    async countActiveJobLinks(userId) {
+      return [...m.jobLinks.values()].filter((l) => l.userId === userId && l.status === "live").length;
+    },
+    async incrementJobLinkViews(id) {
+      const l = m.jobLinks.get(id);
+      if (l && l.status === "live") l.viewCount += 1;
     },
   };
 }
