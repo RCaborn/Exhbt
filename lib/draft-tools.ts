@@ -11,8 +11,8 @@ import { getStore, isSupabaseConfigured, supabaseAdmin, type StoredFile } from "
  *   - the latest AI version of each block (application/json), so "Back to the AI version" works.
  *
  * Both are ordinary private files: `exhbt_files` rows of kind `source` in the private `sources`
- * bucket, attached to the exhbt, so deleting the exhbt removes them (deleteDraftFiles, called by
- * the delete action; the rows also cascade). They are never read by the portfolio.
+ * bucket, attached to the exhbt, so deleting the exhbt removes them (deleteExhbtWithFiles in
+ * lib/uploads.ts removes everything attached; the rows also cascade). They are never read by the portfolio.
  * Nothing here is shown on a public page.
  *
  * TODO(retention): section 5 promises source material is kept for 30 days only. There is no
@@ -47,7 +47,7 @@ async function getObject(file: StoredFile): Promise<string | null> {
 }
 
 async function find(userId: string, exhbtId: string, name: string): Promise<StoredFile | undefined> {
-  return (await getStore().listExhbtFiles(exhbtId, userId)).find((f) => f.kind === "source" && nameOf(f) === name);
+  return (await getStore().listFiles(userId, exhbtId)).find((f) => f.kind === "source" && nameOf(f) === name);
 }
 
 /** Writes (or replaces) one of the exhbt's private draft files. Replacing makes a new record, so sizes stay true. */
@@ -90,9 +90,4 @@ export async function loadAiVersion(userId: string, exhbtId: string): Promise<Ai
   } catch {
     return emptyAiVersion();
   }
-}
-
-/** Removes every file attached to the exhbt (stored objects first), before the exhbt row goes. */
-export async function deleteExhbtFiles(userId: string, exhbtId: string): Promise<void> {
-  for (const f of await getStore().listExhbtFiles(exhbtId, userId)) await deleteFile(userId, f.id).catch(() => undefined);
 }

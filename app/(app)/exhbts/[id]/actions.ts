@@ -4,12 +4,12 @@ import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import { unverifiedOf } from "@/components/editor/model";
 import { getCurrentUser } from "@/lib/auth";
-import { deleteExhbtFiles } from "@/lib/draft-tools";
 import { emptyDoc, ExhbtDocSchema, validateForPublish, type ExhbtDoc } from "@/lib/exhbt/blocks";
 import { slugify, uniqueSlug } from "@/lib/exhbt/slug";
 import { canCreateExhbt, canPublish, getPlan } from "@/lib/plan";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
+import { deleteExhbtWithFiles } from "@/lib/uploads";
 
 /**
  * Everything that changes an exhbt from the list (/exhbts) and the editor (/exhbts/[id]/edit).
@@ -41,6 +41,12 @@ export async function createFromScratch() {
   const verdict = canCreateExhbt(await getPlan(user.id), await store.listExhbts(user.id));
   if (!verdict.ok) redirect("/exhbts?full=1");
   const id = await store.createExhbt(user.id, emptyDoc());
+  // Two quick clicks can both pass the check above; look again now this one exists (as drafting does).
+  const after = canCreateExhbt(await getPlan(user.id), (await store.listExhbts(user.id)).filter((e) => e.id !== id));
+  if (!after.ok) {
+    await store.deleteExhbt(id, user.id);
+    redirect("/exhbts?full=1");
+  }
   redirect(`/exhbts/${id}/edit`);
 }
 
@@ -59,10 +65,8 @@ export async function moveExhbt(id: string, by: -1 | 1) {
 
 export async function deleteExhbt(id: string) {
   const user = await signedIn();
-  const store = getStore();
-  // The kept source text and AI version go with it (stored objects first; the rows cascade).
-  if ((await store.getExhbt(id))?.userId === user.id) await deleteExhbtFiles(user.id, id);
-  await store.deleteExhbt(id, user.id);
+  // Its files too, records and stored objects (lib/uploads.ts).
+  await deleteExhbtWithFiles(user.id, id);
   revalidatePath("/exhbts");
   redirect("/exhbts");
 }

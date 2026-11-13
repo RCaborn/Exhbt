@@ -49,7 +49,7 @@ export default async function EditExhbtPage({ params }: Params) {
       owner={{ name: profile.name?.trim() || profile.username || user.email.split("@")[0]!, photoUrl: await signedFileUrl(profile.photoFileId) }}
       imageUrls={imageUrls}
       fileEvidenceUrl={record.doc.evidence?.kind === "file" ? evidenceUrl : null}
-      planBlock={verdict.ok ? null : verdict.reason}
+      planBlock={verdict.ok ? null : { reason: verdict.reason, upgradeTo: verdict.upgradeTo }}
     />
   );
 }

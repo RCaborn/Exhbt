@@ -128,6 +128,37 @@ Payments stay off until Phase 2 is switched on. Do all of this in Stripe's **tes
 
 ---
 
+## Phase 2 launch day
+
+Do this only when Rory says go, and in this order. Until step 6 the live site is still running `main`, so the Supabase steps must come first and the merge must follow straight after them: the migrations rename the plan keys and change the `exhbts` columns, and Phase 1 code on `main` won't read them.
+
+Before the day: the Stripe section above done and tried in test mode, a full click-through on the `terna-preview` Worker, and the privacy policy and terms read through (they describe Phase 2).
+
+1. **Back up.** In Supabase, **Database > Backups**, check last night's backup is there (or take one if your plan allows).
+2. **Apply the migrations**, in Supabase **SQL Editor > New query**, one file at a time, **in date order**:
+   - `supabase/migrations/20261113000000_plan_names.sql`
+   - `supabase/migrations/20261114000000_phase2_schema.sql`
+   - then any later file in that folder on the `phase-2` branch, by the date at the start of its name. Run only files that aren't already applied; never edit one that is.
+3. **Check Storage.** Under **Storage**, there should be two buckets, `sources` and `evidence`, both **private** (the second migration creates them). If one is missing, run the `insert into storage.buckets` lines from `20261114000000_phase2_schema.sql` again; they're safe to repeat. Never make either bucket public.
+4. **Stripe live mode.** Switch the Stripe dashboard to live mode and repeat steps 2–7 of the Stripe section with live products and prices:
+   - replace `STRIPE_PRICE_PREMIUM` and `STRIPE_PRICE_MAX` in `wrangler.jsonc` with the **live** price ids, on the `phase-2` branch
+   - set the Worker secrets `STRIPE_SECRET_KEY` (starts `sk_live_`) and `STRIPE_WEBHOOK_SECRET` (from the live webhook endpoint)
+5. **Turn Phase 2 on.** In Cloudflare, Worker > **Settings > Variables and Secrets**, add `EXHBT_PHASE2` = `1` as a plain variable. It's read at runtime; with it missing, Phase 2 pages stay hidden after the merge.
+6. **Merge.** Open a pull request from `phase-2` into `main`, wait for CI to pass, and merge it. Cloudflare deploys `main` on its own; watch **Deployments** until it's live.
+7. **Check it's working.**
+   - Open `/api/health`. `ok` should be `true`, and under `phase2`: every setting `true`, `stripe.ok` `true` and `storage.ok` `true`. If a check is false, its `detail` says why.
+   - On your own account, in **live mode**: sign up with a fresh email, upload a project and draft an exhbt, edit it and publish it, then pay for Premium with a real card. Check the plan reads Premium on `/account/billing` and the exhbt shows on your portfolio.
+   - Refund that payment in Stripe (**Payments >** the payment **> Refund**) and cancel the subscription from **Manage billing**.
+   - Delete the test account from `/account` if you don't want to keep it.
+
+**If something goes wrong after the merge:** remove `EXHBT_PHASE2` (or set it to `0`) in Cloudflare. Phase 2 pages go back to 404 straight away, without a redeploy, while you look into it.
+
+### Portfolio subdomains and DNS
+
+Owned by the subdomain work, which is being built separately (decision 0001). That work will fill in this section: DNS records, Worker routes and the checks for portfolio addresses.
+
+---
+
 ## Going public later
 
 Do these first:

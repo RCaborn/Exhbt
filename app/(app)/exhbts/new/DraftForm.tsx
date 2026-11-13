@@ -1,11 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Circle, FileText, Loader2, Upload, X } from "lucide-react";
 import { DOC_ACCEPT, DocError, DocNeedsServer, countWords, extractTextInBrowser, readOnServer } from "@/lib/doc-readers";
+import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
+import type { Plan } from "@/lib/entitlements";
 
 /**
  * The upload step: files are read on the device as they're added (scans and photos ask before
@@ -45,7 +46,7 @@ export function DraftForm({ maxFileMb }: { maxFileMb: number }) {
   const [link, setLink] = useState("");
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<{ message: string; upgrade?: boolean } | null>(null);
+  const [error, setError] = useState<{ message: string; limit?: boolean; upgradeTo?: Plan } | null>(null);
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
   // Drafting progress: which step is under way, and whether the answer has arrived (all done).
@@ -141,9 +142,11 @@ export function DraftForm({ maxFileMb }: { maxFileMb: number }) {
           fileIds: items.filter((it) => it.upload === "done" && it.fileId).map((it) => it.fileId),
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string; upgrade?: boolean };
+      const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string; upgradeTo?: Plan | null };
       if (!res.ok || !data.id) {
-        setError({ message: data.error ?? "We couldn't draft your exhbt just now. Try again in a moment.", upgrade: data.upgrade });
+        // A plan limit (403/429) gets the upgrade offer; anything else is a plain error.
+        const limit = res.status === 403 || res.status === 429;
+        setError({ message: data.error ?? "We couldn't draft your exhbt just now. Try again in a moment.", limit, upgradeTo: data.upgradeTo ?? undefined });
         setBusy(false);
         return;
       }
@@ -267,24 +270,16 @@ export function DraftForm({ maxFileMb }: { maxFileMb: number }) {
         />
       </div>
 
-      {error && (
+      {error?.limit && <UpgradePrompt reason={error.message} upgradeTo={error.upgradeTo} tone="alert" />}
+      {error && !error.limit && (
         <div role="alert" className="rounded-[var(--radius)] border border-error/40 bg-surface px-4 py-3 text-error">
-          <p>
-            {error.message}{" "}
-            {error.upgrade && (
-              <Link href="/pricing" className="link font-semibold">
-                See plans
-              </Link>
-            )}
-          </p>
-          {!error.upgrade && (
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button variant="primary" size="sm" label="Try again" disabled={!canDraft} onClick={() => void submit()}>
-                Try again
-              </Button>
-              <span className="text-sm text-graphite">Your files and notes are still here. Nothing needs uploading again.</span>
-            </div>
-          )}
+          <p>{error.message}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Button variant="primary" size="sm" label="Try again" disabled={!canDraft} onClick={() => void submit()}>
+              Try again
+            </Button>
+            <span className="text-sm text-graphite">Your files and notes are still here. Nothing needs uploading again.</span>
+          </div>
         </div>
       )}
 
