@@ -11,6 +11,7 @@ import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import type { Plan } from "@/lib/entitlements";
 import { LIMITS, plain, safeHref, validateForPublish, wordCount, words, type ExhbtDoc, type Issue } from "@/lib/exhbt/blocks";
+import { BlockTools, useDraftTools, type DraftToolsInit } from "./BlockTools";
 import { ChartEditor, newChart } from "./ChartEditor";
 import { ConfirmAction } from "./ConfirmAction";
 import { FieldIssues } from "./FieldIssues";
@@ -41,6 +42,8 @@ export type EditorProps = {
   fileEvidenceUrl: string | null;
   /** Why the plan won't let this go live, if it won't (lib/plan-rules.ts canPublish). */
   planBlock: { reason: string; upgradeTo?: Plan } | null;
+  /** Rewrite and "Back to the AI version"; null or missing when the exhbt has no kept source text. */
+  draftTools?: DraftToolsInit;
 };
 
 /**
@@ -96,6 +99,7 @@ export function Editor(props: EditorProps) {
   const cw = cardWords(doc);
   const flags = unverifiedOf(doc);
 
+  const dt = useDraftTools(id, props.draftTools, doc, setDoc);
   const update = (patch: Partial<ExhbtDoc>) => setDoc((d) => ({ ...d, ...patch }));
 
   async function publish() {
@@ -167,6 +171,7 @@ export function Editor(props: EditorProps) {
                   ))}
                 </ul>
               )}
+              <BlockTools dt={dt} block="header" />
               <div className="space-y-4">
                 <TextInput id="title" label="Title" value={doc.title} max={LIMITS.titleChars} onChange={(title) => update({ title })} issues={issuesAt(issues, "title")} placeholder="What you did, and what changed" />
                 <TextInput id="context" label="Context line" value={doc.context} max={LIMITS.contextChars} onChange={(context) => update({ context })} issues={issuesAt(issues, "context")} placeholder="e.g. BSc Economics, final-year project" />
@@ -194,20 +199,24 @@ export function Editor(props: EditorProps) {
                   </div>
                 </fieldset>
                 <SkillsInput skills={doc.skills} onChange={(skills) => update({ skills })} issues={issues} />
+                <BlockTools dt={dt} block="skills" />
               </div>
             </Card>
 
             <Card id="card-gap" title="The question" words={cw.gap} limit={LIMITS.gapWords} hint="What the question was and why it mattered. Two short sentences.">
+              <BlockTools dt={dt} block="gap" />
               <RichTextField labelId="card-gap" describedBy="gap-issues" value={doc.gap} onChange={(gap) => update({ gap })} />
               <FieldIssues id="gap-issues" issues={issuesAt(issues, "gap")} />
             </Card>
 
             <Card id="card-flow" title="Process" words={cw.flow} hint="How you did it, as a flowchart. Type in the boxes.">
+              <BlockTools dt={dt} block="flow" />
               <FlowEditor steps={doc.flow} onChange={(flow) => update({ flow })} issues={issues} />
               <FieldIssues id="flow-issues" issues={issuesAt(issues, "flow")} />
             </Card>
 
             <Card id="card-findings" title="Findings" words={cw.findings} hint={`${LIMITS.findings.min} to ${LIMITS.findings.max} bullets, up to ${LIMITS.findings.wordsEach} words each.`}>
+              <BlockTools dt={dt} block="findings" />
               <ol className="space-y-4">
                 {doc.findings.map((f, i) => (
                   <li key={i}>
