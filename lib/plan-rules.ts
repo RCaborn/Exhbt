@@ -14,10 +14,13 @@ export type Verdict = { ok: true } | { ok: false; reason: string; upgradeTo?: Pl
 export function canCreateExhbt(plan: Plan, existing: ExhbtRecord[]): Verdict {
   const max = ENTITLEMENTS[plan].exhbts;
   if (existing.length < max) return { ok: true };
+  const upgradeTo = nextPlan(plan);
   return {
     ok: false,
-    reason: `Your plan holds ${max} ${max === 1 ? "exhbt" : "exhbts"}. Delete one, or upgrade for more.`,
-    upgradeTo: plan === "free" ? "premium" : plan === "premium" ? "max" : undefined,
+    reason: `Your plan holds ${max} ${max === 1 ? "exhbt" : "exhbts"}. ${
+      upgradeTo ? `Delete one, or move to ${PLAN_NAMES[upgradeTo]} for ${ENTITLEMENTS[upgradeTo].exhbts}.` : "Delete one to start another."
+    }`,
+    upgradeTo,
   };
 }
 
@@ -29,11 +32,17 @@ export function canPublish(plan: Plan, existing: ExhbtRecord[], exhbtId: string)
   }
   const live = existing.filter((x) => x.status === "published" && x.id !== exhbtId).length;
   if (live < e.exhbts) return { ok: true };
+  const upgradeTo = nextPlan(plan);
   return {
     ok: false,
-    reason: `You have ${live} live, the most your plan shows. Unpublish one first, or upgrade.`,
-    upgradeTo: plan === "premium" ? "max" : undefined,
+    reason: `You have ${live} live, the most your plan shows. Unpublish one first${upgradeTo ? `, or move to ${PLAN_NAMES[upgradeTo]}` : ""}.`,
+    upgradeTo,
   };
+}
+
+/** The plan one step up, for an upgrade offer, or undefined at the top (Max, universities). */
+export function nextPlan(plan: Plan): Plan | undefined {
+  return plan === "free" ? "premium" : plan === "premium" ? "max" : undefined;
 }
 
 /** Per-job links are a Max feature. */

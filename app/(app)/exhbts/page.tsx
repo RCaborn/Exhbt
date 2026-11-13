@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { createFromScratch, deleteExhbt, moveExhbt } from "./[id]/actions";
 import { ConfirmAction } from "@/components/editor/ConfirmAction";
+import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { getCurrentUser } from "@/lib/auth";
 import { ENTITLEMENTS, PLAN_NAMES } from "@/lib/entitlements";
@@ -49,12 +50,11 @@ export default async function ExhbtsPage() {
         {!canGoLive && (
           <section aria-labelledby="preview-only" className="mt-6 rounded-[20px] border border-line bg-surface p-5 sm:p-6">
             <h2 id="preview-only" className="text-[1.375rem]">Preview only on {PLAN_NAMES[plan]}</h2>
-            <p className="mt-2 text-graphite">Build and preview your exhbts here. Publishing them to your own link comes with {PLAN_NAMES.premium}.</p>
-            <div className="mt-4">
-              <Button href="/account/billing" variant="primary" label={`Publish with ${PLAN_NAMES.premium}`}>
-                Publish with {PLAN_NAMES.premium}
-              </Button>
-            </div>
+            <UpgradePrompt
+              className="mt-3"
+              reason={`Build and preview your exhbts here. Publishing them to your own link comes with ${PLAN_NAMES.premium}.`}
+              upgradeTo="premium"
+            />
           </section>
         )}
 
@@ -73,12 +73,7 @@ export default async function ExhbtsPage() {
               </div>
             </>
           ) : (
-            <p className="mt-2" role="status">
-              {room.reason}{" "}
-              <Link href="/account/billing" className="link font-semibold">
-                See plans
-              </Link>
-            </p>
+            <UpgradePrompt reason={room.reason} upgradeTo={room.upgradeTo} className="mt-3" />
           )}
         </section>
 

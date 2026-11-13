@@ -8,8 +8,10 @@ import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, ImageIcon, Plus, X } from
 import { deleteExhbt, publishExhbt, saveDraft, unpublishExhbt } from "@/app/(app)/exhbts/[id]/actions";
 import { TrustPreview } from "@/components/exhbt/TrustBadge";
 import { ProjectView, type Owner } from "@/components/portfolio/ProjectView";
+import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { CopyLink } from "@/components/ui/CopyLink";
+import type { Plan } from "@/lib/entitlements";
 import { LIMITS, plain, safeHref, validateForPublish, wordCount, words, type ExhbtDoc, type Issue } from "@/lib/exhbt/blocks";
 import { ChartEditor, newChart } from "./ChartEditor";
 import { ConfirmAction } from "./ConfirmAction";
@@ -39,7 +41,7 @@ export type EditorProps = {
   /** Signed URL for an attached file (links are read from the doc). */
   fileEvidenceUrl: string | null;
   /** Why the plan won't let this go live, if it won't (lib/plan-rules.ts canPublish). */
-  planBlock: string | null;
+  planBlock: { reason: string; upgradeTo?: Plan } | null;
   /** When the server copy was last saved (ISO), to tell whether a backup kept in this browser is newer. */
   updatedAt: string;
   /** False on Free: exhbts can be built and previewed, not published. */
@@ -616,10 +618,8 @@ export function Editor(props: EditorProps) {
               </h2>
               {!canGoLive ? (
                 <div className="mt-2 space-y-4">
-                  <p className="text-graphite">This exhbt is a preview only. Publishing to your own link comes with Premium; until then, nobody else can see it.</p>
-                  <Button href="/account/billing" variant="primary">
-                    Publish with Premium
-                  </Button>
+                  <p className="text-graphite">This exhbt is a preview only: nobody else can see it.</p>
+                  {planBlock && <UpgradePrompt reason={planBlock.reason} upgradeTo={planBlock.upgradeTo} />}
                 </div>
               ) : (
                 <>
@@ -651,14 +651,7 @@ export function Editor(props: EditorProps) {
                       </p>
                     )
                   )}
-                  {planBlock && (
-                    <p className="mt-2 text-graphite">
-                      {planBlock}{" "}
-                      <Link href="/pricing" className="link font-semibold text-ink">
-                        See plans
-                      </Link>
-                    </p>
-                  )}
+                  {planBlock && <UpgradePrompt reason={planBlock.reason} upgradeTo={planBlock.upgradeTo} primary={false} className="mt-3" />}
                   {!liveBase && (
                     <p className="mt-2 text-graphite">
                       You need a username to publish.{" "}

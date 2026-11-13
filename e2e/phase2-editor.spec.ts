@@ -132,7 +132,7 @@ test.describe("the exhbt editor", () => {
     // Free can build and preview, not publish.
     await expect(page.getByText("Preview only", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Publish with Premium" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Upgrade to Premium/ })).toBeVisible();
     await expect(page.getByText(/comes with Premium/)).toBeVisible();
     await expect(page.getByText("It's live.")).toHaveCount(0);
 
@@ -171,8 +171,10 @@ test.describe("the exhbt editor", () => {
 
     // Free's one exhbt is used, so the list says why there's no new one (the plan is Premium now; back to Free).
     await page.goto("/dev/plan?plan=free&next=/exhbts");
-    await expect(page.getByText(/Delete one, or upgrade for more/)).toBeVisible();
-    await expect(page.getByRole("link", { name: "See plans" })).toBeVisible();
+    const prompt = page.getByTestId("upgrade-prompt");
+    await expect(prompt.getByText(/Delete one, or move to Premium/)).toBeVisible();
+    await expect(prompt.getByRole("link", { name: /^Upgrade to Premium/ })).toHaveAttribute("href", "/account/billing");
+    await expect(prompt.getByRole("link", { name: "Compare plans" })).toHaveAttribute("href", "/pricing");
     await expect(page.getByRole("button", { name: "Start from scratch" })).toHaveCount(0);
   });
 

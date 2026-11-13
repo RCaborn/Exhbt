@@ -276,7 +276,7 @@ test.describe("Free, the header and the live moment", () => {
     const row = page.getByRole("listitem").filter({ hasText: "Only a preview" });
     await expect(row.getByText("Preview only")).toBeVisible();
     await expect(page.getByText("Live", { exact: true })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Publish with Premium" })).toHaveAttribute("href", "/account/billing");
+    await expect(page.getByRole("link", { name: /Upgrade to Premium/ })).toHaveAttribute("href", "/account/billing");
   });
 
   test("signed in, the header shows Your exhbts, Portfolio and Account, and no Log in", async ({ page }) => {

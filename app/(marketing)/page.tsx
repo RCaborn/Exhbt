@@ -5,10 +5,17 @@ import { EditorExcerpt, LinkExcerpt } from "@/components/home/Excerpts";
 import { SkillsGapExample } from "@/components/home/SkillsGapExample";
 import { StartForm } from "@/components/home/StartForm";
 import { demoExhbts } from "@/lib/exhbt";
-import { BILLING_PERIOD, EXHBTS_PER_JOB_LINK, PLAN_NAMES, PRICES, planFeatures } from "@/lib/entitlements";
+import { BILLING_PERIOD, EXHBTS_PER_JOB_LINK, JOB_LINKS_LIVE, PLAN_NAMES, PRICES, planFeatures } from "@/lib/entitlements";
+import { isPhase2Enabled } from "@/lib/site";
 import { Button } from "@/components/ui/Button";
 
+// Per request: the EXHBT_PHASE2 switch is read at runtime, so the plan cards change to the paid
+// plans (or back to the waitlist) without a rebuild.
+export const dynamic = "force-dynamic";
+
 export default function Home() {
+  // Phase 2 on: the paid plans are sold for real. Off (the live site today): the waitlist.
+  const sell = isPhase2Enabled();
   return (
     <>
       {/* Hero: headline, one line, and the search bar. Nothing else competes with it. */}
@@ -72,22 +79,33 @@ export default function Home() {
         <div className="mx-auto max-w-[72rem] px-4 sm:px-8 py-20 lg:py-28">
           <h2 id="pricing" className="display-2">Free to start</h2>
           <p className="mt-4 max-w-2xl text-lg text-graphite">
-            Your roadmap is free, and so is trying an exhbt. {PLAN_NAMES.premium} puts your exhbts on your own link, and {PLAN_NAMES.max} adds a link for every job.{" "}
+            Your roadmap is free, and so is trying an exhbt. {PLAN_NAMES.premium} puts your exhbts on your own link, and {PLAN_NAMES.max}{" "}
+            {sell && !JOB_LINKS_LIVE ? "adds room for more, with a link for every job coming soon" : "adds a link for every job"}.{" "}
             <Link href="/pricing" className="link text-ink">Compare plans</Link>
           </p>
           <div className="mt-12 grid gap-4 md:grid-cols-3">
             <Plan name={PLAN_NAMES.free} price={PRICES.free} features={planFeatures("free")} href="/roadmap/new" cta="Build my roadmap" />
-            <Plan name={PLAN_NAMES.premium} price={PRICES.premium} per={BILLING_PERIOD} badge="Coming soon" features={planFeatures("premium")} href="/pricing#premium" cta="Join the waitlist" />
-            <Plan
-              name={PLAN_NAMES.max}
-              price={PRICES.max}
-              per={BILLING_PERIOD}
-              badge="Coming soon"
-              features={planFeatures("max")}
-              href="/pricing#max"
-              cta="Join the waitlist"
-              featured
-            />
+            {sell ? (
+              <>
+                {/* Billing sends anyone signed out to sign in first, then back. */}
+                <Plan name={PLAN_NAMES.premium} price={PRICES.premium} per={BILLING_PERIOD} features={planFeatures("premium")} href="/account/billing" cta={`Choose ${PLAN_NAMES.premium}`} button />
+                <Plan name={PLAN_NAMES.max} price={PRICES.max} per={BILLING_PERIOD} features={planFeatures("max")} href="/account/billing" cta={`Choose ${PLAN_NAMES.max}`} button featured />
+              </>
+            ) : (
+              <>
+                <Plan name={PLAN_NAMES.premium} price={PRICES.premium} per={BILLING_PERIOD} badge="Coming soon" features={planFeatures("premium")} href="/pricing#premium" cta="Join the waitlist" />
+                <Plan
+                  name={PLAN_NAMES.max}
+                  price={PRICES.max}
+                  per={BILLING_PERIOD}
+                  badge="Coming soon"
+                  features={planFeatures("max")}
+                  href="/pricing#max"
+                  cta="Join the waitlist"
+                  featured
+                />
+              </>
+            )}
           </div>
           <p className="mt-8 text-graphite">
             Universities can give every student {PLAN_NAMES.max}.{" "}
@@ -132,9 +150,12 @@ function Plan({
   features,
   href,
   cta,
+  button,
   featured,
 }: {
   name: string;
+  /** Show the action as a button (choosing a paid plan) rather than a text link. */
+  button?: boolean;
   price?: string;
   /** Billing period shown after a paid price, e.g. "month". */
   per?: string;
@@ -156,7 +177,12 @@ function Plan({
         </p>
       )}
       <FeatureList items={features} className="mt-4 text-[0.95rem]" />
-      {href && cta && (
+      {href && cta && button && (
+        <div className="mt-auto pt-5">
+          <Button href={href} size="sm">{cta}</Button>
+        </div>
+      )}
+      {href && cta && !button && (
         <Link href={href} className="link mt-auto pt-4 font-semibold text-ink">
           {cta}
         </Link>
