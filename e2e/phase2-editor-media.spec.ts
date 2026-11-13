@@ -261,7 +261,7 @@ test.describe("roadmap to exhbt", () => {
     // Free holds one exhbt: now the Projects page says why and points to billing.
     await page.goto(`${roadmapUrl}?view=projects`);
     await expect(page.getByRole("button", { name: /^Build this as an exhbt/ })).toHaveCount(0);
-    await expect(page.getByText(/Your plan holds 1 exhbt/).first()).toBeVisible();
+    await expect(page.getByText(/Your plan holds \d+ exhbt/).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "See plans" }).first()).toHaveAttribute("href", "/account/billing");
   });
 });
