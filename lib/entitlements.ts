@@ -41,6 +41,11 @@ type Entitlements = {
    * (Rory, 9 Nov 2026: "will change later"); see docs/decisions/0004.
    */
   projectSwapsPerRoadmap: number;
+  /**
+   * A saved list of project ideas, kept across roadmaps and careers (decision 0010). Free people
+   * see every idea in their roadmap; keeping them in a list is a paid feature.
+   */
+  savedIdeas: boolean;
 };
 
 const MAX: Entitlements = {
@@ -56,6 +61,7 @@ const MAX: Entitlements = {
   storageMbTotal: 500,
   originalityCheck: true,
   projectSwapsPerRoadmap: 25,
+  savedIdeas: true,
 };
 
 export const ENTITLEMENTS: Record<Plan, Entitlements> = {
@@ -72,6 +78,7 @@ export const ENTITLEMENTS: Record<Plan, Entitlements> = {
     storageMbTotal: 25,
     originalityCheck: false,
     projectSwapsPerRoadmap: 3,
+    savedIdeas: false,
   },
   premium: {
     roadmapsPer30Days: 8,
@@ -86,6 +93,7 @@ export const ENTITLEMENTS: Record<Plan, Entitlements> = {
     storageMbTotal: 200,
     originalityCheck: true,
     projectSwapsPerRoadmap: 10,
+    savedIdeas: true,
   },
   max: MAX,
   institutional: MAX,
@@ -120,6 +128,13 @@ export function freeRoadmapLimitMessage(): string {
   }.`;
 }
 
+/** Shown when a paid plan has used its roadmaps for the month. Free has its own wording, above. */
+export function roadmapLimitMessage(plan: Plan): string {
+  if (plan === "free") return freeRoadmapLimitMessage();
+  const n = ENTITLEMENTS[plan].roadmapsPer30Days;
+  return `You've used this month's ${n} ${n === 1 ? "roadmap" : "roadmaps"}. A new one opens up as the oldest turns 30 days old.`;
+}
+
 /**
  * Prices (Rory, 12 Nov 2026: £9 and £15). A launch or new-joiner discount would be a Stripe
  * promotion code on top of these, not a different figure here. Billed per BILLING_PERIOD.
@@ -137,6 +152,8 @@ function exhbtCount(n: number, hosted: boolean): string {
   const prefix = hosted ? "Up to " : "";
   return `${prefix}${n} ${noun}${hosted ? " hosted" : ""}`;
 }
+
+const SAVED_IDEAS_LINE = "A saved list of project ideas from every roadmap";
 
 function jobLinksLine(): string {
   const line = `A custom link for every job: we pick your ${EXHBTS_PER_JOB_LINK} best fits`;
@@ -163,6 +180,7 @@ export function planFeatures(plan: "free" | "premium" | "max"): string[] {
           ? [ORIGINALITY_CHECK_LIVE ? "An originality check when you publish" : "An originality check when you publish (coming soon)"]
           : []),
         refreshes(e.roadmapsPer30Days),
+        ...(e.savedIdeas ? [SAVED_IDEAS_LINE] : []),
       ];
     case "max":
       return [
@@ -173,6 +191,7 @@ export function planFeatures(plan: "free" | "premium" | "max"): string[] {
           ? [ORIGINALITY_CHECK_LIVE ? "An originality check when you publish" : "An originality check when you publish (coming soon)"]
           : []),
         refreshes(e.roadmapsPer30Days),
+        ...(e.savedIdeas ? [SAVED_IDEAS_LINE] : []),
       ];
   }
 }

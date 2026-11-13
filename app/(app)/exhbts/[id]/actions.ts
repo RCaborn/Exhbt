@@ -63,6 +63,17 @@ function skillsFromGaps(gaps: string[]): string[] {
   return out;
 }
 
+/** An exhbt prefilled from an idea: its title, the brief as the question, the gaps as skills, three empty process boxes. */
+function docFromIdea(idea: { title: string; brief: string; closesGaps: string[] }): ExhbtDoc {
+  return {
+    ...emptyDoc(),
+    title: idea.title.slice(0, LIMITS.titleChars),
+    context: "Project from my Exhbt roadmap",
+    skills: skillsFromGaps(idea.closesGaps),
+    gap: text(idea.brief),
+  };
+}
+
 /**
  * "Build this as an exhbt" on a roadmap's Projects view: an exhbt prefilled from the idea
  * (title, the brief as the question, the gaps as skills, three empty process boxes), if the
@@ -80,14 +91,22 @@ export async function createFromIdea(roadmapId: string, ideaId: string) {
   if (!idea) redirect(back);
   // Refused: the Projects page shows the reason and a link to billing.
   if (!canCreateExhbt(await getPlan(user.id), await store.listExhbts(user.id)).ok) redirect(back);
-  const doc: ExhbtDoc = {
-    ...emptyDoc(),
-    title: idea.title.slice(0, LIMITS.titleChars),
-    context: "Project from my Exhbt roadmap",
-    skills: skillsFromGaps(idea.closesGaps),
-    gap: text(idea.brief),
-  };
-  const id = await store.createExhbt(user.id, doc);
+  const id = await store.createExhbt(user.id, docFromIdea(idea));
+  redirect(`/exhbts/${id}/edit`);
+}
+
+/** "Build this as an exhbt" on the saved list: the same prefill, from the saved copy. */
+export async function createFromSavedIdea(savedId: string) {
+  if (!isPhase2Enabled()) notFound();
+  const back = "/roadmap/saved";
+  const user = await getCurrentUser();
+  if (!user) redirect(`/login?next=${encodeURIComponent(back)}`);
+  const store = getStore();
+  const idea = await store.getSavedIdea(savedId, user.id);
+  if (!idea) redirect(back);
+  // Refused: the saved page shows the reason and a link to billing.
+  if (!canCreateExhbt(await getPlan(user.id), await store.listExhbts(user.id)).ok) redirect(back);
+  const id = await store.createExhbt(user.id, docFromIdea(idea));
   redirect(`/exhbts/${id}/edit`);
 }
 

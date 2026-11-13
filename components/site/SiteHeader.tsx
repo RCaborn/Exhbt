@@ -10,6 +10,7 @@ const NAV = [
 
 /** What a signed-in person needs from the header: their own exhbts, portfolio and account. */
 const OWN_NAV = [
+  { href: "/roadmap", label: "Roadmaps" },
   { href: "/exhbts", label: "Your exhbts" },
   { href: "/job-links", label: "Job links" },
   { href: "/account/portfolio", label: "Portfolio" },
@@ -32,7 +33,7 @@ export function SiteHeader({
   phase2 = false,
   jobLinks = false,
 }: { signedIn?: boolean; phase2?: boolean; jobLinks?: boolean } = {}) {
-  const nav = signedIn ? OWN_NAV.filter((n) => (n.href === "/job-links" ? phase2 && jobLinks : phase2 || n.href === "/account")) : NAV;
+  const nav = signedIn ? OWN_NAV.filter((n) => (n.href === "/job-links" ? phase2 && jobLinks : phase2 || n.href === "/account" || n.href === "/roadmap")) : NAV;
   return (
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-[78rem] flex-wrap items-center justify-between gap-x-8 gap-y-3 px-4 py-4 sm:px-8">

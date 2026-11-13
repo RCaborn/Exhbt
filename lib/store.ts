@@ -41,6 +41,23 @@ export type ProjectIdea = Project & {
   source: "roadmap" | "swap";
 };
 
+/** What each person can keep in their saved list. An abuse guard, not a plan figure. */
+export const SAVED_IDEAS_CAP = 200;
+
+/**
+ * A project idea someone saved, as a copy: it keeps its words, the job it came from and (while
+ * it exists) the roadmap, so a swap or a deleted roadmap never changes it.
+ */
+export type SavedIdea = Project & {
+  id: string;
+  userId: string;
+  /** The roadmap it was saved from; null once that roadmap is gone. */
+  roadmapId: string | null;
+  /** The target job of that roadmap, as the person typed it. */
+  targetRole: string;
+  createdAt: string;
+};
+
 /** The public face of a person: their portfolio header (docs/phase-2.md section 4). */
 export type PortfolioProfile = {
   userId: string;
@@ -289,6 +306,26 @@ export interface Store {
   countActiveJobLinks(userId: string): Promise<number>;
   /** One more view of a live link. A count only: no cookie, no visitor record. */
   incrementJobLinkViews(id: string): Promise<void>;
+
+  /* saved ideas */
+  /** Every roadmap this person owns, newest first. */
+  listRoadmapsFor(userId: string): Promise<RoadmapRecord[]>;
+  /**
+   * Keeps a copy of an idea. "already" if this roadmap's idea with the same title is saved,
+   * "full" at SAVED_IDEAS_CAP; either way nothing is added.
+   */
+  saveIdea(
+    userId: string,
+    saved: { roadmapId: string | null; targetRole: string; idea: Project },
+  ): Promise<"saved" | "already" | "full">;
+  /** The person's saved ideas, newest first. */
+  listSavedIdeas(userId: string): Promise<SavedIdea[]>;
+  /** One saved idea, only if it is theirs. */
+  getSavedIdea(id: string, userId: string): Promise<SavedIdea | null>;
+  /** Which of a roadmap's ideas (by title) the person has saved: the batch lookup behind the stars. */
+  savedTitlesForRoadmap(userId: string, roadmapId: string): Promise<string[]>;
+  /** Removes a saved idea, only if it is theirs. */
+  removeSavedIdea(id: string, userId: string): Promise<boolean>;
 }
 
 export const isSupabaseConfigured = () =>
@@ -358,6 +395,32 @@ const ideaFromRow = (r: IdeaRow): ProjectIdea => ({
   deliverable: r.deliverable,
   weeks: r.weeks,
   source: r.source,
+});
+
+type SavedIdeaRow = {
+  id: string;
+  user_id: string;
+  roadmap_id: string | null;
+  target_role: string;
+  title: string;
+  brief: string;
+  closes_gaps: string[];
+  deliverable: string;
+  weeks: number;
+  created_at: string;
+};
+
+const savedFromRow = (r: SavedIdeaRow): SavedIdea => ({
+  id: r.id,
+  userId: r.user_id,
+  roadmapId: r.roadmap_id,
+  targetRole: r.target_role,
+  title: r.title,
+  brief: r.brief,
+  closesGaps: r.closes_gaps ?? [],
+  deliverable: r.deliverable,
+  weeks: r.weeks,
+  createdAt: r.created_at,
 });
 
 /** The plan has three slots. */
@@ -586,13 +649,14 @@ function supabaseStore(): Store {
       // Rows as stored. Profiles include the portfolio fields; exhbts carry both the working copy
       // (blocks) and the published one (published_blocks). Files are metadata only, never the bytes.
       // Subscriptions hold Stripe ids and status; card details never reach us.
-      const [profile, roadmaps, exhbts, files, links, subs] = await Promise.all([
+      const [profile, roadmaps, exhbts, files, links, subs, saved] = await Promise.all([
         db.from("profiles").select("*").eq("id", userId).maybeSingle(),
         db.from("roadmaps").select("*").eq("user_id", userId),
         db.from("exhbts").select("*").eq("user_id", userId),
         db.from("exhbt_files").select("id, exhbt_id, bucket, path, mime, bytes, kind, created_at").eq("user_id", userId),
         db.from("curated_links").select("*").eq("user_id", userId),
         db.from("subscriptions").select("*").eq("user_id", userId),
+        db.from("saved_ideas").select("*").eq("user_id", userId),
       ]);
       const roadmapIds = ((roadmaps.data ?? []) as { id: string }[]).map((r) => r.id);
       const ideas = roadmapIds.length ? await db.from("project_ideas").select("*").in("roadmap_id", roadmapIds) : { data: [] };
@@ -605,6 +669,7 @@ function supabaseStore(): Store {
         files: files.data,
         curatedLinks: links.data,
         subscriptions: subs.data,
+        savedIdeas: saved.data,
       };
     },
     async deleteUserData(userId) {
@@ -941,6 +1006,57 @@ function supabaseStore(): Store {
       const { error } = await db.rpc("increment_job_link_views", { link_id: id });
       if (error) console.error("job link view count failed", error.message);
     },
+
+    /* saved ideas */
+    async listRoadmapsFor(userId) {
+      const rows = check(
+        await db.from("roadmaps").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+      ) as RoadmapRow[];
+      return rows.map(fromRow);
+    },
+    async saveIdea(userId, { roadmapId, targetRole, idea }) {
+      const count = await db.from("saved_ideas").select("id", { count: "exact", head: true }).eq("user_id", userId);
+      if (count.error) throw new Error(count.error.message);
+      if ((count.count ?? 0) >= SAVED_IDEAS_CAP) return "full";
+      // Unique on (user, roadmap, title): a double click saves once.
+      const row = {
+        user_id: userId,
+        roadmap_id: roadmapId,
+        target_role: targetRole.slice(0, 300),
+        ...ideaFields(idea),
+      };
+      const res = check(
+        await db
+          .from("saved_ideas")
+          .upsert(row, { onConflict: "user_id,roadmap_id,title", ignoreDuplicates: true })
+          .select("id"),
+      ) as { id: string }[];
+      return res.length === 1 ? "saved" : "already";
+    },
+    async listSavedIdeas(userId) {
+      const rows = check(
+        await db.from("saved_ideas").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+      ) as SavedIdeaRow[];
+      return rows.map(savedFromRow);
+    },
+    async getSavedIdea(id, userId) {
+      const row = check(
+        await db.from("saved_ideas").select("*").eq("id", id).eq("user_id", userId).maybeSingle(),
+      ) as SavedIdeaRow | null;
+      return row ? savedFromRow(row) : null;
+    },
+    async savedTitlesForRoadmap(userId, roadmapId) {
+      const rows = check(
+        await db.from("saved_ideas").select("title").eq("user_id", userId).eq("roadmap_id", roadmapId),
+      ) as { title: string }[];
+      return rows.map((r) => r.title);
+    },
+    async removeSavedIdea(id, userId) {
+      const rows = check(
+        await db.from("saved_ideas").delete().eq("id", id).eq("user_id", userId).select("id"),
+      ) as { id: string }[];
+      return rows.length === 1;
+    },
   };
 }
 
@@ -1077,6 +1193,7 @@ type Mem = {
   /** Stripe subscriptions by subscription id (billing). */
   subscriptions: Map<string, SubscriptionRecord>;
   jobLinks: Map<string, JobLink>;
+  savedIdeas: Map<string, SavedIdea>;
 };
 const newMem = (): Mem => ({
   roadmaps: new Map(),
@@ -1093,6 +1210,7 @@ const newMem = (): Mem => ({
   plans: new Map(),
   subscriptions: new Map(),
   jobLinks: new Map(),
+  savedIdeas: new Map(),
 });
 const g = globalThis as unknown as { __exhbtMem?: Mem };
 
@@ -1109,6 +1227,7 @@ function memoryStore(): Store {
   m.plans ??= new Map();
   m.subscriptions ??= new Map();
   m.jobLinks ??= new Map();
+  m.savedIdeas ??= new Map();
   const liveSubscription = (userId: string): SubscriptionRecord | null => {
     // Newest last in insertion order, so look from the end.
     const mine = [...m.subscriptions.values()].filter((x) => x.userId === userId).reverse();
@@ -1245,6 +1364,7 @@ function memoryStore(): Store {
           .map((e) => structuredClone(e)),
         files: [...m.files.values()].filter((f) => f.userId === userId).map((f) => ({ ...f })),
         subscriptions: [...m.subscriptions.values()].filter((x) => x.userId === userId).map((x) => ({ ...x })),
+        savedIdeas: [...m.savedIdeas.values()].filter((x) => x.userId === userId).map((x) => ({ ...x })),
       };
     },
     async deleteUserData(userId) {
@@ -1259,6 +1379,7 @@ function memoryStore(): Store {
       // As the database cascade does: subscriptions and file records go with the account.
       for (const [id, s] of m.subscriptions) if (s.userId === userId) m.subscriptions.delete(id);
       for (const [id, f] of m.files) if (f.userId === userId) m.files.delete(id);
+      for (const [id, x] of m.savedIdeas) if (x.userId === userId) m.savedIdeas.delete(id);
       m.profiles.delete(userId);
       m.plans.delete(userId);
     },
@@ -1442,6 +1563,51 @@ function memoryStore(): Store {
     async incrementJobLinkViews(id) {
       const l = m.jobLinks.get(id);
       if (l && l.status === "live") l.viewCount += 1;
+    },
+
+    /* saved ideas */
+    async listRoadmapsFor(userId) {
+      return [...m.roadmaps.values()]
+        .filter((r) => r.userId === userId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map((r) => ({ ...r }));
+    },
+    async saveIdea(userId, { roadmapId, targetRole, idea }) {
+      const mine = [...m.savedIdeas.values()].filter((x) => x.userId === userId);
+      if (mine.some((x) => x.roadmapId === roadmapId && x.title === idea.title)) return "already";
+      if (mine.length >= SAVED_IDEAS_CAP) return "full";
+      const id = crypto.randomUUID();
+      m.savedIdeas.set(id, {
+        id,
+        userId,
+        roadmapId,
+        targetRole: targetRole.slice(0, 300),
+        title: idea.title,
+        brief: idea.brief,
+        closesGaps: [...idea.closesGaps],
+        deliverable: idea.deliverable,
+        weeks: idea.weeks,
+        createdAt: new Date().toISOString(),
+      });
+      return "saved";
+    },
+    async listSavedIdeas(userId) {
+      // Map keeps insertion order; newest first is that, reversed.
+      return [...m.savedIdeas.values()]
+        .filter((x) => x.userId === userId)
+        .reverse()
+        .map((x) => ({ ...x, closesGaps: [...x.closesGaps] }));
+    },
+    async getSavedIdea(id, userId) {
+      const x = m.savedIdeas.get(id);
+      return x && x.userId === userId ? { ...x, closesGaps: [...x.closesGaps] } : null;
+    },
+    async savedTitlesForRoadmap(userId, roadmapId) {
+      return [...m.savedIdeas.values()].filter((x) => x.userId === userId && x.roadmapId === roadmapId).map((x) => x.title);
+    },
+    async removeSavedIdea(id, userId) {
+      const x = m.savedIdeas.get(id);
+      return x && x.userId === userId ? m.savedIdeas.delete(id) : false;
     },
   };
 }
