@@ -42,6 +42,9 @@ function docTexts(d: ExhbtDoc): string[] {
   ];
 }
 
+/** Every number written anywhere in the exhbt, as written. */
+export const numbersInDoc = (doc: ExhbtDoc): string[] => docTexts(doc).flatMap(numbersIn);
+
 /**
  * Numbers in the exhbt that don't appear anywhere in the source text, as written in the
  * exhbt, once each. Empty means every number was found.
