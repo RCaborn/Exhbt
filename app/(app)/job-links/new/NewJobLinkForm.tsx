@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useHydrated } from "@/lib/use-hydrated";
 import { slugify } from "@/lib/exhbt/slug";
 import { createJobLink, readListing } from "../actions";
 
@@ -19,8 +20,7 @@ const MIN_WORDS = 60;
 
 export function NewJobLinkForm() {
   const router = useRouter();
-  const [ready, setReady] = useState(false);
-  useEffect(() => setReady(true), []);
+  const ready = useHydrated();
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
   const [source, setSource] = useState<Source>("paste");
@@ -88,13 +88,13 @@ export function NewJobLinkForm() {
         <label htmlFor="company" className="label">
           Company
         </label>
-        <input id="company" value={company} onChange={(e) => setCompany(e.target.value)} maxLength={120} autoComplete="organization" className="field mt-2" />
+        <input id="company" value={company} onChange={(e) => setCompany(e.target.value)} maxLength={120} autoComplete="organization" readOnly={!ready} className="field mt-2" />
       </div>
       <div>
         <label htmlFor="role" className="label">
           Role title
         </label>
-        <input id="role" value={role} onChange={(e) => setRole(e.target.value)} maxLength={120} className="field mt-2" />
+        <input id="role" value={role} onChange={(e) => setRole(e.target.value)} maxLength={120} readOnly={!ready} className="field mt-2" />
       </div>
 
       <fieldset>
@@ -132,6 +132,7 @@ export function NewJobLinkForm() {
                 setReadError(null);
               }}
               aria-describedby="listing-url-hint"
+              readOnly={!ready}
               className="field"
             />
             <Button onClick={() => void read()} loading={reading} disabled={reading || !url.trim()} label="Read the page">
@@ -167,6 +168,7 @@ export function NewJobLinkForm() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             aria-describedby="description-hint"
+            readOnly={!ready}
             className="field mt-2"
           />
           <p className="mt-1 text-sm text-graphite" aria-live="polite">

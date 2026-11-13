@@ -59,9 +59,11 @@ const DOCS: Record<string, Doc> = {
         <p>
           Uploaded files sit in private storage with Supabase in London. They have no public address: when your
           portfolio shows an image or an evidence file, we make a link to it that expires after an hour. We keep the
-          project material you upload with the exhbt it belongs to, and delete it when you delete that exhbt or your
-          account. We plan to delete project material automatically 30 days after upload, but that isn&rsquo;t
-          switched on yet.
+          project material you upload, the text we draft from and the AI version of your exhbt with the exhbt they
+          belong to. When you delete an exhbt we delete all of those, and any image or work file it uses, unless
+          another of your exhbts or your profile photo uses the same file. When you delete your account we delete
+          every file you have stored. We plan to delete project material automatically 30 days after upload, but
+          that isn&rsquo;t switched on yet.
         </p>
         <h2>AI drafting</h2>
         <p>

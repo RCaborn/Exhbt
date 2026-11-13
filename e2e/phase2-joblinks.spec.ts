@@ -168,7 +168,8 @@ test.describe("job link pages", () => {
     await expect(picks(page).nth(0)).toContainText(GP);
     await expect(picks(page).nth(1)).toContainText(FOOTFALL);
 
-    // Edit the intro.
+    // Edit the intro (the field is read-only until the page has hydrated).
+    await expect(page.locator("form[data-ready=true]")).toBeAttached();
     await page.getByLabel(/A line or two to the employer/).fill("I forecast library footfall and cut missed appointments.");
     await page.getByRole("button", { name: "Save intro" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeVisible();

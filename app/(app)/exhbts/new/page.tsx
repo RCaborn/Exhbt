@@ -26,7 +26,7 @@ export default async function NewExhbtPage() {
         <div className="rounded-[24px] border border-line bg-surface p-6 shadow-pack sm:p-10">
           <h1 className="text-[2rem] sm:text-[2.6rem]">Draft an exhbt</h1>
           <p className="mt-3 text-graphite">Add your project files and a few notes. We draft it from them; you check every word.</p>
-          <p className="mt-4 text-sm font-semibold" id="allowance">
+          <p className="mt-4 text-sm text-graphite" id="allowance">
             {v.left} of {v.perPeriod} AI {v.perPeriod === 1 ? "draft" : "drafts"} left · files up to {v.uploadMbPerFile} MB each
           </p>
           {v.ok ? (

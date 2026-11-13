@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/Button";
+import { useHydrated } from "@/lib/use-hydrated";
 import { saveProfileAction, type ProfileState } from "./actions";
 import { BIO_MAX_WORDS, countWords, HEADLINE_MAX_WORDS, NAME_MAX_CHARS } from "./rules";
 
@@ -14,6 +15,7 @@ export type ProfileValues = { name: string; headline: string; bio: string; linke
  */
 export function ProfileForm({ initial }: { initial: ProfileValues }) {
   const [state, action] = useActionState<ProfileState, FormData>(saveProfileAction, undefined);
+  const ready = useHydrated();
   const [v, setV] = useState(initial);
   const [dirty, setDirty] = useState(false);
   const set = <K extends keyof ProfileValues>(k: K, value: ProfileValues[K]) => {
@@ -25,9 +27,9 @@ export function ProfileForm({ initial }: { initial: ProfileValues }) {
   const bioWords = countWords(v.bio);
 
   return (
-    <form action={(fd) => { setDirty(false); return action(fd); }} noValidate className="mt-5 max-w-[32rem] space-y-5">
+    <form action={(fd) => { setDirty(false); return action(fd); }} noValidate data-ready={ready ? "true" : undefined} className="mt-5 max-w-[32rem] space-y-5">
       <Field id="profile-name" label="Name" error={errors.name}>
-        <input id="profile-name" name="name" value={v.name} onChange={(e) => set("name", e.target.value)} autoComplete="name" maxLength={NAME_MAX_CHARS + 20} aria-describedby="profile-name-error" className="field" />
+        <input id="profile-name" name="name" value={v.name} onChange={(e) => set("name", e.target.value)} autoComplete="name" maxLength={NAME_MAX_CHARS + 20} aria-describedby="profile-name-error" readOnly={!ready} className="field" />
       </Field>
 
       <Field id="profile-headline" label="Headline" optional error={errors.headline} count={`${headlineWords} of ${HEADLINE_MAX_WORDS} words`} over={headlineWords > HEADLINE_MAX_WORDS}>
@@ -39,7 +41,7 @@ export function ProfileForm({ initial }: { initial: ProfileValues }) {
           maxLength={200}
           placeholder="Data analyst, health and public services"
           aria-describedby="profile-headline-count profile-headline-error"
-          className="field"
+          readOnly={!ready} className="field"
         />
       </Field>
 
@@ -52,7 +54,7 @@ export function ProfileForm({ initial }: { initial: ProfileValues }) {
           rows={4}
           maxLength={600}
           aria-describedby="profile-bio-count profile-bio-error"
-          className="field"
+          readOnly={!ready} className="field"
         />
       </Field>
 
@@ -67,7 +69,7 @@ export function ProfileForm({ initial }: { initial: ProfileValues }) {
           maxLength={200}
           placeholder="linkedin.com/in/your-name"
           aria-describedby="profile-linkedin-error"
-          className="field"
+          readOnly={!ready} className="field"
         />
       </Field>
 

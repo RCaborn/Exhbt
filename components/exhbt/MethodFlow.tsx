@@ -27,7 +27,7 @@ export function MethodFlow({ steps }: { steps: Step[] }) {
               <span className="min-w-0">
                 <span className="block text-[0.86rem] leading-tight font-semibold">{s.step}</span>
                 {s.detail && (
-                  <span className={`mt-0.5 block font-mono text-[0.72rem] leading-snug ${last ? "text-wash" : "text-graphite"}`}>
+                  <span className={`mt-0.5 block font-mono text-[0.8125rem] leading-snug ${last ? "text-wash" : "text-graphite"}`}>
                     {s.detail}
                   </span>
                 )}
