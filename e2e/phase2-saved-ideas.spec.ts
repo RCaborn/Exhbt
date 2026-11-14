@@ -97,6 +97,7 @@ test.describe("My roadmaps", () => {
     await roadmapWithIdeas(page, "Junior data analyst");
     await page.goto("/roadmap");
     await expect(page.getByRole("heading", { level: 1, name: "Your roadmaps" })).toBeVisible();
+    await expect(page.locator("form[data-ready=true]")).toBeAttached();
     const results = await new AxeBuilder({ page }).withTags(WCAG).analyze();
     expect(results.violations).toEqual([]);
   });
