@@ -1,21 +1,17 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { catalogueNo } from "@/lib/exhbt";
 import { PrintButton } from "./PrintButton";
 
 type Neighbour = { slug: string; doc: { title: string } } | undefined;
 
-/** Above a project: the way back, its catalogue number and "Save as PDF". Not printed. */
-export function ProjectTopNav({ home, position }: { home: string; position: number }) {
+/** Above a project: the way back and "Save as PDF". Not printed. The catalogue number is inside the card. */
+export function ProjectTopNav({ home }: { home: string }) {
   return (
     <nav aria-label="Portfolio" className="mb-5 flex flex-wrap items-center justify-between gap-3 text-sm font-semibold print:hidden">
       <Link href={home} className="inline-flex items-center gap-1.5 hover:text-graphite">
         <ArrowLeft aria-hidden size={15} strokeWidth={2.25} /> All projects
       </Link>
-      <span className="flex items-center gap-4">
-        <PrintButton />
-        <span className="font-mono text-[0.8125rem] text-graphite">{catalogueNo(position)}</span>
-      </span>
+      <PrintButton />
     </nav>
   );
 }

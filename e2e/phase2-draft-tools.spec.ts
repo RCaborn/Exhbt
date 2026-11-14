@@ -65,6 +65,16 @@ async function draftAndOpen(page: Page, tag: string): Promise<string> {
 const findings = (page: Page) => page.getByRole("textbox", { name: "Finding 1" });
 const left = (page: Page, block: string) => page.getByTestId(`tools-${block}`).getByTestId("rewrites-left");
 
+// Each card has one "More actions for <card>" menu: "Rewrite this block", "Back to the AI version" and the count.
+const CARD: Record<string, string> = { header: "Title and context", skills: "Skills", gap: "The question", flow: "Process", findings: "Findings" };
+const menuButton = (page: Page, block: string) => page.getByRole("button", { name: `More actions for ${CARD[block]}` });
+const openMenu = (page: Page, block: string) => menuButton(page, block).click();
+const startRewrite = async (page: Page, block: string) => {
+  await openMenu(page, block);
+  await page.getByTestId(`tools-${block}`).getByRole("button", { name: "Rewrite this block" }).click();
+};
+const back = (page: Page, block: string) => page.getByTestId(`tools-${block}`).getByRole("button", { name: "Back to the AI version" });
+
 test.describe("Draft from a file", () => {
   test("a text file is drafted and the editor opens with the rewrite tools", async ({ page }) => {
     await signIn(page, "txt");
@@ -74,9 +84,11 @@ test.describe("Draft from a file", () => {
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
     await expect(page.getByRole("heading", { level: 1, name: "Edit exhbt" })).toBeVisible();
     for (const block of ["header", "skills", "gap", "flow", "findings"]) {
-      await expect(page.getByTestId(`tools-${block}`)).toBeVisible();
+      await expect(menuButton(page, block)).toBeVisible();
     }
-    await expect(left(page, "findings")).toHaveText(`${FREE_REWRITES} of ${FREE_REWRITES} rewrites left on this exhbt`);
+    await openMenu(page, "findings");
+    await expect(left(page, "findings")).toBeVisible();
+    await expect(left(page, "findings")).toHaveText(`${FREE_REWRITES} of ${FREE_REWRITES} rewrites left`);
   });
 
   test("an exhbt started from scratch has no rewrite tools", async ({ page }) => {
@@ -94,16 +106,20 @@ test.describe("Rewrite and back to the AI version", () => {
     await draftAndOpen(page, "rewrite");
     const before = await findings(page).innerText();
     expect(before).not.toContain("Preview rewrite");
-    await expect(page.getByTestId("tools-findings").getByRole("button", { name: "Back to the AI version of the findings" })).toHaveCount(0);
+    await openMenu(page, "findings");
+    await expect(back(page, "findings")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(menuButton(page, "findings")).toBeFocused();
+    await expect(menuButton(page, "findings")).toHaveAttribute("aria-expanded", "false");
 
-    await page.getByRole("button", { name: "Rewrite the findings" }).click();
+    await startRewrite(page, "findings");
     await page.getByLabel("Note for the rewrite").fill("shorter");
     await page.getByRole("button", { name: "Rewrite the findings now" }).click();
 
     await expect(findings(page)).toContainText("Preview rewrite 1");
-    await expect(left(page, "findings")).toHaveText(`${FREE_REWRITES - 1} of ${FREE_REWRITES} rewrites left on this exhbt`);
+    await expect(left(page, "findings")).toHaveText(`${FREE_REWRITES - 1} of ${FREE_REWRITES} rewrites left`);
     // Every card shows the same count.
-    await expect(left(page, "gap")).toHaveText(`${FREE_REWRITES - 1} of ${FREE_REWRITES} rewrites left on this exhbt`);
+    await expect(left(page, "gap")).toHaveText(`${FREE_REWRITES - 1} of ${FREE_REWRITES} rewrites left`);
     await expect(page.getByTestId("tools-findings").getByTestId("tools-status")).toContainText("Rewritten.");
 
     // It survives a reload (autosave) and the count is the server's.
@@ -116,28 +132,29 @@ test.describe("Rewrite and back to the AI version", () => {
   test("Back to the AI version restores the AI's wording after an edit", async ({ page }) => {
     await draftAndOpen(page, "undo");
     const original = await findings(page).innerText();
-    const back = page.getByRole("button", { name: "Back to the AI version of the findings" });
-    await expect(back).toHaveCount(0);
+    await expect(back(page, "findings")).toHaveCount(0);
 
     await findings(page).click();
     await page.keyboard.press("End");
     await page.keyboard.type(" MY OWN EDIT");
     await expect(findings(page)).toContainText("MY OWN EDIT");
-    await expect(back).toBeVisible();
-    await back.click();
+    await openMenu(page, "findings");
+    await expect(back(page, "findings")).toBeVisible();
+    await back(page, "findings").click();
     await expect(findings(page)).not.toContainText("MY OWN EDIT");
     expect((await findings(page).innerText()).trim()).toBe(original.trim());
-    await expect(back).toHaveCount(0);
+    await expect(back(page, "findings")).toHaveCount(0);
 
     // After a rewrite, "the AI version" is the rewrite.
-    await page.getByRole("button", { name: "Rewrite the findings" }).click();
+    await startRewrite(page, "findings");
     await page.getByRole("button", { name: "Rewrite the findings now" }).click();
     await expect(findings(page)).toContainText("Preview rewrite 1");
     await findings(page).click();
     await page.keyboard.press("End");
     await page.keyboard.type(" SECOND EDIT");
-    await expect(back).toBeVisible();
-    await back.click();
+    await openMenu(page, "findings");
+    await expect(back(page, "findings")).toBeVisible();
+    await back(page, "findings").click();
     await expect(findings(page)).toContainText("Preview rewrite 1");
     await expect(findings(page)).not.toContainText("SECOND EDIT");
   });
@@ -150,15 +167,15 @@ test.describe("Rewrite and back to the AI version", () => {
     await expect(left(stale, "flow")).toContainText(`${FREE_REWRITES} of`);
 
     for (let i = 1; i <= FREE_REWRITES; i++) {
-      await page.getByRole("button", { name: "Rewrite the process" }).click();
+      await startRewrite(page, "flow");
       await page.getByRole("button", { name: "Rewrite the process now" }).click();
       await expect(left(page, "flow")).toContainText(`${FREE_REWRITES - i} of`);
     }
-    await page.getByRole("button", { name: "Rewrite the process" }).click();
+    await startRewrite(page, "flow");
     await expect(page.getByTestId("tools-flow")).toContainText("No rewrites left on this exhbt.");
     await expect(page.getByTestId("tools-flow").getByRole("link", { name: "See your plan" })).toHaveAttribute("href", "/account/billing");
 
-    await stale.getByRole("button", { name: "Rewrite the process" }).click();
+    await startRewrite(stale, "flow");
     await stale.getByRole("button", { name: "Rewrite the process now" }).click();
     const status = stale.getByTestId("tools-flow").getByTestId("tools-status");
     await expect(status).toContainText(`You've used all ${FREE_REWRITES} rewrites for this exhbt on the Free plan.`);
@@ -168,13 +185,14 @@ test.describe("Rewrite and back to the AI version", () => {
 
   test("no accessibility violations on the editor with the rewrite controls open", async ({ page }) => {
     await draftAndOpen(page, "a11y");
-    await page.getByRole("button", { name: "Rewrite the findings" }).click();
-    await page.getByRole("button", { name: "Rewrite the question" }).click();
-    // Make "Back to the AI version" show on the findings card too, so it is scanned.
+    await startRewrite(page, "findings");
+    await startRewrite(page, "gap");
+    // Make "Back to the AI version" show on the findings card too, so it is scanned, with its menu open.
     await findings(page).click();
     await page.keyboard.press("End");
     await page.keyboard.type(" extra");
-    await expect(page.getByRole("button", { name: "Back to the AI version of the findings" })).toBeVisible();
+    await openMenu(page, "findings");
+    await expect(back(page, "findings")).toBeVisible();
     const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
     expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
   });

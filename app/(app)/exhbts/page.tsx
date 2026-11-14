@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { createFromScratch, deleteExhbt, moveExhbt } from "./[id]/actions";
@@ -8,7 +9,9 @@ import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { getCurrentUser } from "@/lib/auth";
 import { ENTITLEMENTS, PLAN_NAMES } from "@/lib/entitlements";
+import { headlineFor } from "@/lib/exhbt/headline";
 import { canCreateExhbt, getPlan, limitsFor } from "@/lib/plan";
+import { portfolioHref } from "@/lib/portfolio-links";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
 
@@ -24,7 +27,12 @@ export default async function ExhbtsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/exhbts");
   const store = getStore();
-  const [plan, exhbts] = await Promise.all([getPlan(user.id), store.listExhbts(user.id)]);
+  const [plan, exhbts, profile, host] = await Promise.all([
+    getPlan(user.id),
+    store.listExhbts(user.id),
+    store.getPortfolioProfile(user.id),
+    headers().then((h) => h.get("x-forwarded-host") ?? h.get("host")),
+  ]);
   const max = limitsFor(plan).exhbts;
   const room = canCreateExhbt(plan, exhbts);
   const canGoLive = ENTITLEMENTS[plan].publicPortfolio;
@@ -81,6 +89,8 @@ export default async function ExhbtsPage() {
           <ol aria-label="Your exhbts, in portfolio order" className="mt-8 space-y-3">
             {exhbts.map((e, i) => {
               const title = e.doc.title.trim() || "Untitled exhbt";
+              const headline = headlineFor(e.doc);
+              const viewHref = canGoLive && e.status === "published" && e.slug && profile.username ? `${portfolioHref(profile.username, host)}/${e.slug}` : null;
               return (
                 <li key={e.id} className="flex flex-col gap-3 rounded-[16px] border border-line bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
@@ -90,6 +100,11 @@ export default async function ExhbtsPage() {
                     <Link href={`/exhbts/${e.id}/edit`} className="link mt-1.5 block font-semibold break-words">
                       {title}
                     </Link>
+                    {headline && (
+                      <span className="mt-0.5 block text-sm" data-headline>
+                        <span className="font-mono font-semibold text-ink">{headline.value}</span> <span className="text-graphite">{headline.label}</span>
+                      </span>
+                    )}
                     <span className="text-sm text-graphite">Updated {updated(e.updatedAt)}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0 sm:flex-nowrap">
@@ -103,6 +118,11 @@ export default async function ExhbtsPage() {
                         <ArrowDown aria-hidden size={14} strokeWidth={2.25} />
                       </Button>
                     </form>
+                    {viewHref && (
+                      <Button href={viewHref} size="sm" label={`View ${title}`}>
+                        View
+                      </Button>
+                    )}
                     <Button href={`/exhbts/${e.id}/edit`} size="sm" label={`Edit ${title}`}>
                       Edit
                     </Button>

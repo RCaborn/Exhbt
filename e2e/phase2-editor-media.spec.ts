@@ -47,6 +47,8 @@ test.describe("images and the work as a file", () => {
 
     await page.locator("input[aria-label='Choose an image']").setInputFiles({ name: "queue.png", mimeType: "image/png", buffer: PNG });
     await expect(page.getByLabel(/Image 1: describe it/)).toBeVisible();
+    // A growing textarea, so a long description is never cut off.
+    expect(await page.getByLabel(/Image 1: describe it/).evaluate((el) => el.tagName)).toBe("TEXTAREA");
     await expect(page.getByRole("region", { name: "Preview" }).locator("img[alt='']").first()).toBeVisible();
 
     await page.getByLabel("This is my work, and the numbers are true").check();

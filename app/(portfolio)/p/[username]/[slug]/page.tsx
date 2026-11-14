@@ -44,7 +44,7 @@ export default async function PortfolioProject({ params }: Params) {
   return (
     // The person's look sets the heading face for the whole project page (--font-display).
     <div data-theme={p.theme.id} style={themeStyle(p.theme)}>
-      <ProjectTopNav home={p.base || "/"} position={i + 1} />
+      <ProjectTopNav home={p.base || "/"} />
       <ProjectView
         doc={it.doc}
         owner={{ name: p.displayName, photoUrl: p.photoUrl, shape: p.theme.photo }}

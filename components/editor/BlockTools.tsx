@@ -1,15 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { RotateCcw, Wand2 } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { MoreHorizontal, RotateCcw, Wand2 } from "lucide-react";
 import { rewriteBlockAction } from "@/app/(app)/exhbts/[id]/draft-tools-actions";
 import { Button } from "@/components/ui/Button";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
 import { BLOCK_NAMES, blockValue, replaceBlock, sameBlock, type AiVersion, type BlockValue, type DraftBlock } from "@/lib/exhbt/draft-blocks";
 
 /**
- * "Rewrite" and "Back to the AI version" for the cards the AI drafts (docs/phase-2.md section 6).
+ * One "More actions" menu per card the AI drafts (docs/phase-2.md section 6): "Rewrite this block", "Back to the AI version" and how many rewrites are left.
  * The rules (limit, facts only, number check) are enforced by the server action; this shows them.
  */
 
@@ -72,10 +72,38 @@ export function useDraftTools(id: string, init: DraftToolsInit, doc: ExhbtDoc, s
 }
 
 const NAMES: Record<DraftBlock, string> = { ...BLOCK_NAMES, header: "title and context line", gap: "question" };
+/** What the card is called on the page, for the menu button's name. */
+const CARD_NAMES: Record<DraftBlock, string> = { header: "Title and context", skills: "Skills", gap: "The question", flow: "Process", findings: "Findings" };
+
+const ITEM = "flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 text-left text-[0.95rem] font-medium text-ink hover:bg-mist disabled:opacity-50";
 
 export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock }) {
   const [open, setOpen] = useState(false);
+  const [menu, setMenu] = useState(false);
   const [note, setNote] = useState("");
+  const wrap = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
+
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenu(false);
+        trigger.current?.focus();
+      }
+    };
+    const onPointer = (e: PointerEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setMenu(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [menu]);
+
   if (!dt.enabled) return null;
 
   const name = NAMES[block];
@@ -89,23 +117,52 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
   const noteId = `rewrite-note-${block}`;
 
   return (
-    <div className="mb-4 rounded-[12px] border border-line px-3 py-2" data-testid={`tools-${block}`}>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" label={`Rewrite the ${name}`} disabled={anyBusy} onClick={() => setOpen((o) => !o)}>
-          <Wand2 aria-hidden size={14} strokeWidth={2.25} /> Rewrite
-        </Button>
-        {edited && (
-          <Button size="sm" label={`Back to the AI version of the ${name}`} disabled={anyBusy} onClick={() => dt.restore(block)}>
-            <RotateCcw aria-hidden size={14} strokeWidth={2.25} /> Back to the AI version
-          </Button>
-        )}
-        <span className="text-sm text-graphite" data-testid="rewrites-left">
-          {dt.left} of {dt.limit} {dt.limit === 1 ? "rewrite" : "rewrites"} left on this exhbt
-        </span>
+    <div className="mb-3" data-testid={`tools-${block}`}>
+      <div ref={wrap} className="relative flex justify-end">
+        <button
+          ref={trigger}
+          type="button"
+          aria-label={`More actions for ${CARD_NAMES[block]}`}
+          aria-expanded={menu}
+          aria-controls={menuId}
+          onClick={() => setMenu((m) => !m)}
+          className="inline-flex size-9 items-center justify-center rounded-full border border-line bg-surface text-ink hover:border-ink"
+        >
+          <MoreHorizontal aria-hidden size={18} strokeWidth={2.25} />
+        </button>
+        <div id={menuId} hidden={!menu} className="absolute top-full right-0 z-10 mt-1 w-64 rounded-[12px] border border-line bg-surface p-1.5 shadow-pack">
+          <button
+            type="button"
+            className={ITEM}
+            disabled={anyBusy}
+            onClick={() => {
+              setMenu(false);
+              setOpen(true);
+            }}
+          >
+            <Wand2 aria-hidden size={14} strokeWidth={2.25} /> Rewrite this block
+          </button>
+          {edited && (
+            <button
+              type="button"
+              className={ITEM}
+              disabled={anyBusy}
+              onClick={() => {
+                setMenu(false);
+                dt.restore(block);
+              }}
+            >
+              <RotateCcw aria-hidden size={14} strokeWidth={2.25} /> Back to the AI version
+            </button>
+          )}
+          <p className="px-2.5 pt-1.5 pb-1 text-sm text-graphite" data-testid="rewrites-left">
+            {dt.left} of {dt.limit} {dt.limit === 1 ? "rewrite" : "rewrites"} left
+          </p>
+        </div>
       </div>
 
       {open && (
-        <div className="mt-3">
+        <div className="mt-2 rounded-[12px] border border-line px-3 py-2">
           {noneLeft ? (
             <p className="text-sm">
               No rewrites left on this exhbt.{" "}
