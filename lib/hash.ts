@@ -6,6 +6,13 @@ import type { RoadmapInput } from "./ai/schemas";
  */
 const OUTPUT_VERSION = 2;
 
+/** SHA-256 as 64 lower-case hex characters: of a file's bytes, or of a string's UTF-8. */
+export async function sha256Hex(data: Uint8Array | string): Promise<string> {
+  const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
+  const digest = await crypto.subtle.digest("SHA-256", bytes as Uint8Array<ArrayBuffer>);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 /** Stable SHA-256 of normalised inputs, used to reuse output for identical requests. */
 export async function hashInput(input: RoadmapInput): Promise<string> {
   const norm = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();

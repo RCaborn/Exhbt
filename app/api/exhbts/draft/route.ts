@@ -9,6 +9,7 @@ import { safeHref } from "@/lib/exhbt/blocks";
 import { normaliseNumber, unverifiedNumbers } from "@/lib/exhbt/verify";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
+import { canDraftInto } from "@/lib/team";
 
 /**
  * Drafts an exhbt from the person's material and saves it as a new draft exhbt
@@ -22,6 +23,8 @@ const Body = z.object({
   notes: z.string().max(5_000).optional(),
   link: z.string().max(500).optional(),
   fileIds: z.array(z.string().max(64)).max(20).optional(),
+  /** Draft into this exhbt instead of a new one: a teammate's own, still empty, exhbt (decision 0013). */
+  into: z.string().max(64).optional(),
 });
 
 /** Too little to draft from: the AI would have nothing true to say. */
@@ -46,7 +49,10 @@ export async function POST(req: Request) {
   }
 
   const store = getStore();
-  const verdict = await draftVerdict(user.id);
+  const { into } = parsed.data;
+  const target = into ? await store.getExhbt(into) : null;
+  if (into && !canDraftInto(target, user.id)) return fail("That exhbt can't be drafted into. Open it and edit it instead.", 409);
+  const verdict = await draftVerdict(user.id, undefined, into);
   if (!verdict.ok) return fail(verdict.reason, verdict.status, { upgradeTo: verdict.upgradeTo ?? null });
 
   let result;
@@ -83,16 +89,19 @@ export async function POST(req: Request) {
     ...(link ? { evidence: { kind: "link" as const, href: link, label: "See the work" } } : {}),
     unverified,
   };
-  const id = await store.createExhbt(user.id, doc);
+  const id = target ? target.id : await store.createExhbt(user.id, doc);
+  if (target) await store.saveExhbtDraft(id, user.id, doc);
   await store.logEvent("exhbt_drafted", user.id, { exhbtId: id, model: result.model, unverified: unverified.length, files: fileIds.length });
 
   // The draft limit race: two requests can both pass the check above while the AI works. Now
   // this draft is saved and counted, check again and, if it went over (drafts or exhbts), take
   // it back. Fail closed: when two race at the limit, both are refused and the person tries
   // again. Files are attached only after this, so a refusal leaves their uploads for the retry.
-  const after = await draftVerdict(user.id, id);
+  const after = await draftVerdict(user.id, id, into);
   if (!after.ok) {
-    await store.deleteExhbt(id, user.id);
+    // Drafting into an existing exhbt puts back what it held; a new one is taken back.
+    if (target) await store.saveExhbtDraft(id, user.id, target.doc);
+    else await store.deleteExhbt(id, user.id);
     return fail(after.reason, after.status, { upgradeTo: after.upgradeTo ?? null });
   }
   if (fileIds.length) await store.attachFiles(user.id, id, fileIds);

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Circle, FileText, Loader2, Upload, X } from "lucide-react";
 import { DOC_ACCEPT, DocError, DocNeedsServer, countWords, extractTextInBrowser, readOnServer } from "@/lib/doc-readers";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
+import { finishUpload } from "@/components/team/finish-upload";
 import { Button } from "@/components/ui/Button";
 import type { Plan } from "@/lib/entitlements";
 
@@ -24,7 +25,12 @@ type Item = {
   error?: string;
   upload: "uploading" | "done" | "failed" | "none";
   fileId?: string;
+  /** A team project's file, already in this person's storage: taking it off the list doesn't delete it. */
+  kept?: boolean;
 };
+
+/** A file from a team project to draft from (decision 0013), read in the browser like any other. */
+export type PreloadFile = { fileId: string; name: string; mime: string; url: string };
 
 /** What the drafting view says, and when (seconds after pressing the button) each step starts. The last stays until the answer arrives. */
 const DRAFT_STEPS = [
@@ -39,7 +45,11 @@ const MIN_WORDS = 20;
 const isImage = (f: File) => f.type.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
 const sizeLabel = (b: number) => (b < MB ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / MB).toFixed(1)} MB`);
 
-export function DraftForm({ maxFileMb }: { maxFileMb: number }) {
+/**
+ * `into`: a teammate's own exhbt to draft into instead of starting a new one, with `preload`,
+ * the team project's files they were given.
+ */
+export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number; into?: string; preload?: PreloadFile[] }) {
   const router = useRouter();
   const [items, setItems] = useState<Item[]>([]);
   const [notes, setNotes] = useState("");
@@ -78,8 +88,26 @@ export function DraftForm({ maxFileMb }: { maxFileMb: number }) {
         throw new DocError("The upload didn't finish. Remove the file and try again.");
       }
       patch(key, { upload: "done", fileId: data.fileId });
+      // Fingerprints the stored file; a match on someone else's exhbt raises the team prompt.
+      void finishUpload(data.fileId, file.name);
     } catch (e) {
       patch(key, { upload: "failed", error: e instanceof DocError ? e.message : "We couldn't upload that file. Check your connection." });
+    }
+  }
+
+  /** Reads a file on the device; then uploads it, unless it's already stored (a team file). */
+  async function read(key: string, file: File, uploadAfter: boolean) {
+    try {
+      const text = await extractTextInBrowser(file);
+      patch(key, { status: "ready", text });
+      if (uploadAfter) void upload(key, file);
+    } catch (e) {
+      if (e instanceof DocNeedsServer) {
+        patch(key, { status: "consent", needs: e.kind });
+        if (uploadAfter) void upload(key, file);
+      } else {
+        patch(key, { status: "error", error: e instanceof DocError ? e.message : "We couldn't read that file." });
+      }
     }
   }
 
@@ -92,20 +120,35 @@ export function DraftForm({ maxFileMb }: { maxFileMb: number }) {
         continue;
       }
       setItems((l) => [...l, { key, file, status: "reading", text: "", upload: "none" }]);
-      try {
-        const text = await extractTextInBrowser(file);
-        patch(key, { status: "ready", text });
-        void upload(key, file);
-      } catch (e) {
-        if (e instanceof DocNeedsServer) {
-          patch(key, { status: "consent", needs: e.kind });
-          void upload(key, file);
-        } else {
-          patch(key, { status: "error", error: e instanceof DocError ? e.message : "We couldn't read that file." });
-        }
-      }
+      await read(key, file, true);
     }
   }
+
+  // A team project's files: fetched from storage and read here, like a file just chosen.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      for (const p of preload) {
+        const key = `team-${p.fileId}`;
+        let file: File;
+        try {
+          const res = await fetch(p.url);
+          if (!res.ok) throw new Error(String(res.status));
+          file = new File([await res.blob()], p.name, { type: p.mime });
+        } catch {
+          if (!cancelled) setItems((l) => [...l, { key, file: new File([], p.name), status: "error", text: "", upload: "none", kept: true, error: "We couldn't open this file. Reload the page to try again." }]);
+          continue;
+        }
+        if (cancelled) return;
+        setItems((l) => (l.some((x) => x.key === key) ? l : [...l, { key, file, status: "reading", text: "", upload: "done", fileId: p.fileId, kept: true }]));
+        await read(key, file, false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
+  }, []);
 
   async function readOnServerFor(it: Item) {
     patch(it.key, { status: "transcribing", error: undefined });
@@ -118,7 +161,7 @@ export function DraftForm({ maxFileMb }: { maxFileMb: number }) {
 
   async function remove(it: Item) {
     setItems((l) => l.filter((x) => x.key !== it.key));
-    if (it.fileId) await fetch(`/api/files/${it.fileId}`, { method: "DELETE" }).catch(() => undefined);
+    if (it.fileId && !it.kept) await fetch(`/api/files/${it.fileId}`, { method: "DELETE" }).catch(() => undefined);
   }
 
   const working = items.some((it) => it.status === "reading" || it.status === "transcribing" || it.upload === "uploading");
@@ -140,6 +183,7 @@ export function DraftForm({ maxFileMb }: { maxFileMb: number }) {
           notes,
           link: link.trim() || undefined,
           fileIds: items.filter((it) => it.upload === "done" && it.fileId).map((it) => it.fileId),
+          ...(into ? { into } : {}),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string; upgradeTo?: Plan | null };
@@ -309,7 +353,7 @@ function statusText(it: Item): React.ReactNode {
   if (it.status === "consent") return "Not read yet";
   if (it.status === "error") return null;
   const words = countWords(it.text);
-  const uploaded = it.upload === "uploading" ? " · uploading…" : it.upload === "done" ? " · uploaded" : "";
+  const uploaded = it.kept ? " · from the team project" : it.upload === "uploading" ? " · uploading…" : it.upload === "done" ? " · uploaded" : "";
   return (
     <span className="inline-flex items-center gap-1.5">
       {words > 0 && (

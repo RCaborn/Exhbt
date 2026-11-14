@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
 
   // Stored files first: the database cascade removes their records, and with them the paths.
   await deleteAllFiles(user.id);
-  await getStore().deleteUserData(user.id);
+  await getStore().deleteUserData(user.id, user.email);
   const res = NextResponse.redirect(new URL("/?deleted=1", req.url), 303);
   if (isSupabaseConfigured()) await (await supabaseServer()).auth.signOut();
   else res.cookies.delete(DEV_USER_COOKIE);

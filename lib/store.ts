@@ -92,6 +92,8 @@ export type ExhbtRecord = {
   confirmedAt: string | null;
   publishedAt: string | null;
   updatedAt: string;
+  /** The team project this was made from, for a teammate's own exhbt (decision 0013). Null otherwise. */
+  teamOf?: string | null;
 };
 
 /** A stored file (exhbt_files): project material, evidence, an image on an exhbt, or a profile photo. */
@@ -103,7 +105,52 @@ export type StoredFile = {
   mime: string;
   bytes: number;
   kind: "source" | "evidence" | "image" | "photo";
+  /** SHA-256 of the bytes (hex), set once the upload has landed. Null before then, and for helper files. */
+  sha256?: string | null;
 };
+
+/** A file with the same fingerprint on another account: which exhbt it's attached to, and when it was stored. */
+export type HashedFile = { file: StoredFile; exhbtId: string; createdAt: string };
+
+/** An accepted teammate on an exhbt (exhbt_members). A byline, not content: no words are counted. */
+export type TeamMember = { exhbtId: string; userId: string; role: string; addedAt: string };
+
+/** An invite to join an exhbt (exhbt_invites). Open while neither accepted nor cancelled; usable until it expires. */
+export type TeamInvite = {
+  id: string;
+  exhbtId: string;
+  email: string;
+  role: string;
+  /** SHA-256 of the signed token in the link; the token itself is never stored. */
+  tokenHash: string;
+  createdAt: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+  cancelledAt: string | null;
+};
+
+export type DuplicateOutcome = "shown" | "asked" | "approved" | "declined" | "mine" | "repeat";
+
+/** One match between an upload and a file on another account's exhbt (duplicate_matches). Never public. */
+export type DuplicateMatch = {
+  id: string;
+  sha256: string;
+  uploaderId: string;
+  uploaderFileId: string | null;
+  ownerId: string;
+  ownerFileId: string | null;
+  ownerExhbtId: string | null;
+  outcome: DuplicateOutcome;
+  /** What the uploader said they did, when they asked to join. */
+  role: string | null;
+  createdAt: string;
+  /** When the uploader answered (asked or mine). */
+  answeredAt: string | null;
+  /** When the owner answered (approved or declined). */
+  decidedAt: string | null;
+};
+
+export type NewDuplicateMatch = Pick<DuplicateMatch, "sha256" | "uploaderId" | "uploaderFileId" | "ownerId" | "ownerFileId" | "ownerExhbtId" | "outcome">;
 
 export type UsernameLookup = { userId: string; username: string } | { redirectTo: string } | null;
 
@@ -140,7 +187,10 @@ export type EventName =
   | "file_read_ai"
   | "job_link_created"
   | "job_link_fetched"
-  | "exhbt_rewritten";
+  | "exhbt_rewritten"
+  | "teammate_invited"
+  | "teammate_joined"
+  | "file_matched";
 
 /** A Stripe subscription as we keep it (the `subscriptions` table). No amounts or card details. */
 export type SubscriptionRecord = {
@@ -233,8 +283,10 @@ export interface Store {
   createLead(lead: { name: string; email: string; institution: string; message: string }): Promise<void>;
   /** Idempotent: joining twice with the same email and interest is a no-op. */
   joinWaitlist(entry: { email: string; interest: WaitlistInterest; source: string }): Promise<void>;
-  exportUserData(userId: string): Promise<Record<string, unknown>>;
-  deleteUserData(userId: string): Promise<void>;
+  /** `email`: the account's address, so invites sent to it are included. */
+  exportUserData(userId: string, email?: string): Promise<Record<string, unknown>>;
+  /** `email`: the account's address, so open invites sent to it go too. */
+  deleteUserData(userId: string, email?: string): Promise<void>;
 
   /* Phase 2: portfolios and exhbts (docs/phase-2.md) */
   /** The plan that applies now: an active subscription, else an institution licence, else free. */
@@ -248,7 +300,8 @@ export interface Store {
     userId: string,
     fields: Partial<Pick<PortfolioProfile, "name" | "headline" | "bio" | "photoFileId" | "linkedin" | "hideFromSearch" | "themeId">>,
   ): Promise<void>;
-  createExhbt(userId: string, doc: ExhbtDoc): Promise<string>;
+  /** `teamOf`: the team project a teammate's own exhbt is made from (decision 0013). */
+  createExhbt(userId: string, doc: ExhbtDoc, opts?: { teamOf?: string | null }): Promise<string>;
   getExhbt(id: string): Promise<ExhbtRecord | null>;
   /** All of a person's exhbts, drafts included, in portfolio order. */
   listExhbts(userId: string): Promise<ExhbtRecord[]>;
@@ -328,6 +381,51 @@ export interface Store {
   savedTitlesForRoadmap(userId: string, roadmapId: string): Promise<string[]>;
   /** Removes a saved idea, only if it is theirs. */
   removeSavedIdea(id: string, userId: string): Promise<boolean>;
+
+  /* teammates (decision 0013) */
+  /** The account's email address, for team emails. Null if unknown. */
+  emailFor(userId: string): Promise<string | null>;
+  /** An exhbt's accepted teammates, earliest first. */
+  listMembers(exhbtId: string): Promise<TeamMember[]>;
+  /** The exhbts a person is a teammate on (not their own), earliest first. */
+  listMembershipsFor(userId: string): Promise<TeamMember[]>;
+  /** Adds a teammate. "already" if they're on it, changing nothing. The cap is checked by the caller (lib/team.ts). */
+  addMember(m: Omit<TeamMember, "addedAt">): Promise<"added" | "already">;
+  /**
+   * Takes a teammate off an exhbt. Their own exhbts made from it stop pointing at it (team_of
+   * cleared), so neither page shows the other. False if they weren't on it.
+   */
+  removeMember(exhbtId: string, userId: string): Promise<boolean>;
+  /** Exhbts made from this team project by teammates (team_of = rootId). */
+  listTeamVersions(rootId: string): Promise<ExhbtRecord[]>;
+  /** Records an invite. The id is chosen by the caller, as the signed token carries it. */
+  createInvite(i: Omit<TeamInvite, "createdAt" | "acceptedAt" | "cancelledAt">): Promise<void>;
+  getInvite(id: string): Promise<TeamInvite | null>;
+  /** An exhbt's open invites (neither accepted nor cancelled, expired included), newest first. */
+  listInvites(exhbtId: string): Promise<TeamInvite[]>;
+  /** A fresh token and expiry for an open invite ("Resend"). False if it isn't open or isn't on that exhbt. */
+  renewInvite(id: string, exhbtId: string, tokenHash: string, expiresAt: string): Promise<boolean>;
+  /** False if it isn't open or isn't on that exhbt. */
+  cancelInvite(id: string, exhbtId: string): Promise<boolean>;
+  /** Marks an open invite accepted, once: a second caller gets false. */
+  markInviteAccepted(id: string): Promise<boolean>;
+
+  /* private duplicate matching (decision 0013) */
+  /** Stores the upload's fingerprint, if the file is theirs. */
+  setFileHash(fileId: string, userId: string, sha256: string): Promise<void>;
+  /** Files with this fingerprint on other accounts, attached to an exhbt, oldest first. */
+  findFilesByHash(sha256: string, exceptUserId: string): Promise<HashedFile[]>;
+  createDuplicateMatch(m: NewDuplicateMatch): Promise<string>;
+  getDuplicateMatch(id: string): Promise<DuplicateMatch | null>;
+  /** The most recent match between this uploader and this exhbt, if any. */
+  latestDuplicateMatch(uploaderId: string, ownerExhbtId: string): Promise<DuplicateMatch | null>;
+  /**
+   * Moves a match on, only from the outcome given, so a double click or two tabs change it once.
+   * Sets answered_at (asked, mine) or decided_at (approved, declined). False if it had moved on.
+   */
+  updateDuplicateMatch(id: string, from: DuplicateOutcome, to: DuplicateOutcome, role?: string | null): Promise<boolean>;
+  /** Requests to join waiting on this owner (outcome asked), oldest first; with `exhbtId`, only that exhbt's. */
+  listJoinRequests(ownerId: string, exhbtId?: string): Promise<DuplicateMatch[]>;
 }
 
 export const isSupabaseConfigured = () =>
@@ -647,21 +745,37 @@ function supabaseStore(): Store {
     async joinWaitlist(entry) {
       check(await db.from("waitlist").upsert(entry, { onConflict: "email,interest", ignoreDuplicates: true }));
     },
-    async exportUserData(userId) {
+    async exportUserData(userId, email) {
       // Rows as stored. Profiles include the portfolio fields; exhbts carry both the working copy
       // (blocks) and the published one (published_blocks). Files are metadata only, never the bytes.
       // Subscriptions hold Stripe ids and status; card details never reach us.
-      const [profile, roadmaps, exhbts, files, links, subs, saved] = await Promise.all([
+      const [profile, roadmaps, exhbts, files, links, subs, saved, memberships] = await Promise.all([
         db.from("profiles").select("*").eq("id", userId).maybeSingle(),
         db.from("roadmaps").select("*").eq("user_id", userId),
         db.from("exhbts").select("*").eq("user_id", userId),
-        db.from("exhbt_files").select("id, exhbt_id, bucket, path, mime, bytes, kind, created_at").eq("user_id", userId),
+        db.from("exhbt_files").select("id, exhbt_id, bucket, path, mime, bytes, kind, sha256, created_at").eq("user_id", userId),
         db.from("curated_links").select("*").eq("user_id", userId),
         db.from("subscriptions").select("*").eq("user_id", userId),
         db.from("saved_ideas").select("*").eq("user_id", userId),
+        db.from("exhbt_members").select("exhbt_id, role, added_at").eq("user_id", userId),
       ]);
       const roadmapIds = ((roadmaps.data ?? []) as { id: string }[]).map((r) => r.id);
-      const ideas = roadmapIds.length ? await db.from("project_ideas").select("*").in("roadmap_id", roadmapIds) : { data: [] };
+      const exhbtIds = ((exhbts.data ?? []) as { id: string }[]).map((r) => r.id);
+      const address = email ?? (profile.data as { email?: string } | null)?.email ?? null;
+      const none = { data: [] };
+      const [ideas, teammates, sent, received, uploads, owned] = await Promise.all([
+        roadmapIds.length ? db.from("project_ideas").select("*").in("roadmap_id", roadmapIds) : none,
+        exhbtIds.length ? db.from("exhbt_members").select("exhbt_id, user_id, role, added_at").in("exhbt_id", exhbtIds) : none,
+        exhbtIds.length ? db.from("exhbt_invites").select(INVITE_EXPORT_COLS).in("exhbt_id", exhbtIds) : none,
+        address ? db.from("exhbt_invites").select(INVITE_EXPORT_COLS).eq("email", address.toLowerCase()) : none,
+        // File matches: only this person's side of each one, never who the other account is.
+        db.from("duplicate_matches").select("sha256, uploader_file_id, outcome, role, created_at, answered_at, decided_at").eq("uploader_id", userId),
+        db
+          .from("duplicate_matches")
+          .select("sha256, owner_file_id, owner_exhbt_id, outcome, created_at, decided_at")
+          .eq("owner_id", userId)
+          .in("outcome", ["asked", "approved", "declined"]),
+      ]);
       return {
         exportedAt: new Date().toISOString(),
         profile: profile.data,
@@ -672,11 +786,23 @@ function supabaseStore(): Store {
         curatedLinks: links.data,
         subscriptions: subs.data,
         savedIdeas: saved.data,
+        teamMemberships: memberships.data,
+        teammatesOnYourExhbts: teammates.data,
+        invitesYouSent: sent.data,
+        invitesToYou: received.data,
+        fileMatchesOnYourUploads: uploads.data,
+        joinRequestsOnYourExhbts: owned.data,
       };
     },
-    async deleteUserData(userId) {
-      // Deleting the auth user cascades to profiles and everything owned by it.
+    async deleteUserData(userId, email) {
+      // Deleting the auth user cascades to profiles and everything owned by it: exhbts (with their
+      // invites and teammates), memberships, and file matches on either side. Invites sent to this
+      // address aren't owned by the account, so they go first. A teammate's own exhbt made from one
+      // of theirs keeps its copied files and loses the link (team_of on delete set null).
       // Storage objects are removed first, by deleteAllFiles in lib/uploads.ts (app/api/account/delete).
+      const address =
+        email ?? (check(await db.from("profiles").select("email").eq("id", userId).maybeSingle()) as { email: string | null } | null)?.email;
+      if (address) check(await db.from("exhbt_invites").delete().eq("email", address.toLowerCase()));
       const { error } = await db.auth.admin.deleteUser(userId);
       if (error) throw new Error(error.message);
     },
@@ -746,14 +872,20 @@ function supabaseStore(): Store {
       if (f.themeId !== undefined) row.portfolio_theme = f.themeId;
       if (Object.keys(row).length) check(await db.from("profiles").update(row).eq("id", userId));
     },
-    async createExhbt(userId, doc) {
+    async createExhbt(userId, doc, opts) {
       const last = check(
         await db.from("exhbts").select("position").eq("user_id", userId).order("position", { ascending: false }).limit(1).maybeSingle(),
       ) as { position: number } | null;
       const row = check(
         await db
           .from("exhbts")
-          .insert({ user_id: userId, title: doc.title.slice(0, 80), blocks: doc, position: (last?.position ?? -1) + 1 })
+          .insert({
+            user_id: userId,
+            title: doc.title.slice(0, 80),
+            blocks: doc,
+            position: (last?.position ?? -1) + 1,
+            team_of: opts?.teamOf ?? null,
+          })
           .select("id")
           .single(),
       ) as { id: string };
@@ -810,10 +942,8 @@ function supabaseStore(): Store {
       return rows.length > 0;
     },
     async getFile(id) {
-      const r = check(
-        await db.from("exhbt_files").select("id, user_id, bucket, path, mime, bytes, kind").eq("id", id).maybeSingle(),
-      ) as { id: string; user_id: string; bucket: StoredFile["bucket"]; path: string; mime: string; bytes: number; kind: StoredFile["kind"] } | null;
-      return r ? { id: r.id, userId: r.user_id, bucket: r.bucket, path: r.path, mime: r.mime, bytes: r.bytes, kind: r.kind } : null;
+      const r = check(await db.from("exhbt_files").select(FILE_COLS).eq("id", id).maybeSingle()) as FileRow | null;
+      return r ? fromFileRow(r) : null;
     },
 
     /* billing */
@@ -903,6 +1033,7 @@ function supabaseStore(): Store {
           mime: f.mime,
           bytes: f.bytes,
           kind: f.kind,
+          sha256: f.sha256 ?? null,
         }),
       );
     },
@@ -924,26 +1055,15 @@ function supabaseStore(): Store {
       return rows.length;
     },
     async deleteFile(id, userId) {
-      const r = check(
-        await db.from("exhbt_files").delete().eq("id", id).eq("user_id", userId).select("id, user_id, bucket, path, mime, bytes, kind").maybeSingle(),
-      ) as { id: string; user_id: string; bucket: StoredFile["bucket"]; path: string; mime: string; bytes: number; kind: StoredFile["kind"] } | null;
-      return r ? { id: r.id, userId: r.user_id, bucket: r.bucket, path: r.path, mime: r.mime, bytes: r.bytes, kind: r.kind } : null;
+      const r = check(await db.from("exhbt_files").delete().eq("id", id).eq("user_id", userId).select(FILE_COLS).maybeSingle()) as FileRow | null;
+      return r ? fromFileRow(r) : null;
     },
 
     /* billing polish */
     async listFiles(userId, exhbtId) {
-      let q = db.from("exhbt_files").select("id, user_id, bucket, path, mime, bytes, kind").eq("user_id", userId);
+      let q = db.from("exhbt_files").select(FILE_COLS).eq("user_id", userId);
       if (exhbtId) q = q.eq("exhbt_id", exhbtId);
-      const rows = check(await q) as {
-        id: string;
-        user_id: string;
-        bucket: StoredFile["bucket"];
-        path: string;
-        mime: string;
-        bytes: number;
-        kind: StoredFile["kind"];
-      }[];
-      return rows.map((r) => ({ id: r.id, userId: r.user_id, bucket: r.bucket, path: r.path, mime: r.mime, bytes: r.bytes, kind: r.kind }));
+      return (check(await q.order("created_at", { ascending: true })) as FileRow[]).map(fromFileRow);
     },
 
     /* draft tools */
@@ -1061,8 +1181,270 @@ function supabaseStore(): Store {
       ) as { id: string }[];
       return rows.length === 1;
     },
+
+    /* teammates */
+    async emailFor(userId) {
+      const row = check(await db.from("profiles").select("email").eq("id", userId).maybeSingle()) as { email: string | null } | null;
+      return row?.email ?? null;
+    },
+    async listMembers(exhbtId) {
+      const rows = check(
+        await db.from("exhbt_members").select(MEMBER_COLS).eq("exhbt_id", exhbtId).order("added_at", { ascending: true }),
+      ) as MemberRow[];
+      return rows.map(fromMemberRow);
+    },
+    async listMembershipsFor(userId) {
+      const rows = check(
+        await db.from("exhbt_members").select(MEMBER_COLS).eq("user_id", userId).order("added_at", { ascending: true }),
+      ) as MemberRow[];
+      return rows.map(fromMemberRow);
+    },
+    async addMember(m) {
+      const rows = check(
+        await db
+          .from("exhbt_members")
+          .upsert({ exhbt_id: m.exhbtId, user_id: m.userId, role: m.role.slice(0, 40) }, { onConflict: "exhbt_id,user_id", ignoreDuplicates: true })
+          .select("exhbt_id"),
+      ) as { exhbt_id: string }[];
+      return rows.length === 1 ? "added" : "already";
+    },
+    async removeMember(exhbtId, userId) {
+      const rows = check(
+        await db.from("exhbt_members").delete().eq("exhbt_id", exhbtId).eq("user_id", userId).select("exhbt_id"),
+      ) as { exhbt_id: string }[];
+      if (!rows.length) return false;
+      check(await db.from("exhbts").update({ team_of: null }).eq("team_of", exhbtId).eq("user_id", userId));
+      return true;
+    },
+    async listTeamVersions(rootId) {
+      const rows = check(
+        await db.from("exhbts").select(EXHBT_COLS).eq("team_of", rootId).order("created_at", { ascending: true }),
+      ) as ExhbtRow[];
+      return rows.map(fromExhbtRow);
+    },
+    async createInvite(i) {
+      check(
+        await db.from("exhbt_invites").insert({
+          id: i.id,
+          exhbt_id: i.exhbtId,
+          email: i.email.toLowerCase(),
+          role: i.role.slice(0, 40),
+          token_hash: i.tokenHash,
+          expires_at: i.expiresAt,
+        }),
+      );
+    },
+    async getInvite(id) {
+      const row = check(await db.from("exhbt_invites").select(INVITE_COLS).eq("id", id).maybeSingle()) as InviteRow | null;
+      return row ? fromInviteRow(row) : null;
+    },
+    async listInvites(exhbtId) {
+      const rows = check(
+        await db
+          .from("exhbt_invites")
+          .select(INVITE_COLS)
+          .eq("exhbt_id", exhbtId)
+          .is("accepted_at", null)
+          .is("cancelled_at", null)
+          .order("created_at", { ascending: false }),
+      ) as InviteRow[];
+      return rows.map(fromInviteRow);
+    },
+    async renewInvite(id, exhbtId, tokenHash, expiresAt) {
+      const rows = check(
+        await db
+          .from("exhbt_invites")
+          .update({ token_hash: tokenHash, expires_at: expiresAt })
+          .eq("id", id)
+          .eq("exhbt_id", exhbtId)
+          .is("accepted_at", null)
+          .is("cancelled_at", null)
+          .select("id"),
+      ) as { id: string }[];
+      return rows.length === 1;
+    },
+    async cancelInvite(id, exhbtId) {
+      const rows = check(
+        await db
+          .from("exhbt_invites")
+          .update({ cancelled_at: new Date().toISOString() })
+          .eq("id", id)
+          .eq("exhbt_id", exhbtId)
+          .is("accepted_at", null)
+          .is("cancelled_at", null)
+          .select("id"),
+      ) as { id: string }[];
+      return rows.length === 1;
+    },
+    async markInviteAccepted(id) {
+      const rows = check(
+        await db
+          .from("exhbt_invites")
+          .update({ accepted_at: new Date().toISOString() })
+          .eq("id", id)
+          .is("accepted_at", null)
+          .is("cancelled_at", null)
+          .select("id"),
+      ) as { id: string }[];
+      return rows.length === 1;
+    },
+
+    /* private duplicate matching */
+    async setFileHash(fileId, userId, sha256) {
+      check(await db.from("exhbt_files").update({ sha256 }).eq("id", fileId).eq("user_id", userId));
+    },
+    async findFilesByHash(sha256, exceptUserId) {
+      const rows = check(
+        await db
+          .from("exhbt_files")
+          .select(`${FILE_COLS}, exhbt_id, created_at`)
+          .eq("sha256", sha256)
+          .neq("user_id", exceptUserId)
+          .not("exhbt_id", "is", null)
+          .order("created_at", { ascending: true })
+          .limit(20),
+      ) as (FileRow & { exhbt_id: string; created_at: string })[];
+      return rows.map((r) => ({ file: fromFileRow(r), exhbtId: r.exhbt_id, createdAt: r.created_at }));
+    },
+    async createDuplicateMatch(m) {
+      const row = check(
+        await db
+          .from("duplicate_matches")
+          .insert({
+            sha256: m.sha256,
+            uploader_id: m.uploaderId,
+            uploader_file_id: m.uploaderFileId,
+            owner_id: m.ownerId,
+            owner_file_id: m.ownerFileId,
+            owner_exhbt_id: m.ownerExhbtId,
+            outcome: m.outcome,
+          })
+          .select("id")
+          .single(),
+      ) as { id: string };
+      return row.id;
+    },
+    async getDuplicateMatch(id) {
+      const row = check(await db.from("duplicate_matches").select("*").eq("id", id).maybeSingle()) as MatchRow | null;
+      return row ? fromMatchRow(row) : null;
+    },
+    async latestDuplicateMatch(uploaderId, ownerExhbtId) {
+      const row = check(
+        await db
+          .from("duplicate_matches")
+          .select("*")
+          .eq("uploader_id", uploaderId)
+          .eq("owner_exhbt_id", ownerExhbtId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ) as MatchRow | null;
+      return row ? fromMatchRow(row) : null;
+    },
+    async updateDuplicateMatch(id, from, to, role) {
+      const now = new Date().toISOString();
+      const rows = check(
+        await db
+          .from("duplicate_matches")
+          .update({
+            outcome: to,
+            ...(to === "asked" || to === "mine" ? { answered_at: now } : { decided_at: now }),
+            ...(role !== undefined ? { role: role ? role.slice(0, 40) : null } : {}),
+          })
+          .eq("id", id)
+          .eq("outcome", from)
+          .select("id"),
+      ) as { id: string }[];
+      return rows.length === 1;
+    },
+    async listJoinRequests(ownerId, exhbtId) {
+      let q = db.from("duplicate_matches").select("*").eq("owner_id", ownerId).eq("outcome", "asked");
+      if (exhbtId) q = q.eq("owner_exhbt_id", exhbtId);
+      return (check(await q.order("answered_at", { ascending: true })) as MatchRow[]).map(fromMatchRow);
+    },
   };
 }
+
+const FILE_COLS = "id, user_id, bucket, path, mime, bytes, kind, sha256";
+type FileRow = {
+  id: string;
+  user_id: string;
+  bucket: StoredFile["bucket"];
+  path: string;
+  mime: string;
+  bytes: number;
+  kind: StoredFile["kind"];
+  sha256: string | null;
+};
+const fromFileRow = (r: FileRow): StoredFile => ({
+  id: r.id,
+  userId: r.user_id,
+  bucket: r.bucket,
+  path: r.path,
+  mime: r.mime,
+  bytes: r.bytes,
+  kind: r.kind,
+  sha256: r.sha256 ?? null,
+});
+
+const MEMBER_COLS = "exhbt_id, user_id, role, added_at";
+type MemberRow = { exhbt_id: string; user_id: string; role: string | null; added_at: string };
+const fromMemberRow = (r: MemberRow): TeamMember => ({ exhbtId: r.exhbt_id, userId: r.user_id, role: r.role ?? "", addedAt: r.added_at });
+
+const INVITE_COLS = "id, exhbt_id, email, role, token_hash, created_at, expires_at, accepted_at, cancelled_at";
+/** What the account export shows of an invite: everything but the token's hash. */
+const INVITE_EXPORT_COLS = "id, exhbt_id, email, role, created_at, expires_at, accepted_at, cancelled_at";
+type InviteRow = {
+  id: string;
+  exhbt_id: string;
+  email: string;
+  role: string | null;
+  token_hash: string;
+  created_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+  cancelled_at: string | null;
+};
+const fromInviteRow = (r: InviteRow): TeamInvite => ({
+  id: r.id,
+  exhbtId: r.exhbt_id,
+  email: r.email,
+  role: r.role ?? "",
+  tokenHash: r.token_hash,
+  createdAt: r.created_at,
+  expiresAt: r.expires_at,
+  acceptedAt: r.accepted_at,
+  cancelledAt: r.cancelled_at,
+});
+
+type MatchRow = {
+  id: string;
+  sha256: string;
+  uploader_id: string;
+  uploader_file_id: string | null;
+  owner_id: string;
+  owner_file_id: string | null;
+  owner_exhbt_id: string | null;
+  outcome: DuplicateOutcome;
+  role: string | null;
+  created_at: string;
+  answered_at: string | null;
+  decided_at: string | null;
+};
+const fromMatchRow = (r: MatchRow): DuplicateMatch => ({
+  id: r.id,
+  sha256: r.sha256,
+  uploaderId: r.uploader_id,
+  uploaderFileId: r.uploader_file_id,
+  ownerId: r.owner_id,
+  ownerFileId: r.owner_file_id,
+  ownerExhbtId: r.owner_exhbt_id,
+  outcome: r.outcome,
+  role: r.role,
+  createdAt: r.created_at,
+  answeredAt: r.answered_at,
+  decidedAt: r.decided_at,
+});
 
 type JobLinkRow = {
   id: string;
@@ -1154,7 +1536,7 @@ const emptyProfile = (userId: string): PortfolioProfile => ({
   themeId: null,
 });
 
-const EXHBT_COLS = "id, user_id, blocks, published_blocks, status, public_slug, position, confirmed_at, published_at, updated_at";
+const EXHBT_COLS = "id, user_id, blocks, published_blocks, status, public_slug, position, confirmed_at, published_at, updated_at, team_of";
 type ExhbtRow = {
   id: string;
   user_id: string;
@@ -1166,6 +1548,7 @@ type ExhbtRow = {
   confirmed_at: string | null;
   published_at: string | null;
   updated_at: string;
+  team_of: string | null;
 };
 const fromExhbtRow = (r: ExhbtRow): ExhbtRecord => ({
   id: r.id,
@@ -1178,6 +1561,7 @@ const fromExhbtRow = (r: ExhbtRow): ExhbtRecord => ({
   confirmedAt: r.confirmed_at,
   publishedAt: r.published_at,
   updatedAt: r.updated_at,
+  teamOf: r.team_of ?? null,
 });
 
 /* ---------------- In-memory (local development and tests only) ---------------- */
@@ -1201,6 +1585,10 @@ type Mem = {
   subscriptions: Map<string, SubscriptionRecord>;
   jobLinks: Map<string, JobLink>;
   savedIdeas: Map<string, SavedIdea>;
+  /** Teammates, keyed `${exhbtId}:${userId}` (decision 0013). */
+  members: Map<string, TeamMember>;
+  invites: Map<string, TeamInvite>;
+  matches: Map<string, DuplicateMatch>;
 };
 const newMem = (): Mem => ({
   roadmaps: new Map(),
@@ -1218,7 +1606,12 @@ const newMem = (): Mem => ({
   subscriptions: new Map(),
   jobLinks: new Map(),
   savedIdeas: new Map(),
+  members: new Map(),
+  invites: new Map(),
+  matches: new Map(),
 });
+/** A file as the in-memory store keeps it: the record, the exhbt it's attached to, and when it was made. */
+type MemFile = StoredFile & { exhbtId?: string | null; createdAt?: string };
 const g = globalThis as unknown as { __exhbtMem?: Mem };
 
 function memoryStore(): Store {
@@ -1235,6 +1628,11 @@ function memoryStore(): Store {
   m.subscriptions ??= new Map();
   m.jobLinks ??= new Map();
   m.savedIdeas ??= new Map();
+  m.members ??= new Map();
+  m.invites ??= new Map();
+  m.matches ??= new Map();
+  const files = () => m.files as Map<string, MemFile>;
+  const isOpen = (i: TeamInvite) => !i.acceptedAt && !i.cancelledAt;
   const liveSubscription = (userId: string): SubscriptionRecord | null => {
     // Newest last in insertion order, so look from the end.
     const mine = [...m.subscriptions.values()].filter((x) => x.userId === userId).reverse();
@@ -1355,11 +1753,25 @@ function memoryStore(): Store {
       m.waitlist ??= [];
       if (!m.waitlist.some((w) => w.email === entry.email && w.interest === entry.interest)) m.waitlist.push(entry);
     },
-    async exportUserData(userId) {
+    async exportUserData(userId, email) {
       // The same parts as the Supabase export: profile (portfolio fields), exhbts with both copies,
-      // file metadata (no bytes) and subscriptions (no card data; we never hold any).
+      // file metadata (no bytes), subscriptions (no card data; we never hold any), and team data.
       const roadmaps = [...m.roadmaps.values()].filter((r) => r.userId === userId);
       const p = m.profiles.get(userId);
+      const mine = new Set([...m.exhbts.values()].filter((e) => e.userId === userId).map((e) => e.id));
+      const address = (email ?? (userId.startsWith("dev-") ? userId.slice(4) : "")).toLowerCase();
+      // Everything but the token's hash, as the Supabase export.
+      const inviteOut = (i: TeamInvite) => ({
+        id: i.id,
+        exhbtId: i.exhbtId,
+        email: i.email,
+        role: i.role,
+        createdAt: i.createdAt,
+        expiresAt: i.expiresAt,
+        acceptedAt: i.acceptedAt,
+        cancelledAt: i.cancelledAt,
+      });
+      const matches = [...m.matches.values()];
       return {
         exportedAt: new Date().toISOString(),
         profile: p ? { ...p } : null,
@@ -1372,21 +1784,45 @@ function memoryStore(): Store {
         files: [...m.files.values()].filter((f) => f.userId === userId).map((f) => ({ ...f })),
         subscriptions: [...m.subscriptions.values()].filter((x) => x.userId === userId).map((x) => ({ ...x })),
         savedIdeas: [...m.savedIdeas.values()].filter((x) => x.userId === userId).map((x) => ({ ...x })),
+        teamMemberships: [...m.members.values()].filter((x) => x.userId === userId).map((x) => ({ exhbtId: x.exhbtId, role: x.role, addedAt: x.addedAt })),
+        teammatesOnYourExhbts: [...m.members.values()].filter((x) => mine.has(x.exhbtId)).map((x) => ({ ...x })),
+        invitesYouSent: [...m.invites.values()].filter((i) => mine.has(i.exhbtId)).map(inviteOut),
+        invitesToYou: address ? [...m.invites.values()].filter((i) => i.email.toLowerCase() === address).map(inviteOut) : [],
+        // File matches: only this person's side of each one, never who the other account is.
+        fileMatchesOnYourUploads: matches
+          .filter((x) => x.uploaderId === userId)
+          .map((x) => ({ sha256: x.sha256, uploaderFileId: x.uploaderFileId, outcome: x.outcome, role: x.role, createdAt: x.createdAt, answeredAt: x.answeredAt, decidedAt: x.decidedAt })),
+        joinRequestsOnYourExhbts: matches
+          .filter((x) => x.ownerId === userId && ["asked", "approved", "declined"].includes(x.outcome))
+          .map((x) => ({ sha256: x.sha256, ownerFileId: x.ownerFileId, ownerExhbtId: x.ownerExhbtId, outcome: x.outcome, createdAt: x.createdAt, decidedAt: x.decidedAt })),
       };
     },
-    async deleteUserData(userId) {
+    async deleteUserData(userId, email) {
       for (const [id, r] of m.roadmaps) {
         if (r.userId === userId) {
           m.roadmaps.delete(id);
           m.ideas.delete(id);
         }
       }
-      for (const [id, e] of m.exhbts) if (e.userId === userId) m.exhbts.delete(id);
+      const gone = new Set<string>();
+      for (const [id, e] of m.exhbts) {
+        if (e.userId === userId) {
+          m.exhbts.delete(id);
+          gone.add(id);
+        }
+      }
       for (const [id, l] of m.jobLinks) if (l.userId === userId) m.jobLinks.delete(id);
       // As the database cascade does: subscriptions and file records go with the account.
       for (const [id, s] of m.subscriptions) if (s.userId === userId) m.subscriptions.delete(id);
       for (const [id, f] of m.files) if (f.userId === userId) m.files.delete(id);
       for (const [id, x] of m.savedIdeas) if (x.userId === userId) m.savedIdeas.delete(id);
+      // Teams: their memberships, the teammates and invites on their exhbts, invites sent to their
+      // address, and matches on either side. Others' exhbts made from theirs lose the link only.
+      const address = (email ?? (userId.startsWith("dev-") ? userId.slice(4) : "")).toLowerCase();
+      for (const [k, x] of m.members) if (x.userId === userId || gone.has(x.exhbtId)) m.members.delete(k);
+      for (const [k, i] of m.invites) if (gone.has(i.exhbtId) || (address && i.email.toLowerCase() === address)) m.invites.delete(k);
+      for (const [k, x] of m.matches) if (x.uploaderId === userId || x.ownerId === userId) m.matches.delete(k);
+      for (const e of m.exhbts.values()) if (e.teamOf && gone.has(e.teamOf)) e.teamOf = null;
       m.profiles.delete(userId);
       m.plans.delete(userId);
     },
@@ -1426,7 +1862,7 @@ function memoryStore(): Store {
       for (const [k, v] of Object.entries(f)) if (v !== undefined) (next as Record<string, unknown>)[k] = v;
       m.profiles.set(userId, next);
     },
-    async createExhbt(userId, doc) {
+    async createExhbt(userId, doc, opts) {
       const id = crypto.randomUUID();
       const mine = [...m.exhbts.values()].filter((e) => e.userId === userId);
       m.exhbts.set(id, {
@@ -1440,6 +1876,7 @@ function memoryStore(): Store {
         confirmedAt: null,
         publishedAt: null,
         updatedAt: new Date().toISOString(),
+        teamOf: opts?.teamOf ?? null,
       });
       return id;
     },
@@ -1477,7 +1914,15 @@ function memoryStore(): Store {
       });
     },
     async deleteExhbt(id, userId) {
-      return own(id, userId) ? m.exhbts.delete(id) : false;
+      if (!own(id, userId)) return false;
+      m.exhbts.delete(id);
+      // As the database does: its teammates and invites go, teammates' own exhbts made from it
+      // keep standing without the link, and file matches forget which exhbt it was.
+      for (const [k, x] of m.members) if (x.exhbtId === id) m.members.delete(k);
+      for (const [k, i] of m.invites) if (i.exhbtId === id) m.invites.delete(k);
+      for (const e of m.exhbts.values()) if (e.teamOf === id) e.teamOf = null;
+      for (const x of m.matches.values()) if (x.ownerExhbtId === id) x.ownerExhbtId = null;
+      return true;
     },
     async getFile(id) {
       return m.files.get(id) ?? null;
@@ -1499,7 +1944,7 @@ function memoryStore(): Store {
       return m.events.filter((e) => e.name === name && e.userId === userId && Date.parse(e.at) >= after).length;
     },
     async createFile(f) {
-      m.files.set(f.id, { ...f, exhbtId: f.exhbtId ?? null } as StoredFile);
+      files().set(f.id, { ...f, exhbtId: f.exhbtId ?? null, sha256: f.sha256 ?? null, createdAt: new Date().toISOString() });
     },
     async storageBytesUsed(userId) {
       return [...m.files.values()].filter((f) => f.userId === userId).reduce((n, f) => n + f.bytes, 0);
@@ -1519,6 +1964,11 @@ function memoryStore(): Store {
       const f = m.files.get(id);
       if (!f || f.userId !== userId) return null;
       m.files.delete(id);
+      // As the database does (on delete set null): a match keeps its row and loses the file.
+      for (const x of m.matches.values()) {
+        if (x.uploaderFileId === id) x.uploaderFileId = null;
+        if (x.ownerFileId === id) x.ownerFileId = null;
+      }
       return f;
     },
 
@@ -1615,6 +2065,105 @@ function memoryStore(): Store {
     async removeSavedIdea(id, userId) {
       const x = m.savedIdeas.get(id);
       return x && x.userId === userId ? m.savedIdeas.delete(id) : false;
+    },
+
+    /* teammates */
+    async emailFor(userId) {
+      // Development sign-in ids are `dev-<email>` (app/auth/dev).
+      return userId.startsWith("dev-") ? userId.slice(4) : null;
+    },
+    async listMembers(exhbtId) {
+      return [...m.members.values()].filter((x) => x.exhbtId === exhbtId).map((x) => ({ ...x }));
+    },
+    async listMembershipsFor(userId) {
+      return [...m.members.values()].filter((x) => x.userId === userId).map((x) => ({ ...x }));
+    },
+    async addMember(x) {
+      const key = `${x.exhbtId}:${x.userId}`;
+      if (m.members.has(key)) return "already";
+      m.members.set(key, { exhbtId: x.exhbtId, userId: x.userId, role: x.role.slice(0, 40), addedAt: new Date().toISOString() });
+      return "added";
+    },
+    async removeMember(exhbtId, userId) {
+      if (!m.members.delete(`${exhbtId}:${userId}`)) return false;
+      for (const e of m.exhbts.values()) if (e.teamOf === exhbtId && e.userId === userId) e.teamOf = null;
+      return true;
+    },
+    async listTeamVersions(rootId) {
+      return [...m.exhbts.values()].filter((e) => e.teamOf === rootId).map((e) => structuredClone(e));
+    },
+    async createInvite(i) {
+      m.invites.set(i.id, { ...i, email: i.email.toLowerCase(), role: i.role.slice(0, 40), createdAt: new Date().toISOString(), acceptedAt: null, cancelledAt: null });
+    },
+    async getInvite(id) {
+      const i = m.invites.get(id);
+      return i ? { ...i } : null;
+    },
+    async listInvites(exhbtId) {
+      return [...m.invites.values()]
+        .filter((i) => i.exhbtId === exhbtId && isOpen(i))
+        .reverse()
+        .map((i) => ({ ...i }));
+    },
+    async renewInvite(id, exhbtId, tokenHash, expiresAt) {
+      const i = m.invites.get(id);
+      if (!i || i.exhbtId !== exhbtId || !isOpen(i)) return false;
+      Object.assign(i, { tokenHash, expiresAt });
+      return true;
+    },
+    async cancelInvite(id, exhbtId) {
+      const i = m.invites.get(id);
+      if (!i || i.exhbtId !== exhbtId || !isOpen(i)) return false;
+      i.cancelledAt = new Date().toISOString();
+      return true;
+    },
+    async markInviteAccepted(id) {
+      const i = m.invites.get(id);
+      if (!i || !isOpen(i)) return false;
+      i.acceptedAt = new Date().toISOString();
+      return true;
+    },
+
+    /* private duplicate matching */
+    async setFileHash(fileId, userId, sha256) {
+      const f = m.files.get(fileId);
+      if (f && f.userId === userId) f.sha256 = sha256;
+    },
+    async findFilesByHash(sha256, exceptUserId) {
+      // Map order is insertion order, so oldest first.
+      return [...files().values()]
+        .filter((f) => f.sha256 === sha256 && f.userId !== exceptUserId && f.exhbtId)
+        .slice(0, 20)
+        .map(({ exhbtId, createdAt, ...file }) => ({ file: { ...file }, exhbtId: exhbtId!, createdAt: createdAt ?? "" }));
+    },
+    async createDuplicateMatch(x) {
+      const id = crypto.randomUUID();
+      m.matches.set(id, { ...x, id, role: null, createdAt: new Date().toISOString(), answeredAt: null, decidedAt: null });
+      return id;
+    },
+    async getDuplicateMatch(id) {
+      const x = m.matches.get(id);
+      return x ? { ...x } : null;
+    },
+    async latestDuplicateMatch(uploaderId, ownerExhbtId) {
+      const all = [...m.matches.values()].filter((x) => x.uploaderId === uploaderId && x.ownerExhbtId === ownerExhbtId);
+      const last = all[all.length - 1];
+      return last ? { ...last } : null;
+    },
+    async updateDuplicateMatch(id, from, to, role) {
+      const x = m.matches.get(id);
+      if (!x || x.outcome !== from) return false;
+      const now = new Date().toISOString();
+      x.outcome = to;
+      if (to === "asked" || to === "mine") x.answeredAt = now;
+      else x.decidedAt = now;
+      if (role !== undefined) x.role = role ? role.slice(0, 40) : null;
+      return true;
+    },
+    async listJoinRequests(ownerId, exhbtId) {
+      return [...m.matches.values()]
+        .filter((x) => x.ownerId === ownerId && x.outcome === "asked" && (!exhbtId || x.ownerExhbtId === exhbtId))
+        .map((x) => ({ ...x }));
     },
   };
 }

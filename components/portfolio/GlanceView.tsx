@@ -1,5 +1,6 @@
 import { ExhbtTile } from "@/components/exhbt/ExhbtTile";
 import { PortfolioHeader } from "@/components/exhbt/PortfolioHeader";
+import { TeamLine } from "@/components/portfolio/TeamByline";
 import { safeHref } from "@/lib/exhbt/blocks";
 import { tileFromDoc } from "@/lib/exhbt/headline";
 import type { PortfolioItem } from "@/lib/portfolio";
@@ -51,7 +52,13 @@ export function GlanceView({
       <ul className="mt-6 grid gap-4 sm:mt-8 md:grid-cols-2 md:gap-5">
         {tiles.map(({ it, tile }, i) => (
           <li key={it.id} className={odd && i === 0 ? "md:col-span-2" : undefined}>
-            <ExhbtTile exhbt={tile} href={`${base}/${it.slug}`} position={i + 1} maxSkills={odd && i === 0 ? 6 : 4} />
+            <ExhbtTile
+              exhbt={tile}
+              href={`${base}/${it.slug}`}
+              position={i + 1}
+              maxSkills={odd && i === 0 ? 6 : 4}
+              team={<TeamLine team={it.team} />}
+            />
           </li>
         ))}
       </ul>

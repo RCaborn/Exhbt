@@ -32,9 +32,12 @@ export function ProjectView({
   position,
   confirmed = true,
   checksHref,
+  team,
 }: {
   doc: ExhbtDoc;
   owner: Owner;
+  /** Teammates under the author (TeamByline, decision 0013). A byline, not part of the doc or its word count. */
+  team?: React.ReactNode;
   /** fileId → signed URL. Images without one are left out. */
   imageUrls?: Record<string, string | null>;
   /** Signed URL for a file, or the link itself. */
@@ -80,6 +83,7 @@ export function ProjectView({
         {/* On phones the skills follow the title instead, so the title isn't pushed down. */}
         {skills("hidden sm:flex sm:max-w-[60%] sm:justify-end")}
       </header>
+      {team}
 
       <H className="mt-6 text-[1.6rem] leading-tight sm:text-[2rem] print:mt-4">{doc.title}</H>
       {doc.context && <p className="mt-1.5 text-graphite">{doc.context}</p>}

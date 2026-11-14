@@ -9,7 +9,7 @@ type Doc = { title: string; updated: string; body: React.ReactNode };
 const DOCS: Record<string, Doc> = {
   privacy: {
     title: "Privacy policy",
-    updated: "12 November 2026",
+    updated: "14 November 2026",
     body: (
       <>
         <p>
@@ -30,6 +30,7 @@ const DOCS: Record<string, Doc> = {
             one, a profile photo.
           </li>
           <li>The files you upload for an exhbt, the text read from them, and everything you write in the editor.</li>
+          <li>If you invite teammates to an exhbt: the email addresses you invite and the roles you give them.</li>
           <li>
             If you pay for a plan: which plan, its status and renewal date, and Stripe&rsquo;s reference for you and
             your subscription. Not your card details.
@@ -65,6 +66,20 @@ const DOCS: Record<string, Doc> = {
           every file you have stored. We plan to delete project material automatically 30 days after upload, but
           that isn&rsquo;t switched on yet.
         </p>
+        <h2>Teammates and shared files</h2>
+        <p>
+          When you invite a teammate, we send one email to the address you give. If they accept, their photo, name and
+          role show on the exhbt once it&rsquo;s published, and they can leave at any time. A teammate who makes their
+          own exhbt from the project gets their own copy of the files you uploaded for it; nothing you wrote is copied.
+        </p>
+        <p>
+          We also work out a fingerprint (a SHA-256 hash) of each file you upload and compare it with the fingerprints
+          of files on other people&rsquo;s exhbts, to spot shared project files and help teammates find each other. Only
+          identical files match. If one does, we ask whether you worked on that project together, without telling you
+          whose exhbt it is. If you ask to join, we show its owner your name and email address so they can say yes or
+          no. Nothing about a match is ever shown publicly. We keep a record of each match and how it was answered, and
+          we may review those records.
+        </p>
         <h2>AI drafting</h2>
         <p>
           When you ask for a draft, the text read from your files goes to Anthropic, with your notes and any link
@@ -94,7 +109,7 @@ const DOCS: Record<string, Doc> = {
             draft an exhbt. Processing may take place outside the UK under appropriate safeguards; inputs are not
             used to train models.
           </li>
-          <li>Resend: sending sign-in emails.</li>
+          <li>Resend: sending sign-in and team emails.</li>
           <li>
             Stripe (paid plans): payments. You pay on Stripe&rsquo;s own page, so your card details go straight to
             Stripe and never reach us.

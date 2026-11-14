@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { CHECKS_GUIDE } from "@/components/brand/Seal";
 import { ProjectView } from "@/components/portfolio/ProjectView";
 import { PrintAddress, ProjectPager, ProjectTopNav } from "@/components/portfolio/ProjectNav";
+import { TeamByline } from "@/components/portfolio/TeamByline";
 import { themeStyle } from "@/components/portfolio/themeFonts";
 import { headlineFor } from "@/lib/exhbt/headline";
 import { MARKETING_HOST, portfolioHost } from "@/lib/hosts";
@@ -52,6 +53,7 @@ export default async function PortfolioProject({ params }: Params) {
         evidenceUrl={evidenceUrl}
         checkedOn={checkedOnLabel(it.publishedAt)}
         position={i + 1}
+        team={<TeamByline team={it.team} />}
         // On alex.exhbt.co.uk a relative guide link would stay on the portfolio host.
         checksHref={p.base ? undefined : `https://${MARKETING_HOST}${CHECKS_GUIDE}`}
       />

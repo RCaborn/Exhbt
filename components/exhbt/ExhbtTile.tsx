@@ -21,12 +21,15 @@ export function ExhbtTile({
   position,
   maxSkills = 4,
   headingLevel = "h3",
+  team,
 }: {
   exhbt: TileExhbt;
   href: string;
   position: number;
   maxSkills?: number;
   headingLevel?: "h2" | "h3";
+  /** Teammates, as text (TeamLine): the tile is a link, so nothing inside it may be one. */
+  team?: React.ReactNode;
 }) {
   const extra = e.skills.length - maxSkills;
   const H = headingLevel;
@@ -76,6 +79,8 @@ export function ExhbtTile({
           );
         })}
       </ol>
+
+      {team}
 
       <div className="mt-auto pt-5">
         <ul className="flex flex-wrap gap-1" aria-label="Skills">
