@@ -1,4 +1,5 @@
 import { plain, type ExhbtDoc } from "./blocks";
+import { chartTexts, chartValues } from "./charts";
 
 /**
  * Every number in an exhbt must come from the person's own material (docs/phase-2.md section 6,
@@ -26,7 +27,7 @@ export function numbersIn(text: string): string[] {
   return (text.match(NUMBER) ?? []).map((m) => m.trim());
 }
 
-/** All the text a reader sees in an exhbt, plus the chart values. */
+/** All the text a reader sees in an exhbt, plus every value on its graphs, whatever their kind. */
 function docTexts(d: ExhbtDoc): string[] {
   return [
     d.title,
@@ -37,7 +38,7 @@ function docTexts(d: ExhbtDoc): string[] {
     plain(d.gap),
     ...d.flow.flatMap((s) => [s.step, s.detail ?? ""]),
     ...d.findings.map(plain),
-    ...d.charts.flatMap((c) => [c.title, c.beforeLabel, c.afterLabel, ...c.rows.flatMap((r) => [r.label, String(r.before), String(r.after)])]),
+    ...d.charts.flatMap((c) => [...chartTexts(c), ...chartValues(c).map(String)]),
     ...d.images.map((im) => plain(im.caption)),
   ];
 }

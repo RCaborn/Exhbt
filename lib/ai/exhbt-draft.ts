@@ -3,7 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
 import { LIMITS, SCHEMA_VERSION, text, type ExhbtDoc } from "@/lib/exhbt/blocks";
-import { numbersIn } from "@/lib/exhbt/verify";
+import { CHART_KINDS, hasData, type Chart } from "@/lib/exhbt/charts";
+import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
 
 /**
@@ -36,8 +37,38 @@ Fields:
 - gap: the question and why it mattered, at most ${L.gapWords} words, at most 2 short sentences.
 - flow: ${L.flow.min} to ${L.flow.max} steps of the process, in order, each at most ${L.flow.stepWords} words. "detail" is an optional note of at most ${L.flow.detailWords} words (e.g. "14,200 rows"), or null.
 - findings: ${L.findings.min} to ${L.findings.max} short bullets of what was found or achieved, each at most ${L.findings.wordsEach} words.
-- charts: at most ${L.charts.max} before/after charts, each with 1 to ${L.charts.rows} rows, only when the material gives both the before and the after values. Otherwise an empty list.
+- charts: at most ${L.charts.max} graphs, only from figures stated in the material, each value copied as written there (no totals, averages or changes you work out). An empty list when the material has no figures worth a graph. Choose the kind that fits the figures:
+  - "beforeAfter": one measure before and after a change. series: [what "before" is called, what "after" is called]; rows: ${L.charts.beforeAfter.rows.min} to ${L.charts.beforeAfter.rows.max}, each with values [before, after]. Set lowerIsBetter.
+  - "bar": one measure across ${L.charts.bar.rows.min} to ${L.charts.bar.rows.max} categories. rows: each with values [value].
+  - "groupedBar": ${L.charts.groupedBar.series.min} to ${L.charts.groupedBar.series.max} series compared across up to ${L.charts.groupedBar.rows.max} groups. series: their names; rows: each with one value per series.
+  - "stackedBar": parts that add up to a whole: up to ${L.charts.stackedBar.rows.max} bars of ${L.charts.stackedBar.series.min} to ${L.charts.stackedBar.series.max} parts, none below 0. series: the parts' names.
+  - "line": up to ${L.charts.line.series.max} series over an ordered axis such as weeks or months, ${L.charts.line.rows.min} to ${L.charts.line.rows.max} points in order. rows: each point's label and one value per series.
+  - "scatter": ${L.charts.scatter.points.min} to ${L.charts.scatter.points.max} pairs of figures, in points; xTitle and yTitle say what each axis measures.
+  - "numbers": ${L.charts.numbers.tiles.min} to ${L.charts.numbers.tiles.max} headline figures, in tiles, each with its label, unit and "from" (the starting value, only if the material states one).
+  - "table": a small table, up to ${L.charts.table.columns.max} columns and ${L.charts.table.rows.max} rows: columns are the headings, cells the rows of text.
+  Fill only the fields the kind uses; leave the rest as empty lists or null. Labels at most ${L.charts.labelChars} characters.
 - In total, aim for about ${L.targetWords} words across title, gap, flow and findings, and never more than ${L.totalWords}.`;
+
+/**
+ * A graph as the model writes it: one flat shape for every kind (structured outputs keep enums
+ * but not constant discriminators), turned into the stored kind by toChart. Unused fields are
+ * empty lists or null.
+ */
+const DraftChartSchema = z.object({
+  kind: z.enum(CHART_KINDS),
+  title: z.string(),
+  xTitle: z.string().nullable(),
+  yTitle: z.string().nullable(),
+  unit: z.string().nullable(),
+  lowerIsBetter: z.boolean().nullable(),
+  series: z.array(z.string()),
+  rows: z.array(z.object({ label: z.string(), values: z.array(z.number()) })),
+  points: z.array(z.object({ x: z.number(), y: z.number(), label: z.string().nullable() })),
+  tiles: z.array(z.object({ value: z.number(), label: z.string(), unit: z.string().nullable(), from: z.number().nullable() })),
+  columns: z.array(z.string()),
+  cells: z.array(z.array(z.string())),
+});
+export type DraftChart = z.infer<typeof DraftChartSchema>;
 
 const DraftSchema = z.object({
   title: z.string(),
@@ -47,16 +78,7 @@ const DraftSchema = z.object({
   gap: z.string(),
   flow: z.array(z.object({ step: z.string(), detail: z.string().nullable() })),
   findings: z.array(z.string()),
-  charts: z.array(
-    z.object({
-      title: z.string(),
-      beforeLabel: z.string(),
-      afterLabel: z.string(),
-      lowerIsBetter: z.boolean(),
-      unit: z.string().nullable(),
-      rows: z.array(z.object({ label: z.string(), before: z.number(), after: z.number() })),
-    }),
-  ),
+  charts: z.array(DraftChartSchema),
   numbers: z.array(z.object({ value: z.string(), sourceQuote: z.string() })),
 });
 type Draft = z.infer<typeof DraftSchema>;
@@ -140,30 +162,116 @@ export function toDoc(d: Draft): ExhbtDoc {
       .map((s) => (s.detail?.trim() ? { step: s.step.trim(), detail: s.detail.trim() } : { step: s.step.trim() })),
     findings: d.findings.map((f) => f.trim()).filter(nonEmpty).slice(0, L.findings.max).map(text),
     charts: d.charts
-      .filter((c) => c.rows.length > 0)
-      .slice(0, L.charts.max)
-      .map((c) => ({
-        title: c.title.trim(),
-        beforeLabel: c.beforeLabel.trim(),
-        afterLabel: c.afterLabel.trim(),
-        lowerIsBetter: c.lowerIsBetter,
-        ...(c.unit?.trim() ? { unit: c.unit.trim() } : {}),
-        rows: c.rows.slice(0, L.charts.rows),
-      })),
+      .map(toChart)
+      .filter((c): c is Chart => c !== null && hasData(c))
+      .slice(0, L.charts.max),
     images: [],
   };
 }
 
 /**
+ * One of the model's graphs as a stored graph of its kind, trimmed to the kind's caps. Rows
+ * without the values the kind needs are dropped, never filled in. Null when nothing is left.
+ */
+export function toChart(g: DraftChart): Chart | null {
+  const C = L.charts;
+  const t = (s: string | null | undefined) => (s ?? "").trim();
+  const some = (o: Record<string, string | boolean | undefined>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== ""));
+  const axes = some({ xTitle: t(g.xTitle), yTitle: t(g.yTitle), unit: t(g.unit) });
+  const title = t(g.title);
+  const rows = g.rows.map((r) => ({ label: t(r.label), values: r.values }));
+  switch (g.kind) {
+    case "beforeAfter": {
+      const kept = rows.filter((r) => r.values.length >= 2).slice(0, C.beforeAfter.rows.max);
+      if (!kept.length) return null;
+      return {
+        kind: "beforeAfter",
+        title,
+        beforeLabel: t(g.series[0]) || "Before",
+        afterLabel: t(g.series[1]) || "After",
+        lowerIsBetter: g.lowerIsBetter ?? false,
+        ...some({ unit: t(g.unit) }),
+        rows: kept.map((r) => ({ label: r.label, before: r.values[0]!, after: r.values[1]! })),
+      };
+    }
+    case "bar": {
+      const kept = rows.filter((r) => r.values.length >= 1).slice(0, C.bar.rows.max);
+      return kept.length ? { kind: "bar", title, ...axes, ...some({ lowerIsBetter: g.lowerIsBetter ?? undefined }), rows: kept.map((r) => ({ label: r.label, value: r.values[0]! })) } : null;
+    }
+    case "groupedBar":
+    case "stackedBar":
+    case "line": {
+      const lim = C[g.kind];
+      const series = g.series.map(t).slice(0, lim.series.max);
+      const kept = rows
+        .filter((r) => r.values.length >= series.length && (g.kind !== "stackedBar" || r.values.every((v) => v >= 0)))
+        .slice(0, lim.rows.max)
+        .map((r) => ({ label: r.label, values: r.values.slice(0, series.length) }));
+      if (!series.length || !kept.length) return null;
+      const better = g.kind === "stackedBar" ? {} : some({ lowerIsBetter: g.lowerIsBetter ?? undefined });
+      return { kind: g.kind, title, ...axes, ...better, series, rows: kept } as Chart;
+    }
+    case "scatter": {
+      const points = g.points.slice(0, C.scatter.points.max).map((p) => ({ x: p.x, y: p.y, ...some({ label: t(p.label) }) }));
+      return points.length ? { kind: "scatter", title, xTitle: t(g.xTitle), yTitle: t(g.yTitle), ...some({ unit: t(g.unit) }), points } : null;
+    }
+    case "numbers": {
+      const tiles = g.tiles
+        .filter((x) => t(x.label))
+        .slice(0, C.numbers.tiles.max)
+        .map((x) => ({ value: x.value, label: t(x.label), ...some({ unit: t(x.unit) }), ...(x.from === null ? {} : { from: x.from }) }));
+      return tiles.length ? { kind: "numbers", title, tiles } : null;
+    }
+    case "table": {
+      const columns = g.columns.map(t).slice(0, C.table.columns.max);
+      const cells = g.cells
+        .slice(0, C.table.rows.max)
+        .map((r) => Array.from({ length: columns.length }, (_, k) => t(r[k])))
+        .filter((r) => r.some(Boolean));
+      return columns.length && cells.length ? { kind: "table", title, columns, rows: cells } : null;
+    }
+  }
+}
+
+/**
  * Local development without an API key: a clearly labelled placeholder built from the
  * material, so the flow (upload, draft, number check, editor) can be tried end to end. Its one
- * finding quotes the material's first sentence, so its numbers are real ones.
+ * finding quotes the material's first sentence, so its numbers are real ones. Its graph is a
+ * bar graph (not before/after, so other kinds get exercised too) of the first few figures in
+ * the material, as written there, so the number check finds every one. When the notes say
+ * "stand-in: add a figure to check", the graph also gets a total it worked out, which the
+ * material doesn't state: the mistake the number check exists for, so its flag can be seen
+ * without an API key.
  */
 function mockDraft(input: DraftInput): DraftResult {
   const source = materialText(input).replace(/^File: .*$/gm, "");
   const firstSentence = (source.replace(/\s+/g, " ").match(/[^.!?]{12,}[.!?]/)?.[0] ?? source.slice(0, 120)).trim();
   const quote = firstSentence.split(" ").slice(0, L.findings.wordsEach).join(" ");
   const numbers = numbersIn(quote).map((value) => ({ value, sourceQuote: quote }));
+  const figures = [...new Set(numbersIn(source).map(normaliseNumber).filter((v): v is string => v !== null))].slice(0, 4).map(Number);
+  // No digits in the labels: they'd be numbers the material doesn't have.
+  const names = ["First figure", "Second figure", "Third figure", "Fourth figure"];
+  const rows = figures.map((v, i) => ({ label: names[i]!, values: [v] }));
+  if (/stand-in: add a figure to check/i.test(input.notes ?? "")) rows.push({ label: "Worked-out total", values: [Math.round(figures.reduce((a, b) => a + b, 0) * 10) / 10] });
+  const charts: DraftChart[] =
+    figures.length >= 2
+      ? [
+          {
+            kind: "bar",
+            title: "Placeholder graph: figures from your files",
+            xTitle: null,
+            yTitle: null,
+            unit: null,
+            lowerIsBetter: null,
+            series: [],
+            rows,
+            points: [],
+            tiles: [],
+            columns: [],
+            cells: [],
+          },
+        ]
+      : [];
   return {
     model: "mock",
     inputTokens: 0,
@@ -182,7 +290,7 @@ function mockDraft(input: DraftInput): DraftResult {
         { step: "Checked every number", detail: null },
       ],
       findings: [quote, "This finding is a placeholder."],
-      charts: [],
+      charts,
       numbers,
     }),
   };

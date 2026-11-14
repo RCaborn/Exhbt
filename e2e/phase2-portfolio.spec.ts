@@ -69,7 +69,7 @@ test.describe("Exhbt blocks", () => {
     // Header, skills and headline count (Rory, 12 Nov 2026: the cap covers everything).
     expect(wordCount({ ...d, context: "a b", skills: ["Python", "Regression analysis"], headline: { value: "−18%", label: "missed appointments" } })).toBe(15 + 2 + 3 + 3);
     // So do graph titles and labels.
-    const chart = { title: "Missed appointments", beforeLabel: "Before", afterLabel: "After change", lowerIsBetter: true, rows: [{ label: "All patients", before: 1, after: 2 }] };
+    const chart = { kind: "beforeAfter" as const, title: "Missed appointments", beforeLabel: "Before", afterLabel: "After change", lowerIsBetter: true, rows: [{ label: "All patients", before: 1, after: 2 }] };
     expect(wordCount({ ...d, charts: [chart] })).toBe(15 + 2 + 1 + 2 + 2);
   });
 

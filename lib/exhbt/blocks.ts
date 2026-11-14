@@ -1,4 +1,5 @@
 import { z } from "zod/v4";
+import { asChart, CHART_LIMITS, ChartSchema, chartIssues, chartTexts, publicChart, type Chart } from "./charts";
 
 /**
  * An exhbt as stored (exhbts.blocks): the layout Rory set on 12 Nov 2026, as data.
@@ -23,7 +24,8 @@ export const LIMITS = {
   gapWords: 40,
   flow: { min: 3, max: 6, stepWords: 8, detailWords: 6 },
   findings: { min: 2, max: 4, wordsEach: 20 },
-  charts: { max: 2, rows: 3 },
+  /** Graphs: up to 2, each one of a fixed set of kinds with its own caps (lib/exhbt/charts.ts, decision 0011). */
+  charts: CHART_LIMITS,
   images: { max: 2, captionWords: 15 },
   evidenceCaptionWords: 15,
   /** Every word on the page (see wordCount). 150 is what the editor aims for; 200 is the limit. */
@@ -48,15 +50,8 @@ export type RichText = z.infer<typeof RichTextSchema>;
 
 export const FlowStepSchema = z.object({ step: z.string(), detail: z.string().optional() });
 
-/** Before/after chart rows, as lib/exhbt.ts KeyResult (components/exhbt/BeforeAfterChart.tsx). */
-export const ChartSchema = z.object({
-  title: z.string(),
-  beforeLabel: z.string(),
-  afterLabel: z.string(),
-  lowerIsBetter: z.boolean(),
-  unit: z.string().optional(),
-  rows: z.array(z.object({ label: z.string(), before: z.number(), after: z.number() })),
-});
+/** A graph: before/after, bars, grouped or stacked bars, a line, scatter, big numbers or a small table (lib/exhbt/charts.ts). */
+export { ChartSchema };
 
 export const ImageSchema = z.object({
   /** exhbt_files.id, served through a signed URL. */
@@ -91,7 +86,7 @@ export const ExhbtDocSchema = z.object({
 });
 export type ExhbtDoc = z.infer<typeof ExhbtDocSchema>;
 export type FlowStep = z.infer<typeof FlowStepSchema>;
-export type Chart = z.infer<typeof ChartSchema>;
+export type { Chart };
 
 export function emptyDoc(): ExhbtDoc {
   return {
@@ -112,7 +107,8 @@ export const words = (s: string): number => s.trim().split(/\s+/).filter(Boolean
 
 /**
  * Every word on the page, for the 200-word cap (Rory, 12 Nov 2026: "200 should cap everything"):
- * header, skills, headline, the gap, the flowchart, findings, graph titles and labels, image
+ * header, skills, headline, the gap, the flowchart, findings, every word on the graphs (titles,
+ * axis titles, units, series names, row and tile labels, table headings and cells), image
  * captions and the evidence label. Only image alt text is left out: it isn't shown on the page.
  */
 export function wordCount(d: ExhbtDoc): number {
@@ -125,7 +121,7 @@ export function wordCount(d: ExhbtDoc): number {
     plain(d.gap),
     ...d.flow.flatMap((s) => [s.step, s.detail ?? ""]),
     ...d.findings.map(plain),
-    ...d.charts.flatMap((c) => [c.title, c.beforeLabel, c.afterLabel, c.unit ?? "", ...c.rows.map((r) => r.label)]),
+    ...d.charts.flatMap(chartTexts),
     ...d.images.map((im) => plain(im.caption)),
     d.evidence?.label ?? "",
   ].reduce((n, s) => n + words(s), 0);
@@ -186,11 +182,7 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
   });
 
   need(d.charts.length <= L.charts.max, "charts", `Up to ${L.charts.max} graphs.`);
-  d.charts.forEach((c, i) => {
-    need(c.title.trim().length > 0, `charts.${i}.title`, "Give the graph a title.");
-    need(c.rows.length >= 1 && c.rows.length <= L.charts.rows, `charts.${i}.rows`, `Each graph has 1 to ${L.charts.rows} rows.`);
-    need(c.rows.every((r) => Number.isFinite(r.before) && Number.isFinite(r.after)), `charts.${i}.rows`, "Every value must be a number.");
-  });
+  parsed.data.charts.forEach((c, i) => out.push(...chartIssues(c, i)));
 
   need(d.images.length <= L.images.max, "images", `Up to ${L.images.max} images.`);
   d.images.forEach((im, i) => {
@@ -206,6 +198,16 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
   need(wordCount(d) <= L.totalWords, "", `Keep the whole exhbt to ${L.totalWords} words (it's ${wordCount(d)}).`);
   return out;
 }
+
+/**
+ * The copy employers see, made when an exhbt is published (lib/store.ts publishExhbt): the same
+ * doc, except that a graph whose numbers are protected keeps only its index, never the figures
+ * typed in (decision 0011).
+ */
+export const publicDoc = (d: ExhbtDoc): ExhbtDoc => ({ ...d, charts: d.charts.map(publicChart) });
+
+/** The doc with every graph given its kind, for a doc read straight from the store (it may predate kinds). */
+export const withChartKinds = (d: ExhbtDoc): ExhbtDoc => ({ ...d, charts: d.charts.map(asChart) });
 
 /** Plain text to runs, for drafts and for tests. */
 export const text = (t: string): RichText => (t ? [{ t }] : []);

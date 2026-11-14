@@ -34,7 +34,7 @@ test.describe("Number check", () => {
     expect(unverifiedNumbers(doc(["Saved £1,250.50 a month."]), "saving 1250.5 pounds")).toEqual([]);
     expect(unverifiedNumbers(doc(["From 7.9% to 6.5%."]), "7.90 then 6.5")).toEqual([]);
     // Each missing number once, as written in the exhbt; chart values count too.
-    const d = { ...doc(["Cut 3 steps, then 3 more."]), charts: [{ title: "x", beforeLabel: "a", afterLabel: "b", lowerIsBetter: true, rows: [{ label: "All", before: 7.9, after: 5.1 }] }] };
+    const d = { ...doc(["Cut 3 steps, then 3 more."]), charts: [{ kind: "beforeAfter" as const, title: "x", beforeLabel: "a", afterLabel: "b", lowerIsBetter: true, rows: [{ label: "All", before: 7.9, after: 5.1 }] }] };
     expect(unverifiedNumbers(d, "from 7.9")).toEqual(["3", "5.1"]);
   });
 });
