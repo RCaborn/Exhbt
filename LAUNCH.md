@@ -128,11 +128,36 @@ Payments stay off until Phase 2 is switched on. Do all of this in Stripe's **tes
 
 ---
 
+## Preview site
+
+A second Worker, `exhbt-preview`, runs the `phase-2` branch with Phase 2 switched on, so you can click through it before launch. It never touches the live site: `terna` still deploys from `main`.
+
+- **Address:** `https://exhbt-preview.<your-workers-subdomain>.workers.dev`. The subdomain is the one in your Cloudflare account under **Workers & Pages > Overview** (the `.workers.dev` name shown there). The address also shows on the Worker's page once the first deploy has run.
+- **Deploys itself** on every push to `phase-2` (`.github/workflows/deploy-preview.yml`, using the same two GitHub secrets as the live deploy). You can also run it by hand from the Actions tab.
+- **Data:** it uses the separate preview Supabase project, not the live one. The project URL and anon key are in `wrangler.jsonc` under `env.preview`, because they aren't secret.
+- **Limit:** a person's own address (`alex.exhbt.co.uk`) can't be tried here, because a `workers.dev` address has no subdomains. The `/p/<name>` routes and the app work.
+
+Set these once, in Cloudflare: **Workers & Pages > `exhbt-preview` > Settings > Variables and Secrets > Add**, type **Secret**. The first deploy creates the Worker; add the secrets after it.
+
+| Secret | Value |
+| --- | --- |
+| `SUPABASE_SERVICE_ROLE_KEY` | The preview project's service_role key: Supabase **Project Settings > API Keys**. |
+| `ANTHROPIC_API_KEY` | Your Anthropic key (the same Default-workspace key is fine). |
+| `RESEND_API_KEY` | Your Resend key. |
+| `EXHBT_COOKIE_SECRET` | A new random value, not the live one. For example run `openssl rand -hex 32`. |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Later, from Stripe **test mode** (see the Stripe section). Put the test price ids in `env.preview.vars` in `wrangler.jsonc`. |
+
+Then, in the **preview** Supabase project, **Authentication > URL Configuration**: set **Site URL** to the preview address, and add the same address (with `/**` on the end) under **Redirect URLs**. Sign-in links are built from the address you visit, so no `NEXT_PUBLIC_SITE_URL` is set on the preview.
+
+Check it: open `/api/health` on the preview address. Every setting should read `true` once the secrets are in.
+
+---
+
 ## Phase 2 launch day
 
 Do this only when Rory says go, and in this order. Until step 6 the live site is still running `main`, so the Supabase steps must come first and the merge must follow straight after them: the migrations rename the plan keys and change the `exhbts` columns, and Phase 1 code on `main` won't read them.
 
-Before the day: the Stripe section above done and tried in test mode, a full click-through on the `terna-preview` Worker, and the privacy policy and terms read through (they describe Phase 2).
+Before the day: the Stripe section above done and tried in test mode, a full click-through on the preview site (Preview site, above), and the privacy policy and terms read through (they describe Phase 2).
 
 1. **Back up.** In Supabase, **Database > Backups**, check last night's backup is there (or take one if your plan allows).
 2. **Apply the migrations**, in Supabase **SQL Editor > New query**, one file at a time, **in date order**:

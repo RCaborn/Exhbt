@@ -36,7 +36,7 @@ Nothing above has run with real Stripe, real Supabase Storage, or the real Haiku
    - Create a webhook to `https://<app host>/api/stripe/webhook` with `checkout.session.completed`, `customer.subscription.updated` and `customer.subscription.deleted`.
    - Turn on the Customer portal.
    - Optional: a promotion code for a new-joiner discount.
-3. **A preview to click through.** Create a second free Supabase project (for example `exhbt-preview`) and say so. A preview Worker then gets set up on its own `workers.dev` address, with all migrations applied there, Stripe test keys, and the Anthropic key. That's where the real-service run happens.
+3. **A preview to click through.** Create a second free Supabase project (for example `exhbt-preview`) and say so. The preview Worker is built (see "Preview site" below); it needs its secrets adding and the migrations applied to that project, then Stripe test keys. That's where the real-service run happens.
 4. **Launch day** (LAUNCH.md has the full order):
    - apply migrations `20261113` → `20261117` to the live Supabase, in date order
    - merge `phase-2` into `main`
@@ -50,6 +50,9 @@ Nothing above has run with real Stripe, real Supabase Storage, or the real Haiku
    - **Billing period:** monthly only, or annual too? Monthly is assumed.
    - **Placeholder figures** in `lib/entitlements.ts`: drafts per month, rewrites per exhbt, upload and storage caps, active job links.
    - **Originality check:** choosing a provider (it's "coming soon" until then).
+
+## Preview site
+`exhbt-preview` is a separate Worker that runs the `phase-2` branch with Phase 2 on, at `https://exhbt-preview.<your-workers-subdomain>.workers.dev`. It deploys on every push to `phase-2` (`.github/workflows/deploy-preview.yml`) and uses the preview Supabase project. It needs these Worker secrets added in the Cloudflare dashboard: `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `EXHBT_COOKIE_SECRET` (a new random value), and the Stripe test keys later. The preview Supabase project's Site URL and redirect URL must be the preview address. LAUNCH.md, "Preview site", has the steps.
 
 ## For the subdomain work (Rory's friend)
 Nothing in `middleware.ts`, `lib/hosts.ts`, `app/(portfolio)/layout.tsx` or Worker routes was changed by this work. Left for that work:
