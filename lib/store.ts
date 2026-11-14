@@ -71,6 +71,8 @@ export type PortfolioProfile = {
   photoFileId: string | null;
   linkedin: string | null;
   hideFromSearch: boolean;
+  /** The chosen portfolio look (lib/portfolio-themes.ts), kept even if the plan later drops it. Null: the default. */
+  themeId: string | null;
 };
 
 /**
@@ -244,7 +246,7 @@ export interface Store {
   claimUsername(userId: string, username: string): Promise<"ok" | "taken">;
   updatePortfolioProfile(
     userId: string,
-    fields: Partial<Pick<PortfolioProfile, "name" | "headline" | "bio" | "photoFileId" | "linkedin" | "hideFromSearch">>,
+    fields: Partial<Pick<PortfolioProfile, "name" | "headline" | "bio" | "photoFileId" | "linkedin" | "hideFromSearch" | "themeId">>,
   ): Promise<void>;
   createExhbt(userId: string, doc: ExhbtDoc): Promise<string>;
   getExhbt(id: string): Promise<ExhbtRecord | null>;
@@ -702,7 +704,7 @@ function supabaseStore(): Store {
       const row = check(
         await db
           .from("profiles")
-          .select("id, username, name, headline, bio, photo_file_id, linkedin_url, hide_from_search")
+          .select("id, username, name, headline, bio, photo_file_id, linkedin_url, hide_from_search, portfolio_theme")
           .eq("id", userId)
           .maybeSingle(),
       ) as ProfileRow | null;
@@ -741,6 +743,7 @@ function supabaseStore(): Store {
       if (f.photoFileId !== undefined) row.photo_file_id = f.photoFileId;
       if (f.linkedin !== undefined) row.linkedin_url = f.linkedin;
       if (f.hideFromSearch !== undefined) row.hide_from_search = f.hideFromSearch;
+      if (f.themeId !== undefined) row.portfolio_theme = f.themeId;
       if (Object.keys(row).length) check(await db.from("profiles").update(row).eq("id", userId));
     },
     async createExhbt(userId, doc) {
@@ -1125,6 +1128,7 @@ type ProfileRow = {
   photo_file_id: string | null;
   linkedin_url: string | null;
   hide_from_search: boolean | null;
+  portfolio_theme: string | null;
 };
 const fromProfileRow = (r: ProfileRow): PortfolioProfile => ({
   userId: r.id,
@@ -1135,6 +1139,7 @@ const fromProfileRow = (r: ProfileRow): PortfolioProfile => ({
   photoFileId: r.photo_file_id,
   linkedin: r.linkedin_url,
   hideFromSearch: Boolean(r.hide_from_search),
+  themeId: r.portfolio_theme,
 });
 const emptyProfile = (userId: string): PortfolioProfile => ({
   userId,
@@ -1145,6 +1150,7 @@ const emptyProfile = (userId: string): PortfolioProfile => ({
   photoFileId: null,
   linkedin: null,
   hideFromSearch: false,
+  themeId: null,
 });
 
 const EXHBT_COLS = "id, user_id, blocks, published_blocks, status, public_slug, position, confirmed_at, published_at, updated_at";

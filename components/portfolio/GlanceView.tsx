@@ -3,6 +3,7 @@ import { PortfolioHeader } from "@/components/exhbt/PortfolioHeader";
 import { safeHref } from "@/lib/exhbt/blocks";
 import { tileFromDoc } from "@/lib/exhbt/headline";
 import type { PortfolioItem } from "@/lib/portfolio";
+import type { PortfolioTheme } from "@/lib/portfolio-themes";
 import type { PortfolioProfile } from "@/lib/store";
 
 /**
@@ -19,12 +20,14 @@ export function GlanceView({
   photoUrl,
   items,
   base,
+  theme,
 }: {
   profile: PortfolioProfile & { username: string };
   displayName: string;
   photoUrl: string | null;
   items: PortfolioItem[];
   base: string;
+  theme?: PortfolioTheme;
 }) {
   const tiles = items.map((it) => ({ it, tile: tileFromDoc(it.doc) }));
   const odd = tiles.length % 2 === 1;
@@ -32,6 +35,7 @@ export function GlanceView({
     <>
       <PortfolioHeader
         framed
+        theme={theme}
         owner={{
           username: profile.username,
           name: displayName,

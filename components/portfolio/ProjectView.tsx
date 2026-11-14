@@ -10,7 +10,7 @@ import { catalogueNo } from "@/lib/exhbt";
 import { type ExhbtDoc } from "@/lib/exhbt/blocks";
 import { headlineFor } from "@/lib/exhbt/headline";
 
-export type Owner = { name: string; photoUrl: string | null };
+export type Owner = { name: string; photoUrl: string | null; /** The portfolio look's photo shape; round when left out. */ shape?: "round" | "square" };
 
 /** Section headings: small, but real headings at the 13px caption size, in sentence case. */
 const LABEL = "font-sans text-[0.8125rem] font-semibold tracking-normal text-graphite";
@@ -74,7 +74,7 @@ export function ProjectView({
       )}
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
-          <Avatar name={owner.name} photoUrl={owner.photoUrl} size={44} />
+          <Avatar name={owner.name} photoUrl={owner.photoUrl} size={44} shape={owner.shape} />
           <p className="font-semibold">{owner.name}</p>
         </div>
         {/* On phones the skills follow the title instead, so the title isn't pushed down. */}

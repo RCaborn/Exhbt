@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { CHECKS_GUIDE } from "@/components/brand/Seal";
 import { ProjectView } from "@/components/portfolio/ProjectView";
 import { PrintAddress, ProjectPager, ProjectTopNav } from "@/components/portfolio/ProjectNav";
+import { themeStyle } from "@/components/portfolio/themeFonts";
 import { headlineFor } from "@/lib/exhbt/headline";
 import { MARKETING_HOST, portfolioHost } from "@/lib/hosts";
 import { previewImage } from "@/lib/og/card";
@@ -41,11 +42,12 @@ export default async function PortfolioProject({ params }: Params) {
   const { imageUrls, evidenceUrl } = await mediaFor(it.doc);
 
   return (
-    <>
+    // The person's look sets the heading face for the whole project page (--font-display).
+    <div data-theme={p.theme.id} style={themeStyle(p.theme)}>
       <ProjectTopNav home={p.base || "/"} position={i + 1} />
       <ProjectView
         doc={it.doc}
-        owner={{ name: p.displayName, photoUrl: p.photoUrl }}
+        owner={{ name: p.displayName, photoUrl: p.photoUrl, shape: p.theme.photo }}
         imageUrls={imageUrls}
         evidenceUrl={evidenceUrl}
         checkedOn={checkedOnLabel(it.publishedAt)}
@@ -55,6 +57,6 @@ export default async function PortfolioProject({ params }: Params) {
       />
       <PrintAddress address={`${portfolioHost(p.profile.username)}/${slug}`} />
       <ProjectPager base={p.base} prev={p.items[i - 1]} next={p.items[i + 1]} />
-    </>
+    </div>
   );
 }
