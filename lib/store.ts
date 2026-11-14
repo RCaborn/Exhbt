@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Project, Roadmap, RoadmapInput } from "./ai/schemas";
-import type { ExhbtDoc } from "./exhbt/blocks";
+import { publicDoc, type ExhbtDoc } from "./exhbt/blocks";
 import type { Plan } from "./entitlements";
 
 export type RoadmapRecord = {
@@ -921,7 +921,8 @@ function supabaseStore(): Store {
       check(
         await db
           .from("exhbts")
-          .update({ published_blocks: cur.blocks, status: "published", public_slug: slug, confirmed_at: now, published_at: now })
+          // The public copy: a graph with protected numbers keeps only its index (decision 0011).
+          .update({ published_blocks: publicDoc(cur.blocks), status: "published", public_slug: slug, confirmed_at: now, published_at: now })
           .eq("id", id)
           .eq("user_id", userId),
       );
@@ -1897,7 +1898,7 @@ function memoryStore(): Store {
       const e = own(id, userId);
       if (!e) return false;
       const now = new Date().toISOString();
-      Object.assign(e, { published: structuredClone(e.doc), status: "published", slug, confirmedAt: now, publishedAt: now });
+      Object.assign(e, { published: publicDoc(structuredClone(e.doc)), status: "published", slug, confirmedAt: now, publishedAt: now });
       return true;
     },
     async unpublishExhbt(id, userId) {

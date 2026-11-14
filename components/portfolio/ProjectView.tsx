@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element -- signed Storage URLs; see Avatar.tsx. */
 import { ArrowUpRight } from "lucide-react";
 import { Seal } from "@/components/brand/Seal";
-import { BeforeAfterChart } from "@/components/exhbt/BeforeAfterChart";
+import { Chart } from "@/components/charts/Chart";
 import { MethodFlow } from "@/components/exhbt/MethodFlow";
 import { RichText } from "@/components/exhbt/RichText";
 import { TrustBadge } from "@/components/exhbt/TrustBadge";
@@ -129,7 +129,7 @@ export function ProjectView({
         <section aria-label="Graphs" className={`mt-7 grid gap-6 print:mt-4 ${doc.charts.length > 1 ? "@3xl:grid-cols-2 print:grid-cols-2" : ""}`}>
           {doc.charts.map((c, i) => (
             <div key={i} className="break-inside-avoid">
-              <BeforeAfterChart data={c} />
+              <Chart data={c} />
             </div>
           ))}
         </section>

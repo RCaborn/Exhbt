@@ -1,4 +1,4 @@
-import { SCHEMA_VERSION, text, type ExhbtDoc } from "./blocks";
+import { SCHEMA_VERSION, text, type Chart, type ExhbtDoc } from "./blocks";
 
 /**
  * Fictional exhbts in the new layout, for development, previews and tests (app/dev/portfolio).
@@ -28,6 +28,8 @@ export const sampleDocs: ExhbtDoc[] = [
       text("Same-day bookings were unaffected, so the change is free to keep."),
     ],
     charts: [
+      // Saved the way graphs were before they had kinds (no `kind`), on purpose: the seeded
+      // portfolio and the tests then go through the path old exhbts take (decision 0011).
       {
         title: "Missed appointments (%)",
         beforeLabel: "24-hour reminder",
@@ -38,7 +40,7 @@ export const sampleDocs: ExhbtDoc[] = [
           { label: "All patients", before: 7.9, after: 6.5 },
           { label: "Under 30", before: 11.2, after: 8.4 },
         ],
-      },
+      } as unknown as Chart,
     ],
     images: [],
     evidence: { kind: "link", href: "https://example.com/gp-reminders-report.pdf", label: "Final report (PDF)" },

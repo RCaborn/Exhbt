@@ -124,7 +124,7 @@ Body, in this order:
    - Edited on the diagram itself, wherever it appears in edit mode (the editor and the portfolio edit mode): type in a box; "+" between boxes to add one, × to remove one; drag or ←/→ to reorder. It redraws as you type.
    - Left to right on wide screens, top to bottom on phones. Every box's text is in the page for screen readers.
 3. **Findings:** 2–4 bullets, ≤ 20 words each. Every number must come from the uploaded material, or it's flagged.
-4. **Graphs:** 1 or 2 charts (`BeforeAfterChart` and the chart rules in AGENTS), built only from numbers in the material. Can be removed if the project has no numbers.
+4. **Graphs:** 1 or 2, each one of a fixed set of kinds (decision 0011, `lib/exhbt/charts.ts`, the chart rules in `DESIGN.md`), built only from numbers in the material. Can be removed if the project has no numbers.
 5. **Images:** up to 2 (a screenshot, a figure from the report), each with a caption ≤ 15 words.
 
 Footer, small: "See the work" (the original file or link, one click away) and the trust badge (confirmed by the author, source attached).

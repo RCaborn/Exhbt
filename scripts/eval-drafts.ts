@@ -22,6 +22,7 @@ import { draftExhbt, materialText, type DraftInput, type DraftResult } from "@/l
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "@/lib/ai/model";
 import { extractTextInBrowser } from "@/lib/doc-readers";
 import { LIMITS, plain, validateForPublish, wordCount, words, type ExhbtDoc, type Issue } from "@/lib/exhbt/blocks";
+import { chartTexts, chartValues, KIND_NAMES } from "@/lib/exhbt/charts";
 import { normaliseNumber, numbersIn, unverifiedNumbers } from "@/lib/exhbt/verify";
 
 const ROOT = process.cwd();
@@ -130,7 +131,7 @@ function docStrings(d: ExhbtDoc): string[] {
     plain(d.gap),
     ...d.flow.map((s) => (s.detail ? `${s.step} (${s.detail})` : s.step)),
     ...d.findings.map(plain),
-    ...d.charts.flatMap((c) => [c.title, c.beforeLabel, c.afterLabel, c.unit ?? "", ...c.rows.map((r) => `${r.label} ${r.before} ${r.after}`)]),
+    ...d.charts.flatMap((c) => [...chartTexts(c), chartValues(c).join(" ")]),
   ].filter((s) => s.trim());
 }
 
@@ -147,11 +148,16 @@ function renderDoc(d: ExhbtDoc): string {
     "Findings:",
     ...d.findings.map((f) => `  - ${plain(f)}`),
     `Charts: ${d.charts.length ? "" : "(none)"}`,
-    ...d.charts.map(
-      (c) =>
-        `  ${c.title} [${c.beforeLabel} -> ${c.afterLabel}${c.unit ? `, ${c.unit}` : ""}${c.lowerIsBetter ? ", lower is better" : ""}]: ` +
-        c.rows.map((r) => `${r.label} ${r.before} -> ${r.after}`).join("; "),
-    ),
+    ...d.charts.map((c) => {
+      if (c.kind === "beforeAfter") {
+        return (
+          `  ${c.title} [${c.beforeLabel} -> ${c.afterLabel}${c.unit ? `, ${c.unit}` : ""}${c.lowerIsBetter ? ", lower is better" : ""}]: ` +
+          c.rows.map((r) => `${r.label} ${r.before} -> ${r.after}`).join("; ")
+        );
+      }
+      // Other kinds: the words and the values, as the page prints them.
+      return `  ${KIND_NAMES[c.kind]}: ${chartTexts(c).filter(Boolean).join(" | ")} | values: ${chartValues(c).join(", ")}`;
+    }),
   ];
   return lines.join("\n");
 }
@@ -581,7 +587,7 @@ const ORACLE_08: ExhbtDoc = {
     [{ t: "Shifts filled a week ahead rose from 64% to 89%." }],
     [{ t: "First real count of visits: 2,316 between February and June, for funders." }],
   ],
-  charts: [{ title: "Before and after", beforeLabel: "Before", afterLabel: "After", lowerIsBetter: true, unit: "%", rows: [{ label: "Food thrown away", before: 18, after: 7 }] }],
+  charts: [{ kind: "beforeAfter", title: "Before and after", beforeLabel: "Before", afterLabel: "After", lowerIsBetter: true, unit: "%", rows: [{ label: "Food thrown away", before: 18, after: 7 }] }],
   images: [],
 };
 
