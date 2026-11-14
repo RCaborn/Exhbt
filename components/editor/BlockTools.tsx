@@ -71,7 +71,11 @@ export function useDraftTools(id: string, init: DraftToolsInit, doc: ExhbtDoc, s
   return { enabled: Boolean(init), left, limit: init?.rewritesLimit ?? 0, ai, busy, message, doc, rewrite, restore };
 }
 
-const NAMES: Record<DraftBlock, string> = { ...BLOCK_NAMES, header: "title and context line", gap: "question" };
+/**
+ * What the rewrite calls each part. Not `{ ...BLOCK_NAMES, header: … }`: the build inlines that
+ * spread into one object literal with "header" twice, and warns.
+ */
+const nameOf = (block: DraftBlock): string => (block === "header" ? "title and context line" : BLOCK_NAMES[block]);
 /** What the card is called on the page, for the menu button's name. */
 const CARD_NAMES: Record<DraftBlock, string> = { header: "Title and context", skills: "Skills", gap: "The question", flow: "Process", findings: "Findings" };
 
@@ -106,7 +110,7 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
 
   if (!dt.enabled) return null;
 
-  const name = NAMES[block];
+  const name = nameOf(block);
   const current = blockValue(dt.doc, block) as BlockValue;
   const ai = dt.ai.blocks[block];
   const edited = ai !== undefined && !sameBlock(current, ai);
