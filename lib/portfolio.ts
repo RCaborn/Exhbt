@@ -6,6 +6,8 @@ import { parseHost, portfolioHost } from "./hosts";
 import { themeFor, type PortfolioTheme } from "./portfolio-themes";
 import { visibleOnPortfolio } from "./plan-rules";
 import { getStore, type ExhbtRecord, type PortfolioProfile } from "./store";
+import { teamFor } from "./team";
+import type { Teammate } from "./team-rules";
 
 /**
  * Everything a public portfolio page needs, loaded the same way for the at-a-glance page and
@@ -13,7 +15,8 @@ import { getStore, type ExhbtRecord, type PortfolioProfile } from "./store";
  * published copy, never the working draft.
  */
 
-export type PortfolioItem = { id: string; slug: string; doc: ExhbtDoc; publishedAt: string | null };
+/** `team`: the people on it besides the author, when it's a team project (decision 0013). */
+export type PortfolioItem = { id: string; slug: string; doc: ExhbtDoc; publishedAt: string | null; team: Teammate[] };
 
 export type LoadedPortfolio =
   | { status: "ok"; profile: PortfolioProfile & { username: string }; displayName: string; photoUrl: string | null; items: PortfolioItem[]; base: string; theme: PortfolioTheme }
@@ -53,19 +56,20 @@ export async function loadPortfolio(username: string, rest = ""): Promise<Loaded
   if (items.length === 0) return { status: "missing" };
 
   const profile = await store.getPortfolioProfile(found.userId);
+  const host = (await headers()).get("x-forwarded-host") ?? (await headers()).get("host");
   return {
     status: "ok",
     profile: { ...profile, username: found.username },
     displayName: profile.name?.trim() || found.username,
     photoUrl: await signedFileUrl(profile.photoFileId),
-    items: items.map(toItem),
+    items: await Promise.all(items.map(async (e) => ({ ...toItem(e), team: await teamFor(e, host) }))),
     base: await basePath(found.username),
     // The chosen look if the plan still has it; the stored choice is never cleared here.
     theme: themeFor(profile, plan),
   };
 }
 
-const toItem = (e: ExhbtRecord): PortfolioItem => ({ id: e.id, slug: e.slug!, doc: e.published!, publishedAt: e.publishedAt });
+const toItem = (e: ExhbtRecord): Omit<PortfolioItem, "team"> => ({ id: e.id, slug: e.slug!, doc: e.published!, publishedAt: e.publishedAt });
 
 /** Signed URLs for one exhbt's images and its evidence file (links pass through). */
 export async function mediaFor(doc: ExhbtDoc): Promise<{ imageUrls: Record<string, string | null>; evidenceUrl: string | null }> {

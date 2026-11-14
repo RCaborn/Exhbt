@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { Editor } from "@/components/editor/Editor";
+import { MatchPrompt } from "@/components/team/MatchPrompt";
+import { TeamStrip } from "@/components/team/TeamStrip";
 import { getCurrentUser } from "@/lib/auth";
 import { fileIdsOf } from "@/components/editor/media";
 import { ENTITLEMENTS } from "@/lib/entitlements";
@@ -16,12 +18,14 @@ import { getStore } from "@/lib/store";
 
 export const metadata: Metadata = { title: "Edit exhbt", robots: { index: false } };
 
-type Params = { params: Promise<{ id: string }> };
+type Params = { params: Promise<{ id: string }>; searchParams: Promise<{ skipped?: string }> };
 
 /** The exhbt editor (docs/phase-2.md section 6). Only the owner sees it; anyone else gets a 404. */
-export default async function EditExhbtPage({ params }: Params) {
+export default async function EditExhbtPage({ params, searchParams }: Params) {
   if (!isPhase2Enabled()) notFound();
   const { id } = await params;
+  // Files a teammate's plan couldn't hold when they made their own exhbt (lib/team.ts makeOwnExhbt).
+  const skipped = Math.max(0, Math.min(99, Number((await searchParams).skipped) || 0));
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(`/exhbts/${id}/edit`)}`);
   const store = getStore();
@@ -41,6 +45,10 @@ export default async function EditExhbtPage({ params }: Params) {
   const aiVersion = hasSource ? await loadAiVersion(user.id, id) : null;
 
   return (
+    <>
+    {/* Teammates and the file-match prompt sit outside the editor (decision 0013). */}
+    <TeamStrip exhbt={record} userId={user.id} skipped={skipped} />
+    <MatchPrompt />
     <Editor
       draftTools={hasSource && aiVersion ? { aiVersion, rewritesLeft: allowance.left, rewritesLimit: allowance.limit } : null}
       id={record.id}
@@ -57,5 +65,6 @@ export default async function EditExhbtPage({ params }: Params) {
       maxFileMb={ENTITLEMENTS[plan].uploadMbPerFile}
       liveFileIds={record.status === "published" && record.published ? fileIdsOf(record.published) : []}
     />
+    </>
   );
 }

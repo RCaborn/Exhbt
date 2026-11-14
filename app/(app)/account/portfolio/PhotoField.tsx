@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/portfolio/Avatar";
+import { finishUpload } from "@/components/team/finish-upload";
 import { Button } from "@/components/ui/Button";
 import { removePhotoAction, savePhotoAction } from "./actions";
 
@@ -74,6 +75,8 @@ export function PhotoField({ name, photoUrl, maxMb }: { name: string; photoUrl: 
       fileId = data.fileId;
       const put = await fetch(data.uploadUrl, { method: "PUT", headers: data.headers, body: blob });
       if (!put.ok) throw new Error("The upload didn't finish. Try again.");
+      // Records the stored file's fingerprint. Photos are never matched against other people's files.
+      void finishUpload(fileId, "photo.jpg");
       const saved = await savePhotoAction(fileId);
       if (saved.error) throw new Error(saved.error);
       fileId = undefined;

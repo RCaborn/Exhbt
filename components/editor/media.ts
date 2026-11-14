@@ -3,6 +3,7 @@
  * evidence, tied to this exhbt), PUT the bytes, and remove a file again. The server checks the
  * plan's caps and the file type; these checks only spare a round trip.
  */
+import { finishUpload } from "@/components/team/finish-upload";
 
 const MB = 1024 * 1024;
 
@@ -53,6 +54,8 @@ export async function uploadForExhbt(file: File, kind: "image" | "evidence", exh
     await removeFile(data.fileId);
     throw new UploadError("The upload didn't finish. Try again.");
   }
+  // Fingerprints the stored file; a match on someone else's exhbt raises the team prompt. Doesn't wait.
+  void finishUpload(data.fileId, file.name);
   return data.fileId;
 }
 

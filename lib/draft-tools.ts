@@ -46,6 +46,12 @@ async function getObject(file: StoredFile): Promise<string | null> {
   return blob ? new TextDecoder().decode(blob) : null;
 }
 
+/**
+ * One of the app's own helper files above, not something the person uploaded. Teammates are
+ * never given these (lib/team.ts): the source text includes the owner's own notes.
+ */
+export const isDraftHelperFile = (f: StoredFile) => f.kind === "source" && (nameOf(f) === SOURCE_NAME || nameOf(f) === AI_NAME);
+
 async function find(userId: string, exhbtId: string, name: string): Promise<StoredFile | undefined> {
   return (await getStore().listFiles(userId, exhbtId)).find((f) => f.kind === "source" && nameOf(f) === name);
 }

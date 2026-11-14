@@ -27,8 +27,12 @@ export type DraftVerdict = ({ ok: true } | { ok: false; reason: string; status: 
  * `counted`: the id of a draft just saved and logged, for the re-check after saving
  * (app/api/exhbts/draft). It is left out of both counts, so the question is still "was there
  * room for it?" and not "is there room for one more?".
+ *
+ * `into`: drafting into an exhbt that already exists (a teammate's own exhbt, decision 0013).
+ * It was counted against the plan when it was made, so it is left out of the exhbt count; the
+ * drafts allowance applies as usual.
  */
-export async function draftVerdict(userId: string, counted?: string): Promise<DraftVerdict> {
+export async function draftVerdict(userId: string, counted?: string, into?: string): Promise<DraftVerdict> {
   const store = getStore();
   const plan = await getPlan(userId);
   const e = limitsFor(plan);
@@ -36,7 +40,7 @@ export async function draftVerdict(userId: string, counted?: string): Promise<Dr
     store.countRecentEventsForUser("exhbt_drafted", userId, DRAFT_WINDOW_HOURS),
     store.listExhbts(userId),
   ]);
-  const existing = counted ? all.filter((x) => x.id !== counted) : all;
+  const existing = all.filter((x) => x.id !== counted && x.id !== into);
   const usedBefore = counted ? Math.max(0, used - 1) : used;
   const allowance: DraftAllowance = {
     perPeriod: e.draftsPer30Days,

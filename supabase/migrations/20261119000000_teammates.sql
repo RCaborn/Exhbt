@@ -35,10 +35,11 @@ create policy "own memberships" on exhbt_members for select using (user_id = aut
 
 -- Invites by email. The link carries a signed token; only its SHA-256 is stored, so a leaked
 -- table can't be turned into working links. Resending replaces the hash and the expiry.
+-- Addresses are stored lower-case, so lookups are exact matches.
 create table exhbt_invites (
   id uuid primary key,
   exhbt_id uuid not null references exhbts(id) on delete cascade,
-  email text not null check (char_length(email) <= 320),
+  email text not null check (char_length(email) <= 320 and email = lower(email)),
   role text not null default '' check (char_length(role) <= 40),
   token_hash text not null unique check (token_hash ~ '^[0-9a-f]{64}$'),
   created_at timestamptz not null default now(),
@@ -47,9 +48,9 @@ create table exhbt_invites (
   cancelled_at timestamptz
 );
 create index exhbt_invites_exhbt_idx on exhbt_invites(exhbt_id);
-create index exhbt_invites_email_idx on exhbt_invites(lower(email));
+create index exhbt_invites_email_idx on exhbt_invites(email);
 -- One open invite per address per exhbt; inviting the same address again resends it.
-create unique index exhbt_invites_open_idx on exhbt_invites(exhbt_id, lower(email))
+create unique index exhbt_invites_open_idx on exhbt_invites(exhbt_id, email)
   where accepted_at is null and cancelled_at is null;
 alter table exhbt_invites enable row level security;
 create policy "invites on own exhbts" on exhbt_invites for select

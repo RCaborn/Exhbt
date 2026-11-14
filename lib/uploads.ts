@@ -123,6 +123,36 @@ export async function deleteFile(userId: string, fileId: string): Promise<boolea
   return (await store.deleteFile(fileId, userId)) !== null;
 }
 
+/* ---------------- Reading and copying stored objects (decision 0013) ---------------- */
+
+/** The stored bytes of a file, or null if the object isn't there (an upload that never finished). */
+export async function readStoredObject(file: StoredFile): Promise<Uint8Array | null> {
+  if (isSupabaseConfigured()) {
+    const { data, error } = await supabaseAdmin().storage.from(file.bucket).download(file.path);
+    return error || !data ? null : new Uint8Array(await data.arrayBuffer());
+  }
+  return devStorageEnabled() ? (devBlobs().get(file.id) ?? null) : null;
+}
+
+/**
+ * Copies a stored object to a new path in the same bucket, on the storage side (no bytes pass
+ * through the Worker). Used to give a teammate their own copy of a team project's files, so
+ * deleting either copy never breaks the other. `toId` is the new record's id (the dev stand-in
+ * keys bytes by id). False if the source object is missing or the copy failed.
+ */
+export async function copyStoredObject(from: StoredFile, toPath: string, toId: string): Promise<boolean> {
+  if (isSupabaseConfigured()) {
+    const { error } = await supabaseAdmin().storage.from(from.bucket).copy(from.path, toPath);
+    if (error) console.error("storage copy failed", error.message);
+    return !error;
+  }
+  if (!devStorageEnabled()) return false;
+  const bytes = devBlobs().get(from.id);
+  if (!bytes) return false;
+  devBlobs().set(toId, bytes.slice());
+  return true;
+}
+
 /* ---------------- Clean-up: an exhbt's files, and every file on account deletion ---------------- */
 
 /** Supabase removes up to 1,000 paths per call; smaller batches keep each request quick. */

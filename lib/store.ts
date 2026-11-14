@@ -767,7 +767,7 @@ function supabaseStore(): Store {
         roadmapIds.length ? db.from("project_ideas").select("*").in("roadmap_id", roadmapIds) : none,
         exhbtIds.length ? db.from("exhbt_members").select("exhbt_id, user_id, role, added_at").in("exhbt_id", exhbtIds) : none,
         exhbtIds.length ? db.from("exhbt_invites").select(INVITE_EXPORT_COLS).in("exhbt_id", exhbtIds) : none,
-        address ? db.from("exhbt_invites").select(INVITE_EXPORT_COLS).ilike("email", address) : none,
+        address ? db.from("exhbt_invites").select(INVITE_EXPORT_COLS).eq("email", address.toLowerCase()) : none,
         // File matches: only this person's side of each one, never who the other account is.
         db.from("duplicate_matches").select("sha256, uploader_file_id, outcome, role, created_at, answered_at, decided_at").eq("uploader_id", userId),
         db
@@ -802,7 +802,7 @@ function supabaseStore(): Store {
       // Storage objects are removed first, by deleteAllFiles in lib/uploads.ts (app/api/account/delete).
       const address =
         email ?? (check(await db.from("profiles").select("email").eq("id", userId).maybeSingle()) as { email: string | null } | null)?.email;
-      if (address) check(await db.from("exhbt_invites").delete().ilike("email", address));
+      if (address) check(await db.from("exhbt_invites").delete().eq("email", address.toLowerCase()));
       const { error } = await db.auth.admin.deleteUser(userId);
       if (error) throw new Error(error.message);
     },
@@ -1226,7 +1226,7 @@ function supabaseStore(): Store {
         await db.from("exhbt_invites").insert({
           id: i.id,
           exhbt_id: i.exhbtId,
-          email: i.email,
+          email: i.email.toLowerCase(),
           role: i.role.slice(0, 40),
           token_hash: i.tokenHash,
           expires_at: i.expiresAt,
@@ -2092,7 +2092,7 @@ function memoryStore(): Store {
       return [...m.exhbts.values()].filter((e) => e.teamOf === rootId).map((e) => structuredClone(e));
     },
     async createInvite(i) {
-      m.invites.set(i.id, { ...i, role: i.role.slice(0, 40), createdAt: new Date().toISOString(), acceptedAt: null, cancelledAt: null });
+      m.invites.set(i.id, { ...i, email: i.email.toLowerCase(), role: i.role.slice(0, 40), createdAt: new Date().toISOString(), acceptedAt: null, cancelledAt: null });
     },
     async getInvite(id) {
       const i = m.invites.get(id);
