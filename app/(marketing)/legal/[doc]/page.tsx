@@ -9,7 +9,7 @@ type Doc = { title: string; updated: string; body: React.ReactNode };
 const DOCS: Record<string, Doc> = {
   privacy: {
     title: "Privacy policy",
-    updated: "12 November 2026",
+    updated: "13 November 2026",
     body: (
       <>
         <p>
@@ -18,7 +18,7 @@ const DOCS: Record<string, Doc> = {
         </p>
         <h2>What we collect</h2>
         <ul>
-          <li>Your email address, to create your account and send sign-in links.</li>
+          <li>Your email address, and a password you choose, to create your account and sign you in. Supabase stores the password in a form that cannot be read back.</li>
           <li>Your name, and your LinkedIn profile address if you give it, for your account and, later, your portfolio.</li>
           <li>
             The text of your CV and anything you type into the roadmap form. Your browser reads the CV file
@@ -94,7 +94,7 @@ const DOCS: Record<string, Doc> = {
             draft an exhbt. Processing may take place outside the UK under appropriate safeguards; inputs are not
             used to train models.
           </li>
-          <li>Resend: sending sign-in emails.</li>
+          <li>Resend: the emails you ask for, including your roadmap, a confirmation when you create an account, and a link to set a password.</li>
           <li>
             Stripe (paid plans): payments. You pay on Stripe&rsquo;s own page, so your card details go straight to
             Stripe and never reach us.
@@ -153,12 +153,11 @@ const DOCS: Record<string, Doc> = {
   },
   cookies: {
     title: "Cookie policy",
-    updated: "5 November 2026",
+    updated: "13 November 2026",
     body: (
       <>
         <p>
-          We only use cookies that are strictly necessary: one to keep you signed in, set when you click a sign-in
-          link. These do not need consent, so you will not see a cookie banner.
+          We only use cookies that are strictly necessary: one to keep you signed in, set when you log in or open a link from an email you asked for. These do not need consent, so you will not see a cookie banner.
         </p>
         <p>
           Our page-view statistics come from Cloudflare Web Analytics, which does not set cookies or fingerprint

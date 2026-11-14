@@ -19,7 +19,7 @@ npm install
 npm run dev
 ```
 
-With no environment variables set, everything works locally: an in-memory store, a dev sign-in link in place of email, emails shown at `/dev/emails`, and a labelled placeholder roadmap. Copy `.env.example` to `.env.local` to use real services.
+With no environment variables set, everything works locally: an in-memory store, a password you choose on `/login` (kept in memory), a dev sign-in link on the roadmap email, emails shown at `/dev/emails`, and a labelled placeholder roadmap. Copy `.env.example` to `.env.local` to use real services.
 
 ## Checks
 

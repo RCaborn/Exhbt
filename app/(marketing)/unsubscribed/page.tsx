@@ -11,7 +11,7 @@ export default async function Unsubscribed({ searchParams }: { searchParams: Pro
       <p className="mt-4 text-lg text-graphite">
         {error
           ? "The unsubscribe link may be incomplete. Copy the full link from the email, or reply to it and we'll take you off the list."
-          : "We won't send you news about Exhbt features. You'll still get emails you ask for, such as sign-in links."}
+          : "We won't send you news about Exhbt features. You'll still get emails you ask for, such as your roadmap or a link to set a password."}
       </p>
       <Link href="/" className="link mt-6 inline-block">Back to Exhbt</Link>
     </div>
