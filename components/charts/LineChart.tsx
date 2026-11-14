@@ -16,7 +16,7 @@ export function LineChart({ data }: { data: ChartOf<"line"> }) {
   const f = valueFormatter(c);
   const n = c.series.length;
   const pts = c.rows.length;
-  const s = scaleFor(c.rows.flatMap((r) => r.values));
+  const s = scaleFor(c.rows.flatMap((r) => r.values), { pad: true });
   const x = (j: number) => (pts <= 1 ? 50 : (j / (pts - 1)) * 100);
   const y = (v: number) => 100 - s.at(v);
   const name = (k: number) => c.series[k]?.trim() || `Line ${k + 1}`;
@@ -45,11 +45,11 @@ export function LineChart({ data }: { data: ChartOf<"line"> }) {
           {s.ticks.map((t) => (
             <div key={t} className="absolute inset-x-0" style={{ top: `${y(t)}%` }}>
               <span className={`absolute inset-x-0 h-px ${t === 0 && s.lo < 0 ? "bg-graphite" : "bg-line"}`} />
-              <span className="absolute right-[calc(100%+6px)] -translate-y-1/2 font-mono text-[0.68rem] whitespace-nowrap text-slate">{tickLabel(t, s)}</span>
+              <span className="absolute right-[calc(100%+6px)] -translate-y-1/2 font-mono text-[0.68rem] whitespace-nowrap text-slate">{tickLabel(t, s, c.unit)}</span>
             </div>
           ))}
 
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible">
+          <svg aria-hidden viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible">
             {c.series
               .map((_, k) => k)
               .sort((a, b) => rank(b) - rank(a))
@@ -70,7 +70,7 @@ export function LineChart({ data }: { data: ChartOf<"line"> }) {
 
           {c.series.map((_, k) =>
             c.rows.map((r, j) => (
-              <svg key={`${k}-${j}`} width="10" height="10" viewBox="0 0 10 10" className="absolute -translate-x-1/2 -translate-y-1/2 overflow-visible" style={{ left: `${x(j)}%`, top: `${y(r.values[k] ?? 0)}%` }}>
+              <svg aria-hidden key={`${k}-${j}`} width="10" height="10" viewBox="0 0 10 10" className="absolute -translate-x-1/2 -translate-y-1/2 overflow-visible" style={{ left: `${x(j)}%`, top: `${y(r.values[k] ?? 0)}%` }}>
                 <MarkerShape marker={MARKERS[rank(k)]!} colour={SERIES_RAMP[rank(k)]!} cx={5} cy={5} r={4} />
               </svg>
             )),
@@ -98,7 +98,7 @@ export function LineChart({ data }: { data: ChartOf<"line"> }) {
           {c.rows.map((r, j) => (
             <span
               key={j}
-              className={`absolute top-[calc(100%+6px)] max-w-[6rem] text-center text-[0.72rem] leading-tight text-graphite ${j === 0 ? "" : j === pts - 1 ? "-translate-x-full text-right" : "-translate-x-1/2"} ${
+              className={`absolute top-[calc(100%+6px)] w-max max-w-[7rem] text-center text-[0.72rem] leading-tight text-graphite ${j === 0 ? "" : j === pts - 1 ? "-translate-x-full text-right" : "-translate-x-1/2"} ${
                 crowded && j % 2 === 1 && j !== pts - 1 ? "hidden @lg:block" : ""
               }`}
               style={{ left: `${x(j)}%` }}

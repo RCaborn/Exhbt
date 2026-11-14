@@ -143,7 +143,7 @@ function KindPicker({ name, n, value, onChange }: { name: string; n: number; val
           return (
             <label
               key={k}
-              className={`flex cursor-pointer items-center gap-2 rounded-[10px] border-[1.5px] px-2.5 py-2 text-sm has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-jade ${
+              className={`relative flex cursor-pointer items-center gap-2 rounded-[10px] border-[1.5px] px-2.5 py-2 text-sm has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-jade ${
                 value === k ? "border-ink bg-wash font-semibold" : "border-line hover:border-field"
               }`}
             >
@@ -306,7 +306,7 @@ function ProtectChoice({ c, p, set, issues }: { c: ProtectableChart; p: string; 
     stackedBar: "the first bar's total",
   };
   return (
-    <div className="mt-4 rounded-[12px] bg-mist p-3">
+    <div className="mt-4 rounded-[12px] border border-line p-3">
       <label htmlFor={`${p}-protect`} className="label">
         Protect the real numbers
       </label>

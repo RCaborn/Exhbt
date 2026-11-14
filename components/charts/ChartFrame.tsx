@@ -88,7 +88,7 @@ export function ChartFrame({
 function Key({ item }: { item: LegendItem }) {
   if (item.marker) {
     return (
-      <svg width="22" height="10" viewBox="0 0 22 10" className="shrink-0 overflow-visible">
+      <svg aria-hidden width="22" height="10" viewBox="0 0 22 10" className="shrink-0 overflow-visible">
         <line x1="1" x2="21" y1="5" y2="5" stroke={item.colour} strokeWidth="2" strokeDasharray={item.dash || undefined} strokeLinecap="round" />
         <MarkerShape marker={item.marker} colour={item.colour} cx={11} cy={5} r={3.5} />
       </svg>

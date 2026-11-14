@@ -11,8 +11,8 @@ import { SERIES_DARK } from "./series";
  */
 export function ScatterChart({ data }: { data: ChartOf<"scatter"> }) {
   const c = data;
-  const sx = scaleFor(c.points.map((p) => p.x));
-  const sy = scaleFor(c.points.map((p) => p.y));
+  const sx = scaleFor(c.points.map((p) => p.x), { pad: true });
+  const sy = scaleFor(c.points.map((p) => p.y), { pad: true });
   const fx = (v: number) => fmtValue(v, c.xUnit);
   const fy = (v: number) => fmtValue(v, c.unit);
   const hi = c.highlight !== undefined && c.highlight >= 0 && c.highlight < c.points.length ? c.highlight : undefined;
@@ -28,7 +28,7 @@ export function ScatterChart({ data }: { data: ChartOf<"scatter"> }) {
           {sy.ticks.map((t) => (
             <div key={`y${t}`} className="absolute inset-x-0" style={{ top: `${100 - sy.at(t)}%` }}>
               <span className="absolute inset-x-0 h-px bg-line" />
-              <span className="absolute right-[calc(100%+6px)] -translate-y-1/2 font-mono text-[0.68rem] whitespace-nowrap text-slate">{tickLabel(t, sy)}</span>
+              <span className="absolute right-[calc(100%+6px)] -translate-y-1/2 font-mono text-[0.68rem] whitespace-nowrap text-slate">{tickLabel(t, sy, c.unit)}</span>
             </div>
           ))}
           {sx.ticks.map((t, i) => (
@@ -37,7 +37,7 @@ export function ScatterChart({ data }: { data: ChartOf<"scatter"> }) {
               <span
                 className={`absolute top-[calc(100%+6px)] font-mono text-[0.68rem] whitespace-nowrap text-slate ${i === 0 ? "" : i === sx.ticks.length - 1 ? "-translate-x-full" : "-translate-x-1/2"}`}
               >
-                {tickLabel(t, sx)}
+                {tickLabel(t, sx, c.xUnit)}
               </span>
             </div>
           ))}

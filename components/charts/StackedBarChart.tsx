@@ -29,7 +29,7 @@ export function StackedBarChart({ data }: { data: ChartOf<"stackedBar"> }) {
         rows: c.rows.map((r, j) => [r.label, ...c.series.map((_, k) => f(r.values[k] ?? 0)), f(totals[j]!)]),
       }}
     >
-      <Rows xTitle={c.xTitle}>
+      <Rows xTitle={c.xTitle} scale={s}>
         {c.rows.map((r, j) => (
           <Row key={j} label={r.label}>
             <div>
@@ -54,7 +54,7 @@ export function StackedBarChart({ data }: { data: ChartOf<"stackedBar"> }) {
           </Row>
         ))}
       </Rows>
-      <Axis scale={s} title={c.yTitle} />
+      <Axis scale={s} title={c.yTitle} unit={c.unit} />
     </ChartFrame>
   );
 }

@@ -23,7 +23,7 @@ export function BarChart({ data }: { data: ChartOf<"bar"> }) {
       notes={[c.lowerIsBetter ? "Lower is better." : null, protectNote(data)]}
       table={{ head: [c.xTitle || "Bar", c.yTitle || "Value"], rows: c.rows.map((r) => [r.label, f(r.value)]) }}
     >
-      <Rows xTitle={c.xTitle}>
+      <Rows xTitle={c.xTitle} scale={s}>
         {c.rows.map((r, j) => (
           <Row key={j} label={r.label}>
             <Track scale={s}>
@@ -33,7 +33,7 @@ export function BarChart({ data }: { data: ChartOf<"bar"> }) {
           </Row>
         ))}
       </Rows>
-      <Axis scale={s} title={c.yTitle} />
+      <Axis scale={s} title={c.yTitle} unit={c.unit} />
     </ChartFrame>
   );
 }
@@ -52,7 +52,7 @@ export function GroupedBarChart({ data }: { data: ChartOf<"groupedBar"> }) {
       notes={[c.lowerIsBetter ? "Lower is better." : null, protectNote(data)]}
       table={{ head: [c.xTitle || "Group", ...c.series.map((_, k) => name(k))], rows: c.rows.map((r) => [r.label, ...c.series.map((_, k) => f(r.values[k] ?? 0))]) }}
     >
-      <Rows xTitle={c.xTitle}>
+      <Rows xTitle={c.xTitle} scale={s}>
         {c.rows.map((r, j) => (
           <Row key={j} label={r.label}>
             <div className="space-y-[2px]">
@@ -66,27 +66,44 @@ export function GroupedBarChart({ data }: { data: ChartOf<"groupedBar"> }) {
           </Row>
         ))}
       </Rows>
-      <Axis scale={s} title={c.yTitle} />
+      <Axis scale={s} title={c.yTitle} unit={c.unit} />
     </ChartFrame>
   );
 }
 
 /* ---------------- Shared by the bar kinds ---------------- */
 
-/** The rows, with the categories' name (if any) over the label column. */
-export function Rows({ xTitle, children }: { xTitle?: string; children: ReactNode }) {
+/** Label column beside the bars from 28rem wide; above them when narrower. */
+const COLUMNS = "grid grid-cols-1 @md:grid-cols-[9rem_minmax(0,1fr)] @md:gap-x-3";
+
+/**
+ * The rows, with the categories' name (if any) over them. When labels sit beside the bars,
+ * hairline gridlines run through every row at the axis ticks; when labels sit above, only each
+ * bar's zero line is drawn, so no line crosses a label.
+ */
+export function Rows({ xTitle, scale, children }: { xTitle?: string; scale: Scale; children: ReactNode }) {
   return (
-    <div className="space-y-2.5">
-      {xTitle && <p className="text-xs font-semibold text-graphite">{xTitle}</p>}
-      {children}
+    <div>
+      {xTitle && <p className="mb-2 text-xs font-semibold text-graphite">{xTitle}</p>}
+      <div className="relative">
+        <div aria-hidden className="pointer-events-none absolute inset-0 hidden @md:grid @md:grid-cols-[9rem_minmax(0,1fr)] @md:gap-x-3">
+          <span />
+          <div className={`relative ${margins(scale)}`}>
+            {scale.ticks.map((t) => (
+              <span key={t} className={`absolute inset-y-0 w-px ${t === 0 ? "bg-graphite" : "bg-line"}`} style={{ left: `${scale.at(t)}%` }} />
+            ))}
+          </div>
+        </div>
+        <div className="relative space-y-2.5">{children}</div>
+      </div>
     </div>
   );
 }
 
-/** A label and its bars: label above on narrow graphs, beside them from 28rem. */
+/** A label and its bars. */
 export function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-1 gap-y-1 @md:grid-cols-[minmax(0,9rem)_minmax(0,1fr)] @md:items-center @md:gap-x-3">
+    <div className={`${COLUMNS} gap-y-1 @md:items-center`}>
       <span className="text-[0.85rem] leading-tight break-words text-graphite">{label}</span>
       {children}
     </div>
@@ -96,13 +113,11 @@ export function Row({ label, children }: { label: string; children: ReactNode })
 /** Room either side of the bars for the printed values, so they never sit on top of a bar. */
 const margins = (s: Scale) => `mr-16 ${s.lo < 0 ? "ml-16" : ""}`;
 
-/** One bar's lane: hairline gridlines at the ticks, then the bar. */
+/** One bar's lane, with its zero line. */
 export function Track({ scale, slim = false, children }: { scale: Scale; slim?: boolean; children: ReactNode }) {
   return (
     <div className={`relative ${slim ? "h-3" : "h-5"} ${margins(scale)}`}>
-      {scale.ticks.map((t) => (
-        <span key={t} aria-hidden className={`absolute inset-y-0 w-px ${t === 0 ? "bg-graphite" : "bg-line"}`} style={{ left: `${scale.at(t)}%` }} />
-      ))}
+      <span aria-hidden className="absolute inset-y-0 w-px bg-graphite" style={{ left: `${scale.at(0)}%` }} />
       {children}
     </div>
   );
@@ -135,9 +150,9 @@ export function ValueLabel({ scale, value, text, strong = false }: { scale: Scal
 }
 
 /** Tick labels under the bars, from the same scale, with the values' name below. */
-export function Axis({ scale, title }: { scale: Scale; title?: string }) {
+export function Axis({ scale, title, unit }: { scale: Scale; title?: string; unit?: string }) {
   return (
-    <div className="mt-1.5 grid grid-cols-1 @md:grid-cols-[minmax(0,9rem)_minmax(0,1fr)] @md:gap-x-3" aria-hidden>
+    <div className={`mt-1.5 ${COLUMNS}`} aria-hidden>
       <span className="hidden @md:block" />
       <div>
         <div className={`relative h-4 ${margins(scale)}`}>
@@ -147,7 +162,7 @@ export function Axis({ scale, title }: { scale: Scale; title?: string }) {
               className={`absolute top-0 font-mono text-[0.68rem] text-slate ${i === 0 ? "" : i === scale.ticks.length - 1 ? "-translate-x-full" : "-translate-x-1/2"}`}
               style={{ left: `${scale.at(t)}%` }}
             >
-              {tickLabel(t, scale)}
+              {tickLabel(t, scale, unit)}
             </span>
           ))}
         </div>

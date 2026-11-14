@@ -46,7 +46,7 @@ export function BeforeAfterChart({
   const fmt = (v: number) => fmtValue(v, data.unit, signed);
 
   return (
-    <figure className="m-0">
+    <figure className="m-0" data-chart>
       <figcaption className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <span className="text-sm font-semibold text-ink">{data.title}</span>
         <span className="flex gap-4 text-xs text-graphite" aria-hidden>
