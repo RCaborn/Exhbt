@@ -371,3 +371,11 @@ test.describe("The same file on someone else's exhbt", () => {
     await expect(page.getByRole("heading", { level: 2, name: /asked to join/ })).toHaveCount(0);
   });
 });
+
+test("the privacy policy says files are fingerprinted, matched privately and may be reviewed", async ({ page }) => {
+  await page.goto("/legal/privacy");
+  await expect(page.getByRole("heading", { level: 2, name: "Teammates and shared files" })).toBeVisible();
+  await expect(page.getByText(/fingerprint \(a SHA-256 hash\) of each file you upload/)).toBeVisible();
+  await expect(page.getByText(/Nothing about a match is ever shown publicly/)).toBeVisible();
+  await expect(page.getByText(/we may review those records/)).toBeVisible();
+});

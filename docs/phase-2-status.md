@@ -19,6 +19,7 @@ Everything below is on the `phase-2` branch. The live site (`main`) is unchanged
 | Usernames and profile | Claim an address; a renamed address redirects for 30 days. Name, headline, bio, LinkedIn, photo, and hiding from search engines. |
 | Roadmaps | "My roadmaps" for switching careers. A new roadmap for a different job reuses your details. Saved ideas (Premium and Max) keep ideas from any roadmap in one list. "Build this as an exhbt" works from any idea. |
 | Per-job links (Max) | Paste a job description or link one. The AI picks the 4 best exhbts with reasons and an intro; the person reorders, swaps, chooses `/lloyds` or `/lloyds-x7k2`, and can switch a link off. **The public page isn't connected yet** (see "For the subdomain work"). |
+| Teammates | Invite teammates by email with a role; they show under the author on the project and its tile, can leave, and can make their own exhbt from the project with copies of its files. An upload that matches a file on someone else's exhbt gets a private "Were you on that project together?", never a public label (decision 0013). |
 | Privacy and safety | Privacy and terms describe only what's built. Deletes remove stored files. Account export covers everything. `/api/health` reports Phase 2 settings and Storage. |
 | AI eval kit | 8 realistic sample projects, a rubric, and a runner (`npm run eval:drafts`, plus the GitHub workflow "Exhbt draft eval"). |
 
@@ -38,7 +39,7 @@ Nothing above has run with real Stripe, real Supabase Storage, or the real Haiku
    - Optional: a promotion code for a new-joiner discount.
 3. **A preview to click through.** Create a second free Supabase project (for example `exhbt-preview`) and say so. The preview Worker is built (see "Preview site" below); it needs its secrets adding and the migrations applied to that project, then Stripe test keys. That's where the real-service run happens.
 4. **Launch day** (LAUNCH.md has the full order):
-   - apply migrations `20261113` → `20261117` to the live Supabase, in date order
+   - apply migrations `20261113` → `20261119` to the live Supabase, in date order (the last, `20261119000000_teammates.sql`, adds teammates, invites and file matching; decision 0013)
    - merge `phase-2` into `main`
    - set `EXHBT_PHASE2=1` on the Worker
    - switch Stripe to live keys
