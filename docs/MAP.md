@@ -38,6 +38,8 @@ Phase 2 is the paid product: build exhbts, publish them to a portfolio, pay for 
 
 **The exhbt and its editor.** An exhbt is a fixed set of blocks (decision 0007). The schema, the limits and `wordCount()` are `lib/exhbt/blocks.ts`; the word cap counts everything on the page except image alt text (decision 0009). `components/portfolio/ProjectView.tsx` draws it. The editor is `/exhbts/[id]/edit` (`components/editor/`): cards with a small Tiptap field for each text, the flowchart edited on the diagram, live preview. Saving never blocks; publishing runs `validateForPublish()` again on the server. `exhbts.blocks` is the working copy and `published_blocks` what employers see, so a live page never shows a half-finished edit.
 
+**Graphs.** Up to two per exhbt, each one of a fixed set of kinds (before and after, bars, grouped and stacked bars, line, scatter, big numbers, a small table), typed in by hand in the graph card, every value printed on the page. The kinds, their caps and checks are `lib/exhbt/charts.ts`; `components/charts/Chart.tsx` draws them for the project page and the editor's preview. A graph can protect its real numbers (shown as a change or an index); publishing then stores only the index, so the typed figures stay in the working copy. Decision 0011.
+
 **Uploads and the AI draft.** `/exhbts/new`. The browser reads most files itself (`lib/doc-readers.ts`); scans and photos go to the AI only with consent (`/api/files/transcribe`). Files go straight from the browser to Supabase Storage with a signed upload URL (`lib/uploads.ts`), into two private buckets: `sources` for project material, `evidence` for images, evidence files and profile photos. Portfolio pages show them through links that expire after an hour (`lib/files.ts`). The draft is `lib/ai/exhbt-draft.ts`, called by `/api/exhbts/draft`; `lib/exhbt/verify.ts` flags any number it can't find in the material.
 
 **Portfolio pages.** The route group `app/(portfolio)`. Profile fields (username, headline, bio, photo, "hide from search") are set at `/account/portfolio`. Which host serves what is decision 0001 and `lib/hosts.ts`; the subdomain routing is being built separately.
@@ -63,6 +65,7 @@ Phase 2 is the paid product: build exhbts, publish them to a portfolio, pay for 
 | Colours, type, the exhbt's layout rules | `DESIGN.md` |
 | A plan's price, or which plan unlocks what | `lib/entitlements.ts`; the rules that read it are `lib/plan-rules.ts` |
 | The exhbt's blocks, limits or word cap | `lib/exhbt/blocks.ts`, and decisions 0007 and 0009 |
+| A kind of graph, its caps, how it's drawn, or protected numbers | `lib/exhbt/charts.ts`, `components/charts/`, the graph card `components/editor/ChartEditor.tsx`, decision 0011 |
 | How an exhbt looks on a portfolio | `components/portfolio/ProjectView.tsx` |
 | The editor | `app/(app)/exhbts/[id]/edit/`, `components/editor/` |
 | The AI draft prompt, or the number check | `lib/ai/exhbt-draft.ts`, `lib/exhbt/verify.ts` |

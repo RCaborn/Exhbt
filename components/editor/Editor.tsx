@@ -11,9 +11,10 @@ import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { CopyLink } from "@/components/ui/CopyLink";
 import type { Plan } from "@/lib/entitlements";
-import { LIMITS, plain, safeHref, validateForPublish, wordCount, words, type ExhbtDoc, type Issue } from "@/lib/exhbt/blocks";
+import { LIMITS, plain, safeHref, validateForPublish, withChartKinds, wordCount, words, type ExhbtDoc, type Issue } from "@/lib/exhbt/blocks";
+import { hasData, newChart } from "@/lib/exhbt/charts";
 import { BlockTools, useDraftTools, type DraftToolsInit } from "./BlockTools";
-import { ChartEditor, newChart } from "./ChartEditor";
+import { ChartEditor } from "./ChartEditor";
 import { ConfirmAction } from "./ConfirmAction";
 import { FieldIssues } from "./FieldIssues";
 import { FlowEditor } from "./FlowEditor";
@@ -235,7 +236,7 @@ export function Editor(props: EditorProps) {
   }
 
   const evidenceHref = doc.evidence?.kind === "link" ? safeHref(doc.evidence.href) : doc.evidence?.kind === "file" ? workUrl : null;
-  const previewDoc: ExhbtDoc = { ...doc, title: doc.title.trim() || "Your title", charts: doc.charts.filter((c) => c.rows.length > 0) };
+  const previewDoc: ExhbtDoc = { ...doc, title: doc.title.trim() || "Your title", charts: doc.charts.filter(hasData) };
   const liveUrl = liveBase && slug ? `${liveBase}/${slug}` : null;
   const justLiveUrl = liveBase && justLive ? `${liveBase}/${justLive.slug}` : null;
   const shownLive = canGoLive && status === "published";
@@ -315,7 +316,7 @@ export function Editor(props: EditorProps) {
                 variant="primary"
                 size="sm"
                 onClick={() => {
-                  setDoc(offer.doc);
+                  setDoc(withChartKinds(offer.doc));
                   setOffer(null);
                 }}
               >
@@ -488,7 +489,7 @@ export function Editor(props: EditorProps) {
               </div>
             </Card>
 
-            <Card id="card-charts" title="Graphs" words={cw.charts} hint={`Up to ${LIMITS.charts.max}, only from numbers in your work. Leave them out if there aren't any.`} flagged={flaggedBy("charts")} heaviest={heaviest === "charts"}>
+            <Card id="card-charts" title="Graphs" words={cw.charts} hint={`Up to ${LIMITS.charts.max}, from figures in your work, typed in by hand. To keep figures confidential, protect the real numbers: the page then shows only the change. Anything else can go in as an image.`} flagged={flaggedBy("charts")} heaviest={heaviest === "charts"}>
               <div className="space-y-4">
                 {doc.charts.map((c, i) => (
                   <ChartEditor

@@ -1,4 +1,5 @@
 import { plain, words, type ExhbtDoc, type Issue } from "@/lib/exhbt/blocks";
+import { chartTexts } from "@/lib/exhbt/charts";
 
 /**
  * Pure helpers the editor and its server actions share: which card an issue belongs to,
@@ -63,7 +64,7 @@ export function cardWords(doc: ExhbtDoc): Record<"header" | "gap" | "flow" | "fi
     gap: words(plain(doc.gap)),
     flow: sum(doc.flow.flatMap((s) => [s.step, s.detail ?? ""])),
     findings: sum(doc.findings.map(plain)),
-    charts: sum(doc.charts.flatMap((c) => [c.title, c.beforeLabel, c.afterLabel, c.unit ?? "", ...c.rows.map((r) => r.label)])),
+    charts: sum(doc.charts.flatMap(chartTexts)),
     images: sum(doc.images.map((im) => plain(im.caption))),
     evidence: words(doc.evidence?.label ?? ""),
   };
