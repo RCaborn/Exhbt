@@ -10,7 +10,7 @@ import { FieldIssues } from "./FieldIssues";
  * The process flowchart, edited on the diagram (decision 0007). Drawn like MethodFlow: step
  * boxes joined by arrows, the result (last box) filled ink. Type in a box; "+" between boxes
  * (or at the end) adds one, × removes one, ← and → move it. Within LIMITS.flow, and it redraws as you type.
- * A row when the card is wide enough (@container), a vertical pipeline otherwise.
+ * A wrapping row from `lg` up (boxes at least 13rem wide), a vertical pipeline below, so phones stay vertical.
  */
 export function FlowEditor({ steps, onChange, issues }: { steps: FlowStep[]; onChange: (s: FlowStep[]) => void; issues: Issue[] }) {
   const { min, max } = LIMITS.flow;
@@ -34,8 +34,8 @@ export function FlowEditor({ steps, onChange, issues }: { steps: FlowStep[]; onC
   };
 
   return (
-    <div className="@container">
-      <ol aria-label="Process flowchart" className="flex flex-col @4xl:flex-row @4xl:items-stretch">
+    <div>
+      <ol aria-label="Process flowchart" className="flex flex-col lg:flex-row lg:flex-wrap lg:items-stretch">
         {steps.map((s, i) => {
           const last = i === steps.length - 1;
           const n = i + 1;
@@ -46,9 +46,9 @@ export function FlowEditor({ steps, onChange, issues }: { steps: FlowStep[]; onC
             last ? "placeholder:text-on-ink" : "placeholder:text-slate"
           }`;
           return (
-            <li key={i} className="flex flex-col items-stretch @4xl:flex-1 @4xl:flex-row @4xl:items-center">
+            <li key={i} className="flex flex-col items-stretch lg:min-w-[13rem] lg:flex-1 lg:flex-row lg:items-center">
               <div
-                className={`flex flex-col gap-1.5 rounded-[8px] border px-3 py-2.5 focus-within:border-jade focus-within:outline-[3px] focus-within:outline-jade focus-within:outline-offset-2 focus-within:shadow-[0_0_0_5px_var(--color-surface),0_0_0_7px_var(--color-ink)] @4xl:h-full @4xl:flex-1 ${
+                className={`flex flex-col gap-1.5 rounded-[8px] border px-3 py-2.5 focus-within:border-jade focus-within:outline-[3px] focus-within:outline-jade focus-within:outline-offset-2 focus-within:shadow-[0_0_0_5px_var(--color-surface),0_0_0_7px_var(--color-ink)] lg:h-full lg:min-w-0 lg:flex-1 ${
                   last ? "border-ink bg-ink text-white" : "border-line bg-surface"
                 }`}
               >
@@ -88,9 +88,9 @@ export function FlowEditor({ steps, onChange, issues }: { steps: FlowStep[]; onC
                 </div>
               </div>
               {!last && (
-                <span className="flex items-center justify-center gap-1 py-1 text-field @4xl:flex-col @4xl:px-1 @4xl:py-0">
-                  <ArrowDown aria-hidden size={14} strokeWidth={2} className="@4xl:hidden" />
-                  <ArrowRight aria-hidden size={14} strokeWidth={2} className="hidden @4xl:block" />
+                <span className="flex items-center justify-center gap-1 py-1 text-field lg:flex-col lg:px-1 lg:py-0">
+                  <ArrowDown aria-hidden size={14} strokeWidth={2} className="lg:hidden" />
+                  <ArrowRight aria-hidden size={14} strokeWidth={2} className="hidden lg:block" />
                   {steps.length < max && (
                     <Button size="sm" variant="secondary" label={`Add a box after box ${n}`} onClick={() => insert(i + 1)}>
                       <Plus aria-hidden size={14} strokeWidth={2.25} />
@@ -103,7 +103,7 @@ export function FlowEditor({ steps, onChange, issues }: { steps: FlowStep[]; onC
         })}
       </ol>
       {steps.length < max && (
-        <div className="mt-2 flex justify-center @4xl:justify-end">
+        <div className="mt-2 flex justify-center lg:justify-end">
           <Button size="sm" label="Add a box at the end" onClick={() => insert(steps.length)}>
             <Plus aria-hidden size={14} strokeWidth={2.25} /> Add a box
           </Button>

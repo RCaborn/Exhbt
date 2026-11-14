@@ -255,7 +255,7 @@ export function Editor(props: EditorProps) {
 
   return (
     <div className="editor-touch bg-mist" data-ready={ready || undefined} inert={!ready || undefined} onBlur={() => void autosave.flush()}>
-      <div className="mx-auto max-w-[78rem] px-4 pt-8 pb-16 sm:px-8">
+      <div className="mx-auto max-w-[78rem] px-4 pt-8 pb-16 sm:px-8 xl:max-w-[90rem]">
         <Link href="/exhbts" className="inline-flex items-center gap-1.5 text-sm font-semibold hover:text-graphite">
           <ArrowLeft aria-hidden size={15} strokeWidth={2.25} /> Your exhbts
         </Link>
@@ -360,7 +360,7 @@ export function Editor(props: EditorProps) {
           </div>
         )}
 
-        <div className="mt-6 grid gap-8 lg:grid-cols-2">
+        <div className="mt-6 grid gap-8 lg:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
           <div className={`min-w-0 space-y-5 ${view === "preview" ? "hidden lg:block" : ""}`}>
             {showGuide && (
               <Checklist
@@ -524,7 +524,7 @@ export function Editor(props: EditorProps) {
                       </div>
                     )}
                     <div className="space-y-3">
-                      <TextInput id={`image-${i}-alt`} label={`Image ${i + 1}: describe it for people who can't see it`} value={im.alt} onChange={(alt) => update({ images: doc.images.map((x, j) => (j === i ? { ...x, alt } : x)) })} issues={issuesAt(issues, `images.${i}.alt`)} placeholder="e.g. Bar chart of queue times before and after" />
+                      <TextInput id={`image-${i}-alt`} label={`Image ${i + 1}: describe it for people who can't see it`} value={im.alt} onChange={(alt) => update({ images: doc.images.map((x, j) => (j === i ? { ...x, alt } : x)) })} issues={issuesAt(issues, `images.${i}.alt`)} multiline placeholder="e.g. Bar chart of queue times before and after" />
                       <div>
                         <span id={`image-${i}-caption`} className="label">
                           Image {i + 1} caption
@@ -799,6 +799,7 @@ function TextInput({
   max,
   placeholder,
   type = "text",
+  multiline = false,
 }: {
   id: string;
   label: string;
@@ -808,7 +809,17 @@ function TextInput({
   max?: number;
   placeholder?: string;
   type?: "text" | "url";
+  /** A textarea that grows with its text, for long answers such as image descriptions. */
+  multiline?: boolean;
 }) {
+  const common = {
+    id,
+    className: multiline ? "field resize-none [field-sizing:content] min-h-[2.75rem]" : "field",
+    value,
+    placeholder,
+    "aria-invalid": issues.length > 0 || undefined,
+    "aria-describedby": `${id}-issues`,
+  };
   return (
     <div>
       <div className="flex items-baseline justify-between gap-2">
@@ -821,16 +832,11 @@ function TextInput({
           </span>
         )}
       </div>
-      <input
-        id={id}
-        type={type}
-        className="field"
-        value={value}
-        placeholder={placeholder}
-        aria-invalid={issues.length > 0 || undefined}
-        aria-describedby={`${id}-issues`}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      {multiline ? (
+        <textarea rows={2} {...common} onChange={(e) => onChange(e.target.value.replace(/\n/g, " "))} />
+      ) : (
+        <input type={type} {...common} onChange={(e) => onChange(e.target.value)} />
+      )}
       <FieldIssues id={`${id}-issues`} issues={issues} />
     </div>
   );

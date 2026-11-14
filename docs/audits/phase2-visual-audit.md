@@ -14,6 +14,16 @@ Out of scope by request: `middleware.ts`, `lib/hosts.ts`, `app/(portfolio)/layou
 
 Not yet. The bones are sound: the project page reads in about 30 seconds, the method flow and the dumbbell chart are clear, axe finds nothing, and nothing scrolls sideways on a phone. But the page a graduate would pay £9 a month for is plainer than the free demo on our own marketing site. `/demo` has the ink brand band, EX·01 catalogue numbers, the "checked" seal, a method strip and a big result number on every tile; the real `/p/<name>` has a mist page, an initials circle and four white cards with "Open project". An employer opening it would think "tidy", not "impressive", and the half-empty screen at 1440 makes a two-project portfolio look thin. The project page drops the headline number the tile promised, so the key result disappears on click. On the student side, the editor works but feels like a long form: the preview scrolls away, publish errors sit at the bottom of a 3,400px page, publishing ends with a small "It's live." and no link to share, and a signed-in user still sees "Log in" in the header with no way back to their exhbts. Fix the first six findings below and the product starts to look worth the money.
 
+## Follow-up status
+
+Ticked off after the audit (branch `phase-2-polish-2`):
+
+- [x] **A5** The exhbts list (`/exhbts`) shows each exhbt's headline number and a "View" link to the public page for live ones (`app/(app)/exhbts/page.tsx`).
+- [x] Image alt-text field in the editor is a growing textarea, so a long description is no longer cut off (`TextInput` with `multiline` in `components/editor/Editor.tsx`).
+- [x] **A1** The header's signed-in links fit on a phone: below `sm` they sit behind a "Menu" button (`components/site/MobileNav.tsx`).
+- [x] **J3 (part)** The project page shows one catalogue number, inside the card; the page bar no longer repeats it.
+- [x] Profile photo: a Free user can upload, replace and remove it on Portfolio settings, and it shows on their previews (checked, covered by `e2e/phase2-polish-2.spec.ts`).
+
 ## Severity counts
 
 | Severity | Count |

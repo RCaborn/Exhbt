@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/Button";
+import { MobileNav } from "./MobileNav";
 
 const NAV = [
   { href: "/how-to-read-an-exhbt", label: "For employers" },
@@ -35,11 +36,11 @@ export function SiteHeader({
 }: { signedIn?: boolean; phase2?: boolean; jobLinks?: boolean } = {}) {
   const nav = signedIn ? OWN_NAV.filter((n) => (n.href === "/job-links" ? phase2 && jobLinks : phase2 || n.href === "/account" || n.href === "/roadmap")) : NAV;
   return (
-    <header className="border-b border-line bg-surface">
-      <div className="mx-auto flex max-w-[78rem] flex-wrap items-center justify-between gap-x-8 gap-y-3 px-4 py-4 sm:px-8">
+    <header className="relative border-b border-line bg-surface">
+      <div className="mx-auto flex max-w-[78rem] items-center justify-between gap-x-8 gap-y-3 px-4 py-4 sm:px-8">
         <Wordmark />
-        <nav aria-label="Main" className="order-3 w-full sm:order-none sm:w-auto">
-          <ul className="flex gap-5 overflow-x-auto text-[0.95rem] font-medium text-graphite sm:gap-7">
+        <nav aria-label="Main" className="hidden sm:block">
+          <ul className="flex gap-7 text-[0.95rem] font-medium text-graphite">
             {nav.map((n) => (
               <li key={n.href} className="shrink-0">
                 <Link href={n.href} className="hover:text-ink">
@@ -50,6 +51,7 @@ export function SiteHeader({
           </ul>
         </nav>
         <div className="flex items-center gap-4 text-[0.95rem]">
+          <MobileNav items={nav} />
           {!signedIn && (
             <Link href="/login" className="link font-medium">
               Log in

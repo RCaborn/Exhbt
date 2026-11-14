@@ -42,7 +42,7 @@ export default async function PortfolioProject({ params }: Params) {
 
   return (
     <>
-      <ProjectTopNav home={p.base || "/"} position={i + 1} />
+      <ProjectTopNav home={p.base || "/"} />
       <ProjectView
         doc={it.doc}
         owner={{ name: p.displayName, photoUrl: p.photoUrl }}
