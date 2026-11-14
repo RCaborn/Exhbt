@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import type { ExhbtDoc } from "./exhbt/blocks";
 import { signedFileUrl } from "./files";
 import { parseHost, portfolioHost } from "./hosts";
+import { themeFor, type PortfolioTheme } from "./portfolio-themes";
 import { visibleOnPortfolio } from "./plan-rules";
 import { getStore, type ExhbtRecord, type PortfolioProfile } from "./store";
 
@@ -15,7 +16,7 @@ import { getStore, type ExhbtRecord, type PortfolioProfile } from "./store";
 export type PortfolioItem = { id: string; slug: string; doc: ExhbtDoc; publishedAt: string | null };
 
 export type LoadedPortfolio =
-  | { status: "ok"; profile: PortfolioProfile & { username: string }; displayName: string; photoUrl: string | null; items: PortfolioItem[]; base: string }
+  | { status: "ok"; profile: PortfolioProfile & { username: string }; displayName: string; photoUrl: string | null; items: PortfolioItem[]; base: string; theme: PortfolioTheme }
   | { status: "redirect"; to: string }
   | { status: "missing" };
 
@@ -59,6 +60,8 @@ export async function loadPortfolio(username: string, rest = ""): Promise<Loaded
     photoUrl: await signedFileUrl(profile.photoFileId),
     items: items.map(toItem),
     base: await basePath(found.username),
+    // The chosen look if the plan still has it; the stored choice is never cleared here.
+    theme: themeFor(profile, plan),
   };
 }
 

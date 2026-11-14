@@ -25,6 +25,7 @@ Tokens live in the `@theme` block of `app/globals.css`. The same values feed the
 | `mint-press` | `#36DDA4` | button hover |
 | `jade` | `#00755D` | links, tags, the focus ring, any mint-coloured text or line that must be read (5.6:1 on white) |
 | `ink` | `#0E0F12` | text; the footer and portfolio band; buttons on mint |
+| `deep-jade` | `#00513F` | one use only: the ground of a portfolio look's band (`lib/portfolio-themes.ts`). Not for text, buttons or anything else |
 | `surface` | `#FFFFFF` | every main ground |
 | `mist` | `#F6F7F8` | the second ground: alternate sections, app pages behind white panels |
 | `wash` | `#E3FCF0` | tags and soft fills |
@@ -43,7 +44,7 @@ Tokens live in the `@theme` block of `app/globals.css`. The same values feed the
 
 ## Type
 - Display: **Bricolage Grotesque** (variable), weight 600, tracking −0.03em. Headings and the wordmark only.
-- Everything else: **Inter** 400/500/600. Two typefaces only: no serif, no mono. Figures use Inter with tabular numbers (the `font-mono` class).
+- Everything else: **Inter** 400/500/600. Two typefaces only on the site: no serif, no mono. Figures use Inter with tabular numbers (the `font-mono` class). The one exception is a paid portfolio look (below), which can swap the heading face on that person's portfolio.
 - One heading scale, set on `h1`–`h3` in `globals.css` (36/48, 28/32, 22 px). Don't size headings per page. Marketing pages add two display steps: `.display` (the page's opening line) and `.display-2` (section titles).
 - Body 16px; captions 13px. Self-hosted via `@fontsource`.
 
@@ -71,7 +72,8 @@ Full rules, sizes and don'ts are in `docs/brand.md`. In short:
 - **Wordmark**: lower-case `exhbt`, Bricolage Grotesque 600. In running text the company is "Exhbt" and the pieces are "exhbts".
 - **Catalogue numbers**: `EX·01`, `EX·02`… on tiles and full exhbts, from the exhbt's position in its portfolio (`catalogueNo` in `lib/exhbt.ts`). They are references an employer can use, so they're allowed; numbering marketing sections is still banned.
 - **Seal** (`components/brand/Seal.tsx`): mark + "checked by exhbt" + date. Says the checks ran, not that results are true, so never "verified". Links to `/how-to-read-an-exhbt#checks` (except inside a tile, which is already a link).
-- **Brand band**: the portfolio header is the page's one ink surface (`PortfolioHeader`, slim `PortfolioBar` above a single exhbt). White and `#C9CBCF` text on it.
+- **Brand band**: the portfolio header is the page's one coloured surface (`PortfolioHeader`, slim `PortfolioBar` above a single exhbt). Ink by default, with white and `#C9CBCF` text on it.
+- **Portfolio looks** (`lib/portfolio-themes.ts`, decision 0012): a fixed list of band colourways, each with a heading face (Bricolage Grotesque, Inter Tight, Space Grotesk or Fraunces) and a photo shape (round or rounded square). Colours come only from the tokens above, plus `deep-jade` as a ground. Nobody picks a colour; every look is checked once, and every text on its band must reach WCAG AA (the contrast test in `e2e/phase2-themes.spec.ts`). Only the band and the portfolio's headings change; the rest of the page stays as it is.
 - **Sign-off** (`MadeWith`): "Portfolio made with exhbt · Build your own roadmap" at the foot of every public portfolio and exhbt.
 
 ## Components

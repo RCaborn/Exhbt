@@ -46,6 +46,11 @@ type Entitlements = {
    * see every idea in their roadmap; keeping them in a list is a paid feature.
    */
   savedIdeas: boolean;
+  /**
+   * How many of the portfolio looks in lib/portfolio-themes.ts the person can use: that many from
+   * the start of the list, or "all". Free has the default only (decision 0012).
+   */
+  portfolioThemes: number | "all";
 };
 
 const MAX: Entitlements = {
@@ -62,6 +67,7 @@ const MAX: Entitlements = {
   originalityCheck: true,
   projectSwapsPerRoadmap: 25,
   savedIdeas: true,
+  portfolioThemes: "all",
 };
 
 export const ENTITLEMENTS: Record<Plan, Entitlements> = {
@@ -79,6 +85,7 @@ export const ENTITLEMENTS: Record<Plan, Entitlements> = {
     originalityCheck: false,
     projectSwapsPerRoadmap: 3,
     savedIdeas: false,
+    portfolioThemes: 1,
   },
   premium: {
     roadmapsPer30Days: 8,
@@ -94,6 +101,7 @@ export const ENTITLEMENTS: Record<Plan, Entitlements> = {
     originalityCheck: true,
     projectSwapsPerRoadmap: 10,
     savedIdeas: true,
+    portfolioThemes: 6,
   },
   max: MAX,
   institutional: MAX,
@@ -153,6 +161,10 @@ function exhbtCount(n: number, hosted: boolean): string {
   return `${prefix}${n} ${noun}${hosted ? " hosted" : ""}`;
 }
 
+function looksLine(n: number | "all"): string {
+  return n === "all" ? "Every portfolio look: colours, fonts and photo shape" : `${n} portfolio looks to choose from`;
+}
+
 const SAVED_IDEAS_LINE = "A saved list of project ideas from every roadmap";
 
 function jobLinksLine(): string {
@@ -181,6 +193,7 @@ export function planFeatures(plan: "free" | "premium" | "max"): string[] {
           : []),
         refreshes(e.roadmapsPer30Days),
         ...(e.savedIdeas ? [SAVED_IDEAS_LINE] : []),
+        looksLine(e.portfolioThemes),
       ];
     case "max":
       return [
@@ -192,6 +205,7 @@ export function planFeatures(plan: "free" | "premium" | "max"): string[] {
           : []),
         refreshes(e.roadmapsPer30Days),
         ...(e.savedIdeas ? [SAVED_IDEAS_LINE] : []),
+        looksLine(e.portfolioThemes),
       ];
   }
 }

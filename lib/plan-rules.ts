@@ -1,4 +1,5 @@
 import { ENTITLEMENTS, PLAN_NAMES, roadmapLimitMessage, type Plan } from "./entitlements";
+import { planForTheme, themeAllowedOn, type PortfolioTheme } from "./portfolio-themes";
 import type { ExhbtRecord } from "./store";
 
 /**
@@ -76,4 +77,11 @@ export function canStartRoadmap(plan: Plan, recent: number): Verdict {
 export function canSaveIdeas(plan: Plan): Verdict {
   if (ENTITLEMENTS[plan].savedIdeas) return { ok: true };
   return { ok: false, reason: `Saving ideas to a list you keep comes with ${PLAN_NAMES.premium}.`, upgradeTo: "premium" };
+}
+
+/** Can they use this portfolio look? The cheapest plan that has it is the upgrade offer. */
+export function canUseTheme(plan: Plan, theme: PortfolioTheme): Verdict {
+  if (themeAllowedOn(plan, theme)) return { ok: true };
+  const upgradeTo = planForTheme(theme);
+  return { ok: false, reason: `The ${theme.name} look comes with ${PLAN_NAMES[upgradeTo]}.`, upgradeTo };
 }

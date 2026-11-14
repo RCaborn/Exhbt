@@ -5,7 +5,8 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { ENTITLEMENTS, PLAN_NAMES } from "@/lib/entitlements";
 import { portfolioHost } from "@/lib/hosts";
-import { getPlan } from "@/lib/plan";
+import { canUseTheme, getPlan } from "@/lib/plan";
+import { PORTFOLIO_THEMES, themeById, themeFor } from "@/lib/portfolio-themes";
 import { portfolioHref } from "@/lib/portfolio-links";
 import { isPhase2Enabled } from "@/lib/site";
 import { signedFileUrl } from "@/lib/files";
@@ -14,6 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { CopyLink } from "@/components/ui/CopyLink";
 import { PhotoField } from "./PhotoField";
 import { ProfileForm } from "./ProfileForm";
+import { ThemePicker, type ThemeLock } from "./ThemePicker";
 import { UsernameForm } from "./UsernameForm";
 
 export const metadata: Metadata = { title: "Portfolio settings", robots: { index: false } };
@@ -33,6 +35,17 @@ export default async function PortfolioSettingsPage() {
   const isPublic = ENTITLEMENTS[plan].publicPortfolio;
   const photoUrl = await signedFileUrl(profile.photoFileId);
   const { username } = profile;
+
+  // Looks the plan doesn't have are locked, with the offer that opens them. The stored choice may
+  // be one of them after a downgrade: the portfolio shows the default and keeps the choice.
+  const locks: Record<string, ThemeLock> = {};
+  for (const t of PORTFOLIO_THEMES) {
+    const v = canUseTheme(plan, t);
+    if (!v.ok) locks[t.id] = { reason: v.reason, upgradeTo: v.upgradeTo, planName: PLAN_NAMES[v.upgradeTo ?? "max"] };
+  }
+  const shown = themeFor(profile, plan);
+  const stored = themeById(profile.themeId);
+  const savedButLocked = stored && stored.id !== shown.id ? stored.name : null;
 
   return (
     <div className="mx-auto max-w-2xl px-4 pt-12 pb-16 sm:px-8 lg:pt-16">
@@ -86,6 +99,23 @@ export default async function PortfolioSettingsPage() {
             bio: profile.bio ?? "",
             linkedin: profile.linkedin ?? "",
             hideFromSearch: profile.hideFromSearch,
+          }}
+        />
+      </section>
+
+      <section aria-labelledby="look-heading" className="mt-12 border-t border-line pt-8">
+        <h2 id="look-heading" className="text-[1.375rem]">Look</h2>
+        <p className="mt-3 text-graphite">The colours, heading font and photo shape of your portfolio&rsquo;s top band.</p>
+        <ThemePicker
+          current={shown.id}
+          locks={locks}
+          savedButLocked={savedButLocked}
+          owner={{
+            username: username ?? "your-username",
+            name: profile.name ?? username ?? "Your name",
+            headline: profile.headline,
+            bio: profile.bio,
+            photoUrl,
           }}
         />
       </section>

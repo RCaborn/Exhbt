@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
+import type { Plan } from "@/lib/entitlements";
 import { usernameProblem } from "@/lib/hosts";
+import { canUseTheme, getPlan } from "@/lib/plan";
+import { themeById } from "@/lib/portfolio-themes";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
 import { deleteFile } from "@/lib/uploads";
@@ -102,6 +105,26 @@ export async function removePhotoAction(): Promise<PhotoState> {
   const old = (await store.getPortfolioProfile(user.id)).photoFileId;
   await store.updatePortfolioProfile(user.id, { photoFileId: null });
   if (old) await deleteFile(user.id, old);
+  revalidatePath("/account/portfolio");
+  return { saved: true };
+}
+
+export type ThemeState = { error?: string; upgradeTo?: Plan; saved?: boolean } | undefined;
+
+/**
+ * Saves the portfolio look. The plan is checked here, not in the picker: a look the plan doesn't
+ * have is refused with the upgrade offer. A look already stored stays stored when the plan drops
+ * it (themeFor shows the default meanwhile), so a later upgrade brings it back.
+ */
+export async function saveThemeAction(_prev: ThemeState, form: FormData): Promise<ThemeState> {
+  if (!isPhase2Enabled()) return { error: "This isn't available yet." };
+  const user = await getCurrentUser();
+  if (!user) return { error: SIGNED_OUT };
+  const theme = themeById(String(form.get("themeId") ?? ""));
+  if (!theme) return { error: "Choose one of the looks in the list." };
+  const verdict = canUseTheme(await getPlan(user.id), theme);
+  if (!verdict.ok) return { error: verdict.reason, upgradeTo: verdict.upgradeTo };
+  await getStore().updatePortfolioProfile(user.id, { themeId: theme.id });
   revalidatePath("/account/portfolio");
   return { saved: true };
 }

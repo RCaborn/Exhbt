@@ -3,14 +3,17 @@ import Link from "next/link";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import type { PortfolioOwner } from "@/lib/exhbt";
 import { portfolioHost } from "@/lib/hosts";
+import { DEFAULT_THEME, type PhotoShape, type PortfolioTheme } from "@/lib/portfolio-themes";
+import { themeStyle } from "@/components/portfolio/themeFonts";
 
 /*
- * The portfolio's one ink brand band. Text on it: white (about 19:1) and #c9cbcf for
- * secondary text (above 11:1); mint for the small labels. Keep it that way;
- * docs/brand.md has the rule.
+ * The portfolio's one brand band. By default it is ink: white text (about 19:1), #c9cbcf for
+ * secondary text (above 11:1), mint for the small labels. A person on a paid plan can pick another
+ * look (lib/portfolio-themes.ts); every look passes WCAG AA for each text on it, and the colours
+ * reach the band as CSS variables (themeStyle). docs/brand.md has the rule.
  */
 
-const SOFT = "text-[#c9cbcf]";
+const SOFT = "text-[color:var(--band-soft)]";
 
 function initialsOf(name: string) {
   return name
@@ -22,14 +25,16 @@ function initialsOf(name: string) {
 }
 
 /** The photo when there is one (decorative: the name is beside it), else initials on mint. */
-function Face({ name, photoUrl, small }: { name: string; photoUrl?: string | null; small?: boolean }) {
-  const shape = small ? "size-9 rounded-[9px]" : "size-14 rounded-[14px] sm:size-16 sm:rounded-[16px]";
+function Face({ name, photoUrl, small, shape: photo = "square" }: { name: string; photoUrl?: string | null; small?: boolean; shape?: PhotoShape }) {
+  const size = small ? "size-9" : "size-14 sm:size-16";
+  const corners = photo === "round" ? "rounded-full" : small ? "rounded-[9px]" : "rounded-[14px] sm:rounded-[16px]";
+  const shape = `${size} ${corners}`;
   if (photoUrl) return <img src={photoUrl} alt="" width={64} height={64} className={`${shape} shrink-0 object-cover`} data-avatar="photo" />;
   return (
     <span
       aria-hidden
       data-avatar="initials"
-      className={`${shape} inline-flex shrink-0 items-center justify-center bg-mint font-mono font-semibold text-ink ${small ? "text-[0.8rem]" : "text-[1.15rem] sm:text-[1.3rem]"}`}
+      className={`${shape} inline-flex shrink-0 items-center justify-center bg-[var(--band-initials-bg)] font-mono font-semibold text-[color:var(--band-initials-text)] ${small ? "text-[0.8rem]" : "text-[1.15rem] sm:text-[1.3rem]"}`}
     >
       {initialsOf(name) || "?"}
     </span>
@@ -38,7 +43,7 @@ function Face({ name, photoUrl, small }: { name: string; photoUrl?: string | nul
 
 function LinkChip({ username }: { username: string }) {
   return (
-    <p className="rounded-full border border-white/25 px-3 py-1 font-mono text-[0.8125rem] text-white">
+    <p className="rounded-full border border-[color:var(--band-edge)] px-3 py-1 font-mono text-[0.8125rem] text-[color:var(--band-text)]">
       {portfolioHost(username)}
     </p>
   );
@@ -64,11 +69,14 @@ export function PortfolioHeader({
   exhbts,
   note,
   framed = false,
+  theme = DEFAULT_THEME,
 }: {
   owner: HeaderOwner;
   exhbts: { skills: string[] }[];
   note?: React.ReactNode;
   framed?: boolean;
+  /** The look (colours, heading face, photo shape). Defaults to Ink. */
+  theme?: PortfolioTheme;
 }) {
   const skills = [...new Set(exhbts.flatMap((e) => e.skills))];
   const inner = framed ? "px-5 sm:px-8" : "mx-auto max-w-[64rem] px-4 sm:px-8";
@@ -77,15 +85,19 @@ export function PortfolioHeader({
     owner.lookingFor && { label: "looking for", value: owner.lookingFor },
   ].filter(Boolean) as { label: string; value: string }[];
   return (
-    <header className={framed ? "overflow-hidden rounded-[20px] border border-line shadow-pack print:shadow-none" : ""}>
-      <div className="bg-ink text-white">
+    <header
+      data-theme={theme.id}
+      style={themeStyle(theme)}
+      className={framed ? "overflow-hidden rounded-[20px] border border-line shadow-pack print:shadow-none" : ""}
+    >
+      <div className="bg-[var(--band-bg)] text-[color:var(--band-text)]">
         <div className={`${inner} pt-6 pb-7 sm:pt-10 sm:pb-10`}>
           {note && <div className={`mb-6 text-sm ${SOFT}`}>{note}</div>}
           <div className="flex flex-wrap items-center gap-x-5 gap-y-4">
             <div className="flex min-w-0 items-center gap-4 sm:gap-5">
-              <Face name={owner.name} photoUrl={owner.photoUrl} />
+              <Face name={owner.name} photoUrl={owner.photoUrl} shape={theme.photo} />
               <div className="min-w-0">
-                <h1 className="text-white">{owner.name}</h1>
+                <h1 className="text-[color:var(--band-text)]">{owner.name}</h1>
                 {owner.headline && <p className={`mt-1 ${SOFT}`}>{owner.headline}</p>}
               </div>
             </div>
@@ -95,13 +107,13 @@ export function PortfolioHeader({
           </div>
           {(owner.bio || owner.linkedin) && (
             <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-8">
-              {owner.bio && <p className="max-w-[40rem] text-[0.95rem] leading-relaxed text-white">{owner.bio}</p>}
+              {owner.bio && <p className="max-w-[40rem] text-[0.95rem] leading-relaxed text-[color:var(--band-text)]">{owner.bio}</p>}
               {owner.linkedin && (
                 <a
                   href={owner.linkedin}
                   rel="noopener"
                   target="_blank"
-                  className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border border-white/25 px-3.5 py-1.5 text-sm font-semibold text-white hover:border-mint sm:self-auto"
+                  className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border border-[color:var(--band-edge)] px-3.5 py-1.5 text-sm font-semibold text-[color:var(--band-text)] hover:border-[color:var(--band-accent)] sm:self-auto"
                 >
                   LinkedIn <ArrowUpRight aria-hidden size={15} strokeWidth={2.25} />
                   <span className="sr-only">(opens in a new tab)</span>
@@ -110,10 +122,10 @@ export function PortfolioHeader({
             </div>
           )}
           {facts.length > 0 && (
-            <dl className="mt-7 grid gap-4 border-t border-white/15 pt-5 text-[0.95rem] sm:grid-cols-2">
+            <dl className="mt-7 grid gap-4 border-t border-[color:var(--band-edge)] pt-5 text-[0.95rem] sm:grid-cols-2">
               {facts.map((f) => (
                 <div key={f.label}>
-                  <dt className="font-mono text-[0.8125rem] text-mint">{f.label}</dt>
+                  <dt className="font-mono text-[0.8125rem] text-[color:var(--band-accent)]">{f.label}</dt>
                   <dd className="mt-0.5">{f.value}</dd>
                 </div>
               ))}
@@ -140,16 +152,16 @@ export function PortfolioHeader({
 }
 
 /** The same band, slim, above a single exhbt: whose it is and the way back. */
-export function PortfolioBar({ owner, backHref }: { owner: PortfolioOwner; backHref: string }) {
+export function PortfolioBar({ owner, backHref, theme = DEFAULT_THEME }: { owner: PortfolioOwner; backHref: string; theme?: PortfolioTheme }) {
   return (
-    <div className="bg-ink text-white">
+    <div data-theme={theme.id} style={themeStyle(theme)} className="bg-[var(--band-bg)] text-[color:var(--band-text)]">
       <div className="mx-auto flex max-w-[56rem] flex-wrap items-center gap-x-4 gap-y-3 px-4 py-4 sm:px-8">
         <Link
           href={backHref}
-          className="group inline-flex items-center gap-3 rounded-[12px] pr-2 font-semibold hover:text-mint"
+          className="group inline-flex items-center gap-3 rounded-[12px] pr-2 font-semibold hover:text-[color:var(--band-accent)]"
         >
           <ArrowLeft aria-hidden size={16} strokeWidth={2.25} className={SOFT} />
-          <Face name={owner.name} small />
+          <Face name={owner.name} small shape={theme.photo} />
           <span>
             {owner.name}&rsquo;s portfolio
           </span>

@@ -27,5 +27,5 @@ export default async function PortfolioGlance({ params }: Params) {
   const p = await loadPortfolio((await params).username);
   if (p.status === "redirect") redirect(p.to);
   if (p.status === "missing") notFound();
-  return <GlanceView profile={p.profile} displayName={p.displayName} photoUrl={p.photoUrl} items={p.items} base={p.base} />;
+  return <GlanceView profile={p.profile} displayName={p.displayName} photoUrl={p.photoUrl} items={p.items} base={p.base} theme={p.theme} />;
 }
