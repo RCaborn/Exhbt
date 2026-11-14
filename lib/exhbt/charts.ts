@@ -169,12 +169,9 @@ export const ChartSchema = z.preprocess(withKind, ChartUnion);
 export type Chart = z.output<typeof ChartUnion>;
 export type ChartOf<K extends ChartKind> = Extract<Chart, { kind: K }>;
 export type BeforeAfter = ChartOf<"beforeAfter">;
-export type SeriesChart = ChartOf<"groupedBar" | "stackedBar" | "line">;
 
 /** The graph with its kind, for data read without parsing (the store returns jsonb as it is). */
 export const asChart = (c: Chart): Chart => withKind(c) as Chart;
-
-export const isSeriesKind = (k: ChartKind): k is SeriesChart["kind"] => k === "groupedBar" || k === "stackedBar" || k === "line";
 
 /** Which ways a kind can protect its numbers. Scatter, tables and big numbers can't (type them as percentages instead). */
 export function protectModes(kind: ChartKind): Protect[] {
@@ -272,7 +269,6 @@ export function chartValues(raw: Chart): number[] {
 /* ---------------- Publishing checks ---------------- */
 
 type Issue = { path: string; message: string };
-const words = (s: string): number => s.trim().split(/\s+/).filter(Boolean).length;
 
 /** What stops graph `i` being published, each with a path the editor can point at ("charts.0.rows.2.label"). */
 export function chartIssues(raw: Chart, i: number): Issue[] {
@@ -361,9 +357,6 @@ export function chartIssues(raw: Chart, i: number): Issue[] {
   }
   return out;
 }
-
-/** Words the person wrote on one graph (for the editor's count). */
-export const chartWordCount = (c: Chart): number => chartTexts(c).reduce((n, s) => n + words(s), 0);
 
 /* ---------------- Protecting the real numbers ---------------- */
 
