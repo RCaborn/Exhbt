@@ -16,5 +16,26 @@
     // price_... ids from the Stripe dashboard (LAUNCH.md, Stripe). Keys stay Worker secrets.
     "STRIPE_PRICE_PREMIUM": "price_REPLACE_WITH_PREMIUM",
     "STRIPE_PRICE_MAX": "price_REPLACE_WITH_MAX"
+  },
+  // Preview Worker: runs the phase-2 branch with Phase 2 on, at its own workers.dev address
+  // (deploy-preview.yml, `deploy --env preview`). It uses the preview Supabase project.
+  // Wrangler does not inherit `vars` into an env, so they are all listed here; main, assets,
+  // compatibility settings, observability and keep_vars are inherited from above. Its secrets
+  // are set on the exhbt-preview Worker in the Cloudflare dashboard (LAUNCH.md, Preview site).
+  // NEXT_PUBLIC_SITE_URL is left unset on purpose: siteOrigin() then uses the request host.
+  "env": {
+    "preview": {
+      "name": "exhbt-preview",
+      "workers_dev": true,
+      "vars": {
+        "NEXT_PUBLIC_SUPABASE_URL": "https://qjoagqlchlmuiojvfpuu.supabase.co",
+        // The anon key is public by design: it ships to browsers and Row Level Security guards the data.
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqb2FncWxjaGxtdWlvanZmcHV1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ2MTM3MzUsImV4cCI6MjExMDE4OTczNX0.OvSer7unZ1lEY8KYZKN05LrmsKh4EwC5CFOk9xuMw-M",
+        "EXHBT_PHASE2": "1",
+        "EMAIL_FROM": "Exhbt <hello@exhbt.co.uk>",
+        "STRIPE_PRICE_PREMIUM": "price_REPLACE_WITH_PREMIUM",
+        "STRIPE_PRICE_MAX": "price_REPLACE_WITH_MAX"
+      }
+    }
   }
 }
