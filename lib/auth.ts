@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { APEX, APP_HOST, MARKETING_HOST } from "./hosts";
 import { isSupabaseConfigured } from "./store";
 
 export type SessionUser = { id: string; email: string };
@@ -34,9 +35,14 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 }
 
 export async function siteOrigin() {
+  // Production sets this to https://app.exhbt.co.uk so every email link lands on the tool host.
+  // A workers.dev preview keeps its own URL: replacing it would point the link at production.
   if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
   const h = await headers();
-  return `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const bare = host.toLowerCase().replace(/:\d+$/, "");
+  if (bare === APEX || bare === MARKETING_HOST) return `https://${APP_HOST}`;
+  return `${h.get("x-forwarded-proto") ?? "http"}://${host}`;
 }
 
 /**
