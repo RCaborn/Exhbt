@@ -129,8 +129,8 @@ Body, in this order:
 
 Footer, small: "See the work" (the original file or link, one click away) and the trust badge (confirmed by the author, source attached).
 
-- The order is fixed, matching the layout. Editorial control means editing every word, adding or removing boxes, findings, graphs and images within the limits, and swapping graphs or images.
-- Removed from the earlier block list: the separate outcome, skills and reflection blocks. Skills moved to the header. Callouts and a second flowchart are not in the layout.
+- The core is fixed and always there: the header, the question and the flowchart. Below it, findings, graphs and images are sections, with a quote, what I'd do next and a link, which people add, remove and reorder within the caps (decision 0015). Editorial control means editing every word, adding or removing boxes and sections, and moving sections.
+- Removed from the earlier block list: the separate outcome and skills blocks. Skills moved to the header; reflection came back as an optional section ("What I'd do next", decision 0015). Callouts and a second flowchart are not in the layout.
 
 **Editor** (`app./exhbts/[id]/edit`, the halfway approach):
 - One card per block in a vertical list. Reorder with a drag handle and with up/down buttons (keyboard and screen-reader friendly).

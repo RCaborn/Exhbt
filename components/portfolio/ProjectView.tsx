@@ -234,7 +234,7 @@ function OneSection({ s, Sub }: { s: Exclude<Section, { kind: "graph" | "image" 
       const label = s.label.trim() || "Link";
       return (
         <section aria-label="Link" className="mt-6 break-inside-avoid print:mt-4">
-          <div className="rounded-[12px] border border-line px-4 py-3">
+          <div className="rounded-[14px] border border-line px-4 py-3">
             {href ? (
               <a href={href} rel="nofollow ugc noopener" target="_blank" className="link inline-flex items-center gap-1.5 font-semibold text-ink">
                 {label}
