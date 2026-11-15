@@ -12,6 +12,11 @@
   "vars": {
     "NEXT_PUBLIC_SUPABASE_URL": "https://jbrcseklzigdcrgqbclx.supabase.co",
     "EMAIL_FROM": "Exhbt <hello@exhbt.co.uk>",
+    // Phase 2 on (Rory, 15 Nov 2026: "push to main, fully ready"). Takes effect when phase-2 is
+    // merged into main, after supabase/launch/apply-phase-2-live.sql has run. To switch Phase 2
+    // off in an emergency, set EXHBT_PHASE2 to 0 in the Worker's dashboard variables: that holds
+    // until the next deploy from main, which sets it back to this value.
+    "EXHBT_PHASE2": "1",
     // Stripe price ids for Premium and Max (not secret). Placeholders: replace with the real
     // price_... ids from the Stripe dashboard (LAUNCH.md, Stripe). Keys stay Worker secrets.
     "STRIPE_PRICE_PREMIUM": "price_REPLACE_WITH_PREMIUM",

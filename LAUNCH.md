@@ -165,7 +165,7 @@ Before the day: the Stripe section above done and tried in test mode, a full cli
 4. **Stripe live mode.** Switch the Stripe dashboard to live mode and repeat steps 2–7 of the Stripe section with live products and prices:
    - replace `STRIPE_PRICE_PREMIUM` and `STRIPE_PRICE_MAX` in `wrangler.jsonc` with the **live** price ids, on the `phase-2` branch
    - set the Worker secrets `STRIPE_SECRET_KEY` (starts `sk_live_`) and `STRIPE_WEBHOOK_SECRET` (from the live webhook endpoint)
-5. **Turn Phase 2 on.** In Cloudflare, Worker > **Settings > Variables and Secrets**, add `EXHBT_PHASE2` = `1` as a plain variable. It's read at runtime; with it missing, Phase 2 pages stay hidden after the merge.
+5. **Phase 2 switches on with the merge.** `EXHBT_PHASE2` = `1` is set in `wrangler.jsonc` (production `vars`), so the deploy from `main` turns it on. Emergency off-switch: set it to `0` in the Worker's **Settings > Variables and Secrets**; that holds until the next deploy from `main`.
 6. **Merge.** Open a pull request from `phase-2` into `main`, wait for CI to pass, and merge it. Cloudflare deploys `main` on its own; watch **Deployments** until it's live.
 7. **Check it's working.**
    - Open `/api/health`. `ok` should be `true`, and under `phase2`: every setting `true`, `stripe.ok` `true` and `storage.ok` `true`. If a check is false, its `detail` says why.
