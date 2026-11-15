@@ -115,10 +115,20 @@ export function Sections({
   );
   const indexOf = (id: UniqueIdentifier) => sections.findIndex((s) => s.id === id);
   const nameOf = (id: UniqueIdentifier) => (indexOf(id) >= 0 ? sectionLabel(sections, indexOf(id)) : "The section");
+  // dnd-kit reports the section over its own place straight after it's picked up; that isn't
+  // read out (it would cut off "Picked up"), only places after it, and coming back to it.
+  const leftStart = useRef(false);
   /** What dnd-kit reads out as a section is picked up, moved and dropped, in our words. */
   const announcements: Announcements = {
-    onDragStart: ({ active }) => `Picked up ${lowerFirst(nameOf(active.id))}, place ${indexOf(active.id) + 1} of ${sections.length}.`,
-    onDragOver: ({ active, over }) => (over ? `${nameOf(active.id)} would go to place ${indexOf(over.id) + 1} of ${sections.length}.` : `${nameOf(active.id)} isn't over a place.`),
+    onDragStart: ({ active }) => {
+      leftStart.current = false;
+      return `Picked up ${lowerFirst(nameOf(active.id))}, place ${indexOf(active.id) + 1} of ${sections.length}.`;
+    },
+    onDragOver: ({ active, over }) => {
+      if (over && over.id === active.id && !leftStart.current) return undefined;
+      leftStart.current = true;
+      return over ? `${nameOf(active.id)} would go to place ${indexOf(over.id) + 1} of ${sections.length}.` : `${nameOf(active.id)} isn't over a place.`;
+    },
     onDragEnd: ({ active, over }) => (over ? `${nameOf(active.id)} dropped in place ${indexOf(over.id) + 1} of ${sections.length}.` : `${nameOf(active.id)} dropped where it was.`),
     onDragCancel: ({ active }) => `Moving ${lowerFirst(nameOf(active.id))} cancelled. It's back where it was.`,
   };
@@ -147,7 +157,8 @@ export function Sections({
         const card = document.querySelector(`[data-section-id="${s.id}"]`);
         const pressed = card?.querySelector<HTMLButtonElement>(`[data-move="${dir}"] button`);
         const other = card?.querySelector<HTMLButtonElement>(`[data-move="${dir === "up" ? "down" : "up"}"] button`);
-        (pressed && !pressed.disabled ? pressed : other)?.focus();
+        const usable = (b: HTMLButtonElement | null | undefined) => b && !b.disabled && b.getAttribute("aria-disabled") !== "true";
+        (usable(pressed) ? pressed : other)?.focus();
       });
     }
   }
@@ -183,7 +194,8 @@ export function Sections({
         <h2 id="card-sections" className="scroll-mt-24 text-[1.375rem]">
           Sections
         </h2>
-        <p className="hint mt-1">Below the flowchart, in this order. Add the ones that suit the project; drag them, or use the arrows, to change the order.</p>
+        {/* On the mist page, not a white card: graphite, since the hint's slate is under 4.5:1 here. */}
+        <p className="mt-1 text-sm text-graphite">Below the flowchart, in this order. Add the ones that suit the project; drag them, or use the arrows, to change the order.</p>
       </div>
 
       {sections.length > 0 && (
@@ -462,7 +474,7 @@ function SectionBody({
         <div className="space-y-4">
           <TextInput
             id={`${pid}-href`}
-            label="Link"
+            label="Web address"
             type="url"
             value={s.href}
             placeholder="https://"
