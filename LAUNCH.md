@@ -160,12 +160,7 @@ Do this only when Rory says go, and in this order. Until step 6 the live site is
 Before the day: the Stripe section above done and tried in test mode, a full click-through on the preview site (Preview site, above), and the privacy policy and terms read through (they describe Phase 2).
 
 1. **Back up.** In Supabase, **Database > Backups**, check last night's backup is there (or take one if your plan allows).
-2. **Apply the migrations**, in Supabase **SQL Editor > New query**, one file at a time, **in date order**:
-   - `supabase/migrations/20261113000000_plan_names.sql`
-   - `supabase/migrations/20261114000000_phase2_schema.sql`
-   - `supabase/migrations/20261115000000_billing_and_files.sql`
-   - `supabase/migrations/20261116000000_job_links.sql`
-   - If the `phase-2` branch has any file in that folder after these, run it too, by the date at the start of its name. Run only files that aren't already applied; never edit one that is.
+2. **Apply the migrations**, in the **live** project's Supabase **SQL Editor > New query**: paste the whole of `supabase/launch/apply-phase-2-live.sql` and press **Run**. It holds every Phase 2 migration (`20261113` to `20261120`) in date order, in one transaction, so it either all applies or nothing changes, and it records each one in the project's migration history. It was checked on 15 Nov 2026 against a copy of the live schema with sample rows: plan names convert (old "plus" becomes "premium", old "premium" becomes "max"), roadmaps and profiles are kept. If a migration is added to `supabase/migrations/` after that file, regenerate it or run the new file on its own afterwards. Never edit a migration that has been applied.
 3. **Check Storage.** Under **Storage**, there should be two buckets, `sources` and `evidence`, both **private** (the `phase2_schema` migration creates them). If one is missing, run the `insert into storage.buckets` lines from `20261114000000_phase2_schema.sql` again; they're safe to repeat. Never make either bucket public.
 4. **Stripe live mode.** Switch the Stripe dashboard to live mode and repeat steps 2–7 of the Stripe section with live products and prices:
    - replace `STRIPE_PRICE_PREMIUM` and `STRIPE_PRICE_MAX` in `wrangler.jsonc` with the **live** price ids, on the `phase-2` branch

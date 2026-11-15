@@ -1,7 +1,7 @@
 -- PREVIEW PROJECT ONLY (exhbt-preview, ref qjoagqlchlmuiojvfpuu). Never run this on the live project.
--- Applies the Phase 2 migrations the preview database doesn't have yet, in date order, all or nothing.
--- How: Supabase dashboard > exhbt-preview > SQL Editor > New query > paste this whole file > Run.
--- Generated from supabase/migrations/ on 14 Nov 2026. The files there stay the source of truth.
+-- Applies, in date order and all or nothing, the Phase 2 migrations this database doesn't have yet.
+-- How: Supabase dashboard > this project > SQL Editor > New query > paste this whole file > Run.
+-- Generated from supabase/migrations/ on 15 Nov 2026. The files there stay the source of truth.
 begin;
 
 -- ===== 20261114000000_phase2_schema =====
@@ -259,5 +259,36 @@ create index duplicate_matches_owner_idx on duplicate_matches(owner_id, outcome)
 create index duplicate_matches_pair_idx on duplicate_matches(uploader_id, owner_exhbt_id, created_at desc);
 alter table duplicate_matches enable row level security; -- service role only
 insert into supabase_migrations.schema_migrations (version, name) values ('20261119000000', '20261119000000_teammates') on conflict do nothing;
+
+-- ===== 20261120000000_portfolio_layout =====
+-- The portfolio customiser: how a person arranges their at-a-glance page (docs/decisions/0014).
+-- Not applied anywhere yet: production migrations go on at launch (docs/phase-2.md section 10).
+--
+-- Three additions, all with safe defaults, so every existing portfolio looks exactly as before:
+--
+--   exhbts.hidden_on_portfolio  true when the owner has left the exhbt off the at-a-glance page. The
+--                               exhbt stays published and its own link keeps working; it leaves the
+--                               glance page and anything that lists the portfolio.
+--   profiles.featured_exhbt_id  the exhbt shown first as a wide tile, or null. Clears itself if that
+--                               exhbt is deleted.
+--   profiles.portfolio_layout   jsonb, the rest of the arrangement. Shape (lib/portfolio-layout.ts):
+--                                 { "v": 1,
+--                                   "slots": ["p", "about", "p", "p", "quote"],  -- "p" = a project, in exhbts.position order
+--                                   "tiles": { "about": { "text": "..." }, "education": { "lines": [...] }, ... },
+--                                   "header": { "skills": true, "linkedin": true } }
+--                               '{}' means the default arrangement. The app validates and normalises it
+--                               on every read and write, so the column only caps the size here.
+--
+-- Row-level security is unchanged: profiles and exhbts are read and written through the existing
+-- policies and the service role. The layout is part of the profile row, so the account export
+-- already includes it and deleting the account deletes it.
+alter table exhbts
+  add column hidden_on_portfolio boolean not null default false;
+
+alter table profiles
+  add column featured_exhbt_id uuid references exhbts(id) on delete set null,
+  add column portfolio_layout jsonb not null default '{}'::jsonb
+    check (pg_column_size(portfolio_layout) <= 16384);
+insert into supabase_migrations.schema_migrations (version, name) values ('20261120000000', '20261120000000_portfolio_layout') on conflict do nothing;
 
 commit;
