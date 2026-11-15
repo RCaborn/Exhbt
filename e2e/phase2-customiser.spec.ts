@@ -157,6 +157,24 @@ async function publicOrder(page: Page, username: string) {
 }
 const handle = (page: Page, title: string) => page.getByRole("button", { name: `Move ${title}`, exact: true });
 
+/**
+ * Picks a tile up with Space, presses the arrows, and drops it with Space. Waits for each
+ * announcement, as a person would, so the drag has measured the tiles before the next key.
+ */
+async function keyboardMove(page: Page, title: string, arrows: string[]) {
+  const live = page.locator("[id^=DndLiveRegion]");
+  await handle(page, title).focus();
+  await page.keyboard.press("Space");
+  await expect(live).toContainText("Picked up");
+  for (const key of arrows) {
+    await page.keyboard.press(key);
+    await expect(live).toContainText(/is over position/);
+    await page.waitForTimeout(120);
+  }
+  await page.keyboard.press("Space");
+  await expect(live).toContainText("Dropped");
+}
+
 async function addTile(page: Page, name: string) {
   await page.getByRole("button", { name: "Add a tile" }).click();
   await page.getByRole("button", { name: new RegExp(`^${name}`) }).click();
@@ -195,6 +213,8 @@ test.describe("Customise portfolio (Phase 2)", () => {
 
   test("dragging with the mouse reorders, with a lifted tile while it moves", async ({ page }) => {
     const u = `ckm${stamp()}`;
+    // Tall enough to have the first and last tiles on screen at once.
+    await page.setViewportSize({ width: 1440, height: 2000 });
     await openCustomiser(page, u, "premium");
     const from = await handle(page, GP).boundingBox();
     const over = await page.locator("[data-testid=preview] li[data-key]").nth(3).boundingBox();
@@ -251,7 +271,7 @@ test.describe("Customise portfolio (Phase 2)", () => {
     await saved(page);
 
     expect(await publicOrder(page, u)).toEqual([THIRD, GP, LIBRARY, FOURTH]);
-    const boxes = await page.locator("main ul > li").evaluateAll((els) => els.map((el) => el.getBoundingClientRect().width));
+    const boxes = await page.locator("main > ul > li").evaluateAll((els) => els.map((el) => el.getBoundingClientRect().width));
     expect(boxes[0]).toBeGreaterThan(boxes[1]! * 1.7);
     // Four tiles with a featured one: the last is wide too, so none sits alone beside a gap.
     expect(boxes[3]).toBeGreaterThan(boxes[1]! * 1.7);
@@ -271,16 +291,16 @@ test.describe("Customise portfolio (Phase 2)", () => {
 
     await addTile(page, "About me");
     const about = page.locator('[data-tile-editor="about"]');
-    await expect(about.getByLabel("About me")).toBeFocused();
-    await about.getByLabel("About me").fill("I like problems where a small change saves real time.");
+    await expect(about.getByRole("textbox", { name: "About me" })).toBeFocused();
+    await about.getByRole("textbox", { name: "About me" }).fill("I like problems where a small change saves real time.");
     await expect(about).toContainText("10 of 60 words");
     await page.getByRole("button", { name: "Done" }).click();
     await expect(page.locator('[data-tile="about"]')).toContainText("small change saves real time");
 
     await addTile(page, "Education");
-    await page.getByLabel("Line 1").fill("BSc Data Science, University of Example, 2026");
+    await page.getByRole("textbox", { name: "Line 1" }).fill("BSc Data Science, University of Example, 2026");
     await page.getByRole("button", { name: "Add a line" }).click();
-    await page.getByLabel("Line 2").fill("A levels: Maths, Further Maths, Physics");
+    await page.getByRole("textbox", { name: "Line 2" }).fill("A levels: Maths, Further Maths, Physics");
     await page.getByRole("button", { name: "Done" }).click();
 
     await addTile(page, "Links and contact");
@@ -304,7 +324,8 @@ test.describe("Customise portfolio (Phase 2)", () => {
     // The email is text, not a mailto link.
     await expect(links).toContainText("amara@example.com");
     await expect(page.locator("a[href^='mailto:']")).toHaveCount(0);
-    await expect(links.locator("a[target=_blank]")).toHaveCount(2);
+    // GitHub, website, and LinkedIn (a new Links tile starts with the address from portfolio settings).
+    await expect(links.locator("a[target=_blank]")).toHaveCount(3);
   });
 
   test("an extra tile can be removed with one click and brought back with Undo, words and all", async ({ page }) => {
@@ -335,7 +356,7 @@ test.describe("Customise portfolio (Phase 2)", () => {
     await openCustomiser(page, u, "premium");
     await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeDisabled();
     await addTile(page, "About me");
-    await page.getByLabel("About me").fill("Hello there.");
+    await page.getByRole("textbox", { name: "About me" }).fill("Hello there.");
     await page.getByRole("button", { name: "Done" }).click();
     await saved(page);
     await page.getByRole("button", { name: "Remove About me" }).click();
@@ -430,11 +451,7 @@ test.describe("Customise portfolio (Phase 2)", () => {
   test("everything survives a reload, and the /exhbts list shares the order", async ({ page }) => {
     const u = `ckp${stamp()}`;
     await openCustomiser(page, u, "premium");
-    await handle(page, FOURTH).focus();
-    await page.keyboard.press("Space");
-    await page.keyboard.press("ArrowLeft");
-    await page.keyboard.press("ArrowLeft");
-    await page.keyboard.press("Space");
+    await keyboardMove(page, FOURTH, ["ArrowUp"]);
     await page.getByRole("button", { name: `Hide ${GP} from your portfolio` }).click();
     await page.getByLabel("Show the skills strip").uncheck();
     await saved(page);
@@ -454,7 +471,7 @@ test.describe("Customise portfolio (Phase 2)", () => {
     expect(titles.filter((t) => t !== GP)).toEqual(expected);
     await expect(page.getByRole("button", { name: `Move ${GP} down` })).toBeVisible();
     // Moving one there changes the customiser's order too.
-    const first = titles[0]!;
+    const first = titles.find((t) => t !== GP)!;
     await page.getByRole("button", { name: `Move ${first} down` }).click();
     await page.goto("/portfolio/customise");
     const moved = await previewOrder(page);
@@ -467,10 +484,7 @@ test.describe("Customise portfolio (Phase 2)", () => {
     await expect(page.getByTestId("upgrade-prompt").first()).toContainText("Premium");
     // Arranging works on a preview.
     expect(await previewOrder(page)).toEqual([GP, LIBRARY]);
-    await handle(page, GP).focus();
-    await page.keyboard.press("Space");
-    await page.keyboard.press("ArrowRight");
-    await page.keyboard.press("Space");
+    await keyboardMove(page, GP, ["ArrowRight"]);
     await saved(page);
     await page.reload();
     expect(await previewOrder(page)).toEqual([LIBRARY, GP]);
@@ -488,7 +502,7 @@ test.describe("Customise portfolio (Phase 2)", () => {
     const u = `ckd${stamp()}`;
     await openCustomiser(page, u, "premium", 2);
     await addTile(page, "About me");
-    await page.getByLabel("About me").fill("Kept through a downgrade.");
+    await page.getByRole("textbox", { name: "About me" }).fill("Kept through a downgrade.");
     await page.getByRole("button", { name: "Done" }).click();
     await saved(page);
     expect(await publicOrder(page, u)).toContain("About me");
@@ -498,10 +512,7 @@ test.describe("Customise portfolio (Phase 2)", () => {
     await expect(page.getByTestId("tiles-held")).toBeVisible();
     await expect(page.locator('[data-testid=preview] [data-tile="about"]')).toHaveCount(0);
     // Changing the order on Free doesn't lose them.
-    await handle(page, GP).focus();
-    await page.keyboard.press("Space");
-    await page.keyboard.press("ArrowRight");
-    await page.keyboard.press("Space");
+    await keyboardMove(page, GP, ["ArrowRight"]);
     await saved(page);
     await page.goto("/dev/plan?plan=premium&next=/portfolio/customise");
     await expect(page.locator('[data-testid=preview] [data-tile="about"]')).toContainText("Kept through a downgrade.");
@@ -513,7 +524,7 @@ test.describe("Customise portfolio (Phase 2)", () => {
     await page.getByRole("button", { name: `Feature ${THIRD}` }).click();
     await page.getByRole("button", { name: `Hide ${LIBRARY} from your portfolio` }).click();
     await addTile(page, "About me");
-    await page.getByLabel("About me").fill("A short line about me.");
+    await page.getByRole("textbox", { name: "About me" }).fill("A short line about me.");
     await saved(page);
     const editor = await new AxeBuilder({ page }).withTags(WCAG).analyze();
     expect(editor.violations, JSON.stringify(editor.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) })))).toEqual([]);
@@ -535,13 +546,14 @@ test.describe("Customise portfolio (Phase 2)", () => {
 /* ---------- a phone ---------- */
 
 test.describe("Customise portfolio on a phone", () => {
-  test.use({ ...devices["Pixel 7"] });
+  const { viewport, userAgent, deviceScaleFactor, isMobile, hasTouch } = devices["Pixel 7"];
+  test.use({ viewport, userAgent, deviceScaleFactor, isMobile, hasTouch });
 
   test("no sideways scroll, the controls reach 44px, and a press-and-hold drag on the grip reorders", async ({ page }) => {
     const u = `ckpx${stamp()}`;
     await openCustomiser(page, u, "premium");
     await addTile(page, "Education");
-    await page.getByLabel("Line 1").fill("BSc Data Science, University of Example, 2026");
+    await page.getByRole("textbox", { name: "Line 1" }).fill("BSc Data Science, University of Example, 2026");
     await page.getByRole("button", { name: "Done" }).click();
     await saved(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -582,7 +594,7 @@ test.describe("Customise portfolio on a phone", () => {
     await expect(page.getByTestId("hidden-tray")).toContainText(GP);
     await page.getByRole("button", { name: "Add a tile" }).tap();
     await page.getByRole("button", { name: /^About me/ }).tap();
-    await expect(page.getByLabel("About me")).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "About me" })).toBeVisible();
     await saved(page);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
   });

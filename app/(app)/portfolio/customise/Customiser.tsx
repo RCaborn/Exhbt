@@ -209,9 +209,19 @@ export function Customiser({ initial, projects, owner, plan, locks, savedButLock
   );
 
   const position = (key: string | number) => shown.indexOf(String(key)) + 1;
+  // dnd-kit reports "over" at once when a tile is picked up; that would drown "Picked up", so skip that first one.
+  const justPicked = useRef(false);
   const announcements: Announcements = {
-    onDragStart: ({ active }) => `Picked up ${labelOf(String(active.id))}. Position ${position(active.id)} of ${shown.length}.`,
-    onDragOver: ({ active, over }) => (over ? `${labelOf(String(active.id))} is over position ${position(over.id)} of ${shown.length}.` : undefined),
+    onDragStart: ({ active }) => {
+      justPicked.current = true;
+      return `Picked up ${labelOf(String(active.id))}. Position ${position(active.id)} of ${shown.length}.`;
+    },
+    onDragOver: ({ active, over }) => {
+      const first = justPicked.current;
+      justPicked.current = false;
+      if (!over || (first && over.id === active.id)) return undefined;
+      return `${labelOf(String(active.id))} is over position ${position(over.id)} of ${shown.length}.`;
+    },
     onDragEnd: ({ active, over }) =>
       over ? `Dropped ${labelOf(String(active.id))}. Position ${position(over.id)} of ${shown.length}.` : `Dropped ${labelOf(String(active.id))}. It stays at position ${position(active.id)} of ${shown.length}.`,
     onDragCancel: ({ active }) => `Cancelled. ${labelOf(String(active.id))} is back at position ${position(active.id)} of ${shown.length}.`,
