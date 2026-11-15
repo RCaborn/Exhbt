@@ -1,9 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { emptyDoc, ExhbtDocSchema, LIMITS, publicDoc, text, validateForPublish, wordCount, type Chart, type ExhbtDoc } from "../lib/exhbt/blocks";
+import { chartsOf, emptyDoc, ExhbtDocSchema, LIMITS, publicDoc, text, validateForPublish, wordCount, type Chart, type ExhbtDoc } from "../lib/exhbt/blocks";
 import { ChartSchema, chartSummary, convertChart, displayed, indexed, newChart, CHART_KINDS } from "../lib/exhbt/charts";
 import { headlineFor } from "../lib/exhbt/headline";
-import { sampleDocs } from "../lib/exhbt/sample";
+import { legacyGpDoc, sampleDocs } from "../lib/exhbt/sample";
 import { slugify } from "../lib/exhbt/slug";
 import { unverifiedNumbers } from "../lib/exhbt/verify";
 
@@ -14,15 +14,17 @@ import { unverifiedNumbers } from "../lib/exhbt/verify";
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const [GP] = sampleDocs as [ExhbtDoc];
 
-/** A publishable exhbt with no graphs, and the same with some. */
+/** A publishable exhbt with no graphs, and the same with some: graph sections after the findings (decision 0015). */
 const base = (): ExhbtDoc => ({
   ...emptyDoc(),
   title: "Shorter lunch queues",
   gap: text("Lunch queues ran long. Would a second till help?"),
   flow: [{ step: "Timed the queue" }, { step: "Opened a second till" }, { step: "Timed it again" }],
-  findings: [text("Waits fell."), text("Sales held steady.")],
+  sections: [{ id: "findings", kind: "findings", items: [text("Waits fell."), text("Sales held steady.")] }],
 });
-const withCharts = (...charts: Chart[]): ExhbtDoc => ({ ...base(), charts });
+const withCharts = (...charts: Chart[]): ExhbtDoc => ({ ...base(), sections: [...base().sections, ...charts.map((chart, i) => ({ id: `graph-${i + 1}`, kind: "graph" as const, chart }))] });
+/** Where the first graph's issues point: the section after the findings. */
+const G = "sections.1.chart";
 const paths = (d: ExhbtDoc) => validateForPublish(d).map((i) => i.path);
 
 const SAMPLES: Record<string, Chart> = {
@@ -39,24 +41,25 @@ test.describe("Graph kinds", () => {
   test("a graph saved before kinds existed reads as before and after, and still works everywhere", () => {
     const legacy = { title: "Missed (%)", beforeLabel: "Before", afterLabel: "After", lowerIsBetter: true, unit: "%", rows: [{ label: "All", before: 7.9, after: 6.5 }] };
     expect(ChartSchema.parse(legacy)).toEqual({ kind: "beforeAfter", ...legacy });
-    const doc = ExhbtDocSchema.parse({ ...base(), charts: [legacy] });
-    expect(doc.charts[0]!.kind).toBe("beforeAfter");
+    // A doc from before sections, with a graph from before kinds: both are read on the way in.
+    const doc = ExhbtDocSchema.parse({ ...legacyGpDoc, charts: [legacy] });
+    expect(chartsOf(doc)[0]!.kind).toBe("beforeAfter");
     // The sample GP exhbt keeps the old shape on purpose (lib/exhbt/sample.ts).
-    expect("kind" in GP.charts[0]!).toBe(false);
+    expect("kind" in legacyGpDoc.charts[0]!).toBe(false);
     expect(validateForPublish(GP)).toEqual([]);
-    expect(wordCount(GP)).toBe(wordCount(ExhbtDocSchema.parse(GP)));
-    expect(headlineFor({ headline: undefined, charts: GP.charts })).toEqual({ value: "−18%", label: "Missed appointments (%), All patients" });
+    expect(wordCount(GP)).toBe(wordCount(ExhbtDocSchema.parse(legacyGpDoc)));
+    expect(headlineFor({ headline: undefined, sections: GP.sections })).toEqual({ value: "−18%", label: "Missed appointments (%), All patients" });
     // Its labels and values are checked like any graph's.
-    expect(unverifiedNumbers(withCharts(GP.charts[0]!), "7.9 6.5 11.2")).toEqual(["24", "3", "30", "8.4"]);
+    expect(unverifiedNumbers(withCharts(legacyGpDoc.charts[0]!), "7.9 6.5 11.2")).toEqual(["24", "3", "30", "8.4"]);
     // Publishing gives it its kind.
-    expect(publicDoc(GP).charts[0]!.kind).toBe("beforeAfter");
+    expect(chartsOf(publicDoc(legacyGpDoc as unknown as ExhbtDoc))[0]!.kind).toBe("beforeAfter");
   });
 
   test("every kind parses, and a new one of each is ready to fill in", () => {
     for (const k of CHART_KINDS) {
       expect(ChartSchema.parse(newChart(k)).kind).toBe(k);
       // Empty, so publishing asks for what's missing, each at a path the editor can show.
-      expect(validateForPublish(withCharts(newChart(k))).every((i) => i.path.startsWith("charts.0"))).toBe(true);
+      expect(validateForPublish(withCharts(newChart(k))).every((i) => i.path.startsWith(G))).toBe(true);
     }
     for (const c of Object.values(SAMPLES)) expect(validateForPublish(withCharts(c))).toEqual([]);
   });
@@ -98,23 +101,24 @@ test.describe("Graph kinds", () => {
 
   test("each kind's limits stop publishing at the part that breaks them", () => {
     const bars = Array.from({ length: LIMITS.charts.bar.rows.max + 1 }, (_, i) => ({ label: `Bar ${"x".repeat(i)}`, value: i }));
-    expect(paths(withCharts({ kind: "bar", title: "Bars", rows: bars }))).toEqual(["charts.0.rows"]);
-    expect(paths(withCharts({ kind: "bar", title: "Bars", rows: [{ label: "", value: 1 }, { label: "B", value: 2 }] }))).toEqual(["charts.0.rows.0.label"]);
+    expect(paths(withCharts({ kind: "bar", title: "Bars", rows: bars }))).toEqual([`${G}.rows`]);
+    expect(paths(withCharts({ kind: "bar", title: "Bars", rows: [{ label: "", value: 1 }, { label: "B", value: 2 }] }))).toEqual([`${G}.rows.0.label`]);
     const five = ["a", "b", "c", "d", "e"];
-    expect(paths(withCharts({ kind: "groupedBar", title: "G", series: five, rows: [{ label: "R", values: [1, 2, 3, 4, 5] }] }))).toEqual(["charts.0.series"]);
-    expect(paths(withCharts({ kind: "stackedBar", title: "S", series: ["a", "b"], rows: [{ label: "R", values: [3, -1] }] }))).toEqual(["charts.0.rows.0"]);
-    expect(paths(withCharts({ kind: "groupedBar", title: "G", series: ["a", "b"], rows: [{ label: "R", values: [1] }] }))).toEqual(["charts.0.rows.0"]);
+    expect(paths(withCharts({ kind: "groupedBar", title: "G", series: five, rows: [{ label: "R", values: [1, 2, 3, 4, 5] }] }))).toEqual([`${G}.series`]);
+    expect(paths(withCharts({ kind: "stackedBar", title: "S", series: ["a", "b"], rows: [{ label: "R", values: [3, -1] }] }))).toEqual([`${G}.rows.0`]);
+    expect(paths(withCharts({ kind: "groupedBar", title: "G", series: ["a", "b"], rows: [{ label: "R", values: [1] }] }))).toEqual([`${G}.rows.0`]);
     const points = Array.from({ length: LIMITS.charts.line.rows.max + 1 }, (_, i) => ({ label: `P${"x".repeat(i)}`, values: [i] }));
-    expect(paths(withCharts({ kind: "line", title: "L", series: ["s"], rows: points }))).toEqual(["charts.0.rows"]);
-    expect(paths(withCharts({ ...(SAMPLES.scatter as Chart), xTitle: "" } as Chart))).toEqual(["charts.0.xTitle"]);
+    expect(paths(withCharts({ kind: "line", title: "L", series: ["s"], rows: points }))).toEqual([`${G}.rows`]);
+    expect(paths(withCharts({ ...(SAMPLES.scatter as Chart), xTitle: "" } as Chart))).toEqual([`${G}.xTitle`]);
     const dots = Array.from({ length: LIMITS.charts.scatter.points.max + 1 }, (_, i) => ({ x: i, y: i }));
-    expect(paths(withCharts({ kind: "scatter", title: "S", xTitle: "x", yTitle: "y", points: dots }))).toEqual(["charts.0.points"]);
+    expect(paths(withCharts({ kind: "scatter", title: "S", xTitle: "x", yTitle: "y", points: dots }))).toEqual([`${G}.points`]);
     const tiles = Array.from({ length: LIMITS.charts.numbers.tiles.max + 1 }, () => ({ value: 1, label: "thing" }));
-    expect(paths(withCharts({ kind: "numbers", title: "N", tiles }))).toEqual(["charts.0.tiles"]);
-    expect(paths(withCharts({ kind: "table", title: "T", columns: ["a", "b", "c", "d", "e", "f"], rows: [["1", "2", "3", "4", "5", "6"]] }))).toEqual(["charts.0.columns"]);
-    expect(paths(withCharts({ kind: "table", title: "T", columns: ["a", ""], rows: [["1", "2"]] }))).toEqual(["charts.0.columns.1"]);
-    expect(paths(withCharts({ ...(SAMPLES.bar as Chart), title: "" } as Chart))).toEqual(["charts.0.title"]);
-    expect(paths(withCharts(SAMPLES.bar!, SAMPLES.line!, SAMPLES.table!))).toEqual(["charts"]);
+    expect(paths(withCharts({ kind: "numbers", title: "N", tiles }))).toEqual([`${G}.tiles`]);
+    expect(paths(withCharts({ kind: "table", title: "T", columns: ["a", "b", "c", "d", "e", "f"], rows: [["1", "2", "3", "4", "5", "6"]] }))).toEqual([`${G}.columns`]);
+    expect(paths(withCharts({ kind: "table", title: "T", columns: ["a", ""], rows: [["1", "2"]] }))).toEqual([`${G}.columns.1`]);
+    expect(paths(withCharts({ ...(SAMPLES.bar as Chart), title: "" } as Chart))).toEqual([`${G}.title`]);
+    // A third graph: the sections as a whole are over (two graphs at most).
+    expect(paths(withCharts(SAMPLES.bar!, SAMPLES.line!, SAMPLES.table!))).toEqual(["sections"]);
   });
 
   test("every graph value is checked against the material, whatever the kind", () => {
@@ -144,14 +148,14 @@ test.describe("Graph kinds", () => {
     for (const raw of ["48317", "52904", "61230", "£"]) expect(pub).not.toContain(raw);
     // Publishing twice changes nothing, and draws the same as the draft.
     expect(indexed(indexed(line))).toEqual(indexed(line));
-    expect(displayed(publicDoc(withCharts(line)).charts[0]!)).toEqual(displayed(line));
+    expect(displayed(chartsOf(publicDoc(withCharts(line)))[0]!)).toEqual(displayed(line));
     // Every kind that can protect does; a zero start can't be protected.
-    expect(publicDoc(withCharts({ kind: "beforeAfter", title: "W", beforeLabel: "B", afterLabel: "A", lowerIsBetter: true, protect: "index", rows: [{ label: "x", before: 250, after: 200 }] })).charts[0]).toMatchObject({ rows: [{ before: 100, after: 80 }] });
-    expect(publicDoc(withCharts({ kind: "stackedBar", title: "S", protect: "index", series: ["a", "b"], rows: [{ label: "x", values: [30, 10] }, { label: "y", values: [60, 20] }] })).charts[0]).toMatchObject({ rows: [{ values: [75, 25] }, { values: [150, 50] }] });
-    expect(paths(withCharts({ kind: "bar", title: "B", protect: "change", rows: [{ label: "x", value: 0 }, { label: "y", value: 5 }] }))).toEqual(["charts.0.protect"]);
+    expect(chartsOf(publicDoc(withCharts({ kind: "beforeAfter", title: "W", beforeLabel: "B", afterLabel: "A", lowerIsBetter: true, protect: "index", rows: [{ label: "x", before: 250, after: 200 }] })))[0]).toMatchObject({ rows: [{ before: 100, after: 80 }] });
+    expect(chartsOf(publicDoc(withCharts({ kind: "stackedBar", title: "S", protect: "index", series: ["a", "b"], rows: [{ label: "x", values: [30, 10] }, { label: "y", values: [60, 20] }] })))[0]).toMatchObject({ rows: [{ values: [75, 25] }, { values: [150, 50] }] });
+    expect(paths(withCharts({ kind: "bar", title: "B", protect: "change", rows: [{ label: "x", value: 0 }, { label: "y", value: 5 }] }))).toEqual([`${G}.protect`]);
     // The headline worked out from a protected before-and-after graph is the same ratio.
     const ba: Chart = { kind: "beforeAfter", title: "Costs", beforeLabel: "B", afterLabel: "A", lowerIsBetter: true, protect: "change", rows: [{ label: "", before: 250, after: 200 }] };
-    expect(headlineFor({ charts: [ba] })).toEqual(headlineFor(publicDoc(withCharts(ba))));
+    expect(headlineFor({ sections: [{ id: "graph-1", kind: "graph", chart: ba }] })).toEqual(headlineFor(publicDoc(withCharts(ba))));
   });
 });
 
@@ -185,8 +189,14 @@ async function pick(g: Locator, kind: string) {
   await expect(radio).toBeChecked();
 }
 
-async function addGraph(page: Page, n: number, kind: string, title: string): Promise<Locator> {
+/** Opens "Add a section" and adds a graph (decision 0015). */
+async function addGraphSection(page: Page) {
+  await page.getByRole("button", { name: "Add a section" }).click();
   await page.getByRole("button", { name: "Add a graph" }).click();
+}
+
+async function addGraph(page: Page, n: number, kind: string, title: string): Promise<Locator> {
+  await addGraphSection(page);
   const g = graph(page, n);
   await pick(g, kind);
   await g.getByLabel("Title", { exact: true }).fill(title);
@@ -249,7 +259,11 @@ test.describe("Graphs in the editor and on the page", () => {
     // The live preview redraws as you type, with every value.
     const preview = page.getByRole("region", { name: "Preview" });
     await expect(preview.locator("figure[data-chart]").filter({ hasText: "Marks by term" }).getByText("64", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("Add a graph")).toHaveCount(0);
+    // Both graphs are used: the menu says so and won't add a third.
+    await page.getByRole("button", { name: "Add a section" }).click();
+    await expect(page.getByRole("button", { name: "Add a graph" })).toBeDisabled();
+    await expect(page.getByText(`All ${LIMITS.charts.max} used.`)).toBeVisible();
+    await page.keyboard.press("Escape");
     await axe(page, "editor");
 
     await publish(page);
@@ -323,7 +337,7 @@ test.describe("Graphs in the editor and on the page", () => {
     await fill(g1, [["Graph 1, row 2, column 1", "Tuned model"], ["Graph 1, row 2, column 2", "84%"]]);
 
     // A new graph starts as before and after.
-    await page.getByRole("button", { name: "Add a graph" }).click();
+    await addGraphSection(page);
     const g2 = graph(page, 2);
     await expect(g2.getByRole("radio", { name: "Before and after", exact: true })).toBeChecked();
     await fill(g2, [["Title", "Missed appointments"], ["Before is called", "Day before"], ["After is called", "Same day"], ["Unit (optional)", "%"], ["Graph 2, row 1 group", "All patients"], ["Graph 2, row 1 Day before", "7.9"], ["Graph 2, row 1 Same day", "6.5"]]);
@@ -370,7 +384,7 @@ test.describe("Graphs in the editor and on the page", () => {
       for (let j = 1; j <= LIMITS.charts.table.rows.max; j++) await g.getByLabel(`Graph 1, row ${j}, column ${k}`).fill("six words in every one cell");
     }
     await expect(page.getByText(/^\d+ words · aim for/)).toContainText(/^2[0-9]{2} words/);
-    await expect(page.locator("section", { has: page.locator("#card-charts") }).getByText(/this part has the most/)).toBeVisible();
+    await expect(page.getByRole("region", { name: "Graph 1", exact: true }).getByText(/this part has the most/)).toBeVisible();
     await page.getByLabel("This is my work, and the numbers are true").check();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
     await expect(page.getByRole("region", { name: "Things to fix before publishing" })).toContainText(`Keep the whole exhbt to ${LIMITS.totalWords} words`);

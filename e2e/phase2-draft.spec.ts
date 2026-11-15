@@ -21,7 +21,7 @@ const PROJECT = [
 const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 test.describe("Number check", () => {
-  const doc = (findings: string[]) => ({ ...emptyDoc(), title: "Reminders", findings: findings.map(text) });
+  const doc = (findings: string[]) => ({ ...emptyDoc(), title: "Reminders", sections: [{ id: "findings", kind: "findings" as const, items: findings.map(text) }] });
 
   test("finds a figure missing from the source", () => {
     const d = doc(["Missed appointments fell 18% after the change.", "Cleaned 14,200 records."]);
@@ -34,7 +34,9 @@ test.describe("Number check", () => {
     expect(unverifiedNumbers(doc(["Saved £1,250.50 a month."]), "saving 1250.5 pounds")).toEqual([]);
     expect(unverifiedNumbers(doc(["From 7.9% to 6.5%."]), "7.90 then 6.5")).toEqual([]);
     // Each missing number once, as written in the exhbt; chart values count too.
-    const d = { ...doc(["Cut 3 steps, then 3 more."]), charts: [{ kind: "beforeAfter" as const, title: "x", beforeLabel: "a", afterLabel: "b", lowerIsBetter: true, rows: [{ label: "All", before: 7.9, after: 5.1 }] }] };
+    const base = doc(["Cut 3 steps, then 3 more."]);
+    const chart = { kind: "beforeAfter" as const, title: "x", beforeLabel: "a", afterLabel: "b", lowerIsBetter: true, rows: [{ label: "All", before: 7.9, after: 5.1 }] };
+    const d = { ...base, sections: [...base.sections, { id: "graph-1", kind: "graph" as const, chart }] };
     expect(unverifiedNumbers(d, "from 7.9")).toEqual(["3", "5.1"]);
   });
 });

@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { ENTITLEMENTS } from "../lib/entitlements";
-import { LIMITS, safeHref, text, validateForPublish, wordCount, type ExhbtDoc } from "../lib/exhbt/blocks";
+import { chartsOf, findingsOf, LIMITS, safeHref, text, validateForPublish, wordCount, type ExhbtDoc, type RichText } from "../lib/exhbt/blocks";
 import { sampleDocs } from "../lib/exhbt/sample";
 import { MARKETING_HOST, parseHost, usernameProblem } from "../lib/hosts";
 import { canCreateExhbt, canMakeJobLinks, canPublish, visibleOnPortfolio } from "../lib/plan-rules";
@@ -18,6 +18,9 @@ const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const [GP, LIBRARY] = sampleDocs as [ExhbtDoc, ExhbtDoc];
 
 const doc = (patch: Partial<ExhbtDoc>): ExhbtDoc => ({ ...structuredClone(GP), ...patch });
+/** GP with its findings bullets replaced (the findings section is the first, decision 0015). */
+const withFindings = (items: RichText[], patch: Partial<ExhbtDoc> = {}): ExhbtDoc =>
+  doc({ sections: GP.sections.map((s) => (s.kind === "findings" ? { ...s, items } : s)), ...patch });
 const paths = (d: ExhbtDoc) => validateForPublish(d).map((i) => i.path);
 /** The test server's address on a name.localhost host (Chromium resolves *.localhost to loopback). */
 const on = (baseURL: string | undefined, name: string) => (baseURL ?? "").replace("//localhost", `//${name}.localhost`);
@@ -32,21 +35,23 @@ test.describe("Exhbt blocks", () => {
     expect(paths(doc({ title: "" }))).toEqual(["title"]);
     expect(paths(doc({ title: "x".repeat(LIMITS.titleChars + 1) }))).toEqual(["title"]);
     expect(paths(doc({ flow: GP.flow.slice(0, LIMITS.flow.min - 1) }))).toEqual(["flow"]);
-    expect(paths(doc({ findings: Array.from({ length: LIMITS.findings.max + 1 }, () => text("A short finding.")) }))).toEqual(["findings"]);
-    expect(paths(doc({ findings: [[{ t: "Report", href: "http://example.com/report" }], text("Another finding.")] }))).toEqual(["findings.0"]);
+    expect(paths(withFindings(Array.from({ length: LIMITS.findings.max + 1 }, () => text("A short finding."))))).toEqual(["sections.0.items"]);
+    expect(paths(withFindings([[{ t: "Report", href: "http://example.com/report" }], text("Another finding.")]))).toEqual(["sections.0.items.0"]);
     expect(paths(doc({ gap: [{ t: "A question", href: "javascript:alert(1)" }] }))).toEqual(["gap"]);
-    expect(paths(doc({ images: [{ fileId: "f1", alt: " ", caption: [] }] }))).toEqual(["images.0.alt"]);
+    expect(paths(doc({ sections: [...GP.sections, { id: "image-1", kind: "image", fileId: "f1", alt: " ", caption: [] }] }))).toEqual(["sections.2.alt"]);
     expect(paths(doc({ evidence: { kind: "link", href: "http://example.com/work", label: "The work" } }))).toEqual(["evidence"]);
   });
 
   test("the whole exhbt has a word limit, even when every block is within its own", () => {
-    const long = doc({
-      title: "Total words",
-      gap: text(nWords(LIMITS.gapWords)),
-      flow: Array.from({ length: LIMITS.flow.max }, () => ({ step: nWords(LIMITS.flow.stepWords), detail: nWords(LIMITS.flow.detailWords) })),
-      findings: Array.from({ length: LIMITS.findings.max }, () => text(nWords(LIMITS.findings.wordsEach))),
-      evidence: undefined,
-    });
+    const long = withFindings(
+      Array.from({ length: LIMITS.findings.max }, () => text(nWords(LIMITS.findings.wordsEach))),
+      {
+        title: "Total words",
+        gap: text(nWords(LIMITS.gapWords)),
+        flow: Array.from({ length: LIMITS.flow.max }, () => ({ step: nWords(LIMITS.flow.stepWords), detail: nWords(LIMITS.flow.detailWords) })),
+        evidence: undefined,
+      },
+    );
     expect(wordCount(long)).toBeGreaterThan(LIMITS.totalWords);
     expect(paths(long)).toEqual([""]);
   });
@@ -58,11 +63,12 @@ test.describe("Exhbt blocks", () => {
       context: "",
       skills: [],
       headline: undefined,
-      charts: [],
       gap: [{ t: "three " }, { t: "four", b: true }],
       flow: [{ step: "five six", detail: "seven" }, { step: "eight" }, { step: "nine" }],
-      findings: [text("ten eleven"), text("twelve")],
-      images: [{ fileId: "f1", alt: "not counted at all", caption: text("thirteen fourteen") }],
+      sections: [
+        { id: "findings", kind: "findings", items: [text("ten eleven"), text("twelve")] },
+        { id: "image-1", kind: "image", fileId: "f1", alt: "not counted at all", caption: text("thirteen fourteen") },
+      ],
       evidence: { kind: "link", href: "https://example.com/x", label: "fifteen" },
     };
     expect(wordCount(d)).toBe(15);
@@ -70,7 +76,7 @@ test.describe("Exhbt blocks", () => {
     expect(wordCount({ ...d, context: "a b", skills: ["Python", "Regression analysis"], headline: { value: "−18%", label: "missed appointments" } })).toBe(15 + 2 + 3 + 3);
     // So do graph titles and labels.
     const chart = { kind: "beforeAfter" as const, title: "Missed appointments", beforeLabel: "Before", afterLabel: "After change", lowerIsBetter: true, rows: [{ label: "All patients", before: 1, after: 2 }] };
-    expect(wordCount({ ...d, charts: [chart] })).toBe(15 + 2 + 1 + 2 + 2);
+    expect(wordCount({ ...d, sections: [...d.sections, { id: "graph-1", kind: "graph", chart }] })).toBe(15 + 2 + 1 + 2 + 2);
   });
 
   test("links must be https", () => {
@@ -185,9 +191,9 @@ test.describe("Public portfolio", () => {
     await expect(page.getByRole("navigation", { name: "Portfolio" })).not.toContainText("EX·");
     await expect(page.getByRole("list", { name: "Methodology" }).getByRole("listitem")).toHaveCount(GP.flow.length);
     const findings = page.getByRole("region", { name: "findings" }).getByRole("listitem");
-    await expect(findings).toHaveCount(GP.findings.length);
+    await expect(findings).toHaveCount(findingsOf(GP).length);
     await expect(findings.first()).toContainText("3-hour reminders cut missed appointments");
-    await expect(page.getByRole("table", { name: GP.charts[0]!.title })).toBeAttached();
+    await expect(page.getByRole("table", { name: chartsOf(GP)[0]!.title })).toBeAttached();
     await expect(page.getByRole("link", { name: /See the work/ })).toHaveAttribute("href", "https://example.com/gp-reminders-report.pdf");
     const checks = page.getByRole("list", { name: "Checks passed" });
     await expect(checks).toContainText("Confirmed by author");
