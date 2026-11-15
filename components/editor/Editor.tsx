@@ -1,26 +1,27 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- signed Storage URLs; see components/portfolio/Avatar.tsx. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, ImageIcon, Plus, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { deleteExhbt, publishExhbt, saveDraft, unpublishExhbt } from "@/app/(app)/exhbts/[id]/actions";
 import { ProjectView, type Owner } from "@/components/portfolio/ProjectView";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { CopyLink } from "@/components/ui/CopyLink";
 import type { Plan } from "@/lib/entitlements";
-import { LIMITS, plain, safeHref, validateForPublish, withChartKinds, wordCount, words, type ExhbtDoc, type Issue } from "@/lib/exhbt/blocks";
-import { hasData, newChart } from "@/lib/exhbt/charts";
+import { LIMITS, normaliseDoc, safeHref, validateForPublish, wordCount, type ExhbtDoc } from "@/lib/exhbt/blocks";
+import { hasData } from "@/lib/exhbt/charts";
+import { newImageSection, roomFor } from "@/lib/exhbt/sections";
 import { BlockTools, useDraftTools, type DraftToolsInit } from "./BlockTools";
-import { ChartEditor } from "./ChartEditor";
 import { ConfirmAction } from "./ConfirmAction";
 import { FieldIssues } from "./FieldIssues";
 import { FlowEditor } from "./FlowEditor";
 import { Checklist, isBlank, stepsFor } from "./Checklist";
 import { IMAGE_ACCEPT, WORK_ACCEPT, checkFile, fileIdsOf, removeFile, UploadError, uploadForExhbt } from "./media";
-import { cardOf, cardWords, confirmNumber, issuesAt, unverifiedOf, visibleIssues, type CardKey } from "./model";
+import { cardOf, cardWords, confirmNumber, issuesAt, labelOf, unverifiedOf, visibleIssues, type CardKey } from "./model";
+import { Card, TextInput } from "./parts";
+import { Sections } from "./Sections";
 import { SkillsInput } from "./SkillsInput";
 import { clearBackup, readBackup, useAutosave, type Backup } from "./useAutosave";
 
@@ -55,35 +56,24 @@ export type EditorProps = {
   draftTools?: DraftToolsInit;
 };
 
-const LABELS: Record<string, string> = { title: "Title", context: "Context line", skills: "Skills", headline: "Headline number", gap: "The question", evidence: "The work" };
+/** Where the list at the top jumps to for an issue: the card's heading, or the "Add a section" button for the sections as a whole. */
+const targetOf = (card: CardKey) => (card === "overall" ? "card-publish" : card === "sections" ? "add-section" : `card-${card}`);
 
-/** "flow.2.step" becomes "Process, box 3": which part an issue is about, for the list at the top. */
-function labelOf(path: string): string {
-  const [head, idx] = path.split(".");
-  const n = idx !== undefined && /^\d+$/.test(idx) ? Number(idx) + 1 : null;
-  if (head === "flow") return n ? `Process, box ${n}` : "Process";
-  if (head === "findings") return n ? `Finding ${n}` : "Findings";
-  if (head === "images") return n ? `Image ${n}` : "Images";
-  if (head === "charts") return n ? `Graph ${n}` : "Graphs";
-  if (head === "skills" && n) return `Skill ${n}`;
-  return LABELS[head ?? ""] ?? "";
-}
-
-const targetOf = (card: CardKey) => (card === "overall" ? "card-publish" : `card-${card}`);
-
-/** Scrolls to a card and puts the cursor in its first field. */
+/** Scrolls to a card and puts the cursor in its first field (or on the button itself, when the target is one). */
 function jumpTo(id: string) {
-  const heading = document.getElementById(id);
-  if (!heading) return;
-  heading.scrollIntoView({ block: "start" });
-  heading.closest("section")?.querySelector<HTMLElement>("input:not([type=file]),textarea,[role=textbox],button")?.focus({ preventScroll: true });
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ block: "start" });
+  if (el instanceof HTMLButtonElement) return el.focus({ preventScroll: true });
+  el.closest("section")?.querySelector<HTMLElement>("input:not([type=file]),textarea,[role=textbox],button")?.focus({ preventScroll: true });
 }
 
 const GUIDE_KEY = "exhbt-guide-hidden";
 
 /**
- * The exhbt editor: one card per part of the fixed layout, in order (decision 0007, the
- * "halfway" approach), with a live preview drawn by the real ProjectView. Saves as you go
+ * The exhbt editor: one card per part of the fixed core (decision 0007, the "halfway"
+ * approach), then the sections below the flowchart, which can be added, removed and reordered
+ * (decision 0015, components/editor/Sections.tsx), with a live preview drawn by the real ProjectView. Saves as you go
  * (useAutosave: retries, a copy kept in this browser, a warning before leaving unsaved);
  * publishing runs the same checks again on the server.
  */
@@ -153,7 +143,7 @@ export function Editor(props: EditorProps) {
   const flags = unverifiedOf(doc);
   const over = total > LIMITS.totalWords;
   // When the whole exhbt is over, the card with the most words is where to trim.
-  const heaviest = over ? (Object.entries(cw).sort((a, b) => b[1] - a[1])[0]?.[0] as CardKey | undefined) : undefined;
+  const heaviest = over ? (Object.entries(cw).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))[0]?.[0] as CardKey | undefined) : undefined;
   const flaggedBy = (card: CardKey) => issues.some((i) => cardOf(i.path) === card) || heaviest === card;
 
   const dt = useDraftTools(id, props.draftTools, doc, setDoc);
@@ -200,7 +190,8 @@ export function Editor(props: EditorProps) {
     try {
       const fileId = await uploadForExhbt(file, "image", id);
       setImageUrls((u) => ({ ...u, [fileId]: URL.createObjectURL(file) }));
-      setDoc((d) => (d.images.length >= LIMITS.images.max ? d : { ...d, images: [...d.images, { fileId, alt: "", caption: [] }] }));
+      // A new image section at the end, if there's still room for one.
+      setDoc((d) => (roomFor(d.sections, "image") === 0 ? d : { ...d, sections: [...d.sections, newImageSection(fileId, d.sections)] }));
     } catch (e) {
       setMediaError((m) => ({ ...m, image: e instanceof UploadError ? e.message : "We couldn't upload that picture." }));
     } finally {
@@ -236,14 +227,15 @@ export function Editor(props: EditorProps) {
   }
 
   const evidenceHref = doc.evidence?.kind === "link" ? safeHref(doc.evidence.href) : doc.evidence?.kind === "file" ? workUrl : null;
-  const previewDoc: ExhbtDoc = { ...doc, title: doc.title.trim() || "Your title", charts: doc.charts.filter(hasData) };
+  // Graphs show in the preview once something is typed in them.
+  const previewDoc: ExhbtDoc = { ...doc, title: doc.title.trim() || "Your title", sections: doc.sections.filter((s) => s.kind !== "graph" || hasData(s.chart)) };
   const liveUrl = liveBase && slug ? `${liveBase}/${slug}` : null;
   const justLiveUrl = liveBase && justLive ? `${liveBase}/${justLive.slug}` : null;
   const shownLive = canGoLive && status === "published";
 
   // What stops publishing, listed at the top once they've tried (and always the over-limit ones).
   const problems = [
-    ...issues.map((i) => ({ message: labelOf(i.path) ? `${labelOf(i.path)}: ${i.message}` : i.message, target: targetOf(cardOf(i.path)) })),
+    ...issues.map((i) => ({ message: labelOf(i.path, doc) ? `${labelOf(i.path, doc)}: ${i.message}` : i.message, target: targetOf(cardOf(i.path)) })),
     ...(triedPublish && result && !result.ok
       ? result.lines.filter((l) => !/^Fix /.test(l)).map((l) => ({ message: l, target: /flagged number/.test(l) ? "card-header" : "card-publish" }))
       : []),
@@ -316,7 +308,8 @@ export function Editor(props: EditorProps) {
                 variant="primary"
                 size="sm"
                 onClick={() => {
-                  setDoc(withChartKinds(offer.doc));
+                  // Kept in this browser, maybe before sections: read into the current shape.
+                  setDoc(normaliseDoc(offer.doc));
                   setOffer(null);
                 }}
               >
@@ -437,131 +430,28 @@ export function Editor(props: EditorProps) {
               <FieldIssues id="gap-issues" issues={issuesAt(issues, "gap")} />
             </Card>
 
-            <Card id="card-flow" title="Process" words={cw.flow} hint="How you did it, as a flowchart. Type in the boxes." flagged={flaggedBy("flow")} heaviest={heaviest === "flow"}>
+            <Card id="card-flow" title="Process" words={cw.flow} hint="How you did it, as a flowchart. Type in the boxes. Every exhbt has one." flagged={flaggedBy("flow")} heaviest={heaviest === "flow"}>
               <BlockTools dt={dt} block="flow" />
               <FlowEditor steps={doc.flow} onChange={(flow) => update({ flow })} issues={issues} />
               <FieldIssues id="flow-issues" issues={issuesAt(issues, "flow")} />
             </Card>
 
-            <Card id="card-findings" title="Findings" words={cw.findings} hint={`${LIMITS.findings.min} to ${LIMITS.findings.max} bullets, up to ${LIMITS.findings.wordsEach} words each.`} flagged={flaggedBy("findings")} heaviest={heaviest === "findings"}>
-              <BlockTools dt={dt} block="findings" />
-              <ol className="space-y-4">
-                {doc.findings.map((f, i) => (
-                  <li key={i}>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span id={`finding-${i}`} className="label mb-0">
-                        Finding {i + 1}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <WordsOf n={words(plain(f))} limit={LIMITS.findings.wordsEach} />
-                        <Button size="sm" label={`Move finding ${i + 1} up`} disabled={i === 0} onClick={() => update({ findings: swap(doc.findings, i, i - 1) })}>
-                          <ArrowUp aria-hidden size={14} strokeWidth={2.25} />
-                        </Button>
-                        <Button size="sm" label={`Move finding ${i + 1} down`} disabled={i === doc.findings.length - 1} onClick={() => update({ findings: swap(doc.findings, i, i + 1) })}>
-                          <ArrowDown aria-hidden size={14} strokeWidth={2.25} />
-                        </Button>
-                        <Button
-                          size="sm"
-                          label={`Remove finding ${i + 1}`}
-                          disabled={doc.findings.length <= LIMITS.findings.min}
-                          onClick={() => update({ findings: doc.findings.filter((_, j) => j !== i) })}
-                        >
-                          <X aria-hidden size={14} strokeWidth={2.25} />
-                        </Button>
-                      </span>
-                    </div>
-                    <RichTextField
-                      labelId={`finding-${i}`}
-                      describedBy={`finding-${i}-issues`}
-                      value={f}
-                      onChange={(v) => update({ findings: doc.findings.map((x, j) => (j === i ? v : x)) })}
-                      placeholder={i === 0 ? "e.g. Average wait fell from 11 to 4 minutes." : "e.g. Sales held steady, so the till paid for itself."}
-                    />
-                    <FieldIssues id={`finding-${i}-issues`} issues={issuesAt(issues, `findings.${i}`)} />
-                  </li>
-                ))}
-              </ol>
-              <FieldIssues id="findings-issues" issues={issuesAt(issues, "findings")} />
-              <div className="mt-4">
-                <Button size="sm" disabled={doc.findings.length >= LIMITS.findings.max} onClick={() => update({ findings: [...doc.findings, []] })} label="Add a finding">
-                  <Plus aria-hidden size={14} strokeWidth={2.25} /> Add a finding
-                </Button>
-              </div>
-            </Card>
-
-            <Card id="card-charts" title="Graphs" words={cw.charts} hint={`Up to ${LIMITS.charts.max}, from figures in your work, typed in by hand. To keep figures confidential, protect the real numbers: the page then shows only the change. Anything else can go in as an image.`} flagged={flaggedBy("charts")} heaviest={heaviest === "charts"}>
-              <div className="space-y-4">
-                {doc.charts.map((c, i) => (
-                  <ChartEditor
-                    key={i}
-                    chart={c}
-                    index={i}
-                    issues={issues}
-                    onChange={(next) => update({ charts: doc.charts.map((x, j) => (j === i ? next : x)) })}
-                    onRemove={() => update({ charts: doc.charts.filter((_, j) => j !== i) })}
-                  />
-                ))}
-              </div>
-              <FieldIssues id="charts-issues" issues={issuesAt(issues, "charts")} />
-              {doc.charts.length < LIMITS.charts.max && (
-                <div className="mt-4">
-                  <Button size="sm" onClick={() => update({ charts: [...doc.charts, newChart()] })} label="Add a graph">
-                    <Plus aria-hidden size={14} strokeWidth={2.25} /> Add a graph
-                  </Button>
-                </div>
-              )}
-            </Card>
-
-            <Card id="card-images" title="Images" words={cw.images} hint={`Up to ${LIMITS.images.max}, each with a caption of up to ${LIMITS.images.captionWords} words. JPEG, PNG, WebP or GIF, up to ${maxFileMb} MB.`} flagged={flaggedBy("images")} heaviest={heaviest === "images"}>
-              <ol className="space-y-5">
-                {doc.images.map((im, i) => (
-                  <li key={im.fileId} className="grid gap-3 sm:grid-cols-[9rem_1fr]">
-                    {imageUrls[im.fileId] ? (
-                      <img src={imageUrls[im.fileId]!} alt="" className="w-full rounded-[12px] border border-line" />
-                    ) : (
-                      <div className="flex aspect-[4/3] items-center justify-center rounded-[12px] border border-dashed border-field bg-mist text-slate">
-                        <ImageIcon aria-hidden size={24} />
-                        <span className="sr-only">Image {i + 1} (preview not available)</span>
-                      </div>
-                    )}
-                    <div className="space-y-3">
-                      <TextInput id={`image-${i}-alt`} label={`Image ${i + 1}: describe it for people who can't see it`} value={im.alt} onChange={(alt) => update({ images: doc.images.map((x, j) => (j === i ? { ...x, alt } : x)) })} issues={issuesAt(issues, `images.${i}.alt`)} multiline placeholder="e.g. Bar chart of queue times before and after" />
-                      <div>
-                        <span id={`image-${i}-caption`} className="label">
-                          Image {i + 1} caption
-                        </span>
-                        <RichTextField labelId={`image-${i}-caption`} describedBy={`image-${i}-caption-issues`} value={im.caption} onChange={(caption) => update({ images: doc.images.map((x, j) => (j === i ? { ...x, caption } : x)) })} />
-                        <FieldIssues id={`image-${i}-caption-issues`} issues={issuesAt(issues, `images.${i}.caption`)} />
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        label={`Remove image ${i + 1}`}
-                        onClick={() => {
-                          dropFile(im.fileId);
-                          update({ images: doc.images.filter((_, j) => j !== i) });
-                        }}
-                      >
-                        Remove image
-                      </Button>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-              <FieldIssues id="images-issues" issues={issuesAt(issues, "images")} />
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <input ref={imageInput} type="file" hidden tabIndex={-1} aria-label="Choose an image" accept={IMAGE_ACCEPT} onChange={(e) => void addImage(e.target.files?.[0])} />
-                <Button size="sm" disabled={doc.images.length >= LIMITS.images.max || busy.image} loading={busy.image} onClick={() => imageInput.current?.click()} label="Add an image">
-                  <Plus aria-hidden size={14} strokeWidth={2.25} /> {busy.image ? "Uploading…" : "Add an image"}
-                </Button>
-                {doc.images.length >= LIMITS.images.max && <span className="hint">That&apos;s the most images.</span>}
-              </div>
-              {mediaError.image && (
-                <p role="alert" className="mt-2 text-sm text-error">
-                  {mediaError.image}
-                </p>
-              )}
-            </Card>
+            <input ref={imageInput} type="file" hidden tabIndex={-1} aria-label="Choose an image" accept={IMAGE_ACCEPT} onChange={(e) => void addImage(e.target.files?.[0])} />
+            <Sections
+              doc={doc}
+              setDoc={setDoc}
+              issues={issues}
+              words={cw}
+              flaggedBy={flaggedBy}
+              heaviest={heaviest}
+              dt={dt}
+              imageUrls={imageUrls}
+              maxFileMb={maxFileMb}
+              onAddImage={() => imageInput.current?.click()}
+              imageBusy={Boolean(busy.image)}
+              imageError={mediaError.image}
+              dropFile={dropFile}
+            />
 
             <Card id="card-evidence" title="The work" words={cw.evidence} hint="One click to the original: a report, a repository, a dashboard. A link, or a file." flagged={flaggedBy("evidence")} heaviest={heaviest === "evidence"}>
               <input ref={workInput} type="file" hidden tabIndex={-1} aria-label="Choose a file" accept={WORK_ACCEPT} onChange={(e) => void attachWork(e.target.files?.[0])} />
@@ -730,7 +620,7 @@ function WordBar({ total }: { total: number }) {
   const over = total > totalWords;
   const pct = Math.min(100, (total / totalWords) * 100);
   return (
-    <div className="flex min-w-[14rem] flex-1 items-center gap-3 sm:max-w-md">
+    <div className="flex min-w-[14rem] flex-1 items-center gap-3 sm:max-w-md" data-word-bar data-over={over || undefined}>
       <span className="font-mono text-graphite">
         <span className={over ? "font-semibold text-error" : "text-ink"}>{total}</span> words · aim for {targetWords}, at most {totalWords}
       </span>
@@ -742,112 +632,9 @@ function WordBar({ total }: { total: number }) {
   );
 }
 
-function Card({
-  id,
-  title,
-  words: n,
-  limit,
-  hint,
-  flagged,
-  heaviest,
-  children,
-}: {
-  id: string;
-  title: string;
-  words?: number;
-  limit?: number;
-  hint?: string;
-  /** Something here needs attention: drawn with an error edge. */
-  flagged?: boolean;
-  /** The whole exhbt is over the word limit and this card has the most. */
-  heaviest?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <section aria-labelledby={id} className={`rounded-[20px] border bg-surface p-5 sm:p-6 ${flagged ? "border-error" : "border-line"}`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id={id} className="scroll-mt-24 text-[1.375rem]">
-          {title}
-        </h2>
-        {n !== undefined && <WordsOf n={n} limit={limit} />}
-      </div>
-      {hint && <p className="hint mt-1">{hint}</p>}
-      {heaviest && (
-        <p className="mt-1 text-sm font-semibold text-error">
-          The whole exhbt is over {LIMITS.totalWords} words, and this part has the most ({n}). Start trimming here.
-        </p>
-      )}
-      <div className="mt-4">{children}</div>
-    </section>
-  );
-}
 
-function WordsOf({ n, limit }: { n: number; limit?: number }) {
-  const over = limit !== undefined && n > limit;
-  return (
-    <span className={`font-mono text-sm ${over ? "font-semibold text-error" : "text-graphite"}`}>
-      {limit !== undefined ? `${n} / ${limit}` : n} {n === 1 && limit === undefined ? "word" : "words"}
-    </span>
-  );
-}
 
-function TextInput({
-  id,
-  label,
-  value,
-  onChange,
-  issues,
-  max,
-  placeholder,
-  type = "text",
-  multiline = false,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  issues: Issue[];
-  max?: number;
-  placeholder?: string;
-  type?: "text" | "url";
-  /** A textarea that grows with its text, for long answers such as image descriptions. */
-  multiline?: boolean;
-}) {
-  const common = {
-    id,
-    className: multiline ? "field resize-none [field-sizing:content] min-h-[2.75rem]" : "field",
-    value,
-    placeholder,
-    "aria-invalid": issues.length > 0 || undefined,
-    "aria-describedby": `${id}-issues`,
-  };
-  return (
-    <div>
-      <div className="flex items-baseline justify-between gap-2">
-        <label htmlFor={id} className="label">
-          {label}
-        </label>
-        {max !== undefined && (
-          <span className={`font-mono text-sm ${value.length > max ? "font-semibold text-error" : "text-graphite"}`}>
-            {value.length} / {max}
-          </span>
-        )}
-      </div>
-      {multiline ? (
-        <textarea rows={2} {...common} onChange={(e) => onChange(e.target.value.replace(/\n/g, " "))} />
-      ) : (
-        <input type={type} {...common} onChange={(e) => onChange(e.target.value)} />
-      )}
-      <FieldIssues id={`${id}-issues`} issues={issues} />
-    </div>
-  );
-}
 
-const swap = <T,>(xs: T[], i: number, j: number): T[] => {
-  const next = [...xs];
-  [next[i], next[j]] = [next[j]!, next[i]!];
-  return next;
-};
 
 const headline = (value: string, label: string) => (value.trim() || label.trim() ? { value, label } : undefined);
 const evidence = (href: string, label: string): ExhbtDoc["evidence"] => (href.trim() || label.trim() ? { kind: "link", href: href.trim(), label } : undefined);
