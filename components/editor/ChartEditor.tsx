@@ -48,23 +48,30 @@ const KIND_HINTS: Record<ChartKind, string> = {
  * One graph: its kind (switching keeps what fits), its title and labels, which part stands out,
  * whether to protect the real numbers, and its figures as a small grid typed in by hand. Drawn
  * live below with the same Chart the project page uses.
+ *
+ * `index` is which graph this is on the page (0 for "Graph 1"); `base` is where it sits in the
+ * doc, for its issues ("sections.1.chart"). `bare` drops the frame and the remove button, for a
+ * graph inside its own section card (components/editor/Sections.tsx): the card has both.
  */
 export function ChartEditor({
   chart,
   index,
+  base,
+  bare = false,
   onChange,
   onRemove,
   issues,
 }: {
   chart: Chart;
   index: number;
+  base: string;
+  bare?: boolean;
   onChange: (c: Chart) => void;
-  onRemove: () => void;
+  onRemove?: () => void;
   issues: Issue[];
 }) {
   const n = index + 1;
   const p = `chart-${index}`;
-  const base = `charts.${index}`;
   const c = chart;
   /** Sets fields on this graph, dropping optional text fields left empty. */
   const set = (patch: Record<string, unknown>) => {
@@ -79,8 +86,8 @@ export function ChartEditor({
   const dataIssues = issues.filter((i) => i.path.startsWith(`${base}.`) && !/\.(title|xTitle|yTitle|protect)$/.test(i.path));
 
   return (
-    <fieldset className="rounded-[14px] border border-line p-4">
-      <legend className="px-1 text-sm font-semibold">Graph {n}</legend>
+    <fieldset className={bare ? "min-w-0" : "rounded-[14px] border border-line p-4"}>
+      <legend className={bare ? "sr-only" : "px-1 text-sm font-semibold"}>Graph {n}</legend>
 
       <KindPicker name={`${p}-kind`} n={n} value={c.kind} onChange={(k) => onChange(untouched(c) ? { ...newChart(k), title: c.title } : convertChart(c, k))} />
 
@@ -108,13 +115,15 @@ export function ChartEditor({
       <div className="mt-4">
         <Grid c={c} n={n} set={set} bad={bad} />
       </div>
-      <FieldIssues id={`${p}-data-issues`} issues={dataIssues.map((i) => ({ ...i, message: `${where(i.path, c)}${i.message}` }))} />
+      <FieldIssues id={`${p}-data-issues`} issues={dataIssues.map((i) => ({ ...i, message: `${where(i.path.slice(base.length + 1), c)}${i.message}` }))} />
 
-      <div className="mt-3 flex flex-wrap justify-end gap-2">
-        <Button size="sm" variant="danger" label={`Remove graph ${n}`} onClick={onRemove}>
-          Remove graph
-        </Button>
-      </div>
+      {onRemove && (
+        <div className="mt-3 flex flex-wrap justify-end gap-2">
+          <Button size="sm" variant="danger" label={`Remove graph ${n}`} onClick={onRemove}>
+            Remove graph
+          </Button>
+        </div>
+      )}
 
       {hasData(c) && (
         <div className="mt-4 rounded-[12px] border border-line bg-surface p-4">
@@ -775,10 +784,9 @@ function NumberInput({ label, value, onChange, onClear }: { label: string; value
 
 /* ---------------- Where an issue is ---------------- */
 
-/** "Bar 3: " for charts.0.rows.2.label, so the message under the grid says which box. */
+/** "Bar 3: " for rows.2.label (the path inside the graph), so the message under the grid says which box. */
 function where(path: string, c: Chart): string {
-  const parts = path.split(".").slice(2);
-  const [what, i] = parts;
+  const [what, i] = path.split(".");
   const k = i !== undefined && /^\d+$/.test(i) ? Number(i) + 1 : null;
   if (!k) return "";
   const rowNoun: Record<string, string> = { beforeAfter: "Row", bar: "Bar", groupedBar: "Group", stackedBar: "Bar", line: "Point", table: "Row" };

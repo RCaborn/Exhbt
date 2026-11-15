@@ -35,6 +35,11 @@ type Props = {
   value?: string;
   formAction?: (formData: FormData) => void | Promise<void>;
   onClick?: (e: React.MouseEvent) => void;
+  id?: string;
+  /** For a button that opens a panel (a disclosure): whether it's open, and the panel's id. */
+  "aria-expanded"?: boolean;
+  "aria-controls"?: string;
+  "aria-describedby"?: string;
 };
 
 export function Button({
