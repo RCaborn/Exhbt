@@ -52,6 +52,8 @@ Phase 2 is the paid product: build exhbts, publish them to a portfolio, pay for 
 
 **Portfolio looks.** The band at the top of a portfolio comes in a fixed list of looks (colours, heading font, photo shape) in `lib/portfolio-themes.ts`. `portfolioThemes` in `lib/entitlements.ts` says how many of them a plan has; `themeFor(profile, plan)` picks the one to show and falls back to the default after a downgrade without clearing the saved choice. The picker is the "Look" section of `/account/portfolio`; the id is stored in `profiles.portfolio_theme`. Decision 0012.
 
+**Portfolio customiser.** `/portfolio/customise` shows the person's glance page at full size, built from the same components as the public one. They drag tiles into order, hide or feature an exhbt, pick a look, switch the skills strip and LinkedIn button, and add extra tiles (About me, Education, Experience, a quote, Links and contact; `extraTiles` in `lib/entitlements.ts`). It autosaves with an undo. The layout is `profiles.portfolio_layout` (`lib/portfolio-layout.ts`); hidden and featured are `exhbts.hidden_on_portfolio` and `profiles.featured_exhbt_id`; project order stays `exhbts.position`. A hidden exhbt keeps its own link. Decision 0014.
+
 **Teammates and identical files.** An exhbt's owner invites teammates by email from `/exhbts/[id]/team`; accepted ones show under the author on the project page and on the tile, and can make their own exhbt from the project with their own copies of its files (`team_of`). After every upload the server fingerprints the stored file (`/api/files/[id]/complete`); the same file on someone else's exhbt gets a private "Were you on that project together?" and never a public label. `lib/team.ts`, `lib/duplicates.ts`, decision 0013.
 
 **Privacy.** The account export (`/api/account/export`, `exportUserData` in `lib/store.ts`) includes the portfolio profile, every exhbt with both copies, file details (not the files), subscriptions, saved ideas, team memberships and invites, and the person's own side of any file match. The privacy policy and terms are `app/(marketing)/legal/[doc]/page.tsx`.
@@ -76,5 +78,6 @@ Phase 2 is the paid product: build exhbts, publish them to a portfolio, pay for 
 | Roadmaps list, saved ideas | `app/(app)/roadmap/page.tsx`, `app/(app)/roadmap/saved/`, `components/roadmap/SaveIdea.tsx`, decision 0010 |
 | Portfolio looks: colours, fonts, which plan has which | `lib/portfolio-themes.ts`, `portfolioThemes` in `lib/entitlements.ts`, decision 0012 |
 | Teammates, invites, a teammate's own exhbt, matching identical files | `lib/team.ts`, `lib/team-rules.ts`, `lib/duplicates.ts`, `app/(app)/exhbts/[id]/team/`, decision 0013 |
+| The customiser, the layout schema, extra tiles | `app/(app)/portfolio/customise/`, `lib/portfolio-layout.ts`, `components/portfolio/ExtraTiles.tsx`, decision 0014 |
 | What the account export includes | `exportUserData` in `lib/store.ts` (both implementations) |
 | Privacy policy, terms, cookies | `app/(marketing)/legal/[doc]/page.tsx` |

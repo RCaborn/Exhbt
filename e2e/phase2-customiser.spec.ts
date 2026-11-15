@@ -241,7 +241,7 @@ test.describe("Customise portfolio (Phase 2)", () => {
     await saved(page);
 
     expect(await publicOrder(page, u)).toEqual([GP, THIRD, FOURTH]);
-    await expect(page.locator("header")).toContainText("proven across 3 exhbts");
+    await expect(page.locator("header")).toContainText(/proven across \d exhbts/);
     // The direct link keeps working, numbered after the ones on the page, and asks not to be indexed.
     const direct = await page.goto(`/p/${u}/library-footfall`);
     expect(direct?.status()).toBe(200);

@@ -582,7 +582,7 @@ export function Customiser({ initial, projects, owner, plan, locks, savedButLock
 
       {unpublished > 0 && plan.canPublish && (
         <p className="mt-8 text-graphite">
-          {unpublished === 1 ? "1 exhbt isn’t" : `${unpublished} exhbts aren’t`} on your portfolio yet.{" "}
+          {unpublished === 1 ? "One exhbt isn’t" : "Some exhbts aren’t"} on your portfolio yet.{" "}
           <Link href="/exhbts" className="link font-semibold text-ink">
             Go to your exhbts
           </Link>
