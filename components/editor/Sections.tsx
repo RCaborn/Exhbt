@@ -3,8 +3,22 @@
 /* eslint-disable @next/next/no-img-element -- signed Storage URLs; see components/portfolio/Avatar.tsx. */
 import { useEffect, useId, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type Announcements,
+  type DragEndEvent,
+  type UniqueIdentifier,
+} from "@dnd-kit/core";
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown, ArrowUp, ChartBar, GripVertical, ImageIcon, Lightbulb, Link2, ListChecks, Plus, Quote, X, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useReducedMotion } from "@/components/ui/useReducedMotion";
 import { LIMITS, plain, wordCount, words, type ExhbtDoc, type Issue, type Section, type SectionKind, type SectionOf } from "@/lib/exhbt/blocks";
 import { moveSection, newSection, roomFor, sectionLabel } from "@/lib/exhbt/sections";
 import { BlockTools, type DraftTools } from "./BlockTools";
@@ -48,11 +62,16 @@ function focusCard(id: string) {
   });
 }
 
+/** How dragging works, read out with each drag handle (dnd-kit's screen-reader instructions). */
+const DRAG_INSTRUCTIONS =
+  "To move this section, press Space or Enter, use the up and down arrow keys, then press Space or Enter again to drop it, or Escape to cancel. The move up and move down buttons do the same.";
+
 /**
  * Everything below the flowchart (decision 0015): one card per section, in page order, each with
- * a drag handle, move up and down buttons (the keyboard and screen-reader way to reorder) and a
- * remove button; then "Add a section", which says how many words are left and offers only the
- * kinds there's room for. The flowchart above stays on every exhbt and isn't here.
+ * a drag handle (dnd-kit's sortable, which also works from the keyboard and reads out each move),
+ * move up and down buttons (a plain keyboard and screen-reader way to reorder) and a remove
+ * button; then "Add a section", which says how many words are left and offers only the kinds
+ * there's room for. The flowchart above stays on every exhbt and isn't here.
  */
 export function Sections({
   doc,
@@ -87,8 +106,27 @@ export function Sections({
 }) {
   const sections = doc.sections;
   const [status, setStatus] = useState<{ text: string; undo?: { section: Section; index: number; label: string } } | null>(null);
-  const [drag, setDrag] = useState<string | null>(null);
-  const [over, setOver] = useState<string | null>(null);
+  const dndId = useId();
+  const reduced = useReducedMotion();
+  const sensors = useSensors(
+    // A small movement before a drag starts, so a click on the handle stays a click.
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const indexOf = (id: UniqueIdentifier) => sections.findIndex((s) => s.id === id);
+  const nameOf = (id: UniqueIdentifier) => (indexOf(id) >= 0 ? sectionLabel(sections, indexOf(id)) : "The section");
+  /** What dnd-kit reads out as a section is picked up, moved and dropped, in our words. */
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `Picked up ${lowerFirst(nameOf(active.id))}, place ${indexOf(active.id) + 1} of ${sections.length}.`,
+    onDragOver: ({ active, over }) => (over ? `${nameOf(active.id)} would go to place ${indexOf(over.id) + 1} of ${sections.length}.` : `${nameOf(active.id)} isn't over a place.`),
+    onDragEnd: ({ active, over }) => (over ? `${nameOf(active.id)} dropped in place ${indexOf(over.id) + 1} of ${sections.length}.` : `${nameOf(active.id)} dropped where it was.`),
+    onDragCancel: ({ active }) => `Moving ${lowerFirst(nameOf(active.id))} cancelled. It's back where it was.`,
+  };
+
+  function onDragEnd({ active, over }: DragEndEvent) {
+    if (!over || active.id === over.id) return;
+    move(indexOf(active.id), indexOf(over.id), "drag");
+  }
 
   const setSections = (fn: (s: Section[]) => Section[]) => setDoc((d) => ({ ...d, sections: fn(d.sections) }));
   /** Changes one section, found by id, so a change never lands on a section that has just moved. */
@@ -100,7 +138,8 @@ export function Sections({
     const s = sections[i]!;
     const next = moveSection(sections, i, to);
     setSections(() => next);
-    setStatus({ text: `${sectionLabel(sections, i)} moved ${to < i ? "up" : "down"}: now ${to + 1} of ${sections.length}.` });
+    // A drag is read out by dnd-kit itself (announcements above); a button press is said here.
+    setStatus(by === "keys" ? { text: `${sectionLabel(sections, i)} moved ${to < i ? "up" : "down"}: now ${to + 1} of ${sections.length}.` } : null);
     if (by === "keys") {
       // Focus stays on the button that was pressed, or the other one when that end is reached.
       const dir = to < i ? "up" : "down";
@@ -148,90 +187,55 @@ export function Sections({
       </div>
 
       {sections.length > 0 && (
-        <ol aria-label="Sections, in page order" className="space-y-5">
-          {sections.map((s, i) => {
-            const key = `section-${i}` as CardKey;
-            const label = sectionLabel(sections, i);
-            const lower = lowerFirst(label);
-            const target = drag !== null && drag !== s.id && over === s.id;
-            return (
-              <li
-                key={s.id}
-                data-section-id={s.id}
-                data-kind={s.kind}
-                className={target ? "rounded-[22px] outline-2 outline-offset-4 outline-jade outline-dashed" : undefined}
-                onDragOver={(e) => {
-                  if (drag === null) return;
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
-                  if (over !== s.id) setOver(s.id);
-                }}
-                onDrop={(e) => {
-                  if (drag === null) return;
-                  e.preventDefault();
-                  const from = sections.findIndex((x) => x.id === drag);
-                  setDrag(null);
-                  setOver(null);
-                  if (from >= 0) move(from, i, "drag");
-                }}
-              >
-                <Card
-                  id={`card-section-${i}`}
-                  level="h3"
-                  title={label}
-                  words={cw[key]}
-                  limit={s.kind === "reflection" ? LIMITS.reflection.words : undefined}
-                  hint={hintFor(s, maxFileMb)}
-                  flagged={flaggedBy(key)}
-                  heaviest={heaviest === key}
-                  controls={{
-                    before: (
-                      <span
-                        draggable
-                        aria-hidden
-                        title="Drag to move"
-                        data-grip
-                        className="cursor-grab self-center text-slate hover:text-ink active:cursor-grabbing"
-                        onDragStart={(e) => {
-                          e.dataTransfer.effectAllowed = "move";
-                          e.dataTransfer.setData("text/plain", s.id);
-                          const li = e.currentTarget.closest("li");
-                          if (li) e.dataTransfer.setDragImage(li, 24, 24);
-                          setDrag(s.id);
-                        }}
-                        onDragEnd={() => {
-                          setDrag(null);
-                          setOver(null);
+        <DndContext id={dndId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd} accessibility={{ announcements, screenReaderInstructions: { draggable: DRAG_INSTRUCTIONS } }}>
+          <SortableContext items={sections.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+            <ol aria-label="Sections, in page order" className="space-y-5">
+              {sections.map((s, i) => {
+                const key = `section-${i}` as CardKey;
+                const label = sectionLabel(sections, i);
+                const lower = lowerFirst(label);
+                return (
+                  <SortableSection key={s.id} id={s.id} kind={s.kind} label={lower} reduced={reduced}>
+                    {(handle) => (
+                      <Card
+                        id={`card-section-${i}`}
+                        level="h3"
+                        title={label}
+                        words={cw[key]}
+                        limit={s.kind === "reflection" ? LIMITS.reflection.words : undefined}
+                        hint={hintFor(s, maxFileMb)}
+                        flagged={flaggedBy(key)}
+                        heaviest={heaviest === key}
+                        controls={{
+                          before: handle,
+                          after: (
+                            <span className="flex items-center gap-1">
+                              <span data-move="up">
+                                <Button size="sm" label={`Move ${lower} up`} disabled={i === 0} onClick={() => move(i, i - 1, "keys")}>
+                                  <ArrowUp aria-hidden size={14} strokeWidth={2.25} />
+                                </Button>
+                              </span>
+                              <span data-move="down">
+                                <Button size="sm" label={`Move ${lower} down`} disabled={i === sections.length - 1} onClick={() => move(i, i + 1, "keys")}>
+                                  <ArrowDown aria-hidden size={14} strokeWidth={2.25} />
+                                </Button>
+                              </span>
+                              <Button size="sm" variant="danger" label={`Remove ${lower}`} onClick={() => remove(i)}>
+                                <X aria-hidden size={14} strokeWidth={2.25} />
+                              </Button>
+                            </span>
+                          ),
                         }}
                       >
-                        <GripVertical size={18} strokeWidth={2.25} />
-                      </span>
-                    ),
-                    after: (
-                      <span className="flex items-center gap-1">
-                        <span data-move="up">
-                          <Button size="sm" label={`Move ${lower} up`} disabled={i === 0} onClick={() => move(i, i - 1, "keys")}>
-                            <ArrowUp aria-hidden size={14} strokeWidth={2.25} />
-                          </Button>
-                        </span>
-                        <span data-move="down">
-                          <Button size="sm" label={`Move ${lower} down`} disabled={i === sections.length - 1} onClick={() => move(i, i + 1, "keys")}>
-                            <ArrowDown aria-hidden size={14} strokeWidth={2.25} />
-                          </Button>
-                        </span>
-                        <Button size="sm" variant="danger" label={`Remove ${lower}`} onClick={() => remove(i)}>
-                          <X aria-hidden size={14} strokeWidth={2.25} />
-                        </Button>
-                      </span>
-                    ),
-                  }}
-                >
-                  <SectionBody s={s} i={i} sections={sections} patch={patch} issues={issues} dt={dt} imageUrls={imageUrls} />
-                </Card>
-              </li>
-            );
-          })}
-        </ol>
+                        <SectionBody s={s} i={i} sections={sections} patch={patch} issues={issues} dt={dt} imageUrls={imageUrls} />
+                      </Card>
+                    )}
+                  </SortableSection>
+                );
+              })}
+            </ol>
+          </SortableContext>
+        </DndContext>
       )}
 
       <div role="status" className="text-sm">
@@ -256,6 +260,53 @@ export function Sections({
       )}
       <FieldIssues id="sections-issues" issues={issuesAt(issues, "sections")} />
     </section>
+  );
+}
+
+/**
+ * One section in the sortable list: the card moves with the pointer (or the arrow keys) and is
+ * lifted with the pack shadow while it's dragged. The handle is a button with the grip icon; the
+ * sorting animation is off for people who ask for less motion.
+ */
+function SortableSection({
+  id,
+  kind,
+  label,
+  reduced,
+  children,
+}: {
+  id: string;
+  kind: SectionKind;
+  /** "graph 1", for "Drag graph 1". */
+  label: string;
+  reduced: boolean;
+  children: (handle: React.ReactNode) => React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id, transition: reduced ? null : undefined });
+  const handle = (
+    <button
+      type="button"
+      ref={setActivatorNodeRef}
+      {...attributes}
+      {...listeners}
+      aria-label={`Drag ${label} to move it`}
+      data-grip
+      className="inline-flex size-9 shrink-0 cursor-grab touch-none items-center justify-center self-center rounded-full border border-line bg-surface text-ink hover:border-ink active:cursor-grabbing"
+    >
+      <GripVertical aria-hidden size={18} strokeWidth={2.25} />
+    </button>
+  );
+  return (
+    <li
+      ref={setNodeRef}
+      data-section-id={id}
+      data-kind={kind}
+      data-dragging={isDragging || undefined}
+      style={{ transform: CSS.Translate.toString(transform), transition: reduced ? undefined : transition }}
+      className={`relative ${isDragging ? "z-10 [&>section]:shadow-pack" : ""}`}
+    >
+      {children(handle)}
+    </li>
   );
 }
 

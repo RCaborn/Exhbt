@@ -40,7 +40,7 @@ export function Card({
   return (
     <section aria-labelledby={id} className={`rounded-[20px] border bg-surface p-5 sm:p-6 ${flagged ? "border-error" : "border-line"}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 items-baseline gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
           {controls?.before}
           <H id={id} className="scroll-mt-24 text-[1.375rem]">
             {title}
