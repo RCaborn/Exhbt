@@ -4,6 +4,22 @@
 -- Generated from supabase/migrations/ on 15 Nov 2026. The files there stay the source of truth.
 begin;
 
+-- The connector recorded the first seven under its own version numbers; they're recorded below under the files'.
+delete from supabase_migrations.schema_migrations where version in
+  ('20261114052617', '20261114053219', '20261114053227', '20261114053616', '20261114053642', '20261114053657', '20261114054533');
+
+-- Already applied on the preview project through the connector, which recorded them under other version numbers.
+-- Recorded so `supabase db push` or the GitHub integration never tries to run them again.
+insert into supabase_migrations.schema_migrations (version, name) values
+  ('20261105000000', '20261105000000_init'),
+  ('20261106000000', '20261106000000_phase1'),
+  ('20261106120000', '20261106120000_meeting_updates'),
+  ('20261106150000', '20261106150000_tiers_and_methodology'),
+  ('20261110000000', '20261110000000_project_ideas'),
+  ('20261112000000', '20261112000000_cv_read'),
+  ('20261113000000', '20261113000000_plan_names')
+on conflict do nothing;
+
 -- ===== 20261114000000_phase2_schema =====
 -- Phase 2: portfolios, exhbts as blocks, files, per-job links. docs/phase-2.md sections 4-8.
 -- Apply on Phase 2 launch day with 20261113000000_plan_names.sql, before the merge.

@@ -4,6 +4,20 @@
 -- Generated from supabase/migrations/ on 15 Nov 2026. The files there stay the source of truth.
 begin;
 
+-- The connector recorded cv_read under its own version number; it's recorded below under the file's.
+delete from supabase_migrations.schema_migrations where version = '20261111235621' and name = 'cv_read';
+
+-- Already applied on the live project before migration history was kept under these names (checked 15 Nov 2026: plan_tier has 'plus', project_ideas exists, exhbts has methodology).
+-- Recorded so `supabase db push` or the GitHub integration never tries to run them again.
+insert into supabase_migrations.schema_migrations (version, name) values
+  ('20261105000000', '20261105000000_init'),
+  ('20261106000000', '20261106000000_phase1'),
+  ('20261106120000', '20261106120000_meeting_updates'),
+  ('20261106150000', '20261106150000_tiers_and_methodology'),
+  ('20261110000000', '20261110000000_project_ideas'),
+  ('20261112000000', '20261112000000_cv_read')
+on conflict do nothing;
+
 -- ===== 20261113000000_plan_names =====
 -- Plan names: Free, Premium (was Plus), Max (was Pro, stored as 'premium').
 -- docs/decisions/0006-plan-names-premium-max.md. Apply on Phase 2 launch day, just before
