@@ -277,7 +277,7 @@ test.describe("Sections in the editor", () => {
     await page.getByRole("textbox", { name: "What you'd do next, or do differently" }).fill(NEXT);
     await addSection(page, "Add a link");
     await page.getByLabel("Web address").fill("https://example.com/queue-model");
-    await page.getByLabel("What it is").fill("Queue model notebook");
+    await page.getByLabel("What the link is").fill("Queue model notebook");
     await page.getByLabel("One line about it (optional)").fill("The timings and the code");
 
     expect(await listOrder(page)).toEqual(["findings", "graph", "image", "quote", "reflection", "link"]);
@@ -511,7 +511,7 @@ test.describe("Sections in the editor", () => {
     await expect(page.getByRole("textbox", { name: "What you'd do next, or do differently" })).toContainText("Next time I would time the evening queue too.");
 
     // Words in quotes with nobody named aren't a quote, and nothing is made up instead.
-    const unnamed = await page.request.post("/api/exhbts/draft", { data: { text: 'Lunch queue study at the student union cafe. Someone wrote "the second till is great" on the board.' } });
+    const unnamed = await page.request.post("/api/exhbts/draft", { data: { text: 'Lunch queue study at the student union cafe. Someone wrote "the second till is great" on the board by the tills during the second week of the trial.' } });
     expect(unnamed.status()).toBe(200);
     await page.goto(`/exhbts/${((await unnamed.json()) as { id: string }).id}/edit`);
     await expect(page.locator("[data-ready=true]")).toBeAttached();
@@ -537,7 +537,7 @@ test.describe("Sections in the editor", () => {
     await page.getByRole("textbox", { name: "What you'd do next, or do differently" }).fill(NEXT);
     await addSection(page, "Add a link");
     await page.getByLabel("Web address").fill("https://example.com/queue-model");
-    await page.getByLabel("What it is").fill("Queue model notebook");
+    await page.getByLabel("What the link is").fill("Queue model notebook");
     await page.getByLabel("One line about it (optional)").fill("The timings and the code");
     await publish(page);
 

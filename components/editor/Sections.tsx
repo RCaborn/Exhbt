@@ -484,7 +484,7 @@ function SectionBody({
           <div>
             <TextInput
               id={`${pid}-label`}
-              label="What it is"
+              label="What the link is"
               value={s.label}
               placeholder="e.g. Model code on GitHub"
               onChange={(label) => patch<"link">(s.id, (x) => ({ ...x, label }))}
