@@ -2,19 +2,22 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
-import { LIMITS, SCHEMA_VERSION, text, type ExhbtDoc, type Section } from "@/lib/exhbt/blocks";
+import { LIMITS, SCHEMA_VERSION, text, words, type ExhbtDoc, type Section } from "@/lib/exhbt/blocks";
 import { CHART_KINDS, hasData, type Chart } from "@/lib/exhbt/charts";
 import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
 
 /**
  * Drafts an exhbt from the person's own material (docs/phase-2.md section 6, decision 0007):
- * the text read from their files, their notes and an optional link. The model fills the fixed
- * blocks as plain strings; this file turns them into an ExhbtDoc. Images and evidence are not
- * drafted: the person adds them in the editor.
+ * the text read from their files, their notes and an optional link. The model fills the core
+ * and proposes sections (decision 0015) as plain strings; this file turns them into an ExhbtDoc.
+ * By default the sections are findings and, when the material has figures, a graph; a second
+ * graph, a quote or "what I'd do next" only when the material supports one. Images, links and
+ * evidence are not drafted: the person adds them in the editor.
  *
  * Every number must be quoted from the material. The model lists each one with the quote it
- * came from, and lib/exhbt/verify.ts checks the draft against the source text anyway.
+ * came from, and lib/exhbt/verify.ts checks the draft against the source text anyway. A quote
+ * is kept only when its words and the speaker's name are in the material as written.
  */
 
 const L = LIMITS;
@@ -37,7 +40,7 @@ Fields:
 - gap: the question and why it mattered, at most ${L.gapWords} words, at most 2 short sentences.
 - flow: ${L.flow.min} to ${L.flow.max} steps of the process, in order, each at most ${L.flow.stepWords} words. "detail" is an optional note of at most ${L.flow.detailWords} words (e.g. "14,200 rows"), or null.
 - findings: ${L.findings.min} to ${L.findings.max} short bullets of what was found or achieved, each at most ${L.findings.wordsEach} words.
-- charts: at most ${L.charts.max} graphs, only from figures stated in the material, each value copied as written there (no totals, averages or changes you work out). An empty list when the material has no figures worth a graph. Choose the kind that fits the figures:
+- charts: usually one graph, a second only when the material has a separate set of figures worth one (never more than ${L.charts.max}), only from figures stated in the material, each value copied as written there (no totals, averages or changes you work out). An empty list when the material has no figures worth a graph. Choose the kind that fits the figures:
   - "beforeAfter": one measure before and after a change. series: [what "before" is called, what "after" is called]; rows: ${L.charts.beforeAfter.rows.min} to ${L.charts.beforeAfter.rows.max}, each with values [before, after]. Set lowerIsBetter.
   - "bar": one measure across ${L.charts.bar.rows.min} to ${L.charts.bar.rows.max} categories. rows: each with values [value].
   - "groupedBar": ${L.charts.groupedBar.series.min} to ${L.charts.groupedBar.series.max} series compared across up to ${L.charts.groupedBar.rows.max} groups. series: their names; rows: each with one value per series.
@@ -47,7 +50,9 @@ Fields:
   - "numbers": ${L.charts.numbers.tiles.min} to ${L.charts.numbers.tiles.max} headline figures, in tiles, each with its label, unit and "from" (the starting value, only if the material states one).
   - "table": a small table, up to ${L.charts.table.columns.max} columns and ${L.charts.table.rows.max} rows: columns are the headings, cells the rows of text.
   Fill only the fields the kind uses; leave the rest as empty lists or null. Labels at most ${L.charts.labelChars} characters.
-- In total, aim for about ${L.targetWords} words across title, gap, flow and findings, and never more than ${L.totalWords}.`;
+- quote: feedback someone gave on the work (a supervisor, a client, a user), only if the material contains it: "text" copied word for word from the material, at most ${L.quote.words} words; "name" as the material gives it; "role" as the material gives it, or empty. Never write, shorten, join or reword a quote; if the only one is longer than ${L.quote.words} words, or nobody is named, null.
+- next: what the person says they would do next or do differently, at most ${L.reflection.words} words, only if the material says so. Empty otherwise.
+- In total, aim for about ${L.targetWords} words across everything you write (graph labels, the quote and its name included), and never more than ${L.totalWords}.`;
 
 /**
  * A graph as the model writes it: one flat shape for every kind (structured outputs keep enums
@@ -79,6 +84,8 @@ const DraftSchema = z.object({
   flow: z.array(z.object({ step: z.string(), detail: z.string().nullable() })),
   findings: z.array(z.string()),
   charts: z.array(DraftChartSchema),
+  quote: z.object({ text: z.string(), name: z.string(), role: z.string() }).nullable(),
+  next: z.string(),
   numbers: z.array(z.object({ value: z.string(), sourceQuote: z.string() })),
 });
 type Draft = z.infer<typeof DraftSchema>;
@@ -134,7 +141,7 @@ export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
   const { input_tokens, output_tokens } = response.usage;
   const draft = DraftSchema.parse(response.parsed_output);
   return {
-    doc: toDoc(draft),
+    doc: toDoc(draft, materialText(input)),
     numbers: draft.numbers,
     model: response.model,
     inputTokens: input_tokens,
@@ -143,21 +150,44 @@ export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
   };
 }
 
+/** For comparing a quote with the material: one space, straight quotes, no case. */
+const squash = (s: string) => s.replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ").trim().toLowerCase();
+
+/**
+ * The quote the model proposed, if it's really in the material: its words as written there, and
+ * the name too. Anything else is dropped rather than flagged: a quote can't be checked like a
+ * number, and an invented one would put words in someone's mouth.
+ */
+export function quoteFrom(q: Draft["quote"], source: string): { text: string; name: string; role: string } | null {
+  if (!q) return null;
+  const text = q.text.trim().replace(/^["“‘']+|["”’']+$/g, "").trim();
+  const name = q.name.trim();
+  const flat = squash(source);
+  if (!text || !name || words(text) > L.quote.words || !flat.includes(squash(text)) || !flat.includes(squash(name))) return null;
+  const role = q.role.trim();
+  return { text, name: name.slice(0, L.quote.nameChars), role: role && flat.includes(squash(role)) ? role.slice(0, L.quote.roleChars) : "" };
+}
+
 /**
  * The model's strings as an ExhbtDoc, trimmed to the block counts. Word limits are left to the
  * editor (drafts may run over; publishing may not), but counts are clamped so the layout holds.
+ * `source` is the material (materialText), for the quote check.
  */
-export function toDoc(d: Draft): ExhbtDoc {
+export function toDoc(d: Draft, source: string): ExhbtDoc {
   const nonEmpty = (s: string) => s.trim().length > 0;
   const findings = d.findings.map((f) => f.trim()).filter(nonEmpty).slice(0, L.findings.max).map(text);
   const charts = d.charts
     .map(toChart)
     .filter((c): c is Chart => c !== null && hasData(c))
     .slice(0, L.charts.max);
-  // Below the flowchart, in this order (decision 0015): findings, then the graphs.
+  const quote = quoteFrom(d.quote, source);
+  const next = d.next.trim();
+  // Below the flowchart, in this order (decision 0015): findings, the graphs, the quote, what I'd do next.
   const sections: Section[] = [
     ...(findings.length ? [{ id: "findings", kind: "findings" as const, items: findings }] : []),
     ...charts.map((chart, i) => ({ id: `graph-${i + 1}`, kind: "graph" as const, chart })),
+    ...(quote ? [{ id: "quote-1", kind: "quote" as const, ...quote }] : []),
+    ...(next ? [{ id: "reflection-1", kind: "reflection" as const, text: text(next) }] : []),
   ];
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -246,7 +276,8 @@ export function toChart(g: DraftChart): Chart | null {
  * the material, as written there, so the number check finds every one. When the notes say
  * "stand-in: add a figure to check", the graph also gets a total it worked out, which the
  * material doesn't state: the mistake the number check exists for, so its flag can be seen
- * without an API key.
+ * without an API key. A sentence in double quotes followed by a name (and ", role") becomes the
+ * quote; a sentence starting "Next time" or "If I did this again" becomes what I'd do next.
  */
 function mockDraft(input: DraftInput): DraftResult {
   const source = materialText(input).replace(/^File: .*$/gm, "");
@@ -258,6 +289,10 @@ function mockDraft(input: DraftInput): DraftResult {
   const names = ["First figure", "Second figure", "Third figure", "Fourth figure"];
   const rows = figures.map((v, i) => ({ label: names[i]!, values: [v] }));
   if (/stand-in: add a figure to check/i.test(input.notes ?? "")) rows.push({ label: "Worked-out total", values: [Math.round(figures.reduce((a, b) => a + b, 0) * 10) / 10] });
+  // Feedback in the material: "…" Priya Shah, Cafe manager. (dashes and a comma before the name are fine).
+  const q = source.match(/["“]([^"”]{8,400})["”]\s*(?:[-–—,]\s*)?((?:[A-Z][\w'’-]+)(?:\s[A-Z][\w'’-]+){0,3})(?:,\s*([^.\n]{2,60}))?/);
+  const feedback = q ? { text: q[1]!.trim(), name: q[2]!.trim(), role: (q[3] ?? "").trim() } : null;
+  const next = source.replace(/\s+/g, " ").match(/(?:^|[.!?]\s+)((?:Next time|If I did (?:this|it) again)[^.!?]{3,}[.!?])/i)?.[1]?.split(" ").slice(0, L.reflection.words).join(" ") ?? "";
   const charts: DraftChart[] =
     figures.length >= 2
       ? [
@@ -296,7 +331,9 @@ function mockDraft(input: DraftInput): DraftResult {
       ],
       findings: [quote, "This finding is a placeholder."],
       charts,
+      quote: feedback,
+      next,
       numbers,
-    }),
+    }, materialText(input)),
   };
 }
