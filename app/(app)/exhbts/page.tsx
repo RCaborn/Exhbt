@@ -67,6 +67,15 @@ export default async function ExhbtsPage({ searchParams }: { searchParams: Promi
           </p>
         </div>
 
+        {profile.username && exhbts.length > 0 && (
+          <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-graphite">
+            The order here is your portfolio&apos;s order.
+            <Button href="/portfolio/customise" size="sm">
+              Customise portfolio
+            </Button>
+          </p>
+        )}
+
         {requests.length > 0 && (
           <section aria-labelledby="join-requests" className="mt-6 rounded-[20px] border border-ink bg-surface p-5 sm:p-6">
             <h2 id="join-requests" className="text-[1.375rem]">
@@ -129,6 +138,7 @@ export default async function ExhbtsPage({ searchParams }: { searchParams: Promi
                     <span className={canGoLive && e.status === "published" ? "chip" : "chip bg-mist text-graphite"}>
                       {!canGoLive ? "Preview only" : e.status === "published" ? "Live" : "Draft"}
                     </span>
+                    {canGoLive && e.status === "published" && e.hiddenOnPortfolio && <span className="chip ml-1.5 bg-mist text-graphite">Hidden from portfolio</span>}
                     <Link href={`/exhbts/${e.id}/edit`} className="link mt-1.5 block font-semibold break-words">
                       {title}
                     </Link>

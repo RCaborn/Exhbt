@@ -1,11 +1,23 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { Plan } from "@/lib/entitlements";
 import { normaliseDoc, type ExhbtDoc } from "@/lib/exhbt/blocks";
-import { sampleSeeds } from "@/lib/exhbt/sample";
+import { sampleDocs, sampleSeeds } from "@/lib/exhbt/sample";
 import { usernameProblem } from "@/lib/hosts";
+import { normaliseLayout } from "@/lib/portfolio-layout";
 import { getStore, isSupabaseConfigured, setPlanForDevelopment, setStoredCopiesForDevelopment } from "@/lib/store";
 
 const PLANS: Plan[] = ["free", "premium", "max", "institutional"];
+
+/** Titles for copies of a sample exhbt, so `count` can go past the samples (to try the customiser with several tiles). */
+const MORE_TITLES = [
+  "Planning staff rotas for a campus cafe",
+  "Mapping late buses on a student route",
+  "Tracking recycling across a halls site",
+  "Costing a society's events budget",
+  "Measuring noise around a library",
+  "Comparing study spaces by how often they are used",
+];
+const MAX_COUNT = sampleSeeds.length + MORE_TITLES.length;
 
 /**
  * Development only: makes a fictional portfolio so the pages can be seen and tested before the
@@ -23,7 +35,7 @@ export async function GET(req: NextRequest) {
   const username = (q.get("username") ?? "amara").toLowerCase();
   const planParam = q.get("plan") ?? "premium";
   const plan = planParam as Plan;
-  const count = Math.max(0, Math.min(sampleSeeds.length, Number(q.get("count") ?? sampleSeeds.length)));
+  const count = Math.max(0, Math.min(MAX_COUNT, Number(q.get("count") ?? sampleSeeds.length)));
   const converted = q.get("layout") === "sections";
   if (usernameProblem(username)) return new NextResponse(usernameProblem(username), { status: 400 });
   if (planParam !== "subscription" && !PLANS.includes(plan)) return new NextResponse("Unknown plan", { status: 400 });
@@ -39,11 +51,18 @@ export async function GET(req: NextRequest) {
     linkedin: "https://www.linkedin.com/in/example",
   });
   for (const e of await store.listExhbts(userId)) await store.deleteExhbt(e.id, userId);
-  for (const [i, seed] of sampleSeeds.slice(0, count).entries()) {
-    const id = await store.createExhbt(userId, normaliseDoc(seed));
-    await store.publishExhbt(id, userId, i === 0 ? "gp-reminders" : "library-footfall");
+  // A fresh arrangement too: the default layout, nothing hidden or featured.
+  await store.savePortfolioLayout(userId, { layout: normaliseLayout(null), featuredExhbtId: null, hiddenIds: [], order: [] });
+  for (let i = 0; i < count; i++) {
+    const seed = i < sampleSeeds.length ? sampleSeeds[i] : undefined;
+    const base = sampleDocs[i % sampleDocs.length]!;
+    const doc = seed !== undefined ? normaliseDoc(seed) : { ...base, title: MORE_TITLES[i - sampleSeeds.length]! };
+    const id = await store.createExhbt(userId, doc);
+    await store.publishExhbt(id, userId, i === 0 ? "gp-reminders" : i === 1 ? "library-footfall" : `project-${i + 1}`);
     // As stored before sections, both copies (createExhbt and publishing write the current shape).
-    if (!converted && (seed as ExhbtDoc).sections === undefined) setStoredCopiesForDevelopment(id, { doc: seed, published: seed });
+    if (seed !== undefined && !converted && (seed as ExhbtDoc).sections === undefined) {
+      setStoredCopiesForDevelopment(id, { doc: seed, published: seed });
+    }
   }
   return NextResponse.redirect(new URL(`/p/${username}`, req.url));
 }

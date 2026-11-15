@@ -8,7 +8,7 @@ type Params = { params: Promise<{ username: string }> };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const p = await loadPortfolio((await params).username);
-  if (p.status !== "ok") return { title: "Portfolio not found", robots: { index: false } };
+  if (p.status !== "ok" || p.items.length === 0) return { title: "Portfolio not found", robots: { index: false } };
   const title = `${p.displayName} · Portfolio`;
   const description = p.profile.headline ?? `Projects by ${p.displayName}.`;
   const image = await previewImage(p.base, `${p.displayName}'s portfolio`);
@@ -26,6 +26,19 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 export default async function PortfolioGlance({ params }: Params) {
   const p = await loadPortfolio((await params).username);
   if (p.status === "redirect") redirect(p.to);
-  if (p.status === "missing") notFound();
-  return <GlanceView profile={p.profile} displayName={p.displayName} photoUrl={p.photoUrl} items={p.items} base={p.base} theme={p.theme} />;
+  // Every exhbt hidden: no page to show at the address (each one is still live at its own link).
+  if (p.status === "missing" || p.items.length === 0) notFound();
+  return (
+    <GlanceView
+      profile={p.profile}
+      displayName={p.displayName}
+      photoUrl={p.photoUrl}
+      items={p.items}
+      order={p.order}
+      featuredId={p.featuredId}
+      layout={p.layout}
+      base={p.base}
+      theme={p.theme}
+    />
+  );
 }

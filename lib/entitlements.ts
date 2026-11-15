@@ -51,6 +51,12 @@ type Entitlements = {
    * the start of the list, or "all". Free has the default only (decision 0012).
    */
   portfolioThemes: number | "all";
+  /**
+   * The extra tiles around the project tiles on the portfolio page: About me, Education,
+   * Experience, a featured quote, Links and contact (decision 0014). Free can arrange, hide and
+   * feature its project tiles in the customiser, but has no public page to put tiles on.
+   */
+  extraTiles: boolean;
 };
 
 const MAX: Entitlements = {
@@ -68,6 +74,7 @@ const MAX: Entitlements = {
   projectSwapsPerRoadmap: 25,
   savedIdeas: true,
   portfolioThemes: "all",
+  extraTiles: true,
 };
 
 export const ENTITLEMENTS: Record<Plan, Entitlements> = {
@@ -86,6 +93,7 @@ export const ENTITLEMENTS: Record<Plan, Entitlements> = {
     projectSwapsPerRoadmap: 3,
     savedIdeas: false,
     portfolioThemes: 1,
+    extraTiles: false,
   },
   premium: {
     roadmapsPer30Days: 8,
@@ -102,6 +110,7 @@ export const ENTITLEMENTS: Record<Plan, Entitlements> = {
     projectSwapsPerRoadmap: 10,
     savedIdeas: true,
     portfolioThemes: 6,
+    extraTiles: true,
   },
   max: MAX,
   institutional: MAX,
@@ -166,6 +175,7 @@ function looksLine(n: number | "all"): string {
 }
 
 const SAVED_IDEAS_LINE = "A saved list of project ideas from every roadmap";
+const TILES_LINE = "Extra tiles on your portfolio: about you, education, experience, a quote, your links";
 
 function jobLinksLine(): string {
   const line = `A custom link for every job: we pick your ${EXHBTS_PER_JOB_LINK} best fits`;
@@ -194,6 +204,7 @@ export function planFeatures(plan: "free" | "premium" | "max"): string[] {
         refreshes(e.roadmapsPer30Days),
         ...(e.savedIdeas ? [SAVED_IDEAS_LINE] : []),
         looksLine(e.portfolioThemes),
+        ...(e.extraTiles ? [TILES_LINE] : []),
       ];
     case "max":
       return [
@@ -206,6 +217,7 @@ export function planFeatures(plan: "free" | "premium" | "max"): string[] {
         refreshes(e.roadmapsPer30Days),
         ...(e.savedIdeas ? [SAVED_IDEAS_LINE] : []),
         looksLine(e.portfolioThemes),
+        ...(e.extraTiles ? [TILES_LINE] : []),
       ];
   }
 }

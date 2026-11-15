@@ -10,7 +10,7 @@ import { loadPortfolio } from "@/lib/portfolio";
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ username: string }> }) {
   const p = await loadPortfolio((await params).username);
-  if (p.status !== "ok") return new Response("Not found", { status: 404 });
+  if (p.status !== "ok" || p.items.length === 0) return new Response("Not found", { status: 404 });
   return portfolioCard({
     name: p.displayName,
     headline: p.profile.headline,
