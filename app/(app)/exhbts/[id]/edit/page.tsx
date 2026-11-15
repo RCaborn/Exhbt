@@ -7,7 +7,6 @@ import { TeamStrip } from "@/components/team/TeamStrip";
 import { getCurrentUser } from "@/lib/auth";
 import { fileIdsOf } from "@/components/editor/media";
 import { ENTITLEMENTS } from "@/lib/entitlements";
-import { withChartKinds } from "@/lib/exhbt/blocks";
 import { loadAiVersion, loadDraftSource } from "@/lib/draft-tools";
 import { signedFileUrl } from "@/lib/files";
 import { parseHost, portfolioHost } from "@/lib/hosts";
@@ -53,7 +52,8 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
     <Editor
       draftTools={hasSource && aiVersion ? { aiVersion, rewritesLeft: allowance.left, rewritesLimit: allowance.limit } : null}
       id={record.id}
-      initialDoc={withChartKinds(record.doc)}
+      // The store reads every doc into the current shape (sections, graph kinds; decision 0015).
+      initialDoc={record.doc}
       status={record.status}
       slug={record.slug}
       liveBase={liveBase}

@@ -4,6 +4,7 @@
  * plan's caps and the file type; these checks only spare a round trip.
  */
 import { finishUpload } from "@/components/team/finish-upload";
+import { imagesOf, type ExhbtDoc } from "@/lib/exhbt/blocks";
 
 const MB = 1024 * 1024;
 
@@ -68,9 +69,9 @@ export async function removeFile(fileId: string): Promise<void> {
   }
 }
 
-/** Every stored file an exhbt doc points at. */
-export function fileIdsOf(doc: { images: { fileId: string }[]; evidence?: { kind: string; fileId?: string } }): string[] {
-  const ids = doc.images.map((i) => i.fileId);
+/** Every stored file an exhbt doc points at: its image sections and a file as the work. */
+export function fileIdsOf(doc: ExhbtDoc): string[] {
+  const ids = imagesOf(doc).map((i) => i.fileId);
   if (doc.evidence?.kind === "file" && doc.evidence.fileId) ids.push(doc.evidence.fileId);
   return ids;
 }

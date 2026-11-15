@@ -270,11 +270,13 @@ export function chartValues(raw: Chart): number[] {
 
 type Issue = { path: string; message: string };
 
-/** What stops graph `i` being published, each with a path the editor can point at ("charts.0.rows.2.label"). */
-export function chartIssues(raw: Chart, i: number): Issue[] {
+/**
+ * What stops a graph being published, each with a path the editor can point at. `p` is where the
+ * graph sits in the doc ("sections.1.chart"), so an issue reads "sections.1.chart.rows.2.label".
+ */
+export function chartIssues(raw: Chart, p: string): Issue[] {
   const c = asChart(raw);
   const L = CHART_LIMITS;
-  const p = `charts.${i}`;
   const out: Issue[] = [];
   const need = (ok: boolean, path: string, message: string) => {
     if (!ok) out.push({ path, message });

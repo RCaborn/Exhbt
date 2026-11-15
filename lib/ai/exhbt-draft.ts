@@ -2,7 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
-import { LIMITS, SCHEMA_VERSION, text, type ExhbtDoc } from "@/lib/exhbt/blocks";
+import { LIMITS, SCHEMA_VERSION, text, type ExhbtDoc, type Section } from "@/lib/exhbt/blocks";
 import { CHART_KINDS, hasData, type Chart } from "@/lib/exhbt/charts";
 import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
@@ -149,6 +149,16 @@ export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
  */
 export function toDoc(d: Draft): ExhbtDoc {
   const nonEmpty = (s: string) => s.trim().length > 0;
+  const findings = d.findings.map((f) => f.trim()).filter(nonEmpty).slice(0, L.findings.max).map(text);
+  const charts = d.charts
+    .map(toChart)
+    .filter((c): c is Chart => c !== null && hasData(c))
+    .slice(0, L.charts.max);
+  // Below the flowchart, in this order (decision 0015): findings, then the graphs.
+  const sections: Section[] = [
+    ...(findings.length ? [{ id: "findings", kind: "findings" as const, items: findings }] : []),
+    ...charts.map((chart, i) => ({ id: `graph-${i + 1}`, kind: "graph" as const, chart })),
+  ];
   return {
     schemaVersion: SCHEMA_VERSION,
     title: d.title.trim().slice(0, L.titleChars),
@@ -160,12 +170,7 @@ export function toDoc(d: Draft): ExhbtDoc {
       .filter((s) => nonEmpty(s.step))
       .slice(0, L.flow.max)
       .map((s) => (s.detail?.trim() ? { step: s.step.trim(), detail: s.detail.trim() } : { step: s.step.trim() })),
-    findings: d.findings.map((f) => f.trim()).filter(nonEmpty).slice(0, L.findings.max).map(text),
-    charts: d.charts
-      .map(toChart)
-      .filter((c): c is Chart => c !== null && hasData(c))
-      .slice(0, L.charts.max),
-    images: [],
+    sections,
   };
 }
 

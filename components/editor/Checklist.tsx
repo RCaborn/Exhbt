@@ -1,7 +1,8 @@
 "use client";
 
 import { Check, X } from "lucide-react";
-import { plain, words, type ExhbtDoc } from "@/lib/exhbt/blocks";
+import { findingsOf, plain, words, type ExhbtDoc } from "@/lib/exhbt/blocks";
+import { hasData } from "@/lib/exhbt/charts";
 import { Button } from "@/components/ui/Button";
 
 /** True for a doc with nothing typed in yet: what "Start from scratch" makes. */
@@ -11,10 +12,9 @@ export function isBlank(doc: ExhbtDoc): boolean {
     !doc.context.trim() &&
     words(plain(doc.gap)) === 0 &&
     doc.flow.every((s) => !s.step.trim() && !(s.detail ?? "").trim()) &&
-    doc.findings.every((f) => words(plain(f)) === 0) &&
     doc.skills.length === 0 &&
-    doc.charts.length === 0 &&
-    doc.images.length === 0 &&
+    // Only the empty findings a new exhbt starts with: no other section, nothing typed.
+    doc.sections.every((s) => s.kind === "findings" && s.items.every((f) => words(plain(f)) === 0)) &&
     !doc.evidence
   );
 }
@@ -23,11 +23,14 @@ export type Step = { key: string; label: string; done: boolean; target: string }
 
 /** The first-exhbt steps, each ticking when the doc has it (and the last when it is live). */
 export function stepsFor(doc: ExhbtDoc, live: boolean): Step[] {
+  // Publishing needs findings or a graph (decision 0015): the step points at the first of either, or the "Add a section" menu.
+  const at = doc.sections.findIndex((s) => s.kind === "findings" || s.kind === "graph");
+  const shown = findingsOf(doc).filter((f) => words(plain(f)) > 0).length >= 2 || doc.sections.some((s) => s.kind === "graph" && hasData(s.chart));
   return [
     { key: "title", label: "Give it a title", done: doc.title.trim().length > 0, target: "card-header" },
     { key: "question", label: "Write the question", done: words(plain(doc.gap)) > 0, target: "card-gap" },
     { key: "process", label: "Fill in 3 or more process boxes", done: doc.flow.filter((s) => s.step.trim()).length >= 3, target: "card-flow" },
-    { key: "findings", label: "Add 2 or more findings", done: doc.findings.filter((f) => words(plain(f)) > 0).length >= 2, target: "card-findings" },
+    { key: "findings", label: "Add 2 or more findings, or a graph", done: shown, target: at >= 0 ? `card-section-${at}` : "add-section" },
     { key: "publish", label: "Publish it", done: live, target: "card-publish" },
   ];
 }
