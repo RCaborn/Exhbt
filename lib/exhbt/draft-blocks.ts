@@ -1,10 +1,11 @@
-import { emptyDoc, plain, type ExhbtDoc, type FlowStep, type RichText } from "./blocks";
+import { emptyDoc, findingsOf, plain, type ExhbtDoc, type FlowStep, type RichText } from "./blocks";
 import { normaliseNumber, numbersIn, numbersInDoc, unverifiedNumbers } from "./verify";
 
 /**
  * The parts of an exhbt the AI drafts, and so the parts it can rewrite or be undone to
  * (docs/phase-2.md section 6). Pure, so the editor, the server actions and the tests share it.
- * Graphs, images and the evidence link are not here: the person adds those.
+ * Graphs, images, the other sections and the evidence link are not here: the person adds those.
+ * "findings" is the findings section (decision 0015), wherever it sits.
  */
 
 export const DRAFT_BLOCKS = ["header", "gap", "flow", "findings", "skills"] as const;
@@ -47,10 +48,19 @@ export function blockValue(doc: ExhbtDoc, key: DraftBlock): BlockValue {
     case "flow":
       return doc.flow;
     case "findings":
-      return doc.findings;
+      return findingsOf(doc);
     case "skills":
       return doc.skills;
   }
+}
+
+/** The doc with the findings section's bullets replaced; one is added straight after the flowchart if there's none. */
+function withFindings(doc: ExhbtDoc, items: RichText[]): ExhbtDoc {
+  if (doc.sections.some((s) => s.kind === "findings")) {
+    return { ...doc, sections: doc.sections.map((s) => (s.kind === "findings" ? { ...s, items } : s)) };
+  }
+  const id = doc.sections.some((s) => s.id === "findings") ? `findings-${doc.sections.length + 1}` : "findings";
+  return { ...doc, sections: [{ id, kind: "findings", items }, ...doc.sections] };
 }
 
 export function applyBlock<K extends DraftBlock>(doc: ExhbtDoc, key: K, value: BlockValues[K]): ExhbtDoc;
@@ -67,7 +77,7 @@ export function applyBlock(doc: ExhbtDoc, key: DraftBlock, value: BlockValue): E
     case "flow":
       return { ...doc, flow: value as FlowStep[] };
     case "findings":
-      return { ...doc, findings: value as RichText[] };
+      return withFindings(doc, value as RichText[]);
     case "skills":
       return { ...doc, skills: value as string[] };
   }
@@ -91,7 +101,7 @@ export function aiVersionOf(doc: ExhbtDoc, source: string, extraUnverified: stri
  * known to be unsupported (the draft route's quote check): they count when this block has them.
  */
 export function flagsForBlock(doc: ExhbtDoc, key: DraftBlock, source: string, extra: string[] = []): string[] {
-  const only = applyBlock({ ...emptyDoc(), flow: [], findings: [] }, key, blockValue(doc, key) as never);
+  const only = applyBlock({ ...emptyDoc(), flow: [], sections: [] }, key, blockValue(doc, key) as never);
   const found = unverifiedNumbers(only, source);
   const here = new Set(blockTexts(doc, key).flatMap(numbersIn).map(normaliseNumber));
   const seen = new Set(found.map((n) => normaliseNumber(n) ?? n));
@@ -114,7 +124,7 @@ function blockTexts(doc: ExhbtDoc, key: DraftBlock): string[] {
     case "flow":
       return doc.flow.flatMap((s) => [s.step, s.detail ?? ""]);
     case "findings":
-      return doc.findings.map(plain);
+      return findingsOf(doc).map(plain);
     case "skills":
       return doc.skills;
   }

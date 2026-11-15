@@ -2,7 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
-import { LIMITS, plain, text, type ExhbtDoc } from "@/lib/exhbt/blocks";
+import { findingsOf, LIMITS, plain, text, type ExhbtDoc } from "@/lib/exhbt/blocks";
 import { BLOCK_NAMES, type BlockValue, type BlockValues, type DraftBlock } from "@/lib/exhbt/draft-blocks";
 import { MAX_MATERIAL_CHARS } from "./exhbt-draft";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
@@ -73,7 +73,7 @@ export function docAsText(d: ExhbtDoc): string {
     `Skills: ${d.skills.join(", ")}`,
     `The question: ${plain(d.gap)}`,
     `Process: ${d.flow.map((s) => (s.detail ? `${s.step} (${s.detail})` : s.step)).join(" -> ")}`,
-    `Findings:\n${d.findings.map((f) => `- ${plain(f)}`).join("\n")}`,
+    `Findings:\n${findingsOf(d).map((f) => `- ${plain(f)}`).join("\n")}`,
   ].join("\n");
 }
 

@@ -21,7 +21,7 @@ import { z } from "zod/v4";
 import { draftExhbt, materialText, type DraftInput, type DraftResult } from "@/lib/ai/exhbt-draft";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "@/lib/ai/model";
 import { extractTextInBrowser } from "@/lib/doc-readers";
-import { LIMITS, plain, validateForPublish, wordCount, words, type ExhbtDoc, type Issue } from "@/lib/exhbt/blocks";
+import { chartsOf, findingsOf, LIMITS, normaliseDoc, plain, sectionTexts, validateForPublish, wordCount, words, type ExhbtDoc, type Issue, type RichText } from "@/lib/exhbt/blocks";
 import { chartTexts, chartValues, KIND_NAMES } from "@/lib/exhbt/charts";
 import { normaliseNumber, numbersIn, unverifiedNumbers } from "@/lib/exhbt/verify";
 
@@ -130,8 +130,7 @@ function docStrings(d: ExhbtDoc): string[] {
     ...d.skills,
     plain(d.gap),
     ...d.flow.map((s) => (s.detail ? `${s.step} (${s.detail})` : s.step)),
-    ...d.findings.map(plain),
-    ...d.charts.flatMap((c) => [...chartTexts(c), chartValues(c).join(" ")]),
+    ...d.sections.flatMap((s) => (s.kind === "graph" ? [...chartTexts(s.chart), chartValues(s.chart).join(" ")] : sectionTexts(s))),
   ].filter((s) => s.trim());
 }
 
@@ -146,9 +145,9 @@ function renderDoc(d: ExhbtDoc): string {
     "Flowchart:",
     ...d.flow.map((s, i) => `  ${i + 1}. ${s.step}${s.detail ? ` (${s.detail})` : ""}`),
     "Findings:",
-    ...d.findings.map((f) => `  - ${plain(f)}`),
-    `Charts: ${d.charts.length ? "" : "(none)"}`,
-    ...d.charts.map((c) => {
+    ...findingsOf(d).map((f) => `  - ${plain(f)}`),
+    `Charts: ${chartsOf(d).length ? "" : "(none)"}`,
+    ...chartsOf(d).map((c) => {
       if (c.kind === "beforeAfter") {
         return (
           `  ${c.title} [${c.beforeLabel} -> ${c.afterLabel}${c.unit ? `, ${c.unit}` : ""}${c.lowerIsBetter ? ", lower is better" : ""}]: ` +
@@ -254,7 +253,7 @@ function runChecks(result: DraftResult, source: string, f: Facts, banned: Banned
   const openers = banned.openers.filter((o) => sentenceStarts.some((s) => s.toLowerCase().startsWith(o.toLowerCase())));
 
   const flowWords = d.flow.map((s) => words(s.step));
-  const findingWords = d.findings.map((x) => words(plain(x)));
+  const findingWords = findingsOf(d).map((x) => words(plain(x)));
   const expectState = (want: boolean, have: boolean) => (want === have ? "ok" : want ? "missing" : "unexpected");
 
   return {
@@ -281,14 +280,14 @@ function runChecks(result: DraftResult, source: string, f: Facts, banned: Banned
       gapWords: words(plain(d.gap)),
       flowBoxes: d.flow.length,
       flowMaxWords: Math.max(0, ...flowWords),
-      findings: d.findings.length,
+      findings: findingsOf(d).length,
       findingsMaxWords: Math.max(0, ...findingWords),
-      charts: d.charts.length,
+      charts: chartsOf(d).length,
       headline: !!d.headline,
     },
     expectations: {
       headline: expectState(f.expect.headlineNumber, !!d.headline),
-      chart: expectState(f.expect.chart, d.charts.length > 0),
+      chart: expectState(f.expect.chart, chartsOf(d).length > 0),
       noNumbers: f.expect.noNumbers ? (draftNumbers.length ? "broken" : "ok") : "n/a",
     },
   };
@@ -573,7 +572,7 @@ function summary(runs: FixtureRun[], meta: { started: string; mode: string; judg
 // Self-test: the checks must tell a good draft from a bad one before any real draft is scored.
 
 /** A hand-written draft of fixture 08 that should score 2 on every code check (the oracle). */
-const ORACLE_08: ExhbtDoc = {
+const ORACLE_08: ExhbtDoc = normaliseDoc({
   schemaVersion: 1,
   title: "Cut food larder waiting times from 34 to 12 minutes",
   context: "Community placement, Eastbrook Community Larder",
@@ -589,16 +588,18 @@ const ORACLE_08: ExhbtDoc = {
   ],
   charts: [{ kind: "beforeAfter", title: "Before and after", beforeLabel: "Before", afterLabel: "After", lowerIsBetter: true, unit: "%", rows: [{ label: "Food thrown away", before: 18, after: 7 }] }],
   images: [],
-};
+});
+
+/** The doc with its findings bullets replaced. */
+const withFindings = (d: ExhbtDoc, items: RichText[]): ExhbtDoc => ({ ...d, sections: d.sections.map((s) => (s.kind === "findings" ? { ...s, items } : s)) });
 
 /** The same draft broken on purpose: an invented number, a banned word, "we", an exclamation mark, too many words. */
 const BAD_08: ExhbtDoc = {
-  ...ORACLE_08,
-  title: "A transformative project that we delivered!",
-  findings: [
+  ...withFindings(ORACLE_08, [
     [{ t: "We cut waiting times by 65% across the larder, a pivotal change for every single member who came through the doors each week." }],
     [{ t: "Waste fell sharply." }],
-  ],
+  ]),
+  title: "A transformative project that we delivered!",
   gap: [{ t: "The larder had a lot of problems with queues and waste and the rota and it needed someone to come in and look at all of it carefully, which is what this project set out to do over the placement." }],
 };
 
@@ -607,7 +608,7 @@ async function selfTest(banned: Banned): Promise<boolean> {
   const { input } = await loadInput(f);
   const source = materialText(input);
   const asResult = (doc: ExhbtDoc): DraftResult => ({ doc, numbers: [], model: "self-test", inputTokens: 0, outputTokens: 0, costUsd: 0 });
-  const empty: ExhbtDoc = { ...ORACLE_08, title: "", headline: undefined, skills: [], gap: [], flow: [], findings: [], charts: [] };
+  const empty: ExhbtDoc = { ...ORACLE_08, title: "", headline: undefined, skills: [], gap: [], flow: [], sections: [] };
   const cases: { name: string; doc: ExhbtDoc; want: Partial<Record<Criterion, number>> }[] = [
     { name: "oracle", doc: ORACLE_08, want: { C1: 2, C2: 2, C5: 2, C8: 2 } },
     { name: "bad", doc: BAD_08, want: { C1: 0, C2: 0, C5: 1, C8: 0 } },

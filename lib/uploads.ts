@@ -1,7 +1,7 @@
 import "server-only";
 import { getPlan, limitsFor } from "./plan";
 import { devBlobs, devStorageEnabled } from "./files";
-import type { ExhbtDoc } from "./exhbt/blocks";
+import { imagesOf, normaliseDoc, type ExhbtDoc } from "./exhbt/blocks";
 import { getStore, isSupabaseConfigured, supabaseAdmin, type StoredFile } from "./store";
 
 /**
@@ -178,7 +178,7 @@ async function removeStoredObjects(files: StoredFile[]): Promise<void> {
 /** The file ids an exhbt's working or live copy points at (images and a file as the work). */
 function fileIdsIn(doc: ExhbtDoc | null | undefined): string[] {
   if (!doc) return [];
-  const ids = (doc.images ?? []).map((im) => im.fileId);
+  const ids = imagesOf(normaliseDoc(doc)).map((im) => im.fileId);
   if (doc.evidence?.kind === "file") ids.push(doc.evidence.fileId);
   return ids;
 }

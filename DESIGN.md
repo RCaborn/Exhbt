@@ -103,16 +103,19 @@ Full rules, sizes and don'ts are in `docs/brand.md`. In short:
 - `SkillRadar`: one axis per skill (3–6, fixed in the job's order), levels 0–4 from the centre. The same pair: "from" as a light fill, "to" as a dark outline. Grid in `line`. Labels are HTML over the SVG and show skill names only: **no numbers** (the levels are AI estimates; Rory, 9 Nov 2026). The meaning is carried in words instead. "Level up next" skills get an ink arrow-up marker, and "In the bag" skills get the same green tick as the strengths screen; both are set in ink semibold. Under the chart, `SkillHighlights` lists the two groups (up to three skills each). One line gives where the skills came from (`SKILLS_SOURCE_NOTE`). A hidden data table holds every level. No animation. Radars exaggerate area, so don't add shading, gradients or a third series.
 
 ## The exhbt in Phase 2
-Phase 2 swaps the card above for a fixed block layout (decision 0007), drawn by `components/portfolio/ProjectView.tsx`. A recruiter skims it, so every part is short and mostly bullets. Top to bottom:
+Phase 2 swaps the card above for a block layout (decisions 0007 and 0015), drawn by `components/portfolio/ProjectView.tsx`. A recruiter skims it, so every part is short and mostly bullets. The core comes first, always, in this order:
 - the person's photo and name top left, skill boxes top right
 - the title, then a one-line context
 - the question: what the gap was and why it mattered
 - the process flowchart (`MethodFlow`), straight after the question
-- findings, as bullets
-- up to two graphs (any of the kinds above, with their rules) and up to two images with captions
-- the work, one click away, and the trust badge
 
-150–200 words, and every word on the page counts, graph labels and captions included; only image alt text is left out (decision 0009). The order never changes. Limits are `LIMITS` in `lib/exhbt/blocks.ts`.
+Below the flowchart, sections in the order the person sets: findings as bullets, up to two graphs (any of the kinds above, with their rules), up to two images with captions, a quote, what I'd do next and a link. Graphs next to each other share a row on wide pages and in print, and so do images. Each kind has a small caption-size heading in graphite, like "The question", except graphs, images and the link. The quote sits in curly quotes at body size under the heading "Feedback", with the name and role underneath in graphite; it never gets formatting. The link is one bordered row (14px radius, like other small panels, with a `line` edge): its label as an ink link with the up-right arrow, the description under it in graphite, and no address shown.
+
+The footer, at the foot of every exhbt: the work, one click away, and the trust badge.
+
+150–200 words, and every word on the page counts, graph labels, captions and the quote's name included; only image alt text and link addresses are left out (decision 0009). The core's order never changes. Limits are `LIMITS` in `lib/exhbt/blocks.ts`.
+
+In the editor each section is a card with a visible grip handle (the `GripVertical` icon, a round button), move up and down buttons, and remove. While a card is dragged it takes the `shadow-pack` shadow, and nothing animates for people who ask for less motion (`useReducedMotion` in `components/ui/`).
 
 ## Flow patterns
 - **Click-through, not long pages**, for the roadmap builder and result. Marketing pages scroll normally.

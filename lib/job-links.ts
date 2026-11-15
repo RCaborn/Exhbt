@@ -1,6 +1,6 @@
 import "server-only";
 import { headers } from "next/headers";
-import { plain, type ExhbtDoc } from "./exhbt/blocks";
+import { findingsOf, plain, type ExhbtDoc } from "./exhbt/blocks";
 import { signedFileUrl } from "./files";
 import { parseHost } from "./hosts";
 import type { MatchCandidate } from "./jobs/rank";
@@ -36,7 +36,7 @@ export async function pickableExhbts(userId: string): Promise<ExhbtRecord[]> {
 /** What the matcher sees of an exhbt: the published copy only. */
 export function toCandidate(e: ExhbtRecord): MatchCandidate {
   const d = e.published ?? e.doc;
-  return { id: e.id, title: d.title, context: d.context, skills: d.skills, findings: d.findings.map(plain).filter(Boolean) };
+  return { id: e.id, title: d.title, context: d.context, skills: d.skills, findings: findingsOf(d).map(plain).filter(Boolean) };
 }
 
 async function basePath(username: string): Promise<string> {

@@ -1,5 +1,5 @@
 import type { TileExhbt } from "@/components/exhbt/ExhbtTile";
-import type { ExhbtDoc } from "./blocks";
+import { chartsOf, type ExhbtDoc } from "./blocks";
 import { asChart } from "./charts";
 
 export type Headline = { value: string; label: string };
@@ -14,14 +14,15 @@ function pct(before: number, after: number): string | null {
 
 /**
  * The number that sums an exhbt up, for its tile, its page and its link preview: the one the
- * person wrote, or else the change in the first row of their first graph when that is a
- * before-and-after graph (their own figures, worked out, never invented; a ratio, so it is the
- * same when the graph's numbers are protected). Null when there is neither; the methodology then
- * carries the tile.
+ * person wrote, or else the change in the first row of their first graph (the first graph section
+ * on the page, wherever it sits) when that is a before-and-after graph (their own figures, worked
+ * out, never invented; a ratio, so it is the same when the graph's numbers are protected). Null
+ * when there is neither; the methodology then carries the tile.
  */
-export function headlineFor(doc: Pick<ExhbtDoc, "headline" | "charts">): Headline | null {
+export function headlineFor(doc: Pick<ExhbtDoc, "headline" | "sections">): Headline | null {
   if (doc.headline?.value.trim()) return doc.headline;
-  const chart = doc.charts[0] ? asChart(doc.charts[0]) : undefined;
+  const first = chartsOf(doc)[0];
+  const chart = first ? asChart(first) : undefined;
   if (!chart || chart.kind !== "beforeAfter") return null;
   const row = chart.rows[0];
   if (!row) return null;

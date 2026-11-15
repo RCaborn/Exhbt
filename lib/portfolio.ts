@@ -1,6 +1,6 @@
 import "server-only";
 import { headers } from "next/headers";
-import type { ExhbtDoc } from "./exhbt/blocks";
+import { imagesOf, type ExhbtDoc } from "./exhbt/blocks";
 import { signedFileUrl } from "./files";
 import { parseHost, portfolioHost } from "./hosts";
 import { themeFor, type PortfolioTheme } from "./portfolio-themes";
@@ -74,7 +74,7 @@ const toItem = (e: ExhbtRecord): Omit<PortfolioItem, "team"> => ({ id: e.id, slu
 /** Signed URLs for one exhbt's images and its evidence file (links pass through). */
 export async function mediaFor(doc: ExhbtDoc): Promise<{ imageUrls: Record<string, string | null>; evidenceUrl: string | null }> {
   const imageUrls: Record<string, string | null> = {};
-  for (const im of doc.images) imageUrls[im.fileId] = await signedFileUrl(im.fileId);
+  for (const im of imagesOf(doc)) imageUrls[im.fileId] = await signedFileUrl(im.fileId);
   const ev = doc.evidence;
   const evidenceUrl = !ev ? null : ev.kind === "link" ? ev.href : await signedFileUrl(ev.fileId);
   return { imageUrls, evidenceUrl };

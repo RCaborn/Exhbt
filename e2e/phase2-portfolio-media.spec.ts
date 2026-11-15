@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { ENTITLEMENTS } from "../lib/entitlements";
-import { type ExhbtDoc } from "../lib/exhbt/blocks";
+import { chartsOf, type ExhbtDoc } from "../lib/exhbt/blocks";
 import { headlineFor } from "../lib/exhbt/headline";
 import { sampleDocs } from "../lib/exhbt/sample";
 
@@ -175,7 +175,7 @@ test.describe("Project page", () => {
     await expect(page.getByRole("button", { name: "Save as PDF" })).toBeHidden();
     await expect(page.getByRole("list", { name: "Methodology" })).toBeVisible();
     await expect(page.getByRole("region", { name: "findings" })).toBeVisible();
-    await expect(page.getByRole("table", { name: GP.charts[0]!.title })).toBeAttached();
+    await expect(page.getByRole("table", { name: chartsOf(GP)[0]!.title })).toBeAttached();
     await expect(page.getByRole("list", { name: "Checks passed" })).toBeVisible();
     await expect(page.locator("[data-print-address]")).toBeVisible();
     await expect(page.locator("[data-print-address]")).toHaveText("amara.exhbt.co.uk/gp-reminders");
@@ -188,8 +188,8 @@ test.describe("Project page", () => {
 test.describe("Headline numbers", () => {
   test("the one the person wrote, or else their first graph's change, or none", () => {
     expect(headlineFor(GP)).toEqual(GP.headline);
-    expect(headlineFor({ headline: undefined, charts: GP.charts })).toEqual({ value: "−18%", label: "Missed appointments (%), All patients" });
-    expect(headlineFor({ headline: { value: " ", label: "" }, charts: [] })).toBeNull();
-    expect(headlineFor({ headline: undefined, charts: LIBRARY.charts })).toBeNull();
+    expect(headlineFor({ headline: undefined, sections: GP.sections })).toEqual({ value: "−18%", label: "Missed appointments (%), All patients" });
+    expect(headlineFor({ headline: { value: " ", label: "" }, sections: [] })).toBeNull();
+    expect(headlineFor({ headline: undefined, sections: LIBRARY.sections })).toBeNull();
   });
 });

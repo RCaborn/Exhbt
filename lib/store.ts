@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Project, Roadmap, RoadmapInput } from "./ai/schemas";
-import { publicDoc, type ExhbtDoc } from "./exhbt/blocks";
+import { normaliseDoc, publicDoc, type ExhbtDoc } from "./exhbt/blocks";
 import type { Plan } from "./entitlements";
 
 export type RoadmapRecord = {
@@ -922,6 +922,7 @@ function supabaseStore(): Store {
         await db
           .from("exhbts")
           // The public copy: a graph with protected numbers keeps only its index (decision 0011).
+          // publicDoc reads an old (pre-sections) doc as sections first (decision 0015).
           .update({ published_blocks: publicDoc(cur.blocks), status: "published", public_slug: slug, confirmed_at: now, published_at: now })
           .eq("id", id)
           .eq("user_id", userId),
@@ -1550,11 +1551,15 @@ type ExhbtRow = {
   updated_at: string;
   team_of: string | null;
 };
+/**
+ * Both copies in the current shape: rows saved before sections (decision 0015) read as sections
+ * here, so nothing after the store sees the old layout. The stored jsonb isn't changed.
+ */
 const fromExhbtRow = (r: ExhbtRow): ExhbtRecord => ({
   id: r.id,
   userId: r.user_id,
-  doc: r.blocks,
-  published: r.published_blocks,
+  doc: normaliseDoc(r.blocks),
+  published: r.published_blocks ? normaliseDoc(r.published_blocks) : null,
   status: r.status === "published" ? "published" : "draft",
   slug: r.public_slug,
   position: r.position,
@@ -1565,6 +1570,12 @@ const fromExhbtRow = (r: ExhbtRow): ExhbtRecord => ({
 });
 
 /* ---------------- In-memory (local development and tests only) ---------------- */
+
+/** A copy of a stored exhbt with both copies in the current shape, as fromExhbtRow does for Supabase. */
+const readCopies = (e: ExhbtRecord): ExhbtRecord => {
+  const c = structuredClone(e);
+  return { ...c, doc: normaliseDoc(c.doc), published: c.published ? normaliseDoc(c.published) : null };
+};
 
 type MemRoadmap = RoadmapRecord & { ipHash: string; marketingOptIn: boolean };
 type Mem = {
@@ -1882,10 +1893,10 @@ function memoryStore(): Store {
     },
     async getExhbt(id) {
       const e = m.exhbts.get(id);
-      return e ? structuredClone(e) : null;
+      return e ? readCopies(e) : null;
     },
     async listExhbts(userId) {
-      return [...m.exhbts.values()].filter((e) => e.userId === userId).sort((a, b) => a.position - b.position).map((e) => structuredClone(e));
+      return [...m.exhbts.values()].filter((e) => e.userId === userId).sort((a, b) => a.position - b.position).map(readCopies);
     },
     async saveExhbtDraft(id, userId, doc) {
       const e = own(id, userId);
@@ -2090,7 +2101,7 @@ function memoryStore(): Store {
       return true;
     },
     async listTeamVersions(rootId) {
-      return [...m.exhbts.values()].filter((e) => e.teamOf === rootId).map((e) => structuredClone(e));
+      return [...m.exhbts.values()].filter((e) => e.teamOf === rootId).map(readCopies);
     },
     async createInvite(i) {
       m.invites.set(i.id, { ...i, email: i.email.toLowerCase(), role: i.role.slice(0, 40), createdAt: new Date().toISOString(), acceptedAt: null, cancelledAt: null });
@@ -2173,6 +2184,18 @@ export function setPlanForDevelopment(userId: string, plan: Plan) {
   if (process.env.NODE_ENV === "production") throw new Error("Development only.");
   (g.__exhbtMem ??= newMem()).plans ??= new Map();
   g.__exhbtMem!.plans.set(userId, plan);
+}
+
+/**
+ * Development only: sets an exhbt's two stored copies exactly as given, without reading them into
+ * the current shape. app/dev/portfolio uses it to store an exhbt the way rows saved before
+ * sections (decision 0015) sit in the database, so the path old exhbts take is seen and tested.
+ */
+export function setStoredCopiesForDevelopment(id: string, copies: { doc: unknown; published: unknown }) {
+  if (process.env.NODE_ENV === "production") throw new Error("Development only.");
+  const e = g.__exhbtMem?.exhbts.get(id);
+  if (!e) throw new Error("No such exhbt.");
+  Object.assign(e, { doc: structuredClone(copies.doc), published: structuredClone(copies.published) });
 }
 
 /** Read-only view of the in-memory store, for the dev pages and tests. */

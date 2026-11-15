@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { ENTITLEMENTS } from "../lib/entitlements";
-import { emptyDoc, text } from "../lib/exhbt/blocks";
+import { emptyDoc, text, type ExhbtDoc, type RichText } from "../lib/exhbt/blocks";
 import { aiVersionOf, blockValue, replaceBlock, sameBlock } from "../lib/exhbt/draft-blocks";
 import { uniqueEmail } from "./helpers";
 
@@ -21,7 +21,9 @@ const PROJECT = [
 const FREE_REWRITES = ENTITLEMENTS.free.blockRegenerations;
 
 test.describe("Block helpers", () => {
-  const doc = { ...emptyDoc(), title: "Reminders", gap: text("Did timing matter?"), findings: [text("Fell from 7.9% to 6.5%."), text("Cleaned 14,200 rows.")], skills: ["Python"] };
+  /** The findings block is the findings section (decision 0015). */
+  const withFindings = (d: ExhbtDoc, items: RichText[]): ExhbtDoc => ({ ...d, sections: [{ id: "findings", kind: "findings", items }] });
+  const doc = withFindings({ ...emptyDoc(), title: "Reminders", gap: text("Did timing matter?"), skills: ["Python"] }, [text("Fell from 7.9% to 6.5%."), text("Cleaned 14,200 rows.")]);
 
   test("a block can be read, replaced and compared", () => {
     expect(blockValue(doc, "skills")).toEqual(["Python"]);
@@ -30,14 +32,14 @@ test.describe("Block helpers", () => {
   });
 
   test("replacing a block drops flags for numbers that are gone and adds the new block's", () => {
-    const flagged = { ...doc, findings: [text("Fell 18%."), text("Cleaned 14,200 rows.")], unverified: ["18%"] };
+    const flagged = { ...withFindings(doc, [text("Fell 18%."), text("Cleaned 14,200 rows.")]), unverified: ["18%"] };
     const next = replaceBlock(flagged, "findings", [text("Fell from 7.9% to 6.5%."), text("Up 22%.")], ["22%"]);
     expect(next.unverified).toEqual(["22%"]);
     expect(next.title).toBe("Reminders");
   });
 
   test("the AI version keeps each block, with the numbers the source lacks", () => {
-    const ai = aiVersionOf({ ...doc, findings: [text("Fell 18%."), text("Cleaned 14,200 rows.")] }, PROJECT);
+    const ai = aiVersionOf(withFindings(doc, [text("Fell 18%."), text("Cleaned 14,200 rows.")]), PROJECT);
     expect(ai.unverified.findings).toEqual(["18%"]);
     expect(ai.unverified.gap).toEqual([]);
     expect(ai.blocks.skills).toEqual(["Python"]);

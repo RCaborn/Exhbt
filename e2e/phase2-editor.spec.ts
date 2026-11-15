@@ -216,6 +216,7 @@ test.describe("the exhbt editor", () => {
 
     await startFromScratch(page);
     await page.locator("#title").fill("Forecasting footfall");
+    await page.getByRole("button", { name: "Add a section" }).click();
     await page.getByRole("button", { name: "Add a graph" }).click();
     await expect(page.getByLabel("Graph 1, row 1 group")).toBeVisible();
     ({ violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze());

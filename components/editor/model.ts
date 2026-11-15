@@ -1,5 +1,5 @@
 import { plain, words, type ExhbtDoc, type Issue } from "@/lib/exhbt/blocks";
-import { chartTexts } from "@/lib/exhbt/charts";
+import { sectionLabel, sectionWords } from "@/lib/exhbt/sections";
 
 /**
  * Pure helpers the editor and its server actions share: which card an issue belongs to,
@@ -14,17 +14,23 @@ export function confirmNumber(doc: ExhbtDoc, n: string): ExhbtDoc {
   return { ...doc, unverified: unverifiedOf(doc).filter((u) => u !== n) } as ExhbtDoc;
 }
 
-export type CardKey = "header" | "gap" | "flow" | "findings" | "charts" | "images" | "evidence" | "overall";
+/**
+ * The editor's cards: the fixed core, one per section below the flowchart (`section-2` is the
+ * third section on the page, decision 0015), "sections" for issues about the sections as a whole
+ * (how many, findings or a graph), the work, and "overall" for the word total.
+ */
+export type CardKey = "header" | "gap" | "flow" | "evidence" | "sections" | "overall" | `section-${number}`;
 
-/** Which card an issue path ("flow.2.step", "findings.0", "title") points at. */
+/** Which card an issue path ("flow.2.step", "sections.1.chart.title", "title") points at. */
 export function cardOf(path: string): CardKey {
-  const head = path.split(".")[0] ?? "";
+  const [head = "", idx] = path.split(".");
   if (["title", "context", "skills", "headline"].includes(head)) return "header";
-  if (["gap", "flow", "findings", "charts", "images", "evidence"].includes(head)) return head as CardKey;
+  if (head === "sections") return idx !== undefined && /^\d+$/.test(idx) ? `section-${Number(idx)}` : "sections";
+  if (["gap", "flow", "evidence"].includes(head)) return head as CardKey;
   return "overall";
 }
 
-/** Whatever sits at a path, e.g. "flow.2.step" → doc.flow[2].step. */
+/** Whatever sits at a path, e.g. "flow.2.step" → doc.flow[2].step, "sections.0.items" → doc.sections[0].items. */
 function at(doc: ExhbtDoc, path: string): unknown {
   return path.split(".").reduce<unknown>((v, k) => (v && typeof v === "object" ? (v as Record<string, unknown>)[k] : undefined), doc);
 }
@@ -36,6 +42,9 @@ function hasContent(v: unknown): boolean {
   return typeof v === "number";
 }
 
+/** Issues about how many of something there are: always worth knowing, filled in or not. */
+const isCount = (path: string) => ["flow", "skills", "sections"].includes(path) || /^sections\.\d+\.items$/.test(path);
+
 /**
  * Issues worth showing now. A field that's still empty isn't nagged about until the person
  * tries to publish; anything over a limit shows as soon as it happens.
@@ -44,8 +53,8 @@ export function visibleIssues(doc: ExhbtDoc, issues: Issue[], showAll: boolean):
   if (showAll) return issues;
   return issues.filter((i) => {
     const v = at(doc, i.path);
-    // Counts (flow, findings, …) and the overall total are always worth knowing.
-    if (i.path === "" || (Array.isArray(v) && ["flow", "findings", "charts", "images", "skills"].includes(i.path))) return true;
+    // Counts (flow, findings, sections, …) and the overall total are always worth knowing.
+    if (i.path === "" || (Array.isArray(v) && isCount(i.path))) return true;
     return hasContent(v);
   });
 }
@@ -55,17 +64,31 @@ export const issuesIn = (issues: Issue[], card: CardKey) => issues.filter((i) =>
 
 /**
  * Words in each card. They add up to wordCount in lib/exhbt/blocks.ts, which counts every word on
- * the page except alt text ("200 should cap everything").
+ * the page except alt text and link addresses ("200 should cap everything").
  */
-export function cardWords(doc: ExhbtDoc): Record<"header" | "gap" | "flow" | "findings" | "charts" | "images" | "evidence", number> {
+export function cardWords(doc: ExhbtDoc): Partial<Record<CardKey, number>> {
   const sum = (xs: string[]) => xs.reduce((n, s) => n + words(s), 0);
   return {
     header: sum([doc.title, doc.context, ...doc.skills, doc.headline?.value ?? "", doc.headline?.label ?? ""]),
     gap: words(plain(doc.gap)),
     flow: sum(doc.flow.flatMap((s) => [s.step, s.detail ?? ""])),
-    findings: sum(doc.findings.map(plain)),
-    charts: sum(doc.charts.flatMap(chartTexts)),
-    images: sum(doc.images.map((im) => plain(im.caption))),
+    ...Object.fromEntries(doc.sections.map((s, i) => [`section-${i}`, sectionWords(s)])),
     evidence: words(doc.evidence?.label ?? ""),
   };
+}
+
+const LABELS: Record<string, string> = { title: "Title", context: "Context line", skills: "Skills", headline: "Headline number", gap: "The question", evidence: "The work", sections: "Sections" };
+
+/** "flow.2.step" becomes "Process, box 3", "sections.0.items.1" "Finding 2": which part an issue is about, for the list at the top. */
+export function labelOf(path: string, doc: ExhbtDoc): string {
+  const [head, idx, field, sub] = path.split(".");
+  const n = idx !== undefined && /^\d+$/.test(idx) ? Number(idx) : null;
+  if (head === "flow") return n !== null ? `Process, box ${n + 1}` : "Process";
+  if (head === "skills" && n !== null) return `Skill ${n + 1}`;
+  if (head === "sections" && n !== null) {
+    const s = doc.sections[n];
+    if (s?.kind === "findings" && field === "items" && sub !== undefined && /^\d+$/.test(sub)) return `Finding ${Number(sub) + 1}`;
+    return sectionLabel(doc.sections, n);
+  }
+  return LABELS[head ?? ""] ?? "";
 }

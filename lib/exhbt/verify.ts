@@ -1,4 +1,4 @@
-import { plain, type ExhbtDoc } from "./blocks";
+import { plain, sectionTexts, type ExhbtDoc } from "./blocks";
 import { chartTexts, chartValues } from "./charts";
 
 /**
@@ -27,7 +27,11 @@ export function numbersIn(text: string): string[] {
   return (text.match(NUMBER) ?? []).map((m) => m.trim());
 }
 
-/** All the text a reader sees in an exhbt, plus every value on its graphs, whatever their kind. */
+/**
+ * All the text a reader sees in an exhbt, plus every value on its graphs, whatever their kind:
+ * the core and every section (findings, graphs, captions, the quote with its name and role, what
+ * I'd do next, the link's label and description).
+ */
 function docTexts(d: ExhbtDoc): string[] {
   return [
     d.title,
@@ -37,9 +41,7 @@ function docTexts(d: ExhbtDoc): string[] {
     ...d.skills,
     plain(d.gap),
     ...d.flow.flatMap((s) => [s.step, s.detail ?? ""]),
-    ...d.findings.map(plain),
-    ...d.charts.flatMap((c) => [...chartTexts(c), ...chartValues(c).map(String)]),
-    ...d.images.map((im) => plain(im.caption)),
+    ...d.sections.flatMap((s) => (s.kind === "graph" ? [...chartTexts(s.chart), ...chartValues(s.chart).map(String)] : sectionTexts(s))),
   ];
 }
 
