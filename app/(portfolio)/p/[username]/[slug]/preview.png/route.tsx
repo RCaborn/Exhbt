@@ -7,7 +7,7 @@ import { loadPortfolio } from "@/lib/portfolio";
 export async function GET(_req: Request, { params }: { params: Promise<{ username: string; slug: string }> }) {
   const { username, slug } = await params;
   const p = await loadPortfolio(username, `/${slug}`);
-  const it = p.status === "ok" ? p.items.find((x) => x.slug === slug) : undefined;
+  const it = p.status === "ok" ? [...p.items, ...p.hiddenItems].find((x) => x.slug === slug) : undefined;
   if (p.status !== "ok" || !it) return new Response("Not found", { status: 404 });
   return projectCard({
     name: p.displayName,

@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Project, Roadmap, RoadmapInput } from "./ai/schemas";
 import { publicDoc, type ExhbtDoc } from "./exhbt/blocks";
 import type { Plan } from "./entitlements";
+import { normaliseLayout, type PortfolioLayout } from "./portfolio-layout";
 
 export type RoadmapRecord = {
   id: string;
@@ -73,6 +74,10 @@ export type PortfolioProfile = {
   hideFromSearch: boolean;
   /** The chosen portfolio look (lib/portfolio-themes.ts), kept even if the plan later drops it. Null: the default. */
   themeId: string | null;
+  /** The exhbt shown first, as a wide tile (decision 0014). Null: none. */
+  featuredExhbtId: string | null;
+  /** How the at-a-glance page is arranged: where the extra tiles sit, their words, the header bits (lib/portfolio-layout.ts). */
+  layout: PortfolioLayout;
 };
 
 /**
@@ -94,6 +99,8 @@ export type ExhbtRecord = {
   updatedAt: string;
   /** The team project this was made from, for a teammate's own exhbt (decision 0013). Null otherwise. */
   teamOf?: string | null;
+  /** Left off the at-a-glance page by the person. Still live at its own link (decision 0014). Absent means false. */
+  hiddenOnPortfolio?: boolean;
 };
 
 /** A stored file (exhbt_files): project material, evidence, an image on an exhbt, or a profile photo. */
@@ -315,6 +322,12 @@ export interface Store {
   unpublishExhbt(id: string, userId: string): Promise<boolean>;
   /** Sets portfolio order to the order of `ids`. */
   reorderExhbts(userId: string, ids: string[]): Promise<void>;
+  /**
+   * Saves the customiser's arrangement in one go (decision 0014): the layout and the featured exhbt
+   * on the profile, which of their exhbts are hidden, and the portfolio order (`order` is every one
+   * of their exhbts' ids). The caller has checked it all against the plan and ownership.
+   */
+  savePortfolioLayout(userId: string, change: { layout: PortfolioLayout; featuredExhbtId: string | null; hiddenIds: string[]; order: string[] }): Promise<void>;
   deleteExhbt(id: string, userId: string): Promise<boolean>;
   getFile(id: string): Promise<StoredFile | null>;
 
@@ -830,7 +843,7 @@ function supabaseStore(): Store {
       const row = check(
         await db
           .from("profiles")
-          .select("id, username, name, headline, bio, photo_file_id, linkedin_url, hide_from_search, portfolio_theme")
+          .select("id, username, name, headline, bio, photo_file_id, linkedin_url, hide_from_search, portfolio_theme, featured_exhbt_id, portfolio_layout")
           .eq("id", userId)
           .maybeSingle(),
       ) as ProfileRow | null;
@@ -936,6 +949,14 @@ function supabaseStore(): Store {
     },
     async reorderExhbts(userId, ids) {
       await Promise.all(ids.map((id, position) => db.from("exhbts").update({ position }).eq("id", id).eq("user_id", userId)));
+    },
+    async savePortfolioLayout(userId, c) {
+      check(await db.from("profiles").update({ portfolio_layout: c.layout, featured_exhbt_id: c.featuredExhbtId }).eq("id", userId));
+      // Unhide whatever is not in the list, then hide what is (never everything at once, so a reader never sees a gap).
+      const unhide = db.from("exhbts").update({ hidden_on_portfolio: false }).eq("user_id", userId).eq("hidden_on_portfolio", true);
+      check(c.hiddenIds.length ? await unhide.not("id", "in", `(${c.hiddenIds.join(",")})`) : await unhide);
+      if (c.hiddenIds.length) check(await db.from("exhbts").update({ hidden_on_portfolio: true }).eq("user_id", userId).in("id", c.hiddenIds));
+      await Promise.all(c.order.map((id, position) => db.from("exhbts").update({ position }).eq("id", id).eq("user_id", userId)));
     },
     async deleteExhbt(id, userId) {
       const rows = check(await db.from("exhbts").delete().eq("id", id).eq("user_id", userId).select("id")) as { id: string }[];
@@ -1512,6 +1533,8 @@ type ProfileRow = {
   linkedin_url: string | null;
   hide_from_search: boolean | null;
   portfolio_theme: string | null;
+  featured_exhbt_id: string | null;
+  portfolio_layout: unknown;
 };
 const fromProfileRow = (r: ProfileRow): PortfolioProfile => ({
   userId: r.id,
@@ -1523,6 +1546,8 @@ const fromProfileRow = (r: ProfileRow): PortfolioProfile => ({
   linkedin: r.linkedin_url,
   hideFromSearch: Boolean(r.hide_from_search),
   themeId: r.portfolio_theme,
+  featuredExhbtId: r.featured_exhbt_id ?? null,
+  layout: normaliseLayout(r.portfolio_layout),
 });
 const emptyProfile = (userId: string): PortfolioProfile => ({
   userId,
@@ -1534,9 +1559,11 @@ const emptyProfile = (userId: string): PortfolioProfile => ({
   linkedin: null,
   hideFromSearch: false,
   themeId: null,
+  featuredExhbtId: null,
+  layout: normaliseLayout(null),
 });
 
-const EXHBT_COLS = "id, user_id, blocks, published_blocks, status, public_slug, position, confirmed_at, published_at, updated_at, team_of";
+const EXHBT_COLS = "id, user_id, blocks, published_blocks, status, public_slug, position, confirmed_at, published_at, updated_at, team_of, hidden_on_portfolio";
 type ExhbtRow = {
   id: string;
   user_id: string;
@@ -1549,6 +1576,7 @@ type ExhbtRow = {
   published_at: string | null;
   updated_at: string;
   team_of: string | null;
+  hidden_on_portfolio: boolean | null;
 };
 const fromExhbtRow = (r: ExhbtRow): ExhbtRecord => ({
   id: r.id,
@@ -1562,6 +1590,7 @@ const fromExhbtRow = (r: ExhbtRow): ExhbtRecord => ({
   publishedAt: r.published_at,
   updatedAt: r.updated_at,
   teamOf: r.team_of ?? null,
+  hiddenOnPortfolio: Boolean(r.hidden_on_portfolio),
 });
 
 /* ---------------- In-memory (local development and tests only) ---------------- */
@@ -1877,6 +1906,7 @@ function memoryStore(): Store {
         publishedAt: null,
         updatedAt: new Date().toISOString(),
         teamOf: opts?.teamOf ?? null,
+        hiddenOnPortfolio: false,
       });
       return id;
     },
@@ -1913,9 +1943,20 @@ function memoryStore(): Store {
         if (e) e.position = position;
       });
     },
+    async savePortfolioLayout(userId, c) {
+      m.profiles.set(userId, { ...profile(userId), layout: structuredClone(c.layout), featuredExhbtId: c.featuredExhbtId });
+      const hidden = new Set(c.hiddenIds);
+      for (const e of m.exhbts.values()) if (e.userId === userId) e.hiddenOnPortfolio = hidden.has(e.id);
+      c.order.forEach((id, position) => {
+        const e = own(id, userId);
+        if (e) e.position = position;
+      });
+    },
     async deleteExhbt(id, userId) {
       if (!own(id, userId)) return false;
       m.exhbts.delete(id);
+      // As the database does (on delete set null): the profile's featured exhbt clears.
+      for (const p of m.profiles.values()) if (p.featuredExhbtId === id) p.featuredExhbtId = null;
       // As the database does: its teammates and invites go, teammates' own exhbts made from it
       // keep standing without the link, and file matches forget which exhbt it was.
       for (const [k, x] of m.members) if (x.exhbtId === id) m.members.delete(k);

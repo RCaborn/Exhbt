@@ -70,6 +70,7 @@ export function PortfolioHeader({
   note,
   framed = false,
   theme = DEFAULT_THEME,
+  showSkills = true,
 }: {
   owner: HeaderOwner;
   exhbts: { skills: string[] }[];
@@ -77,6 +78,8 @@ export function PortfolioHeader({
   framed?: boolean;
   /** The look (colours, heading face, photo shape). Defaults to Ink. */
   theme?: PortfolioTheme;
+  /** False when the person has switched the skills strip off (the portfolio customiser, decision 0014). */
+  showSkills?: boolean;
 }) {
   const skills = [...new Set(exhbts.flatMap((e) => e.skills))];
   const inner = framed ? "px-5 sm:px-8" : "mx-auto max-w-[64rem] px-4 sm:px-8";
@@ -133,7 +136,7 @@ export function PortfolioHeader({
           )}
         </div>
       </div>
-      {skills.length > 0 && (
+      {showSkills && skills.length > 0 && (
         <div className="border-b border-line bg-surface">
           <div className={`${inner} flex flex-wrap items-baseline gap-x-4 gap-y-2 py-5`}>
             <p className="font-mono text-[0.8125rem] text-slate">proven across {exhbts.length} {exhbts.length === 1 ? "exhbt" : "exhbts"}</p>

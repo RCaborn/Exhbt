@@ -67,6 +67,31 @@ export function visibleOnPortfolio(plan: Plan, exhbts: ExhbtRecord[]): ExhbtReco
     .slice(0, e.exhbts);
 }
 
+/**
+ * What the at-a-glance page lists: the reachable exhbts (above) minus the ones the person has hidden.
+ * A hidden exhbt is still live at its own link, still counts toward the plan's limit and can still
+ * be picked for a job link; it only leaves the glance page and anything that lists the portfolio
+ * (decision 0014).
+ */
+export function listedOnPortfolio(plan: Plan, exhbts: ExhbtRecord[]): ExhbtRecord[] {
+  return visibleOnPortfolio(plan, exhbts).filter((x) => !x.hiddenOnPortfolio);
+}
+
+/**
+ * The exhbts the customiser shows as tiles, in the person's order. Where a portfolio can go
+ * public, the ones it shows (published, up to the plan's count); on Free (no public page) every
+ * exhbt, so a person can try an arrangement on their drafts before they upgrade.
+ */
+export function customisableExhbts(plan: Plan, exhbts: ExhbtRecord[]): ExhbtRecord[] {
+  return ENTITLEMENTS[plan].publicPortfolio ? visibleOnPortfolio(plan, exhbts) : [...exhbts].sort((a, b) => a.position - b.position);
+}
+
+/** Extra tiles (About me, Education, and the rest) come with the paid plans. */
+export function canUseExtraTiles(plan: Plan): Verdict {
+  if (ENTITLEMENTS[plan].extraTiles) return { ok: true };
+  return { ok: false, reason: `Extra tiles for your portfolio come with ${PLAN_NAMES.premium}.`, upgradeTo: "premium" };
+}
+
 /** Can they start another roadmap? `recent` is how many they made in the last 30 days. */
 export function canStartRoadmap(plan: Plan, recent: number): Verdict {
   if (recent < ENTITLEMENTS[plan].roadmapsPer30Days) return { ok: true };

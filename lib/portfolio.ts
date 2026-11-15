@@ -3,6 +3,8 @@ import { headers } from "next/headers";
 import type { ExhbtDoc } from "./exhbt/blocks";
 import { signedFileUrl } from "./files";
 import { parseHost, portfolioHost } from "./hosts";
+import { ENTITLEMENTS } from "./entitlements";
+import { isTileKind, sequence, shownKeys, tileHasContent, type PortfolioLayout } from "./portfolio-layout";
 import { themeFor, type PortfolioTheme } from "./portfolio-themes";
 import { visibleOnPortfolio } from "./plan-rules";
 import { getStore, type ExhbtRecord, type PortfolioProfile } from "./store";
@@ -19,7 +21,22 @@ import type { Teammate } from "./team-rules";
 export type PortfolioItem = { id: string; slug: string; doc: ExhbtDoc; publishedAt: string | null; team: Teammate[] };
 
 export type LoadedPortfolio =
-  | { status: "ok"; profile: PortfolioProfile & { username: string }; displayName: string; photoUrl: string | null; items: PortfolioItem[]; base: string; theme: PortfolioTheme }
+  | {
+      status: "ok";
+      profile: PortfolioProfile & { username: string };
+      displayName: string;
+      photoUrl: string | null;
+      /** The projects on the at-a-glance page, in the order it shows them (the featured one first). */
+      items: PortfolioItem[];
+      /** Live at their own link but left off the glance page by the person (decision 0014). */
+      hiddenItems: PortfolioItem[];
+      /** The glance page top to bottom: a project's id, or the name of an extra tile. */
+      order: string[];
+      featuredId: string | null;
+      layout: PortfolioLayout;
+      base: string;
+      theme: PortfolioTheme;
+    }
   | { status: "redirect"; to: string }
   | { status: "missing" };
 
@@ -51,18 +68,34 @@ export async function loadPortfolio(username: string, rest = ""): Promise<Loaded
   if ("redirectTo" in found) return { status: "redirect", to: await redirectTarget(found.redirectTo, rest) };
 
   const plan = await store.planFor(found.userId);
-  const items = visibleOnPortfolio(plan, await store.listExhbts(found.userId));
+  const reachable = visibleOnPortfolio(plan, await store.listExhbts(found.userId));
   // Free has no public page (decision 0006); nor does a paid account with nothing live yet.
-  if (items.length === 0) return { status: "missing" };
+  if (reachable.length === 0) return { status: "missing" };
 
   const profile = await store.getPortfolioProfile(found.userId);
   const host = (await headers()).get("x-forwarded-host") ?? (await headers()).get("host");
+
+  // The arrangement (decision 0014): hidden exhbts leave the page, the featured one goes first, and
+  // extra tiles sit where the person put them, if their plan has them and they have words.
+  const hidden = new Set(reachable.filter((e) => e.hiddenOnPortfolio).map((e) => e.id));
+  const featuredId =
+    profile.featuredExhbtId && reachable.some((e) => e.id === profile.featuredExhbtId) && !hidden.has(profile.featuredExhbtId) ? profile.featuredExhbtId : null;
+  const extras = ENTITLEMENTS[plan].extraTiles;
+  const order = shownKeys(sequence(profile.layout, reachable.map((e) => e.id)), hidden, featuredId).filter(
+    (k) => !isTileKind(k) || (extras && tileHasContent(k, profile.layout.tiles)),
+  );
+  const byId = new Map(reachable.map((e) => [e.id, e]));
+  const toFull = async (e: ExhbtRecord) => ({ ...toItem(e), team: await teamFor(e, host) });
   return {
     status: "ok",
     profile: { ...profile, username: found.username },
     displayName: profile.name?.trim() || found.username,
     photoUrl: await signedFileUrl(profile.photoFileId),
-    items: await Promise.all(items.map(async (e) => ({ ...toItem(e), team: await teamFor(e, host) }))),
+    items: await Promise.all(order.filter((k) => byId.has(k)).map((k) => toFull(byId.get(k)!))),
+    hiddenItems: await Promise.all(reachable.filter((e) => hidden.has(e.id)).map(toFull)),
+    order,
+    featuredId,
+    layout: profile.layout,
     base: await basePath(found.username),
     // The chosen look if the plan still has it; the stored choice is never cleared here.
     theme: themeFor(profile, plan),
