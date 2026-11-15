@@ -76,8 +76,9 @@ export default async function PortfolioSettingsPage() {
         </p>
       )}
       {username && (
-        <div className="mt-5">
+        <div className="mt-5 flex flex-wrap gap-3">
           <Button href={portfolioHref(username, host)}>View my portfolio</Button>
+          <Button href="/portfolio/customise">Customise portfolio</Button>
         </div>
       )}
 

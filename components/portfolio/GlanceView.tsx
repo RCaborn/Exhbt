@@ -31,7 +31,7 @@ export function headerOwner(
   profile: Pick<PortfolioProfile, "username" | "headline" | "bio" | "linkedin"> & { username: string },
   displayName: string,
   photoUrl: string | null,
-  layout: PortfolioLayout,
+  layout: Pick<PortfolioLayout, "header">,
 ): HeaderOwner {
   return {
     username: profile.username,
