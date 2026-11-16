@@ -125,11 +125,12 @@ export function ProjectView({
             </Link>
           )}
 
-          <dl className="mt-6 px-1 @3xl/xp:px-5 print:mt-4 print:px-1">
+          {/* Stacked above the work, the facts sit side by side and the ticks in a row, so the question isn't pushed far down. */}
+          <dl className="mt-4 grid grid-cols-1 gap-x-6 px-1 @md/xp:grid-cols-2 @3xl/xp:mt-6 @3xl/xp:block @3xl/xp:px-5 print:mt-4 print:block print:px-1">
             {kind && <Fact term="What it is">{kind}</Fact>}
             {whereWhen && <Fact term="Where and when">{whereWhen}</Fact>}
-            <Fact term="Can you trust it?">
-              <ul aria-label="Can you trust it?" className="mt-1 space-y-1.5" data-checks>
+            <Fact term="Can you trust it?" wide>
+              <ul aria-label="Can you trust it?" className="mt-1 flex flex-wrap gap-x-5 gap-y-1.5 @3xl/xp:block @3xl/xp:space-y-1.5 print:block print:space-y-1" data-checks>
                 {checks.map((c) => (
                   <li key={c.key} className="flex items-start gap-2" data-done={c.done || undefined}>
                     {c.done ? (
@@ -193,9 +194,9 @@ export function ProjectView({
   );
 }
 
-function Fact({ term, children }: { term: string; children: React.ReactNode }) {
+function Fact({ term, children, wide = false }: { term: string; children: React.ReactNode; /** Both columns when the facts sit side by side. */ wide?: boolean }) {
   return (
-    <div className="xp-fact border-b py-3 first:pt-0 last:border-b-0 print:py-2">
+    <div className={`xp-fact border-b py-3 last:border-b-0 @3xl/xp:first:pt-0 print:py-2 ${wide ? "@md/xp:col-span-2" : ""}`}>
       <dt className="xp-muted text-[0.8125rem]">{term}</dt>
       <dd className="mt-0.5 text-[0.9375rem] leading-snug font-semibold">{children}</dd>
     </div>
