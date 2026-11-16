@@ -208,7 +208,9 @@ export type EventName =
   | "exhbt_rewritten"
   | "teammate_invited"
   | "teammate_joined"
-  | "file_matched";
+  | "file_matched"
+  | "referral_recorded"
+  | "referral_credited";
 
 /** A Stripe subscription as we keep it (the `subscriptions` table). No amounts or card details. */
 export type SubscriptionRecord = {
@@ -225,6 +227,21 @@ export type SubscriptionRecord = {
    * so an event older than the one already applied is ignored. Null for writes not from an event.
    */
   lastEventAt?: string | null;
+};
+
+/** A referral (decision 0020): pending until the referred person's first payment, then earned, then credited. */
+export type ReferralStatus = "pending" | "earned" | "credited";
+export type ReferralRecord = {
+  id: string;
+  referrerId: string;
+  /** Null once the referred person has deleted their account. */
+  referredId: string | null;
+  status: ReferralStatus;
+  createdAt: string;
+  earnedAt: string | null;
+  creditedAt: string | null;
+  /** Stripe's balance transaction id once credited. */
+  creditRef: string | null;
 };
 
 /** Statuses that keep a paid plan. past_due keeps it while Stripe retries the card. */
@@ -458,6 +475,24 @@ export interface Store {
   updateDuplicateMatch(id: string, from: DuplicateOutcome, to: DuplicateOutcome, role?: string | null): Promise<boolean>;
   /** Requests to join waiting on this owner (outcome asked), oldest first; with `exhbtId`, only that exhbt's. */
   listJoinRequests(ownerId: string, exhbtId?: string): Promise<DuplicateMatch[]>;
+
+  /* referrals (decision 0020) */
+  /** The person's referral code, made on first ask. Never changes. */
+  getReferralCode(userId: string): Promise<string>;
+  /** Whose code this is, or null. */
+  findUserByReferralCode(code: string): Promise<string | null>;
+  /** Records that referrer brought in referred. False if referred already has a referrer, or they are the same account. */
+  recordReferral(referrerId: string, referredId: string): Promise<boolean>;
+  /** The referral where this person is the referred one. */
+  getReferralByReferred(referredId: string): Promise<ReferralRecord | null>;
+  /** Pending to earned, once. Returns the referral if it is earned afterwards (so a retry carries on), else null. */
+  markReferralEarned(referredId: string): Promise<ReferralRecord | null>;
+  /** Earned referrals waiting on this referrer being a Stripe customer. */
+  listEarnedReferrals(referrerId: string): Promise<ReferralRecord[]>;
+  /** Earned to credited, once. False if it had already moved on. */
+  markReferralCredited(id: string, creditRef: string): Promise<boolean>;
+  /** The referrer's own side, for the account box. Never says who the referred person is. */
+  referralSummary(referrerId: string): Promise<{ credited: number; waiting: number }>;
 }
 
 export const isSupabaseConfigured = () =>
@@ -858,9 +893,16 @@ function supabaseStore(): Store {
           .eq("owner_id", userId)
           .in("outcome", ["asked", "approved", "declined"]),
       ]);
+      // Referrals: only this person's side. Who they referred, and who referred them, stays out.
+      const [referralsMade, referredBy] = await Promise.all([
+        db.from("referrals").select("status, created_at, earned_at, credited_at").eq("referrer_id", userId),
+        db.from("referrals").select("status, created_at").eq("referred_id", userId).maybeSingle(),
+      ]);
       return {
         exportedAt: new Date().toISOString(),
         profile: profile.data,
+        referralsYouMade: referralsMade.data,
+        referralOnYourAccount: referredBy.data,
         roadmaps: roadmaps.data,
         projectIdeas: ideas.data,
         exhbts: exhbts.data,
@@ -885,6 +927,10 @@ function supabaseStore(): Store {
       const address =
         email ?? (check(await db.from("profiles").select("email").eq("id", userId).maybeSingle()) as { email: string | null } | null)?.email;
       if (address) check(await db.from("exhbt_invites").delete().eq("email", address.toLowerCase()));
+      // Referrals: one still waiting on this person's first payment goes with them. An earned or
+      // credited one stays with the link to them cleared (referred_id on delete set null), so the
+      // referrer keeps what they earned.
+      check(await db.from("referrals").delete().eq("referred_id", userId).eq("status", "pending"));
       const { error } = await db.auth.admin.deleteUser(userId);
       if (error) throw new Error(error.message);
     },
@@ -1453,7 +1499,102 @@ function supabaseStore(): Store {
       if (exhbtId) q = q.eq("owner_exhbt_id", exhbtId);
       return (check(await q.order("answered_at", { ascending: true })) as MatchRow[]).map(fromMatchRow);
     },
+
+    /* referrals */
+    async getReferralCode(userId) {
+      const read = async () =>
+        (check(await db.from("profiles").select("referral_code").eq("id", userId).maybeSingle()) as { referral_code: string | null } | null)
+          ?.referral_code ?? null;
+      const have = await read();
+      if (have) return have;
+      for (let i = 0; i < 5; i++) {
+        // Only fills an empty code, so two first visits can't give different codes.
+        const res = await db.from("profiles").update({ referral_code: newReferralCode() }).eq("id", userId).is("referral_code", null);
+        if (res.error && res.error.code !== "23505") throw new Error(res.error.message);
+        const now = await read();
+        if (now) return now;
+      }
+      throw new Error("Could not make a referral code.");
+    },
+    async findUserByReferralCode(code) {
+      const r = check(await db.from("profiles").select("id").eq("referral_code", code).maybeSingle()) as { id: string } | null;
+      return r?.id ?? null;
+    },
+    async recordReferral(referrerId, referredId) {
+      if (referrerId === referredId) return false;
+      const res = await db.from("referrals").insert({ referrer_id: referrerId, referred_id: referredId });
+      if (!res.error) return true;
+      if (res.error.code === "23505") return false; // the referred account already has a referrer
+      throw new Error(res.error.message);
+    },
+    async getReferralByReferred(referredId) {
+      const r = check(await db.from("referrals").select(REFERRAL_COLS).eq("referred_id", referredId).maybeSingle()) as ReferralRow | null;
+      return r ? fromReferralRow(r) : null;
+    },
+    async markReferralEarned(referredId) {
+      // One conditional update: only a pending row moves, so two deliveries change it once.
+      check(
+        await db
+          .from("referrals")
+          .update({ status: "earned", earned_at: new Date().toISOString() })
+          .eq("referred_id", referredId)
+          .eq("status", "pending")
+          .select("id"),
+      );
+      const r = check(await db.from("referrals").select(REFERRAL_COLS).eq("referred_id", referredId).maybeSingle()) as ReferralRow | null;
+      return r && r.status === "earned" ? fromReferralRow(r) : null;
+    },
+    async listEarnedReferrals(referrerId) {
+      const rows = check(
+        await db.from("referrals").select(REFERRAL_COLS).eq("referrer_id", referrerId).eq("status", "earned").order("earned_at", { ascending: true }),
+      ) as ReferralRow[];
+      return rows.map(fromReferralRow);
+    },
+    async markReferralCredited(id, creditRef) {
+      const rows = check(
+        await db
+          .from("referrals")
+          .update({ status: "credited", credited_at: new Date().toISOString(), credit_ref: creditRef })
+          .eq("id", id)
+          .eq("status", "earned")
+          .select("id"),
+      ) as { id: string }[];
+      return rows.length > 0;
+    },
+    async referralSummary(referrerId) {
+      const rows = check(await db.from("referrals").select("status").eq("referrer_id", referrerId)) as { status: ReferralStatus }[];
+      return { credited: rows.filter((r) => r.status === "credited").length, waiting: rows.filter((r) => r.status !== "credited").length };
+    },
   };
+}
+
+const REFERRAL_COLS = "id, referrer_id, referred_id, status, created_at, earned_at, credited_at, credit_ref";
+type ReferralRow = {
+  id: string;
+  referrer_id: string;
+  referred_id: string | null;
+  status: ReferralStatus;
+  created_at: string;
+  earned_at: string | null;
+  credited_at: string | null;
+  credit_ref: string | null;
+};
+const fromReferralRow = (r: ReferralRow): ReferralRecord => ({
+  id: r.id,
+  referrerId: r.referrer_id,
+  referredId: r.referred_id,
+  status: r.status,
+  createdAt: r.created_at,
+  earnedAt: r.earned_at,
+  creditedAt: r.credited_at,
+  creditRef: r.credit_ref,
+});
+
+/** Eight characters, no look-alikes (no 0, o, 1, l, i). Short enough to read out. */
+const CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
+function newReferralCode(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
 }
 
 const FILE_COLS = "id, user_id, bucket, path, mime, bytes, kind, sha256";
@@ -1698,6 +1839,9 @@ type Mem = {
   members: Map<string, TeamMember>;
   invites: Map<string, TeamInvite>;
   matches: Map<string, DuplicateMatch>;
+  /** Referral codes by user id, and referrals by id (decision 0020). */
+  referralCodes: Map<string, string>;
+  referrals: Map<string, ReferralRecord>;
 };
 const newMem = (): Mem => ({
   roadmaps: new Map(),
@@ -1718,6 +1862,8 @@ const newMem = (): Mem => ({
   members: new Map(),
   invites: new Map(),
   matches: new Map(),
+  referralCodes: new Map(),
+  referrals: new Map(),
 });
 /** A file as the in-memory store keeps it: the record, the exhbt it's attached to, and when it was made. */
 type MemFile = StoredFile & { exhbtId?: string | null; createdAt?: string };
@@ -1740,6 +1886,8 @@ function memoryStore(): Store {
   m.members ??= new Map();
   m.invites ??= new Map();
   m.matches ??= new Map();
+  m.referralCodes ??= new Map();
+  m.referrals ??= new Map();
   const files = () => m.files as Map<string, MemFile>;
   const isOpen = (i: TeamInvite) => !i.acceptedAt && !i.cancelledAt;
   const liveSubscription = (userId: string): SubscriptionRecord | null => {
@@ -1898,9 +2046,14 @@ function memoryStore(): Store {
         cancelledAt: i.cancelledAt,
       });
       const matches = [...m.matches.values()];
+      const refs = [...m.referrals.values()];
       return {
         exportedAt: new Date().toISOString(),
         profile: p ? { ...p } : null,
+        referralsYouMade: refs
+          .filter((x) => x.referrerId === userId)
+          .map((x) => ({ status: x.status, created_at: x.createdAt, earned_at: x.earnedAt, credited_at: x.creditedAt })),
+        referralOnYourAccount: refs.filter((x) => x.referredId === userId).map((x) => ({ status: x.status, created_at: x.createdAt }))[0] ?? null,
         roadmaps,
         projectIdeas: roadmaps.flatMap((r) => m.ideas.get(r.id) ?? []),
         exhbts: [...m.exhbts.values()]
@@ -1949,6 +2102,16 @@ function memoryStore(): Store {
       for (const [k, i] of m.invites) if (gone.has(i.exhbtId) || (address && i.email.toLowerCase() === address)) m.invites.delete(k);
       for (const [k, x] of m.matches) if (x.uploaderId === userId || x.ownerId === userId) m.matches.delete(k);
       for (const e of m.exhbts.values()) if (e.teamOf && gone.has(e.teamOf)) e.teamOf = null;
+      // Referrals: as the database does. Pending ones on this person go; earned or credited ones keep
+      // the referrer's record with the link to this person cleared; their own code and referrals go.
+      for (const [k, x] of m.referrals) {
+        if (x.referrerId === userId) m.referrals.delete(k);
+        else if (x.referredId === userId) {
+          if (x.status === "pending") m.referrals.delete(k);
+          else x.referredId = null;
+        }
+      }
+      m.referralCodes.delete(userId);
       m.profiles.delete(userId);
       m.plans.delete(userId);
     },
@@ -2302,6 +2465,57 @@ function memoryStore(): Store {
       return [...m.matches.values()]
         .filter((x) => x.ownerId === ownerId && x.outcome === "asked" && (!exhbtId || x.ownerExhbtId === exhbtId))
         .map((x) => ({ ...x }));
+    },
+
+    /* referrals */
+    async getReferralCode(userId) {
+      let code = m.referralCodes.get(userId);
+      if (!code) {
+        const taken = new Set(m.referralCodes.values());
+        do code = newReferralCode();
+        while (taken.has(code));
+        m.referralCodes.set(userId, code);
+      }
+      return code;
+    },
+    async findUserByReferralCode(code) {
+      for (const [userId, c] of m.referralCodes) if (c === code) return userId;
+      return null;
+    },
+    async recordReferral(referrerId, referredId) {
+      if (referrerId === referredId) return false;
+      if ([...m.referrals.values()].some((x) => x.referredId === referredId)) return false;
+      const id = crypto.randomUUID();
+      m.referrals.set(id, { id, referrerId, referredId, status: "pending", createdAt: new Date().toISOString(), earnedAt: null, creditedAt: null, creditRef: null });
+      return true;
+    },
+    async getReferralByReferred(referredId) {
+      const r = [...m.referrals.values()].find((x) => x.referredId === referredId);
+      return r ? { ...r } : null;
+    },
+    async markReferralEarned(referredId) {
+      const r = [...m.referrals.values()].find((x) => x.referredId === referredId);
+      if (!r) return null;
+      if (r.status === "pending") {
+        r.status = "earned";
+        r.earnedAt = new Date().toISOString();
+      }
+      return r.status === "earned" ? { ...r } : null;
+    },
+    async listEarnedReferrals(referrerId) {
+      return [...m.referrals.values()].filter((x) => x.referrerId === referrerId && x.status === "earned").map((x) => ({ ...x }));
+    },
+    async markReferralCredited(id, creditRef) {
+      const r = m.referrals.get(id);
+      if (!r || r.status !== "earned") return false;
+      r.status = "credited";
+      r.creditedAt = new Date().toISOString();
+      r.creditRef = creditRef;
+      return true;
+    },
+    async referralSummary(referrerId) {
+      const mine = [...m.referrals.values()].filter((x) => x.referrerId === referrerId);
+      return { credited: mine.filter((x) => x.status === "credited").length, waiting: mine.filter((x) => x.status !== "credited").length };
     },
   };
 }

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { BILLING_PERIOD, PLAN_NAMES } from "@/lib/entitlements";
+import { BILLING_PERIOD, PLAN_NAMES, REFERRAL_CREDIT } from "@/lib/entitlements";
 
 const PAID = `${PLAN_NAMES.premium} and ${PLAN_NAMES.max}`;
 
@@ -43,6 +43,13 @@ const DOCS: Record<string, Doc> = {
           <li>
             If you pay for a plan: which plan, its status and renewal date, and Stripe&rsquo;s reference for you and
             your subscription. Not your card details.
+          </li>
+          <li>
+            Referrals are not open yet. When they are, each account gets a short referral code. If you follow
+            someone&rsquo;s referral link and sign up, we keep a record that links your new account to theirs, with its
+            status, until your account is deleted. We tell the person who referred you only that a referral was
+            credited, never who you are. If they get {REFERRAL_CREDIT} credit when you first pay, that credit is
+            applied to their own Stripe balance.
           </li>
           <li>
             A record of what the service does, linked to your account: events such as &ldquo;roadmap
@@ -237,6 +244,11 @@ const DOCS: Record<string, Doc> = {
           beyond what your project needs, or malicious files. Don&rsquo;t pass off other people&rsquo;s work as yours,
           or try to get round plan limits or reach other people&rsquo;s accounts.
         </p>
+
+        <h2>Contact</h2>
+        <p>
+          Questions about these terms: <a className="link" href="mailto:hello@exhbt.co.uk">hello@exhbt.co.uk</a>.
+        </p>
       </>
     ),
   },
@@ -261,6 +273,14 @@ const DOCS: Record<string, Doc> = {
             to 90 days.
           </li>
         </ul>
+        <h2>Referral cookie (not in use yet)</h2>
+        <p>
+          Referrals are not open, so we set no referral cookie today. When they open, following a referral link will
+          set one cookie, <strong>exhbt_ref</strong>, for 30 days. It holds the referral code from the link and the
+          time you followed it, signed so it can&rsquo;t be altered, and nothing about you. We use it once, when you
+          sign up, to link your new account to the person who sent you, and then remove it. This page will be updated
+          to say how it is used before that happens.
+        </p>
         <h2>What your browser stores</h2>
         <p>
           The exhbt editor keeps a copy of your unsaved changes in your browser&rsquo;s local storage until the server

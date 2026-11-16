@@ -137,6 +137,13 @@ export const JOB_LINKS_LIVE = false;
 /** Exhbts picked for a job-specific link. */
 export const EXHBTS_PER_JOB_LINK = 4;
 
+/**
+ * What a referrer gets when someone they referred makes a first payment: account credit in Stripe
+ * (a customer balance), in pence and as shown. Referrals are built but off (lib/referrals.ts).
+ */
+export const REFERRAL_CREDIT_PENCE = 500;
+export const REFERRAL_CREDIT = "£5";
+
 /** Shown when a free account has used its roadmaps for the month (builder or project-ideas gate). */
 export function freeRoadmapLimitMessage(): string {
   const n = ENTITLEMENTS.free.roadmapsPer30Days;

@@ -81,5 +81,6 @@ Phase 2 is the paid product: build exhbts, publish them to a portfolio, pay for 
 | Portfolio looks: colours, fonts, which plan has which | `lib/portfolio-themes.ts`, `portfolioThemes` in `lib/entitlements.ts`, decision 0012 |
 | Teammates, invites, a teammate's own exhbt, matching identical files | `lib/team.ts`, `lib/team-rules.ts`, `lib/duplicates.ts`, `app/(app)/exhbts/[id]/team/`, decision 0013 |
 | The customiser, the layout schema, extra tiles | `app/(app)/portfolio/customise/`, `lib/portfolio-layout.ts`, `components/portfolio/ExtraTiles.tsx`, decision 0014 |
+| Referrals (off): the link, cookie, credit, the `REFERRALS_LIVE` switch, the credit figure | `lib/referrals.ts`, `app/r/[code]/route.ts`, `applyReferralsOnCheckout` in `app/api/stripe/webhook/route.ts`, `REFERRAL_CREDIT_PENCE` in `lib/entitlements.ts`, decision 0020 |
 | What the account export includes | `exportUserData` in `lib/store.ts` (both implementations) |
 | Privacy policy, terms, cookies | `app/(marketing)/legal/[doc]/page.tsx` |

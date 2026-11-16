@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { safeNext, supabaseServer } from "@/lib/auth";
+import { recordReferralFromCookie } from "@/lib/referrals";
 import { getStore } from "@/lib/store";
 
 /** Supabase magic-link landing: exchange the code, attach any pending roadmap, continue. */
@@ -16,5 +17,6 @@ export async function GET(req: NextRequest) {
   const store = getStore();
   await store.claimPendingRoadmaps(data.user.email, data.user.id);
   await store.logEvent("signup_completed", data.user.id);
+  await recordReferralFromCookie(data.user.id, data.user.created_at ?? null);
   return NextResponse.redirect(new URL(next, url.origin));
 }
