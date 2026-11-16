@@ -14,7 +14,7 @@ const DOCS: Record<string, Doc> = {
       <>
         <p>
           Exhbt (&ldquo;we&rdquo;) is the controller of the personal data described here. Contact:{" "}
-          <a className="link" href="mailto:privacy@exhbt.co.uk">privacy@exhbt.co.uk</a>.
+          <a className="link" href="mailto:hello@exhbt.co.uk">hello@exhbt.co.uk</a>.
         </p>
 
         <h2>What we collect</h2>
@@ -292,7 +292,7 @@ export default async function LegalPage({ params }: { params: Promise<{ doc: str
   return (
     <div className="mx-auto max-w-[68ch] px-4 pt-14 sm:px-8 lg:pt-20">
       <h1>{d.title}</h1>
-      <p className="hint mt-3">Last updated {d.updated}. Draft pending legal review.</p>
+      <p className="hint mt-3">Last updated {d.updated}.</p>
       <div className="prose-read mt-8">{d.body}</div>
     </div>
   );
