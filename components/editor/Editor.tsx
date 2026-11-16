@@ -502,7 +502,7 @@ export function Editor(props: EditorProps) {
                   </p>
                   <TextInput
                     id="evidence-label"
-                    label="What it is"
+                    label="Name on the button"
                     value={doc.evidence.label}
                     placeholder="e.g. Final report (PDF)"
                     onChange={(label) => update({ evidence: { kind: "file", fileId: (doc.evidence as { fileId: string }).fileId, label } })}
@@ -530,7 +530,7 @@ export function Editor(props: EditorProps) {
                   />
                   <TextInput
                     id="evidence-label"
-                    label="What it is"
+                    label="Name on the button"
                     value={doc.evidence?.label ?? ""}
                     placeholder="e.g. Final report (PDF)"
                     onChange={(label) => update({ evidence: evidence(doc.evidence?.kind === "link" ? doc.evidence.href : "", label) })}

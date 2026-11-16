@@ -129,7 +129,7 @@ export function ProjectView({
             {kind && <Fact term="What it is">{kind}</Fact>}
             {whereWhen && <Fact term="Where and when">{whereWhen}</Fact>}
             <Fact term="Can you trust it?">
-              <ul className="mt-1 space-y-1.5" data-checks>
+              <ul aria-label="Can you trust it?" className="mt-1 space-y-1.5" data-checks>
                 {checks.map((c) => (
                   <li key={c.key} className="flex items-start gap-2" data-done={c.done || undefined}>
                     {c.done ? (
