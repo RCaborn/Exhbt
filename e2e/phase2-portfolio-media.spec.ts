@@ -15,12 +15,12 @@ const [GP, LIBRARY] = sampleDocs as [ExhbtDoc, ExhbtDoc];
 const unique = (tag: string) => `${tag}-${Date.now().toString(36)}${Math.floor(Math.random() * 1e3)}`;
 const on = (baseURL: string | undefined, name: string) => (baseURL ?? "").replace("//localhost", `//${name}.localhost`);
 
-/** A Premium portfolio for `<username>@example.com`, then signed in as them on the settings page. */
+/** A Premium portfolio for `<username>@example.com`, then signed in as them on the builder's "You" step. */
 async function seedAndSignIn(page: Page, username: string) {
   const res = await page.request.get(`/dev/portfolio?username=${username}&plan=premium`, { maxRedirects: 0 });
   expect(res.status(), await res.text()).toBe(307);
-  await page.goto(`/auth/dev?email=${username}@example.com&next=/account/portfolio`);
-  await expect(page.getByRole("heading", { level: 1, name: "Portfolio settings" })).toBeVisible();
+  await page.goto(`/auth/dev?email=${username}@example.com&next=${encodeURIComponent("/portfolio?step=you")}`);
+  await expect(page.getByRole("heading", { level: 1, name: "Build your portfolio" })).toBeVisible();
 }
 
 /** A real PNG, drawn in the page: wider than tall, so the crop has something to do. */
@@ -77,7 +77,7 @@ test.describe("Profile photo", () => {
     await expect(page.locator('article [data-avatar="photo"]')).toBeVisible();
 
     // Replace: the new photo shows and the old file is gone.
-    await page.goto("/account/portfolio");
+    await page.goto("/portfolio?step=you");
     await uploadPhoto(page, "second.png");
     await page.goto(`/p/${name}`);
     const second = await glancePhoto(page).getAttribute("src");
@@ -85,7 +85,7 @@ test.describe("Profile photo", () => {
     expect((await page.request.get(first!)).status()).toBe(404);
 
     // Remove: initials again, and the file is deleted.
-    await page.goto("/account/portfolio");
+    await page.goto("/portfolio?step=you");
     await page.getByRole("button", { name: "Remove photo" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Photo removed." })).toBeVisible();
     await page.goto(`/p/${name}`);

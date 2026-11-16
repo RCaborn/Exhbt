@@ -320,11 +320,12 @@ test.describe("Sections in the editor", () => {
     await expect(article.getByRole("img", { name: "A queue at the cafe till" })).toBeVisible();
     await axe(page, "project page");
 
-    // The portfolio tile still shows the headline (the graph's change) and the flow.
+    // On the home page it is the best piece of work, with its first graph as the key figure (decision 0016).
     await page.goto("/p/sasha");
-    const tile = page.getByRole("link", { name: new RegExp(title) });
-    await expect(tile).toContainText("−64%");
-    for (const box of ["Timed the queue", "Opened a second till", "Timed it again"]) await expect(tile).toContainText(box);
+    const band = page.locator("[data-section=featured]");
+    await expect(band.getByRole("heading", { level: 2 })).toHaveText(title);
+    await expect(band.locator("[data-key-figure=chart]")).toBeVisible();
+    await expect(band.getByRole("link", { name: "See how I did it" })).toHaveAttribute("href", `/p/sasha/${slugify(title)}`);
   });
 
   test("reorder with the buttons, the drag handle's keys and a pointer drag; the order is saved", async ({ page }) => {

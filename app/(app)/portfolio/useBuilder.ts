@@ -1,19 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { checkTiles, type CustomiseState, type SaveResult } from "@/lib/portfolio-customise";
 
 /**
- * The customiser's state and its saving (decision 0014).
+ * The portfolio builder's state and its saving (decisions 0014 and 0016). Generic over the state, so
+ * the builder holds the "You" fields and the arrangement in one object with one status line.
  *
  *  - Every change shows at once (the state is updated before anything is sent).
  *  - Saving is debounced: about half a second after the last change, and at once when the tab is
  *    hidden or the page is left. One save at a time, always of the newest state, so an older
  *    request can't land after a newer one.
- *  - A state the tiles' own rules refuse (a quote over 30 words, an address that isn't https) is
- *    not sent; the status says so and the field shows what to fix. Everything else waits with it.
+ *  - A state the rules refuse (`problemOf`: a quote over its word cap, an address that isn't https)
+ *    is not sent; the status says so and the field shows what to fix. Everything else waits with it.
  *  - The last structural change can be undone: the whole state before it comes back and saves.
- *    Typing into a tile is not a change to undo; it is just edited.
+ *    Typing into a field is not a change to undo; it is just edited.
  *  - A failed save keeps the state on screen and says so; the next change, or "Try again", sends it.
  */
 
@@ -26,10 +26,12 @@ export type SaveStatus =
 
 const SAVE_AFTER_MS = 600;
 
-export function useCustomiser(initial: CustomiseState, save: (state: CustomiseState) => Promise<SaveResult>) {
+type SaveResult = { ok: true } | { ok: false; error: string };
+
+export function useBuilder<T>(initial: T, save: (state: T) => Promise<SaveResult>, problemOf: (state: T) => string | null | undefined) {
   const [state, setState] = useState(initial);
   const [status, setStatus] = useState<SaveStatus>({ kind: "saved" });
-  const [undoable, setUndoable] = useState<{ label: string; state: CustomiseState } | null>(null);
+  const [undoable, setUndoable] = useState<{ label: string; state: T } | null>(null);
   const undoRef = useRef(undoable);
   const latest = useRef(initial);
   const saved = useRef(initial);
@@ -37,6 +39,8 @@ export function useCustomiser(initial: CustomiseState, save: (state: CustomiseSt
   const running = useRef(false);
   const saveRef = useRef(save);
   saveRef.current = save;
+  const problemRef = useRef(problemOf);
+  problemRef.current = problemOf;
   const flushRef = useRef<() => Promise<void>>(async () => {});
 
   flushRef.current = async () => {
@@ -50,7 +54,7 @@ export function useCustomiser(initial: CustomiseState, save: (state: CustomiseSt
       return;
     }
     const sending = latest.current;
-    const first = Object.values(checkTiles(sending.tiles, sending.order).problems)[0];
+    const first = problemRef.current(sending);
     if (first) {
       setStatus({ kind: "invalid", message: first });
       return;
@@ -81,7 +85,7 @@ export function useCustomiser(initial: CustomiseState, save: (state: CustomiseSt
 
   /** Applies a change. Give `undo` (a short past-tense phrase) for a change the person can take back. */
   const change = useCallback(
-    (update: (s: CustomiseState) => CustomiseState, undo?: string) => {
+    (update: (s: T) => T, undo?: string) => {
       const before = latest.current;
       const next = update(before);
       if (next === before) return;

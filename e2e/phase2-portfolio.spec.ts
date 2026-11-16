@@ -229,9 +229,12 @@ test.describe("Public portfolio", () => {
     await page.goto("/p/amara");
     await expect(page.getByRole("heading", { level: 1, name: "Amara Okafor" })).toBeVisible();
     await expect(page.getByText("Data analyst, health and public services")).toBeVisible();
-    await expect(page.locator("[data-catalogue]")).toHaveText(["EX·01", "EX·02"]);
+    // Rory's layout (decision 0016): the first exhbt in the band, the next as a card, no catalogue numbers.
+    await expect(page.locator("[data-section=featured] h2")).toHaveText(GP.title);
+    await expect(page.locator("[data-card] h3")).toHaveText([LIBRARY.title]);
+    await expect(page.locator("[data-catalogue]")).toHaveCount(0);
 
-    await page.getByRole("link", { name: new RegExp(GP.title) }).click();
+    await page.getByRole("link", { name: "See how I did it" }).click();
     await page.waitForURL(/\/p\/amara\/gp-reminders$/);
     await expect(page.getByRole("heading", { level: 1, name: GP.title })).toBeVisible();
     await expect(page.locator("article [data-catalogue]")).toHaveCount(0);
@@ -247,7 +250,7 @@ test.describe("Public portfolio", () => {
 
     await page.getByRole("link", { name: "All of Amara's work" }).click();
     await page.waitForURL(/\/p\/amara$/);
-    await page.getByRole("link", { name: new RegExp(GP.title) }).click();
+    await page.getByRole("link", { name: "See how I did it" }).click();
     await page.waitForURL(/\/gp-reminders$/);
 
     await page.getByRole("navigation", { name: "Other projects" }).getByRole("link", { name: /Next/ }).click();
@@ -264,7 +267,8 @@ test.describe("Public portfolio", () => {
     await seed(page, "amara", "premium");
     await page.goto(`${SUBDOMAIN}/`);
     await expect(page.getByRole("heading", { level: 1, name: "Amara Okafor" })).toBeVisible();
-    await expect(page.getByRole("link", { name: new RegExp(GP.title) })).toHaveAttribute("href", "/gp-reminders");
+    await expect(page.getByRole("link", { name: "See how I did it" })).toHaveAttribute("href", "/gp-reminders");
+    await expect(page.getByRole("link", { name: new RegExp(LIBRARY.title) })).toHaveAttribute("href", "/library-footfall");
     await expect(page.getByRole("link", { name: /Build your own roadmap/ })).toHaveAttribute("href", `https://${MARKETING_HOST}/start`);
 
     await page.goto(`${SUBDOMAIN}/gp-reminders`);

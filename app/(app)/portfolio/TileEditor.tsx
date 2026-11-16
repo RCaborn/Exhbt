@@ -54,7 +54,7 @@ const wordsCount = (s: string, max: number) => ({ count: `${countWords(s)} of ${
 
 function Lines({ kind, value, onChange, problems, ready }: Props<"education" | "experience">) {
   const lines = value.lines.length ? value.lines : [""];
-  const set = (i: number, text: string) => onChange({ lines: lines.map((l, j) => (j === i ? text : l)) });
+  const set = (i: number, text: string) => onChange({ ...value, lines: lines.map((l, j) => (j === i ? text : l)) });
   const noun = kind === "education" ? "education" : "experience";
   const sample = kind === "education" ? "BSc Data Science, University of Example, 2026" : "Retail supervisor, Example Stores, 2023 to 2025";
   const error = problems[`${kind}.lines`];
@@ -79,7 +79,7 @@ function Lines({ kind, value, onChange, problems, ready }: Props<"education" | "
           {lines.length > 1 && (
             <button
               type="button"
-              onClick={() => onChange({ lines: lines.filter((_, j) => j !== i) })}
+              onClick={() => onChange({ ...value, lines: lines.filter((_, j) => j !== i) })}
               aria-label={`Remove ${noun} line ${i + 1}`}
               className="mt-7 inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface hover:border-ink"
             >
@@ -96,11 +96,25 @@ function Lines({ kind, value, onChange, problems, ready }: Props<"education" | "
       {lines.length < TILE_LIMITS.lines && (
         <button
           type="button"
-          onClick={() => onChange({ lines: [...lines, ""] })}
+          onClick={() => onChange({ ...value, lines: [...lines, ""] })}
           className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-sm font-semibold hover:border-ink"
         >
           <Plus aria-hidden size={14} strokeWidth={2.5} /> Add a line
         </button>
+      )}
+      {kind === "education" && (
+        <Field id="education-tools" label="Tools" hint="(optional)" error={problems["education.tools"]}>
+          <input
+            id="education-tools"
+            value={(value as NonNullable<Tiles["education"]>).tools ?? ""}
+            onChange={(e) => onChange({ ...value, tools: e.target.value })}
+            maxLength={TILE_LIMITS.toolsChars + 20}
+            placeholder="Python, SQL, Power BI"
+            readOnly={!ready}
+            aria-describedby="education-tools-error"
+            className="field"
+          />
+        </Field>
       )}
     </div>
   );

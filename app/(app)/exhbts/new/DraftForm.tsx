@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Circle, FileText, Loader2, Upload, X } from "lucide-react";
+import { ArrowRight, Circle, FileText, Loader2, Upload, X } from "lucide-react";
 import { DOC_ACCEPT, DocError, DocNeedsServer, countWords, extractTextInBrowser, readOnServer } from "@/lib/doc-readers";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { finishUpload } from "@/components/team/finish-upload";
 import { Button } from "@/components/ui/Button";
 import type { Plan } from "@/lib/entitlements";
+import { Tick } from "@/components/ui/Tick";
 
 /**
  * The upload step: files are read on the device as they're added (scans and photos ask before
@@ -357,9 +358,7 @@ function statusText(it: Item): React.ReactNode {
   return (
     <span className="inline-flex items-center gap-1.5">
       {words > 0 && (
-        <span className="inline-flex size-4 items-center justify-center rounded-full border border-ink bg-mint">
-          <Check aria-hidden size={10} strokeWidth={3} />
-        </span>
+        <Tick size="xs" />
       )}
       {words > 0 ? `${words.toLocaleString("en-GB")} words` : "Not read"}
       {uploaded}
@@ -390,9 +389,7 @@ function DraftingView({ step, done, words }: { step: number; done: boolean; word
           return (
             <li key={s.label} data-state={state} aria-current={state === "active" ? "step" : undefined} className={`flex items-center gap-2.5 ${state === "waiting" ? "text-graphite" : "font-semibold"}`}>
               {state === "done" ? (
-                <span className="inline-flex size-5 items-center justify-center rounded-full border border-ink bg-mint">
-                  <Check aria-hidden size={12} strokeWidth={3} />
-                </span>
+                <Tick />
               ) : state === "active" ? (
                 <Loader2 aria-hidden size={20} className="motion-safe:animate-spin" />
               ) : (

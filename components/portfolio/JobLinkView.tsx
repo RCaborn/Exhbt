@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ExhbtTile } from "@/components/exhbt/ExhbtTile";
 import { Avatar } from "@/components/portfolio/Avatar";
+import { tileFromDoc } from "@/lib/exhbt/headline";
 import type { LoadedJobLink } from "@/lib/job-links";
 
 /**
  * A per-job page (docs/phase-2.md section 8): "For Lloyds Banking Group · Graduate Data Analyst",
- * the person's intro, and their picked exhbts as tiles in the order they chose. Tiles match the
- * at-a-glance page. Each opens the project with ?for=<slug>, so the project page can offer the
+ * the person's intro, and their picked exhbts as tiles in the order they chose. The tiles are the
+ * at-a-glance page's own (ExhbtTile), numbered in this link's order (docs/brand.md). Each opens the project with ?for=<slug>, so the project page can offer the
  * way back to this page.
  */
 export function JobLinkView({ data }: { data: LoadedJobLink }) {
@@ -26,33 +27,10 @@ export function JobLinkView({ data }: { data: LoadedJobLink }) {
       </header>
 
       <h2 className="sr-only">Projects</h2>
-      <ul className="mt-8 grid gap-4 md:grid-cols-2">
-        {items.map((it) => (
+      <ul className="mt-8 grid gap-4 md:grid-cols-2 md:gap-5">
+        {items.map((it, i) => (
           <li key={it.id}>
-            <Link
-              href={`${base}/${it.slug}${forParam}`}
-              className="group flex h-full flex-col rounded-[16px] border border-line bg-surface p-5 hover:border-ink"
-            >
-              {it.doc.headline && (
-                <p className="text-[2rem] leading-none font-extrabold tracking-[-0.03em]">
-                  {it.doc.headline.value} <span className="text-base font-semibold tracking-normal text-graphite">{it.doc.headline.label}</span>
-                </p>
-              )}
-              <p className={`${it.doc.headline ? "mt-3" : ""} text-[1.15rem] leading-snug font-bold`}>{it.doc.title}</p>
-              {it.doc.context && <p className="mt-1 text-sm text-graphite">{it.doc.context}</p>}
-              {it.doc.skills.length > 0 && (
-                <ul aria-label="Skills" className="mt-3 flex flex-wrap gap-1.5">
-                  {it.doc.skills.slice(0, 4).map((s) => (
-                    <li key={s} className="rounded-[6px] border border-line bg-mist px-2 py-0.5 font-mono text-[0.72rem]">
-                      {s}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <span className="mt-auto inline-flex items-center gap-1.5 pt-4 text-sm font-semibold">
-                Open project <ArrowRight aria-hidden size={15} strokeWidth={2.25} className="group-hover:translate-x-0.5" />
-              </span>
-            </Link>
+            <ExhbtTile exhbt={tileFromDoc(it.doc)} href={`${base}/${it.slug}${forParam}`} position={i + 1} />
           </li>
         ))}
       </ul>

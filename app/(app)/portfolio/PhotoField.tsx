@@ -57,6 +57,7 @@ export function PhotoField({ name, photoUrl, maxMb }: { name: string; photoUrl: 
       return;
     }
     setBusy("upload");
+    setStatus("Uploading your photo…");
     let fileId: string | undefined;
     try {
       let blob: Blob;
@@ -83,6 +84,7 @@ export function PhotoField({ name, photoUrl, maxMb }: { name: string; photoUrl: 
       setStatus("Photo saved.");
       router.refresh();
     } catch (e) {
+      setStatus("");
       if (fileId) await fetch(`/api/files/${fileId}`, { method: "DELETE" }).catch(() => undefined);
       setError(e instanceof Error ? e.message : "We couldn't upload that photo. Check your connection.");
     } finally {

@@ -21,7 +21,7 @@ const OWN_NAV = [
   { href: "/roadmap", label: "Roadmaps" },
   { href: "/exhbts", label: "Your exhbts" },
   { href: "/job-links", label: "Job links" },
-  { href: "/account/portfolio", label: "Portfolio" },
+  { href: "/portfolio", label: "Portfolio" },
   { href: "/account", label: "Account" },
 ];
 

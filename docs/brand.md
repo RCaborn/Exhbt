@@ -37,7 +37,7 @@ Every exhbt in a portfolio has a number like a museum accession number: `EX·01`
 - The three mint ticks stay next to it on the full exhbt.
 
 ## Brand band
-One coloured surface per portfolio page, at the top: `PortfolioHeader` on the portfolio, the slim `PortfolioBar` above a single exhbt. It is ink unless the person chose another look.
+One coloured surface per portfolio page: the "My best piece of work" band on the portfolio home (decision 0016), the slim `PortfolioBar` above a single exhbt. It is ink unless the person chose another look.
 
 - Text on ink is white, or `#C9CBCF` for secondary text. Keep everything on the band at 7:1 or more.
 - No other ink blocks on those pages apart from the site footer.

@@ -1,9 +1,9 @@
 import { z } from "zod/v4";
 import type { Plan } from "./entitlements";
-import { HeaderBitsSchema, TILE_KINDS, TilesSchema, type HeaderBits, type Tiles } from "./portfolio-layout";
+import { HeaderBitsSchema, SECTION_KEYS, TILE_KINDS, TilesSchema, type HeaderBits, type SectionKey, type Tiles } from "./portfolio-layout";
 
 /**
- * What the portfolio customiser (app/(app)/portfolio/customise) sends to be saved, and what the
+ * What the portfolio builder's arrangement (app/(app)/portfolio, the Projects and Look steps) sends to be saved, and what the
  * server sends back. Pure, so the page, the action and the tests share one definition
  * (docs/decisions/0014). The server re-checks everything in the action; the client uses the same
  * schema to say what is wrong before it sends.
@@ -11,8 +11,10 @@ import { HeaderBitsSchema, TILE_KINDS, TilesSchema, type HeaderBits, type Tiles 
 
 /** The whole arrangement, as the page holds it. */
 export type CustomiseState = {
-  /** Every tile on the page, top to bottom: a project's id or an extra tile's name. Hidden and featured projects keep their place. */
+  /** The person's exhbts in their order (hidden and featured ones keep their place). */
   order: string[];
+  /** The home page's sections below the hero, top to bottom (decision 0016). */
+  sections: SectionKey[];
   /** Exhbts left off the glance page. */
   hidden: string[];
   /** The wide first tile, or null. */
@@ -20,7 +22,7 @@ export type CustomiseState = {
   /** The look the person has chosen and saved. */
   themeId: string;
   header: HeaderBits;
-  /** The words in each extra tile that is in `order`. */
+  /** The words the sections show (About me, Experience, a quote). */
   tiles: Tiles;
 };
 
@@ -30,6 +32,7 @@ const Key = z.string().min(1).max(64);
 
 export const CustomiseSchema = z.object({
   order: z.array(Key).max(MAX_KEYS),
+  sections: z.array(z.enum(SECTION_KEYS)).max(SECTION_KEYS.length),
   hidden: z.array(Key).max(MAX_KEYS),
   featured: Key.nullable(),
   themeId: z.string().max(40),

@@ -109,7 +109,8 @@ export const ENTITLEMENTS: Record<Plan, Entitlements> = {
     originalityCheck: true,
     projectSwapsPerRoadmap: 10,
     savedIdeas: true,
-    portfolioThemes: 6,
+    // The Exhbt look went in at the top of the list as the default (16 Nov 2026); one more keeps Premium's set.
+    portfolioThemes: 7,
     extraTiles: true,
   },
   max: MAX,

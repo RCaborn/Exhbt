@@ -1,6 +1,7 @@
 import { Check } from "lucide-react";
 import { APP_HOST } from "@/lib/hosts";
 import { BrowserFrame } from "./BrowserFrame";
+import { Tick } from "@/components/ui/Tick";
 
 /** Small, real-looking slices of the product used on the home page instead of illustrations. */
 
@@ -20,9 +21,7 @@ export function EditorExcerpt() {
         </div>
         <div className="mt-4 flex items-center justify-between border-y border-line px-5 py-2.5 text-xs">
           <span className="inline-flex items-center gap-1.5 font-medium">
-            <span className="inline-flex size-4 items-center justify-center rounded-full border border-ink bg-mint">
-              <Check aria-hidden size={10} strokeWidth={3} />
-            </span>
+            <Tick size="xs" />
             Source attached
           </span>
           <span className="font-mono text-graphite">164 / 200 words</span>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ExhbtTile } from "@/components/exhbt/ExhbtTile";
 import { PortfolioHeader } from "@/components/exhbt/PortfolioHeader";
 import { demoExhbts, demoOwner } from "@/lib/exhbt";
+import { themeById } from "@/lib/portfolio-themes";
 
 export const metadata: Metadata = {
   title: "Demo portfolio",
@@ -14,6 +15,8 @@ export default function DemoPortfolio() {
   return (
     <div className="bg-mist pb-16">
       <PortfolioHeader
+        // The demo keeps the ink band its copy and links are set for; the default look is now Exhbt (decision 0016).
+        theme={themeById("ink")}
         owner={demoOwner}
         exhbts={demoExhbts}
         note={

@@ -85,8 +85,8 @@ export default async function JobLinkEditPage({ params, searchParams }: Props) {
           ) : (
             <p className="mt-2">
               Choose your username to get an address.{" "}
-              <Link href="/account/portfolio" className="link font-semibold">
-                Portfolio settings
+              <Link href="/portfolio?step=publish" className="link font-semibold">
+                Choose your address
               </Link>
             </p>
           )}

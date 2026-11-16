@@ -141,8 +141,9 @@ test.describe("Inviting teammates", () => {
     // So does the owner, and the portfolio tile says it too.
     await signInAs(page, `${own}@example.com`, `/p/${own}/${SLUG}`);
     await expect(page.locator("[data-team]").getByText("Ben Ray")).toBeVisible();
+    // The home page shows the project; who it was with is on the project page (decision 0016).
     await page.goto(`/p/${own}`);
-    await expect(page.locator("[data-team]")).toContainText("Team project with Ben Ray (Built the model)");
+    await expect(page.locator("[data-section=featured]")).toBeVisible();
     await axe(page);
 
     // The owner removes them: gone from the page.
