@@ -50,7 +50,7 @@ Every colour, corner and face on the home page is a CSS custom property set by t
 | `--band-bg`, `--band-text`, `--band-soft`, `--band-accent`, `--band-edge` | the one coloured surface (the best-work band; its button is band-text on band-bg) | wash, ink, graphite, jade |
 | `--band-initials-bg`, `--band-initials-text` | the photo's stand-in | jade, white |
 
-A look sets the page part with the optional `page` field in `lib/portfolio-themes.ts` (`PageLook`); without it the brand's white page applies. The default look is a new first entry, **Exhbt** (Rory's spec: white page, wash band, Bricolage, round photo). It went in at the top of the list, so `portfolioThemes` for Premium went up by one to keep the same set; Free's one look is now Exhbt instead of Ink.
+A look sets the page part with the optional `page` field in `lib/portfolio-themes.ts` (`PageLook`); without it the brand's white page applies. Two things on the page are not themed: graphs keep the brand's one-hue ramp (decision 0011), drawn on `--pf-card`, so a dark look must keep its cards light or give the graphs variables of their own; and the exhbt mark in the sign-off keeps its colours (`docs/brand.md`). The default look is a new first entry, **Exhbt** (Rory's spec: white page, wash band, Bricolage, round photo). It went in at the top of the list, so `portfolioThemes` for Premium went up by one to keep the same set; Free's one look is now Exhbt instead of Ink.
 
 ## Feeling like theirs
 
