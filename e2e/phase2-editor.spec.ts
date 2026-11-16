@@ -160,14 +160,19 @@ test.describe("the exhbt editor", () => {
     }
     await expect(page.getByText("Average wait fell from 11 to 4 minutes.")).toBeVisible();
 
-    // Unpublish: nothing is live, so there's no public page.
+    // Unpublish: nothing is live, so there's no public page. The owner sees a preview of it instead
+    // (decision 0016); a visitor gets not found.
     await page.goto(editor);
     await expect(page.locator("[data-ready=true]")).toBeAttached();
     await page.getByRole("button", { name: "Unpublish" }).click();
     await page.getByRole("button", { name: "Yes, unpublish" }).click();
     await expect(page.getByRole("heading", { level: 2, name: "Publish" })).toBeVisible();
-    const res = await page.goto("/p/eddie");
+    await page.goto("/p/eddie");
+    await expect(page.getByTestId("owner-preview")).toBeVisible();
+    const visitor = await page.context().browser()!.newPage();
+    const res = await visitor.goto(new URL("/p/eddie", page.url()).toString());
     expect(res?.status()).toBe(404);
+    await visitor.close();
 
     // Free's one exhbt is used, so the list says why there's no new one (the plan is Premium now; back to Free).
     await page.goto("/dev/plan?plan=free&next=/exhbts");
