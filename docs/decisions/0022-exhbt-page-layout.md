@@ -20,7 +20,7 @@ The main column:
 - the skill pills, top right
 - **the title, which is the question** the work set out to answer, large
 - the context line under it, with the gap highlighted (a flat mint block)
-- the flowchart, as before: always there, 3 to 6 boxes, the last one dark. A row from 42rem of column width and in print, a column below that.
+- the flowchart, as before: always there, 3 to 6 boxes, the last one dark. A row from 36rem of column width and in print, a column below that.
 - the sections, in the person's order (decision 0015)
 
 Gone from the page: the `EX·01` catalogue number and the headline figure. `headline` stays in the schema, the word cap, job-link tiles and the link preview, since old exhbts have it; the editor still offers it, labelled as shown on job links. `catalogueNo` stays for the Phase 1 card and the tiles.

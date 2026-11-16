@@ -101,13 +101,9 @@ export function ProjectView({
       <div className="grid gap-8 @3xl/xp:grid-cols-[13.5rem_minmax(0,1fr)] @3xl/xp:gap-9 print:block">
         <aside aria-label={`About ${first} and this work`} className="xp-aside min-w-0 print:mb-3 print:grid print:grid-cols-[52mm_minmax(0,1fr)] print:gap-x-6 print:border-b print:pb-3">
           <div className="xp-card flex items-center gap-4 p-4 @3xl/xp:flex-col @3xl/xp:items-stretch @3xl/xp:gap-0 @3xl/xp:p-5 print:flex-row print:items-center print:gap-3 print:p-3">
-            <div className="shrink-0 @3xl/xp:mx-auto print:mx-0">
-              <span className="@3xl/xp:hidden print:block">
-                <Avatar name={owner.name} photoUrl={owner.photoUrl} size={64} shape={owner.shape} />
-              </span>
-              <span className="hidden @3xl/xp:block print:hidden">
-                <Avatar name={owner.name} photoUrl={owner.photoUrl} size={88} shape={owner.shape} />
-              </span>
+            {/* One photo, sized by .xp-avatar in globals.css: 64px beside the name, 88px over it in the sidebar. */}
+            <div className="xp-avatar shrink-0 @3xl/xp:mx-auto print:mx-0">
+              <Avatar name={owner.name} photoUrl={owner.photoUrl} size={88} shape={owner.shape} />
             </div>
             <div className="min-w-0 @3xl/xp:mt-4 print:mt-0">
               <p className="xp-name xp-display text-[1.5rem] leading-tight @3xl/xp:text-[1.625rem] print:text-[1.3rem]">{owner.name}</p>

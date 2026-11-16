@@ -260,8 +260,9 @@
     color: var(--xp-ink);
     font-family: var(--xp-font, var(--font-sans));
   }
-  /* Headings take the page's ink, not the site's (the base layer sets ink on every heading). */
-  .xp :is(h1, h2, h3) {
+  /* Headings and paragraphs take the page's ink, not the site's (the base layer sets ink on every
+     heading, and Astryx's reset on every paragraph). Low specificity, so .xp-muted still wins. */
+  :where(.xp) :is(h1, h2, h3, p) {
     color: inherit;
   }
   .xp-display {
@@ -271,6 +272,27 @@
   }
   .xp-muted {
     color: var(--xp-muted);
+  }
+  /* The sidebar photo (Avatar sets its size inline): 64px beside the name, 88px over it once the
+     sidebar stands beside the work, 56px in the printed band. */
+  .xp-avatar > * {
+    width: 4rem !important;
+    height: 4rem !important;
+    font-size: 1.45rem !important;
+  }
+  @container xp (min-width: 48rem) {
+    .xp-avatar > * {
+      width: 88px !important;
+      height: 88px !important;
+      font-size: 2rem !important;
+    }
+  }
+  @media print {
+    .xp-avatar > * {
+      width: 3.5rem !important;
+      height: 3.5rem !important;
+      font-size: 1.25rem !important;
+    }
   }
   .xp-card {
     background: var(--xp-card);
