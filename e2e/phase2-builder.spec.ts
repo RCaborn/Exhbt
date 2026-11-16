@@ -31,6 +31,9 @@ async function axe(page: Page) {
   expect(r.violations, JSON.stringify(r.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) })))).toEqual([]);
 }
 const stepHeading = (page: Page) => page.getByRole("heading", { level: 2 }).first();
+/** The home page's sections below the hero, top to bottom. */
+const sections = (page: Page, scope = "[data-testid=preview]") =>
+  page.locator(`${scope} [data-section]`).evaluateAll((els) => els.map((el) => el.getAttribute("data-section")));
 
 test.describe("The profile rules, no browser", () => {
   test("links become https addresses, the intro keeps its paragraphs, limits are words", () => {
@@ -187,6 +190,34 @@ test.describe("Build your portfolio", () => {
     await visitor.close();
   });
 
+  test("sections drag with the mouse in the preview, with a lifted section while it moves; the home page follows", async ({ page }) => {
+    // Tall enough for the whole preview to be on screen at once.
+    await page.setViewportSize({ width: 1440, height: 2600 });
+    const u = `bld${stamp()}`;
+    await open(page, u, "max", 2, "projects");
+    await page.getByRole("button", { name: "Edit About me" }).click();
+    await page.locator("#about-text").fill("A line about me.");
+    await saved(page);
+    const preview = page.getByTestId("preview");
+    expect(await sections(page)).toEqual(["featured", "work", "about", "contact"]);
+
+    const grip = preview.getByRole("button", { name: "Move About me", exact: true });
+    await grip.scrollIntoViewIfNeeded();
+    const from = (await grip.boundingBox())!;
+    const target = (await preview.locator("[data-section-key=featured]").boundingBox())!;
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 10, from.y - 20, { steps: 4 });
+    await page.mouse.move(from.x + 10, target.y + 20, { steps: 25 });
+    await expect(page.getByTestId("lifted-section")).toBeVisible();
+    await page.mouse.up();
+    await expect(page.getByTestId("lifted-section")).toHaveCount(0);
+    await expect.poll(() => sections(page)).toEqual(["about", "featured", "work", "contact"]);
+    await saved(page);
+    await page.goto(`/p/${u}`);
+    expect(await sections(page, "main")).toEqual(["about", "featured", "work", "contact"]);
+  });
+
   test("the old addresses redirect into the builder", async ({ page }) => {
     await open(page, `blr${stamp()}`);
     await page.goto("/portfolio/customise");
@@ -215,5 +246,30 @@ test.describe("Build your portfolio on a phone", () => {
     await page.goto(`/p/${u}`);
     expect(await overflow()).toBeLessThanOrEqual(0);
     await axe(page);
+  });
+
+  test("a press-and-hold on a section's grip drags it in the preview", async ({ page }) => {
+    const u = `blt${stamp()}`;
+    await open(page, u, "max", 2, "projects");
+    expect(await sections(page)).toEqual(["featured", "work", "about", "contact"]);
+    const preview = page.getByTestId("preview");
+    const grip = preview.getByRole("button", { name: "Move Get in touch", exact: true });
+    await grip.scrollIntoViewIfNeeded();
+    const a = (await grip.boundingBox())!;
+    const target = (await preview.locator("[data-section-key=about]").boundingBox())!;
+    const cdp = await page.context().newCDPSession(page);
+    const point = (x: number, y: number) => [{ x, y, id: 1 }];
+    const sx = a.x + a.width / 2;
+    const sy = a.y + a.height / 2;
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: point(sx, sy) });
+    await page.waitForTimeout(300); // the short press that tells a drag from a scroll
+    const ty = target.y + 10;
+    for (let i = 1; i <= 20; i++) {
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: point(sx, sy + ((ty - sy) * i) / 20) });
+      await page.waitForTimeout(16);
+    }
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await expect.poll(() => sections(page)).toEqual(["featured", "work", "contact", "about"]);
+    await saved(page);
   });
 });
