@@ -3,11 +3,17 @@ import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/Button";
 import { MobileNav } from "./MobileNav";
 
+/** Signed out: two pages, then the two ways in. Employers and universities are in the footer. */
 const NAV = [
-  { href: "/how-to-read-an-exhbt", label: "For employers" },
+  { href: "/what-is-an-exhbt", label: "What is an exhbt?" },
   { href: "/pricing", label: "Pricing" },
-  { href: "/universities", label: "For universities" },
 ];
+
+/** The two ways in, in the header and in the phone menu. */
+export const ACTIONS = [
+  { href: "/exhbts/new", label: "Build your exhbt", variant: "secondary" },
+  { href: "/roadmap/new", label: "Build your roadmap", variant: "primary" },
+] as const;
 
 /** What a signed-in person needs from the header: their own exhbts, portfolio and account. */
 const OWN_NAV = [
@@ -39,7 +45,7 @@ export function SiteHeader({
     <header className="relative border-b border-line bg-surface">
       <div className="mx-auto flex max-w-[78rem] items-center justify-between gap-x-8 gap-y-3 px-4 py-4 sm:px-8">
         <Wordmark />
-        <nav aria-label="Main" className="hidden sm:block">
+        <nav aria-label="Main" className={signedIn ? "hidden sm:block" : "hidden lg:block"}>
           <ul className="flex gap-7 text-[0.95rem] font-medium text-graphite">
             {nav.map((n) => (
               <li key={n.href} className="shrink-0">
@@ -51,17 +57,21 @@ export function SiteHeader({
           </ul>
         </nav>
         <div className="flex items-center gap-4 text-[0.95rem]">
-          <MobileNav items={nav} />
+          <MobileNav items={nav} actions={signedIn ? [] : [...ACTIONS]} breakpoint={signedIn ? "sm" : "lg"} />
           {!signedIn && (
-            <Link href="/login" className="link font-medium">
-              Log in
-            </Link>
+            <>
+              <Link href="/login" className="link font-medium">
+                Log in
+              </Link>
+              <span className="hidden items-center gap-2 lg:inline-flex">
+                {ACTIONS.map((a) => (
+                  <Button key={a.href} href={a.href} variant={a.variant}>
+                    {a.label}
+                  </Button>
+                ))}
+              </span>
+            </>
           )}
-          <span className="hidden sm:inline-flex">
-            <Button href="/roadmap/new" variant="primary">
-              Build my roadmap
-            </Button>
-          </span>
         </div>
       </div>
     </header>

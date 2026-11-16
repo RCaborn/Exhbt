@@ -2,9 +2,10 @@ import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
 
 const LINKS = [
+  ["/what-is-an-exhbt", "What is an exhbt?"],
   ["/pricing", "Pricing"],
   ["/universities", "For universities"],
-  ["/how-to-read-an-exhbt", "For employers"],
+  ["/how-to-read-an-exhbt", "How to read an exhbt"],
   ["/legal/privacy", "Privacy"],
   ["/legal/terms", "Terms"],
   ["/legal/cookies", "Cookies"],
@@ -18,7 +19,7 @@ export function SiteFooter() {
         <div>
           <Logo className="text-white" />
           <p className="mt-3 max-w-sm text-[#c9cbcf]">
-            Turns graduates&rsquo; project work into a portfolio of exhbts that employers can check.
+            Your own portfolio site at name.exhbt.co.uk, built from your projects.
           </p>
         </div>
         <nav aria-label="Footer">
