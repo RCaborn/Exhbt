@@ -62,6 +62,15 @@ export type HostKind =
  * link opened on www would set it there and the next page would open on app without a session.
  * /account, /exhbts and /start are not in that list, so they stay on the host that was opened.
  */
+/**
+ * The move to the app host is off until EXHBT_TOOL_HOST=1. Sign-in cookies are host-only, so turning
+ * it on signs everyone out once, and app.exhbt.co.uk must already reach this Worker (the routes ship
+ * with the phase-2 launch). Until then sign-in stays on www.
+ */
+export function toolHostEnabled(): boolean {
+  return process.env.EXHBT_TOOL_HOST === "1";
+}
+
 const TOOL_PATHS = ["/login", "/roadmap", "/auth"];
 
 /**
@@ -69,7 +78,13 @@ const TOOL_PATHS = ["/login", "/roadmap", "/auth"];
  * Only those two hosts move. Localhost and *.workers.dev are one origin in development
  * and on preview builds; sending them to the production app host would break both.
  */
-export function toolRedirectUrl(rawHost: string | null | undefined, pathname: string, search = ""): string | null {
+export function toolRedirectUrl(
+  rawHost: string | null | undefined,
+  pathname: string,
+  search = "",
+  enabled = toolHostEnabled(),
+): string | null {
+  if (!enabled) return null;
   const host = (rawHost ?? "").toLowerCase().replace(/:\d+$/, "");
   if (host !== APEX && host !== MARKETING_HOST) return null;
   if (!TOOL_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;

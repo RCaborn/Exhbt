@@ -1,7 +1,7 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import { APEX, APP_HOST, MARKETING_HOST } from "./hosts";
+import { APEX, APP_HOST, MARKETING_HOST, toolHostEnabled } from "./hosts";
 import { isSupabaseConfigured } from "./store";
 
 export type SessionUser = { id: string; email: string };
@@ -41,7 +41,7 @@ export async function siteOrigin() {
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   const bare = host.toLowerCase().replace(/:\d+$/, "");
-  if (bare === APEX || bare === MARKETING_HOST) return `https://${APP_HOST}`;
+  if (toolHostEnabled() && (bare === APEX || bare === MARKETING_HOST)) return `https://${APP_HOST}`;
   return `${h.get("x-forwarded-proto") ?? "http"}://${host}`;
 }
 

@@ -14,7 +14,7 @@ flowchart LR
   person --> job["A path per job, on Max"]
 ```
 
-On the real domains, www and the apex send /login, /roadmap and /auth to the app host, and a person's host is their portfolio. Localhost and a workers.dev preview stay one origin, so development is unchanged. Employer links are a path on the person's host. Cookies for sign-in stay on the app host. The Worker routes that attach those domains are not in `wrangler.jsonc` yet: a deploy cannot add them until exhbt.co.uk is a zone on this Cloudflare account.
+At launch, with `EXHBT_TOOL_HOST=1` set, www and the apex send /login, /roadmap and /auth to the app host (until then sign-in stays on www, and email links use the request host); a person's host is their portfolio. Localhost and a workers.dev preview stay one origin, so development is unchanged. Employer links are a path on the person's host. Cookies for sign-in stay on the app host. The Worker routes that attach those domains are not in `wrangler.jsonc` yet: a deploy cannot add them until exhbt.co.uk is a zone on this Cloudflare account.
 
 ## Plans
 

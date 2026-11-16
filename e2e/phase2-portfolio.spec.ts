@@ -109,7 +109,7 @@ test.describe("Hosts", () => {
   });
 
   test("www and the apex send sign-in and the builder to the app host", () => {
-    const go = (host: string, path: string, search = "") => toolRedirectUrl(host, path, search);
+    const go = (host: string, path: string, search = "") => toolRedirectUrl(host, path, search, true);
     for (const host of ["www.exhbt.co.uk", "exhbt.co.uk", "WWW.exhbt.co.uk:443"]) {
       expect(go(host, "/login"), host).toBe(`https://${APP_HOST}/login`);
       expect(go(host, "/roadmap/new", "?role=analyst"), host).toBe(`https://${APP_HOST}/roadmap/new?role=analyst`);
@@ -124,13 +124,13 @@ test.describe("Hosts", () => {
     expect(go("www.exhbt.co.uk", "/start")).toBeNull();
   });
 
-  test("www sign-in is sent to the app host, and localhost is not", async ({ request }) => {
-    const moved = await request.get("/login?next=%2Froadmap", {
+  test("the move to the app host is off by default, so www keeps its sign-in", async ({ request }) => {
+    expect(toolRedirectUrl("www.exhbt.co.uk", "/login", "")).toBeNull();
+    const www = await request.get("/login?next=%2Froadmap", {
       headers: { host: "www.exhbt.co.uk" },
       maxRedirects: 0,
     });
-    expect(moved.status()).toBe(301);
-    expect(moved.headers().location).toBe("https://app.exhbt.co.uk/login?next=%2Froadmap");
+    expect(www.status()).toBe(200);
 
     const stayed = await request.get("/login", { maxRedirects: 0 });
     expect(stayed.status()).not.toBe(301);

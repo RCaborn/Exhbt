@@ -48,7 +48,7 @@ export async function middleware(req: NextRequest) {
   if (pathname.startsWith("/p/") && !phase2()) return notFound();
 
   const tool = toolRedirectUrl(rawHost, pathname, req.nextUrl.search);
-  if (tool) return NextResponse.redirect(tool, 301);
+  if (tool) return NextResponse.redirect(tool, 307);
 
   if (!SESSION_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return NextResponse.next();
 
