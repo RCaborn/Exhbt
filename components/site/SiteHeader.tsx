@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/Button";
+import { HeaderLinks } from "./HeaderLinks";
 import { MobileNav } from "./MobileNav";
 
 /** Signed out: two pages, then the two ways in. Employers and universities are in the footer. */
@@ -46,15 +47,7 @@ export function SiteHeader({
       <div className="mx-auto flex max-w-[78rem] items-center justify-between gap-x-8 gap-y-3 px-4 py-4 sm:px-8">
         <Wordmark />
         <nav aria-label="Main" className={signedIn ? "hidden sm:block" : "hidden lg:block"}>
-          <ul className="flex gap-7 text-[0.95rem] font-medium text-graphite">
-            {nav.map((n) => (
-              <li key={n.href} className="shrink-0">
-                <Link href={n.href} className="hover:text-ink">
-                  {n.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <HeaderLinks items={nav} />
         </nav>
         <div className="flex items-center gap-4 text-[0.95rem]">
           <MobileNav items={nav} actions={signedIn ? [] : [...ACTIONS]} breakpoint={signedIn ? "sm" : "lg"} />

@@ -80,17 +80,28 @@ export function Exhbt({ exhbt: e, example, headingLevel = "h2", className = "", 
       </ul>
 
       <div className="mx-6 mt-5 border-t border-line sm:mx-8" data-field="evidence">
-        <a
-          href={e.evidence.href}
-          className="group flex items-center gap-3 py-3.5 hover:text-graphite"
-          aria-label={`Open the work: ${e.evidence.label}`}
-        >
-          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-[8px] bg-mist">
-            <EvidenceIcon aria-hidden size={18} strokeWidth={1.75} />
-          </span>
-          <span className="min-w-0 flex-1 font-medium">{e.evidence.label}</span>
-          <ArrowUpRight aria-hidden size={18} strokeWidth={2} className="shrink-0 text-slate group-hover:text-ink" />
-        </a>
+        {example && e.evidence.href === "#" ? (
+          // A fictional example has no file to open, so this row is a label, not a dead link.
+          <div className="flex items-center gap-3 py-3.5">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-[8px] bg-mist">
+              <EvidenceIcon aria-hidden size={18} strokeWidth={1.75} />
+            </span>
+            <span className="min-w-0 flex-1 font-medium">{e.evidence.label}</span>
+            <span className="shrink-0 text-xs text-graphite">Example only</span>
+          </div>
+        ) : (
+          <a
+            href={e.evidence.href}
+            className="group flex items-center gap-3 py-3.5 hover:text-graphite"
+            aria-label={`Open the work: ${e.evidence.label}`}
+          >
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-[8px] bg-mist">
+              <EvidenceIcon aria-hidden size={18} strokeWidth={1.75} />
+            </span>
+            <span className="min-w-0 flex-1 font-medium">{e.evidence.label}</span>
+            <ArrowUpRight aria-hidden size={18} strokeWidth={2} className="shrink-0 text-slate group-hover:text-ink" />
+          </a>
+        )}
       </div>
 
       <footer className="border-t border-line px-6 py-4 sm:px-8">

@@ -11,7 +11,6 @@ const USAGE = [
   ["Seats used", "1,284 of 2,000"],
   ["Roadmaps completed", "1,102"],
   ["Students with a published exhbt", "617"],
-  ["Exhbts opened by employers, last 30 days", "2,940"],
 ] as const;
 
 const COURSES = [
@@ -23,12 +22,12 @@ const COURSES = [
 
 export default function UniversitiesPage() {
   return (
-    <div className="mx-auto max-w-[76rem] px-4 pt-14 sm:px-8 lg:pt-20">
+    <div className="mx-auto max-w-[76rem] px-4 pt-14 pb-24 sm:px-8 lg:pt-20">
       <div className="max-w-3xl">
         <h1 className="display">For universities</h1>
         <p className="mt-4 text-lg text-graphite">
           Give every student a roadmap and {PLAN_NAMES.max}, and see which courses are turning project work into
-          evidence employers open. Licences run for a year and are invoiced, from £6,000 depending on cohort size.
+          evidence employers open. Licences run for a year and are invoiced; the price depends on your cohort size, so ask us for a quote.
         </p>
       </div>
 
@@ -40,7 +39,7 @@ export default function UniversitiesPage() {
           </div>
           <dl className="grid grid-cols-2 border-b border-line">
             {USAGE.map(([k, v]) => (
-              <div key={k} className="border-line px-5 py-4 odd:border-r [&:nth-child(-n+2)]:border-b">
+              <div key={k} className="border-line px-5 py-4 odd:border-r [&:nth-child(-n+2)]:border-b [&:last-child]:col-span-2 [&:last-child]:border-r-0">
                 <dt className="text-sm text-graphite">{k}</dt>
                 <dd className="mt-1 font-mono text-[1.05rem]">{v}</dd>
               </div>
@@ -83,13 +82,13 @@ export default function UniversitiesPage() {
           <div>
             <dt className="font-medium">Data</dt>
             <dd className="mt-1.5 text-graphite">
-              Stored in the UK, encrypted at rest and in transit. Students can export or delete their data
+              Stored in the EU, encrypted at rest and in transit. Students can export or delete their data
               themselves. We publish our list of processors.
             </dd>
           </div>
           <div>
             <dt className="font-medium">Accessibility</dt>
-            <dd className="mt-1.5 text-graphite">Built to WCAG 2.1 AA, including the exhbt editor.</dd>
+            <dd className="mt-1.5 text-graphite">We test the public pages against WCAG 2.1 AA on every change, and we fix what we find.</dd>
           </div>
           <div>
             <dt className="font-medium">Onboarding</dt>
@@ -107,7 +106,7 @@ export default function UniversitiesPage() {
       <section aria-labelledby="contact" className="mt-24 grid gap-12 border-t border-line pt-12 lg:grid-cols-[18rem_1fr]">
         <div>
           <h2 id="contact" className="">Talk to us</h2>
-          <p className="mt-3 text-graphite">We reply within two working days.</p>
+          <p className="mt-3 text-graphite">Tell us roughly how many students you have and we&rsquo;ll come back with a quote.</p>
         </div>
         <div className="max-w-xl">
           <LeadForm />

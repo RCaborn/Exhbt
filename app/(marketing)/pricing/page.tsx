@@ -8,10 +8,10 @@ import {
   JOB_LINKS_LIVE,
   PLAN_NAMES,
   PRICES,
-  planFeatures,
 } from "@/lib/entitlements";
 import { FeatureList } from "@/components/site/FeatureList";
 import { Button } from "@/components/ui/Button";
+import { marketingFeatures } from "@/lib/marketing-features";
 import { isPhase2Enabled } from "@/lib/site";
 
 // Per request: the EXHBT_PHASE2 switch is read at runtime, so the paid plans appear (or go back
@@ -55,14 +55,14 @@ export default async function PricingPage(props: Props) {
         </p>
       </div>
 
-      <div className="mt-12 grid gap-4 lg:grid-cols-3">
+      <div className="mt-12 grid gap-4 lg:grid-cols-3 lg:items-start">
         <section aria-labelledby="tier-free" className="flex flex-col rounded-[20px] border border-line bg-mist p-7">
           <h2 id="tier-free" className="text-[1.375rem]">{PLAN_NAMES.free}</h2>
           <p className="mt-2 text-[2.6rem] leading-none font-extrabold tracking-[-0.03em]">{PRICES.free}</p>
-          <p className="mt-3 text-graphite">Start here. No card, nothing to install.</p>
-          <FeatureList items={planFeatures("free")} className="mt-5" />
-          <div className="mt-auto pt-6">
-            <Button href="/roadmap/new">Build my roadmap</Button>
+          <p className="mt-3 text-graphite">Start here. No card, nothing to install. Anything you build stays private: publishing to a public address comes with {PLAN_NAMES.premium} and {PLAN_NAMES.max}.</p>
+          <FeatureList items={marketingFeatures("free")} className="mt-5" />
+          <div className="pt-6">
+            <Button href="/roadmap/new">Build your roadmap</Button>
           </div>
         </section>
 
@@ -175,7 +175,7 @@ function Tier({
         <span className="ml-1 text-base font-semibold tracking-normal text-graphite">a {BILLING_PERIOD}</span>
       </p>
       <p className="mt-3 text-graphite">{summary}</p>
-      <FeatureList items={planFeatures(id)} className="mt-5" />
+      <FeatureList items={marketingFeatures(id)} className="mt-5" />
       {sell ? (
         <div className="mt-auto pt-7">
           {/* Billing sends anyone signed out to sign in first, then back (app/(app)/account/billing). */}

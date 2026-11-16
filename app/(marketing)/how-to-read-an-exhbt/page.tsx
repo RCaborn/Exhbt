@@ -3,7 +3,7 @@ import { Exhbt } from "@/components/exhbt/Exhbt";
 import { exampleExhbt } from "@/lib/exhbt";
 
 export const metadata: Metadata = {
-  title: "For employers: how to read an exhbt",
+  title: "How to read an exhbt",
   description: "A two-minute guide for hiring managers and careers staff to Exhbt portfolios. Free, no account needed.",
 };
 
@@ -51,7 +51,7 @@ export default function HowToRead() {
         <p className="mt-4 text-lg text-graphite">
           For hiring managers and careers staff. An exhbt is one project from a graduate&rsquo;s portfolio. Every
           one uses the same layout and limits, about 200 words plus a chart, so once you know the parts you can
-          read any of them in about thirty seconds. Free, and you never need an account.
+          read any of them quickly. Free, and you never need an account.
         </p>
       </div>
 

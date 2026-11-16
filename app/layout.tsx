@@ -11,7 +11,7 @@ import { isPrivatePreview } from "@/lib/site";
 export const metadata: Metadata = {
   title: { default: "Exhbt: evidence employers can check", template: "%s · Exhbt" },
   description:
-    "A free skills-gap roadmap for graduates, then a portfolio of short, checked exhbts of your project work that hiring managers can read in 30 seconds.",
+    "A free skills-gap roadmap for graduates, then your own portfolio site at name.exhbt.co.uk, built from short, checked exhbts of your project work.",
   // Private preview: keep every page out of search results (see lib/site.ts).
   ...(isPrivatePreview ? { robots: { index: false, follow: false } } : {}),
 };

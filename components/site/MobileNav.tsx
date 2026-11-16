@@ -80,7 +80,12 @@ export function MobileNav({
           <ul>
             {items.map((n) => (
               <li key={n.href} className="border-t border-line first:border-t-0">
-                <Link href={n.href} onClick={() => setOpen(false)} className="block py-3 text-[1rem] font-medium text-ink">
+                <Link
+                  href={n.href}
+                  onClick={() => setOpen(false)}
+                  aria-current={pathname === n.href ? "page" : undefined}
+                  className={`block py-3 text-[1rem] font-medium text-ink ${pathname === n.href ? "underline decoration-jade decoration-2 underline-offset-8" : ""}`}
+                >
                   {n.label}
                 </Link>
               </li>

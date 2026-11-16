@@ -9,7 +9,6 @@ const LINKS = [
   ["/legal/privacy", "Privacy"],
   ["/legal/terms", "Terms"],
   ["/legal/cookies", "Cookies"],
-  ["/start", "Quick start"],
 ] as const;
 
 export function SiteFooter() {
