@@ -13,6 +13,7 @@ import { isPhase2Enabled as phase2 } from "@/lib/site";
 
 /** Routes that read the session. Marketing pages stay static and fast. */
 const SESSION_PATHS = [
+  "/admin",
   "/roadmap",
   "/account",
   "/api/account",
