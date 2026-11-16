@@ -152,14 +152,13 @@ test.describe("Link previews", () => {
 });
 
 test.describe("Project page", () => {
-  test("shows the headline number under the title, the catalogue number and the seal", async ({ page }) => {
+  test("shows the checks with the date, and no headline number or catalogue number (decision 0022)", async ({ page }) => {
     await seedAndSignIn(page, "amara");
     await page.goto("/p/amara/gp-reminders");
-    const headline = page.locator("article [data-headline]");
-    await expect(headline).toContainText(GP.headline!.value);
-    await expect(headline).toContainText(GP.headline!.label);
-    await expect(page.locator("article [data-catalogue]")).toHaveText("EX·01");
-    await expect(page.getByRole("link", { name: /Checked by exhbt/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: GP.title })).toBeVisible();
+    await expect(page.locator("article [data-headline]")).toHaveCount(0);
+    await expect(page.locator("article [data-catalogue]")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /^Checked by exhbt, / })).toBeVisible();
   });
 
   test("prints as the exhbt alone, with its address", async ({ page }) => {
@@ -174,9 +173,9 @@ test.describe("Project page", () => {
     await expect(page.getByRole("complementary", { name: "Made with exhbt" })).toBeHidden();
     await expect(page.getByRole("button", { name: "Save as PDF" })).toBeHidden();
     await expect(page.getByRole("list", { name: "Methodology" })).toBeVisible();
-    await expect(page.getByRole("region", { name: "findings" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "What I found" })).toBeVisible();
     await expect(page.getByRole("table", { name: chartsOf(GP)[0]!.title })).toBeAttached();
-    await expect(page.getByRole("list", { name: "Checks passed" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Can you trust it?" })).toBeVisible();
     await expect(page.locator("[data-print-address]")).toBeVisible();
     await expect(page.locator("[data-print-address]")).toHaveText("amara.exhbt.co.uk/gp-reminders");
     // One A4 page.

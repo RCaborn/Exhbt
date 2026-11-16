@@ -36,6 +36,8 @@ function docTexts(d: ExhbtDoc): string[] {
   return [
     d.title,
     d.context,
+    d.whereWhen ?? "",
+    d.summary ?? "",
     d.headline?.value ?? "",
     d.headline?.label ?? "",
     ...d.skills,

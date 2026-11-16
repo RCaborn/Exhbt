@@ -21,6 +21,7 @@ import { Checklist, isBlank, stepsFor } from "./Checklist";
 import { IMAGE_ACCEPT, WORK_ACCEPT, checkFile, fileIdsOf, removeFile, UploadError, uploadForExhbt } from "./media";
 import { cardOf, cardWords, confirmNumber, issuesAt, labelOf, unverifiedOf, visibleIssues, type CardKey } from "./model";
 import { Card, TextInput } from "./parts";
+import { PreviewArrange } from "./PreviewArrange";
 import { Sections } from "./Sections";
 import { SkillsInput } from "./SkillsInput";
 import { clearBackup, readBackup, useAutosave, type Backup } from "./useAutosave";
@@ -86,6 +87,8 @@ export function Editor(props: EditorProps) {
   const [result, setResult] = useState<{ ok: boolean; lines: string[] } | null>(null);
   const [justLive, setJustLive] = useState<{ slug: string; changed: boolean } | null>(null);
   const [view, setView] = useState<"edit" | "preview">("edit");
+  // The preview's sections as a list to drag (PreviewArrange, decision 0022).
+  const [arranging, setArranging] = useState(false);
   const [ready, setReady] = useState(false);
   const [offer, setOffer] = useState<Backup | null>(null);
   const [guided] = useState(() => isBlank(props.initialDoc));
@@ -228,7 +231,7 @@ export function Editor(props: EditorProps) {
 
   const evidenceHref = doc.evidence?.kind === "link" ? safeHref(doc.evidence.href) : doc.evidence?.kind === "file" ? workUrl : null;
   // Graphs show in the preview once something is typed in them.
-  const previewDoc: ExhbtDoc = { ...doc, title: doc.title.trim() || "Your title", sections: doc.sections.filter((s) => s.kind !== "graph" || hasData(s.chart)) };
+  const previewDoc: ExhbtDoc = { ...doc, title: doc.title.trim() || "Your question", sections: doc.sections.filter((s) => s.kind !== "graph" || hasData(s.chart)) };
   const liveUrl = liveBase && slug ? `${liveBase}/${slug}` : null;
   const justLiveUrl = liveBase && justLive ? `${liveBase}/${justLive.slug}` : null;
   const shownLive = canGoLive && status === "published";
@@ -370,7 +373,7 @@ export function Editor(props: EditorProps) {
                 }}
               />
             )}
-            <Card id="card-header" title="Title and skills" words={cw.header} flagged={flaggedBy("header")} heaviest={heaviest === "header"}>
+            <Card id="card-header" title="Your question and details" words={cw.header} flagged={flaggedBy("header")} heaviest={heaviest === "header"}>
               {flags.length > 0 && (
                 <ul aria-label="Numbers to check" className="mb-4 space-y-2">
                   {flags.map((n) => (
@@ -388,11 +391,39 @@ export function Editor(props: EditorProps) {
               )}
               <BlockTools dt={dt} block="header" />
               <div className="space-y-4">
-                <TextInput id="title" label="Title" value={doc.title} max={LIMITS.titleChars} onChange={(title) => update({ title })} issues={issuesAt(issues, "title")} placeholder="What you did, and what changed. e.g. Cut cafe queues from 11 to 4 minutes" />
-                <TextInput id="context" label="Context line" value={doc.context} max={LIMITS.contextChars} onChange={(context) => update({ context })} issues={issuesAt(issues, "context")} placeholder="e.g. BSc Economics, final-year project" />
+                <TextInput
+                  id="title"
+                  label="Your question (the title)"
+                  value={doc.title}
+                  max={LIMITS.titleChars}
+                  onChange={(title) => update({ title })}
+                  issues={issuesAt(issues, "title")}
+                  placeholder="The question your work answers. e.g. Would a second till cut lunchtime queues?"
+                />
+                <TextInput
+                  id="summary"
+                  label="One-sentence summary"
+                  value={doc.summary ?? ""}
+                  onChange={(summary) => update({ summary })}
+                  issues={issuesAt(issues, "summary")}
+                  multiline
+                  placeholder="What you found, in one sentence. Shown on your portfolio's cards."
+                />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <TextInput id="context" label="What it is" value={doc.context} max={LIMITS.contextChars} onChange={(context) => update({ context })} issues={issuesAt(issues, "context")} placeholder="e.g. MSc Finance dissertation" />
+                  <TextInput
+                    id="whereWhen"
+                    label="Where and when"
+                    value={doc.whereWhen ?? ""}
+                    max={LIMITS.whereWhenChars}
+                    onChange={(whereWhen) => update({ whereWhen })}
+                    issues={issuesAt(issues, "whereWhen")}
+                    placeholder="e.g. University of Leeds, May 2026"
+                  />
+                </div>
                 <fieldset>
                   <legend className="label">
-                    Headline number <span className="font-normal text-graphite">(optional, shown on your portfolio)</span>
+                    Headline number <span className="font-normal text-graphite">(optional, shown on job links)</span>
                   </legend>
                   <div className="grid grid-cols-[8rem_1fr] gap-2">
                     <input
@@ -418,14 +449,23 @@ export function Editor(props: EditorProps) {
               </div>
             </Card>
 
-            <Card id="card-gap" title="The question" words={cw.gap} limit={LIMITS.gapWords} hint="What the question was and why it mattered. Two short sentences." flagged={flaggedBy("gap")} heaviest={heaviest === "gap"}>
+            <Card
+              id="card-gap"
+              title="Context"
+              words={cw.gap}
+              limit={LIMITS.gapWords}
+              hint="Why the question matters, in one or two short sentences. Select the gap nobody has filled yet and press Highlight."
+              flagged={flaggedBy("gap")}
+              heaviest={heaviest === "gap"}
+            >
               <BlockTools dt={dt} block="gap" />
               <RichTextField
                 labelId="card-gap"
                 describedBy="gap-issues"
                 value={doc.gap}
                 onChange={(gap) => update({ gap })}
-                placeholder="e.g. Lunchtime queues ran past ten minutes. Would a second till help?"
+                highlight
+                placeholder="e.g. Lunchtime queues ran past ten minutes. Nobody had timed what a second till would save."
               />
               <FieldIssues id="gap-issues" issues={issuesAt(issues, "gap")} />
             </Card>
@@ -462,7 +502,7 @@ export function Editor(props: EditorProps) {
                   </p>
                   <TextInput
                     id="evidence-label"
-                    label="What it is"
+                    label="Name on the button"
                     value={doc.evidence.label}
                     placeholder="e.g. Final report (PDF)"
                     onChange={(label) => update({ evidence: { kind: "file", fileId: (doc.evidence as { fileId: string }).fileId, label } })}
@@ -490,7 +530,7 @@ export function Editor(props: EditorProps) {
                   />
                   <TextInput
                     id="evidence-label"
-                    label="What it is"
+                    label="Name on the button"
                     value={doc.evidence?.label ?? ""}
                     placeholder="e.g. Final report (PDF)"
                     onChange={(label) => update({ evidence: evidence(doc.evidence?.kind === "link" ? doc.evidence.href : "", label) })}
@@ -605,8 +645,26 @@ export function Editor(props: EditorProps) {
             tabIndex={0}
             className={`min-w-0 lg:sticky lg:top-20 lg:max-h-[calc(100svh-6rem)] lg:self-start lg:overflow-y-auto ${view === "edit" ? "hidden lg:block" : ""}`}
           >
-            <p className="mb-2 text-sm font-semibold text-graphite">Preview</p>
-            <ProjectView doc={previewDoc} owner={owner} imageUrls={imageUrls} evidenceUrl={evidenceHref} headingLevel="h2" confirmed={confirmed} />
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-graphite">Preview</p>
+              {doc.sections.length > 1 && (
+                <Button size="sm" variant={arranging ? "ink" : "secondary"} aria-pressed={arranging} onClick={() => setArranging((a) => !a)} label={arranging ? "Done arranging" : "Arrange sections"}>
+                  {arranging ? "Done arranging" : "Arrange sections"}
+                </Button>
+              )}
+            </div>
+            {/* The page as employers see it, on a white sheet (the editor's ground is mist). */}
+            <div className="rounded-[20px] border border-line bg-surface p-5 sm:p-6">
+              <ProjectView
+                doc={previewDoc}
+                owner={owner}
+                imageUrls={imageUrls}
+                evidenceUrl={evidenceHref}
+                headingLevel="h2"
+                confirmed={confirmed}
+                sectionsSlot={arranging && doc.sections.length > 1 ? <PreviewArrange doc={doc} setDoc={setDoc} imageUrls={imageUrls} /> : undefined}
+              />
+            </div>
           </section>
         </div>
       </div>

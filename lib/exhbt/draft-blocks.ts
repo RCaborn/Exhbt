@@ -15,14 +15,15 @@ export const isDraftBlock = (v: unknown): v is DraftBlock => typeof v === "strin
 /** What a person calls each part: "Rewrite the process", "Back to the AI version of the findings". */
 export const BLOCK_NAMES: Record<DraftBlock, string> = {
   header: "title",
-  gap: "question",
+  gap: "context",
   flow: "process",
   findings: "findings",
   skills: "skills",
 };
 
 export type BlockValues = {
-  header: { title: string; context: string; headline?: { value: string; label: string } };
+  /** whereWhen and summary are missing from AI versions kept before decision 0022; applyBlock then leaves the doc's own. */
+  header: { title: string; context: string; whereWhen?: string; summary?: string; headline?: { value: string; label: string } };
   gap: RichText;
   flow: FlowStep[];
   findings: RichText[];
@@ -42,7 +43,13 @@ export function blockValue<K extends DraftBlock>(doc: ExhbtDoc, key: K): BlockVa
 export function blockValue(doc: ExhbtDoc, key: DraftBlock): BlockValue {
   switch (key) {
     case "header":
-      return { title: doc.title, context: doc.context, ...(doc.headline ? { headline: doc.headline } : {}) };
+      return {
+        title: doc.title,
+        context: doc.context,
+        ...(doc.whereWhen !== undefined ? { whereWhen: doc.whereWhen } : {}),
+        ...(doc.summary !== undefined ? { summary: doc.summary } : {}),
+        ...(doc.headline ? { headline: doc.headline } : {}),
+      };
     case "gap":
       return doc.gap;
     case "flow":
@@ -68,9 +75,18 @@ export function applyBlock(doc: ExhbtDoc, key: DraftBlock, value: BlockValue): E
   switch (key) {
     case "header": {
       const v = value as BlockValues["header"];
+      // Rewrites no longer write a headline number (decision 0022), so one the doc has is kept unless the value brings its own.
       const { headline: _old, ...rest } = doc;
       void _old;
-      return { ...rest, title: v.title, context: v.context, ...(v.headline ? { headline: v.headline } : {}) };
+      const headline = v.headline ?? doc.headline;
+      return {
+        ...rest,
+        title: v.title,
+        context: v.context,
+        ...(v.whereWhen !== undefined ? { whereWhen: v.whereWhen } : {}),
+        ...(v.summary !== undefined ? { summary: v.summary } : {}),
+        ...(headline ? { headline } : {}),
+      };
     }
     case "gap":
       return { ...doc, gap: value as RichText };
@@ -118,7 +134,7 @@ export function flagsForBlock(doc: ExhbtDoc, key: DraftBlock, source: string, ex
 function blockTexts(doc: ExhbtDoc, key: DraftBlock): string[] {
   switch (key) {
     case "header":
-      return [doc.title, doc.context, doc.headline?.value ?? "", doc.headline?.label ?? ""];
+      return [doc.title, doc.context, doc.whereWhen ?? "", doc.summary ?? "", doc.headline?.value ?? "", doc.headline?.label ?? ""];
     case "gap":
       return [plain(doc.gap)];
     case "flow":
