@@ -110,7 +110,7 @@ async function openLook(page: Page) {
 
 const option = (page: Page, id: string) => page.locator(`[data-theme-option="${id}"]`);
 /** The masthead in the builder's live preview. */
-const preview = (page: Page) => page.locator("[data-testid=preview] header[data-theme]");
+const preview = (page: Page) => page.locator("[data-testid=preview] [data-portfolio-home]");
 const status = (page: Page) => page.getByTestId("save-status");
 
 async function chooseAndSave(page: Page, id: string) {
@@ -123,10 +123,11 @@ async function chooseAndSave(page: Page, id: string) {
 /** The band on the public portfolio: its data attribute and its background colour. */
 async function band(page: Page, username: string) {
   await page.goto(`/p/${username}`);
-  const header = page.locator("header[data-theme]");
-  await expect(header).toBeVisible();
-  const bg = await header.evaluate((el) => getComputedStyle(el).backgroundColor);
-  return { id: await header.getAttribute("data-theme"), bg };
+  // The look's coloured band is the "My best piece of work" section (decision 0016).
+  const home = page.locator("[data-portfolio-home]");
+  await expect(home).toBeVisible();
+  const bg = await home.locator("[data-band]").evaluate((el) => getComputedStyle(el).backgroundColor);
+  return { id: await home.getAttribute("data-theme"), bg };
 }
 
 test.describe("Portfolio looks (Phase 2)", () => {
@@ -241,7 +242,7 @@ test.describe("Portfolio looks (Phase 2)", () => {
     for (const id of ["paper", "mint", "deep-jade", "folio"]) {
       await chooseAndSave(page, id);
       await page.goto(`/p/${username}`);
-      await expect(page.locator(`header[data-theme="${id}"]`)).toBeVisible();
+      await expect(page.locator(`[data-portfolio-home][data-theme="${id}"]`)).toBeVisible();
       const res = await new AxeBuilder({ page }).withTags(WCAG).analyze();
       expect(res.violations, `${id}: ${JSON.stringify(res.violations.map((v) => v.id))}`).toEqual([]);
       await openLook(page);

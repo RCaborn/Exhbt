@@ -85,20 +85,22 @@ test.describe("Build your portfolio", () => {
     await expect(page).toHaveURL(/step=look/);
     await expect(stepHeading(page)).toBeFocused();
     await page.locator('[data-theme-option="jade"]').click();
-    await expect(preview.locator("header[data-theme]")).toHaveAttribute("data-theme", "jade");
+    await expect(preview.locator("[data-portfolio-home]")).toHaveAttribute("data-theme", "jade");
     await saved(page);
     await axe(page);
 
     // Your projects: keyboard reorder.
-    await page.getByRole("button", { name: "Continue to your projects" }).click();
+    await page.getByRole("button", { name: "Continue to your page" }).click();
     await page.getByRole("button", { name: `Move ${GP}`, exact: true }).focus();
     await page.keyboard.press("Space");
-    await expect(page.locator("[id^=DndLiveRegion]")).toContainText(`Picked up ${GP}`);
+    await expect(page.locator("[id^=DndLiveRegion]:not(:empty)")).toContainText(`Picked up ${GP}`);
     await page.keyboard.press("ArrowDown");
-    await expect(page.locator("[id^=DndLiveRegion]")).toContainText("is over position 2");
+    await expect(page.locator("[id^=DndLiveRegion]:not(:empty)")).toContainText("is over position 2");
     await page.keyboard.press("Space");
-    await expect(page.locator("[id^=DndLiveRegion]")).toContainText("Dropped");
-    await expect(preview.locator("ul > li[data-key] h3")).toHaveText([LIBRARY, GP]);
+    await expect(page.locator("[id^=DndLiveRegion]:not(:empty)")).toContainText("Dropped");
+    // Nothing starred, so the first exhbt is the band and the rest are cards.
+    await expect(preview.locator("[data-section=featured] h2")).toHaveText(LIBRARY);
+    await expect(preview.locator("[data-card] h3")).toHaveText([GP]);
     await saved(page);
     await axe(page);
 
@@ -111,7 +113,7 @@ test.describe("Build your portfolio", () => {
 
     // Back and forward in the browser move between steps.
     await page.goBack();
-    await expect(stepHeading(page)).toHaveText("Your projects");
+    await expect(stepHeading(page)).toHaveText("Your page");
 
     // The public page: name first in the tab, the person's own icon, the intro, quiet contact lines.
     const res = await page.goto(`/p/${u}`);
@@ -122,13 +124,16 @@ test.describe("Build your portfolio", () => {
     const svg = await page.request.get(icon!);
     expect(svg.headers()["content-type"]).toContain("image/svg+xml");
     expect(await svg.text()).toContain(">JM<");
-    await expect(page.locator("header[data-theme]")).toHaveAttribute("data-theme", "jade");
+    await expect(page.locator("[data-portfolio-home]")).toHaveAttribute("data-theme", "jade");
     await expect(page.locator("[data-intro]")).toContainText("taught myself Python");
     await expect(page.getByText("Based in Leeds")).toBeVisible();
-    await expect(page.getByRole("link", { name: /GitHub/ })).toHaveAttribute("href", "https://github.com/jordan-m");
+    await expect(page.locator("[data-section=contact]").getByRole("link", { name: /github\.com\/jordan-m/ })).toHaveAttribute("href", "https://github.com/jordan-m");
     await expect(page.getByText("jordan@example.com")).toBeVisible();
     await expect(page.locator("a[href^='mailto:']")).toHaveCount(0);
-    expect(await page.locator("main ul > li h3").allTextContents()).toEqual([LIBRARY, GP]);
+    await expect(page.locator("[data-section=featured] h2")).toHaveText(LIBRARY);
+    await expect(page.locator("[data-card] h3")).toHaveText([GP]);
+    // Rory's layout: no catalogue numbers and no headline figures on the home page.
+    await expect(page.locator("[data-catalogue], [data-headline]")).toHaveCount(0);
     await axe(page);
   });
 
@@ -172,7 +177,7 @@ test.describe("Build your portfolio", () => {
     expect(res?.status()).toBe(200);
     await expect(page.getByTestId("owner-preview")).toContainText("Publish your first exhbt");
     await expect(page).toHaveTitle(/^Preview · /);
-    await expect(page.locator("[data-empty-projects]")).toBeVisible();
+    await expect(page.locator("[data-section=featured][data-empty]")).toBeVisible();
     await expect(page.locator("meta[name=robots]")).toHaveAttribute("content", /noindex/);
     await axe(page);
 

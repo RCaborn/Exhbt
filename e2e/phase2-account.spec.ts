@@ -118,7 +118,7 @@ test.describe("Address and profile", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Sam Taylor" })).toBeVisible();
     await expect(page.getByText("Junior analyst who likes tidy data")).toBeVisible();
     await expect(page.getByText("Maths graduate. I build small tools that save teams time.")).toBeVisible();
-    await expect(page.getByRole("link", { name: /LinkedIn/ })).toHaveAttribute("href", "https://www.linkedin.com/in/sam-taylor");
+    await expect(page.getByRole("link", { name: /linkedin\.com\/in\/sam-taylor/ })).toHaveAttribute("href", "https://www.linkedin.com/in/sam-taylor");
   });
 
   test("a free account can't claim an address; one it already has stays", async ({ page }) => {

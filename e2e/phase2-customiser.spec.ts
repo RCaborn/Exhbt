@@ -148,14 +148,20 @@ async function saved(page: Page) {
   await expect(status(page)).toHaveText("Saved");
 }
 
-/** The headings of the tiles in the customiser's preview, top to bottom. */
-const previewOrder = (page: Page) => page.locator("[data-testid=preview] ul > li[data-key] h3").allTextContents();
-/** The headings of the tiles on the public at-a-glance page. */
+/** The exhbts on a home page, top to bottom: the one in the band, then the cards (decision 0016). */
+const projectTitles = (scope: string) => (page: Page) =>
+  page.locator(`${scope} [data-section=featured] h2, ${scope} [data-card] h3`).allTextContents();
+/** The exhbts in the builder's preview. */
+const previewOrder = projectTitles("[data-testid=preview]");
+/** The exhbts on the public home page. */
 async function publicOrder(page: Page, username: string) {
   const res = await page.goto(`/p/${username}`);
   expect(res?.status()).toBe(200);
-  return page.locator("main ul > li h3").allTextContents();
+  return projectTitles("main")(page);
 }
+/** The sections below the hero, top to bottom. */
+const sectionOrder = (page: Page, scope = "[data-testid=preview]") =>
+  page.locator(`${scope} [data-section]`).evaluateAll((els) => els.map((el) => el.getAttribute("data-section")));
 const handle = (page: Page, title: string) => page.getByRole("button", { name: `Move ${title}`, exact: true });
 
 /**
@@ -163,7 +169,7 @@ const handle = (page: Page, title: string) => page.getByRole("button", { name: `
  * announcement, as a person would, so the drag has measured the tiles before the next key.
  */
 async function keyboardMove(page: Page, title: string, arrows: string[]) {
-  const live = page.locator("[id^=DndLiveRegion]");
+  const live = page.locator("[id^=DndLiveRegion]:not(:empty)");
   await handle(page, title).focus();
   await page.keyboard.press("Space");
   await expect(live).toContainText("Picked up");
@@ -179,9 +185,9 @@ async function keyboardMove(page: Page, title: string, arrows: string[]) {
 /** The rows of the Projects step, top to bottom. */
 const rows = (page: Page) => page.locator("[data-testid=tile-list] > li");
 
-async function addTile(page: Page, name: string) {
-  await page.getByRole("button", { name: "Add a tile" }).click();
-  await page.getByRole("button", { name: new RegExp(`^${name}`) }).click();
+async function addSection(page: Page, name: string) {
+  await page.getByRole("button", { name: "Add a section" }).click();
+  await page.locator("#add-section-menu").getByRole("button", { name: new RegExp(`^${name}`) }).click();
 }
 
 test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
@@ -192,11 +198,11 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
 
     await handle(page, GP).focus();
     await page.keyboard.press("Space");
-    await expect(page.locator("[id^=DndLiveRegion]")).toContainText(`Picked up ${GP}. Position 1 of 4.`);
+    await expect(page.locator("[id^=DndLiveRegion]:not(:empty)")).toContainText(`Picked up ${GP}. Position 1 of 4.`);
     await page.keyboard.press("ArrowDown");
-    await expect(page.locator("[id^=DndLiveRegion]")).toContainText("is over position 2 of 4.");
+    await expect(page.locator("[id^=DndLiveRegion]:not(:empty)")).toContainText("is over position 2 of 4.");
     await page.keyboard.press("Space");
-    await expect(page.locator("[id^=DndLiveRegion]")).toContainText(`Dropped ${GP}. Position 2 of 4.`);
+    await expect(page.locator("[id^=DndLiveRegion]:not(:empty)")).toContainText(`Dropped ${GP}. Position 2 of 4.`);
 
     expect(await previewOrder(page)).toEqual([LIBRARY, GP, THIRD, FOURTH]);
     await expect(page.getByRole("button", { name: /^Undo: Moved/ })).toBeEnabled();
@@ -210,7 +216,7 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     await page.keyboard.press("Space");
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("Escape");
-    await expect(page.locator("[id^=DndLiveRegion]")).toContainText("Cancelled.");
+    await expect(page.locator("[id^=DndLiveRegion]:not(:empty)")).toContainText("Cancelled.");
     expect(await previewOrder(page)).toEqual([GP, LIBRARY, THIRD, FOURTH]);
     await expect(status(page)).toHaveText("Saved");
   });
@@ -245,7 +251,7 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     await saved(page);
 
     expect(await publicOrder(page, u)).toEqual([GP, THIRD, FOURTH]);
-    await expect(page.locator("header[data-masthead]")).toBeVisible();
+    await expect(page.locator("[data-portfolio-home] header")).toBeVisible();
     // The direct link keeps working, numbered after the ones on the page, and asks not to be indexed.
     const direct = await page.goto(`/p/${u}/library-footfall`);
     expect(direct?.status()).toBe(200);
@@ -264,7 +270,7 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     expect(await publicOrder(page, u)).toEqual([GP, LIBRARY, THIRD, FOURTH]);
   });
 
-  test("feature makes a wide first tile on both pages, and hiding the featured one drops the star", async ({ page }) => {
+  test("feature puts an exhbt in the band on both pages, and hiding the featured one drops the star", async ({ page }) => {
     const u = `ckf${stamp()}`;
     await openCustomiser(page, u, "premium");
     await page.getByRole("button", { name: `Feature ${THIRD}` }).click();
@@ -275,10 +281,8 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     await saved(page);
 
     expect(await publicOrder(page, u)).toEqual([THIRD, GP, LIBRARY, FOURTH]);
-    const boxes = await page.locator("main > ul > li").evaluateAll((els) => els.map((el) => el.getBoundingClientRect().width));
-    expect(boxes[0]).toBeGreaterThan(boxes[1]! * 1.7);
-    // Four tiles with a featured one: the last is wide too, so none sits alone beside a gap.
-    expect(boxes[3]).toBeGreaterThan(boxes[1]! * 1.7);
+    await expect(page.locator("[data-section=featured] h2")).toHaveText(THIRD);
+    await expect(page.locator("[data-section=featured]").getByRole("link", { name: "See how I did it" })).toHaveAttribute("href", `/p/${u}/project-3`);
 
     await page.goto("/portfolio?step=projects");
     await page.getByRole("button", { name: `Hide ${THIRD} from your portfolio` }).click();
@@ -289,87 +293,98 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     await expect(page.getByRole("button", { name: `Feature ${GP}` })).toBeVisible();
   });
 
-  test("extra tiles: add Education, Experience and a quote, edit them in place, and see them on the glance page", async ({ page }) => {
+  test("sections: add Experience and a quote, fill in About me with education and tools, and see them on the home page", async ({ page }) => {
     const u = `cke${stamp()}`;
     await openCustomiser(page, u, "premium", 2);
+    expect(await sectionOrder(page)).toEqual(["featured", "work", "about", "contact"]);
 
-    await addTile(page, "Education");
-    const edu = page.locator('[data-tile-editor="education"]');
-    await expect(edu.getByRole("textbox", { name: "Line 1" })).toBeFocused();
-    await edu.getByRole("textbox", { name: "Line 1" }).fill("BSc Data Science, University of Example, 2026");
-    await page.getByRole("button", { name: "Add a line" }).click();
-    await page.getByRole("textbox", { name: "Line 2" }).fill("A levels: Maths, Further Maths, Physics");
-    await page.getByRole("button", { name: "Done" }).click();
-    await expect(page.locator('[data-testid=preview] [data-tile="education"] li')).toHaveCount(2);
+    await page.getByRole("button", { name: "Edit About me" }).click();
+    await page.locator("#about-text").fill("I like problems where a small change saves real time.");
+    await page.locator("#education-line-0").fill("BSc Data Science, University of Example, 2026");
+    await page.locator("#education-tools").fill("Python, SQL");
 
-    await addTile(page, "Experience");
-    await page.getByRole("textbox", { name: "Line 1" }).fill("Retail supervisor, 2023 to 2025");
-    await page.getByRole("button", { name: "Done" }).click();
-    await saved(page);
-
-    // Menu: the tiles on the page are no longer offered. About me and Links and contact are step 1 now.
-    await page.getByRole("button", { name: "Add a tile" }).click();
-    await expect(page.getByRole("button", { name: /^Education/ })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /^About me/ })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /^Links and contact/ })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /^Featured quote/ })).toBeVisible();
-    await page.keyboard.press("Escape");
-
-    expect(await publicOrder(page, u)).toEqual([GP, LIBRARY, "Education", "Experience"]);
-    await expect(page.locator('[data-tile="education"] li')).toHaveCount(2);
-  });
-
-  test("an extra tile can be removed with one click and brought back with Undo, words and all", async ({ page }) => {
-    const u = `ckr${stamp()}`;
-    await openCustomiser(page, u, "premium", 2);
-    await addTile(page, "Featured quote");
+    await addSection(page, "Experience");
+    await page.locator("#experience-line-0").fill("Retail supervisor, Example Stores, 2023 to 2025");
+    await addSection(page, "A quote");
     await page.getByLabel("The quote").fill("She turned a messy spreadsheet into a decision.");
     await page.getByLabel("Who said it").fill("Dr Priya Shah");
     await page.getByLabel("Their role").fill("Module tutor");
-    await page.getByRole("button", { name: "Done" }).click();
     await saved(page);
-    await page.goto(`/p/${u}`);
-    await expect(page.locator('[data-tile="quote"]')).toContainText("Dr Priya Shah, Module tutor");
+    expect(await sectionOrder(page)).toEqual(["featured", "work", "about", "contact", "experience", "quote"]);
 
-    await page.goto("/portfolio?step=projects");
-    await page.getByRole("button", { name: "Remove Featured quote" }).click();
-    await expect(page.locator("[data-testid=preview] [data-tile=quote]")).toHaveCount(0);
-    await saved(page);
-    await page.goto(`/p/${u}`);
-    await expect(page.locator('[data-tile="quote"]')).toHaveCount(0);
+    // The menu offers only what isn't on the page.
+    await page.getByRole("button", { name: "Add a section" }).click();
+    await expect(page.locator("#add-section-menu").getByRole("button")).toHaveCount(0);
+    await page.keyboard.press("Escape");
 
-    await page.goto("/portfolio?step=projects");
-    await expect(page.getByRole("button", { name: "Remove Featured quote" })).toHaveCount(0);
+    await page.goto(`/p/${u}`);
+    expect(await sectionOrder(page, "main")).toEqual(["featured", "work", "about", "contact", "experience", "quote"]);
+    const about = page.locator("[data-section=about]");
+    await expect(about).toContainText("small change saves real time");
+    await expect(about.getByText("BSc Data Science, University of Example")).toBeVisible();
+    await expect(about.getByText("2026")).toBeVisible();
+    await expect(about).toContainText("Python, SQL");
+    await expect(page.locator("[data-section=quote]")).toContainText("Dr Priya Shah, Module tutor");
   });
 
-  test("Undo takes back the last change", async ({ page }) => {
-    const u = `cku${stamp()}`;
-    await openCustomiser(page, u, "premium");
-    await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeDisabled();
-    await addTile(page, "Education");
-    await page.getByRole("textbox", { name: "Line 1" }).fill("Hello there.");
-    await page.getByRole("button", { name: "Done" }).click();
+  test("sections drag in the preview: Space, arrows, Space moves one, and the home page follows", async ({ page }) => {
+    const u = `cks${stamp()}`;
+    await openCustomiser(page, u, "premium", 2);
+    await page.getByRole("button", { name: "Edit About me" }).click();
+    await page.locator("#about-text").fill("A line about me.");
     await saved(page);
-    await page.getByRole("button", { name: "Remove Education" }).click();
-    await expect(page.getByRole("button", { name: "Undo: Removed Education" })).toBeEnabled();
-    await page.getByRole("button", { name: "Undo: Removed Education" }).click();
-    await expect(page.locator('[data-testid=preview] [data-tile="education"]')).toContainText("Hello there.");
+    const live = page.locator("[id^=DndLiveRegion]:not(:empty)");
+    await page.getByRole("button", { name: "Move About me", exact: true }).focus();
+    await page.keyboard.press("Space");
+    await expect(live).toContainText("Picked up About me. Position 3 of 4.");
+    await page.keyboard.press("ArrowUp");
+    await expect(live).toContainText("is over position 2 of 4");
+    await page.waitForTimeout(120);
+    await page.keyboard.press("ArrowUp");
+    await expect(live).toContainText("is over position 1 of 4");
+    await page.waitForTimeout(120);
+    await page.keyboard.press("Space");
+    await expect(live).toContainText("Dropped About me. Position 1 of 4.");
+    expect(await sectionOrder(page)).toEqual(["about", "featured", "work", "contact"]);
+    await expect(page.getByRole("button", { name: "Undo: Moved About me" })).toBeEnabled();
     await saved(page);
-    expect(await publicOrder(page, u)).toContain("Education");
+    await page.goto(`/p/${u}`);
+    expect(await sectionOrder(page, "main")).toEqual(["about", "featured", "work", "contact"]);
   });
 
-  test("tile limits: words are checked, and a tile that fails is not saved until it is fixed", async ({ page }) => {
+  test("a section comes off the page with one click and back with Undo, words and all", async ({ page }) => {
+    const u = `ckr${stamp()}`;
+    await openCustomiser(page, u, "premium", 2);
+    await addSection(page, "A quote");
+    await page.getByLabel("The quote").fill("She turned a messy spreadsheet into a decision.");
+    await page.getByLabel("Who said it").fill("Dr Priya Shah");
+    await saved(page);
+
+    await page.getByTestId("preview").getByRole("button", { name: "Remove A quote" }).click();
+    await expect(page.locator("[data-testid=preview] [data-section=quote]")).toHaveCount(0);
+    await page.getByRole("button", { name: "Undo: Removed A quote" }).click();
+    await expect(page.locator("[data-testid=preview] [data-section=quote]")).toContainText("Dr Priya Shah");
+    await saved(page);
+    await page.goto(`/p/${u}`);
+    await expect(page.locator("[data-section=quote]")).toContainText("messy spreadsheet");
+
+    await page.goto("/portfolio?step=projects");
+    await page.getByRole("button", { name: "Take A quote off the page" }).click();
+    await saved(page);
+    await page.goto(`/p/${u}`);
+    await expect(page.locator("[data-section=quote]")).toHaveCount(0);
+  });
+
+  test("limits: words are checked, links must be https, and a field that fails is not saved until it is fixed", async ({ page }) => {
     const u = `ckl${stamp()}`;
     await openCustomiser(page, u, "premium", 2);
-    await addTile(page, "Featured quote");
+    await addSection(page, "A quote");
     await page.getByLabel("The quote").fill(words(TILE_LIMITS.quoteWords + 5));
     await expect(page.locator("#quote-text-error")).toContainText(`${TILE_LIMITS.quoteWords} words`);
     await expect(status(page)).toContainText("Not saved yet");
     await page.getByLabel("The quote").fill("Short and good.");
     await expect(status(page)).toHaveText("Saved");
-    await page.getByRole("button", { name: "Done" }).click();
 
-    // Links are on step 1 now, with the same https rule.
     await page.goto("/portfolio?step=you");
     await page.getByLabel(/Website/).fill("http://amara.dev");
     await expect(page.locator("#you-website-error")).toContainText("https");
@@ -379,9 +394,9 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     await page.getByLabel(/Website/).fill("https://amara.dev");
     await expect(status(page)).toHaveText("Saved");
 
-    // Nothing unchecked reached the page.
     await page.goto(`/p/${u}`);
     await expect(page.locator("a[href^='javascript:'], a[href^='http://']")).toHaveCount(0);
+    await expect(page.locator("[data-section=contact]").getByRole("link", { name: /amara\.dev/ })).toHaveAttribute("href", "https://amara.dev/");
   });
 
   test("the looks: a plan's looks save and show, locked ones preview with the upgrade prompt and save nothing", async ({ page }) => {
@@ -395,17 +410,17 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     const lockedId = PORTFOLIO_THEMES[open]!.id;
     await page.locator(`[data-theme-option="${lockedId}"]`).click();
     await expect(page.getByTestId("upgrade-prompt")).toContainText("Max");
-    await expect(page.locator("[data-testid=preview] header[data-theme]")).toHaveAttribute("data-theme", lockedId); // previews
+    await expect(page.locator("[data-testid=preview] [data-portfolio-home]")).toHaveAttribute("data-theme", lockedId); // previews
     await expect(status(page)).toHaveText("Saved"); // but nothing is sent
     await page.goto(`/p/${u}`);
-    await expect(page.locator("header[data-theme]")).toHaveAttribute("data-theme", PORTFOLIO_THEMES[0]!.id);
+    await expect(page.locator("[data-portfolio-home]")).toHaveAttribute("data-theme", PORTFOLIO_THEMES[0]!.id);
 
     await page.goto("/portfolio?step=look");
     await page.locator('[data-theme-option="jade"]').click();
-    await expect(page.locator("[data-testid=preview] header[data-theme]")).toHaveAttribute("data-theme", "jade");
+    await expect(page.locator("[data-testid=preview] [data-portfolio-home]")).toHaveAttribute("data-theme", "jade");
     await saved(page);
     await page.goto(`/p/${u}`);
-    await expect(page.locator("header[data-theme]")).toHaveAttribute("data-theme", "jade");
+    await expect(page.locator("[data-portfolio-home]")).toHaveAttribute("data-theme", "jade");
   });
 
   test("Max has every look open", async ({ page }) => {
@@ -414,24 +429,25 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
   });
 
   test("LinkedIn can be left off the page and put back", async ({ page }) => {
-    // The skills strip went with the quieter masthead (decision 0016); its stored switch is kept but unused.
     const u = `ckb${stamp()}`;
     await openCustomiser(page, u, "premium", 4, "/portfolio?step=you");
-    const preview = page.getByTestId("preview");
-    await expect(preview.getByRole("link", { name: /LinkedIn/ })).toBeAttached();
+    const contact = page.locator("[data-testid=preview] [data-section=contact]");
+    await expect(contact.getByRole("link", { name: /linkedin/i })).toBeAttached();
 
     await page.getByLabel("Show it on my page").uncheck();
-    await expect(preview.getByRole("link", { name: /LinkedIn/ })).toHaveCount(0);
+    // With nothing else to show, Get in touch is empty and visitors won't see it.
+    await expect(contact.getByRole("link", { name: /linkedin/i })).toHaveCount(0);
     await saved(page);
     await page.goto(`/p/${u}`);
-    await expect(page.locator("header").getByRole("link", { name: /LinkedIn/ })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /linkedin/i })).toHaveCount(0);
 
     await page.goto("/portfolio?step=you");
     await expect(page.getByLabel("Show it on my page")).not.toBeChecked();
     await page.getByLabel("Show it on my page").check();
     await saved(page);
     await page.goto(`/p/${u}`);
-    await expect(page.locator("header").getByRole("link", { name: /LinkedIn/ })).toBeVisible();
+    await expect(page.locator("[data-section=contact]").getByRole("link", { name: /linkedin/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Get in touch" })).toHaveAttribute("href", "#contact");
   });
 
   test("everything survives a reload, and the /exhbts list shares the order", async ({ page }) => {
@@ -462,7 +478,7 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     expect(moved.indexOf(first)).toBeGreaterThan(0);
   });
 
-  test("Free sees the projects step and the upgrade prompt; publishing and extra tiles stay held back", async ({ page, browser }) => {
+  test("Free sees the page step and the upgrade prompt; publishing and the extra sections stay held back", async ({ page, browser }) => {
     const u = `ckz${stamp()}`;
     await openCustomiser(page, u, "free", 2);
     await expect(page.getByTestId("upgrade-prompt").first()).toContainText("Premium");
@@ -472,10 +488,10 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     await saved(page);
     await page.reload();
     expect(await previewOrder(page)).toEqual([LIBRARY, GP]);
-    // Extra tiles show the usual prompt instead of a menu of tiles.
-    await page.getByRole("button", { name: "Add a tile" }).click();
-    await expect(page.locator("#add-tile-menu").getByTestId("upgrade-prompt")).toContainText("Premium");
-    await expect(page.getByRole("button", { name: /^Education/ })).toHaveCount(0);
+    // Experience and a quote show the usual prompt instead of being added.
+    await page.getByRole("button", { name: "Add a section" }).click();
+    await expect(page.locator("#add-section-menu").getByTestId("upgrade-prompt").first()).toContainText("Premium");
+    await expect(page.locator("#add-section-menu").getByRole("button", { name: /^Experience/ })).toHaveCount(0);
     // Only the default look is open.
     await page.goto("/portfolio?step=look");
     await expect(page.locator("[data-theme-option]:not([data-locked])")).toHaveCount(1);
@@ -487,44 +503,40 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     await visitor.close();
   });
 
-  test("a downgrade keeps the saved tiles, and the public page stops showing them", async ({ page }) => {
+  test("a downgrade keeps the saved extra sections, and the home page stops showing them", async ({ page }) => {
     const u = `ckd${stamp()}`;
     await openCustomiser(page, u, "premium", 2);
-    await addTile(page, "Education");
-    await page.getByRole("textbox", { name: "Line 1" }).fill("Kept through a downgrade.");
-    await page.getByRole("button", { name: "Done" }).click();
+    await addSection(page, "Experience");
+    await page.locator("#experience-line-0").fill("Kept through a downgrade.");
     await saved(page);
-    expect(await publicOrder(page, u)).toContain("Education");
+    await page.goto(`/p/${u}`);
+    await expect(page.locator("[data-section=experience]")).toContainText("Kept through a downgrade.");
 
-    // A plan with no extra tiles (free) holds them.
     await page.goto("/dev/plan?plan=free&next=%2Fportfolio%3Fstep%3Dprojects");
     await expect(page.getByTestId("tiles-held")).toBeVisible();
-    await expect(page.locator('[data-testid=preview] [data-tile="education"]')).toHaveCount(0);
-    // Changing the order on Free doesn't lose them.
+    await expect(page.locator("[data-testid=preview] [data-section=experience]")).toHaveCount(0);
+    // Changing the order on Free doesn't lose it.
     await keyboardMove(page, GP, ["ArrowDown"]);
     await saved(page);
     await page.goto("/dev/plan?plan=premium&next=%2Fportfolio%3Fstep%3Dprojects");
-    await expect(page.locator('[data-testid=preview] [data-tile="education"]')).toContainText("Kept through a downgrade.");
+    await expect(page.locator("[data-testid=preview] [data-section=experience]")).toContainText("Kept through a downgrade.");
   });
 
-  test("axe passes on the projects step (with tiles, a hidden exhbt and a featured one) and on the glance page", async ({ page }) => {
+  test("axe passes on the page step (with sections, a hidden exhbt and a featured one) and on the home page", async ({ page }) => {
     const u = `cka${stamp()}`;
     await openCustomiser(page, u, "premium");
     await page.getByRole("button", { name: `Feature ${THIRD}` }).click();
     await page.getByRole("button", { name: `Hide ${LIBRARY} from your portfolio` }).click();
-    await addTile(page, "Education");
-    await page.getByRole("textbox", { name: "Line 1" }).fill("A short line about me.");
+    await addSection(page, "Experience");
+    await page.locator("#experience-line-0").fill("Retail supervisor, 2023 to 2025");
     await saved(page);
     const editing = await new AxeBuilder({ page }).withTags(WCAG).analyze();
     expect(editing.violations, JSON.stringify(editing.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) })))).toEqual([]);
-    await page.getByRole("button", { name: "Done" }).click();
-    const step = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(step.violations, JSON.stringify(step.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) })))).toEqual([]);
 
     await page.goto(`/p/${u}`);
-    await expect(page.locator('[data-tile="education"]')).toBeVisible();
-    const glance = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(glance.violations, JSON.stringify(glance.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) })))).toEqual([]);
+    await expect(page.locator("[data-section=experience]")).toBeVisible();
+    const home = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(home.violations, JSON.stringify(home.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) })))).toEqual([]);
   });
 });
 
@@ -537,9 +549,8 @@ test.describe("Arrange the portfolio on a phone", () => {
   test("no sideways scroll, the controls reach 44px, and a press-and-hold drag on the grip reorders", async ({ page }) => {
     const u = `ckpx${stamp()}`;
     await openCustomiser(page, u, "premium");
-    await addTile(page, "Education");
-    await page.getByRole("textbox", { name: "Line 1" }).fill("BSc Data Science, University of Example, 2026");
-    await page.getByRole("button", { name: "Done" }).click();
+    await addSection(page, "Experience");
+    await page.locator("#experience-line-0").fill("Retail supervisor, 2023 to 2025");
     await saved(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
@@ -577,9 +588,9 @@ test.describe("Arrange the portfolio on a phone", () => {
     expect((await previewOrder(page))[0]).toBe(LIBRARY);
     await page.getByRole("button", { name: `Hide ${GP} from your portfolio` }).tap();
     await expect(page.getByTestId("hidden-tray")).toContainText(GP);
-    await page.getByRole("button", { name: "Add a tile" }).tap();
-    await page.getByRole("button", { name: /^Education/ }).tap();
-    await expect(page.getByRole("textbox", { name: "Line 1" })).toBeVisible();
+    await page.getByRole("button", { name: "Add a section" }).tap();
+    await page.locator("#add-section-menu").getByRole("button", { name: /^Experience/ }).tap();
+    await expect(page.locator("#experience-line-0")).toBeVisible();
     await saved(page);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
   });
