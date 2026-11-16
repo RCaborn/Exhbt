@@ -322,6 +322,13 @@
     border-color: var(--xp-accent);
     border-radius: var(--xp-radius-button);
     max-width: 100%;
+    /* A long file name wraps instead of being cut off. */
+    white-space: normal;
+    height: auto;
+    min-height: 3rem;
+    padding-block: 0.65rem;
+    text-align: center;
+    line-height: 1.3;
   }
   .xp .xp-work-button:hover {
     background: var(--xp-accent-hover);
@@ -383,10 +390,6 @@
     background: var(--xp-highlight);
     border-radius: 4px;
     padding: 0.04em 0.2em;
-  }
-  /* The public exhbt page sits on the look's ground; the portfolio layout's own is mist (app/(portfolio)/layout.tsx). */
-  div:has(> main#main > [data-exhbt-route]) {
-    background: var(--xp-page-ground);
   }
   /* A linked card lifts 2px on hover (the one card motion). */
   .card-link {
@@ -454,6 +457,12 @@
     min-height: 44px;
     min-width: 44px;
   }
+}
+
+/* The public exhbt page sits on the look's ground; the portfolio layout's own is mist (app/(portfolio)/layout.tsx).
+   Unlayered, so it wins over the layout's bg-mist utility. */
+div:has(> main#main > [data-exhbt-route]) {
+  background: var(--xp-page-ground);
 }
 
 /* Print and "Save as PDF" (the project page's button): one A4 page, the exhbt alone. The page

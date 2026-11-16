@@ -98,9 +98,9 @@ export function ProjectView({
 
   return (
     <article data-exhbt-page className="xp @container/xp">
-      <div className="grid gap-8 @3xl/xp:grid-cols-[13.5rem_minmax(0,1fr)] @3xl/xp:gap-10 @5xl/xp:grid-cols-[14.5rem_minmax(0,1fr)] print:grid-cols-[44mm_minmax(0,1fr)] print:gap-6">
+      <div className="grid gap-8 @3xl/xp:grid-cols-[13.5rem_minmax(0,1fr)] @3xl/xp:gap-9 print:grid-cols-[44mm_minmax(0,1fr)] print:gap-6">
         <aside aria-label={`About ${first} and this work`} className="min-w-0 @3xl/xp:sticky @3xl/xp:top-8 @3xl/xp:self-start print:static">
-          <div className="xp-card flex items-center gap-4 p-4 @3xl/xp:flex-col @3xl/xp:items-stretch @3xl/xp:gap-0 @3xl/xp:p-6 print:flex-col print:items-stretch print:gap-0 print:p-4">
+          <div className="xp-card flex items-center gap-4 p-4 @3xl/xp:flex-col @3xl/xp:items-stretch @3xl/xp:gap-0 @3xl/xp:p-5 print:flex-col print:items-stretch print:gap-0 print:p-4">
             <div className="shrink-0 @3xl/xp:mx-auto print:mx-auto">
               <span className="@3xl/xp:hidden print:hidden">
                 <Avatar name={owner.name} photoUrl={owner.photoUrl} size={64} shape={owner.shape} />
@@ -113,19 +113,19 @@ export function ProjectView({
               <p className="xp-name xp-display text-[1.5rem] leading-tight @3xl/xp:text-[1.625rem]">{owner.name}</p>
               {owner.bio?.trim() && <p className="xp-muted mt-1.5 text-[0.9375rem] leading-snug">{owner.bio.trim()}</p>}
               {owner.homeHref && (
-                <Link href={owner.homeHref} className="xp-outline-button mt-4 hidden h-11 w-full items-center justify-center px-4 text-[0.9375rem] font-semibold @3xl/xp:flex print:hidden">
+                <Link href={owner.homeHref} className="xp-outline-button mt-4 hidden h-11 w-full items-center justify-center px-3 text-center text-[0.875rem] leading-tight font-semibold @3xl/xp:flex print:hidden">
                   All of {first}&apos;s work
                 </Link>
               )}
             </div>
           </div>
           {owner.homeHref && (
-            <Link href={owner.homeHref} className="xp-outline-button mt-3 flex h-11 w-full items-center justify-center px-4 text-[0.9375rem] font-semibold @3xl/xp:hidden print:hidden">
+            <Link href={owner.homeHref} className="xp-outline-button mt-3 flex h-11 w-full items-center justify-center px-3 text-center text-[0.875rem] leading-tight font-semibold @3xl/xp:hidden print:hidden">
               All of {first}&apos;s work
             </Link>
           )}
 
-          <dl className="mt-6 px-1 @3xl/xp:px-6 print:mt-4 print:px-1">
+          <dl className="mt-6 px-1 @3xl/xp:px-5 print:mt-4 print:px-1">
             {kind && <Fact term="What it is">{kind}</Fact>}
             {whereWhen && <Fact term="Where and when">{whereWhen}</Fact>}
             <Fact term="Can you trust it?">
@@ -149,7 +149,7 @@ export function ProjectView({
           {hasWork && (
             <div className="mt-6 print:mt-4">
               <Button href={evidenceUrl!} variant="primary" size="lg" target="_blank" rel="nofollow ugc noopener" className="xp-work-button w-full" label={`See the work: ${doc.evidence!.label}`}>
-                <span className="min-w-0 truncate">See the work: {doc.evidence!.label}</span>
+                <span className="min-w-0">See the work: {doc.evidence!.label}</span>
                 <ArrowUpRight aria-hidden size={17} strokeWidth={2.25} className="shrink-0" />
               </Button>
             </div>
@@ -163,9 +163,9 @@ export function ProjectView({
 
         <div className="@container/main min-w-0">
           {doc.skills.length > 0 && (
-            <ul aria-label="Skills used" className="flex flex-wrap gap-1.5 @2xl/main:justify-end">
+            <ul aria-label="Skills used" className="flex flex-wrap gap-1 @2xl/main:justify-end">
               {doc.skills.map((s) => (
-                <li key={s} className="xp-pill px-2.5 py-1 text-[0.8125rem] font-medium">
+                <li key={s} className="xp-pill px-2 py-[0.2rem] text-[0.78rem] font-medium">
                   {s}
                 </li>
               ))}
@@ -173,11 +173,11 @@ export function ProjectView({
           )}
           {team && <div className="mt-3">{team}</div>}
 
-          <H className="xp-title xp-display mt-5 text-[clamp(2rem,7.4cqi,3.5rem)] leading-[1.02] text-balance print:mt-3 print:text-[2.3rem]">
+          <H className="xp-title xp-display mt-5 text-[clamp(2rem,7cqi,3.4rem)] leading-[1.02] text-balance print:mt-3 print:text-[2.3rem]">
             {doc.title}
           </H>
           {doc.gap.length > 0 && (
-            <p className="xp-context mt-5 max-w-[42rem] text-[1.0625rem] leading-[1.6] @2xl/main:text-[1.25rem] print:mt-3 print:text-[1.1rem]">
+            <p className="xp-context mt-5 max-w-[42rem] text-[1.0625rem] leading-[1.6] @2xl/main:text-[1.1875rem] print:mt-3 print:text-[1.1rem]">
               <RichText value={doc.gap} highlight />
             </p>
           )}
@@ -197,7 +197,7 @@ function Fact({ term, children }: { term: string; children: React.ReactNode }) {
   return (
     <div className="xp-fact border-b py-3 first:pt-0 last:border-b-0 print:py-2">
       <dt className="xp-muted text-[0.8125rem]">{term}</dt>
-      <dd className="mt-0.5 font-semibold leading-snug">{children}</dd>
+      <dd className="mt-0.5 text-[0.9375rem] leading-snug font-semibold">{children}</dd>
     </div>
   );
 }
@@ -343,12 +343,12 @@ export function SectionBlock({ s, Sub, imageUrls }: { s: Section; Sub: Sub; imag
 function Findings({ s, Sub }: { s: SectionOf<"findings">; Sub: Sub }) {
   return (
     <section aria-labelledby={`${s.id}-h`} className="min-w-0 break-inside-avoid">
-      <Sub id={`${s.id}-h`} className="xp-found-heading xp-display border-b pb-3 text-[1.625rem] leading-tight print:text-[1.35rem]">
+      <Sub id={`${s.id}-h`} className="xp-found-heading xp-display border-b pb-3 text-[1.5rem] leading-tight print:text-[1.35rem]">
         What I found
       </Sub>
       <ul>
         {s.items.map((f, i) => (
-          <li key={i} className="xp-finding border-b py-3.5 text-[1.0625rem] leading-relaxed last:border-b-0 print:py-2 print:text-[0.95rem]">
+          <li key={i} className="xp-finding border-b py-3.5 text-[1rem] leading-relaxed last:border-b-0 print:py-2 print:text-[0.95rem]">
             <RichText value={f} />
           </li>
         ))}
