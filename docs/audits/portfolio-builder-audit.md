@@ -36,4 +36,4 @@ The page is the same for everyone except the band colour. Things a person could 
 5. Their name in the tab, and their initials as the tab icon, in their look's colours.
 6. Help to write the intro from what they've already told us (the CV and roadmap), and only that.
 
-All six are in the new flow. Templates that change the whole layout (Classic, Notebook, Exhbt) are separate work; the page reads its colours and heading face from the theme's CSS variables so a template can replace them.
+Two through six are in the new flow. The cover picture was built and then dropped on 16 Nov (Alex: keep it simple), and the contact block became quiet links rather than a labelled block; decision 0016 has what was decided. Templates that change the whole layout (Classic, Notebook, Exhbt) are separate work; the page reads its colours and heading face from the theme's CSS variables so a template can replace them.

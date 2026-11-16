@@ -19,6 +19,12 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const p = await loadPortfolio((await params).username);
   if (p.status !== "ok" || p.items.length === 0) {
     // The owner's preview of an unpublished page (below) is never for search engines either.
+    const ownerId = p.status === "empty" ? p.userId : p.status === "ok" ? p.profile.userId : null;
+    const user = ownerId ? await getCurrentUser() : null;
+    if (user && user.id === ownerId) {
+      const profile = await getStore().getPortfolioProfile(ownerId);
+      return { title: { absolute: `Preview · ${profile.name?.trim() || profile.username}` }, robots: { index: false, follow: false } };
+    }
     return { title: "Portfolio not found", robots: { index: false } };
   }
   const title = pageTitle(p.displayName, p.profile.headline);

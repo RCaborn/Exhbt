@@ -171,6 +171,7 @@ test.describe("Build your portfolio", () => {
     const res = await page.goto(`/p/${u}`);
     expect(res?.status()).toBe(200);
     await expect(page.getByTestId("owner-preview")).toContainText("Publish your first exhbt");
+    await expect(page).toHaveTitle(/^Preview · /);
     await expect(page.locator("[data-empty-projects]")).toBeVisible();
     await expect(page.locator("meta[name=robots]")).toHaveAttribute("content", /noindex/);
     await axe(page);
