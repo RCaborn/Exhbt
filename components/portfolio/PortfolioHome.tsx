@@ -274,34 +274,37 @@ function Work({ projects, more }: { projects: HomeProject[]; more: boolean }) {
         {more ? "More of my work" : "My work"}
       </h2>
       <ul className="mt-6 grid gap-5 @2xl:grid-cols-2">
-        {projects.map((p) => {
-          const body = (
-            <>
-              <div className="flex min-h-48 items-center justify-center border-b border-[color:var(--pf-line)] bg-[var(--pf-well)] p-5">
-                <Figure project={p} />
-              </div>
-              <div className="p-5">
-                <h3 className="text-[1.0625rem] leading-snug font-semibold tracking-[-0.01em] text-[color:var(--pf-ink)]">{p.title}</h3>
-                {p.summary && <p className="mt-1.5 text-[0.9375rem] leading-relaxed text-[color:var(--pf-soft)]">{p.summary}</p>}
-              </div>
-            </>
-          );
-          const card =
-            "flex h-full flex-col overflow-hidden rounded-[var(--pf-radius)] border border-[color:var(--pf-line)] bg-[var(--pf-card)] transition-[transform,border-color] duration-150";
-          return (
-            <li key={p.id} data-card={p.id}>
-              {p.href ? (
-                <Link href={p.href} className={`${card} hover:-translate-y-0.5 hover:border-[color:var(--pf-ink)] motion-reduce:hover:translate-y-0`}>
-                  {body}
-                </Link>
-              ) : (
-                <div className={card}>{body}</div>
-              )}
-            </li>
-          );
-        })}
+        {projects.map((p) => (
+          <li key={p.id} data-card={p.id}>
+            <ProjectCard project={p} />
+          </li>
+        ))}
       </ul>
     </section>
+  );
+}
+
+/** One of the cards under "More of my work": the key figure on top, then the title and one sentence. Also drawn on a per-job page. */
+export function ProjectCard({ project: p }: { project: HomeProject }) {
+  const body = (
+    <>
+      <div className="flex min-h-48 items-center justify-center border-b border-[color:var(--pf-line)] bg-[var(--pf-well)] p-5">
+        <Figure project={p} />
+      </div>
+      <div className="p-5">
+        <h3 className="text-[1.0625rem] leading-snug font-semibold tracking-[-0.01em] text-[color:var(--pf-ink)]">{p.title}</h3>
+        {p.summary && <p className="mt-1.5 text-[0.9375rem] leading-relaxed text-[color:var(--pf-soft)]">{p.summary}</p>}
+      </div>
+    </>
+  );
+  const card =
+    "flex h-full flex-col overflow-hidden rounded-[var(--pf-radius)] border border-[color:var(--pf-line)] bg-[var(--pf-card)] transition-[transform,border-color] duration-150";
+  return p.href ? (
+    <Link href={p.href} className={`${card} hover:-translate-y-0.5 hover:border-[color:var(--pf-ink)] motion-reduce:hover:translate-y-0`}>
+      {body}
+    </Link>
+  ) : (
+    <div className={card}>{body}</div>
   );
 }
 

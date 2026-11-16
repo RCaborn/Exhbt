@@ -195,7 +195,7 @@ test.describe("job link pages", () => {
     await page.getByRole("link", { name: "Preview the page" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "For Acme · Graduate Data Analyst" })).toBeVisible();
     await expect(page.getByText("I forecast library footfall and cut missed appointments.")).toBeVisible();
-    const tiles = page.locator("main ul > li > a[href*='?for=']");
+    const tiles = page.locator("[data-job-page] ol > li > a[href*='?for=']");
     await expect(tiles).toHaveCount(2);
     await expect(tiles.nth(0)).toContainText(FOOTFALL);
     await expect(tiles.nth(0)).toHaveAttribute("href", `/p/jlmax/library-footfall?for=${slug}`);
@@ -254,5 +254,112 @@ test.describe("job link pages", () => {
     await page.getByRole("button", { name: "Pick my exhbts" }).click();
     await page.waitForURL(/\/job-links\/[0-9a-f-]{36}$/);
     await expect(picks(page)).toHaveCount(2);
+  });
+});
+
+/** The test server's address on a name.localhost host (Chromium resolves *.localhost to loopback). */
+const on = (baseURL: string | undefined, name: string) => (baseURL ?? "").replace("//localhost", `//${name}.localhost`);
+
+async function makeLink(page: Page, company: string, role: string, style: "suffix" | "clean" = "suffix") {
+  await openNewForm(page);
+  await page.getByLabel("Company", { exact: true }).fill(company);
+  await page.getByLabel("Role title", { exact: true }).fill(role);
+  await page.getByLabel("Job description", { exact: true }).fill(DESCRIPTION);
+  if (style === "clean") await page.getByRole("radio", { name: /^Clean/ }).check();
+  await page.getByRole("button", { name: "Pick my exhbts" }).click();
+  await page.waitForURL(/\/job-links\/[0-9a-f-]{36}$/);
+  return page.url();
+}
+
+test.describe("the public job page", () => {
+  test("name.localhost/<slug> shows the job heading, intro and picks in order; ?for= gives the way back; it is noindex; off is a 404", async ({ page, baseURL }) => {
+    await signInAs(page, "jlpub", "max");
+    const editor = await makeLink(page, "Acme", "Graduate Data Analyst", "clean");
+    await expect(page.getByTestId("job-link-address")).toHaveText("jlpub.exhbt.co.uk/acme");
+    // Put the GP exhbt first (the stand-in ranks footfall first) and write the intro, so the order and the words are the person's.
+    await page.getByRole("button", { name: `Move ${FOOTFALL} down` }).click();
+    await expect(picks(page).nth(0)).toContainText(GP);
+    await expect(page.locator("form[data-ready=true]")).toBeAttached();
+    await page.getByLabel(/A line or two to the employer/).fill("I cut missed appointments and forecast demand.");
+    await page.getByRole("button", { name: "Save intro" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeVisible();
+
+    const origin = on(baseURL, "jlpub");
+    const res = await page.goto(`${origin}/acme`);
+    expect(res?.status()).toBe(200);
+    await expect(page.getByRole("heading", { level: 1, name: "For Acme · Graduate Data Analyst" })).toBeVisible();
+    await expect(page.getByText("I cut missed appointments and forecast demand.")).toBeVisible();
+    // The picks are the portfolio's cards, in the person's order, each with the AI's reason under it.
+    const cards = page.locator("[data-job-page] ol > li[data-card]");
+    await expect(cards).toHaveCount(2);
+    await expect(cards.nth(0)).toContainText(GP);
+    await expect(cards.nth(1)).toContainText(FOOTFALL);
+    await expect(cards.nth(1).locator("[data-reason]")).toContainText("SQL, Time series, Excel");
+    await expect(cards.nth(0).locator("a")).toHaveAttribute("href", "/gp-reminders?for=acme");
+    await expect(page.getByRole("link", { name: /See all of Amara Okafor's work/ })).toHaveAttribute("href", "/");
+    // Never indexed, and no project frame around it.
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+    await expect(page).toHaveTitle("For Acme · Amara Okafor");
+    await expect(page.locator("[data-exhbt-page]")).toHaveCount(0);
+    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(violations.map((v) => `public ${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
+
+    // Opening a pick keeps the way back to the job page.
+    await cards.nth(0).locator("a").click();
+    await page.waitForURL(`${origin}/gp-reminders?for=acme`);
+    await expect(page.getByRole("heading", { level: 1, name: GP })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Back to Acme" })).toHaveAttribute("href", "/acme");
+    // Without ?for=, or with one that isn't a live link, there is no way back (and nothing about the company).
+    await page.goto(`${origin}/gp-reminders`);
+    await expect(page.getByRole("heading", { level: 1, name: GP })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Back to/ })).toHaveCount(0);
+    await page.goto(`${origin}/gp-reminders?for=nothing-here`);
+    await expect(page.getByRole("heading", { level: 1, name: GP })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Back to/ })).toHaveCount(0);
+
+    // Off: not found on the public page, and no way back from a project.
+    await page.goto(editor);
+    await page.getByRole("button", { name: "Turn off" }).click();
+    await expect(page.getByText("Off", { exact: true })).toBeVisible();
+    expect((await page.goto(`${origin}/acme`))?.status()).toBe(404);
+    await page.goto(`${origin}/gp-reminders?for=acme`);
+    await expect(page.getByRole("heading", { level: 1, name: GP })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Back to/ })).toHaveCount(0);
+
+    // On again: it is back. Deleted: gone.
+    await page.goto(editor);
+    await page.getByRole("button", { name: "Turn on" }).click();
+    await expect(page.getByText("Live", { exact: true })).toBeVisible();
+    expect((await page.goto(`${origin}/acme`))?.status()).toBe(200);
+    await page.goto(editor);
+    await page.getByRole("button", { name: "Delete the link for Acme · Graduate Data Analyst" }).click();
+    await page.getByRole("button", { name: "Yes, delete" }).click();
+    await page.waitForURL(/\/job-links$/);
+    expect((await page.goto(`${origin}/acme`))?.status()).toBe(404);
+  });
+
+  test("a job link and an exhbt never share a slug, and an unknown slug is a 404", async ({ page, baseURL }) => {
+    await signInAs(page, "jlslug", "max");
+    // A company named like one of the person's exhbts: the link takes the next free address.
+    await makeLink(page, "Library footfall", "Analyst", "clean");
+    await expect(page.getByTestId("job-link-address")).toHaveText("jlslug.exhbt.co.uk/library-footfall-2");
+    const origin = on(baseURL, "jlslug");
+    await page.goto(`${origin}/library-footfall`);
+    await expect(page.getByRole("heading", { level: 1, name: FOOTFALL })).toBeVisible();
+    await page.goto(`${origin}/library-footfall-2`);
+    await expect(page.getByRole("heading", { level: 1, name: "For Library footfall · Analyst" })).toBeVisible();
+    expect((await page.goto(`${origin}/no-such-job`))?.status()).toBe(404);
+  });
+
+  test("a downgrade takes the public page down", async ({ page, baseURL }) => {
+    await signInAs(page, "jldown", "max");
+    await makeLink(page, "Acme", "Analyst", "clean");
+    const origin = on(baseURL, "jldown");
+    expect((await page.goto(`${origin}/acme`))?.status()).toBe(200);
+    // Same person, now on Premium: the link is still stored, but the plan no longer includes job links.
+    await page.goto("/dev/plan?plan=premium&next=/job-links");
+    expect((await page.goto(`${origin}/acme`))?.status()).toBe(404);
+    await page.goto("/dev/plan?plan=max&next=/job-links");
+    expect((await page.goto(`${origin}/acme`))?.status()).toBe(200);
   });
 });
