@@ -92,6 +92,21 @@ export function toolRedirectUrl(
 }
 
 /**
+ * Where a request on the bare apex should go, or null when it stays put. Only the exact apex
+ * moves: www, app, portfolio subdomains, localhost and workers.dev previews are untouched.
+ * Sign-in cookies are host-only, so serving both exhbt.co.uk and www would give two sessions.
+ */
+export function canonicalRedirectUrl(
+  rawHost: string | null | undefined,
+  pathname: string,
+  search = "",
+): string | null {
+  const host = (rawHost ?? "").toLowerCase().replace(/:\d+$/, "");
+  if (host !== APEX) return null;
+  return `https://${MARKETING_HOST}${pathname}${search}`;
+}
+
+/**
  * What a request's host is. Local development and previews (localhost, *.workers.dev) are
  * treated as one origin serving marketing and the app, except `name.localhost`, which
  * is a portfolio so subdomains can be tested locally.

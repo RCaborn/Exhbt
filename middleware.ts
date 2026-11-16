@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { APEX, parseHost, toolRedirectUrl } from "@/lib/hosts";
+import { APEX, canonicalRedirectUrl, parseHost, toolRedirectUrl } from "@/lib/hosts";
 import { isPhase2Enabled as phase2 } from "@/lib/site";
 
 /**
+ * 0. The apex redirects to www (308, path and query kept).
  * 1. Hosts (docs/decisions/0001): alex.exhbt.co.uk is rewritten to the portfolio route group
  *    (/p/alex/...), with no sign-in cookies on that host. Reserved or malformed names 404.
  *    www and the apex send /login, /roadmap and /auth to app.exhbt.co.uk (docs/phase-2.md).
@@ -32,6 +33,11 @@ const notFound = () => new NextResponse("Not found", { status: 404, headers: { "
 
 export async function middleware(req: NextRequest) {
   const rawHost = req.headers.get("host");
+  // The apex goes to www first, so there is one host (and one host-only session cookie).
+  // 308 keeps the method and body, which POSTs to /api/pv need. Register the Stripe webhook
+  // on www.exhbt.co.uk: a redirect on the apex would be followed by Stripe only rarely.
+  const canonical = canonicalRedirectUrl(rawHost, req.nextUrl.pathname, req.nextUrl.search);
+  if (canonical) return NextResponse.redirect(canonical, 308);
   const host = parseHost(rawHost);
   const { pathname } = req.nextUrl;
 

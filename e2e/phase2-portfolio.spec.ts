@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { ENTITLEMENTS } from "../lib/entitlements";
 import { chartsOf, findingsOf, LIMITS, safeHref, text, validateForPublish, wordCount, type ExhbtDoc, type RichText } from "../lib/exhbt/blocks";
 import { sampleDocs } from "../lib/exhbt/sample";
-import { APP_HOST, MARKETING_HOST, parseHost, toolRedirectUrl, usernameProblem } from "../lib/hosts";
+import { APP_HOST, MARKETING_HOST, canonicalRedirectUrl, parseHost, toolRedirectUrl, usernameProblem } from "../lib/hosts";
 import { canCreateExhbt, canMakeJobLinks, canPublish, visibleOnPortfolio } from "../lib/plan-rules";
 import type { ExhbtRecord } from "../lib/store";
 
@@ -134,6 +134,25 @@ test.describe("Hosts", () => {
 
     const stayed = await request.get("/login", { maxRedirects: 0 });
     expect(stayed.status()).not.toBe(301);
+  });
+
+  test("the bare apex moves to www with the path and query kept; no other host does", async ({ request }) => {
+    for (const host of ["exhbt.co.uk", "EXHBT.co.uk:443"]) {
+      expect(canonicalRedirectUrl(host, "/auth/confirm", "?token_hash=abc&type=email"), host)
+        .toBe(`https://${MARKETING_HOST}/auth/confirm?token_hash=abc&type=email`);
+    }
+    expect(canonicalRedirectUrl("exhbt.co.uk", "/")).toBe(`https://${MARKETING_HOST}/`);
+    for (const host of [MARKETING_HOST, APP_HOST, "alex.exhbt.co.uk", "localhost:3200", "alex.localhost", "x.workers.dev", ""]) {
+      expect(canonicalRedirectUrl(host, "/pricing", ""), host).toBeNull();
+    }
+    expect(canonicalRedirectUrl(null, "/", "")).toBeNull();
+
+    const get = await request.get("/auth/confirm?token_hash=abc&type=email", { headers: { host: "exhbt.co.uk" }, maxRedirects: 0 });
+    expect(get.status()).toBe(308);
+    expect(get.headers().location).toBe(`https://${MARKETING_HOST}/auth/confirm?token_hash=abc&type=email`);
+    const post = await request.post("/api/pv", { headers: { host: "exhbt.co.uk" }, data: {}, maxRedirects: 0 });
+    expect(post.status()).toBe(308);
+    expect(post.headers().location).toBe(`https://${MARKETING_HOST}/api/pv`);
   });
 
   test("usernames: shape, single hyphens, and reserved names", () => {
