@@ -20,8 +20,17 @@ export type RoadmapRecord = {
   projectSwapsUsed: number;
   /** Set when they keep their plan, or use their last swap. */
   planConfirmedAt: string | null;
+  /** When the plan's ideas were last started (docs/decisions/0019). Null: never. */
+  ideasStartedAt: string | null;
+  /** When the last try failed. Counts only if it is not before `ideasStartedAt`. */
+  ideasFailedAt: string | null;
+  /** How many times they've been started, for the retry limit. */
+  ideasAttempts: number;
   createdAt: string;
 };
+
+/** How `claimIdeasRun` answered. */
+export type IdeasClaim = "claimed" | "running" | "failed" | "limit";
 
 export type NewRoadmap = {
   /** Null for a signed-out builder: the email is asked for at the project-ideas gate. */
@@ -184,6 +193,8 @@ export type EventName =
   | "projects_unlocked"
   | "project_swapped"
   | "plan_kept"
+  | "ideas_completed"
+  | "ideas_failed"
   | "cv_read_ai"
   | "cv_read_failed"
   | "login_link_sent"
@@ -275,6 +286,14 @@ export interface Store {
   listProjectIdeas(roadmapId: string): Promise<ProjectIdea[]>;
   /** Adds a roadmap's first ideas (up to three), once: does nothing if it already has some. */
   seedProjectIdeas(roadmapId: string, ideas: Project[]): Promise<void>;
+  /**
+   * Takes the one right to make a roadmap's ideas, so two requests racing never pay for two
+   * calls. "running": another try started less than `staleMs` ago and hasn't failed. "failed": the
+   * last try failed and `retry` is false. "limit": `maxAttempts` tries used. Otherwise "claimed".
+   */
+  claimIdeasRun(roadmapId: string, opts: { staleMs: number; maxAttempts: number; retry: boolean }): Promise<IdeasClaim>;
+  /** Records that the try ended in failure (success needs no record: the ideas exist). */
+  failIdeasRun(roadmapId: string): Promise<void>;
   /**
    * Replaces one idea in place and counts the swap. The last allowed swap also confirms the
    * plan. Returns false, changing nothing, when `limit` swaps have been used (or another swap
@@ -469,8 +488,24 @@ type RoadmapRow = {
   projects_unlocked_at: string | null;
   project_swaps_used: number | null;
   plan_confirmed_at: string | null;
+  ideas_started_at: string | null;
+  ideas_failed_at: string | null;
+  ideas_attempts: number | null;
   created_at: string;
 };
+
+/** The claim decision, shared by both stores: null means "go ahead and claim". */
+function ideasClaimBlock(
+  r: { ideasStartedAt: string | null; ideasFailedAt: string | null; ideasAttempts: number },
+  o: { staleMs: number; maxAttempts: number; retry: boolean },
+): Exclude<IdeasClaim, "claimed"> | null {
+  const started = r.ideasStartedAt ? Date.parse(r.ideasStartedAt) : null;
+  const failed = started !== null && r.ideasFailedAt !== null && Date.parse(r.ideasFailedAt) >= started;
+  if (started !== null && !failed && Date.now() - started < o.staleMs) return "running";
+  if (r.ideasAttempts >= o.maxAttempts) return "limit";
+  if (failed && !o.retry) return "failed";
+  return null;
+}
 
 const fromRow = (r: RoadmapRow): RoadmapRecord => ({
   id: r.id,
@@ -485,6 +520,9 @@ const fromRow = (r: RoadmapRow): RoadmapRecord => ({
   projectsUnlockedAt: r.projects_unlocked_at ?? null,
   projectSwapsUsed: r.project_swaps_used ?? 0,
   planConfirmedAt: r.plan_confirmed_at ?? null,
+  ideasStartedAt: r.ideas_started_at ?? null,
+  ideasFailedAt: r.ideas_failed_at ?? null,
+  ideasAttempts: r.ideas_attempts ?? 0,
   createdAt: r.created_at,
 });
 
@@ -690,6 +728,37 @@ function supabaseStore(): Store {
       if (rows.length === 0) return;
       // Positions are unique per roadmap, so two first visits at once can't seed twice.
       check(await db.from("project_ideas").upsert(rows, { onConflict: "roadmap_id,position", ignoreDuplicates: true }));
+    },
+    async claimIdeasRun(roadmapId, opts) {
+      const row = check(
+        await db
+          .from("roadmaps")
+          .select("ideas_started_at, ideas_failed_at, ideas_attempts")
+          .eq("id", roadmapId)
+          .maybeSingle(),
+      ) as Pick<RoadmapRow, "ideas_started_at" | "ideas_failed_at" | "ideas_attempts"> | null;
+      if (!row) return "limit";
+      const state = {
+        ideasStartedAt: row.ideas_started_at,
+        ideasFailedAt: row.ideas_failed_at,
+        ideasAttempts: row.ideas_attempts ?? 0,
+      };
+      const blocked = ideasClaimBlock(state, opts);
+      if (blocked) return blocked;
+      // Compare-and-set on the attempt count, which only ever goes up: of two callers that read the
+      // same row, only one update matches.
+      const won = check(
+        await db
+          .from("roadmaps")
+          .update({ ideas_started_at: new Date().toISOString(), ideas_failed_at: null, ideas_attempts: state.ideasAttempts + 1 })
+          .eq("id", roadmapId)
+          .eq("ideas_attempts", state.ideasAttempts)
+          .select("id"),
+      ) as { id: string }[];
+      return won.length === 1 ? "claimed" : "running";
+    },
+    async failIdeasRun(roadmapId) {
+      check(await db.from("roadmaps").update({ ideas_failed_at: new Date().toISOString() }).eq("id", roadmapId));
     },
     async swapProjectIdea(roadmapId, ideaId, idea, limit) {
       const row = check(
@@ -1701,6 +1770,9 @@ function memoryStore(): Store {
         projectsUnlockedAt: null,
         projectSwapsUsed: 0,
         planConfirmedAt: null,
+        ideasStartedAt: null,
+        ideasFailedAt: null,
+        ideasAttempts: 0,
         createdAt: new Date().toISOString(),
         ipHash: r.ipHash,
         marketingOptIn: false,
@@ -1761,6 +1833,20 @@ function memoryStore(): Store {
         roadmapId,
         ideas.slice(0, PLAN_SIZE).map((p, i) => ({ ...p, id: crypto.randomUUID(), position: i, source: "roadmap" as const })),
       );
+    },
+    async claimIdeasRun(roadmapId, opts) {
+      const r = m.roadmaps.get(roadmapId);
+      if (!r) return "limit";
+      const blocked = ideasClaimBlock(r, opts);
+      if (blocked) return blocked;
+      r.ideasStartedAt = new Date().toISOString();
+      r.ideasFailedAt = null;
+      r.ideasAttempts += 1;
+      return "claimed";
+    },
+    async failIdeasRun(roadmapId) {
+      const r = m.roadmaps.get(roadmapId);
+      if (r) r.ideasFailedAt = new Date().toISOString();
     },
     async swapProjectIdea(roadmapId, ideaId, idea, limit) {
       const r = m.roadmaps.get(roadmapId);

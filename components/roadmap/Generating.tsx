@@ -56,7 +56,7 @@ export function Generating({ id, role }: { id: string; role: string }) {
             <p className="mt-6 text-graphite">
               {status === "slow"
                 ? "Still working. Longer answers take a little more time."
-                : "Reading your answers, comparing them with the job, and picking projects. Usually under a minute."}
+                : "Reading your answers and comparing them with the job. Usually under a minute. Your project ideas are written right after, in the background."}
             </p>
             <p className="hint mt-2">We&rsquo;ll also email you a copy.</p>
           </>

@@ -1,4 +1,4 @@
-import type { Roadmap } from "@/lib/ai/schemas";
+import type { Project, Roadmap } from "@/lib/ai/schemas";
 
 /**
  * "Your roadmap is ready" email. Table layout and inline styles because email clients
@@ -20,6 +20,8 @@ const esc = (s: string) =>
 
 export function roadmapReadyEmail(opts: {
   roadmap: Roadmap;
+  /** The plan's ideas, if they are ready when the email goes. Left out of the email when not. */
+  projects?: Project[];
   viewUrl: string;
   signInUrl: string;
   unsubscribeUrl: string;
@@ -27,10 +29,10 @@ export function roadmapReadyEmail(opts: {
   /** Absolute URL of public/brand/exhbt-mark.png. Without it the header is the wordmark alone. */
   logoUrl?: string;
 }): { subject: string; html: string; text: string } {
-  const { roadmap: r, viewUrl, signInUrl, unsubscribeUrl, privacyUrl, logoUrl } = opts;
+  const { roadmap: r, projects: ideas, viewUrl, signInUrl, unsubscribeUrl, privacyUrl, logoUrl } = opts;
   const role = r.targetRole || "your target role";
   const gaps = r.gaps.slice(0, 3);
-  const projects = r.projects.slice(0, 2);
+  const projects = (ideas ?? r.projects).slice(0, 2);
   const subject = `Your roadmap to ${role}`;
 
   const gapRows = gaps

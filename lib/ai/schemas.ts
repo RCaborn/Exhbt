@@ -84,7 +84,14 @@ export const RoadmapSchema = z.object({
     .describe("The skills this job asks for most, most important first."),
 });
 
-/** What the model must return. */
+/**
+ * What the roadmap call asks the model for: the same, without the projects. The project ideas are
+ * their own, later call (lib/ai/projects.ts, docs/decisions/0019) so the roadmap comes back sooner.
+ * Roadmaps stored before that split still carry their projects, so the stored shape keeps the field.
+ */
+export const RoadmapModelSchema = RoadmapSchema.omit({ projects: true });
+
+/** The stored shape of a roadmap's output. */
 export type GeneratedRoadmap = z.infer<typeof RoadmapSchema>;
 export type SkillLevel = GeneratedRoadmap["skillMap"][number];
 
