@@ -93,14 +93,14 @@ Each service switches on when its environment variables are set; until then the 
 
 | Service | Variables | Without it |
 |---|---|---|
-| **Supabase** (database, sign-in, files), London region | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | In-memory store (lost on restart) and a dev sign-in link. **Production refuses to start without it.** |
+| **Supabase** (database, sign-in, files), EU (Paris, eu-west-3) live; the preview project is London | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | In-memory store (lost on restart) and a dev sign-in link. **Production refuses to start without it.** |
 | **Anthropic** (roadmap generation, `claude-haiku-5-5`) | `ANTHROPIC_API_KEYS` | Labelled placeholder roadmap |
 | **Resend** (roadmap email) | `RESEND_API_KEY`, `EMAIL_FROM` | Emails go to `/dev/emails` |
 | Cookie and link signing | `EXHBT_COOKIE_SECRET` | Dev default; **required in production** |
 | Public URL (used in email links) | `NEXT_PUBLIC_SITE_URL` | Taken from the request |
 
 Supabase setup:
-1. Create a project in **London (eu-west-2)** and run every file in `supabase/migrations/` in date order.
+1. Create a project in an EU region (live is Paris, eu-west-3; the preview project is London, eu-west-2) and run every file in `supabase/migrations/` in date order.
 2. Under Auth, enable email sign-in, set the Site URL, and add `https://<domain>/auth/callback` and `https://<domain>/auth/confirm` as redirect URLs.
 3. Sign-in emails from `/login` are sent by the app through Resend, like the roadmap email (`sendMagicLink` in `lib/auth.ts`), so they don't depend on Supabase's SMTP or email templates. Their links go to `/auth/confirm` and work on any device.
 4. Verify your sending domain (exhbt.co.uk) in Resend.
@@ -108,7 +108,7 @@ Supabase setup:
 
 Then deploy. The intended route is Cloudflare building from GitHub on every push to `main`; **[LAUNCH.md](LAUNCH.md)** has the click-by-click steps. Manual alternative: `npm run deploy`, with secrets set via `npx wrangler secret put <NAME>`.
 
-**Private preview vs public:** the site is private by default: `noindex` everywhere, `robots.txt` disallows all, and a preview bar shows. It only goes public when built with `EXHBT_PUBLIC=1` (`lib/site.ts`). In production a missing `ANTHROPIC_API_KEYS` or `RESEND_API_KEY` fails loudly (logged); it never falls back to placeholder roadmaps or the dev outbox.
+**Private preview vs public:** the site is private by default: `noindex` everywhere, `robots.txt` disallows all, and a preview bar shows. It only goes public when built with `EXHBT_PUBLIC=1` (`lib/site.ts`, `next.config.ts`). Production sets it in `wrangler.jsonc` `vars` (and the production build step must too); the preview Worker does not. In production a missing `ANTHROPIC_API_KEYS` or `RESEND_API_KEY` fails loudly (logged); it never falls back to placeholder roadmaps or the dev outbox.
 
 ## Phase 2: services and settings
 

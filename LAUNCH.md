@@ -19,7 +19,7 @@ Dashboards change their wording from time to time. If a label below doesn't matc
 
 1. Go to **supabase.com**, sign up, and create a **New project**:
    - Name: `exhbt`
-   - **Region: London (eu-west-2)**. This matters for UK data rules.
+   - **Region: the live project is in Paris (eu-west-3), in the EU, and the privacy policy says so. If you ever create a new live project, pick an EU region and keep the policy in step. The separate preview project is in London.**
    - Save the database password in your password manager. You won't need it for this checklist.
 2. When the project is ready, open **SQL Editor > New query**:
    - Open `supabase/migrations/20261105000000_init.sql` in this repo on GitHub, copy all of it, paste it, and press **Run**. It should say "Success".
@@ -188,4 +188,4 @@ Do these first:
 - connect your own domain (Worker > Settings > Domains & Routes)
 - verify it in Resend
 
-Then add a **build variable** `EXHBT_PUBLIC` = `1` and redeploy. That removes the preview bar and lets search engines index the public pages. Without it, the site always stays hidden.
+The live site goes public with `EXHBT_PUBLIC` = `1`: it is in `wrangler.jsonc` (top-level `vars`), and the production build step in `.github/workflows/deploy.yml` must set it too, because pages are built with it (the value is read at build time). That removes the preview bar and lets search engines index the public pages. The preview Worker (`env.preview`) leaves it unset, so it keeps the bar and stays hidden. Without the flag a site always stays hidden.

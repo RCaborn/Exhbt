@@ -62,7 +62,7 @@ test.describe("Privacy policy and terms", () => {
     await page.goto("/legal/privacy");
     await expect(page.getByRole("heading", { level: 2, name: "Public portfolios" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "Project files" })).toBeVisible();
-    await expect(page.getByRole("heading", { level: 2, name: "AI drafting" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "AI", exact: true })).toBeVisible();
     await expect(page.getByText(/Hide my portfolio from search/)).toBeVisible();
     await expect(page.getByText(/card details go straight to\s+Stripe/)).toBeVisible();
   });
