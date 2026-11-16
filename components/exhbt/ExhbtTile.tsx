@@ -36,7 +36,7 @@ export function ExhbtTile({
   return (
     <Link
       href={href}
-      className="group flex h-full flex-col rounded-[16px] border border-line bg-surface p-5 shadow-pack transition-[transform,border-color] duration-150 hover:-translate-y-0.5 hover:border-jade sm:p-6"
+      className="card-link group flex h-full flex-col rounded-[16px] border border-line bg-surface p-5 shadow-pack sm:p-6"
     >
       <div className="flex items-center justify-between gap-3">
         <span className="font-mono text-[0.8125rem] font-semibold" data-catalogue>{catalogueNo(position)}</span>

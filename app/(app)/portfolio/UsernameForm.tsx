@@ -3,7 +3,9 @@
 import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { portfolioHost, usernameProblem } from "@/lib/hosts";
+import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
+import type { Plan } from "@/lib/entitlements";
 import { claimUsernameAction, type UsernameState } from "./actions";
 
 type Remote = { name: string; ok: boolean; reason?: string };
@@ -12,7 +14,24 @@ type Remote = { name: string; ok: boolean; reason?: string };
  * Claim or change the username, with a live check: the format rule straight away (after a short
  * pause in typing), then whether it's free, from /api/username/check.
  */
-export function UsernameForm({ current }: { current: string | null }) {
+export function UsernameForm({ current, blocked }: { current: string | null; blocked?: { reason: string; upgradeTo?: Plan } | null }) {
+  if (blocked) {
+    // No address on this plan (canClaimUsername). One they already have stays theirs.
+    return (
+      <div className="mt-4 space-y-4">
+        {current && (
+          <p>
+            Your address is <span className="font-semibold">{portfolioHost(current)}</span>. It stays yours.
+          </p>
+        )}
+        <UpgradePrompt reason={blocked.reason} upgradeTo={blocked.upgradeTo} />
+      </div>
+    );
+  }
+  return <ClaimForm current={current} />;
+}
+
+function ClaimForm({ current }: { current: string | null }) {
   const [state, action] = useActionState<UsernameState, FormData>(claimUsernameAction, undefined);
   const [value, setValue] = useState(current ?? "");
   const [settled, setSettled] = useState(value);
@@ -50,7 +69,7 @@ export function UsernameForm({ current }: { current: string | null }) {
   const preview = value && !usernameProblem(value) ? portfolioHost(value) : null;
 
   return (
-    <form action={action} noValidate className="mt-5 max-w-[32rem]">
+    <form action={action} noValidate className="mt-4 max-w-[32rem]">
       <label htmlFor="username" className="label">Username</label>
       <input
         id="username"
@@ -71,6 +90,7 @@ export function UsernameForm({ current }: { current: string | null }) {
       <p id="username-status" className={`mt-1 min-h-5 text-sm ${message?.ok ? "text-jade" : "text-error"}`} aria-live="polite">
         {message?.text}
       </p>
+      {state?.upgradeTo && state.name === value && <UpgradePrompt className="mt-2" reason={state.error ?? ""} upgradeTo={state.upgradeTo} />}
       {current && <p className="mt-2 text-sm text-graphite">If you change it, your old address redirects to the new one for 30 days.</p>}
       <div className="mt-4">
         <Submit label={current ? "Change username" : "Claim username"} />

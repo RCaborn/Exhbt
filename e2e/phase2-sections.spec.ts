@@ -182,9 +182,9 @@ async function startWithCore(page: Page, title: string) {
   await page.getByRole("button", { name: "Start from scratch" }).click();
   await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
   await expect(page.locator("[data-ready=true]")).toBeAttached();
-  await expect(page.getByRole("textbox", { name: "The question" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Context", exact: true })).toBeVisible();
   await page.locator("#title").fill(title);
-  await page.getByRole("textbox", { name: "The question" }).fill("Lunch queues ran long. Would a second till help?");
+  await page.getByRole("textbox", { name: "Context", exact: true }).fill("Lunch queues ran long. Would a second till help?");
   for (const [i, box] of ["Timed the queue", "Opened a second till", "Timed it again"].entries()) await page.getByLabel(`Box ${i + 1}`, { exact: true }).fill(box);
 }
 
@@ -206,9 +206,8 @@ async function addSection(page: Page, name: string) {
 /** The kinds in the editor's list, in order. */
 const listOrder = (page: Page) => page.locator('ol[aria-label="Sections, in page order"] > li').evaluateAll((lis) => lis.map((li) => li.getAttribute("data-kind")));
 
-/** The parts of a drawn exhbt, in order, by their heading or label. */
-const pageOrder = (scope: Locator) =>
-  scope.locator("article > section").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label") ?? e.querySelector("h2, h3")?.textContent?.trim() ?? ""));
+/** The parts of a drawn exhbt below the title, in order: the flowchart, then each section's kind (data-part, ProjectView). */
+const pageOrder = (scope: Locator) => scope.locator("article [data-part]").evaluateAll((els) => els.map((e) => e.getAttribute("data-part") ?? ""));
 
 /** The figure on the word bar. */
 async function wordsOnBar(page: Page): Promise<number> {
@@ -287,7 +286,7 @@ test.describe("Sections in the editor", () => {
     await expect(pv.getByText("Priya Shah, Cafe manager")).toBeVisible();
     await expect(pv.getByText(NEXT)).toBeVisible();
     await expect(pv.getByRole("link", { name: "Queue model notebook" })).toHaveAttribute("href", "https://example.com/queue-model");
-    expect(await pageOrder(pv)).toEqual(["The question", "Process", "Findings", "Graphs", "Images", "Feedback", "What I'd do next", "Link"]);
+    expect(await pageOrder(pv)).toEqual(["process", "findings", "graph", "image", "quote", "reflection", "link"]);
 
     // The menu now offers only what there's room for, and the words left went down.
     await openMenu(page);
@@ -312,7 +311,7 @@ test.describe("Sections in the editor", () => {
     await publish(page);
     await page.goto(`/p/sasha/${slugify(title)}`);
     const article = page.locator("article");
-    expect(await pageOrder(page.locator("main"))).toEqual(["The question", "Process", "Findings", "Graphs", "Images", "Feedback", "What I'd do next", "Link"]);
+    expect(await pageOrder(page.locator("main"))).toEqual(["process", "findings", "graph", "image", "quote", "reflection", "link"]);
     await expect(page.getByRole("region", { name: "Feedback" })).toContainText(`“${QUOTE}”`);
     await expect(page.getByRole("region", { name: "Feedback" })).toContainText("Priya Shah, Cafe manager");
     await expect(page.getByRole("region", { name: "What I'd do next" })).toContainText(NEXT);
@@ -321,11 +320,12 @@ test.describe("Sections in the editor", () => {
     await expect(article.getByRole("img", { name: "A queue at the cafe till" })).toBeVisible();
     await axe(page, "project page");
 
-    // The portfolio tile still shows the headline (the graph's change) and the flow.
+    // On the home page it is the best piece of work, with its first graph as the key figure (decision 0016).
     await page.goto("/p/sasha");
-    const tile = page.getByRole("link", { name: new RegExp(title) });
-    await expect(tile).toContainText("−64%");
-    for (const box of ["Timed the queue", "Opened a second till", "Timed it again"]) await expect(tile).toContainText(box);
+    const band = page.locator("[data-section=featured]");
+    await expect(band.getByRole("heading", { level: 2 })).toHaveText(title);
+    await expect(band.locator("[data-key-figure=chart]")).toBeVisible();
+    await expect(band.getByRole("link", { name: "See how I did it" })).toHaveAttribute("href", `/p/sasha/${slugify(title)}`);
   });
 
   test("reorder with the buttons, the drag handle's keys and a pointer drag; the order is saved", async ({ page }) => {
@@ -351,7 +351,7 @@ test.describe("Sections in the editor", () => {
     // At the top the up button is off, so focus moves to the down one.
     await expect(up).toBeDisabled();
     await expect(page.getByRole("button", { name: "Move what I'd do next down" })).toBeFocused();
-    expect(await pageOrder(preview(page))).toEqual(["The question", "Process", "What I'd do next", "Findings", "Feedback"]);
+    expect(await pageOrder(preview(page))).toEqual(["process", "reflection", "findings", "quote"]);
 
     // The drag handle from the keyboard (dnd-kit): Space, an arrow, Space.
     const quoteHandle = page.getByRole("button", { name: "Drag quote to move it" });
@@ -381,7 +381,7 @@ test.describe("Sections in the editor", () => {
     await page.mouse.move(x, y + (onto.y + onto.height / 2) - (from.y + from.height / 2), { steps: 20 });
     await page.mouse.up();
     await expect.poll(() => listOrder(page)).toEqual(["quote", "reflection", "findings"]);
-    expect(await pageOrder(preview(page))).toEqual(["The question", "Process", "Feedback", "What I'd do next", "Findings"]);
+    expect(await pageOrder(preview(page))).toEqual(["process", "quote", "reflection", "findings"]);
 
     // The order is saved with the exhbt.
     await waitForSave(page);
@@ -393,7 +393,7 @@ test.describe("Sections in the editor", () => {
   test("a quote that takes the exhbt over 200 words blocks publishing, and the bar turns red", async ({ page }) => {
     await signInAs(page, "wanda");
     await startWithCore(page, "Cutting lunch queues at the student union cafe");
-    await page.getByRole("textbox", { name: "The question" }).fill(nWords(LIMITS.gapWords));
+    await page.getByRole("textbox", { name: "Context", exact: true }).fill(nWords(LIMITS.gapWords));
     for (let i = 1; i <= LIMITS.flow.min; i++) {
       await page.getByLabel(`Box ${i}`, { exact: true }).fill(nWords(LIMITS.flow.stepWords));
       await page.getByLabel(`Box ${i} detail`).fill(nWords(LIMITS.flow.detailWords));
@@ -476,11 +476,11 @@ test.describe("Sections in the editor", () => {
       return (await page.locator("article").innerHTML()).replaceAll(username, "USER");
     };
     const old = await articleOf("olden");
-    // The order the page always had: the question, the process, findings, the graph; the work in the footer.
-    expect(await pageOrder(page.locator("main"))).toEqual(["The question", "Process", "Findings", "Graphs"]);
-    await expect(page.getByRole("region", { name: "findings" }).getByRole("listitem")).toHaveCount(legacyGpDoc.findings.length);
+    // The order the page always had: the process, findings, the graph (beside them since decision 0022); the work in the sidebar.
+    expect(await pageOrder(page.locator("main"))).toEqual(["process", "findings", "graph"]);
+    await expect(page.getByRole("region", { name: "What I found" }).getByRole("listitem")).toHaveCount(legacyGpDoc.findings.length);
     await expect(page.getByRole("table", { name: legacyGpDoc.charts[0]!.title })).toBeAttached();
-    await expect(page.locator("article footer").getByRole("link", { name: /See the work: Final report \(PDF\)/ })).toBeVisible();
+    await expect(page.getByRole("complementary", { name: /and this work$/ }).getByRole("link", { name: /See the work: Final report \(PDF\)/ })).toBeVisible();
     expect(await articleOf("newer")).toBe(old);
 
     // In the editor it opens as sections, and nothing about its page changes until it's published again.

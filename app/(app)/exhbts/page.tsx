@@ -70,8 +70,8 @@ export default async function ExhbtsPage({ searchParams }: { searchParams: Promi
         {profile.username && exhbts.length > 0 && (
           <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-graphite">
             The order here is your portfolio&apos;s order.
-            <Button href="/portfolio/customise" size="sm">
-              Customise portfolio
+            <Button href="/portfolio?step=projects" size="sm">
+              Arrange your portfolio
             </Button>
           </p>
         )}

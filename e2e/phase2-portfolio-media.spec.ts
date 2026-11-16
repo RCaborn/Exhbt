@@ -15,12 +15,12 @@ const [GP, LIBRARY] = sampleDocs as [ExhbtDoc, ExhbtDoc];
 const unique = (tag: string) => `${tag}-${Date.now().toString(36)}${Math.floor(Math.random() * 1e3)}`;
 const on = (baseURL: string | undefined, name: string) => (baseURL ?? "").replace("//localhost", `//${name}.localhost`);
 
-/** A Premium portfolio for `<username>@example.com`, then signed in as them on the settings page. */
+/** A Premium portfolio for `<username>@example.com`, then signed in as them on the builder's "You" step. */
 async function seedAndSignIn(page: Page, username: string) {
   const res = await page.request.get(`/dev/portfolio?username=${username}&plan=premium`, { maxRedirects: 0 });
   expect(res.status(), await res.text()).toBe(307);
-  await page.goto(`/auth/dev?email=${username}@example.com&next=/account/portfolio`);
-  await expect(page.getByRole("heading", { level: 1, name: "Portfolio settings" })).toBeVisible();
+  await page.goto(`/auth/dev?email=${username}@example.com&next=${encodeURIComponent("/portfolio?step=you")}`);
+  await expect(page.getByRole("heading", { level: 1, name: "Build your portfolio" })).toBeVisible();
 }
 
 /** A real PNG, drawn in the page: wider than tall, so the crop has something to do. */
@@ -77,7 +77,7 @@ test.describe("Profile photo", () => {
     await expect(page.locator('article [data-avatar="photo"]')).toBeVisible();
 
     // Replace: the new photo shows and the old file is gone.
-    await page.goto("/account/portfolio");
+    await page.goto("/portfolio?step=you");
     await uploadPhoto(page, "second.png");
     await page.goto(`/p/${name}`);
     const second = await glancePhoto(page).getAttribute("src");
@@ -85,7 +85,7 @@ test.describe("Profile photo", () => {
     expect((await page.request.get(first!)).status()).toBe(404);
 
     // Remove: initials again, and the file is deleted.
-    await page.goto("/account/portfolio");
+    await page.goto("/portfolio?step=you");
     await page.getByRole("button", { name: "Remove photo" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Photo removed." })).toBeVisible();
     await page.goto(`/p/${name}`);
@@ -152,14 +152,13 @@ test.describe("Link previews", () => {
 });
 
 test.describe("Project page", () => {
-  test("shows the headline number under the title, the catalogue number and the seal", async ({ page }) => {
+  test("shows the checks with the date, and no headline number or catalogue number (decision 0022)", async ({ page }) => {
     await seedAndSignIn(page, "amara");
     await page.goto("/p/amara/gp-reminders");
-    const headline = page.locator("article [data-headline]");
-    await expect(headline).toContainText(GP.headline!.value);
-    await expect(headline).toContainText(GP.headline!.label);
-    await expect(page.locator("article [data-catalogue]")).toHaveText("EX·01");
-    await expect(page.getByRole("link", { name: /Checked by exhbt/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: GP.title })).toBeVisible();
+    await expect(page.locator("article [data-headline]")).toHaveCount(0);
+    await expect(page.locator("article [data-catalogue]")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /^Checked by exhbt, / })).toBeVisible();
   });
 
   test("prints as the exhbt alone, with its address", async ({ page }) => {
@@ -174,9 +173,9 @@ test.describe("Project page", () => {
     await expect(page.getByRole("complementary", { name: "Made with exhbt" })).toBeHidden();
     await expect(page.getByRole("button", { name: "Save as PDF" })).toBeHidden();
     await expect(page.getByRole("list", { name: "Methodology" })).toBeVisible();
-    await expect(page.getByRole("region", { name: "findings" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "What I found" })).toBeVisible();
     await expect(page.getByRole("table", { name: chartsOf(GP)[0]!.title })).toBeAttached();
-    await expect(page.getByRole("list", { name: "Checks passed" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Can you trust it?" })).toBeVisible();
     await expect(page.locator("[data-print-address]")).toBeVisible();
     await expect(page.locator("[data-print-address]")).toHaveText("amara.exhbt.co.uk/gp-reminders");
     // One A4 page.

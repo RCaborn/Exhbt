@@ -52,6 +52,7 @@ export const TILE_LIMITS = {
   nameChars: 60,
   roleChars: 60,
   linkChars: 200,
+  toolsChars: 120,
 } as const;
 
 const oneLine = (s: string) => s.trim().replace(/\s+/g, " ");
@@ -108,7 +109,13 @@ const optional = (check: (s: string) => string | null, message: string) =>
 const EMAIL = z.email();
 export const TilesSchema = z.object({
   about: z.object({ text: words(TILE_LIMITS.aboutWords, "this") }).optional(),
-  education: z.object({ lines: LinesSchema }).optional(),
+  education: z
+    .object({
+      lines: LinesSchema,
+      /** The tools they use, as one line ("Python, SQL, Power BI"), shown as the last row under About me. */
+      tools: chars(TILE_LIMITS.toolsChars, "the tools").optional(),
+    })
+    .optional(),
   experience: z.object({ lines: LinesSchema }).optional(),
   quote: z
     .object({
@@ -161,13 +168,14 @@ export function normaliseLayout(raw: unknown): PortfolioLayout {
   if (Array.isArray(raw.slots)) {
     for (const s of raw.slots.slice(0, MAX_SLOTS)) {
       if (s === "p") slots.push("p");
-      else if (typeof s === "string" && isTileKind(s) && !slots.includes(s)) slots.push(s);
+      else if (typeof s === "string" && (isTileKind(s) || isSectionKey(s)) && !slots.includes(s)) slots.push(s);
     }
   }
   const tiles: Tiles = {};
   const rawTiles = isObject(raw.tiles) ? raw.tiles : {};
+  const kept = tileKindsShownBy(slots);
   for (const kind of TILE_KINDS) {
-    if (!slots.includes(kind)) continue;
+    if (!kept.includes(kind)) continue;
     const one = TilesSchema.safeParse({ [kind]: rawTiles[kind] });
     if (one.success && one.data[kind]) (tiles as Record<string, unknown>)[kind] = one.data[kind];
   }
@@ -274,4 +282,83 @@ export function layoutFromOrder(order: string[], tiles: Tiles, header: HeaderBit
   const kept: Tiles = {};
   for (const kind of TILE_KINDS) if (slots.includes(kind) && tiles[kind]) (kept as Record<string, unknown>)[kind] = tiles[kind];
   return { v: 1, slots, tiles: kept, header };
+}
+
+
+/* ---------- the home page's sections (decision 0016, Rory's layout spec of 16 Nov 2026) ---------- */
+
+/**
+ * Below the fixed top bar and hero, a portfolio home is a list of sections the person adds, removes
+ * and drags into any order. They are stored in `slots` as these keys; the words some of them show
+ * stay in `tiles` (About me reads `about` and `education`, Get in touch falls back to `links`).
+ * The exhbts keep their order in `exhbts.position`; the featured one is `profiles.featured_exhbt_id`.
+ */
+export const SECTION_KEYS = ["featured", "work", "about", "experience", "quote", "contact"] as const;
+export type SectionKey = (typeof SECTION_KEYS)[number];
+export const isSectionKey = (k: string): k is SectionKey => (SECTION_KEYS as readonly string[]).includes(k);
+
+/** What the builder calls each section. The page's own headings are in the page component. */
+export const SECTION_NAMES: Record<SectionKey, string> = {
+  featured: "My best piece of work",
+  work: "More of my work",
+  about: "About me",
+  experience: "Experience",
+  quote: "A quote",
+  contact: "Get in touch",
+};
+export const SECTION_HINTS: Record<SectionKey, string> = {
+  featured: "Your starred exhbt, large, with its key figure",
+  work: "The rest of your exhbts as cards",
+  about: "A few sentences, your education and your tools",
+  experience: "Work you have done",
+  quote: "Something a tutor or manager said",
+  contact: "Your links and email, from the first step",
+};
+
+/** The arrangement in Rory's spec, and what a new or older portfolio starts from. */
+export const DEFAULT_SECTIONS: readonly SectionKey[] = ["featured", "work", "about", "contact"];
+
+/** Sections that come with the paid plans' extra tiles (`extraTiles` in lib/entitlements.ts). */
+export const EXTRA_SECTIONS: readonly SectionKey[] = ["experience", "quote"];
+
+/** Which stored tiles a list of slots (old or new) puts on the page. */
+export function tileKindsShownBy(slots: readonly string[]): TileKind[] {
+  const has = (k: string) => slots.includes(k);
+  const out: TileKind[] = [];
+  if (has("about")) out.push("about");
+  if (has("about") || has("education")) out.push("education");
+  if (has("experience")) out.push("experience");
+  if (has("quote")) out.push("quote");
+  if (has("contact") || has("links")) out.push("links");
+  return out;
+}
+
+/**
+ * The sections, top to bottom. A layout saved by the builder holds section keys already. One saved
+ * by the old customiser (decision 0014: "p" for each project and the extra tiles between them) is read
+ * as the default arrangement plus the extra tiles it had, in their order; nothing stored is lost.
+ */
+export function sectionsOf(layout: Pick<PortfolioLayout, "slots">): SectionKey[] {
+  const slots = layout.slots;
+  if (slots.length === 0) return [...DEFAULT_SECTIONS];
+  if (slots.some((s) => s === "featured" || s === "work" || s === "contact")) {
+    return slots.filter((s, i): s is SectionKey => isSectionKey(s) && slots.indexOf(s) === i);
+  }
+  const extras = slots.filter((s): s is SectionKey => s === "experience" || s === "quote");
+  return ["featured", "work", "about", ...extras.filter((s, i) => extras.indexOf(s) === i), "contact"];
+}
+
+/** The layout to store for these sections: the slots are the sections; tiles are kept for the sections that show them. */
+export function layoutFromSections(sections: readonly SectionKey[], tiles: Tiles, header: HeaderBits): PortfolioLayout {
+  const slots = [...new Set(sections)];
+  const keep = tileKindsShownBy(slots);
+  const kept: Tiles = {};
+  for (const kind of TILE_KINDS) if (keep.includes(kind) && tiles[kind]) (kept as Record<string, unknown>)[kind] = tiles[kind];
+  return { v: 1, slots, tiles: kept, header };
+}
+
+/** "MSc Finance, St Andrews, 2026" to its words and its year, for a row with the year on the right. */
+export function splitYear(line: string): { label: string; year: string | null } {
+  const m = line.trim().match(/^(.*?)[,–—-]?\s*((?:19|20)\d{2}(?:\s*(?:[–—-]|to)\s*(?:(?:19|20)\d{2}|now|present))?)$/i);
+  return m && m[1]!.trim() ? { label: m[1]!.trim().replace(/[,–—-]$/, "").trim(), year: m[2]!.trim() } : { label: line.trim(), year: null };
 }

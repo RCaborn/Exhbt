@@ -195,7 +195,7 @@ test.describe("job link pages", () => {
     await page.getByRole("link", { name: "Preview the page" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "For Acme · Graduate Data Analyst" })).toBeVisible();
     await expect(page.getByText("I forecast library footfall and cut missed appointments.")).toBeVisible();
-    const tiles = page.getByRole("link", { name: /Open project/ });
+    const tiles = page.locator("main ul > li > a[href*='?for=']");
     await expect(tiles).toHaveCount(2);
     await expect(tiles.nth(0)).toContainText(FOOTFALL);
     await expect(tiles.nth(0)).toHaveAttribute("href", `/p/jlmax/library-footfall?for=${slug}`);

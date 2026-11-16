@@ -25,7 +25,7 @@ Lower case because it reads as a product and as the URL people will type. In sen
 Every exhbt in a portfolio has a number like a museum accession number: `EX·01`, `EX·02`.
 
 - Derived from its position in the owner's portfolio (`catalogueNo(position)` in `lib/exhbt.ts`). Never stored and never typed by hand.
-- Inter with tabular numbers, semibold, ink. On a tile it sits top left; on a full exhbt it sits above the author line.
+- Inter with tabular numbers, semibold, ink. On a tile it sits top left; on the demo card (`Exhbt.tsx`) it sits above the author line. The exhbt page itself doesn't show one (decision 0022).
 - Use them only for exhbts. Don't number marketing sections, features or steps with them; DESIGN.md still bans decorative numbering.
 - On a job-specific link, the numbers follow that link's order.
 
@@ -37,7 +37,7 @@ Every exhbt in a portfolio has a number like a museum accession number: `EX·01`
 - The three mint ticks stay next to it on the full exhbt.
 
 ## Brand band
-One coloured surface per portfolio page, at the top: `PortfolioHeader` on the portfolio, the slim `PortfolioBar` above a single exhbt. It is ink unless the person chose another look.
+One coloured surface per portfolio page: the "My best piece of work" band on the portfolio home (decision 0016), the slim `PortfolioBar` above a single exhbt. It is ink unless the person chose another look.
 
 - Text on ink is white, or `#C9CBCF` for secondary text. Keep everything on the band at 7:1 or more.
 - No other ink blocks on those pages apart from the site footer.

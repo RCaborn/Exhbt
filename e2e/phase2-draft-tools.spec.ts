@@ -68,7 +68,7 @@ const findings = (page: Page) => page.getByRole("textbox", { name: "Finding 1" }
 const left = (page: Page, block: string) => page.getByTestId(`tools-${block}`).getByTestId("rewrites-left");
 
 // Each card has one "More actions for <card>" menu: "Rewrite this block", "Back to the AI version" and the count.
-const CARD: Record<string, string> = { header: "Title and context", skills: "Skills", gap: "The question", flow: "Process", findings: "Findings" };
+const CARD: Record<string, string> = { header: "Your question and details", skills: "Skills", gap: "Context", flow: "Process", findings: "Findings" };
 const menuButton = (page: Page, block: string) => page.getByRole("button", { name: `More actions for ${CARD[block]}` });
 const openMenu = (page: Page, block: string) => menuButton(page, block).click();
 const startRewrite = async (page: Page, block: string) => {

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { usernameProblem } from "@/lib/hosts";
+import { canClaimUsername, getPlan } from "@/lib/plan";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
 
@@ -10,8 +11,9 @@ const reply = (body: UsernameCheck | { error: string }, status = 200) =>
   NextResponse.json(body, { status, headers: { "cache-control": "no-store" } });
 
 /**
- * The live availability check on /account/portfolio. Signed in only. The person's own current
- * name, and their old name while it still redirects to them, count as available.
+ * The live availability check in the portfolio builder's address step. Signed in only. The person's
+ * own current name, and their old name while it still redirects to them, count as available. On a
+ * plan without a portfolio address (canClaimUsername) every other name is refused, as the claim is.
  */
 export async function GET(req: NextRequest) {
   if (!isPhase2Enabled()) return reply({ error: "Not found" }, 404);
@@ -23,6 +25,8 @@ export async function GET(req: NextRequest) {
   if (problem) return reply({ ok: false, reason: problem });
 
   const store = getStore();
+  const verdict = canClaimUsername(await getPlan(user.id));
+  if (!verdict.ok && (await store.getPortfolioProfile(user.id)).username !== name) return reply({ ok: false, reason: verdict.reason });
   const found = await store.lookupUsername(name);
   if (!found) return reply({ ok: true });
   if ("userId" in found) return reply(found.userId === user.id ? { ok: true } : { ok: false, reason: "That name is taken. Try another." });

@@ -5,14 +5,17 @@ import { asChart, CHART_LIMITS, ChartSchema, chartIssues, chartTexts, publicChar
  * An exhbt as stored (exhbts.blocks): the layout Rory set on 12 Nov 2026, as data, with the
  * optional parts as sections (13 Nov 2026). docs/decisions/0007, 0015; docs/phase-2.md section 6.
  *
- *   header:   photo + name (from the profile, not stored here) · skill boxes · title · context line · headline
- *   core:     the question (gap) → the process flowchart (3 to 6 boxes). Always there, in this order.
+ *   header:   photo + name (from the profile, not stored here) · skill boxes · the title, phrased as
+ *             the question · the context line (gap), its bold run drawn as a highlight
+ *   sidebar:  what it is (context) · where and when · the checks · the work · Save as PDF
+ *   core:     the context line → the process flowchart (3 to 6 boxes). Always there, in this order.
  *   sections: below the flowchart, in the person's order: findings, graphs (0-2), images (0-2),
  *             a quote, what I'd do next, a link. Each can be added, removed and moved.
  *   footer:   the work (evidence) · trust badge (system)
  *
  * Drafts may break the limits (saving is never blocked); publishing may not (validateForPublish,
- * run on the server). Docs saved before sections existed are read by normaliseDoc.
+ * run on the server). Docs saved before sections existed are read by normaliseDoc. The page layout
+ * (16 Nov 2026) is decision 0022: `whereWhen` and `summary` are optional, so older docs read as they are.
  */
 
 export const SCHEMA_VERSION = 2;
@@ -22,8 +25,14 @@ export type SectionKind = (typeof SECTION_KINDS)[number];
 
 /** Hard limits, checked on publish. The editor shows them as it goes. */
 export const LIMITS = {
+  /** The title is the question the work answers (decision 0022). */
   titleChars: 80,
+  /** "What it is", e.g. "MSc Finance dissertation" (stored as `context`). */
   contextChars: 90,
+  /** "Where and when", e.g. "University of St Andrews, August 2026". */
+  whereWhenChars: 60,
+  /** One sentence on what you found, for portfolio cards (exhbtSummary). */
+  summaryWords: 25,
   skills: { max: 6, wordsEach: 3, charsEach: 32 },
   gapWords: 40,
   flow: { min: 3, max: 6, stepWords: 8, detailWords: 6 },
@@ -106,12 +115,22 @@ export type SectionOf<K extends SectionKind> = Extract<Section, { kind: K }>;
 const DocSchema = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
   title: z.string(),
-  /** One line under the title, e.g. "BSc Economics, final-year project". */
+  /**
+   * "What it is", in the sidebar, e.g. "MSc Finance dissertation" (decision 0022). The key is
+   * older than the name: it was the line under the title, and every stored doc already holds this.
+   */
   context: z.string(),
-  /** The one number that sums it up, on portfolio tiles. Optional. */
+  /** "Where and when", in the sidebar, e.g. "University of St Andrews, August 2026". Optional: older docs have none. */
+  whereWhen: z.string().optional(),
+  /** One sentence on what you found, for portfolio cards. Optional; exhbtSummary falls back to the first finding. */
+  summary: z.string().optional(),
+  /** The one number that sums it up, on job-link tiles and link previews (not on the page since decision 0022). Optional. */
   headline: z.object({ value: z.string(), label: z.string() }).optional(),
   skills: z.array(z.string()),
-  /** Context and the gap: the question and why it mattered. */
+  /**
+   * The context line under the title: why the question matters. Its bold run is drawn as the
+   * highlighted phrase, the gap (decision 0022). Called "The question" before the title became one.
+   */
   gap: RichTextSchema,
   /** The process flowchart: always there, 3 to 6 boxes. */
   flow: z.array(FlowStepSchema),
@@ -205,6 +224,17 @@ export function emptyDoc(): ExhbtDoc {
 export const plain = (rt: RichText): string => rt.map((r) => r.t).join("");
 export const words = (s: string): number => s.trim().split(/\s+/).filter(Boolean).length;
 
+/**
+ * One sentence on what the exhbt found, for portfolio cards and the featured band: the summary
+ * the person wrote, or else the first finding as plain text. Empty when there's neither.
+ */
+export function exhbtSummary(d: Pick<ExhbtDoc, "summary" | "sections">): string {
+  const own = d.summary?.trim();
+  if (own) return own;
+  const first = findingsOf(d).find((f) => plain(f).trim());
+  return first ? plain(first).trim() : "";
+}
+
 /** Every text a section puts on the page, for the word cap. Image alt text and link addresses don't show, so they're left out. */
 export function sectionTexts(s: Section): string[] {
   switch (s.kind) {
@@ -225,7 +255,8 @@ export function sectionTexts(s: Section): string[] {
 
 /**
  * Every word on the page, for the 200-word cap (Rory, 12 and 13 Nov 2026: "200 should cap
- * everything", "even if you add, it is within limit"): header, skills, headline, the gap, the
+ * everything", "even if you add, it is within limit"): header, skills, headline, what it is, where
+ * and when, the summary (it shows on portfolio cards), the context line, the
  * flowchart, every section (findings, every word on the graphs, image captions, the quote with its
  * name and role, what I'd do next, the link's label and description) and the evidence label. Only
  * image alt text and link addresses are left out: they aren't shown on the page.
@@ -234,6 +265,8 @@ export function wordCount(d: ExhbtDoc): number {
   return [
     d.title,
     d.context,
+    d.whereWhen ?? "",
+    d.summary ?? "",
     ...d.skills,
     d.headline?.value ?? "",
     d.headline?.label ?? "",
@@ -284,7 +317,9 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
 
   need(doc.title.trim().length > 0, "title", "Add a title.");
   need(doc.title.length <= L.titleChars, "title", `Keep the title to ${L.titleChars} characters.`);
-  need(doc.context.length <= L.contextChars, "context", `Keep the context line to ${L.contextChars} characters.`);
+  need(doc.context.length <= L.contextChars, "context", `Keep "What it is" to ${L.contextChars} characters.`);
+  need((doc.whereWhen ?? "").length <= L.whereWhenChars, "whereWhen", `Keep "Where and when" to ${L.whereWhenChars} characters.`);
+  need(words(doc.summary ?? "") <= L.summaryWords, "summary", `Keep the summary to one sentence of ${L.summaryWords} words or fewer.`);
 
   need(doc.skills.length <= L.skills.max, "skills", `Up to ${L.skills.max} skills.`);
   doc.skills.forEach((s, i) => {
@@ -292,8 +327,8 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
     need(words(s) <= L.skills.wordsEach && s.length <= L.skills.charsEach, `skills.${i}`, "Keep each skill short.");
   });
 
-  need(words(plain(doc.gap)) > 0, "gap", "Say what the question was.");
-  need(words(plain(doc.gap)) <= L.gapWords, "gap", `Keep the question to ${L.gapWords} words.`);
+  need(words(plain(doc.gap)) > 0, "gap", "Add the context: why the question matters.");
+  need(words(plain(doc.gap)) <= L.gapWords, "gap", `Keep the context to ${L.gapWords} words.`);
   httpsOnly(doc.gap, "gap");
 
   need(doc.flow.length >= L.flow.min, "flow", `The flowchart needs at least ${L.flow.min} boxes.`);
@@ -367,3 +402,16 @@ export function publicDoc(raw: ExhbtDoc): ExhbtDoc {
 
 /** Plain text to runs, for drafts and for tests. */
 export const text = (t: string): RichText => (t ? [{ t }] : []);
+
+/**
+ * The context line as runs, with `phrase` (the gap) marked: the bold run the page draws as a
+ * highlight (decision 0022). The first place the phrase occurs, as written; plain text when it's
+ * empty or not in the line, so the AI can't highlight words that aren't there.
+ */
+export function withHighlight(line: string, phrase: string): RichText {
+  const t = line.trim();
+  const p = phrase.trim().replace(/^["“‘']+|["”’']+$/g, "").trim();
+  const at = p ? t.indexOf(p) : -1;
+  if (at < 0) return text(t);
+  return [{ t: t.slice(0, at) }, { t: p, b: true }, { t: t.slice(at + p.length) }].filter((r) => r.t.length > 0);
+}

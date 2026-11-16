@@ -1,20 +1,9 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { PrintButton } from "./PrintButton";
 
 type Neighbour = { slug: string; doc: { title: string } } | undefined;
 
-/** Above a project: the way back and "Save as PDF". Not printed. The catalogue number is inside the card. */
-export function ProjectTopNav({ home }: { home: string }) {
-  return (
-    <nav aria-label="Portfolio" className="mb-5 flex flex-wrap items-center justify-between gap-3 text-sm font-semibold print:hidden">
-      <Link href={home} className="inline-flex items-center gap-1.5 hover:text-graphite">
-        <ArrowLeft aria-hidden size={15} strokeWidth={2.25} /> All projects
-      </Link>
-      <PrintButton />
-    </nav>
-  );
-}
+/* The way back ("All of <name>'s work") and "Save as PDF" are in the exhbt page's sidebar (ProjectView, decision 0022). */
 
 /** Previous and next. When only one exists it takes the full width, so there's no empty half. Not printed. */
 export function ProjectPager({ base, prev, next }: { base: string; prev: Neighbour; next: Neighbour }) {

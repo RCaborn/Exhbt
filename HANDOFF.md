@@ -137,7 +137,7 @@ Where Phase 2 lives:
 | How an exhbt looks | `components/portfolio/ProjectView.tsx` |
 | The editor | `app/(app)/exhbts/[id]/edit/`, `components/editor/` |
 | Uploads and AI drafts | `app/(app)/exhbts/new/`, `lib/uploads.ts`, `lib/files.ts`, `lib/ai/exhbt-draft.ts`, `lib/exhbt/verify.ts` |
-| Portfolio settings | `app/(app)/account/portfolio/` |
+| The portfolio builder (profile, look, projects, address) | `app/(app)/portfolio/` (decision 0016) |
 | Portfolio pages | `app/(portfolio)/` (hosts: decision 0001; the subdomain routing is being built separately) |
 | Billing | `app/(app)/account/billing/`, `lib/stripe.ts`, `app/api/stripe/webhook/route.ts` |
 | Which plan someone is on | `lib/plan.ts` (`getPlan`), rules in `lib/plan-rules.ts` |

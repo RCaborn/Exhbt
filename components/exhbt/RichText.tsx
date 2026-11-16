@@ -4,14 +4,17 @@ import { safeHref, type RichText as RichTextValue } from "@/lib/exhbt/blocks";
  * Renders the stored runs (bold, italic, links) as React elements. Never raw HTML, so
  * nothing a person types can inject markup. Links must be https, open in a new tab, and
  * carry rel="nofollow ugc" because they're user content.
+ *
+ * With `highlight`, bold is drawn as the highlighted phrase instead (a `<mark>`): the exhbt's
+ * context line marks its gap that way (decision 0022).
  */
-export function RichText({ value }: { value: RichTextValue }) {
+export function RichText({ value, highlight = false }: { value: RichTextValue; highlight?: boolean }) {
   return (
     <>
       {value.map((r, i) => {
         let node: React.ReactNode = r.t;
         if (r.i) node = <em>{node}</em>;
-        if (r.b) node = <strong className="font-semibold">{node}</strong>;
+        if (r.b) node = highlight ? <mark className="xp-mark">{node}</mark> : <strong className="font-semibold">{node}</strong>;
         const href = safeHref(r.href);
         if (href) {
           node = (

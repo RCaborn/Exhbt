@@ -40,7 +40,7 @@ Nothing above has run with real Stripe, real Supabase Storage, or the real Haiku
    - Optional: a promotion code for a new-joiner discount.
 3. **A preview to click through.** Create a second free Supabase project (for example `exhbt-preview`) and say so. The preview Worker is built (see "Preview site" below); it needs its secrets adding and the migrations applied to that project, then Stripe test keys. That's where the real-service run happens.
 4. **Launch day** (LAUNCH.md has the full order):
-   - apply migrations `20261113` → `20261120` to the live Supabase, in date order (`20261119000000_teammates.sql` adds teammates, invites and file matching, decision 0013; `20261120000000_portfolio_layout.sql` adds the customiser's columns, decision 0014)
+   - apply migrations `20261113` → `20261121` to the live Supabase, in date order (`20261119000000_teammates.sql` adds teammates, invites and file matching, decision 0013; `20261120000000_portfolio_layout.sql` adds the customiser's columns, decision 0014; `20261121000000_portfolio_personal.sql` adds the portfolio builder's profile fields and lets the intro suggestion log its AI call, decision 0016). The one-paste bundles in `supabase/launch` and `supabase/preview` don't include `20261121` yet; they're rebuilt as a delta at release
    - merge `phase-2` into `main`
    - set `EXHBT_PHASE2=1` on the Worker
    - switch Stripe to live keys

@@ -1,5 +1,6 @@
 Status: accepted
 Date: 12 Nov 2026
+Amended by: 0015 (sections), 0022 (the page layout: the title is the question, a sidebar)
 
 # An exhbt is a fixed set of blocks, edited in place
 

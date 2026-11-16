@@ -24,7 +24,7 @@ export type CardKey = "header" | "gap" | "flow" | "evidence" | "sections" | "ove
 /** Which card an issue path ("flow.2.step", "sections.1.chart.title", "title") points at. */
 export function cardOf(path: string): CardKey {
   const [head = "", idx] = path.split(".");
-  if (["title", "context", "skills", "headline"].includes(head)) return "header";
+  if (["title", "context", "whereWhen", "summary", "skills", "headline"].includes(head)) return "header";
   if (head === "sections") return idx !== undefined && /^\d+$/.test(idx) ? `section-${Number(idx)}` : "sections";
   if (["gap", "flow", "evidence"].includes(head)) return head as CardKey;
   return "overall";
@@ -69,7 +69,7 @@ export const issuesIn = (issues: Issue[], card: CardKey) => issues.filter((i) =>
 export function cardWords(doc: ExhbtDoc): Partial<Record<CardKey, number>> {
   const sum = (xs: string[]) => xs.reduce((n, s) => n + words(s), 0);
   return {
-    header: sum([doc.title, doc.context, ...doc.skills, doc.headline?.value ?? "", doc.headline?.label ?? ""]),
+    header: sum([doc.title, doc.context, doc.whereWhen ?? "", doc.summary ?? "", ...doc.skills, doc.headline?.value ?? "", doc.headline?.label ?? ""]),
     gap: words(plain(doc.gap)),
     flow: sum(doc.flow.flatMap((s) => [s.step, s.detail ?? ""])),
     ...Object.fromEntries(doc.sections.map((s, i) => [`section-${i}`, sectionWords(s)])),
@@ -77,7 +77,17 @@ export function cardWords(doc: ExhbtDoc): Partial<Record<CardKey, number>> {
   };
 }
 
-const LABELS: Record<string, string> = { title: "Title", context: "Context line", skills: "Skills", headline: "Headline number", gap: "The question", evidence: "The work", sections: "Sections" };
+const LABELS: Record<string, string> = {
+  title: "Your question (the title)",
+  context: "What it is",
+  whereWhen: "Where and when",
+  summary: "One-sentence summary",
+  skills: "Skills",
+  headline: "Headline number",
+  gap: "Context",
+  evidence: "The work",
+  sections: "Sections",
+};
 
 /** "flow.2.step" becomes "Process, box 3", "sections.0.items.1" "Finding 2": which part an issue is about, for the list at the top. */
 export function labelOf(path: string, doc: ExhbtDoc): string {

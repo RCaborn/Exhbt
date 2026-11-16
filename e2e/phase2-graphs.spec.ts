@@ -172,9 +172,9 @@ async function startWithBasics(page: Page, title: string) {
   await page.getByRole("button", { name: "Start from scratch" }).click();
   await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
   await expect(page.locator("[data-ready=true]")).toBeAttached();
-  await expect(page.getByRole("textbox", { name: "The question" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Context", exact: true })).toBeVisible();
   await page.locator("#title").fill(title);
-  await page.getByRole("textbox", { name: "The question" }).fill("Lunch queues ran long. Would a second till help?");
+  await page.getByRole("textbox", { name: "Context", exact: true }).fill("Lunch queues ran long. Would a second till help?");
   for (const [i, box] of ["Timed the queue", "Opened a second till", "Timed it again"].entries()) await page.getByLabel(`Box ${i + 1}`, { exact: true }).fill(box);
   await page.getByRole("textbox", { name: "Finding 1" }).fill("Waits fell.");
   await page.getByRole("textbox", { name: "Finding 2" }).fill("Sales held steady.");

@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { Tick } from "@/components/ui/Tick";
 
 /**
  * The system-generated trust line. Mint fill with ink ticks for a check that has passed.
@@ -34,12 +34,7 @@ export function TrustBadge({
         <ul className="flex flex-wrap gap-x-4 gap-y-1.5" aria-label="Checks passed">
           {passed.map((c, i) => (
             <li key={c.label} className="inline-flex items-center gap-1.5 font-medium text-ink">
-              <span
-                className={`inline-flex size-[18px] items-center justify-center rounded-full border border-ink bg-mint ${animate ? "tick-in" : ""}`}
-                style={animate ? { animationDelay: `${400 + i * 180}ms` } : undefined}
-              >
-                <Check aria-hidden size={11} strokeWidth={3} />
-              </span>
+              <Tick size="sm" className={animate ? "tick-in" : ""} style={animate ? { animationDelay: `${400 + i * 180}ms` } : undefined} />
               {c.label}
             </li>
           ))}

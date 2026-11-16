@@ -105,13 +105,12 @@ test.describe("Phone header", () => {
 });
 
 test.describe("Project page", () => {
-  test("shows one catalogue number, inside the card", async ({ page }) => {
+  test("shows no catalogue number (decision 0022)", async ({ page }) => {
     const name = unique("cat");
     await seed(page, name, "premium");
     await page.goto(`/p/${name}/gp-reminders`);
-    await expect(page.locator("[data-catalogue]")).toHaveCount(1);
-    await expect(page.locator("article [data-catalogue]")).toHaveText("EX·01");
-    await expect(page.getByRole("navigation", { name: "Portfolio" })).not.toContainText("EX·");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.locator("[data-catalogue]")).toHaveCount(0);
   });
 
   test("the flowchart is a row at 1440 wide", async ({ page }) => {
@@ -215,9 +214,9 @@ test.describe("Your exhbts list", () => {
 
 test.describe("Profile photo on Free", () => {
   test("a Free user can upload, replace and remove a photo, and it shows on their preview", async ({ page }) => {
-    await signInAs(page, uniqueEmail("freephoto"), "/account/portfolio");
-    await expect(page.getByRole("heading", { level: 1, name: "Portfolio settings" })).toBeVisible();
-    await expect(page.getByText("isn’t public on Free")).toBeVisible();
+    await signInAs(page, uniqueEmail("freephoto"), "/portfolio?step=you");
+    await expect(page.getByRole("heading", { level: 1, name: "Build your portfolio" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "About you" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Upload a photo" })).toBeVisible();
 
     const png = async () =>
@@ -248,7 +247,7 @@ test.describe("Profile photo on Free", () => {
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
     await expect(page.locator('section[aria-label="Preview"] [data-avatar="photo"]')).toBeVisible();
 
-    await page.goto("/account/portfolio");
+    await page.goto("/portfolio?step=you");
     await choose("second.png");
     await expect(page.getByRole("status").filter({ hasText: "Photo saved." })).toBeVisible();
     await page.getByRole("button", { name: "Remove photo" }).click();

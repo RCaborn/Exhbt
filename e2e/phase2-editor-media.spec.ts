@@ -21,7 +21,7 @@ async function startFromScratch(page: Page) {
   await page.getByRole("button", { name: "Start from scratch" }).click();
   await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
   await expect(page.locator("[data-ready=true]")).toBeAttached();
-  await expect(page.getByRole("textbox", { name: "The question" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Context", exact: true })).toBeVisible();
 }
 
 async function waitForSaved(page: Page) {
@@ -31,7 +31,7 @@ async function waitForSaved(page: Page) {
 /** Fills everything a publish needs, apart from images and the work. */
 async function fillValid(page: Page, title: string) {
   await page.locator("#title").fill(title);
-  await page.getByRole("textbox", { name: "The question" }).fill("Queues ran long at lunch. Would a second till help?");
+  await page.getByRole("textbox", { name: "Context", exact: true }).fill("Queues ran long at lunch. Would a second till help?");
   await page.getByLabel("Box 1", { exact: true }).fill("Timed the queue");
   await page.getByLabel("Box 2", { exact: true }).fill("Added a second till");
   await page.getByLabel("Box 3", { exact: true }).fill("Waits fell");
@@ -197,14 +197,14 @@ test.describe("guidance", () => {
     const guide = page.getByRole("region", { name: "Your first exhbt" });
     await expect(guide).toBeVisible();
     const item = (name: string) => guide.getByRole("listitem").filter({ hasText: name });
-    await expect(item("Give it a title")).not.toHaveAttribute("data-done", "true");
+    await expect(item("Ask your question (the title)")).not.toHaveAttribute("data-done", "true");
     await expect(page.locator("#title")).toHaveAttribute("placeholder", /e\.g\./);
     await expect(page.getByLabel("Box 1", { exact: true })).toHaveAttribute("placeholder", /e\.g\./);
 
     await page.locator("#title").fill("Checking the checklist");
-    await expect(item("Give it a title")).toHaveAttribute("data-done", "true");
-    await page.getByRole("textbox", { name: "The question" }).fill("Does it tick?");
-    await expect(item("Write the question")).toHaveAttribute("data-done", "true");
+    await expect(item("Ask your question (the title)")).toHaveAttribute("data-done", "true");
+    await page.getByRole("textbox", { name: "Context", exact: true }).fill("Does it tick?");
+    await expect(item("Write the context")).toHaveAttribute("data-done", "true");
     for (const n of [1, 2, 3]) await page.getByLabel(`Box ${n}`, { exact: true }).fill(`Step ${n}`);
     await expect(item("process boxes")).toHaveAttribute("data-done", "true");
     await page.getByRole("textbox", { name: "Finding 1" }).fill("One.");
@@ -220,10 +220,10 @@ test.describe("guidance", () => {
     await signInAs(page, "walt", "premium");
     await startFromScratch(page);
     const long = Array.from({ length: LIMITS.totalWords + 30 }, (_, i) => `word${i}`).join(" ");
-    await page.getByRole("textbox", { name: "The question" }).fill(long);
+    await page.getByRole("textbox", { name: "Context", exact: true }).fill(long);
     await expect(page.getByText(`aim for ${LIMITS.targetWords}, at most ${LIMITS.totalWords}`)).toBeVisible();
     await expect(page.getByText(/this part has the most/)).toBeVisible();
-    await expect(page.getByText(`Keep the question to ${LIMITS.gapWords} words.`)).toBeVisible();
+    await expect(page.getByText(`Keep the context to ${LIMITS.gapWords} words.`)).toBeVisible();
   });
 
   test("the preview stays in view on a wide screen, and the badge waits for the confirmation", async ({ page }) => {
@@ -231,10 +231,10 @@ test.describe("guidance", () => {
     await startFromScratch(page);
     const preview = page.getByRole("region", { name: "Preview" });
     await expect(preview).toHaveCSS("position", "sticky");
-    await expect(preview.getByText("Confirmed by author")).toHaveCount(0);
+    await expect(preview.getByText(/^Confirmed by /)).toHaveCount(0);
     await expect(preview.getByText("Not confirmed yet")).toBeVisible();
     await page.getByLabel("This is my work, and the numbers are true").check();
-    await expect(preview.getByText("Confirmed by author")).toBeVisible();
+    await expect(preview.getByText(/^Confirmed by /)).toBeVisible();
   });
 });
 
@@ -257,7 +257,7 @@ test.describe("roadmap to exhbt", () => {
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
     await expect(page.locator("#title")).toHaveValue(title.slice(0, LIMITS.titleChars));
     await expect(page.locator("#context")).toHaveValue("Project from my Exhbt roadmap");
-    await expect(page.getByRole("textbox", { name: "The question" })).not.toBeEmpty();
+    await expect(page.getByRole("textbox", { name: "Context", exact: true })).not.toBeEmpty();
     await expect(page.getByLabel(/^Box \d$/)).toHaveCount(3);
 
     // Free holds one exhbt: now the Projects page says why and points to billing.

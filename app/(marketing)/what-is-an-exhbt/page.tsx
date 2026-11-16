@@ -18,32 +18,28 @@ export const metadata: Metadata = {
 /** The parts of the example above, top to bottom. */
 const PARTS: { name: string; body: string }[] = [
   {
-    name: "Title",
-    body: "Names the project as a result, not an activity. Under it, one line of context (a module, a placement, a side project) and, when there is one, the single number that sums it up.",
+    name: "The person and the work",
+    body: "Down the side: your photo, name and a line about you, then what the work is (a dissertation, a placement project) and where and when you did it.",
   },
   {
     name: "The question",
-    body: "What the gap was and why it mattered, in a few sentences. This is where a reader decides whether the project is relevant to the job.",
+    body: "The title is the question the work set out to answer. Under it, a line of context with the gap highlighted. This is where a reader decides whether the project is relevant to the job.",
   },
   {
     name: "The flowchart",
     body: "The method as a row of boxes, in order, ending on the result. It shows how you work, which a CV rarely does.",
   },
   {
-    name: "Findings",
-    body: "What you found, as short bullets. Each one is something you could be asked about in an interview.",
-  },
-  {
-    name: "Graphs",
-    body: "The key result drawn plainly, with every value printed on the chart so nobody has to read it off an axis. If the numbers are confidential, the graph can show the change instead.",
+    name: "What I found",
+    body: "Short ruled points beside the key chart, with every value printed so nobody has to read it off an axis. Each point is something you could be asked about in an interview.",
   },
   {
     name: "The work",
-    body: "A link to the thing itself: the report, repository, dataset or recording. The page makes the claim; the work is what backs it.",
+    body: "One button to the thing itself: the report, repository, dataset or recording. The page makes the claim; the work is what backs it.",
   },
   {
     name: "The checks",
-    body: "A seal and ticks that Exhbt adds, not you: that you confirmed the exhbt is accurate and your own, and that the source is attached.",
+    body: "Ticks that Exhbt adds, not you: that you confirmed the exhbt is accurate and your own, that the source is attached, and when Exhbt checked it.",
   },
 ];
 
@@ -95,13 +91,12 @@ export default function WhatIsAnExhbt() {
             any of them. This one is an example. {demoOwner.name} and the project are made up, so the link to the work is left out.
           </p>
           <div className="mt-12 grid gap-12 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-20">
-            <div className="min-w-0 lg:sticky lg:top-8 lg:self-start">
+            <div className="min-w-0 rounded-[20px] border border-line bg-surface p-5 shadow-pack sm:p-6 lg:sticky lg:top-8 lg:self-start">
               <ProjectView
                 doc={doc}
                 owner={{ name: demoOwner.name, photoUrl: null }}
                 checkedOn="12 March 2026"
                 headingLevel="h2"
-                position={1}
               />
             </div>
             <div className="min-w-0 max-w-xl">
