@@ -147,7 +147,7 @@ function TopBar({ username, nav, contact }: { username: string | null; nav: { hr
 function Hero({ person, theme }: { person: PortfolioPerson; theme: PortfolioTheme }) {
   const intro = (person.bio ?? "").split(/\n{2,}/).filter((p) => p.trim());
   const corners = theme.photo === "round" ? "rounded-full" : "rounded-[var(--pf-radius-lg)]";
-  const face = "size-28 @3xl:size-40";
+  const face = "size-28 @3xl:size-40 @5xl:size-48";
   return (
     <header className={`${WRAP} grid items-center gap-x-12 gap-y-6 pt-10 pb-14 @3xl:grid-cols-[auto_minmax(0,1fr)] @3xl:pt-14 @3xl:pb-20`}>
       {person.photoUrl ? (
@@ -163,12 +163,12 @@ function Hero({ person, theme }: { person: PortfolioPerson; theme: PortfolioThem
       )}
       <div className="min-w-0">
         <p className="text-[1rem] text-[color:var(--pf-soft)]">Hi, I&rsquo;m</p>
-        <h1 className="mt-1 font-[family-name:var(--font-display)] text-[clamp(3rem,11cqw,7.25rem)] leading-[0.92] font-semibold tracking-[-0.045em] break-words text-[color:var(--pf-ink)]">
+        <h1 className="mt-1 font-[family-name:var(--font-display)] text-[clamp(3rem,11.5cqw,8.5rem)] leading-[0.92] font-semibold tracking-[-0.045em] break-words text-[color:var(--pf-ink)]">
           {person.name}
         </h1>
         {person.headline && <p className="mt-4 text-[1.0625rem] font-medium text-[color:var(--pf-ink)]">{person.headline}</p>}
         {intro.length > 0 && (
-          <div data-intro className="mt-5 max-w-[36rem] space-y-3 text-[1.125rem] leading-relaxed text-[color:var(--pf-soft)] @3xl:text-[1.25rem]">
+          <div data-intro className="mt-6 max-w-[38rem] space-y-3 text-[1.125rem] leading-relaxed text-[color:var(--pf-soft)] @3xl:text-[1.375rem]">
             {intro.map((p, i) => (
               <p key={i}>{p}</p>
             ))}
