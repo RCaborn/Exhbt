@@ -26,6 +26,7 @@ export type LoadedPortfolio =
       profile: PortfolioProfile & { username: string };
       displayName: string;
       photoUrl: string | null;
+      coverUrl: string | null;
       /** The projects on the at-a-glance page, in the order it shows them (the featured one first). */
       items: PortfolioItem[];
       /** Live at their own link but left off the glance page by the person (decision 0014). */
@@ -38,6 +39,11 @@ export type LoadedPortfolio =
       theme: PortfolioTheme;
     }
   | { status: "redirect"; to: string }
+  /**
+   * The name is taken but nothing is live yet (a draft-only paid account, or Free). Visitors get
+   * not found; the owner gets a preview of how the page will look (decision 0016).
+   */
+  | { status: "empty"; userId: string; username: string; base: string }
   | { status: "missing" };
 
 /**
@@ -70,7 +76,7 @@ export async function loadPortfolio(username: string, rest = ""): Promise<Loaded
   const plan = await store.planFor(found.userId);
   const reachable = visibleOnPortfolio(plan, await store.listExhbts(found.userId));
   // Free has no public page (decision 0006); nor does a paid account with nothing live yet.
-  if (reachable.length === 0) return { status: "missing" };
+  if (reachable.length === 0) return { status: "empty", userId: found.userId, username: found.username, base: await basePath(found.username) };
 
   const profile = await store.getPortfolioProfile(found.userId);
   const host = (await headers()).get("x-forwarded-host") ?? (await headers()).get("host");
@@ -91,6 +97,7 @@ export async function loadPortfolio(username: string, rest = ""): Promise<Loaded
     profile: { ...profile, username: found.username },
     displayName: profile.name?.trim() || found.username,
     photoUrl: await signedFileUrl(profile.photoFileId),
+    coverUrl: await signedFileUrl(profile.coverFileId),
     items: await Promise.all(order.filter((k) => byId.has(k)).map((k) => toFull(byId.get(k)!))),
     hiddenItems: await Promise.all(reachable.filter((e) => hidden.has(e.id)).map(toFull)),
     order,

@@ -59,6 +59,22 @@ export type SavedIdea = Project & {
   createdAt: string;
 };
 
+/** The profile fields a person sets themselves (the portfolio builder, decision 0016). */
+export type PortfolioProfileField =
+  | "name"
+  | "headline"
+  | "bio"
+  | "photoFileId"
+  | "coverFileId"
+  | "linkedin"
+  | "github"
+  | "website"
+  | "contactEmail"
+  | "location"
+  | "lookingFor"
+  | "hideFromSearch"
+  | "themeId";
+
 /** The public face of a person: their portfolio header (docs/phase-2.md section 4). */
 export type PortfolioProfile = {
   userId: string;
@@ -72,6 +88,18 @@ export type PortfolioProfile = {
   photoFileId: string | null;
   linkedin: string | null;
   hideFromSearch: boolean;
+  /** exhbt_files.id of the wide cover picture across the top of the portfolio, or null (decision 0016). */
+  coverFileId: string | null;
+  /** Where they are, in their words ("Leeds", "London or remote"). */
+  location: string | null;
+  /** One line on what they want next. */
+  lookingFor: string | null;
+  /** An https github.com address. */
+  github: string | null;
+  /** An https address of their own site. */
+  website: string | null;
+  /** An email shown as text on the page (never a mailto). Not the sign-in address unless they type it. */
+  contactEmail: string | null;
   /** The chosen portfolio look (lib/portfolio-themes.ts), kept even if the plan later drops it. Null: the default. */
   themeId: string | null;
   /** The exhbt shown first, as a wide tile (decision 0014). Null: none. */
@@ -163,7 +191,7 @@ export type UsernameLookup = { userId: string; username: string } | { redirectTo
 
 export type AICall = {
   userId: string | null;
-  step: "roadmap" | "exhbt_draft" | "exhbt_rewrite" | "originality" | "link_ranking" | "project_ideas" | "cv_read" | "file_transcribe";
+  step: "roadmap" | "exhbt_draft" | "exhbt_rewrite" | "originality" | "link_ranking" | "project_ideas" | "cv_read" | "file_transcribe" | "portfolio_intro";
   model: string;
   inputTokens: number;
   outputTokens: number;
@@ -197,7 +225,8 @@ export type EventName =
   | "exhbt_rewritten"
   | "teammate_invited"
   | "teammate_joined"
-  | "file_matched";
+  | "file_matched"
+  | "intro_suggested";
 
 /** A Stripe subscription as we keep it (the `subscriptions` table). No amounts or card details. */
 export type SubscriptionRecord = {
@@ -305,7 +334,7 @@ export interface Store {
   claimUsername(userId: string, username: string): Promise<"ok" | "taken">;
   updatePortfolioProfile(
     userId: string,
-    fields: Partial<Pick<PortfolioProfile, "name" | "headline" | "bio" | "photoFileId" | "linkedin" | "hideFromSearch" | "themeId">>,
+    fields: Partial<Pick<PortfolioProfile, PortfolioProfileField>>,
   ): Promise<void>;
   /** `teamOf`: the team project a teammate's own exhbt is made from (decision 0013). */
   createExhbt(userId: string, doc: ExhbtDoc, opts?: { teamOf?: string | null }): Promise<string>;
@@ -843,7 +872,9 @@ function supabaseStore(): Store {
       const row = check(
         await db
           .from("profiles")
-          .select("id, username, name, headline, bio, photo_file_id, linkedin_url, hide_from_search, portfolio_theme, featured_exhbt_id, portfolio_layout")
+          .select(
+            "id, username, name, headline, bio, photo_file_id, linkedin_url, hide_from_search, portfolio_theme, featured_exhbt_id, portfolio_layout, cover_file_id, location, looking_for, github_url, website_url, contact_email",
+          )
           .eq("id", userId)
           .maybeSingle(),
       ) as ProfileRow | null;
@@ -883,6 +914,12 @@ function supabaseStore(): Store {
       if (f.linkedin !== undefined) row.linkedin_url = f.linkedin;
       if (f.hideFromSearch !== undefined) row.hide_from_search = f.hideFromSearch;
       if (f.themeId !== undefined) row.portfolio_theme = f.themeId;
+      if (f.coverFileId !== undefined) row.cover_file_id = f.coverFileId;
+      if (f.location !== undefined) row.location = f.location;
+      if (f.lookingFor !== undefined) row.looking_for = f.lookingFor;
+      if (f.github !== undefined) row.github_url = f.github;
+      if (f.website !== undefined) row.website_url = f.website;
+      if (f.contactEmail !== undefined) row.contact_email = f.contactEmail;
       if (Object.keys(row).length) check(await db.from("profiles").update(row).eq("id", userId));
     },
     async createExhbt(userId, doc, opts) {
@@ -1536,6 +1573,12 @@ type ProfileRow = {
   portfolio_theme: string | null;
   featured_exhbt_id: string | null;
   portfolio_layout: unknown;
+  cover_file_id?: string | null;
+  location?: string | null;
+  looking_for?: string | null;
+  github_url?: string | null;
+  website_url?: string | null;
+  contact_email?: string | null;
 };
 const fromProfileRow = (r: ProfileRow): PortfolioProfile => ({
   userId: r.id,
@@ -1549,6 +1592,12 @@ const fromProfileRow = (r: ProfileRow): PortfolioProfile => ({
   themeId: r.portfolio_theme,
   featuredExhbtId: r.featured_exhbt_id ?? null,
   layout: normaliseLayout(r.portfolio_layout),
+  coverFileId: r.cover_file_id ?? null,
+  location: r.location ?? null,
+  lookingFor: r.looking_for ?? null,
+  github: r.github_url ?? null,
+  website: r.website_url ?? null,
+  contactEmail: r.contact_email ?? null,
 });
 const emptyProfile = (userId: string): PortfolioProfile => ({
   userId,
@@ -1562,6 +1611,12 @@ const emptyProfile = (userId: string): PortfolioProfile => ({
   themeId: null,
   featuredExhbtId: null,
   layout: normaliseLayout(null),
+  coverFileId: null,
+  location: null,
+  lookingFor: null,
+  github: null,
+  website: null,
+  contactEmail: null,
 });
 
 const EXHBT_COLS = "id, user_id, blocks, published_blocks, status, public_slug, position, confirmed_at, published_at, updated_at, team_of, hidden_on_portfolio";

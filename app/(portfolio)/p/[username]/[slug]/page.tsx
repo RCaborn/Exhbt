@@ -26,6 +26,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return {
     title: { absolute: title },
     description,
+    icons: { icon: [{ url: `${p.base}/initials.svg`, type: "image/svg+xml" }] },
     // The link preview (preview.png beside this page) shows whatever the search setting; that only stops indexing.
     openGraph: { type: "article", title, description, siteName: "exhbt", images: [image] },
     twitter: { card: "summary_large_image", title, description, images: [image] },
@@ -38,7 +39,7 @@ export default async function PortfolioProject({ params }: Params) {
   const { username, slug } = await params;
   const p = await loadPortfolio(username, `/${slug}`);
   if (p.status === "redirect") redirect(p.to);
-  if (p.status === "missing") notFound();
+  if (p.status !== "ok") notFound();
   const i = p.items.findIndex((x) => x.slug === slug);
   // Hidden from the glance page: still opens from its own link, numbered after the exhbts that are on it,
   // with no previous or next (it isn't in the run).
