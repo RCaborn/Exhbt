@@ -5,7 +5,7 @@ import type { Project, Roadmap, RoadmapInput } from "./ai/schemas";
 import { normaliseDoc, publicDoc, type ExhbtDoc } from "./exhbt/blocks";
 import type { Plan } from "./entitlements";
 import { normaliseLayout, type PortfolioLayout } from "./portfolio-layout";
-import { accountPlan, cleanQuery, type AdminAccountDetail, type AdminAccountRow, type AdminAccountsPage, type AdminRowMap, type AdminRows, type AdminTable } from "./admin-types";
+import { accountPlan, cleanQuery, type AdminAccountDetail, type AdminAccountRow, type AdminAccountsPage, type AdminRows, type AdminTable } from "./admin-types";
 import { sbAdminAccount, sbAdminAccounts, sbAdminRows, sbIsAdmin } from "./admin-supabase";
 
 export type RoadmapRecord = {

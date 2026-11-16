@@ -68,7 +68,7 @@ export default async function AdminAccountsPage({ searchParams }: { searchParams
               Previous
             </Link>
           ) : (
-            <span className="text-slate">Previous</span>
+            <span className="text-graphite">Previous</span>
           )}
           <span className="text-graphite">
             Page {data.page} of {pages}
@@ -78,7 +78,7 @@ export default async function AdminAccountsPage({ searchParams }: { searchParams
               Next
             </Link>
           ) : (
-            <span className="text-slate">Next</span>
+            <span className="text-graphite">Next</span>
           )}
         </nav>
       )}

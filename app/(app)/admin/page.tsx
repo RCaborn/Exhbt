@@ -177,8 +177,8 @@ function Exhbts({ o }: { o: Overview }) {
               head={["People with", "Count"]}
               numeric={[1]}
               rows={[
-                ["1 exhbt", num(e.perPerson.one)],
-                ["2 exhbts", num(e.perPerson.two)],
+                ["One", num(e.perPerson.one)],
+                ["Two", num(e.perPerson.two)],
                 ["3 or more", num(e.perPerson.threePlus)],
               ]}
             />

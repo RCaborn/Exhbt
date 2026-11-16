@@ -57,6 +57,11 @@ const DOCS: Record<string, Doc> = {
             requests we also keep a one-way hash of your IP address, to limit abuse. We do not use advertising or
             tracking cookies.
           </li>
+          <li>
+            Anonymous page-view counts: when a page loads we count one view, with the page address (no search
+            terms or personal links) and the site that sent you. We use no cookie, store no IP address or browser
+            details, and do not tie a view to your account. We skip it if your browser sends Do Not Track.
+          </li>
           <li>If you join the waitlist or write to us as a university: your email and what you tell us.</li>
         </ul>
 
@@ -289,8 +294,9 @@ const DOCS: Record<string, Doc> = {
         <h2>Statistics</h2>
         <p>
           Cloudflare Web Analytics gives us basic visit counts without cookies or fingerprinting your device. Visits to
-          a job link are counted as a number, with no cookie. If we ever add optional cookies, they will be off until
-          you turn them on.
+          a job link are counted as a number, with no cookie. We also count page views ourselves, anonymously: the page
+          and the site that sent you, with no cookie and no IP address stored. If we ever add optional cookies, they
+          will be off until you turn them on.
         </p>
       </>
     ),
