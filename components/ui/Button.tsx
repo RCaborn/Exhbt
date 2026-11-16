@@ -40,6 +40,9 @@ type Props = {
   "aria-expanded"?: boolean;
   "aria-controls"?: string;
   "aria-describedby"?: string;
+  /** With `href`: open somewhere else (e.g. "_blank" for a person's file), with its rel. */
+  target?: string;
+  rel?: string;
 };
 
 export function Button({

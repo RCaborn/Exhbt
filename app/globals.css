@@ -198,6 +198,196 @@
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone;
   }
+  /* The exhbt page (components/portfolio/ProjectView.tsx, decision 0022). Every colour, radius
+     and face on it is one of these variables. The defaults are the Exhbt look and sit on :root, so
+     a portfolio look overrides any of them on an ancestor, e.g.
+       [data-theme="night"] { --xp-ground: #0e0f12; --xp-ink: #ffffff; ... }
+     (the route's wrapper carries data-theme). The ground behind the whole page is --xp-page-ground,
+     read where the layout's div is, so a look sets it from the root:
+       :root:has([data-exhbt-route][data-theme="night"]) { --xp-page-ground: #0e0f12; }
+     The list, and what each one paints, is in docs/decisions/0022-exhbt-page-layout.md. */
+  :root {
+    --xp-page-ground: var(--color-surface);
+    --xp-ground: var(--color-surface);
+    --xp-ink: var(--color-ink);
+    --xp-muted: var(--color-graphite);
+    --xp-rule: var(--color-line);
+    --xp-rule-strong: var(--color-ink);
+    --xp-card: var(--color-mist);
+    --xp-card-ink: var(--color-ink);
+    --xp-card-edge: transparent;
+    /* Graphs sit on white, never mist: the lightest series step is below 2:1 on mist (DESIGN.md). */
+    --xp-figure: var(--color-surface);
+    --xp-figure-edge: var(--color-line);
+    --xp-pill: var(--color-mist);
+    --xp-pill-ink: var(--color-ink);
+    --xp-pill-edge: transparent;
+    --xp-tick: var(--color-jade);
+    --xp-tick-ink: var(--color-surface);
+    --xp-link: var(--color-jade);
+    --xp-accent: var(--color-mint);
+    --xp-accent-hover: var(--color-mint-press);
+    --xp-accent-ink: var(--color-ink);
+    --xp-outline-ground: var(--color-surface);
+    --xp-outline-ink: var(--color-ink);
+    --xp-outline-edge: var(--color-line);
+    --xp-highlight: color-mix(in srgb, var(--color-mint) 42%, var(--color-surface));
+    --xp-highlight-ink: inherit;
+    --xp-flow-ground: var(--color-surface);
+    --xp-flow-ink: var(--color-ink);
+    --xp-flow-edge: var(--color-line);
+    --xp-flow-end: var(--color-ink);
+    --xp-flow-end-ink: var(--color-surface);
+    --xp-arrow: var(--color-slate);
+    --xp-avatar: var(--color-mint);
+    --xp-avatar-ink: var(--color-ink);
+    --xp-avatar-edge: var(--color-ink);
+    --xp-radius-card: 20px;
+    --xp-radius-box: 12px;
+    --xp-radius-pill: 8px;
+    --xp-radius-button: 999px;
+    --xp-title-weight: 600;
+    --xp-title-tracking: -0.035em;
+    /* --xp-title-font and --xp-font have no default here: unset, they follow the look's
+       --font-display (set inline on the route by themeStyle) and the site's Inter. */
+  }
+  .xp {
+    background: var(--xp-ground);
+    color: var(--xp-ink);
+    font-family: var(--xp-font, var(--font-sans));
+  }
+  .xp-display {
+    font-family: var(--xp-title-font, var(--font-display));
+    font-weight: var(--xp-title-weight);
+    letter-spacing: var(--xp-title-tracking);
+  }
+  .xp-muted {
+    color: var(--xp-muted);
+  }
+  .xp-card {
+    background: var(--xp-card);
+    color: var(--xp-card-ink);
+    border: 1px solid var(--xp-card-edge);
+    border-radius: var(--xp-radius-card);
+  }
+  .xp-pill {
+    background: var(--xp-pill);
+    color: var(--xp-pill-ink);
+    border: 1px solid var(--xp-pill-edge);
+    border-radius: var(--xp-radius-pill);
+  }
+  .xp-fact,
+  .xp-finding,
+  .xp-next {
+    border-color: var(--xp-rule);
+  }
+  .xp-found-heading {
+    border-color: var(--xp-rule-strong);
+  }
+  .xp-quote {
+    border-color: var(--xp-tick);
+  }
+  .xp-tick {
+    background: var(--xp-tick);
+    color: var(--xp-tick-ink);
+  }
+  .xp-tick-open {
+    border: 1px dashed var(--xp-muted);
+  }
+  .xp-link {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--xp-link) 55%, transparent);
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 3px;
+  }
+  .xp-link:hover {
+    text-decoration-color: var(--xp-link);
+  }
+  .xp-outline-button {
+    background: var(--xp-outline-ground);
+    border: 1px solid var(--xp-outline-edge);
+    border-radius: var(--xp-radius-button);
+    color: var(--xp-outline-ink);
+    transition: border-color 160ms ease;
+  }
+  .xp-outline-button:hover {
+    border-color: var(--xp-outline-ink);
+  }
+  /* "See the work": an Astryx Button (components/ui/Button.tsx) recoloured by the look. This
+     layer sits above Astryx's, so these win without !important. */
+  .xp .xp-work-button {
+    background: var(--xp-accent);
+    color: var(--xp-accent-ink);
+    border-color: var(--xp-accent);
+    border-radius: var(--xp-radius-button);
+    max-width: 100%;
+  }
+  .xp .xp-work-button:hover {
+    background: var(--xp-accent-hover);
+    border-color: var(--xp-accent-hover);
+  }
+  .xp [data-avatar="initials"] {
+    background: var(--xp-avatar);
+    color: var(--xp-avatar-ink);
+    border-color: var(--xp-avatar-edge);
+  }
+  /* The gap in the context line: a flat block behind the words (the bold run, drawn as a mark). */
+  .xp-mark {
+    background: var(--xp-highlight);
+    color: var(--xp-highlight-ink);
+    border-radius: min(4px, var(--xp-radius-box));
+    padding: 0.04em 0.28em;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  .xp-figure {
+    background: var(--xp-figure);
+    border: 1px solid var(--xp-figure-edge);
+    border-radius: var(--xp-radius-card);
+  }
+  .xp-flow-box {
+    background: var(--xp-flow-ground);
+    color: var(--xp-flow-ink);
+    border: 1px solid var(--xp-flow-edge);
+    border-radius: var(--xp-radius-box);
+  }
+  .xp-flow-box[data-last] {
+    background: var(--xp-flow-end);
+    border-color: var(--xp-flow-end);
+    color: var(--xp-flow-end-ink);
+  }
+  .xp-flow-detail {
+    color: var(--xp-muted);
+  }
+  .xp-flow-box[data-last] .xp-flow-detail {
+    color: color-mix(in srgb, var(--xp-flow-end-ink) 78%, transparent);
+  }
+  .xp-flow-arrow {
+    color: var(--xp-arrow);
+  }
+  .xp-section {
+    margin-top: 2.75rem;
+  }
+  .xp-label {
+    font-family: inherit;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1.4;
+    color: var(--xp-muted);
+  }
+  /* In the editor the context field shows its highlighted phrase the way the page does. */
+  .field-highlight strong {
+    font-weight: inherit;
+    background: var(--xp-highlight);
+    border-radius: 4px;
+    padding: 0.04em 0.2em;
+  }
+  /* The public exhbt page sits on the look's ground; the portfolio layout's own is mist (app/(portfolio)/layout.tsx). */
+  div:has(> main#main > [data-exhbt-route]) {
+    background: var(--xp-page-ground);
+  }
   /* A linked card lifts 2px on hover (the one card motion). */
   .card-link {
     transition:
@@ -293,5 +483,9 @@
   main#main {
     padding: 0 !important;
     max-width: none !important;
+  }
+  /* The exhbt page: tighter gaps between sections so a full exhbt fits one page. */
+  .xp-section {
+    margin-top: 1.1rem;
   }
 }
