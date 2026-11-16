@@ -42,7 +42,7 @@ export default async function AdminAccountPage({ params }: { params: Promise<{ i
         </Panel>
 
         <Panel id="roadmaps" title="Roadmaps">
-          <DataTable caption="Roadmaps" head={["Made", "Ideas"]} rows={a.roadmapList.map((r) => [when(r.createdAt), r.ideasFailed ? "failed" : "ok"])} empty="None." />
+          <DataTable caption="Roadmaps" head={["Made", "Ideas"]} rows={a.roadmapList.map((r) => [when(r.createdAt), r.ideasFailed === null ? "-" : r.ideasFailed ? "failed" : "ok"])} empty="None." />
         </Panel>
 
         <Panel id="exhbts" title="Exhbts">

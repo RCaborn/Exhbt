@@ -159,6 +159,26 @@ test.describe("Admin panel", () => {
     await expect(page.getByRole("region", { name: "Page views", exact: true })).not.toContainText("a@b.c");
   });
 
+  test("a view sent from a portfolio host counts as a portfolio, stored without the person's name", async ({ page, baseURL }) => {
+    const port = new URL(baseURL!).port;
+    await signIn(page, { admin: true });
+    const before = { portfolio: await stat(page, "views-portfolio"), total: await stat(page, "views-total") };
+    const origin = `http://someone.localhost:${port}`;
+    const send = (path: string) =>
+      page.request.post("/api/pv", { data: JSON.stringify({ p: path, r: "" }), headers: { origin, "content-type": "text/plain", "user-agent": HUMAN } });
+    expect((await send("/")).status()).toBe(204);
+    expect((await send("/an-exhbt-slug-1")).status()).toBe(204);
+    await expect
+      .poll(async () => {
+        await page.goto("/admin?range=all");
+        return [(await stat(page, "views-portfolio")) - before.portfolio, (await stat(page, "views-total")) - before.total];
+      })
+      .toEqual([2, 2]);
+    const pages = page.getByRole("region", { name: "Page views", exact: true }).getByRole("table", { name: "Top pages" });
+    await expect(pages).not.toContainText("an-exhbt-slug");
+    await expect(pages).not.toContainText("someone");
+  });
+
   test("a real page load sends the beacon, and no cookie is set for it", async ({ page, context }) => {
     await signIn(page, { admin: true });
     const before = await stat(page, "views-total");

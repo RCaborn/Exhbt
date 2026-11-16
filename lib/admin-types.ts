@@ -99,7 +99,8 @@ export type AdminAccountsPage = { rows: AdminAccountRow[]; total: number; page: 
 /** A read-only account page: counts and the person's own events (names and times, no props). */
 export type AdminAccountDetail = AdminAccountRow & {
   role: string;
-  roadmapList: { id: string; createdAt: string; ideasFailed: boolean }[];
+  /** ideasFailed is null where the database has no such column yet. */
+  roadmapList: { id: string; createdAt: string; ideasFailed: boolean | null }[];
   exhbtList: { id: string; status: string; createdAt: string }[];
   events: { name: string; at: string }[];
   aiCalls: number;

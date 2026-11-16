@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { getCurrentUser, type SessionUser } from "./auth";
 import { accountPlan, ALL_TIME_TABLES, type AdminAccountDetail, type AdminAccountsPage, type AdminRowMap, type AdminTable } from "./admin-types";
@@ -12,11 +13,12 @@ import { getStore, LIVE_SUBSCRIPTION_STATUSES } from "./store";
  * page that forgets cannot leak data.
  */
 
-export async function requireAdmin(): Promise<SessionUser> {
+/** Cached for the request, so the layout, the page and the data functions check once between them. */
+export const requireAdmin = cache(async (): Promise<SessionUser> => {
   const user = await getCurrentUser();
   if (!user || !(await getStore().isAdmin(user.id))) notFound();
   return user;
-}
+});
 
 export const RANGES = ["7d", "30d", "90d", "all"] as const;
 export type Range = (typeof RANGES)[number];
@@ -104,6 +106,8 @@ export async function adminOverview(range: Range, now = Date.now()): Promise<Ove
       const r = await store.adminRows(admin.id, t, ALL_TIME_TABLES.includes(t) ? null : since);
       return { rows: r.rows as AdminRowMap[T], truncated: r.truncated };
     } catch (e) {
+      // Shown as "could not load" and logged, so a timeout is not mistaken for a missing table.
+      console.error(`admin: could not read ${t}:`, (e as Error).message);
       return { error: (e as Error).message };
     }
   };
@@ -114,7 +118,7 @@ export async function adminOverview(range: Range, now = Date.now()): Promise<Ove
 
   type Loaded = { rows: unknown; truncated: boolean } | { error: string };
   const build = <T>(needs: Loaded[], make: () => T): Section<T> => {
-    for (const n of needs) if ("error" in n) return { ok: false, note: "Not available on this database yet." };
+    for (const n of needs) if ("error" in n) return { ok: false, note: "Could not load this part. It may need a database update; the server log has the reason." };
     return { ok: true, data: make(), partial: needs.some((n) => "truncated" in n && n.truncated) };
   };
   const rowsOf = <R extends unknown[]>(l: { rows: R; truncated: boolean } | { error: string }): R => ("rows" in l ? l.rows : ([] as unknown as R));
@@ -175,7 +179,7 @@ export async function adminOverview(range: Range, now = Date.now()): Promise<Ove
 
   const ideasSection = build([ideas, saved, events, roadmaps], () => {
     const rs = rowsOf(roadmaps);
-    const known = rs.some((r) => r.ideasFailedAt !== undefined);
+    const known = rs.length === 0 || rs.some((r) => r.ideasFailedAt !== undefined);
     return {
       generated: rowsOf(ideas).length,
       swaps: count("project_swapped"),

@@ -36,9 +36,21 @@ async function readAll<T>(build: (from: number, to: number) => PromiseLike<Res>)
 
 const num = (v: unknown) => Number(v ?? 0);
 
-export async function sbIsAdmin(db: SupabaseClient, userId: string): Promise<boolean> {
-  const { data } = await db.from("profiles").select("role").eq("id", userId).maybeSingle();
-  return (data as { role?: string } | null)?.role === "exhbt_admin";
+const roleChecks = new WeakMap<SupabaseClient, Map<string, Promise<boolean>>>();
+
+/** One role lookup per client and account: every method still checks, but a request pays once. */
+export function sbIsAdmin(db: SupabaseClient, userId: string): Promise<boolean> {
+  const seen = roleChecks.get(db) ?? new Map<string, Promise<boolean>>();
+  roleChecks.set(db, seen);
+  let p = seen.get(userId);
+  if (!p) {
+    p = (async () => {
+      const { data } = await db.from("profiles").select("role").eq("id", userId).maybeSingle();
+      return (data as { role?: string } | null)?.role === "exhbt_admin";
+    })();
+    seen.set(userId, p);
+  }
+  return p;
 }
 
 export async function sbAdminRows<T extends AdminTable>(db: SupabaseClient, table: T, since: string | null): Promise<AdminRows<T>> {
@@ -270,15 +282,23 @@ export async function sbAdminAccount(db: SupabaseClient, userId: string, live: s
   if (one.error) throw new Error(one.error.message);
   if (!one.data) return null;
   const p = one.data as { id: string; email: string; created_at: string; username: string | null; role: string };
+  // The ideas flag is a later column; an older database gets the list without it.
+  const roadmapRows = async (): Promise<{ id: string; created_at: string; ideas_failed_at: string | null | undefined }[]> => {
+    const full = await db.from("roadmaps").select("id, created_at, ideas_failed_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(200);
+    if (!full.error) return (full.data ?? []) as { id: string; created_at: string; ideas_failed_at: string | null }[];
+    const plain = await db.from("roadmaps").select("id, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(200);
+    if (plain.error) throw new Error(plain.error.message);
+    return ((plain.data ?? []) as { id: string; created_at: string }[]).map((r) => ({ ...r, ideas_failed_at: undefined }));
+  };
   const [rm, ex, ev, ai, fl, row] = await Promise.all([
-    db.from("roadmaps").select("id, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(200),
+    roadmapRows(),
     db.from("exhbts").select("id, status, created_at, updated_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(200),
     db.from("events").select("name, created_at").eq("user_id", userId).neq("name", "page_view").order("created_at", { ascending: false }).limit(100),
     db.from("ai_call_logs").select("cost_usd").eq("user_id", userId).limit(5000),
     db.from("exhbt_files").select("bytes").eq("user_id", userId).limit(5000),
     sbAdminAccounts(db, { q: "", page: 1, pageSize: 1, id: userId }, live),
   ]);
-  for (const r of [rm, ex, ev, ai, fl]) if (r.error) throw new Error(r.error.message);
+  for (const r of [ex, ev, ai, fl]) if (r.error) throw new Error(r.error.message);
   const base = row.rows.find((r) => r.id === userId);
   if (!base) return null;
   const files = (fl.data ?? []) as { bytes: number }[];
@@ -286,7 +306,7 @@ export async function sbAdminAccount(db: SupabaseClient, userId: string, live: s
   return {
     ...base,
     role: p.role,
-    roadmapList: ((rm.data ?? []) as { id: string; created_at: string }[]).map((r) => ({ id: r.id, createdAt: r.created_at, ideasFailed: false })),
+    roadmapList: rm.map((r) => ({ id: r.id, createdAt: r.created_at, ideasFailed: r.ideas_failed_at === undefined ? null : Boolean(r.ideas_failed_at) })),
     exhbtList: ((ex.data ?? []) as { id: string; status: string; created_at: string }[]).map((e) => ({ id: e.id, status: e.status, createdAt: e.created_at })),
     events: ((ev.data ?? []) as { name: string; created_at: string }[]).map((e) => ({ name: e.name, at: e.created_at })),
     aiCalls: calls.length,
