@@ -1,8 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { devices, expect, test, type Page } from "@playwright/test";
 import { exhbtSummary, plain, text, wordCount, LIMITS, validateForPublish, withHighlight, type ExhbtDoc } from "../lib/exhbt/blocks";
-import { openBankingDoc, sampleDocs } from "../lib/exhbt/sample";
+import { fullDoc, openBankingDoc, sampleDocs } from "../lib/exhbt/sample";
 import { withKeyFigure } from "../lib/exhbt/sections";
+import { applyBlock, blockValue } from "../lib/exhbt/draft-blocks";
 
 // The exhbt page in the layout Rory drew on 16 Nov 2026 (decision 0022): a sidebar with the person,
 // what it is, where and when, the checks, the work and Save as PDF; the title as the question, the
@@ -12,6 +13,8 @@ import { withKeyFigure } from "../lib/exhbt/sections";
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const [GP] = sampleDocs as [ExhbtDoc, ExhbtDoc];
 const PIXEL_7 = { viewport: devices["Pixel 7"].viewport, deviceScaleFactor: devices["Pixel 7"].deviceScaleFactor, isMobile: true, hasTouch: true };
+/** A 1x1 PNG, for an image section. */
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 const unique = (tag: string) => `${tag}${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`;
 
 async function seed(page: Page, username: string) {
@@ -49,6 +52,15 @@ test.describe("The exhbt's fields", () => {
     expect(withHighlight(line, "not in the line")).toEqual(text(line));
     expect(withHighlight(line, "")).toEqual(text(line));
     expect(plain(withHighlight(line, "Queues ran long."))).toBe(line);
+  });
+
+  test("the AI's header carries where and when and the summary, so going back to it restores them", () => {
+    const ai = blockValue({ ...openBankingDoc, whereWhen: "", summary: "" }, "header");
+    expect(ai).toMatchObject({ whereWhen: "", summary: "" });
+    const edited = { ...openBankingDoc, whereWhen: "Typed by the person", summary: "Also typed." };
+    expect(applyBlock(edited, "header", ai)).toMatchObject({ whereWhen: "", summary: "" });
+    // An AI version kept before these fields existed leaves the person's own alone.
+    expect(applyBlock(edited, "header", { title: "T?", context: "C" })).toMatchObject({ title: "T?", whereWhen: "Typed by the person", summary: "Also typed." });
   });
 
   test("a key figure from an upload goes beside What I found", () => {
@@ -124,7 +136,7 @@ test.describe("The exhbt page", () => {
     await axe(page, "gp-reminders");
   });
 
-  test("Save as PDF opens the print dialog, and the page prints on one A4 page with the sidebar beside the work", async ({ page }) => {
+  test("Save as PDF opens the print dialog, and the page prints on one A4 page with the sidebar as a band above the work", async ({ page }) => {
     const name = unique("pdf");
     await seed(page, name);
     await page.addInitScript(() => {
@@ -139,7 +151,21 @@ test.describe("The exhbt page", () => {
 
     await page.emulateMedia({ media: "print" });
     await expect(page.getByRole("button", { name: "Save as PDF" })).toBeHidden();
-    expect((await page.getByRole("complementary", { name: /and this work$/ }).boundingBox())!.x).toBeLessThan((await box(page, "article h1")).x);
+    const band = (await page.getByRole("complementary", { name: /and this work$/ }).boundingBox())!;
+    expect(band.y + band.height).toBeLessThanOrEqual((await box(page, "article h1")).y);
+    const pdf = await page.pdf({ format: "A4", preferCSSPageSize: true, printBackground: true });
+    expect(pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g)?.length).toBe(1);
+  });
+
+  test("a full exhbt near the word cap (two graphs, a quote, a link, six boxes) still prints on one A4 page", async ({ page }) => {
+    expect(wordCount(fullDoc)).toBeGreaterThan(LIMITS.totalWords - 10);
+    expect(validateForPublish(fullDoc)).toEqual([]);
+    const name = unique("full");
+    const res = await page.request.get(`/dev/portfolio?username=${name}&plan=premium&with=full`, { maxRedirects: 0 });
+    expect(res.status()).toBe(307);
+    await page.goto(`/p/${name}/open-banking-full`);
+    await expect(page.getByRole("region", { name: "Feedback" })).toBeVisible();
+    await page.emulateMedia({ media: "print" });
     const pdf = await page.pdf({ format: "A4", preferCSSPageSize: true, printBackground: true });
     expect(pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g)?.length).toBe(1);
   });
@@ -153,6 +179,32 @@ test.describe("The exhbt page", () => {
     await expect(page.locator("article [data-last]")).toHaveCSS("border-top-left-radius", "0px");
     await expect(page.getByRole("link", { name: /^See the work/ })).toHaveCSS("background-color", "rgb(4, 5, 6)");
     expect(await page.locator("main#main").evaluate((m) => getComputedStyle(m.parentElement!).backgroundColor)).toBe("rgb(7, 8, 9)");
+  });
+
+  test("a dark look (like Night, PDF page 3) can restyle every part and keep its text readable", async ({ page }) => {
+    const name = unique("night");
+    await seed(page, name);
+    await page.goto(`/p/${name}/open-banking`);
+    // Only the variables: the figure card stays white, as graphs need.
+    await page.addStyleTag({
+      content: `[data-exhbt-route] {
+        --xp-ground: #0e0f12; --xp-ink: #ffffff; --xp-muted: #c9cbcf; --xp-rule: #3e4044; --xp-rule-strong: #ffffff;
+        --xp-card: #1b1d22; --xp-card-ink: #ffffff; --xp-card-muted: #c9cbcf; --xp-pill: #1b1d22; --xp-pill-ink: #ffffff;
+        --xp-tick: #4fe9b4; --xp-tick-ink: #0e0f12; --xp-link: #4fe9b4; --xp-accent: #ffffff; --xp-accent-hover: #e5e6e8; --xp-accent-ink: #0e0f12;
+        --xp-outline-ground: transparent; --xp-outline-ink: #ffffff; --xp-outline-edge: #6f7278;
+        --xp-highlight: #00513f; --xp-highlight-ink: #ffffff;
+        --xp-flow-ground: #1b1d22; --xp-flow-ink: #ffffff; --xp-flow-edge: #3e4044; --xp-flow-muted: #c9cbcf; --xp-flow-end: #4fe9b4; --xp-flow-end-ink: #0e0f12;
+        --xp-arrow: #c9cbcf; --xp-avatar: #ffffff; --xp-avatar-ink: #0e0f12; --xp-avatar-edge: #ffffff;
+        --xp-radius-card: 0px; --xp-radius-box: 0px; --xp-radius-pill: 0px; --xp-radius-button: 0px;
+      }`,
+    });
+    await expect(page.locator("article")).toHaveCSS("background-color", "rgb(14, 15, 18)");
+    await expect(page.locator("article h1")).toHaveCSS("color", "rgb(255, 255, 255)");
+    await expect(page.locator("article mark")).toHaveCSS("color", "rgb(255, 255, 255)");
+    await expect(page.locator(".xp-pill").first()).toHaveCSS("border-top-left-radius", "0px");
+    // The page's own parts (the portfolio's sign-off and pager sit outside it, on the page ground).
+    const { violations } = await new AxeBuilder({ page }).include("article").withTags(WCAG).analyze();
+    expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
   });
 });
 
@@ -208,9 +260,64 @@ test.describe("The page in the editor", () => {
     await expect(arranged.getByRole("button", { name: "Move what I'd do next down" })).toBeFocused();
     await expect(page.locator('ol[aria-label="Sections, in page order"] > li')).toHaveCount(3);
     expect(await page.locator('ol[aria-label="Sections, in page order"] > li').evaluateAll((lis) => lis.map((li) => li.getAttribute("data-kind")))).toEqual(["reflection", "findings", "graph"]);
+
+    // The grip in the preview, from the keyboard (dnd-kit): Space, an arrow, Space.
+    await arranged.getByRole("button", { name: "Drag findings to move it" }).focus();
+    await page.keyboard.press("Space");
+    await expect(page.getByText("Picked up findings, place 2 of 3.")).toBeAttached();
+    await page.keyboard.press("ArrowUp");
+    await expect(page.getByText("Findings would go to place 1 of 3.")).toBeAttached();
+    await page.keyboard.press("Space");
+    await expect(page.getByText("Findings dropped in place 1 of 3.")).toBeAttached();
+    await expect.poll(() => page.locator('ol[aria-label="Sections, in page order"] > li').evaluateAll((lis) => lis.map((li) => li.getAttribute("data-kind")))).toEqual(["findings", "reflection", "graph"]);
+    await axe(page, "editor while arranging");
+
     await page.getByRole("button", { name: "Done arranging" }).click();
-    expect(await preview.locator("article [data-part]").evaluateAll((els) => els.map((e) => e.getAttribute("data-part")))).toEqual(["process", "reflection", "findings", "graph"]);
+    expect(await preview.locator("article [data-part]").evaluateAll((els) => els.map((e) => e.getAttribute("data-part")))).toEqual(["process", "findings", "reflection", "graph"]);
     await axe(page, "editor with the new fields");
+  });
+
+  test("an image moved next to What I found sits beside it on the published page; a new graph can be arranged too", async ({ page }) => {
+    const name = unique("img");
+    await seed(page, name);
+    await page.goto(`/auth/dev?email=${name}@example.com&next=/exhbts`);
+    await page.getByRole("link", { name: openBankingDoc.title, exact: true }).click();
+    await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
+    await expect(page.locator("[data-ready=true]").first()).toBeAttached();
+
+    // An image (it lands last), with its description.
+    await page.getByRole("button", { name: "Add a section" }).click();
+    const chooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Add an image" }).click();
+    await (await chooser).setFiles({ name: "phase-diagram.png", mimeType: "image/png", buffer: PNG });
+    await page.getByLabel(/Image 1: describe it/).fill("Arrows towards cooperation and competition");
+    // And a new graph, still blank.
+    await page.getByRole("button", { name: "Add a section" }).click();
+    await page.getByRole("button", { name: "Add a graph", exact: true }).click();
+
+    const preview = page.getByRole("region", { name: "Preview" });
+    await page.getByRole("button", { name: "Arrange sections" }).click();
+    const arranged = preview.getByRole("list", { name: "Sections in the preview, in page order" });
+    await expect(arranged.locator(":scope > li")).toHaveCount(5);
+    // Image 1 from place 4 to place 2, straight after What I found.
+    await arranged.getByRole("button", { name: "Move image 1 up" }).click();
+    await arranged.getByRole("button", { name: "Move image 1 up" }).click();
+    await page.getByRole("button", { name: "Done arranging" }).click();
+    await page.getByRole("button", { name: "Remove graph 2" }).click();
+    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+
+    await page.getByLabel("This is my work, and the numbers are true").check();
+    await page.getByRole("button", { name: "Publish changes" }).click();
+    await expect(page.getByText("Your changes are live.")).toBeVisible();
+    await page.goto(`/p/${name}/open-banking`);
+    const found = page.locator("[data-found]");
+    await expect(found.locator('[data-part="image"] img')).toHaveAttribute("alt", "Arrows towards cooperation and competition");
+    const f = await box(page, '[data-found] [data-part="findings"]');
+    const im = await box(page, '[data-found] [data-part="image"]');
+    expect(im.x).toBeGreaterThan(f.x + f.width - 1);
+    // The graph, no longer next to the findings, takes the full width below.
+    expect(await page.locator("article [data-part]").evaluateAll((els) => els.map((e) => e.getAttribute("data-part")))).toEqual(["process", "findings", "image", "graph", "reflection"]);
+    expect((await box(page, '[data-part="graph"]')).width).toBeGreaterThan(f.width + im.width);
   });
 
   test("the AI draft (stand-in) writes the question, what it is, where and when, a summary and a highlighted gap", async ({ page }) => {

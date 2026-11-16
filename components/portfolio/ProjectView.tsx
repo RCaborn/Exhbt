@@ -98,19 +98,19 @@ export function ProjectView({
 
   return (
     <article data-exhbt-page className="xp @container/xp">
-      <div className="grid gap-8 @3xl/xp:grid-cols-[13.5rem_minmax(0,1fr)] @3xl/xp:gap-9 print:grid-cols-[44mm_minmax(0,1fr)] print:gap-6">
-        <aside aria-label={`About ${first} and this work`} className="min-w-0 @3xl/xp:sticky @3xl/xp:top-8 @3xl/xp:self-start print:static">
-          <div className="xp-card flex items-center gap-4 p-4 @3xl/xp:flex-col @3xl/xp:items-stretch @3xl/xp:gap-0 @3xl/xp:p-5 print:flex-col print:items-stretch print:gap-0 print:p-4">
-            <div className="shrink-0 @3xl/xp:mx-auto print:mx-auto">
-              <span className="@3xl/xp:hidden print:hidden">
+      <div className="grid gap-8 @3xl/xp:grid-cols-[13.5rem_minmax(0,1fr)] @3xl/xp:gap-9 print:block">
+        <aside aria-label={`About ${first} and this work`} className="xp-aside min-w-0 print:mb-3 print:grid print:grid-cols-[52mm_minmax(0,1fr)] print:gap-x-6 print:border-b print:pb-3">
+          <div className="xp-card flex items-center gap-4 p-4 @3xl/xp:flex-col @3xl/xp:items-stretch @3xl/xp:gap-0 @3xl/xp:p-5 print:flex-row print:items-center print:gap-3 print:p-3">
+            <div className="shrink-0 @3xl/xp:mx-auto print:mx-0">
+              <span className="@3xl/xp:hidden print:block">
                 <Avatar name={owner.name} photoUrl={owner.photoUrl} size={64} shape={owner.shape} />
               </span>
-              <span className="hidden @3xl/xp:block print:block">
+              <span className="hidden @3xl/xp:block print:hidden">
                 <Avatar name={owner.name} photoUrl={owner.photoUrl} size={88} shape={owner.shape} />
               </span>
             </div>
-            <div className="min-w-0 @3xl/xp:mt-4 print:mt-3">
-              <p className="xp-name xp-display text-[1.5rem] leading-tight @3xl/xp:text-[1.625rem]">{owner.name}</p>
+            <div className="min-w-0 @3xl/xp:mt-4 print:mt-0">
+              <p className="xp-name xp-display text-[1.5rem] leading-tight @3xl/xp:text-[1.625rem] print:text-[1.3rem]">{owner.name}</p>
               {owner.bio?.trim() && <p className="xp-muted mt-1.5 text-[0.875rem] leading-snug">{owner.bio.trim()}</p>}
               {owner.homeHref && (
                 <Link href={owner.homeHref} className="xp-outline-button mt-4 hidden h-11 w-full items-center justify-center px-3 text-center text-[0.875rem] leading-tight font-semibold @3xl/xp:flex print:hidden">
@@ -126,7 +126,7 @@ export function ProjectView({
           )}
 
           {/* Stacked above the work, the facts sit side by side and the ticks in a row, so the question isn't pushed far down. */}
-          <dl className="mt-4 grid grid-cols-1 gap-x-6 px-1 @md/xp:grid-cols-2 @3xl/xp:mt-6 @3xl/xp:block @3xl/xp:px-5 print:mt-4 print:block print:px-1">
+          <dl className="mt-4 grid grid-cols-1 gap-x-6 px-1 @md/xp:grid-cols-2 @3xl/xp:mt-6 @3xl/xp:block @3xl/xp:px-5 print:row-span-2 print:mt-0 print:grid print:grid-cols-3 print:gap-x-5 print:px-0">
             {kind && <Fact term="What it is">{kind}</Fact>}
             {whereWhen && <Fact term="Where and when">{whereWhen}</Fact>}
             <Fact term="Can you trust it?" wide>
@@ -148,7 +148,7 @@ export function ProjectView({
           </dl>
 
           {hasWork && (
-            <div className="mt-6 print:mt-4">
+            <div className="mt-6 print:mt-3">
               <Button href={evidenceUrl!} variant="primary" size="md" target="_blank" rel="nofollow ugc noopener" className="xp-work-button w-full" label={`See the work: ${doc.evidence!.label}`}>
                 <span className="min-w-0">See the work: {doc.evidence!.label}</span>
               </Button>
@@ -171,18 +171,18 @@ export function ProjectView({
               ))}
             </ul>
           )}
-          {team && <div className="mt-3">{team}</div>}
+          {team}
 
-          <H className="xp-title xp-display mt-5 text-[clamp(2rem,7cqi,3.4rem)] leading-[1.02] text-balance print:mt-3 print:text-[2.3rem]">
+          <H className="xp-title xp-display mt-5 text-[clamp(2rem,7cqi,3.4rem)] leading-[1.02] text-balance print:mt-2 print:text-[2rem]">
             {doc.title}
           </H>
           {doc.gap.length > 0 && (
-            <p className="xp-context mt-5 max-w-[42rem] text-[1.0625rem] leading-[1.6] @2xl/main:text-[1.1875rem] print:mt-3 print:text-[1.1rem]">
+            <p className="xp-context mt-5 max-w-[42rem] text-[1.0625rem] leading-[1.6] @2xl/main:text-[1.1875rem] print:mt-2 print:text-[1rem]">
               <RichText value={doc.gap} highlight />
             </p>
           )}
 
-          <section aria-label="Process" data-part="process" className="mt-8 break-inside-avoid print:mt-5">
+          <section aria-label="Process" data-part="process" className="mt-8 break-inside-avoid print:mt-3">
             <MethodFlow steps={doc.flow} variant="page" />
           </section>
 
@@ -195,7 +195,7 @@ export function ProjectView({
 
 function Fact({ term, children, wide = false }: { term: string; children: React.ReactNode; /** Both columns when the facts sit side by side. */ wide?: boolean }) {
   return (
-    <div className={`xp-fact border-b py-3 last:border-b-0 @3xl/xp:first:pt-0 print:py-2 ${wide ? "@md/xp:col-span-2" : ""}`}>
+    <div className={`xp-fact border-b py-3 last:border-b-0 @3xl/xp:first:pt-0 print:border-b-0 print:py-0 ${wide ? "@md/xp:col-span-2 print:col-span-1" : ""}`}>
       <dt className="xp-muted text-[0.78rem]">{term}</dt>
       <dd className="mt-0.5 text-[0.875rem] leading-snug font-semibold">{children}</dd>
     </div>
@@ -308,7 +308,7 @@ export function SectionBlock({ s, Sub, imageUrls }: { s: Section; Sub: Sub; imag
       );
     case "reflection":
       return (
-        <section aria-labelledby={`${s.id}-h`} data-part="reflection" className="xp-section xp-next break-inside-avoid border-t pt-6 print:pt-3">
+        <section aria-labelledby={`${s.id}-h`} data-part="reflection" className="xp-section xp-next break-inside-avoid border-t pt-6 print:pt-2">
           <Sub id={`${s.id}-h`} className="xp-label">
             What I&apos;d do next
           </Sub>
@@ -322,7 +322,7 @@ export function SectionBlock({ s, Sub, imageUrls }: { s: Section; Sub: Sub; imag
       const label = s.label.trim() || "Link";
       return (
         <section aria-label="Link" data-part="link" className="xp-section break-inside-avoid">
-          <div className="xp-card px-5 py-4">
+          <div className="xp-card px-5 py-4 print:px-3 print:py-2">
             {href ? (
               <a href={href} rel="nofollow ugc noopener" target="_blank" className="xp-link inline-flex items-center gap-1.5 font-semibold">
                 {label}
@@ -343,12 +343,12 @@ export function SectionBlock({ s, Sub, imageUrls }: { s: Section; Sub: Sub; imag
 function Findings({ s, Sub }: { s: SectionOf<"findings">; Sub: Sub }) {
   return (
     <section aria-labelledby={`${s.id}-h`} data-part="findings" className="min-w-0 break-inside-avoid">
-      <Sub id={`${s.id}-h`} className="xp-found-heading xp-display border-b pb-3 text-[1.5rem] leading-tight print:text-[1.35rem]">
+      <Sub id={`${s.id}-h`} className="xp-found-heading xp-display border-b pb-3 text-[1.5rem] leading-tight print:pb-1.5 print:text-[1.25rem]">
         What I found
       </Sub>
       <ul>
         {s.items.map((f, i) => (
-          <li key={i} className="xp-finding border-b py-3.5 text-[0.9375rem] leading-relaxed last:border-b-0 print:py-2 print:text-[0.95rem]">
+          <li key={i} className="xp-finding border-b py-3.5 text-[0.9375rem] leading-relaxed last:border-b-0 print:py-1 print:text-[0.9rem] print:leading-snug">
             <RichText value={f} />
           </li>
         ))}

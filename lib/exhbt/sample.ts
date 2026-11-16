@@ -121,6 +121,45 @@ export const openBankingDoc: ExhbtDoc = {
   evidence: { kind: "link", href: "https://example.com/open-banking-dissertation.pdf", label: "Dissertation.pdf" },
 };
 
+/**
+ * The open-banking sample with every kind of section but an image (which needs an uploaded file),
+ * close to the 200-word cap: for checking that a full exhbt still prints on one A4 page.
+ * app/dev/portfolio adds it with `with=full`, at /p/<username>/open-banking-full.
+ */
+export const fullDoc: ExhbtDoc = {
+  ...openBankingDoc,
+  flow: [...openBankingDoc.flow.slice(0, 4), { step: "Test access fees and market structure", detail: "comparative statics" }, openBankingDoc.flow[4]!],
+  sections: [
+    {
+      id: "findings",
+      kind: "findings",
+      items: [
+        ...(openBankingDoc.sections[0] as { items: ReturnType<typeof text>[] }).items,
+        text("Small fintechs gain most from cooperation when switching costs are low."),
+      ],
+    },
+    openBankingDoc.sections[1]!,
+    {
+      id: "graph-2",
+      kind: "graph",
+      chart: {
+        kind: "line",
+        title: "Cooperation over time (%)",
+        unit: "%",
+        series: ["Retail", "SME"],
+        rows: [
+          { label: "Year one", values: [20, 15] },
+          { label: "Year two", values: [35, 22] },
+          { label: "Year three", values: [48, 30] },
+        ],
+      },
+    },
+    { id: "quote-1", kind: "quote", text: "A clear model of a question regulators keep asking.", name: "Dr Jane Doe", role: "Supervisor" },
+    { id: "reflection-1", kind: "reflection", text: text("Test the model against real partnership data from UK banks.") },
+    { id: "link-1", kind: "link", href: "https://example.com/open-banking-code", label: "Model code", description: "The replicator equations in SymPy" },
+  ],
+};
+
 /** The samples as they're stored by app/dev/portfolio: the GP one in the old layout. */
 export const sampleSeeds: unknown[] = [legacyGpDoc, libraryDoc];
 

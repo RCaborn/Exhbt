@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { Plan } from "@/lib/entitlements";
 import { normaliseDoc, type ExhbtDoc } from "@/lib/exhbt/blocks";
-import { openBankingDoc, sampleDocs, sampleSeeds } from "@/lib/exhbt/sample";
+import { fullDoc, openBankingDoc, sampleDocs, sampleSeeds } from "@/lib/exhbt/sample";
 import { usernameProblem } from "@/lib/hosts";
 import { normaliseLayout } from "@/lib/portfolio-layout";
 import { getStore, isSupabaseConfigured, setPlanForDevelopment, setStoredCopiesForDevelopment } from "@/lib/store";
@@ -28,7 +28,8 @@ const MAX_COUNT = sampleSeeds.length + MORE_TITLES.length;
  * The GP sample is stored in the layout from before sections (lib/exhbt/sample.ts, decision
  * 0015), in both copies, so the path old exhbts take is what the pages show. `layout=sections`
  * stores it already read into sections instead, to compare the two. `with=open-banking` adds the
- * sample in the page layout of decision 0022 at /p/<username>/open-banking.
+ * sample in the page layout of decision 0022 at /p/<username>/open-banking; `with=full` the same with
+ * every section but an image, near the word cap, at /p/<username>/open-banking-full.
  */
 export async function GET(req: NextRequest) {
   if (isSupabaseConfigured() || process.env.NODE_ENV === "production") return new NextResponse("Not found", { status: 404 });
@@ -69,6 +70,11 @@ export async function GET(req: NextRequest) {
   if (q.get("with") === "open-banking") {
     const id = await store.createExhbt(userId, openBankingDoc);
     await store.publishExhbt(id, userId, "open-banking");
+  }
+  // The same with every section but an image, near the word cap (the one-page print check).
+  if (q.get("with") === "full") {
+    const id = await store.createExhbt(userId, fullDoc);
+    await store.publishExhbt(id, userId, "open-banking-full");
   }
   return NextResponse.redirect(new URL(`/p/${username}`, req.url));
 }

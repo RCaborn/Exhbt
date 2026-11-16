@@ -60,7 +60,7 @@ export default async function PortfolioProject({ params }: Params) {
         imageUrls={imageUrls}
         evidenceUrl={evidenceUrl}
         checkedOn={checkedOnLabel(it.publishedAt)}
-        team={<TeamByline team={it.team} />}
+        team={it.team.length > 0 ? <TeamByline team={it.team} /> : undefined}
         saveAsPdf
         // On alex.exhbt.co.uk a relative guide link would stay on the portfolio host.
         checksHref={p.base ? undefined : `https://${MARKETING_HOST}${CHECKS_GUIDE}`}

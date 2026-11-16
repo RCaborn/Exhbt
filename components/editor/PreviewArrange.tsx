@@ -9,6 +9,7 @@ import { SectionBlock } from "@/components/portfolio/ProjectView";
 import { Button } from "@/components/ui/Button";
 import { useReducedMotion } from "@/components/ui/useReducedMotion";
 import type { ExhbtDoc, Section } from "@/lib/exhbt/blocks";
+import { hasData } from "@/lib/exhbt/charts";
 import { moveSection, sectionLabel } from "@/lib/exhbt/sections";
 
 type SetDoc = React.Dispatch<React.SetStateAction<ExhbtDoc>>;
@@ -84,7 +85,12 @@ export function PreviewArrange({ doc, setDoc, imageUrls }: { doc: ExhbtDoc; setD
           <ol aria-label="Sections in the preview, in page order" className="space-y-3">
             {sections.map((s, i) => (
               <ArrangeItem key={s.id} s={s} label={lowerFirst(sectionLabel(sections, i))} reduced={reduced} first={i === 0} last={i === sections.length - 1} onMove={(d) => move(i, i + d, "keys")}>
-                <SectionBlock s={s} Sub="h3" imageUrls={imageUrls} />
+                {s.kind === "graph" && !hasData(s.chart) ? (
+                  // The page leaves out a graph with no figures yet; here it still needs a place to pick up.
+                  <p className="xp-muted rounded-[12px] border border-dashed border-line px-4 py-6 text-center text-sm">No figures in this graph yet. Fill it in on the left.</p>
+                ) : (
+                  <SectionBlock s={s} Sub="h3" imageUrls={imageUrls} />
+                )}
               </ArrangeItem>
             ))}
           </ol>

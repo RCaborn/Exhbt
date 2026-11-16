@@ -8,7 +8,7 @@ Rory drew the page on 16 Nov 2026: `docs/design/portfolio-and-exhbt-layouts.pdf`
 
 ## The layout
 
-A sidebar on the left, the work on the right. On a phone, and anywhere the page is given less than 48rem (the editor's half-width preview included), the sidebar sits above the main column.
+A sidebar on the left, the work on the right. On a phone, and anywhere the page is given less than 48rem (the editor's half-width preview included), the sidebar sits above the main column, with its facts side by side and the ticks in a row where there's room. It scrolls with the page rather than sticking, so nothing in it is cut off on a short window.
 
 The sidebar, top to bottom:
 - a card with the photo, the name, the short line under it (the profile's headline) and "All of <first name>'s work", back to the portfolio
@@ -59,22 +59,24 @@ The person's portfolio look carries over: the route sets `data-theme` and the lo
 | `--xp-ground`, `--xp-ink`, `--xp-muted` | the page's ground, text, and secondary text (labels, captions, the bio) |
 | `--xp-font`, `--xp-title-font`, `--xp-title-weight`, `--xp-title-tracking` | the body face, and the title, name and "What I found" face. Unset fonts follow the site's Inter and the look's `--font-display` |
 | `--xp-rule`, `--xp-rule-strong` | hairlines between facts and findings; the rule under "What I found" |
-| `--xp-card`, `--xp-card-ink`, `--xp-card-edge` | the sidebar's person card and the link card |
-| `--xp-figure`, `--xp-figure-edge` | the card under a graph or image (keep it white or near it: graphs need it) |
+| `--xp-card`, `--xp-card-ink`, `--xp-card-muted`, `--xp-card-edge` | the sidebar's person card and the link card (the bio and the link's description are the muted text) |
+| `--xp-figure`, `--xp-figure-ink`, `--xp-figure-muted`, `--xp-figure-edge` | the card under a graph or image, its text and an image's caption. Keep the ground white or near it, even on a dark look: the graphs colour themselves for white |
 | `--xp-pill`, `--xp-pill-ink`, `--xp-pill-edge` | skill pills |
 | `--xp-tick`, `--xp-tick-ink` | the filled ticks, and the quote's rule |
 | `--xp-link` | link underlines |
 | `--xp-accent`, `--xp-accent-hover`, `--xp-accent-ink` | the "See the work" button |
 | `--xp-outline-ground`, `--xp-outline-ink`, `--xp-outline-edge` | "All of <name>'s work" |
 | `--xp-highlight`, `--xp-highlight-ink` | the highlighted gap |
-| `--xp-flow-ground`, `--xp-flow-ink`, `--xp-flow-edge`, `--xp-flow-end`, `--xp-flow-end-ink`, `--xp-arrow` | flowchart boxes, the dark last box, the arrows |
-| `--xp-avatar`, `--xp-avatar-ink`, `--xp-avatar-edge` | the initials when there's no photo |
+| `--xp-flow-ground`, `--xp-flow-ink`, `--xp-flow-muted`, `--xp-flow-edge`, `--xp-flow-end`, `--xp-flow-end-ink`, `--xp-arrow` | flowchart boxes and their detail line, the dark last box, the arrows |
+| `--xp-avatar`, `--xp-avatar-ink`, `--xp-avatar-edge` | the initials when there's no photo (a photo's edge is `--xp-rule`) |
 | `--xp-radius-card`, `--xp-radius-box`, `--xp-radius-pill`, `--xp-radius-button` | corners: cards, flowchart boxes and the highlight, pills, buttons. 0 for the sharp looks |
 
-Every pair a look sets has to pass WCAG AA, as the band colours do (`e2e/phase2-themes.spec.ts`).
+Headings, the teammates' byline (decision 0013) and links in the text take the page's ink too. Every pair a look sets has to pass WCAG AA, as the band colours do (`e2e/phase2-themes.spec.ts`); `e2e/exhbt-page.spec.ts` sets a dark set of these variables and runs axe on the page.
+
+Two things sit outside the page, on `--xp-page-ground`, and keep their own colours: the portfolio's "made with exhbt" sign-off (`MadeWith`, in the portfolio layout) and the previous and next cards (`ProjectPager`). A dark look has to restyle those as well.
 
 ## Print
 
-"Save as PDF" prints one A4 page: the sidebar becomes a 44mm column, the flowchart stays a row, the sections close up (`@media print` in `app/globals.css`).
+"Save as PDF" prints one A4 page: the sidebar becomes a band across the top (the person and the work on the left; what it is, where and when and the checks in three columns), the main column takes the full width below it, the flowchart stays a row and the sections close up (the `print:` classes and `@media print` in `app/globals.css`, which also sets a 12px rem). A full exhbt at 196 words with two graphs, a quote and a link fits with room to spare (`fullDoc` in `lib/exhbt/sample.ts`, checked in `e2e/exhbt-page.spec.ts`); an image as well may run onto a second page.
 
 Code: `components/portfolio/ProjectView.tsx`, `components/exhbt/MethodFlow.tsx` (`variant="page"`), `components/editor/PreviewArrange.tsx`, `lib/exhbt/blocks.ts`, `lib/exhbt/sections.ts`, `lib/ai/exhbt-draft.ts`, `app/(portfolio)/p/[username]/[slug]/page.tsx`. Tests: `e2e/exhbt-page.spec.ts`.

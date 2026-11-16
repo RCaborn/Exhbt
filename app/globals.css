@@ -216,9 +216,12 @@
     --xp-card: var(--color-mist);
     --xp-card-ink: var(--color-ink);
     --xp-card-edge: transparent;
+    --xp-card-muted: var(--color-graphite);
     /* Graphs sit on white, never mist: the lightest series step is below 2:1 on mist (DESIGN.md). */
     --xp-figure: var(--color-surface);
     --xp-figure-edge: var(--color-line);
+    --xp-figure-ink: var(--color-ink);
+    --xp-figure-muted: var(--color-graphite);
     --xp-pill: var(--color-mist);
     --xp-pill-ink: var(--color-ink);
     --xp-pill-edge: transparent;
@@ -236,6 +239,7 @@
     --xp-flow-ground: var(--color-surface);
     --xp-flow-ink: var(--color-ink);
     --xp-flow-edge: var(--color-line);
+    --xp-flow-muted: var(--color-graphite);
     --xp-flow-end: var(--color-ink);
     --xp-flow-end-ink: var(--color-surface);
     --xp-arrow: var(--color-slate);
@@ -256,6 +260,10 @@
     color: var(--xp-ink);
     font-family: var(--xp-font, var(--font-sans));
   }
+  /* Headings take the page's ink, not the site's (the base layer sets ink on every heading). */
+  .xp :is(h1, h2, h3) {
+    color: inherit;
+  }
   .xp-display {
     font-family: var(--xp-title-font, var(--font-display));
     font-weight: var(--xp-title-weight);
@@ -270,12 +278,16 @@
     border: 1px solid var(--xp-card-edge);
     border-radius: var(--xp-radius-card);
   }
+  .xp-card .xp-muted {
+    color: var(--xp-card-muted);
+  }
   .xp-pill {
     background: var(--xp-pill);
     color: var(--xp-pill-ink);
     border: 1px solid var(--xp-pill-edge);
     border-radius: var(--xp-radius-pill);
   }
+  .xp-aside,
   .xp-fact,
   .xp-finding,
   .xp-next {
@@ -332,14 +344,15 @@
     font-size: 0.875rem;
     padding-inline: 0.75rem;
   }
+  .xp-figure {
+    color: var(--xp-figure-ink);
+  }
+  .xp-figure .xp-muted {
+    color: var(--xp-figure-muted);
+  }
   .xp .xp-work-button:hover {
     background: var(--xp-accent-hover);
     border-color: var(--xp-accent-hover);
-  }
-  .xp [data-avatar="initials"] {
-    background: var(--xp-avatar);
-    color: var(--xp-avatar-ink);
-    border-color: var(--xp-avatar-edge);
   }
   /* The gap in the context line: a flat block behind the words (the bold run, drawn as a mark). */
   .xp-mark {
@@ -367,7 +380,7 @@
     color: var(--xp-flow-end-ink);
   }
   .xp-flow-detail {
-    color: var(--xp-muted);
+    color: var(--xp-flow-muted);
   }
   .xp-flow-box[data-last] .xp-flow-detail {
     color: color-mix(in srgb, var(--xp-flow-end-ink) 78%, transparent);
@@ -466,6 +479,27 @@
 div:has(> main#main > [data-exhbt-route]) {
   background: var(--xp-page-ground);
 }
+/* Shared components drawn inside the exhbt page, recoloured by the look. Unlayered, because they
+   colour themselves with Tailwind utilities, which outrank the components layer. */
+.xp [data-avatar="initials"] {
+  background: var(--xp-avatar);
+  color: var(--xp-avatar-ink);
+  border-color: var(--xp-avatar-edge);
+}
+.xp [data-avatar="photo"] {
+  border-color: var(--xp-rule);
+}
+.xp [data-team] {
+  border-color: var(--xp-rule);
+  color: var(--xp-ink);
+}
+.xp [data-team] .text-graphite {
+  color: var(--xp-muted);
+}
+.xp [data-team] .text-ink,
+.xp a.link {
+  color: inherit;
+}
 
 /* Print and "Save as PDF" (the project page's button): one A4 page, the exhbt alone. The page
    chrome hides itself with print:hidden; this sets the paper, a slightly smaller rem so a full
@@ -476,7 +510,7 @@ div:has(> main#main > [data-exhbt-route]) {
     margin: 12mm;
   }
   html {
-    font-size: 13px;
+    font-size: 12px;
   }
   html,
   body {
@@ -497,6 +531,6 @@ div:has(> main#main > [data-exhbt-route]) {
   }
   /* The exhbt page: tighter gaps between sections so a full exhbt fits one page. */
   .xp-section {
-    margin-top: 1.1rem;
+    margin-top: 0.85rem;
   }
 }

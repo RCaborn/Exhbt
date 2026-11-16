@@ -198,8 +198,9 @@ export function toDoc(d: Draft, source: string): ExhbtDoc {
     title: d.title.trim().slice(0, L.titleChars),
     // What it is and where and when sit in the sidebar (decision 0022); the summary goes on portfolio cards.
     context: d.context.trim().slice(0, L.contextChars),
-    ...(nonEmpty(d.whereWhen) ? { whereWhen: d.whereWhen.trim().slice(0, L.whereWhenChars) } : {}),
-    ...(nonEmpty(d.summary) ? { summary: d.summary.trim() } : {}),
+    // Always written, empty or not, so "Back to the AI version" of the header restores them too.
+    whereWhen: d.whereWhen.trim().slice(0, L.whereWhenChars),
+    summary: d.summary.trim(),
     skills: d.skills.map((s) => s.trim()).filter(nonEmpty).slice(0, L.skills.max),
     // The highlighted gap only when its words are really in the line.
     gap: withHighlight(d.gap, d.gapHighlight),
