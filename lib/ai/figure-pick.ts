@@ -102,7 +102,7 @@ function mockPick(images: PageImage[]): FigurePickResult {
       {
         found: true,
         image: 1,
-        box: { x: 0.06, y: 0.05, w: 0.88, h: 0.5 },
+        box: { x: 0.06, y: 0.05, w: 0.88, h: 0.48 },
         alt: `Development preview: no API key is configured, so this description of ${images[0]!.label} is a placeholder. Describe the figure here.`,
         caption: "Placeholder caption for the figure picked from your report",
       },

@@ -130,7 +130,12 @@ const DOCS: Record<string, Doc> = {
           <li>writing your roadmap from the job, your CV text and what you told us, and suggesting project ideas;</li>
           <li>reading a CV scan or photo, only if you choose to send it;</li>
           <li>transcribing a scan or photo of project material, only if you choose to send it;</li>
-          <li>drafting an exhbt from your project material, and rewriting a block when you ask.</li>
+          <li>drafting an exhbt from your project material, and rewriting a block when you ask;</li>
+          <li>
+            choosing a figure for an exhbt: when you draft one from a PDF, images of the pages with charts, diagrams or
+            pictures on them (from the first 30) are sent to pick the one that best shows your result. We keep the figure
+            cut out of the page, not the page images.
+          </li>
         </ul>
         <p>
           The model is told to use only facts you supplied. We then check every number in a draft against your material
