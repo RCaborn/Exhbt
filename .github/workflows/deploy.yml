@@ -41,5 +41,8 @@ jobs:
       - name: Build and deploy to Cloudflare Workers
         run: npm run deploy
         env:
+          # Public site (lib/site.ts): read at build time too, so it must be set here as well as
+          # in wrangler.jsonc. deploy-preview.yml leaves it out, so the preview keeps its bar.
+          EXHBT_PUBLIC: "1"
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
