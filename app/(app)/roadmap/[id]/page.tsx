@@ -8,6 +8,10 @@ import { RoadmapViews, parseView, type ProjectsState } from "@/components/roadma
 import { extractContact } from "@/lib/cv-contact";
 import { ENTITLEMENTS } from "@/lib/entitlements";
 import { ideasFor, planDone, projectsUnlocked } from "@/lib/roadmap/ideas";
+import type { BuildState } from "@/components/roadmap/BuildThis";
+import { canCreateExhbt, canSaveIdeas, getPlan } from "@/lib/plan";
+import type { SaveState } from "@/components/roadmap/SaveIdea";
+import { isPhase2Enabled } from "@/lib/site";
 
 export const metadata: Metadata = { title: "Your roadmap", robots: { index: false } };
 
@@ -48,6 +52,23 @@ export default async function RoadmapPage({
     if (current === "projects") await getStore().logEvent("projects_gate_viewed", user?.id ?? null);
   }
 
+  // "Build this as an exhbt" (Phase 2): who can, and why not.
+  let build: BuildState | undefined;
+  // Saving an idea to the list kept across roadmaps (Premium and Max); a locked star on Free.
+  let save: SaveState | undefined;
+  if (isPhase2Enabled() && current === "projects" && projects.unlocked) {
+    if (!user) build = { state: "signed-out" };
+    else {
+      const plan = await getPlan(user.id);
+      const verdict = canCreateExhbt(plan, await getStore().listExhbts(user.id));
+      build = verdict.ok ? { state: "ok" } : { state: "full", reason: verdict.reason };
+      const canSave = canSaveIdeas(plan);
+      save = canSave.ok
+        ? { state: "ok", saved: await getStore().savedTitlesForRoadmap(user.id, id) }
+        : { state: "locked", reason: canSave.reason, upgradeTo: canSave.upgradeTo };
+    }
+  }
+
   return (
     <RoadmapViews
       id={id}
@@ -56,6 +77,8 @@ export default async function RoadmapPage({
       emailedTo={record.emailSentAt ? record.pendingEmail : null}
       signedIn={Boolean(user)}
       projects={projects}
+      build={build}
+      save={save}
     />
   );
 }

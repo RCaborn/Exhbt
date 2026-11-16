@@ -1,0 +1,4 @@
+group,users,sessions_per_week,completion_rate,avg_minutes_per_session,opt_out_rate
+control (no reminder),412,2.3,38.1%,14.2,0.0%
+morning reminder 08:00,398,2.6,41.0%,15.0,4.8%
+evening reminder 19:30,405,3.1,46.7%,17.9,3.2%

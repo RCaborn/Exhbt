@@ -1,0 +1,20 @@
+{
+  "fixture": "06-history-essay",
+  "shape": "History essay as a Word file, with no numerals anywhere in it.",
+  "tests": "No numbers can be invented (there are none to quote), no headline number, no chart, and the draft still reads as a project.",
+  "files": ["06-history-essay.docx"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":false,"chart":false,"noNumbers":true},
+  "keyFacts": [
+    {"id":"question","fact":"How far the railway transformed the (fictional) market town of Ashcombe.","match":["railway"]},
+    {"id":"sources","fact":"Newspaper, a corn merchant's letter-book, board of guardians minutes and trade directories.","match":["Gazette","letter-book","letter book","trade director","guardians","primary sources"]},
+    {"id":"economy","fact":"Trade changed: corn exchange, larger livestock market by the goods yard; carriers, small brewers and coaching inns declined.","match":["corn exchange","livestock","carriers","brewers","coaching inns"]},
+    {"id":"social-order","fact":"The social order barely changed: the same landed families ran local institutions.","match":["social order","same families","landed families","who held power","who was in charge","hierarchy"]},
+    {"id":"source-criticism","fact":"Weighs the sources' bias (railway-supporting newspaper, a winner's letters).","match":["bias","limits","limitations","winners"]}
+  ],
+  "forbidden": [
+    {"id":"dates","why":"The essay gives no dates or figures, so a century written as a number is invented.","match":["19th","1800s","18th"]}
+  ],
+  "sourceNumbers": []
+}

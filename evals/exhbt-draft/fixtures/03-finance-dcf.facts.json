@@ -1,0 +1,20 @@
+{
+  "fixture": "03-finance-dcf",
+  "shape": "Finance coursework as a Word file: DCF valuation of a fictional listed retailer, assumptions, result, sensitivity.",
+  "tests": "Keeps a dense page of figures to the few that matter (value per share against market price, WACC) without computing new ones.",
+  "files": ["03-finance-dcf.docx"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":true,"chart":false,"noNumbers":false},
+  "keyFacts": [
+    {"id":"task","fact":"DCF valuation of Harrowgate Outdoor plc (fictional) from its accounts.","match":["Harrowgate","DCF","discounted cash flow"]},
+    {"id":"value","fact":"Value per share £3.68 against a market price of £3.10.","match":[["3.68","3.10"],"3.68"]},
+    {"id":"upside","fact":"18.7% above the market price.","match":["18.7%"]},
+    {"id":"wacc","fact":"WACC of 9.2%; terminal growth 2.0%.","match":["9.2%","WACC"]},
+    {"id":"sensitivity","fact":"Sensitivity: £4.31 at 8.2% WACC and £3.21 at 10.2%; value stays above market price.","match":["4.31","3.21","sensitivity"]},
+    {"id":"recommendation","fact":"A cautious buy.","match":["buy","undervalued"]},
+    {"id":"context","fact":"BSc Accounting and Finance, Year 2 Corporate Finance coursework.","match":["Accounting and Finance","Corporate Finance"]}
+  ],
+  "forbidden": [],
+  "sourceNumbers": ["2","40%","2,000","1","86","31%","31","2025","£412.6","£45.4","11.0%","£18.2","£14.9","£96.0","120","14","£3.10","3","6%","4%","11.5%","25%","4.5%","3.6%","10%","4","9.2%","10.6%","4.4%","10","5.0%","1.24","6.8%","5.1%","5","2.0%","68%","6","£538.0","£442.0","£3.68","18.7%","7","£4.31","8.2%","£3.21","10.2%","1.5%","£3.47","7.1","11.9","10.4","8","22%","9","3%","£4.50","72%"]
+}

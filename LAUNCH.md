@@ -23,7 +23,7 @@ Dashboards change their wording from time to time. If a label below doesn't matc
    - Save the database password in your password manager. You won't need it for this checklist.
 2. When the project is ready, open **SQL Editor > New query**:
    - Open `supabase/migrations/20261105000000_init.sql` in this repo on GitHub, copy all of it, paste it, and press **Run**. It should say "Success".
-   - Do the same with each remaining file in that folder, **in date order**: `20261106000000_phase1.sql`, then `20261106120000_meeting_updates.sql`, then `20261106150000_tiers_and_methodology.sql`, then `20261110000000_project_ideas.sql`, then `20261111200000_generation_lock_and_rate_limits.sql`.
+   - Do the same with each remaining file in that folder, **in date order**: `20261106000000_phase1.sql`, then `20261106120000_meeting_updates.sql`, then `20261106150000_tiers_and_methodology.sql`, then `20261110000000_project_ideas.sql`, then `20261112000000_cv_read.sql`.
    - If a file fails with `relation "roadmaps" does not exist`, an earlier file hasn't been run in this project: start again from `20261105000000_init.sql`. A failed file changes nothing, so it's safe to run again once fixed.
    - Optional, when you have it: load the UK jobs dataset (see `HANDOFF.md`). Until then a small sample is used.
 3. **Project Settings > API (or API Keys)**. Copy three values:
@@ -94,6 +94,90 @@ You'll come back to Supabase in step 5 once you know the site's address.
 Then tell Claude the address. It can run a fuller automated check against the live site.
 
 **If something's wrong:** in Cloudflare open the Worker's **Logs**. A missing key shows a clear message such as `ANTHROPIC_API_KEYS is not set.`
+
+---
+
+## Stripe (payments, Phase 2) · ~20 min
+
+Payments stay off until Phase 2 is switched on. Do all of this in Stripe's **test mode** first (the toggle at the top of the dashboard), try it, then repeat in live mode with the live keys and ids.
+
+1. Go to **stripe.com** and create an account for the business. Set the account's currency to **GBP**.
+2. **Product catalogue > Add product**, twice:
+   - **Premium**: one recurring price, **monthly**, in GBP.
+   - **Max**: one recurring price, **monthly**, in GBP.
+   The amounts must match `PRICES` in `lib/entitlements.ts` (that is what the site shows; Stripe is what actually charges).
+3. Open each price and copy its id (starts `price_`). In `wrangler.jsonc` under `vars`, replace the placeholders:
+   - `STRIPE_PRICE_PREMIUM` = the Premium price id
+   - `STRIPE_PRICE_MAX` = the Max price id
+   Commit that change on a branch. These ids aren't secret.
+4. **Developers > API keys**: copy the **Secret key** (starts `sk_test_` in test mode).
+5. **Developers > Webhooks > Add endpoint**:
+   - URL: `https://app.exhbt.co.uk/api/stripe/webhook`
+   - Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+   - After saving, reveal the **Signing secret** (starts `whsec_`).
+6. Add both as Worker secrets, either in Cloudflare (Worker > **Settings > Variables and Secrets**, type **Secret**) or from a terminal:
+   ```
+   npx wrangler secret put STRIPE_SECRET_KEY
+   npx wrangler secret put STRIPE_WEBHOOK_SECRET
+   ```
+   Never put either in `wrangler.jsonc` or in chat.
+7. **Settings > Billing > Customer portal**: turn it on, and allow customers to update payment methods, see invoices, cancel, and **switch plans** between Premium and Max (add both products). The "Manage billing" and "Switch to" buttons on `/account/billing` open this page.
+8. Optional, for a new-joiner discount later: **Product catalogue > Coupons**, then add a **promotion code**. Checkout already shows a box for codes.
+9. Open `/api/health`. Under `phase2`, every setting should be `true` and `stripe.ok` should be `true`. (This section doesn't change the overall `ok` until payments are meant to be live.)
+10. Try it in test mode: sign in, open `/account/billing`, choose Premium and pay with card `4242 4242 4242 4242`, any future date and any CVC. Back on the billing page the plan should read Premium within a minute. **Manage billing** should open Stripe's page, where you can cancel; the plan should go back to Free when the subscription ends.
+
+---
+
+## Preview site
+
+A second Worker, `exhbt-preview`, runs the `phase-2` branch with Phase 2 switched on, so you can click through it before launch. It never touches the live site: `terna` still deploys from `main`.
+
+- **Address:** `https://exhbt-preview.<your-workers-subdomain>.workers.dev`. The subdomain is the one in your Cloudflare account under **Workers & Pages > Overview** (the `.workers.dev` name shown there). The address also shows on the Worker's page once the first deploy has run.
+- **Deploys itself** on every push to `phase-2` (`.github/workflows/deploy-preview.yml`, using the same two GitHub secrets as the live deploy). You can also run it by hand from the Actions tab.
+- **Data:** it uses the separate preview Supabase project, not the live one. The project URL and anon key are in `wrangler.jsonc` under `env.preview`, because they aren't secret.
+- **Limit:** a person's own address (`alex.exhbt.co.uk`) can't be tried here, because a `workers.dev` address has no subdomains. The `/p/<name>` routes and the app work.
+
+Set these once, in Cloudflare: **Workers & Pages > `exhbt-preview` > Settings > Variables and Secrets > Add**, type **Secret**. The first deploy creates the Worker; add the secrets after it.
+
+| Secret | Value |
+| --- | --- |
+| `SUPABASE_SERVICE_ROLE_KEY` | The preview project's service_role key: Supabase **Project Settings > API Keys**. |
+| `ANTHROPIC_API_KEY` | Your Anthropic key (the same Default-workspace key is fine). |
+| `RESEND_API_KEY` | Your Resend key. |
+| `EXHBT_COOKIE_SECRET` | A new random value, not the live one. For example run `openssl rand -hex 32`. |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Later, from Stripe **test mode** (see the Stripe section). Put the test price ids in `env.preview.vars` in `wrangler.jsonc`. |
+
+Then, in the **preview** Supabase project, **Authentication > URL Configuration**: set **Site URL** to the preview address, and add the same address (with `/**` on the end) under **Redirect URLs**. Sign-in links are built from the address you visit, so no `NEXT_PUBLIC_SITE_URL` is set on the preview.
+
+Check it: open `/api/health` on the preview address. Every setting should read `true` once the secrets are in.
+
+---
+
+## Phase 2 launch day
+
+Do this only when Rory says go, and in this order. Until step 6 the live site is still running `main`, so the Supabase steps must come first and the merge must follow straight after them: the migrations rename the plan keys and change the `exhbts` columns, and Phase 1 code on `main` won't read them.
+
+Before the day: the Stripe section above done and tried in test mode, a full click-through on the preview site (Preview site, above), and the privacy policy and terms read through (they describe Phase 2).
+
+1. **Back up.** In Supabase, **Database > Backups**, check last night's backup is there (or take one if your plan allows).
+2. **Apply the migrations**, in the **live** project's Supabase **SQL Editor > New query**: paste the whole of `supabase/launch/apply-phase-2-live.sql` and press **Run**. It holds every Phase 2 migration (`20261113` to `20261120`) in date order, in one transaction, so it either all applies or nothing changes, and it records each one in the project's migration history. It was checked on 15 Nov 2026 against a copy of the live schema with sample rows: plan names convert (old "plus" becomes "premium", old "premium" becomes "max"), roadmaps and profiles are kept. If a migration is added to `supabase/migrations/` after that file, regenerate it or run the new file on its own afterwards. Never edit a migration that has been applied.
+3. **Check Storage.** Under **Storage**, there should be two buckets, `sources` and `evidence`, both **private** (the `phase2_schema` migration creates them). If one is missing, run the `insert into storage.buckets` lines from `20261114000000_phase2_schema.sql` again; they're safe to repeat. Never make either bucket public.
+4. **Stripe live mode.** Switch the Stripe dashboard to live mode and repeat steps 2–7 of the Stripe section with live products and prices:
+   - replace `STRIPE_PRICE_PREMIUM` and `STRIPE_PRICE_MAX` in `wrangler.jsonc` with the **live** price ids, on the `phase-2` branch
+   - set the Worker secrets `STRIPE_SECRET_KEY` (starts `sk_live_`) and `STRIPE_WEBHOOK_SECRET` (from the live webhook endpoint)
+5. **Phase 2 switches on with the merge.** `EXHBT_PHASE2` = `1` is set in `wrangler.jsonc` (production `vars`), so the deploy from `main` turns it on. Emergency off-switch: set it to `0` in the Worker's **Settings > Variables and Secrets**; that holds until the next deploy from `main`.
+6. **Merge.** Open a pull request from `phase-2` into `main`, wait for CI to pass, and merge it. Cloudflare deploys `main` on its own; watch **Deployments** until it's live.
+7. **Check it's working.**
+   - Open `/api/health`. `ok` should be `true`, and under `phase2`: every setting `true`, `stripe.ok` `true` and `storage.ok` `true`. If a check is false, its `detail` says why.
+   - On your own account, in **live mode**: sign up with a fresh email, upload a project and draft an exhbt, edit it and publish it, then pay for Premium with a real card. Check the plan reads Premium on `/account/billing` and the exhbt shows on your portfolio.
+   - Refund that payment in Stripe (**Payments >** the payment **> Refund**) and cancel the subscription from **Manage billing**.
+   - Delete the test account from `/account` if you don't want to keep it.
+
+**If something goes wrong after the merge:** remove `EXHBT_PHASE2` (or set it to `0`) in Cloudflare. Phase 2 pages go back to 404 straight away, without a redeploy, while you look into it.
+
+### Portfolio subdomains and DNS
+
+Owned by the subdomain work, which is being built separately (decision 0001). That work will fill in this section: DNS records, Worker routes and the checks for portfolio addresses.
 
 ---
 

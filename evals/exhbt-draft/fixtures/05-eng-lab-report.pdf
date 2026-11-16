@@ -1,0 +1,43 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R 6 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 5 0 R /Resources << /Font << /F1 3 0 R >> >> >>
+endobj
+5 0 obj
+<< /Length 3041 >>
+stream
+BT /F1 10 Tf 50 800 Td 13 TL (Kestrel Valley University, Department of Mechanical Engineering) Tj T* (MEng Mechanical Engineering, Year 2. Module ME2104 Solid Mechanics Laboratory) Tj T* (Lab report 3: Young's modulus of an aluminium alloy by cantilever deflection) Tj T* (Lab group C7 \(4 students\). This report is my individual write-up. Date of experiment: 21) Tj T* (October 2025.) Tj T* () Tj T* (1. Aim) Tj T* () Tj T* (To measure the Young's modulus \(E\) of a 6082 aluminium alloy bar by loading it as a cantilever) Tj T* (and measuring the tip deflection, and to compare the result with the reference value of 69 GPa) Tj T* (given in the module data sheet.) Tj T* () Tj T* (2. Theory) Tj T* () Tj T* (For a cantilever of length L with a point load F at the free end, simple beam theory gives the) Tj T* (tip deflection as delta = F L^3 / \(3 E I\), where I is the second moment of area. For a) Tj T* (rectangular section of width b and thickness h, I = b h^3 / 12. A plot of deflection against) Tj T* (load should be a straight line through the origin with gradient L^3 / \(3 E I\), so E can be) Tj T* (found from the gradient.) Tj T* () Tj T* (3. Apparatus and method) Tj T* () Tj T* (The bar was clamped in a rigid bench vice with a free length of 300 mm, measured with a steel) Tj T* (rule \(resolution 1 mm\). Its width \(25.0 mm\) and thickness \(3.00 mm\) were measured with a) Tj T* (digital micrometer at five points along the bar and averaged. Tip deflection was read from a) Tj T* (dial gauge with a resolution of 0.01 mm, placed 5 mm in from the free end.) Tj T* () Tj T* (Loads were added from 0 N to 5.0 N in steps of 0.5 N using slotted masses on a hanger, then) Tj T* (removed in the same steps, so each run gave 11 loading and 11 unloading readings. The group did) Tj T* (three runs, re-zeroing the dial gauge before each one. Before the first run the bar was loaded) Tj T* (to 5.0 N and unloaded twice to settle it in the clamp.) Tj T* () Tj T* (4. Results) Tj T* () Tj T* (Table 1: Mean tip deflection over three runs \(loading\)) Tj T* () Tj T* (Load \(N\)    Deflection \(mm\)) Tj T* (0.0         0.00) Tj T* (1.0         2.41) Tj T* (2.0         4.79) Tj T* (3.0         7.21) Tj T* (4.0         9.62) Tj T* (5.0         12.00) Tj T* () Tj T* (\(Readings at the half-newton steps are in Appendix A.\)) Tj T* () Tj T* (A least-squares straight line through all 33 loading readings gives a gradient of 2.40 mm/N) Tj T* (with an intercept of 0.01 mm and R^2 = 0.9996. The unloading readings were on average 0.04 mm) Tj T* (higher than the loading readings at the same load, a small hysteresis that most likely comes) Tj T* (from slip in the clamp rather than from the material.) Tj T* () Tj T* (With I = 25.0 x 3.00^3 / 12 = 56.25 mm^4 and L = 300 mm:) Tj T* () Tj T* (E = L^3 / \(3 I x gradient\) = 27,000,000 / \(3 x 56.25 x 2.40\) = 66,700 N/mm^2 = 66.7 GPa.) Tj T* () Tj T* (5. Error analysis) Tj T* () Tj T* (The uncertainty in E was found by combining the fractional uncertainties of each measured) Tj T* ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 7 0 R /Resources << /Font << /F1 3 0 R >> >> >>
+endobj
+7 0 obj
+<< /Length 1794 >>
+stream
+BT /F1 10 Tf 50 800 Td 13 TL (quantity in quadrature, with each raised to the power it appears with in the formula.) Tj T* () Tj T* (Thickness h: +/- 0.02 mm on 3.00 mm, cubed: 2.0%) Tj T* (Length L: +/- 1 mm on 300 mm, cubed: 1.0%) Tj T* (Width b: +/- 0.05 mm on 25.0 mm: 0.2%) Tj T* (Gradient: +/- 0.08 mm/N from the spread between the three runs: 3.3%) Tj T* () Tj T* (Combined uncertainty: 4.0%, so E = 66.7 +/- 2.7 GPa.) Tj T* () Tj T* (The gradient and the thickness dominate. The thickness enters cubed, so a 0.02 mm error in a 3) Tj T* (mm bar matters more than a 1 mm error in its length. The clamp is the other weak point: if the) Tj T* (bar rotates slightly in the vice, the effective length is longer than 300 mm and the measured) Tj T* (deflection is too large, which would make E come out too low.) Tj T* () Tj T* (6. Discussion) Tj T* () Tj T* (The measured value of 66.7 GPa is 3.3% below the reference value of 69 GPa, and the reference) Tj T* (lies inside the uncertainty range of 64.0 to 69.4 GPa. The direction of the difference is what) Tj T* (clamp rotation would produce. The deflection-load graph is straight to within the reading) Tj T* (resolution, so the bar stayed within its elastic range up to 5.0 N, as expected: the peak) Tj T* (bending stress at 5.0 N is about 40 MPa, well below the alloy's yield strength of about 250) Tj T* (MPa.) Tj T* () Tj T* (7. Conclusion) Tj T* () Tj T* (The cantilever method gave E = 66.7 +/- 2.7 GPa for the 6082 aluminium bar, consistent with the) Tj T* (reference value of 69 GPa. The two improvements that would most reduce the uncertainty are) Tj T* (measuring the thickness with a more precise instrument at more points, and using a clamp that) Tj T* (grips the bar along a longer length to stop it rotating.) Tj T* () Tj T* ET
+endstream
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000218 00000 n 
+0000000344 00000 n 
+0000003437 00000 n 
+0000003563 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+5409
+%%EOF

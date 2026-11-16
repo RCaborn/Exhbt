@@ -1,11 +1,11 @@
 # Exhbt: developer handoff (Phase 1)
 
-Phase 1 is everything up to a student or graduate receiving their free roadmap, plus the Pro waitlist. It is complete and tested with **no external services connected**: every service has a working local stand-in, and connecting the real one is a matter of setting environment variables (below).
+Phase 1 is everything up to a student or graduate receiving their free roadmap, plus the Premium waitlist. It is complete and tested with **no external services connected**: every service has a working local stand-in, and connecting the real one is a matter of setting environment variables (below).
 
 The current shape is [docs/MAP.md](docs/MAP.md). Plan figures are `lib/entitlements.ts`. Hosts are `lib/hosts.ts`. In short:
 - Domain **exhbt.co.uk**; portfolio pieces are **exhbts**.
 - Builder order: job, CV (skippable), situation with education & skills. The email is asked for at the gate before the project ideas (decision 0004).
-- Plus and Pro are waitlist-only. The public name Pro is stored as `premium`.
+- The paid plans are Premium and Max (decision 0006). On the live site they're still waitlist-only; payments come with Phase 2 (below).
 - Universities pay; employers are always free.
 - A portfolio is a subdomain of the apex (`lib/hosts.ts`). That split is decided and not routed yet.
 
@@ -30,7 +30,7 @@ Builder, one question per screen (/roadmap/new?step=1..3)
   │           ├─ cache hit for identical input, or call the AI (cost logged)
   │           └─ signed in only: send the "Your roadmap to {role}" email once (copy + sign-in link)
   └─ output ready ─► five click-through views (?view=)
-        overview ─► gaps (radar) ─► strengths ─► projects ─► next (Pro waitlist)
+        overview ─► gaps (radar) ─► strengths ─► projects ─► next (Premium waitlist)
         projects, no email yet ─► gate: name, email, LinkedIn (optional), prefilled from the CV
           └─ server action unlockProjects: Free monthly limit, store the details, send the email once
         projects, unlocked ─► the plan: three ideas, Swap each (AI, cost logged), "Keep this plan"
@@ -79,9 +79,9 @@ Useful dev-only pages:
 | Tier checklists (pricing page, home) | `planFeatures()` in `lib/entitlements.ts`, rendered by `components/site/FeatureList.tsx` |
 | The exhbt card (methodology flow, chart, skills) | `components/exhbt/Exhbt.tsx`, `MethodFlow.tsx`, `BeforeAfterChart.tsx`; data shape and example in `lib/exhbt.ts` |
 | The skill radar (roadmap Gaps and Projects screens, home example) | `components/charts/SkillRadar.tsx`; levels and the after-projects rule in `lib/roadmap/skills.ts`; home data in `components/home/SkillsGapExample.tsx` |
-| Plans and limits (Free/Plus/Pro/Universities), tier names | `lib/entitlements.ts`; pricing page `app/(marketing)/pricing/page.tsx` |
+| Plans and limits (Free, Premium, Max, Universities), tier names | `lib/entitlements.ts`; pricing page `app/(marketing)/pricing/page.tsx` |
 | "We've read N UK job profiles" line | `lib/jobs/claim.ts` (shows only when `NEXT_PUBLIC_JOBS_DATASET_ROLES` ≥ 1,000) |
-| Pro waitlist (interest value `premium`) | `components/waitlist/` (form + server action), `waitlist` table |
+| Premium waitlist (interest value `premium`) | `components/waitlist/` (form + server action), `waitlist` table |
 | UK jobs data (skills per role) | `lib/jobs/`; importer `scripts/import-jobs.mjs` |
 | Legal text (drafts, need a solicitor) | `app/(marketing)/legal/[doc]/page.tsx` |
 
@@ -110,6 +110,38 @@ Then deploy. The intended route is Cloudflare building from GitHub on every push
 
 **Private preview vs public:** the site is private by default: `noindex` everywhere, `robots.txt` disallows all, and a preview bar shows. It only goes public when built with `EXHBT_PUBLIC=1` (`lib/site.ts`). In production a missing `ANTHROPIC_API_KEYS` or `RESEND_API_KEY` fails loudly (logged); it never falls back to placeholder roadmaps or the dev outbox.
 
+## Phase 2: services and settings
+
+Phase 2 (portfolios, the exhbt editor, uploads and AI drafts, paid plans) is on the `phase-2` branch; the plan is `docs/phase-2.md` and the shape is in `docs/MAP.md`. Like Phase 1, it runs locally with nothing connected.
+
+| Service | Settings | Without it |
+|---|---|---|
+| **Phase 2 switch** | `EXHBT_PHASE2=1`, a runtime variable (not a build one) | Always on in development and tests. In production, Phase 2 pages return 404 until it's set, so turning it off hides them without a redeploy |
+| **Stripe** (checkout, billing portal, webhook) | Secrets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`. Price ids `STRIPE_PRICE_PREMIUM`, `STRIPE_PRICE_MAX` in `wrangler.jsonc` `vars` (not secret) | Billing page can't take payments. The e2e suite sets test values in `playwright.config.ts` |
+| **Supabase Storage** | Buckets `sources` and `evidence`, both private, created by `supabase/migrations/20261114000000_phase2_schema.sql`. Uses the Supabase keys above | Uploads go to an in-memory stand-in (`/dev/upload`, `/dev/files`) |
+
+`/api/health` reports these under `phase2`: each Stripe setting (present or not, never the value), whether the Stripe key and both price ids work, and whether both buckets exist and are private. None of it changes the overall `ok` yet. Fold it in when payments are meant to be live.
+
+Prices and limits are `lib/entitlements.ts`. The Stripe dashboard steps are in `LAUNCH.md`.
+
+Development pages for Phase 2 (all 404 in production and when Supabase is connected):
+- **`/dev/portfolio?username=amara&plan=premium&count=2`**: makes a fictional portfolio with published exhbts and opens it. The owner is the dev sign-in user `<username>@example.com`, so sign in with that address (`/auth/dev?email=amara@example.com`) to edit the same portfolio.
+- **`/dev/plan?plan=max&next=/exhbts`**: puts the signed-in dev user on a plan without Stripe.
+- **`/dev/upload/<id>`** and **`/dev/files/<id>`**: the in-memory stand-in for Storage. Uploads PUT to the first; portfolio pages read from the second. Files are gone when the server restarts.
+
+Where Phase 2 lives:
+
+| You want to change… | Go to |
+|---|---|
+| Blocks, limits, word count | `lib/exhbt/blocks.ts` (decisions 0007 and 0009) |
+| How an exhbt looks | `components/portfolio/ProjectView.tsx` |
+| The editor | `app/(app)/exhbts/[id]/edit/`, `components/editor/` |
+| Uploads and AI drafts | `app/(app)/exhbts/new/`, `lib/uploads.ts`, `lib/files.ts`, `lib/ai/exhbt-draft.ts`, `lib/exhbt/verify.ts` |
+| Portfolio settings | `app/(app)/account/portfolio/` |
+| Portfolio pages | `app/(portfolio)/` (hosts: decision 0001; the subdomain routing is being built separately) |
+| Billing | `app/(app)/account/billing/`, `lib/stripe.ts`, `app/api/stripe/webhook/route.ts` |
+| Which plan someone is on | `lib/plan.ts` (`getPlan`), rules in `lib/plan-rules.ts` |
+
 ## Known limits and decisions
 
 - **Hosting plan:** Cloudflare's free Workers plan allows about 10 ms of CPU per request, and server rendering can exceed that. Budget for **Workers Paid ($5/month)**. CV parsing already happens in the browser to keep server work light.
@@ -118,7 +150,7 @@ Then deploy. The intended route is Cloudflare building from GitHub on every push
 - **Fake emails are accepted** (the roadmap shows without verifying the address). That was a product decision; rate limits contain abuse.
 - **Scanned-image PDFs** have no text to read; the builder asks people to paste instead. There's no OCR.
 - **JavaScript is required** for the builder (steps and CV reading are client-side). Server-side file parsing was removed to keep the Worker small and fast.
-- **Pro has no price yet:** the pricing page and the roadmap's last screen collect a waitlist (`waitlist` table). Checkout comes with Pro.
+- **Phase 1 has no checkout:** the pricing page and the roadmap's last screen collect a waitlist for Premium (`waitlist` table). With Phase 2 on, they point to the plans and checkout instead.
 - **The jobs seed is illustrative.** Its skills are placeholders until the real dataset is imported; confirm the dataset's licence allows this use before importing.
 - **Per-employer links** are a path on the person's host, with a short random suffix so the company name cannot be guessed. See `lib/hosts.ts`.
 
@@ -127,7 +159,7 @@ Then deploy. The intended route is Cloudflare building from GitHub on every push
 `e2e/` (Playwright, run by CI in `.github/workflows/ci.yml`):
 - `phase1.spec.ts`:
   - job pre-fill, `/start` entry, per-step validation, Back keeps answers
-  - jobs data shapes the gaps; Pro waitlist
+  - jobs data shapes the gaps; Premium waitlist
   - instant result through the free views to the project-ideas gate, then the plan
   - the gate's CV prefill and validation; swapping ideas until it's your plan
   - email in the outbox, with a working sign-in link
@@ -138,8 +170,18 @@ Then deploy. The intended route is Cloudflare building from GitHub on every push
 - `responsive.spec.ts`: the home CTA is above the fold on desktop and phone; no sideways scrolling.
 - `preview.spec.ts`: private-preview noindex, robots and banner.
 
+- Phase 2: `phase2-account.spec.ts` (usernames, profile), `phase2-portfolio.spec.ts` (blocks, plan rules, portfolio pages), `phase2-draft.spec.ts` (uploads, AI draft), `phase2-editor.spec.ts` (editor, publish), `phase2-billing.spec.ts` (Stripe), `phase2-hardening.spec.ts` (account export, privacy and terms).
+
 Tests run against the dev server with no services connected. They use the build folder `.next-e2e`, so they can run while `npm run dev` is up.
+
+To run the suite beside another one (a second worktree, or a dev server on the default port), give it its own port and keep it to one browser at a time:
+
+```bash
+E2E_PORT=3236 npx playwright test --workers=1
+```
+
+On a machine with Chromium already installed (Claude Code cloud), add `PW_CHROMIUM_PATH=<path to chrome>`. The full suite takes about six minutes. If the dev server adds a `.next-*/types` line to `tsconfig.json` while it runs, don't commit it.
 
 ## What comes next
 
-Pro (exhbt editor, AI drafting, originality check, the public portfolio host, per-employer links, payments) is not built yet. The decisions are in `docs/decisions/`. The tables already exist (`exhbts`, `curated_links`, `profiles.username`), and the exhbt card renders today from `lib/exhbt.ts` data.
+Phase 2 is above. Still to come: per-job links on Max (in progress), the subdomain routing (being built separately; decision 0001), and the originality check, which is sold as "coming soon" until `ORIGINALITY_CHECK_LIVE` is true in `lib/entitlements.ts`. The decisions are in `docs/decisions/`.

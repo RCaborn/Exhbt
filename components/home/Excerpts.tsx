@@ -23,7 +23,7 @@ export function EditorExcerpt() {
             <span className="inline-flex size-4 items-center justify-center rounded-full border border-ink bg-mint">
               <Check aria-hidden size={10} strokeWidth={3} />
             </span>
-            Originality check passed
+            Source attached
           </span>
           <span className="font-mono text-graphite">164 / 200 words</span>
         </div>

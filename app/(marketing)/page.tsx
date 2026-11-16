@@ -5,10 +5,17 @@ import { EditorExcerpt, LinkExcerpt } from "@/components/home/Excerpts";
 import { SkillsGapExample } from "@/components/home/SkillsGapExample";
 import { StartForm } from "@/components/home/StartForm";
 import { demoExhbts } from "@/lib/exhbt";
-import { EXHBTS_PER_JOB_LINK, PLAN_NAMES, PRICES, planFeatures } from "@/lib/entitlements";
+import { BILLING_PERIOD, EXHBTS_PER_JOB_LINK, JOB_LINKS_LIVE, PLAN_NAMES, PRICES, planFeatures } from "@/lib/entitlements";
+import { isPhase2Enabled } from "@/lib/site";
 import { Button } from "@/components/ui/Button";
 
+// Per request: the EXHBT_PHASE2 switch is read at runtime, so the plan cards change to the paid
+// plans (or back to the waitlist) without a rebuild.
+export const dynamic = "force-dynamic";
+
 export default function Home() {
+  // Phase 2 on: the paid plans are sold for real. Off (the live site today): the waitlist.
+  const sell = isPhase2Enabled();
   return (
     <>
       {/* Hero: headline, one line, and the search bar. Nothing else competes with it. */}
@@ -35,14 +42,14 @@ export default function Home() {
         id="draft"
         ground="bg-mist"
         title="Turn a finished project into an exhbt"
-        body={`Add the report, notes or results. We draft a short exhbt with the methodology as a flow and a chart of the key result, from what you gave us and nothing else. You confirm it's yours. On ${PLAN_NAMES.premium}, publishing also runs an originality check.`}
+        body={`Add the report, notes or results. We draft a short exhbt with the methodology as a flow and a chart of the key result, from what you gave us and nothing else. You confirm it's yours.`}
         artifact={<EditorExcerpt />}
       />
       <Step
         id="send"
         ground="bg-surface"
         title="Send each employer their own link"
-        body={`Your exhbts live on your own link. On ${PLAN_NAMES.premium}, upload a job description and get a custom link with the ${EXHBTS_PER_JOB_LINK} that fit it best.`}
+        body={`On ${PLAN_NAMES.premium}, your exhbts live on your own link. On ${PLAN_NAMES.max}, upload a job description and get a custom link with the ${EXHBTS_PER_JOB_LINK} that fit it best.`}
         artifact={<LinkExcerpt />}
       />
 
@@ -72,23 +79,36 @@ export default function Home() {
         <div className="mx-auto max-w-[72rem] px-4 sm:px-8 py-20 lg:py-28">
           <h2 id="pricing" className="display-2">Free to start</h2>
           <p className="mt-4 max-w-2xl text-lg text-graphite">
-            Your roadmap is free, and {PLAN_NAMES.free} includes a portfolio link. {PLAN_NAMES.plus} and {PLAN_NAMES.premium} raise the limits.{" "}
+            Your roadmap is free, and so is trying an exhbt. {PLAN_NAMES.premium} puts your exhbts on your own link, and {PLAN_NAMES.max}{" "}
+            {sell && !JOB_LINKS_LIVE ? "adds room for more, with a link for every job coming soon" : "adds a link for every job"}.{" "}
             <Link href="/pricing" className="link text-ink">Compare plans</Link>
           </p>
           <div className="mt-12 grid gap-4 md:grid-cols-3">
             <Plan name={PLAN_NAMES.free} price={PRICES.free} features={planFeatures("free")} href="/roadmap/new" cta="Build my roadmap" />
-            <Plan name={PLAN_NAMES.plus} badge="Coming soon" features={planFeatures("plus")} href="/pricing#plus" cta="Join the waitlist" />
-            <Plan
-              name={PLAN_NAMES.premium}
-              badge="Coming soon"
-              features={planFeatures("premium")}
-              href="/pricing#premium"
-              cta="Join the waitlist"
-              featured
-            />
+            {sell ? (
+              <>
+                {/* Billing sends anyone signed out to sign in first, then back. */}
+                <Plan name={PLAN_NAMES.premium} price={PRICES.premium} per={BILLING_PERIOD} features={planFeatures("premium")} href="/account/billing" cta={`Choose ${PLAN_NAMES.premium}`} button />
+                <Plan name={PLAN_NAMES.max} price={PRICES.max} per={BILLING_PERIOD} features={planFeatures("max")} href="/account/billing" cta={`Choose ${PLAN_NAMES.max}`} button featured />
+              </>
+            ) : (
+              <>
+                <Plan name={PLAN_NAMES.premium} price={PRICES.premium} per={BILLING_PERIOD} badge="Coming soon" features={planFeatures("premium")} href="/pricing#premium" cta="Join the waitlist" />
+                <Plan
+                  name={PLAN_NAMES.max}
+                  price={PRICES.max}
+                  per={BILLING_PERIOD}
+                  badge="Coming soon"
+                  features={planFeatures("max")}
+                  href="/pricing#max"
+                  cta="Join the waitlist"
+                  featured
+                />
+              </>
+            )}
           </div>
           <p className="mt-8 text-graphite">
-            Universities can give every student {PLAN_NAMES.premium}.{" "}
+            Universities can give every student {PLAN_NAMES.max}.{" "}
             <Link href="/universities" className="link text-ink">How licences work</Link>
           </p>
         </div>
@@ -125,14 +145,20 @@ function Step({ id, ground, title, body, artifact }: { id: string; ground: strin
 function Plan({
   name,
   price,
+  per,
   badge,
   features,
   href,
   cta,
+  button,
   featured,
 }: {
   name: string;
+  /** Show the action as a button (choosing a paid plan) rather than a text link. */
+  button?: boolean;
   price?: string;
+  /** Billing period shown after a paid price, e.g. "month". */
+  per?: string;
   badge?: string;
   features: string[];
   href?: string;
@@ -144,9 +170,19 @@ function Plan({
       <p className="flex flex-wrap items-center gap-2 font-semibold">
         {name} {badge && <span className="chip">{badge}</span>}
       </p>
-      {price && <p className="mt-2 text-[2.6rem] leading-none font-extrabold tracking-[-0.03em]">{price}</p>}
+      {price && (
+        <p className="mt-2 text-[2.6rem] leading-none font-extrabold tracking-[-0.03em]">
+          {price}
+          {per && <span className="ml-1 text-base font-semibold tracking-normal text-graphite">a {per}</span>}
+        </p>
+      )}
       <FeatureList items={features} className="mt-4 text-[0.95rem]" />
-      {href && cta && (
+      {href && cta && button && (
+        <div className="mt-auto pt-5">
+          <Button href={href} size="sm">{cta}</Button>
+        </div>
+      )}
+      {href && cta && !button && (
         <Link href={href} className="link mt-auto pt-4 font-semibold text-ink">
           {cta}
         </Link>

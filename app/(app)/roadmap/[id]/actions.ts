@@ -6,7 +6,8 @@ import { z } from "zod/v4";
 import { getStore } from "@/lib/store";
 import { getCurrentUser } from "@/lib/auth";
 import { canView } from "@/lib/access";
-import { ENTITLEMENTS, freeRoadmapLimitMessage } from "@/lib/entitlements";
+import { ENTITLEMENTS, roadmapLimitMessage } from "@/lib/entitlements";
+import { getPlan } from "@/lib/plan";
 import { normaliseLinkedin } from "@/lib/cv-contact";
 import { emailRoadmapOnce } from "@/lib/roadmap-service";
 import { ideasFor, planDone, projectsUnlocked } from "@/lib/roadmap/ideas";
@@ -44,10 +45,12 @@ export async function unlockProjects(roadmapId: string, _prev: GateState, form: 
   if (!email.success || Object.keys(fieldErrors).length > 0) return { fieldErrors };
 
   const store = getStore();
-  // The free monthly limit, checked here now that the email is known (it isn't at the builder).
-  if ((await store.countRecentRoadmaps(email.data, 24 * 30)) >= ENTITLEMENTS.free.roadmapsPer30Days) {
-    return { error: freeRoadmapLimitMessage() };
-  }
+  // The monthly limit, checked here now that the email is known (it isn't at a signed-out builder).
+  // A signed-in person's roadmap already carries their email, so it is already in the count:
+  // leave it out, and use their own plan's figure.
+  const plan = user ? await getPlan(user.id) : "free";
+  const others = (await store.countRecentRoadmaps(email.data, 24 * 30)) - (record.pendingEmail === email.data ? 1 : 0);
+  if (others >= ENTITLEMENTS[plan].roadmapsPer30Days) return { error: roadmapLimitMessage(plan) };
 
   await store.unlockRoadmap(roadmapId, {
     email: email.data,

@@ -4,9 +4,8 @@ import { redirect, unstable_rethrow } from "next/navigation";
 import { RoadmapInputSchema } from "@/lib/ai/schemas";
 import { getStore } from "@/lib/store";
 import { getCurrentUser } from "@/lib/auth";
-import { callerIpHash, grantBrowserAccess } from "@/lib/access";
-import { hashInput } from "@/lib/hash";
-import { ENTITLEMENTS, freeRoadmapLimitMessage } from "@/lib/entitlements";
+import type { Plan } from "@/lib/entitlements";
+import { createRoadmapFor } from "@/lib/roadmap-create";
 
 type Field = "targetRole" | "cv" | "situation" | "education";
 export type FormState = { error?: string; fieldErrors?: Partial<Record<Field, string>>; step?: number } | undefined;
@@ -17,11 +16,6 @@ export type FormState = { error?: string; fieldErrors?: Partial<Record<Field, st
  */
 const STEP_OF: Record<Field, number> = { targetRole: 1, cv: 2, situation: 3, education: 3 };
 const LAST_STEP = 3;
-
-/** Free plan refreshes: roadmaps per email in any 30 days (lib/entitlements.ts). */
-const FREE_PER_30_DAYS = ENTITLEMENTS.free.roadmapsPer30Days;
-/** Abuse guard, independent of plan. The end-to-end tests raise it: they build many roadmaps from one address. */
-const PER_IP_PER_DAY = (process.env.NODE_ENV !== "production" && Number(process.env.EXHBT_PER_IP_PER_DAY)) || 10;
 
 /**
  * The single submit for the roadmap builder. Creates the roadmap, remembers this
@@ -54,30 +48,41 @@ export async function startRoadmap(_prev: FormState, form: FormData): Promise<Fo
   }
 
   try {
-    const store = getStore();
-    const ipHash = await callerIpHash();
-    // Signed in: the email is known now, so the free limit applies here. Signed out: at the gate.
-    if (user && (await store.countRecentRoadmaps(user.email, 24 * 30)) >= FREE_PER_30_DAYS) {
-      return { error: freeRoadmapLimitMessage(), step: LAST_STEP };
-    }
-    if ((await store.countRecentByIpHash(ipHash, 24)) >= PER_IP_PER_DAY) {
-      return { error: "Too many roadmaps from this connection today. Please try again tomorrow.", step: LAST_STEP };
-    }
-
-    const id = await store.createRoadmap({
-      email: user?.email ?? null,
-      input: parsed.data,
-      inputHash: await hashInput(parsed.data),
-      ipHash,
-    });
-    await grantBrowserAccess(id);
-    if (user) await store.claimPendingRoadmaps(user.email, user.id);
-    await store.logEvent("signup_started", user?.id ?? null, { source: "roadmap" });
-
-    redirect(`/roadmap/${id}`);
+    const made = await createRoadmapFor(parsed.data, user);
+    if (!made.ok) return { error: made.error, step: LAST_STEP };
+    redirect(`/roadmap/${made.id}`);
   } catch (e) {
     unstable_rethrow(e); // redirect() / notFound()
     console.error("startRoadmap failed", e);
     return { error: "That didn't work. Please try again in a moment.", step: LAST_STEP };
+  }
+}
+
+export type NewJobState = { error?: string; limit?: { upgradeTo?: Plan }; fieldError?: string } | undefined;
+
+/**
+ * "New roadmap for a different job" on My roadmaps: only the job is asked for. Everything else
+ * (situation, education, skills, CV) is copied from the person's newest roadmap, and the same
+ * checks as the builder apply (the plan's roadmaps per 30 days, the per-connection guard).
+ */
+export async function startRoadmapForJob(_prev: NewJobState, form: FormData): Promise<NewJobState> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login?next=/roadmap");
+  const targetRole = String(form.get("targetRole") ?? "").trim();
+  if (targetRole.length < 2) return { fieldError: "Describe the job you want." };
+  if (targetRole.length > 300) return { fieldError: "Keep the job to a short description." };
+
+  try {
+    const latest = await getStore().latestRoadmapFor(user.id);
+    if (!latest) redirect("/roadmap/new");
+    const parsed = RoadmapInputSchema.safeParse({ ...latest.input, targetRole });
+    if (!parsed.success) redirect(`/roadmap/new?from=${latest.id}&role=${encodeURIComponent(targetRole.slice(0, 120))}`);
+    const made = await createRoadmapFor(parsed.data, user);
+    if (!made.ok) return { error: made.error, limit: made.limit };
+    redirect(`/roadmap/${made.id}`);
+  } catch (e) {
+    unstable_rethrow(e);
+    console.error("startRoadmapForJob failed", e);
+    return { error: "That didn't work. Please try again in a moment." };
   }
 }

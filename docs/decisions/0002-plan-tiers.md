@@ -1,4 +1,4 @@
-Status: accepted
+Status: superseded by 0006 (plan names and Free's portfolio), 12 Nov 2026
 Date: 8 Nov 2026
 Supersedes: the 6 Nov tier bullets in `docs/PLAN.md`
 

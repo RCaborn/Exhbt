@@ -1,0 +1,1 @@
+This was my summer internship project at a small ed-tech start-up (I've called it Quillby here). I ran an A/B test over four weeks on when the revision app should send its study reminders, and analysed the results in Python with pandas. The spreadsheet is the results table by group. I presented it to the product team at the end of the internship.

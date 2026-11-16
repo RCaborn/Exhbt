@@ -2,10 +2,13 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, Mail } from "lucide-react";
 import { WaitlistForm } from "@/components/waitlist/WaitlistForm";
 import { PLAN_NAMES } from "@/lib/entitlements";
+import { isPhase2Enabled } from "@/lib/site";
 import { SkillHighlights } from "@/components/charts/SkillHighlights";
 import { SkillRadar } from "@/components/charts/SkillRadar";
+import { BuildThis, type BuildState } from "@/components/roadmap/BuildThis";
 import { IdeaCard } from "@/components/roadmap/IdeaCard";
 import { PlanEditor } from "@/components/roadmap/PlanEditor";
+import { SaveIdea, type SaveState } from "@/components/roadmap/SaveIdea";
 import { ProjectsGate } from "@/components/roadmap/ProjectsGate";
 import type { Roadmap } from "@/lib/ai/schemas";
 import type { Contact } from "@/lib/cv-contact";
@@ -50,10 +53,14 @@ type Props = {
   emailedTo: string | null;
   signedIn: boolean;
   projects: ProjectsState;
+  /** Building an idea as an exhbt (Phase 2 only; left out when it's off). */
+  build?: BuildState;
+  /** Saving ideas to the person's list (signed in, Phase 2 only; locked on Free). */
+  save?: SaveState;
 };
 
 /** The roadmap as five short click-through screens. Each view is its own URL (?view=). */
-export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn, projects }: Props) {
+export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn, projects, build, save }: Props) {
   const index = VIEWS.findIndex((v) => v.key === view);
   const href = (k: ViewKey) => `/roadmap/${id}?view=${k}`;
   const prev = VIEWS[index - 1];
@@ -88,7 +95,7 @@ export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn, projects 
         <div className="mt-6 rounded-[24px] border border-line bg-surface p-6 shadow-pack sm:p-10">
           {view === "overview" && <Overview roadmap={roadmap} role={role} href={href} />}
           {view === "gaps" && <Gaps roadmap={roadmap} role={role} />}
-          {view === "projects" && <Projects id={id} roadmap={roadmap} role={role} state={projects} />}
+          {view === "projects" && <Projects id={id} roadmap={roadmap} role={role} state={projects} build={build} save={save} />}
           {view === "strengths" && <Strengths roadmap={roadmap} role={role} />}
           {view === "next" && <Next emailedTo={emailedTo} signedIn={signedIn} id={id} unlocked={projects.unlocked} />}
 
@@ -191,7 +198,21 @@ function Gaps({ roadmap, role }: { roadmap: Roadmap; role: string }) {
   );
 }
 
-function Projects({ id, roadmap, role, state }: { id: string; roadmap: Roadmap; role: string; state: ProjectsState }) {
+function Projects({
+  id,
+  roadmap,
+  role,
+  state,
+  build,
+  save,
+}: {
+  id: string;
+  roadmap: Roadmap;
+  role: string;
+  state: ProjectsState;
+  build?: BuildState;
+  save?: SaveState;
+}) {
   if (!state.unlocked) {
     return (
       <>
@@ -216,12 +237,30 @@ function Projects({ id, roadmap, role, state }: { id: string; roadmap: Roadmap; 
         <ol aria-label="Your plan" className="mt-8 space-y-4">
           {ideas.map((p) => (
             <li key={p.id}>
-              <IdeaCard idea={p} />
+              <IdeaCard
+                idea={p}
+                footer={
+                  (build || save) && (
+                    <div className="flex flex-wrap items-center gap-3">
+                      {build && <BuildThis build={build} roadmapId={id} ideaId={p.id} title={p.title} />}
+                      {save && <SaveIdea save={save} roadmapId={id} ideaId={p.id} title={p.title} />}
+                    </div>
+                  )
+                }
+              />
             </li>
           ))}
         </ol>
       ) : (
-        <PlanEditor id={id} ideas={ideas} swapsLeft={swapsLeft} />
+        <PlanEditor id={id} ideas={ideas} swapsLeft={swapsLeft} build={build} save={save} />
+      )}
+      {save && (
+        <p className="mt-6 text-sm text-graphite">
+          <Link href="/roadmap/saved" className="link font-semibold text-ink">
+            Saved ideas
+          </Link>{" "}
+          from all your roadmaps.
+        </p>
       )}
       <AfterProjects roadmap={roadmap} ideas={ideas} done={done} />
     </>
@@ -313,14 +352,32 @@ function Next({ emailedTo, signedIn, id, unlocked }: { emailedTo: string | null;
 
       <div className="mt-10 rounded-[16px] bg-ink p-6 text-white sm:p-8">
         <h2 className="">When a project is done, make it count</h2>
-        <p className="mt-3 max-w-[34rem] text-[#c9cbcf]">
-          {PLAN_NAMES.plus} hosts more exhbts on your own link, and helps draft them. {PLAN_NAMES.premium} adds a
-          custom link for each job you apply to, with your best-fit projects, and an originality check when you
-          publish. Both open soon.
-        </p>
-        <div className="mt-6">
-          <WaitlistForm source="roadmap-next" interest="premium" defaultEmail={emailedTo ?? ""} tone="dark" />
-        </div>
+        {isPhase2Enabled() ? (
+          <>
+            <p className="mt-3 max-w-[34rem] text-[#c9cbcf]">
+              Turn a finished project into an exhbt: upload your notes or files and we draft it, you check it, and it goes on your own link.
+              {" "}{PLAN_NAMES.max} adds a custom link for each job you apply to.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+              <Button href="/exhbts/new" variant="primary" size="lg">
+                Make an exhbt
+              </Button>
+              <Link href="/account/billing" className="link font-semibold text-white">
+                See the plans
+              </Link>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="mt-3 max-w-[34rem] text-[#c9cbcf]">
+              {PLAN_NAMES.premium} drafts your exhbts from your files and puts them on your own link. {PLAN_NAMES.max} adds a
+              custom link for each job you apply to, with your best-fit projects. Both include an originality check when you publish (coming soon), and both open soon.
+            </p>
+            <div className="mt-6">
+              <WaitlistForm source="roadmap-next" interest="max" defaultEmail={emailedTo ?? ""} tone="dark" />
+            </div>
+          </>
+        )}
       </div>
 
       <p className="mt-8 text-graphite">

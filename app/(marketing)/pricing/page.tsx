@@ -1,25 +1,57 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { WaitlistForm } from "@/components/waitlist/WaitlistForm";
-import { ENTITLEMENTS, EXHBTS_PER_JOB_LINK, PLAN_NAMES, PRICES, planFeatures } from "@/lib/entitlements";
+import {
+  BILLING_PERIOD,
+  ENTITLEMENTS,
+  EXHBTS_PER_JOB_LINK,
+  JOB_LINKS_LIVE,
+  PLAN_NAMES,
+  PRICES,
+  planFeatures,
+} from "@/lib/entitlements";
 import { FeatureList } from "@/components/site/FeatureList";
 import { Button } from "@/components/ui/Button";
+import { isPhase2Enabled } from "@/lib/site";
 
-export const metadata: Metadata = {
-  title: "Pricing",
-  description: `Free includes the roadmap and a portfolio link. ${PLAN_NAMES.plus} and ${PLAN_NAMES.premium} raise the limits. Employers never pay.`,
-};
+// Per request: the EXHBT_PHASE2 switch is read at runtime, so the paid plans appear (or go back
+// to the waitlist) without a rebuild.
+export const dynamic = "force-dynamic";
 
-const { free, plus, premium } = ENTITLEMENTS;
+type Props = { searchParams: Promise<{ preview?: string }> };
 
-export default function PricingPage() {
+/**
+ * Selling for real (Phase 2 on) or the waitlist (Phase 2 off, the live site today). In development
+ * `?preview=waitlist` shows the waitlist version, so its tests still run with Phase 2 on.
+ */
+async function selling({ searchParams }: Props): Promise<boolean> {
+  if (!isPhase2Enabled()) return false;
+  return !(process.env.NODE_ENV !== "production" && (await searchParams).preview === "waitlist");
+}
+
+/** What Max adds over Premium, said only as far as it's built. */
+const maxExtra = (sell: boolean) =>
+  !sell || JOB_LINKS_LIVE ? "adds a link for every job" : "adds room for more, with a link for every job coming soon";
+
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const sell = await selling(props);
+  return {
+    title: "Pricing",
+    description: `Free includes the roadmap and an exhbt to try. ${PLAN_NAMES.premium} puts your exhbts on your own link, and ${PLAN_NAMES.max} ${maxExtra(sell)}. Employers never pay.`,
+  };
+}
+
+const { free, premium, max } = ENTITLEMENTS;
+
+export default async function PricingPage(props: Props) {
+  const sell = await selling(props);
   return (
     <div className="mx-auto max-w-[76rem] px-4 pt-14 pb-24 sm:px-8 lg:pt-20">
       <div className="max-w-2xl">
         <h1 className="display">Pricing</h1>
         <p className="mt-4 text-lg text-graphite">
-          The roadmap is free, and {PLAN_NAMES.free} includes a portfolio link. {PLAN_NAMES.plus} and {PLAN_NAMES.premium}{" "}
-          raise the limits. Employers never pay.
+          The roadmap is free, and so is trying an exhbt. {PLAN_NAMES.premium} puts your exhbts on your own link, and{" "}
+          {PLAN_NAMES.max} {maxExtra(sell)}. Employers never pay.
         </p>
       </div>
 
@@ -35,15 +67,21 @@ export default function PricingPage() {
         </section>
 
         <Tier
-          id="plus"
-          name={PLAN_NAMES.plus}
-          summary="Your best projects on one link you can send to any employer."
-        />
-        <Tier
           id="premium"
           name={PLAN_NAMES.premium}
+          summary="Your best projects on one link you can send to any employer."
+          sell={sell}
+        />
+        <Tier
+          id="max"
+          name={PLAN_NAMES.max}
           featured
-          summary="A tailored link for every application, built from the job description."
+          summary={
+            !sell || JOB_LINKS_LIVE
+              ? "A tailored link for every application, built from the job description."
+              : "Room for more exhbts, and a tailored link for every application when it arrives."
+          }
+          sell={sell}
         />
       </div>
 
@@ -51,7 +89,7 @@ export default function PricingPage() {
         <div className="rounded-[20px] border border-line p-7">
           <h2 id="others" className="text-[1.375rem]">Universities</h2>
           <p className="mt-2 text-graphite">
-            License Exhbt for your students and they all get {PLAN_NAMES.premium}, with an admin view of take-up.
+            License Exhbt for your students and they all get {PLAN_NAMES.max}, with an admin view of take-up.
             Annual invoice.
           </p>
           <Link href="/universities" className="link mt-4 inline-block font-semibold">How licences work</Link>
@@ -71,27 +109,37 @@ export default function PricingPage() {
             <dd className="mt-1.5 text-graphite">
               Building a new roadmap, for example for a different job or after your situation changes. {PLAN_NAMES.free}{" "}
               includes {free.roadmapsPer30Days} {free.roadmapsPer30Days === 1 ? "refresh" : "refreshes"} in any 30 days.{" "}
-              {PLAN_NAMES.plus} includes {plus.roadmapsPer30Days} refreshes, and {PLAN_NAMES.premium} includes {premium.roadmapsPer30Days} refreshes.
+              {PLAN_NAMES.premium} includes {premium.roadmapsPer30Days} refreshes, and {PLAN_NAMES.max} includes {max.roadmapsPer30Days} refreshes.
             </dd>
           </div>
           <div>
-            <dt className="font-medium">What&rsquo;s the difference between {PLAN_NAMES.plus} and {PLAN_NAMES.premium}?</dt>
+            <dt className="font-medium">What&rsquo;s the difference between {PLAN_NAMES.premium} and {PLAN_NAMES.max}?</dt>
             <dd className="mt-1.5 text-graphite">
-              {PLAN_NAMES.plus} gives you one portfolio link with {plus.exhbts} exhbts. {PLAN_NAMES.premium} holds up to{" "}
-              {premium.exhbts}, and makes a separate link for each job you apply to, showing the {EXHBTS_PER_JOB_LINK} that
-              fit that job description best.
+              {PLAN_NAMES.premium} gives you your own portfolio link with up to {premium.exhbts} exhbts. {PLAN_NAMES.max} holds up to{" "}
+              {max.exhbts}, and makes a separate link for each job you apply to, showing the {EXHBTS_PER_JOB_LINK} that
+              fit that job description best.{sell && !JOB_LINKS_LIVE && " The links for each job are coming soon."}
             </dd>
           </div>
-          <div>
-            <dt className="font-medium">When do they open, and what will they cost?</dt>
-            <dd className="mt-1.5 text-graphite">
-              We&rsquo;re opening them to the waitlist first. You&rsquo;ll get the price and an invitation by email
-              before anything is charged.
-            </dd>
-          </div>
+          {sell ? (
+            <div>
+              <dt className="font-medium">How does paying work?</dt>
+              <dd className="mt-1.5 text-graphite">
+                {PLAN_NAMES.premium} is {PRICES.premium} and {PLAN_NAMES.max} is {PRICES.max} a {BILLING_PERIOD}, paid by card through
+                Stripe. Change plan or cancel from Account, Billing. If you move to a smaller plan, nothing is deleted.
+              </dd>
+            </div>
+          ) : (
+            <div>
+              <dt className="font-medium">When do they open, and what will they cost?</dt>
+              <dd className="mt-1.5 text-graphite">
+                We&rsquo;re opening them to the waitlist first. You&rsquo;ll get the price and an invitation by email
+                before anything is charged.
+              </dd>
+            </div>
+          )}
           <div>
             <dt className="font-medium">My university has a licence. Do I need to pay?</dt>
-            <dd className="mt-1.5 text-graphite">No. Sign up with your university email address and you get {PLAN_NAMES.premium}.</dd>
+            <dd className="mt-1.5 text-graphite">No. Sign up with your university email address and you get {PLAN_NAMES.max}.</dd>
           </div>
         </dl>
       </section>
@@ -99,7 +147,19 @@ export default function PricingPage() {
   );
 }
 
-function Tier({ id, name, summary, featured }: { id: "plus" | "premium"; name: string; summary: string; featured?: boolean }) {
+function Tier({
+  id,
+  name,
+  summary,
+  featured,
+  sell,
+}: {
+  id: "premium" | "max";
+  name: string;
+  summary: string;
+  featured?: boolean;
+  sell: boolean;
+}) {
   return (
     <section
       id={id}
@@ -108,14 +168,25 @@ function Tier({ id, name, summary, featured }: { id: "plus" | "premium"; name: s
     >
       <div className="flex flex-wrap items-center gap-3">
         <h2 id={`tier-${id}`} className="text-[1.375rem]">{name}</h2>
-        <span className="chip">Coming soon</span>
+        {!sell && <span className="chip">Coming soon</span>}
       </div>
+      <p className="mt-2 text-[2.6rem] leading-none font-extrabold tracking-[-0.03em]">
+        {PRICES[id]}
+        <span className="ml-1 text-base font-semibold tracking-normal text-graphite">a {BILLING_PERIOD}</span>
+      </p>
       <p className="mt-3 text-graphite">{summary}</p>
       <FeatureList items={planFeatures(id)} className="mt-5" />
-      <div className="mt-auto pt-7">
-        <p className="mb-2 text-sm font-semibold">Join the waitlist</p>
-        <WaitlistForm source={`pricing-${id}`} interest={id} />
-      </div>
+      {sell ? (
+        <div className="mt-auto pt-7">
+          {/* Billing sends anyone signed out to sign in first, then back (app/(app)/account/billing). */}
+          <Button href="/account/billing" variant={featured ? "primary" : "secondary"}>{`Choose ${name}`}</Button>
+        </div>
+      ) : (
+        <div className="mt-auto pt-7">
+          <p className="mb-2 text-sm font-semibold">Join the waitlist</p>
+          <WaitlistForm source={`pricing-${id}`} interest={id} />
+        </div>
+      )}
     </section>
   );
 }

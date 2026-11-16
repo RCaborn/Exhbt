@@ -5,7 +5,7 @@ import { getStore } from "@/lib/store";
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
-  const data = await getStore().exportUserData(user.id);
+  const data = await getStore().exportUserData(user.id, user.email);
   return new NextResponse(JSON.stringify(data, null, 2), {
     headers: {
       "content-type": "application/json",

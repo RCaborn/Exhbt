@@ -8,6 +8,9 @@ test.describe("Accessibility (WCAG 2.1 AA, automated)", () => {
   for (const path of ["/", "/pricing", "/universities", "/how-to-read-an-exhbt", "/legal/privacy", "/login", "/roadmap/new", "/start", "/demo", "/demo/gp-reminders"]) {
     test(`no violations on ${path}`, async ({ page }) => {
       await page.goto(path);
+      // The builder's buttons are inert (greyed) until the page is interactive; scan the ready page,
+      // not that brief pre-hydration state.
+      if (path === "/roadmap/new") await expect(page.locator("form[data-ready=true]")).toBeAttached();
       const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
       expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
     });
@@ -37,6 +40,7 @@ test.describe("Accessibility (WCAG 2.1 AA, automated)", () => {
     for (const step of [1, 2, 3]) {
       await page.goto(`/roadmap/new?step=${step}`);
       await expect(page.getByText(`Step ${step} of 3`)).toBeVisible();
+      await expect(page.locator("form[data-ready=true]")).toBeAttached();
       const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
       expect(violations.map((v) => `step ${step} ${v.id}`)).toEqual([]);
     }

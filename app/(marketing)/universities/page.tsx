@@ -27,7 +27,7 @@ export default function UniversitiesPage() {
       <div className="max-w-3xl">
         <h1 className="display">For universities</h1>
         <p className="mt-4 text-lg text-graphite">
-          Give every student a roadmap and {PLAN_NAMES.premium}, and see which courses are turning project work into
+          Give every student a roadmap and {PLAN_NAMES.max}, and see which courses are turning project work into
           evidence employers open. Licences run for a year and are invoiced, from £6,000 depending on cohort size.
         </p>
       </div>

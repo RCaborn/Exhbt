@@ -9,13 +9,13 @@ import { Button } from "@/components/ui/Button";
 type Props = {
   /** Where the form sits, for analytics (e.g. "pricing", "roadmap-next"). */
   source: string;
-  interest?: "plus" | "premium" | "university";
+  interest?: "premium" | "max" | "university";
   defaultEmail?: string;
   /** "dark" for use on the navy band. */
   tone?: "light" | "dark";
 };
 
-export function WaitlistForm({ source, interest = "premium", defaultEmail = "", tone = "light" }: Props) {
+export function WaitlistForm({ source, interest = "max", defaultEmail = "", tone = "light" }: Props) {
   const [state, action] = useActionState<WaitlistState, FormData>(joinWaitlist, undefined);
   const id = `waitlist-${source}`;
 

@@ -25,6 +25,7 @@ Tokens live in the `@theme` block of `app/globals.css`. The same values feed the
 | `mint-press` | `#36DDA4` | button hover |
 | `jade` | `#00755D` | links, tags, the focus ring, any mint-coloured text or line that must be read (5.6:1 on white) |
 | `ink` | `#0E0F12` | text; the footer and portfolio band; buttons on mint |
+| `deep-jade` | `#00513F` | one use only: the ground of a portfolio look's band (`lib/portfolio-themes.ts`). Not for text, buttons or anything else |
 | `surface` | `#FFFFFF` | every main ground |
 | `mist` | `#F6F7F8` | the second ground: alternate sections, app pages behind white panels |
 | `wash` | `#E3FCF0` | tags and soft fills |
@@ -43,7 +44,7 @@ Tokens live in the `@theme` block of `app/globals.css`. The same values feed the
 
 ## Type
 - Display: **Bricolage Grotesque** (variable), weight 600, tracking −0.03em. Headings and the wordmark only.
-- Everything else: **Inter** 400/500/600. Two typefaces only: no serif, no mono. Figures use Inter with tabular numbers (the `font-mono` class).
+- Everything else: **Inter** 400/500/600. Two typefaces only on the site: no serif, no mono. Figures use Inter with tabular numbers (the `font-mono` class). The one exception is a paid portfolio look (below), which can swap the heading face on that person's portfolio.
 - One heading scale, set on `h1`–`h3` in `globals.css` (36/48, 28/32, 22 px). Don't size headings per page. Marketing pages add two display steps: `.display` (the page's opening line) and `.display-2` (section titles).
 - Body 16px; captions 13px. Self-hosted via `@fontsource`.
 
@@ -71,7 +72,9 @@ Full rules, sizes and don'ts are in `docs/brand.md`. In short:
 - **Wordmark**: lower-case `exhbt`, Bricolage Grotesque 600. In running text the company is "Exhbt" and the pieces are "exhbts".
 - **Catalogue numbers**: `EX·01`, `EX·02`… on tiles and full exhbts, from the exhbt's position in its portfolio (`catalogueNo` in `lib/exhbt.ts`). They are references an employer can use, so they're allowed; numbering marketing sections is still banned.
 - **Seal** (`components/brand/Seal.tsx`): mark + "checked by exhbt" + date. Says the checks ran, not that results are true, so never "verified". Links to `/how-to-read-an-exhbt#checks` (except inside a tile, which is already a link).
-- **Brand band**: the portfolio header is the page's one ink surface (`PortfolioHeader`, slim `PortfolioBar` above a single exhbt). White and `#C9CBCF` text on it.
+- **Brand band**: the portfolio header is the page's one coloured surface (`PortfolioHeader`, slim `PortfolioBar` above a single exhbt). Ink by default, with white and `#C9CBCF` text on it.
+- **Portfolio looks** (`lib/portfolio-themes.ts`, decision 0012): a fixed list of band colourways, each with a heading face (Bricolage Grotesque, Inter Tight, Space Grotesk or Fraunces) and a photo shape (round or rounded square). Colours come only from the tokens above, plus `deep-jade` as a ground. Nobody picks a colour; every look is checked once, and every text on its band must reach WCAG AA (the contrast test in `e2e/phase2-themes.spec.ts`). Only the band and the portfolio's headings change; the rest of the page stays as it is.
+- **Dragging tiles** (`/portfolio/customise`, decision 0014): a real button with a grip icon is the handle; the tile itself never drags, so scrolling and links work. The lifted tile keeps its card and takes `shadow-pack` and a jade outline; the others slide (no scaling) in 180ms, and nothing moves under `prefers-reduced-motion`. Tile controls are small round icon buttons (36px, 44px on touch) with an `aria-label` and a tooltip; the preview inside a tile is inert. Status is quiet text ("Saved") with one Undo.
 - **Sign-off** (`MadeWith`): "Portfolio made with exhbt · Build your own roadmap" at the foot of every public portfolio and exhbt.
 
 ## Components
@@ -90,8 +93,30 @@ Full rules, sizes and don'ts are in `docs/brand.md`. In short:
 
   The same card is used everywhere; there's no preview variant.
 - `MethodFlow`: the methodology as a pipeline of 3–6 step boxes joined by arrows. The last step (the result) is filled ink. It lays out by its container (`@container` on the card): a row at 42rem or wider, otherwise a vertical pipeline. Step numbers (01–06) are allowed here because the order carries meaning. Rendered as an `<ol>` labelled "Methodology".
-- `BeforeAfterChart`: a dumbbell for before-to-after per measure (1–3 rows), drawn in the brand's one hue in two shades (mint before, jade after; `components/charts/series.ts`). They are 3.7:1 apart, so they stay distinct for colour-blind readers; checked by contrast maths, not yet re-run through the dataviz validator. Every value is printed beside its dot (mint is 1.5:1 on white); legend for the two series; a hidden data table; the change is shown as a % on the right. No other chart colours without re-running the validator. The pair lives in `components/charts/series.ts`.
+- `BeforeAfterChart`: a dumbbell for before-to-after per measure (1–3 rows), drawn in the brand's one hue in two shades (mint before, jade after; `components/charts/series.ts`). They are 3.7:1 apart, so they stay distinct for colour-blind readers; checked by contrast maths. Every value is printed beside its dot (mint is 1.5:1 on white); legend for the two series; a hidden data table; the change is shown as a % on the right. The pair lives in `components/charts/series.ts`.
+- **Graphs on an exhbt** (`Chart` in `components/charts/`, decision 0011): before and after, bars, grouped bars, stacked bars, a line, scatter, big numbers or a small table, and nothing else; anything more exotic goes in as an image. The rules every kind keeps:
+  - **Values printed**, in text ink, never in the series colour: at the end of each bar, the total of a stacked bar with its parts listed underneath, every point of a line's highlighted series (first and last only on a narrow graph with many points) and the last value of the others where it fits, the labelled and highlighted points of a scatter. Whatever isn't printed is read off the ticks and is in the table.
+  - **One hue.** Before and after keeps the mint/jade pair. Every other kind uses `SERIES_RAMP`: four steps of jade, darkest first (`#00755D`, `#179274`, `#2AAF89`, `#3DCC9F`). The highlighted series, bar or line takes jade; the rest take the next steps, and bars that aren't the highlighted one take the lightest. It passes the dataviz validator as an ordinal ramp on white (14 Nov 2026: one hue, steps at least 0.06 apart in lightness, the lightest 2.03:1). One hue can't tell series apart by colour alone, so each also has a legend entry and printed values, and lines add a dash and a marker shape (circle, square, triangle, diamond). Graphs sit on white, never mist: the lightest step is below 2:1 there. No other chart colours without re-running the validator.
+  - **Axes from one scale**: clean ticks (1, 2, 2.5 or 5 times a power of ten), hairline gridlines in `line`, a graphite zero line. Bars start at zero and are at most 16px thick with a 4px rounded end; lines are 2px (2.5px highlighted) with 8px markers ringed in white; stacked parts have a 2px white gap.
+  - **Accessible**: the drawing is one `role="img"` with a short summary, and a visually hidden table holds every figure. A table graph is a real table instead.
+  - **Responsive and printable**: bar labels sit beside the bars from 28rem of container width and above them below it; the exhbt's `@container` decides, so the editor's preview matches. Two graphs sit side by side on wide pages and in print; line and scatter heights are fixed in mm for A4.
+  - **Protected numbers** (for confidential work): the graph shows the change from the start in % (with a + on rises) or an index where the start is 100, and a line under it says the real figures aren't shared. Units are dropped; % ticks show a %.
 - `SkillRadar`: one axis per skill (3–6, fixed in the job's order), levels 0–4 from the centre. The same pair: "from" as a light fill, "to" as a dark outline. Grid in `line`. Labels are HTML over the SVG and show skill names only: **no numbers** (the levels are AI estimates; Rory, 9 Nov 2026). The meaning is carried in words instead. "Level up next" skills get an ink arrow-up marker, and "In the bag" skills get the same green tick as the strengths screen; both are set in ink semibold. Under the chart, `SkillHighlights` lists the two groups (up to three skills each). One line gives where the skills came from (`SKILLS_SOURCE_NOTE`). A hidden data table holds every level. No animation. Radars exaggerate area, so don't add shading, gradients or a third series.
+
+## The exhbt in Phase 2
+Phase 2 swaps the card above for a block layout (decisions 0007 and 0015), drawn by `components/portfolio/ProjectView.tsx`. A recruiter skims it, so every part is short and mostly bullets. The core comes first, always, in this order:
+- the person's photo and name top left, skill boxes top right
+- the title, then a one-line context
+- the question: what the gap was and why it mattered
+- the process flowchart (`MethodFlow`), straight after the question
+
+Below the flowchart, sections in the order the person sets: findings as bullets, up to two graphs (any of the kinds above, with their rules), up to two images with captions, a quote, what I'd do next and a link. Graphs next to each other share a row on wide pages and in print, and so do images. Each kind has a small caption-size heading in graphite, like "The question", except graphs, images and the link. The quote sits in curly quotes at body size under the heading "Feedback", with the name and role underneath in graphite; it never gets formatting. The link is one bordered row (14px radius, like other small panels, with a `line` edge): its label as an ink link with the up-right arrow, the description under it in graphite, and no address shown.
+
+The footer, at the foot of every exhbt: the work, one click away, and the trust badge.
+
+150–200 words, and every word on the page counts, graph labels, captions and the quote's name included; only image alt text and link addresses are left out (decision 0009). The core's order never changes. Limits are `LIMITS` in `lib/exhbt/blocks.ts`.
+
+In the editor each section is a card with a visible grip handle (the `GripVertical` icon, a round button), move up and down buttons, and remove. While a card is dragged it takes the `shadow-pack` shadow, and nothing animates for people who ask for less motion (`useReducedMotion` in `components/ui/`).
 
 ## Flow patterns
 - **Click-through, not long pages**, for the roadmap builder and result. Marketing pages scroll normally.

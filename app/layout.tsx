@@ -28,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             Skip to content
           </a>
           {isPrivatePreview && (
-            <p role="note" className="bg-ink px-4 py-1.5 text-center text-[0.8rem] font-medium text-white">
+            <p role="note" className="bg-ink px-4 py-1.5 text-center text-[0.8rem] font-medium text-white print:hidden">
               Private preview. Exhbt isn&rsquo;t public yet, so please don&rsquo;t share this link widely.
             </p>
           )}
