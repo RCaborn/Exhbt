@@ -142,6 +142,7 @@ export default function Home() {
           </div>
           <div className="min-w-0">
             <EditorExcerpt />
+            <p className="mt-3 text-sm text-graphite">Example: part of the editor, with a made-up project.</p>
           </div>
         </div>
       </section>
@@ -213,7 +214,7 @@ export default function Home() {
           </div>
           <p className="mt-8 text-graphite">
             Universities can give every student {PLAN_NAMES.max}.{" "}
-            <Link href="/universities" className="link text-ink">How licences work</Link>
+            <Link href="/universities" className="link text-ink">For universities</Link>
           </p>
         </div>
       </section>
@@ -262,7 +263,7 @@ export default function Home() {
             <div>
               <dt className="text-[1.1rem] font-bold">Does my university need to be involved?</dt>
               <dd className="mt-1.5 text-graphite">
-                No. If your university has a licence, you get {PLAN_NAMES.max} when you sign up with your university email.{" "}
+                No. If your university has a licence, it gives you {PLAN_NAMES.max}.{" "}
                 <Link href="/universities" className="link text-ink">For universities</Link>
               </dd>
             </div>

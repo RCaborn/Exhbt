@@ -23,7 +23,7 @@ const PARTS: { name: string; body: string }[] = [
   },
   {
     name: "The question",
-    body: "What the gap was and why it mattered. Two or three sentences. This is where a reader decides whether the project is relevant to the job.",
+    body: "What the gap was and why it mattered, in a few sentences. This is where a reader decides whether the project is relevant to the job.",
   },
   {
     name: "The flowchart",
@@ -77,7 +77,7 @@ export default function WhatIsAnExhbt() {
             What is an <span className="highlight">exhbt?</span>
           </h1>
           <p className="mt-6 max-w-[40rem] text-[1.15rem] text-graphite sm:text-[1.3rem]">
-            One project, written up on a single page so a hiring manager can read it in under a minute and check it
+            One project, written up on a single page so a hiring manager can read it quickly and check it
             for themselves. You make a few of them, and together they&rsquo;re your portfolio.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
@@ -92,7 +92,7 @@ export default function WhatIsAnExhbt() {
           <h2 id="layout" className="display-2 max-w-[18ch]">The same layout, every time</h2>
           <p className="mt-4 max-w-[40rem] text-lg text-graphite">
             Every exhbt has the same parts in the same order, so an employer learns the page once and can then skim
-            any of them. This one is an example. {demoOwner.name} and the project are made up.
+            any of them. This one is an example. {demoOwner.name} and the project are made up, so the link to the work is left out.
           </p>
           <div className="mt-12 grid gap-12 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-20">
             <div className="min-w-0 lg:sticky lg:top-8 lg:self-start">
@@ -102,7 +102,6 @@ export default function WhatIsAnExhbt() {
                 checkedOn="12 March 2026"
                 headingLevel="h2"
                 position={1}
-                evidenceUrl="/how-to-read-an-exhbt"
               />
             </div>
             <div className="min-w-0 max-w-xl">
@@ -187,6 +186,7 @@ export default function WhatIsAnExhbt() {
                 </ul>
               </div>
             </BrowserFrame>
+            <p className="mt-3 text-sm text-graphite">Example: this address and {demoOwner.name} are made up.</p>
           </div>
         </div>
       </section>

@@ -51,6 +51,13 @@ export function SiteHeader({
         </nav>
         <div className="flex items-center gap-4 text-[0.95rem]">
           <MobileNav items={nav} actions={signedIn ? [] : [...ACTIONS]} breakpoint={signedIn ? "sm" : "lg"} />
+          {signedIn && (
+            <span className="hidden sm:inline-flex">
+              <Button href="/roadmap/new" variant="primary">
+                Build your roadmap
+              </Button>
+            </span>
+          )}
           {!signedIn && (
             <>
               <Link href="/login" className="link font-medium">

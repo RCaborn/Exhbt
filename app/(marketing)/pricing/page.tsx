@@ -89,10 +89,9 @@ export default async function PricingPage(props: Props) {
         <div className="rounded-[20px] border border-line p-7">
           <h2 id="others" className="text-[1.375rem]">Universities</h2>
           <p className="mt-2 text-graphite">
-            License Exhbt for your students and they all get {PLAN_NAMES.max}, with an admin view of take-up.
-            Annual invoice.
+            A university licence gives every student {PLAN_NAMES.max}.
           </p>
-          <Link href="/universities" className="link mt-4 inline-block font-semibold">How licences work</Link>
+          <Link href="/universities" className="link mt-4 inline-block font-semibold">For universities</Link>
         </div>
         <div className="rounded-[20px] border border-line p-7">
           <h2 className="text-[1.375rem]">Employers</h2>
@@ -108,7 +107,7 @@ export default async function PricingPage(props: Props) {
             <dt className="font-medium">What counts as a roadmap refresh?</dt>
             <dd className="mt-1.5 text-graphite">
               Building a new roadmap, for example for a different job or after your situation changes. {PLAN_NAMES.free}{" "}
-              includes {free.roadmapsPer30Days} {free.roadmapsPer30Days === 1 ? "refresh" : "refreshes"} in any 30 days.{" "}
+              includes {free.roadmapsPer30Days} {free.roadmapsPer30Days === 1 ? "refresh" : "refreshes"} a month.{" "}
               {PLAN_NAMES.premium} includes {premium.roadmapsPer30Days} refreshes, and {PLAN_NAMES.max} includes {max.roadmapsPer30Days} refreshes.
             </dd>
           </div>
@@ -139,7 +138,7 @@ export default async function PricingPage(props: Props) {
           )}
           <div>
             <dt className="font-medium">My university has a licence. Do I need to pay?</dt>
-            <dd className="mt-1.5 text-graphite">No. Sign up with your university email address and you get {PLAN_NAMES.max}.</dd>
+            <dd className="mt-1.5 text-graphite">No. Your university&rsquo;s licence gives you {PLAN_NAMES.max}.</dd>
           </div>
         </dl>
       </section>
