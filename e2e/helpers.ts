@@ -17,7 +17,7 @@ export const CV_WITH_CONTACT =
   "BSc Data Science, University of Example, 2026. Final-year project on appointment reminders using Python and pandas.";
 
 /** Walks the three-step builder (job, CV, where you are now). Leaves the page on the result URL. */
-export async function buildRoadmap(page: Page, opts: { role?: string; withCv?: boolean; cv?: string } = {}) {
+export async function buildRoadmap(page: Page, opts: { role?: string; withCv?: boolean; cv?: string; skills?: string } = {}) {
   await page.goto(`/roadmap/new?role=${encodeURIComponent(opts.role ?? "Junior data analyst")}`);
   await waitForBuilder(page);
   await expect(page.getByText("Step 2 of 3")).toBeVisible();
@@ -31,6 +31,7 @@ export async function buildRoadmap(page: Page, opts: { role?: string; withCv?: b
   await expect(page.getByText("Step 3 of 3")).toBeVisible();
   await page.getByLabel("Recently graduated").check();
   await page.locator("#education").fill("BSc Data Science, University of Example, 2026. Expected 2:1.");
+  if (opts.skills) await page.locator("#skills").fill(opts.skills);
   await page.getByRole("button", { name: /See my roadmap/ }).click();
 }
 

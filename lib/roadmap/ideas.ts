@@ -59,6 +59,7 @@ export async function startIdeas(roadmapId: string, opts: { retry?: boolean } = 
   if (!record?.output) return "idle";
   if ((await ideasFor(record)).length > 0) return "ready";
 
+  const attempt = record.ideasAttempts + 1; // read before the claim: the in-memory store shares the record
   const claim = await store.claimIdeasRun(roadmapId, {
     staleMs: IDEAS_STALE_MS,
     maxAttempts: IDEAS_MAX_ATTEMPTS,
@@ -68,7 +69,7 @@ export async function startIdeas(roadmapId: string, opts: { retry?: boolean } = 
   if (claim === "failed") return "failed";
   if (claim === "limit") return "limit";
 
-  runInBackground(makeIdeas(record, record.ideasAttempts + 1));
+  runInBackground(makeIdeas(record, attempt));
   return "pending";
 }
 
