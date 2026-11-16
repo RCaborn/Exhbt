@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod/v4";
 import { callerIpHash } from "@/lib/access";
-import { safeNext } from "@/lib/auth";
+import { safeNext, sendMagicLink } from "@/lib/auth";
 import { createAccount, saveNewPassword, sendPasswordReset, signInWithIdentifier } from "@/lib/password-auth";
 import { loginIdentifierProblem, passwordProblem } from "@/lib/passwords";
 import { getStore, type EventName } from "@/lib/store";
@@ -117,4 +117,23 @@ export async function savePassword(_prev: FormState, form: FormData): Promise<Fo
   }
   if (devLogin) return { continueTo: devLoginUrl(devLogin, "/account") };
   return { continueTo: "/account" };
+}
+
+/** The fallback: a one-time sign-in link by email. Same reply whether or not the address has an account. */
+export async function requestLink(_prev: FormState, form: FormData): Promise<FormState> {
+  const email = z.email().safeParse(String(form.get("email") ?? "").trim().toLowerCase());
+  if (!email.success) return { error: "Enter a valid email address." };
+  const blocked = await tooMany("login_link_sent", EMAILS_PER_HOUR, "Too many sign-in emails from this connection. Please try again in an hour.");
+  if (blocked) return { error: blocked };
+  const next = safeNext(String(form.get("next") ?? ""));
+  let devLink: string | undefined;
+  try {
+    ({ devLink } = await sendMagicLink(email.data, next));
+  } catch (e) {
+    console.error("sign-in email failed", (e as Error).message);
+    return { error: "We could not send the email just now. Please try again in a minute." };
+  }
+  const q = new URLSearchParams({ email: email.data, kind: "link" });
+  if (devLink) q.set("dev", devLink);
+  redirect(`/check-email?${q}`);
 }

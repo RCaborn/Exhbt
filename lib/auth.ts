@@ -63,6 +63,28 @@ export async function signInLinkFor(email: string, next: string, via = "roadmap_
   return `${origin}/auth/confirm?token_hash=${props.hashed_token}&type=${type}&next=${n}&via=${encodeURIComponent(via)}`;
 }
 
+/**
+ * Sends the "email me a link" sign-in email (the fallback beside the password). We build the link
+ * ourselves (signInLinkFor) and send it through Resend, rather than Supabase's signInWithOtp: that one
+ * is a PKCE link that only works in the browser that asked for it. Returns a dev-only link when
+ * Supabase is not configured.
+ */
+export async function sendMagicLink(email: string, next: string): Promise<{ devLink?: string }> {
+  if (isSupabaseConfigured()) {
+    const origin = await siteOrigin();
+    const { sendEmail } = await import("./email/send");
+    const { signInEmail } = await import("./email/templates/sign-in");
+    const content = signInEmail({
+      signInUrl: await signInLinkFor(email, next, "login"),
+      privacyUrl: `${origin}/legal/privacy`,
+      logoUrl: `${origin}/brand/exhbt-mark.png`,
+    });
+    await sendEmail({ to: email, ...content });
+    return {};
+  }
+  return { devLink: `/auth/dev?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}` };
+}
+
 export const DEV_USER_COOKIE = DEV_COOKIE;
 
 /** Only allow same-site relative redirects after login. */

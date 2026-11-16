@@ -25,6 +25,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <Link href="/login/reset" className="link">Forgot your password?</Link>
       </p>
       <p className="hint mt-3">
+        Prefer no password? <Link href={`/login/link?next=${encodeURIComponent(next)}`} className="link">Email me a link</Link> to log in.
+      </p>
+      <p className="hint mt-3">
         Used an emailed link before? <Link href="/login/reset" className="link">Set a password</Link> once, then this page is enough.{" "}
         <Link href="/roadmap/new" className="link">Start with a free roadmap</Link> if you don&rsquo;t have an account yet.
       </p>
