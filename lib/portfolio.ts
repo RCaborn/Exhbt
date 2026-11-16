@@ -4,7 +4,8 @@ import { imagesOf, type ExhbtDoc } from "./exhbt/blocks";
 import { signedFileUrl } from "./files";
 import { parseHost, portfolioHost } from "./hosts";
 import { ENTITLEMENTS } from "./entitlements";
-import { isTileKind, sequence, shownKeys, tileHasContent, type PortfolioLayout } from "./portfolio-layout";
+import { homeProject, type HomeProject } from "./portfolio-home";
+import { EXTRA_SECTIONS, sectionsOf, type PortfolioLayout, type SectionKey } from "./portfolio-layout";
 import { themeFor, type PortfolioTheme } from "./portfolio-themes";
 import { visibleOnPortfolio } from "./plan-rules";
 import { getStore, type ExhbtRecord, type PortfolioProfile } from "./store";
@@ -26,12 +27,14 @@ export type LoadedPortfolio =
       profile: PortfolioProfile & { username: string };
       displayName: string;
       photoUrl: string | null;
-      /** The projects on the at-a-glance page, in the order it shows them (the featured one first). */
+      /** The projects on the home page, the featured one first, then in the person's order. */
       items: PortfolioItem[];
+      /** The same projects as the home page's band and cards show them (title, one sentence, key figure). */
+      projects: HomeProject[];
+      /** The home page's sections, top to bottom (decision 0016). */
+      sections: SectionKey[];
       /** Live at their own link but left off the glance page by the person (decision 0014). */
       hiddenItems: PortfolioItem[];
-      /** The glance page top to bottom: a project's id, or the name of an extra tile. */
-      order: string[];
       featuredId: string | null;
       layout: PortfolioLayout;
       base: string;
@@ -80,28 +83,34 @@ export async function loadPortfolio(username: string, rest = ""): Promise<Loaded
   const profile = await store.getPortfolioProfile(found.userId);
   const host = (await headers()).get("x-forwarded-host") ?? (await headers()).get("host");
 
-  // The arrangement (decision 0014): hidden exhbts leave the page, the featured one goes first, and
-  // extra tiles sit where the person put them, if their plan has them and they have words.
+  // The arrangement (decisions 0014 and 0016): hidden exhbts leave the page, the featured one is the
+  // band, and the sections come in the person's order; experience and a quote only on a plan with extra tiles.
   const hidden = new Set(reachable.filter((e) => e.hiddenOnPortfolio).map((e) => e.id));
   const featuredId =
     profile.featuredExhbtId && reachable.some((e) => e.id === profile.featuredExhbtId) && !hidden.has(profile.featuredExhbtId) ? profile.featuredExhbtId : null;
   const extras = ENTITLEMENTS[plan].extraTiles;
-  const order = shownKeys(sequence(profile.layout, reachable.map((e) => e.id)), hidden, featuredId).filter(
-    (k) => !isTileKind(k) || (extras && tileHasContent(k, profile.layout.tiles)),
-  );
-  const byId = new Map(reachable.map((e) => [e.id, e]));
+  const shownList = reachable.filter((e) => !hidden.has(e.id));
+  const listed = featuredId ? [shownList.find((e) => e.id === featuredId)!, ...shownList.filter((e) => e.id !== featuredId)] : shownList;
   const toFull = async (e: ExhbtRecord) => ({ ...toItem(e), team: await teamFor(e, host) });
+  const base = await basePath(found.username);
+  const projects = await Promise.all(
+    shownList.map(async (e) => {
+      const p = homeProject(e.id, e.published!, `${base}/${e.slug}`);
+      return p.figure.kind === "image" ? { ...p, imageUrl: await signedFileUrl(p.figure.fileId) } : p;
+    }),
+  );
   return {
     status: "ok",
     profile: { ...profile, username: found.username },
     displayName: profile.name?.trim() || found.username,
     photoUrl: await signedFileUrl(profile.photoFileId),
-    items: await Promise.all(order.filter((k) => byId.has(k)).map((k) => toFull(byId.get(k)!))),
+    items: await Promise.all(listed.map(toFull)),
     hiddenItems: await Promise.all(reachable.filter((e) => hidden.has(e.id)).map(toFull)),
-    order,
+    projects,
+    sections: sectionsOf(profile.layout).filter((k) => extras || !EXTRA_SECTIONS.includes(k)),
     featuredId,
     layout: profile.layout,
-    base: await basePath(found.username),
+    base,
     // The chosen look if the plan still has it; the stored choice is never cleared here.
     theme: themeFor(profile, plan),
   };

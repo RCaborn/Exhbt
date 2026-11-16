@@ -1,0 +1,23 @@
+import { headers } from "next/headers";
+import { MadeWith } from "@/components/brand/MadeWith";
+import { MARKETING_HOST, parseHost } from "@/lib/hosts";
+
+/**
+ * The frame around a single project (and a per-job page): a column on mist with the "made with
+ * exhbt" sign-off at the foot. It was the whole portfolio's layout until the home page went edge to
+ * edge (decision 0016); it is unchanged here.
+ */
+export default async function ProjectFrame({ children }: { children: React.ReactNode }) {
+  // On alex.exhbt.co.uk a relative "/start" would stay on the portfolio host; send people to our site.
+  const onPortfolioHost = parseHost((await headers()).get("host")).kind === "portfolio";
+  return (
+    <div className="min-h-svh bg-mist">
+      <main id="main" className="mx-auto max-w-[64rem] px-4 pt-8 pb-10 sm:px-8 sm:pt-12">
+        {children}
+      </main>
+      <div className="mx-auto max-w-[64rem] px-4 pb-12 sm:px-8">
+        <MadeWith startHref={onPortfolioHost ? `https://${MARKETING_HOST}/start` : "/start"} />
+      </div>
+    </div>
+  );
+}

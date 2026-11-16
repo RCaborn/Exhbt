@@ -1,115 +1,204 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ExhbtTile } from "@/components/exhbt/ExhbtTile";
-import { ExtraTile } from "@/components/portfolio/ExtraTiles";
-import { EmptyProjects, GLANCE_GRID, WIDE } from "@/components/portfolio/GlanceView";
-import { PortfolioMasthead, type PortfolioPerson } from "@/components/portfolio/PortfolioPage";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type Announcements,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical, X } from "lucide-react";
+import { PortfolioHome } from "@/components/portfolio/PortfolioHome";
+import type { PortfolioPerson } from "@/components/portfolio/PortfolioPage";
 import { checkTiles } from "@/lib/portfolio-customise";
-import { isTileKind, shownKeys, tileHasContent, wideIndexes, type TileKind, type Tiles } from "@/lib/portfolio-layout";
+import { SECTION_NAMES, tileKindsShownBy, type SectionKey, type Tiles } from "@/lib/portfolio-layout";
 import type { PortfolioTheme } from "@/lib/portfolio-themes";
 import type { BuilderProject, BuilderState } from "./steps";
 
-/** The width the page is drawn at before it is scaled into the preview column on a wide screen. */
-const PAGE_WIDTH = 1040;
-
 /**
- * The live preview: the whole portfolio page as visitors will see it, drawn from the same pieces as
- * /p/<username> (`PortfolioMasthead`, the glance grid, `ExhbtTile`, `ExtraTile`). On a wide screen
- * the page is drawn at desktop width and scaled down to fit the column, so it shows the real
- * two-column layout; on a phone it is drawn at the phone's width, as a visitor on a phone sees it.
- * It is a picture of the page: nothing in it takes focus or opens a link.
+ * The live preview, and the place the page is arranged (decision 0016): the person's home page as
+ * visitors see it, drawn by the same component as /p/<username> (`PortfolioHome`). The top bar and
+ * hero are fixed; each section below has a grip to drag it (mouse, a short press on touch, or Space,
+ * the arrow keys and Space on the keyboard) and a button to take it off the page. Empty sections show
+ * as outlines saying what goes there. The page lays itself out by the width it is given (container
+ * queries), so the preview column shows the real arrangement without scaling.
  */
+
+const EASE = "cubic-bezier(0.2, 0, 0, 1)";
+const MOVE_MS = 180;
+const ICON_BTN =
+  "inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-ink shadow-pack hover:border-ink";
+
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const q = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(q.matches);
+    const on = () => setReduced(q.matches);
+    q.addEventListener("change", on);
+    return () => q.removeEventListener("change", on);
+  }, []);
+  return reduced;
+}
+
 export function Preview({
   state,
   person,
   theme,
   projects,
+  onSections,
+  onRemove,
 }: {
   state: BuilderState;
   person: PortfolioPerson;
   theme: PortfolioTheme;
   projects: BuilderProject[];
+  /** A new order of the sections, after a drag. */
+  onSections: (next: SectionKey[], moved: SectionKey) => void;
+  onRemove: (key: SectionKey) => void;
 }) {
   const a = state.arrangement;
+  const reduced = useReducedMotion();
+  const [activeId, setActiveId] = useState<SectionKey | null>(null);
+  const justPicked = useRef(false);
   const byId = new Map(projects.map((p) => [p.id, p]));
-  const shown = shownKeys(a.order, new Set(a.hidden), a.featured).filter((k) => (isTileKind(k) ? tileHasContent(k, a.tiles) : byId.has(k)));
-  const featured = a.featured && shown[0] === a.featured ? a.featured : null;
-  const wide = wideIndexes(shown.length, Boolean(featured));
-  let n = 0;
+  const hidden = new Set(a.hidden);
+  const shownProjects = a.order.filter((id) => byId.has(id) && !hidden.has(id)).map((id) => byId.get(id)!.home);
+  const tiles = tidy(a.tiles, a.sections);
+  const sections = a.sections;
+  const name = (k: string) => SECTION_NAMES[k as SectionKey] ?? "section";
+  const position = (k: string | number) => sections.indexOf(String(k) as SectionKey) + 1;
 
-  return (
-    <Scaled>
-      <div inert data-testid="preview" className="bg-mist p-4 sm:p-8">
-        <PortfolioMasthead person={person} theme={theme} />
-        {shown.length === 0 ? (
-          <EmptyProjects />
-        ) : (
-          <ul className={GLANCE_GRID}>
-            {shown.map((key, i) => {
-              const isWide = wide.has(i);
-              if (isTileKind(key)) {
-                return (
-                  <li key={key} data-key={key} className={isWide ? WIDE : undefined}>
-                    <ExtraTile kind={key} tiles={tidy(a.tiles, key)} />
-                  </li>
-                );
-              }
-              n += 1;
-              return (
-                <li key={key} data-key={key} className={isWide ? WIDE : undefined}>
-                  <ExhbtTile exhbt={byId.get(key)!.tile} href="#" position={n} maxSkills={isWide ? 6 : 4} />
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-    </Scaled>
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 160, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
-}
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => {
+      justPicked.current = true;
+      return `Picked up ${name(String(active.id))}. Position ${position(active.id)} of ${sections.length}.`;
+    },
+    onDragOver: ({ active, over }) => {
+      const first = justPicked.current;
+      justPicked.current = false;
+      if (!over || (first && over.id === active.id)) return undefined;
+      return `${name(String(active.id))} is over position ${position(over.id)} of ${sections.length}.`;
+    },
+    onDragEnd: ({ active, over }) =>
+      over
+        ? `Dropped ${name(String(active.id))}. Position ${position(over.id)} of ${sections.length}.`
+        : `Dropped ${name(String(active.id))}. It stays at position ${position(active.id)} of ${sections.length}.`,
+    onDragCancel: ({ active }) => `Cancelled. ${name(String(active.id))} is back at position ${position(active.id)} of ${sections.length}.`,
+  };
 
-/** The tile as the page will show it: each kind's words tidied by the same rules as saving, or as typed if they don't pass yet. */
-function tidy(tiles: Tiles, kind: TileKind): Tiles {
-  const { clean } = checkTiles(tiles, [kind]);
-  return clean[kind] ? clean : tiles;
-}
+  function onDragEnd({ active, over }: DragEndEvent) {
+    setActiveId(null);
+    if (!over || active.id === over.id) return;
+    const from = sections.indexOf(active.id as SectionKey);
+    const to = sections.indexOf(over.id as SectionKey);
+    if (from < 0 || to < 0) return;
+    onSections(arrayMove(sections, from, to), active.id as SectionKey);
+  }
 
-/** Draws its child at PAGE_WIDTH and scales it to the column from 1024px of window width up. */
-function Scaled({ children }: { children: React.ReactNode }) {
-  const outer = useRef<HTMLDivElement>(null);
-  const inner = useRef<HTMLDivElement>(null);
-  const [fit, setFit] = useState<{ scale: number; height: number } | null>(null);
-
-  useEffect(() => {
-    const o = outer.current;
-    const i = inner.current;
-    if (!o || !i) return;
-    const wide = window.matchMedia("(min-width: 1024px)");
-    const measure = () => {
-      if (!wide.matches) return setFit(null);
-      const scale = Math.min(1, o.clientWidth / PAGE_WIDTH);
-      setFit({ scale, height: i.offsetHeight * scale });
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(o);
-    ro.observe(i);
-    wide.addEventListener("change", measure);
-    return () => {
-      ro.disconnect();
-      wide.removeEventListener("change", measure);
-    };
-  }, []);
+  const page = (frame?: (key: SectionKey, node: React.ReactNode) => React.ReactNode, only?: SectionKey) => (
+    <PortfolioHome
+      person={person}
+      theme={theme}
+      projects={shownProjects}
+      featuredId={a.featured}
+      sections={only ? [only] : sections}
+      tiles={tiles}
+      mode="preview"
+      frame={frame}
+      inertChrome
+    />
+  );
 
   return (
-    <div ref={outer} className="overflow-hidden" style={fit ? { height: fit.height } : undefined}>
-      <div
-        ref={inner}
-        style={fit ? { width: PAGE_WIDTH, transform: `scale(${fit.scale})`, transformOrigin: "top left" } : undefined}
+    <div data-testid="preview" className="relative">
+      <DndContext
+        id="portfolio-sections"
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={(e) => setActiveId(e.active.id as SectionKey)}
+        onDragEnd={onDragEnd}
+        onDragCancel={() => setActiveId(null)}
+        accessibility={{
+          announcements,
+          screenReaderInstructions: {
+            draggable: "To pick up a section, press Space. Use the arrow keys to move it, then press Space to drop it. Press Escape to cancel.",
+          },
+        }}
       >
-        {children}
-      </div>
+        <SortableContext items={sections} strategy={verticalListSortingStrategy}>
+          {page((key, node) => (
+            <SortableSection id={key} reduced={reduced} onRemove={() => onRemove(key)}>
+              {node}
+            </SortableSection>
+          ))}
+        </SortableContext>
+        <DragOverlay dropAnimation={reduced ? null : { duration: MOVE_MS, easing: EASE }}>
+          {activeId ? (
+            <div className="cursor-grabbing overflow-hidden rounded-[16px] bg-surface opacity-95 shadow-pack outline outline-2 outline-jade" data-testid="lifted-section">
+              {page(undefined, activeId)}
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
     </div>
   );
+}
+
+/**
+ * A section with its controls. The page inside is a picture (inert: its links don't open and nothing
+ * in it takes focus); the grip and the remove button sit on top of it, outside the picture.
+ */
+function SortableSection({ id, reduced, onRemove, children }: { id: SectionKey; reduced: boolean; onRemove: () => void; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    transition: reduced ? null : { duration: MOVE_MS, easing: EASE },
+    attributes: { roleDescription: "draggable section" },
+  });
+  const label = SECTION_NAMES[id];
+  return (
+    <div
+      ref={setNodeRef}
+      data-section-key={id}
+      style={{ transform: CSS.Translate.toString(transform), transition: transition ?? undefined }}
+      className={`group/section relative outline-offset-[-2px] hover:outline hover:outline-2 hover:outline-jade/50 focus-within:outline focus-within:outline-2 focus-within:outline-jade ${isDragging ? "opacity-40" : ""}`}
+    >
+      <div className="absolute top-2 right-2 z-10 flex gap-1.5">
+        <button
+          type="button"
+          ref={setActivatorNodeRef}
+          {...attributes}
+          {...listeners}
+          aria-label={`Move ${label}`}
+          title={`Move ${label}`}
+          className={`${ICON_BTN} cursor-grab touch-none active:cursor-grabbing`}
+        >
+          <GripVertical aria-hidden size={18} strokeWidth={2} />
+        </button>
+        <button type="button" onClick={onRemove} aria-label={`Remove ${label}`} title={`Remove ${label}`} className={ICON_BTN}>
+          <X aria-hidden size={16} strokeWidth={2.25} />
+        </button>
+      </div>
+      <div inert>{children}</div>
+    </div>
+  );
+}
+
+/** The tiles as the page will show them: each kind's words tidied by the same rules as saving, or as typed if they don't pass yet. */
+function tidy(tiles: Tiles, sections: SectionKey[]): Tiles {
+  const { clean } = checkTiles(tiles, tileKindsShownBy(sections));
+  return { ...tiles, ...clean };
 }

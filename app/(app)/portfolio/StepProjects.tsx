@@ -20,19 +20,30 @@ import { Eye, EyeOff, GripVertical, Pencil, Plus, Star, X } from "lucide-react";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { checkTiles, type CustomiseState } from "@/lib/portfolio-customise";
-import { emptyTile, isTileKind, shownKeys, TILE_HINTS, TILE_NAMES, tileHasContent, type TileKind, type Tiles } from "@/lib/portfolio-layout";
+import {
+  emptyTile,
+  EXTRA_SECTIONS,
+  SECTION_HINTS,
+  SECTION_KEYS,
+  SECTION_NAMES,
+  shownKeys,
+  tileKindsShownBy,
+  type SectionKey,
+  type TileKind,
+  type Tiles,
+} from "@/lib/portfolio-layout";
 import type { BuilderPlan, BuilderProject } from "./steps";
 import { TileEditor } from "./TileEditor";
 
 /**
- * Step 3, Your projects (decision 0014, in the builder by decision 0016): the page's tiles as a list
- * in page order. Drag a row by its grip (mouse, a short press on touch, or Space, arrows, Space on
- * the keyboard), feature one (always first), hide one (it stays live at its own link), open one in
- * the editor, and add, edit or remove extra tiles. The preview beside the list shows the result.
+ * Step 3, Your page (decisions 0014 and 0016): the exhbts in their order (drag a row by its grip with
+ * the mouse, a short press on touch, or Space, arrows, Space on the keyboard), feature one for the band,
+ * hide one (it stays live at its own link), open one in the editor; then the page's sections: add one,
+ * fill in its words, take one off. The sections are put in order by dragging them in the preview.
  */
 
-/** Extra tiles the menu offers. About me and Links and contact are the intro and contact on step 1 now; saved ones still show. */
-const OFFERED: TileKind[] = ["education", "experience", "quote"];
+/** Sections whose words are written here. */
+const WRITTEN: Partial<Record<SectionKey, TileKind[]>> = { about: ["about", "education"], experience: ["experience"], quote: ["quote"] };
 const EASE = "cubic-bezier(0.2, 0, 0, 1)";
 const MOVE_MS = 180;
 
@@ -109,16 +120,16 @@ export function StepProjects({
   onFocusLost: () => void;
 }) {
   const reduced = useReducedMotion();
-  const [editing, setEditing] = useState<TileKind | null>(null);
+  const [editing, setEditing] = useState<SectionKey | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const byId = new Map(projects.map((p) => [p.id, p]));
   const shown = shownKeys(state.order, new Set(state.hidden), state.featured);
   const featured = state.featured && shown[0] === state.featured ? state.featured : null;
   const listKeys = featured ? shown.slice(1) : shown;
-  const problems = checkTiles(state.tiles, state.order).problems;
-  const labelOf = (key: string) => (isTileKind(key) ? TILE_NAMES[key] : (byId.get(key)?.title ?? "tile"));
-  const addable = OFFERED.filter((k) => !state.order.includes(k));
+  const problems = checkTiles(state.tiles, tileKindsShownBy(state.sections)).problems;
+  const labelOf = (key: string) => byId.get(key)?.title ?? "exhbt";
+  const addable = SECTION_KEYS.filter((k) => !state.sections.includes(k));
   const justPicked = useRef(false);
 
   useEffect(() => {
@@ -174,56 +185,23 @@ export function StepProjects({
   };
   const feature = (id: string) =>
     change((s) => ({ ...s, featured: s.featured === id ? null : id }), state.featured === id ? `Took the star off ${labelOf(id)}` : `Featured ${labelOf(id)}`);
-  const addTile = (kind: TileKind) => {
+  const addSection = (key: SectionKey) => {
     setMenuOpen(false);
-    change((s) => ({ ...s, order: [...s.order, kind], tiles: { ...s.tiles, [kind]: emptyTile(kind) } }), `Added ${TILE_NAMES[kind]}`);
-    setEditing(kind);
-  };
-  const removeTile = (kind: TileKind) => {
-    if (editing === kind) setEditing(null);
     change((s) => {
-      const { [kind]: _gone, ...tiles } = s.tiles;
-      void _gone;
-      return { ...s, order: s.order.filter((k) => k !== kind), tiles };
-    }, `Removed ${TILE_NAMES[kind]}`);
+      const tiles = { ...s.tiles };
+      for (const kind of WRITTEN[key] ?? []) if (!tiles[kind]) (tiles as Record<string, unknown>)[kind] = emptyTile(kind);
+      return { ...s, sections: [...s.sections, key], tiles };
+    }, `Added ${SECTION_NAMES[key]}`);
+    if (WRITTEN[key]) setEditing(key);
+  };
+  const removeSection = (key: SectionKey) => {
+    if (editing === key) setEditing(null);
+    change((s) => ({ ...s, sections: s.sections.filter((k) => k !== key) }), `Removed ${SECTION_NAMES[key]}`);
     onFocusLost();
   };
   const editTile = <K extends TileKind>(kind: K, next: NonNullable<Tiles[K]>) => change((s) => ({ ...s, tiles: { ...s.tiles, [kind]: next } }));
 
   function row(key: string, handle: React.ReactNode) {
-    if (isTileKind(key)) {
-      const kind = key;
-      const open = editing === kind;
-      return (
-        <div className="rounded-[14px] border border-line bg-surface">
-          <div className="flex items-center gap-2 p-2 pl-2">
-            {handle}
-            <div className="min-w-0 flex-1 px-1">
-              <p className="font-semibold">{TILE_NAMES[kind]}</p>
-              {!tileHasContent(kind, state.tiles) && <p className="text-sm text-graphite">Empty, so visitors don&rsquo;t see it</p>}
-            </div>
-            <IconButton label={open ? `Close ${TILE_NAMES[kind]} editor` : `Edit ${TILE_NAMES[kind]}`} expanded={open} onClick={() => setEditing(open ? null : kind)}>
-              <Pencil aria-hidden size={16} strokeWidth={2} />
-            </IconButton>
-            <IconButton label={`Remove ${TILE_NAMES[kind]}`} onClick={() => removeTile(kind)}>
-              <X aria-hidden size={16} strokeWidth={2.25} />
-            </IconButton>
-          </div>
-          {open && (
-            <div className="border-t border-line p-3">
-              <TileEditor
-                kind={kind}
-                value={(state.tiles[kind] ?? emptyTile(kind)) as never}
-                onChange={(v) => editTile(kind, v as never)}
-                onDone={() => setEditing(null)}
-                problems={problems}
-                ready={ready}
-              />
-            </div>
-          )}
-        </div>
-      );
-    }
     const p = byId.get(key);
     if (!p) return null;
     const isFeatured = key === featured;
@@ -251,7 +229,7 @@ export function StepProjects({
     <div>
       {plan.publishNote && <UpgradePrompt className="mb-6" reason={`On ${plan.name} this is a preview. ${plan.publishNote.reason}`} upgradeTo={plan.publishNote.upgradeTo} />}
 
-      {projects.length === 0 && state.order.every((k) => !isTileKind(k)) ? (
+      {projects.length === 0 ? (
         <div className="rounded-[16px] border border-dashed border-field p-6 text-center">
           <p className="font-semibold">No exhbts yet</p>
           <p className="mt-1 text-graphite">Write up a project and it shows here, ready to put in order.</p>
@@ -297,7 +275,7 @@ export function StepProjects({
         </>
       )}
 
-      {projects.length > 0 && shown.every((k) => isTileKind(k)) && plan.isPublic && (
+      {projects.length > 0 && shown.length === 0 && plan.isPublic && (
         <p role="alert" className="mt-4 rounded-[14px] border border-error/40 bg-surface px-4 py-3 text-error">
           Every exhbt is hidden, so your portfolio page is offline. Show at least one.
         </p>
@@ -329,47 +307,84 @@ export function StepProjects({
         </section>
       )}
 
-      <section aria-labelledby="more-heading" className="mt-10 border-t border-line pt-8">
-        <h3 id="more-heading" className="text-[1.0625rem] font-sans font-semibold tracking-normal">
-          More on your page
+      <section aria-labelledby="sections-heading" className="mt-10 border-t border-line pt-8" data-testid="sections-panel">
+        <h3 id="sections-heading" className="text-[1.0625rem] font-sans font-semibold tracking-normal">
+          Sections on your page
         </h3>
-        <p className="mt-1 text-sm text-graphite">Your education, work you&rsquo;ve done, or something a tutor or manager said.</p>
+        <p className="mt-1 text-sm text-graphite">Your name and intro stay at the top. Drag the sections into order in the preview.</p>
+        <ul className="mt-3 space-y-2">
+          {state.sections.map((key) => {
+            const written = WRITTEN[key];
+            const open = editing === key;
+            return (
+              <li key={key} data-section-row={key} className="rounded-[14px] border border-line bg-surface">
+                <div className="flex items-center gap-2 p-2 pl-4">
+                  <p className="min-w-0 flex-1 font-semibold">{SECTION_NAMES[key]}</p>
+                  {written && (
+                    <IconButton label={open ? `Close ${SECTION_NAMES[key]} editor` : `Edit ${SECTION_NAMES[key]}`} expanded={open} onClick={() => setEditing(open ? null : key)}>
+                      <Pencil aria-hidden size={16} strokeWidth={2} />
+                    </IconButton>
+                  )}
+                  <IconButton label={`Take ${SECTION_NAMES[key]} off the page`} onClick={() => removeSection(key)}>
+                    <X aria-hidden size={16} strokeWidth={2.25} />
+                  </IconButton>
+                </div>
+                {open && written && (
+                  <div className="space-y-3 border-t border-line p-3">
+                    {written.map((kind) => (
+                      <TileEditor
+                        key={kind}
+                        kind={kind}
+                        value={(state.tiles[kind] ?? emptyTile(kind)) as never}
+                        onChange={(v) => editTile(kind, v as never)}
+                        onDone={() => setEditing(null)}
+                        problems={problems}
+                        ready={ready}
+                      />
+                    ))}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
         <div className="relative mt-3">
           <button
             type="button"
             aria-expanded={menuOpen}
-            aria-controls="add-tile-menu"
-            disabled={!ready}
+            aria-controls="add-section-menu"
+            disabled={!ready || addable.length === 0}
             onClick={() => setMenuOpen((o) => !o)}
             onKeyDown={(e) => e.key === "Escape" && setMenuOpen(false)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-ink bg-surface px-4 py-2 text-sm font-semibold hover:bg-mist"
+            className="inline-flex items-center gap-1.5 rounded-full border border-ink bg-surface px-4 py-2 text-sm font-semibold hover:bg-mist disabled:opacity-50"
           >
-            <Plus aria-hidden size={16} strokeWidth={2.5} /> Add a tile
+            <Plus aria-hidden size={16} strokeWidth={2.5} /> Add a section
           </button>
           {menuOpen && (
-            <div id="add-tile-menu" onKeyDown={(e) => e.key === "Escape" && setMenuOpen(false)} className="mt-2 rounded-[14px] border border-line bg-surface p-2 shadow-pack">
-              {!plan.extraTiles ? (
-                <UpgradePrompt reason={plan.extraTilesReason ?? ""} upgradeTo="premium" />
-              ) : addable.length === 0 ? (
-                <p className="px-3 py-2 text-graphite">Every tile is on your page.</p>
-              ) : (
-                <ul>
-                  {addable.map((k) => (
+            <div id="add-section-menu" onKeyDown={(e) => e.key === "Escape" && setMenuOpen(false)} className="mt-2 rounded-[14px] border border-line bg-surface p-2 shadow-pack">
+              <ul>
+                {addable.map((k) =>
+                  EXTRA_SECTIONS.includes(k) && !plan.extraTiles ? (
+                    <li key={k} className="px-3 py-2">
+                      <span className="block font-semibold">{SECTION_NAMES[k]}</span>
+                      <UpgradePrompt reason={plan.extraTilesReason ?? ""} upgradeTo="premium" primary={false} className="mt-1" />
+                    </li>
+                  ) : (
                     <li key={k}>
-                      <button type="button" onClick={() => addTile(k)} className="block w-full rounded-[10px] px-3 py-2 text-left hover:bg-mist">
-                        <span className="block font-semibold">{TILE_NAMES[k]}</span>
-                        <span className="block text-sm text-graphite">{TILE_HINTS[k]}</span>
+                      <button type="button" onClick={() => addSection(k)} className="block w-full rounded-[10px] px-3 py-2 text-left hover:bg-mist">
+                        <span className="block font-semibold">{SECTION_NAMES[k]}</span>
+                        <span className="block text-sm text-graphite">{SECTION_HINTS[k]}</span>
                       </button>
                     </li>
-                  ))}
-                </ul>
-              )}
+                  ),
+                )}
+              </ul>
             </div>
           )}
         </div>
         {plan.heldTiles && (
           <p className="mt-3 text-sm text-graphite" data-testid="tiles-held">
-            Your saved tiles come back when you&rsquo;re on a plan that has them.
+            Your saved experience and quote come back when you&rsquo;re on a plan that has them.
           </p>
         )}
       </section>

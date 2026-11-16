@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { EmptyProjects, GlanceView, personFrom } from "@/components/portfolio/GlanceView";
+import { headers } from "next/headers";
+import { PortfolioHome } from "@/components/portfolio/PortfolioHome";
+import { personFrom } from "@/components/portfolio/PortfolioPage";
 import { Button } from "@/components/ui/Button";
 import { getCurrentUser } from "@/lib/auth";
 import { ENTITLEMENTS, PLAN_NAMES } from "@/lib/entitlements";
 import { signedFileUrl } from "@/lib/files";
 import { previewImage } from "@/lib/og/card";
+import { MARKETING_HOST, parseHost } from "@/lib/hosts";
 import { loadPortfolio } from "@/lib/portfolio";
+import { EXTRA_SECTIONS, sectionsOf } from "@/lib/portfolio-layout";
 import { themeFor } from "@/lib/portfolio-themes";
 import { getStore } from "@/lib/store";
 
@@ -41,7 +45,12 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   };
 }
 
-/** The at-a-glance page: who they are, and every project as a tile. Every shared link lands here. */
+/** On alex.exhbt.co.uk a relative "/start" would stay on the portfolio host; send people to our site. */
+async function startHref() {
+  return parseHost((await headers()).get("host")).kind === "portfolio" ? `https://${MARKETING_HOST}/start` : "/start";
+}
+
+/** The portfolio home (decision 0016): who they are, their best work, more of it, about them. Every shared link lands here. */
 export default async function PortfolioGlance({ params }: Params) {
   const p = await loadPortfolio((await params).username);
   if (p.status === "redirect") redirect(p.to);
@@ -56,15 +65,17 @@ export default async function PortfolioGlance({ params }: Params) {
   }
 
   return (
-    <GlanceView
-      person={personFrom(p.profile, p.displayName, p.photoUrl, p.layout)}
-      items={p.items}
-      order={p.order}
-      featuredId={p.featuredId}
-      layout={p.layout}
-      base={p.base}
-      theme={p.theme}
-    />
+    <main id="main">
+      <PortfolioHome
+        person={personFrom(p.profile, p.displayName, p.photoUrl, p.layout)}
+        theme={p.theme}
+        projects={p.projects}
+        featuredId={p.featuredId}
+        sections={p.sections}
+        tiles={p.layout.tiles}
+        startHref={await startHref()}
+      />
+    </main>
   );
 }
 
@@ -73,7 +84,7 @@ export default async function PortfolioGlance({ params }: Params) {
  * a note saying why visitors can't see it yet and what to do. Signed in on this origin only (sign-in
  * cookies stay on the app host, so on a portfolio subdomain the owner gets not found like anyone else).
  */
-async function OwnerPreview({ userId, base, allHidden }: { userId: string; base: string; allHidden: boolean }) {
+async function OwnerPreview({ userId, allHidden }: { userId: string; base: string; allHidden: boolean }) {
   const store = getStore();
   const [profile, plan] = await Promise.all([store.getPortfolioProfile(userId), store.planFor(userId)]);
   const name = profile.name?.trim() || profile.username || "Your name";
@@ -86,8 +97,8 @@ async function OwnerPreview({ userId, base, allHidden }: { userId: string; base:
       : "This is how your page will look. Publish your first exhbt and it goes live at this address.";
 
   return (
-    <>
-      <div data-testid="owner-preview" className="mb-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-[16px] border border-line bg-surface px-5 py-4">
+    <main id="main">
+      <div data-testid="owner-preview" className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-line bg-wash px-5 py-4 sm:px-10">
         <p className="max-w-[40rem]">
           <span className="font-semibold">Only you can see this.</span> {message}
         </p>
@@ -100,16 +111,16 @@ async function OwnerPreview({ userId, base, allHidden }: { userId: string; base:
           </Button>
         </div>
       </div>
-      <GlanceView
+      <PortfolioHome
         person={personFrom(profile, name, photoUrl, profile.layout)}
-        items={[]}
-        order={[]}
-        featuredId={null}
-        layout={profile.layout}
-        base={base}
         theme={themeFor(profile, plan)}
-        empty={<EmptyProjects />}
+        projects={[]}
+        featuredId={null}
+        sections={sectionsOf(profile.layout).filter((k) => ENTITLEMENTS[plan].extraTiles || !EXTRA_SECTIONS.includes(k))}
+        tiles={profile.layout.tiles}
+        mode="preview"
+        startHref={await startHref()}
       />
-    </>
+    </main>
   );
 }

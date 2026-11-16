@@ -59,7 +59,48 @@ export type PortfolioTheme = {
   initials: { bg: string; text: string };
   face: HeadingFace;
   photo: PhotoShape;
+  /**
+   * The rest of the page around the band (the portfolio home's ground, text, cards, corners and
+   * buttons), as CSS variables (`PAGE_VARS`). Leave out to keep the brand's white page. A look that
+   * restyles the whole page (a dark ground, square corners) sets these.
+   */
+  page?: Partial<PageLook>;
 };
+
+/** The page around the band: every colour and corner the portfolio home and its tiles read. */
+export type PageLook = {
+  ground: string;
+  ink: string;
+  soft: string;
+  faint: string;
+  line: string;
+  card: string;
+  /** The well a card's key figure sits in. */
+  well: string;
+  buttonBg: string;
+  buttonText: string;
+  accent: string;
+  radius: string;
+  radiusLarge: string;
+};
+
+/** The brand's page (DESIGN.md tokens): white ground, ink text, hairlines, 16px cards, ink buttons. */
+export const DEFAULT_PAGE: PageLook = {
+  ground: WHITE,
+  ink: INK,
+  soft: GRAPHITE,
+  faint: "#6f7278",
+  line: LINE,
+  card: WHITE,
+  well: MIST,
+  buttonBg: INK,
+  buttonText: WHITE,
+  accent: JADE,
+  radius: "16px",
+  radiusLarge: "24px",
+};
+
+export const pageOf = (t: Pick<PortfolioTheme, "page">): PageLook => ({ ...DEFAULT_PAGE, ...t.page });
 
 const dark = (bg: string, soft: string, accent: string) => ({ bg, text: WHITE, soft, accent, edge: "#ffffff40", initials: { bg: MINT, text: INK } });
 const light = (bg: string, edge: string) => ({ bg, text: INK, soft: GRAPHITE, accent: JADE, edge, initials: { bg: JADE, text: WHITE } });
@@ -69,6 +110,8 @@ const light = (bg: string, edge: string) => ({ bg, text: INK, soft: GRAPHITE, ac
  * ones only Max has. Names are plain; the id is what is stored.
  */
 export const PORTFOLIO_THEMES: readonly PortfolioTheme[] = [
+  // The Exhbt look (Rory's layout spec, 16 Nov 2026): a white page with the band in wash. The default, so first.
+  { id: "exhbt", name: "Exhbt", bg: WASH, text: INK, soft: GRAPHITE, accent: JADE, edge: "#00755d40", initials: { bg: JADE, text: WHITE }, face: "bricolage", photo: "round" },
   { id: "ink", name: "Ink", ...dark(INK, ON_INK, MINT), face: "bricolage", photo: "square" },
   { id: "jade", name: "Jade", ...dark(JADE, WASH, WASH), face: "bricolage", photo: "square" },
   { id: "mint", name: "Mint", bg: MINT, text: INK, soft: GRAPHITE, accent: INK, edge: "#0e0f1240", initials: { bg: INK, text: MINT }, face: "bricolage", photo: "round" },

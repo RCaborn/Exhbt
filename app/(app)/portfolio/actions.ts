@@ -9,7 +9,7 @@ import { ENTITLEMENTS, type Plan } from "@/lib/entitlements";
 import { usernameProblem } from "@/lib/hosts";
 import { canClaimUsername, canUseTheme, customisableExhbts, getPlan } from "@/lib/plan";
 import { CustomiseSchema, MAX_REQUEST_CHARS } from "@/lib/portfolio-customise";
-import { isTileKind, layoutFromOrder } from "@/lib/portfolio-layout";
+import { EXTRA_SECTIONS, layoutFromSections, sectionsOf } from "@/lib/portfolio-layout";
 import { ProfileDraftSchema } from "@/lib/portfolio-profile";
 import { themeById, themeFor } from "@/lib/portfolio-themes";
 import { isPhase2Enabled } from "@/lib/site";
@@ -142,17 +142,23 @@ export async function saveBuilderAction(raw: unknown): Promise<BuilderSaveResult
   const candidateIds = new Set(candidates.map((e) => e.id));
   const extrasOk = ENTITLEMENTS[plan].extraTiles;
 
+  // The exhbts: only their own that the plan lists, each once; any the page missed go on the end.
   const seen = new Set<string>();
-  let order = input.order.filter((k) => {
-    const ok = (candidateIds.has(k) || (extrasOk && isTileKind(k))) && !seen.has(k);
+  const order = input.order.filter((k) => {
+    const ok = candidateIds.has(k) && !seen.has(k);
     if (ok) seen.add(k);
     return ok;
   });
   for (const e of candidates) if (!seen.has(e.id)) order.push(e.id);
+
+  // The sections, each once (the schema allows only known keys). Experience and a quote come with
+  // extra tiles; on a plan without them, ones saved before are kept, words and all, for when the plan returns.
+  let sections = input.sections.filter((k, i) => input.sections.indexOf(k) === i);
   let tiles = input.tiles;
   if (!extrasOk) {
-    order = [...order, ...profile.layout.slots.filter(isTileKind)];
-    tiles = profile.layout.tiles;
+    const held = sectionsOf(profile.layout).filter((k) => EXTRA_SECTIONS.includes(k));
+    sections = [...sections.filter((k) => !EXTRA_SECTIONS.includes(k)), ...held];
+    tiles = { ...tiles, experience: profile.layout.tiles.experience, quote: profile.layout.tiles.quote };
   }
 
   const hidden = input.hidden.filter((id) => candidateIds.has(id));
@@ -169,7 +175,7 @@ export async function saveBuilderAction(raw: unknown): Promise<BuilderSaveResult
   }
 
   // Their exhbts take the places the listed ones had, so drafts and anything else stay put.
-  const queue = order.filter((k) => candidateIds.has(k));
+  const queue = [...order];
   const sorted = [...exhbts].sort((a, b) => a.position - b.position).map((e) => e.id);
   const positions = sorted.map((id) => (candidateIds.has(id) ? queue.shift()! : id));
 
@@ -187,7 +193,7 @@ export async function saveBuilderAction(raw: unknown): Promise<BuilderSaveResult
     ...(themeId ? { themeId } : {}),
   });
   await store.savePortfolioLayout(user.id, {
-    layout: layoutFromOrder(order, tiles, input.header),
+    layout: layoutFromSections(sections, tiles, input.header),
     featuredExhbtId: featured,
     hiddenIds: [...hidden, ...keptHidden],
     order: positions,

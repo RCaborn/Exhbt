@@ -7,7 +7,7 @@ import type { PortfolioPerson } from "@/components/portfolio/PortfolioPage";
 import type { Plan } from "@/lib/entitlements";
 import { normaliseLinkedin } from "@/lib/cv-contact";
 import { checkTiles } from "@/lib/portfolio-customise";
-import { normaliseGithub, normaliseWebsite } from "@/lib/portfolio-layout";
+import { normaliseGithub, normaliseWebsite, SECTION_NAMES, tileKindsShownBy } from "@/lib/portfolio-layout";
 import { profileProblems, type ProfileDraft } from "@/lib/portfolio-profile";
 import { DEFAULT_THEME, themeById } from "@/lib/portfolio-themes";
 import { useHydrated } from "@/lib/use-hydrated";
@@ -31,7 +31,7 @@ import { Tick } from "@/components/ui/Tick";
 const TITLES: Record<Step, string> = {
   you: "About you",
   look: "Your look",
-  projects: "Your projects",
+  projects: "Your page",
   publish: "Publish and share",
 };
 const INTROS: Record<Step, string> = {
@@ -59,7 +59,7 @@ type Props = {
 
 /** The first thing stopping a save, or null. */
 function problemOf(s: BuilderState): string | null {
-  return Object.values(profileProblems(s.profile))[0] ?? Object.values(checkTiles(s.arrangement.tiles, s.arrangement.order).problems)[0] ?? null;
+  return Object.values(profileProblems(s.profile))[0] ?? Object.values(checkTiles(s.arrangement.tiles, tileKindsShownBy(s.arrangement.sections)).problems)[0] ?? null;
 }
 
 /** The person as the preview draws them: what's typed, with links only once they're real https addresses. */
@@ -302,7 +302,17 @@ export function Builder(props: Props) {
           <aside aria-label="Preview of your portfolio" className="min-w-0 lg:sticky lg:top-4 lg:self-start">
             <p className="mb-2 text-sm font-semibold text-graphite">Preview</p>
             <div tabIndex={0} role="region" aria-label="Preview, scrolls" className="overflow-hidden rounded-[20px] border border-line bg-mist shadow-pack lg:max-h-[calc(100svh-4rem)] lg:overflow-y-auto">
-              <Preview state={state} person={person} theme={theme} projects={projects} />
+              <Preview
+                state={state}
+                person={person}
+                theme={theme}
+                projects={projects}
+                onSections={(next, moved) => changeArrangement((x) => ({ ...x, sections: next }), `Moved ${SECTION_NAMES[moved]}`)}
+                onRemove={(key) => {
+                  changeArrangement((x) => ({ ...x, sections: x.sections.filter((k) => k !== key) }), `Removed ${SECTION_NAMES[key]}`);
+                  parkFocus();
+                }}
+              />
             </div>
           </aside>
         </div>

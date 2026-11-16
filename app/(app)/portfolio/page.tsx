@@ -3,12 +3,12 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { ENTITLEMENTS, PLAN_NAMES } from "@/lib/entitlements";
-import { tileFromDoc } from "@/lib/exhbt/headline";
 import { signedFileUrl } from "@/lib/files";
 import { canClaimUsername, canPublish as publishVerdict, canUseExtraTiles, canUseTheme, customisableExhbts, getPlan } from "@/lib/plan";
 import type { CustomiseState } from "@/lib/portfolio-customise";
 import { portfolioHref } from "@/lib/portfolio-links";
-import { isTileKind, sequence, TILE_KINDS } from "@/lib/portfolio-layout";
+import { homeProject } from "@/lib/portfolio-home";
+import { EXTRA_SECTIONS, sectionsOf, TILE_KINDS } from "@/lib/portfolio-layout";
 import { draftFromProfile } from "@/lib/portfolio-profile";
 import { PORTFOLIO_THEMES, themeById, themeFor } from "@/lib/portfolio-themes";
 import { isPhase2Enabled } from "@/lib/site";
@@ -47,27 +47,34 @@ export default async function BuildPortfolioPage({ searchParams }: { searchParam
 
   // The exhbts the portfolio lists (any exhbt on Free, which can't publish, so there is something to arrange).
   const candidates = customisableExhbts(plan, exhbts);
-  const projects: BuilderProject[] = candidates.map((e) => {
-    const doc = isPublic && e.published ? e.published : e.doc;
-    return { id: e.id, title: doc.title.trim() || "Untitled exhbt", tile: tileFromDoc(doc), live: e.status === "published" };
-  });
+  const projects: BuilderProject[] = await Promise.all(
+    candidates.map(async (e) => {
+      const doc = isPublic && e.published ? e.published : e.doc;
+      const home = homeProject(e.id, doc, "#");
+      if (home.figure.kind === "image") home.imageUrl = await signedFileUrl(home.figure.fileId);
+      return { id: e.id, title: home.title, home, live: e.status === "published" };
+    }),
+  );
   const listed = new Set(projects.map((p) => p.id));
   const drafts = exhbts.filter((e) => !listed.has(e.id)).map((e) => ({ id: e.id, title: e.doc.title.trim() || "Untitled exhbt", live: e.status === "published" }));
 
-  // Extra tiles are held, not deleted, when a plan doesn't have them: they come back with the plan.
-  const storedTiles = profile.layout.slots.filter(isTileKind);
-  const order = sequence(profile.layout, projects.map((p) => p.id)).filter((k) => !isTileKind(k) || tilesVerdict.ok);
+  // Experience and a quote are held, not deleted, when a plan doesn't have them: they come back with the plan.
+  const storedSections = sectionsOf(profile.layout);
+  const order = projects.map((p) => p.id);
+  const sections = storedSections.filter((k) => tilesVerdict.ok || !EXTRA_SECTIONS.includes(k));
   const featured = profile.featuredExhbtId && listed.has(profile.featuredExhbtId) ? profile.featuredExhbtId : null;
   const hidden = candidates.filter((e) => e.hiddenOnPortfolio).map((e) => e.id);
   const shown = themeFor(profile, plan);
-  const stateTiles = tilesVerdict.ok ? profile.layout.tiles : {};
+  const stored = profile.layout.tiles;
+  const stateTiles: CustomiseState["tiles"] = tilesVerdict.ok ? stored : { about: stored.about, education: stored.education, links: stored.links };
   const arrangement: CustomiseState = {
     order,
+    sections,
     hidden,
     featured: featured && !hidden.includes(featured) ? featured : null,
     themeId: shown.id,
     header: profile.layout.header,
-    tiles: Object.fromEntries(TILE_KINDS.filter((k) => order.includes(k)).map((k) => [k, stateTiles[k]])) as CustomiseState["tiles"],
+    tiles: Object.fromEntries(TILE_KINDS.filter((k) => stateTiles[k]).map((k) => [k, stateTiles[k]])) as CustomiseState["tiles"],
   };
 
   const locks: Record<string, ThemeLock> = {};
@@ -92,7 +99,7 @@ export default async function BuildPortfolioPage({ searchParams }: { searchParam
         publishNote: held && !held.ok ? { reason: held.reason, upgradeTo: held.upgradeTo } : null,
         extraTiles: tilesVerdict.ok,
         extraTilesReason: tilesVerdict.ok ? null : tilesVerdict.reason,
-        heldTiles: !tilesVerdict.ok && storedTiles.length > 0,
+        heldTiles: !tilesVerdict.ok && storedSections.some((k) => EXTRA_SECTIONS.includes(k)),
         uploadMb: ENTITLEMENTS[plan].uploadMbPerFile,
       }}
       addressBlocked={
