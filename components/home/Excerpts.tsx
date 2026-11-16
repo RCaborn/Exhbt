@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { APP_HOST, portfolioUrl } from "@/lib/hosts";
+import { APP_HOST } from "@/lib/hosts";
 import { BrowserFrame } from "./BrowserFrame";
 import { Tick } from "@/components/ui/Tick";
 
@@ -32,33 +32,6 @@ export function EditorExcerpt() {
           </span>
           <p>This is accurate and it is my own work.</p>
         </div>
-      </figure>
-    </BrowserFrame>
-  );
-}
-
-const LINK_EXHBTS = [
-  "Cutting missed GP appointments by changing when reminders are sent",
-  "A ward-level bed occupancy dashboard in Power BI",
-  "Cleaning 4 years of A&E wait-time data for a public report",
-];
-
-export function LinkExcerpt() {
-  return (
-    <BrowserFrame url={portfolioUrl("amara", "northfield-health")}>
-      <figure className="text-[0.9rem]" aria-label="A job-specific link">
-        <div className="px-5 pt-4 pb-1">
-          <p className="text-xs text-graphite">Amara Okafor for</p>
-          <p className="text-[1.05rem] font-bold tracking-[-0.01em]">Junior data analyst, Northfield Health</p>
-        </div>
-        <ol className="divide-y divide-line px-5">
-          {LINK_EXHBTS.map((t) => (
-            <li key={t} className="flex items-start justify-between gap-4 py-2.5">
-              <span>{t}</span>
-              <Tick size="xs" label="Checked" className="mt-0.5" />
-            </li>
-          ))}
-        </ol>
       </figure>
     </BrowserFrame>
   );

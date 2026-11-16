@@ -38,10 +38,10 @@ export function SkillsGapExample() {
         </h2>
         <p className="mt-4 max-w-[42rem] text-lg text-graphite">
           Upload your CV and say which job you want. We chart the skills that job asks for, where your CV puts you
-          on each, and where three small projects would take you. {SOURCING_LINE}
+          on each, and where small projects would take you. {SOURCING_LINE}
         </p>
         <div className="mt-12 grid gap-6 md:grid-cols-2">
-          <div className="rounded-[var(--radius)] border border-line p-5 sm:p-6">
+          <div className="flex flex-col rounded-[var(--radius)] border border-line p-5 sm:p-6">
             <SkillRadar
               title="Amara now, against a junior data analyst job"
               fromLabel="Now"
@@ -50,9 +50,9 @@ export function SkillsGapExample() {
               note={NOTE}
               highlight={now}
             />
-            <SkillHighlights up={now.up} bag={now.bag} />
+            <div className="mt-auto"><SkillHighlights up={now.up} bag={now.bag} /></div>
           </div>
-          <div className="rounded-[var(--radius)] border border-line p-5 sm:p-6">
+          <div className="flex flex-col rounded-[var(--radius)] border border-line p-5 sm:p-6">
             <SkillRadar
               title="After the two suggested projects"
               fromLabel="Now"
@@ -61,7 +61,7 @@ export function SkillsGapExample() {
               note={NOTE}
               highlight={after}
             />
-            <SkillHighlights up={after.up} bag={after.bag} />
+            <div className="mt-auto"><SkillHighlights up={after.up} bag={after.bag} /></div>
           </div>
         </div>
       </div>

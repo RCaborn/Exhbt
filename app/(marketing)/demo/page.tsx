@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { MadeWith } from "@/components/brand/MadeWith";
 import { ExhbtTile } from "@/components/exhbt/ExhbtTile";
 import { PortfolioHeader } from "@/components/exhbt/PortfolioHeader";
 import { demoExhbts, demoOwner } from "@/lib/exhbt";
@@ -19,7 +18,7 @@ export default function DemoPortfolio() {
         exhbts={demoExhbts}
         note={
           <>
-            Demo portfolio. The person and projects are fictional.{" "}
+            Example portfolio. The person, the address and the projects are fictional.{" "}
             <Link href="/pricing" className="font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-mint">
               Get your own
             </Link>
@@ -35,7 +34,6 @@ export default function DemoPortfolio() {
             </li>
           ))}
         </ul>
-        <MadeWith />
       </div>
     </div>
   );

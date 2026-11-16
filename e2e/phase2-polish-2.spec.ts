@@ -99,7 +99,7 @@ test.describe("Phone header", () => {
     expect(await noSideScroll(page)).toBe(true);
     const header = page.locator("header").first();
     await header.getByRole("button", { name: "Menu" }).click();
-    await expect(header.getByRole("navigation", { name: "Main menu" }).getByRole("link", { name: "For employers" })).toBeVisible();
+    await expect(header.getByRole("navigation", { name: "Main menu" }).getByRole("link", { name: "What is an exhbt?" })).toBeVisible();
     await expect(header.getByRole("link", { name: "Log in" })).toBeVisible();
   });
 });

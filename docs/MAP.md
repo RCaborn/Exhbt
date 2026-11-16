@@ -83,5 +83,6 @@ Phase 2 is the paid product: build exhbts, publish them to a portfolio, pay for 
 | The portfolio builder, the layout schema, extra tiles | `app/(app)/portfolio/`, `lib/portfolio-layout.ts`, `components/portfolio/ExtraTiles.tsx`, decisions 0014 and 0016 |
 | The top of a portfolio page, the profile fields, "Suggest an intro" | `components/portfolio/PortfolioPage.tsx`, `lib/portfolio-profile.ts`, `lib/ai/portfolio-intro.ts`, decision 0016 |
 | Referrals (off): the link, cookie, credit, the `REFERRALS_LIVE` switch, the credit figure | `lib/referrals.ts`, `app/r/[code]/route.ts`, `applyReferralsOnCheckout` in `app/api/stripe/webhook/route.ts`, `REFERRAL_CREDIT_PENCE` in `lib/entitlements.ts`, decision 0020 |
+| The admin panel (team only, read-only), its role check, and the anonymous page-view beacon | `app/(app)/admin/`, `lib/admin.ts`, `lib/admin-supabase.ts`, the `/* admin */` block in `lib/store.ts`, `app/api/pv/route.ts`, `components/site/PageViewBeacon.tsx`, decision 0021 |
 | What the account export includes | `exportUserData` in `lib/store.ts` (both implementations) |
 | Privacy policy, terms, cookies | `app/(marketing)/legal/[doc]/page.tsx` |
