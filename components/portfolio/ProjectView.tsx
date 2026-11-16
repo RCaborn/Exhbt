@@ -14,12 +14,6 @@ export type Owner = { name: string; photoUrl: string | null; /** The portfolio l
 
 /** Section headings: small, but real headings at the 13px caption size, in sentence case. */
 const LABEL = "font-sans text-[0.8125rem] font-semibold tracking-normal text-graphite";
-/**
- * Headings for parts that explain themselves on sight (the flowchart, the bullets, a quote with its
- * name under it): kept for screen readers and the outline, not shown (Rory and Alex, 16 Nov 2026:
- * far fewer labels; decision 0016).
- */
-const QUIET = "sr-only";
 
 /**
  * One exhbt, in the layout Rory set (12 Nov 2026; docs/decisions/0007, 0015):
@@ -105,16 +99,16 @@ export function ProjectView({
       )}
       {skills("mt-4 flex sm:hidden")}
 
-      <section aria-labelledby="gap" className="mt-8 break-inside-avoid print:mt-4">
+      <section aria-labelledby="gap" className="mt-6 break-inside-avoid print:mt-4">
         <Sub id="gap" className={LABEL}>The question</Sub>
         <p className="mt-1.5 text-[1.05rem] leading-relaxed">
           <RichText value={doc.gap} />
         </p>
       </section>
 
-      <section aria-labelledby="process" className="mt-8 break-inside-avoid print:mt-4">
-        <Sub id="process" className={QUIET}>Process</Sub>
-        <div>
+      <section aria-labelledby="process" className="mt-6 break-inside-avoid print:mt-4">
+        <Sub id="process" className={LABEL}>Process</Sub>
+        <div className="mt-2">
           <MethodFlow steps={doc.flow} />
         </div>
       </section>
@@ -194,11 +188,11 @@ function OneSection({ s, Sub }: { s: Exclude<Section, { kind: "graph" | "image" 
   switch (s.kind) {
     case "findings":
       return (
-        <section aria-labelledby="findings" className="mt-8 break-inside-avoid print:mt-4">
-          <Sub id="findings" className={QUIET}>
+        <section aria-labelledby="findings" className="mt-6 break-inside-avoid print:mt-4">
+          <Sub id="findings" className={LABEL}>
             Findings
           </Sub>
-          <ul className="space-y-2">
+          <ul className="mt-2 space-y-1.5">
             {s.items.map((f, i) => (
               <li key={i} className="flex gap-2.5 leading-snug">
                 <span aria-hidden className="mt-[0.55em] size-1.5 shrink-0 rounded-full bg-ink" />
@@ -212,11 +206,11 @@ function OneSection({ s, Sub }: { s: Exclude<Section, { kind: "graph" | "image" 
       );
     case "quote":
       return (
-        <section aria-labelledby="feedback" className="mt-8 break-inside-avoid print:mt-4">
-          <Sub id="feedback" className={QUIET}>
+        <section aria-labelledby="feedback" className="mt-6 break-inside-avoid print:mt-4">
+          <Sub id="feedback" className={LABEL}>
             Feedback
           </Sub>
-          <figure className="m-0">
+          <figure className="m-0 mt-1.5">
             <blockquote className="text-[1.05rem] leading-relaxed">“{s.text.trim()}”</blockquote>
             {(s.name.trim() || s.role.trim()) && (
               <figcaption className="mt-1 text-sm text-graphite">{[s.name.trim(), s.role.trim()].filter(Boolean).join(", ")}</figcaption>
@@ -226,7 +220,7 @@ function OneSection({ s, Sub }: { s: Exclude<Section, { kind: "graph" | "image" 
       );
     case "reflection":
       return (
-        <section aria-labelledby="next" className="mt-8 break-inside-avoid print:mt-4">
+        <section aria-labelledby="next" className="mt-6 break-inside-avoid print:mt-4">
           <Sub id="next" className={LABEL}>
             What I&apos;d do next
           </Sub>
@@ -239,7 +233,7 @@ function OneSection({ s, Sub }: { s: Exclude<Section, { kind: "graph" | "image" 
       const href = safeHref(s.href);
       const label = s.label.trim() || "Link";
       return (
-        <section aria-label="Link" className="mt-8 break-inside-avoid print:mt-4">
+        <section aria-label="Link" className="mt-6 break-inside-avoid print:mt-4">
           <div className="rounded-[14px] border border-line px-4 py-3">
             {href ? (
               <a href={href} rel="nofollow ugc noopener" target="_blank" className="link inline-flex items-center gap-1.5 font-semibold text-ink">

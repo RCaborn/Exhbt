@@ -45,14 +45,11 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
   const aiVersion = hasSource ? await loadAiVersion(user.id, id) : null;
 
   return (
+    <>
+    {/* Teammates and the file-match prompt sit outside the editor (decision 0013). */}
+    <TeamStrip exhbt={record} userId={user.id} skipped={skipped} />
+    <MatchPrompt />
     <Editor
-      // Teammates and the file-match prompt sit under the editor's heading (decision 0013).
-      banner={
-        <>
-          <TeamStrip exhbt={record} userId={user.id} skipped={skipped} />
-          <MatchPrompt />
-        </>
-      }
       draftTools={hasSource && aiVersion ? { aiVersion, rewritesLeft: allowance.left, rewritesLimit: allowance.limit } : null}
       id={record.id}
       // The store reads every doc into the current shape (sections, graph kinds; decision 0015).
@@ -69,5 +66,6 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
       maxFileMb={ENTITLEMENTS[plan].uploadMbPerFile}
       liveFileIds={record.status === "published" && record.published ? fileIdsOf(record.published) : []}
     />
+    </>
   );
 }
