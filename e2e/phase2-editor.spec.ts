@@ -75,7 +75,7 @@ async function startFromScratch(page: Page) {
   await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
   await expect(page.locator("[data-ready=true]")).toBeAttached();
   // Tiptap loads in its own chunk after the page.
-  await expect(page.getByRole("textbox", { name: "The question" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Context", exact: true })).toBeVisible();
 }
 
 /** Waits for the autosave after the last change to land. */
@@ -94,7 +94,7 @@ test.describe("the exhbt editor", () => {
 
     await page.locator("#title").fill(TITLE);
     await page.locator("#context").fill("Operations module, Year 2");
-    await page.getByRole("textbox", { name: "The question" }).fill("Lunchtime queues ran past ten minutes. Would a second till help?");
+    await page.getByRole("textbox", { name: "Context", exact: true }).fill("Lunchtime queues ran past ten minutes. Would a second till help?");
     await page.getByLabel("Box 1", { exact: true }).fill("Timed the queue for two weeks");
     await page.getByLabel("Box 2", { exact: true }).fill("Moved drinks to a second till");
     await page.getByLabel("Box 3", { exact: true }).fill("Waits fell to four minutes");
@@ -122,7 +122,7 @@ test.describe("the exhbt editor", () => {
     await page.reload();
     await expect(page.locator("#title")).toHaveValue(TITLE);
     await expect(page.locator("#context")).toHaveValue("Operations module, Year 2");
-    await expect(page.getByRole("textbox", { name: "The question" })).toContainText("Would a second till help?");
+    await expect(page.getByRole("textbox", { name: "Context", exact: true })).toContainText("Would a second till help?");
     await expect(page.getByLabel("Box 3", { exact: true })).toHaveValue("Waits fell to four minutes");
     await expect(page.getByLabel("Box 4", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("textbox", { name: "Finding 2" })).toContainText("paid for itself");

@@ -215,19 +215,18 @@ test.describe("Public portfolio", () => {
     await page.getByRole("link", { name: new RegExp(GP.title) }).click();
     await page.waitForURL(/\/p\/amara\/gp-reminders$/);
     await expect(page.getByRole("heading", { level: 1, name: GP.title })).toBeVisible();
-    await expect(page.locator("article [data-catalogue]")).toHaveText("EX·01");
-    await expect(page.getByRole("navigation", { name: "Portfolio" })).not.toContainText("EX·");
+    await expect(page.locator("article [data-catalogue]")).toHaveCount(0);
     await expect(page.getByRole("list", { name: "Methodology" }).getByRole("listitem")).toHaveCount(GP.flow.length);
-    const findings = page.getByRole("region", { name: "findings" }).getByRole("listitem");
+    const findings = page.getByRole("region", { name: "What I found" }).getByRole("listitem");
     await expect(findings).toHaveCount(findingsOf(GP).length);
     await expect(findings.first()).toContainText("3-hour reminders cut missed appointments");
     await expect(page.getByRole("table", { name: chartsOf(GP)[0]!.title })).toBeAttached();
     await expect(page.getByRole("link", { name: /See the work/ })).toHaveAttribute("href", "https://example.com/gp-reminders-report.pdf");
-    const checks = page.getByRole("list", { name: "Checks passed" });
-    await expect(checks).toContainText("Confirmed by author");
+    const checks = page.getByRole("list", { name: "Can you trust it?" });
+    await expect(checks).toContainText("Confirmed by Amara");
     await expect(checks).toContainText("Source attached");
 
-    await page.getByRole("link", { name: "All projects" }).click();
+    await page.getByRole("link", { name: "All of Amara's work" }).click();
     await page.waitForURL(/\/p\/amara$/);
     await page.getByRole("link", { name: new RegExp(GP.title) }).click();
     await page.waitForURL(/\/gp-reminders$/);
@@ -235,10 +234,9 @@ test.describe("Public portfolio", () => {
     await page.getByRole("navigation", { name: "Other projects" }).getByRole("link", { name: /Next/ }).click();
     await page.waitForURL(/\/p\/amara\/library-footfall$/);
     await expect(page.getByRole("heading", { level: 1, name: LIBRARY.title })).toBeVisible();
-    await expect(page.locator("article [data-catalogue]")).toHaveText("EX·02");
-    // No work linked, so the badge doesn't claim a source.
-    await expect(page.getByRole("list", { name: "Checks passed" })).toContainText("Confirmed by author");
-    await expect(page.getByRole("list", { name: "Checks passed" })).not.toContainText("Source attached");
+    // No work linked, so the checks don't claim a source.
+    await expect(page.getByRole("list", { name: "Can you trust it?" })).toContainText("Confirmed by Amara");
+    await expect(page.getByRole("list", { name: "Can you trust it?" })).not.toContainText("Source attached");
     await expect(page.getByRole("link", { name: /See the work/ })).toHaveCount(0);
   });
 
@@ -252,7 +250,7 @@ test.describe("Public portfolio", () => {
 
     await page.goto(`${SUBDOMAIN}/gp-reminders`);
     await expect(page.getByRole("heading", { level: 1, name: GP.title })).toBeVisible();
-    await expect(page.getByRole("link", { name: "All projects" })).toHaveAttribute("href", "/");
+    await expect(page.getByRole("link", { name: "All of Amara's work" })).toHaveAttribute("href", "/");
     await expect(page.getByRole("navigation", { name: "Other projects" }).getByRole("link", { name: /Next/ })).toHaveAttribute("href", "/library-footfall");
   });
 
