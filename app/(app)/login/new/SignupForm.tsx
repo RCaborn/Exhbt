@@ -5,15 +5,17 @@ import { useFormStatus } from "react-dom";
 import { signup, type FormState } from "../actions";
 import { useContinue } from "../useContinue";
 import { Button } from "@/components/ui/Button";
+import { useHydrated } from "@/lib/use-hydrated";
 
 export function SignupForm({ next }: { next: string }) {
   const [state, action] = useActionState<FormState, FormData>(signup, undefined);
+  const ready = useHydrated();
   useContinue(state?.continueTo);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   return (
-    <form action={action} className="space-y-5" noValidate>
+    <form action={action} className="space-y-5" noValidate data-ready={ready ? "true" : undefined}>
       <input type="hidden" name="next" value={next} />
       <div>
         <label htmlFor="email" className="label">Email address</label>

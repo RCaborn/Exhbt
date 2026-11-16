@@ -5,14 +5,16 @@ import { useFormStatus } from "react-dom";
 import { login, type FormState } from "./actions";
 import { useContinue } from "./useContinue";
 import { Button } from "@/components/ui/Button";
+import { useHydrated } from "@/lib/use-hydrated";
 
 export function LoginForm({ next }: { next: string }) {
   const [state, action] = useActionState<FormState, FormData>(login, undefined);
+  const ready = useHydrated();
   useContinue(state?.continueTo);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   return (
-    <form action={action} className="space-y-5" noValidate>
+    <form action={action} className="space-y-5" noValidate data-ready={ready ? "true" : undefined}>
       <input type="hidden" name="next" value={next} />
       <div>
         <label htmlFor="identifier" className="label">Email or username</label>

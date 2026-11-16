@@ -5,14 +5,16 @@ import { useFormStatus } from "react-dom";
 import { savePassword, type FormState } from "../actions";
 import { useContinue } from "../useContinue";
 import { Button } from "@/components/ui/Button";
+import { useHydrated } from "@/lib/use-hydrated";
 
 export function PasswordForm({ token }: { token?: string }) {
   const [state, action] = useActionState<FormState, FormData>(savePassword, undefined);
+  const ready = useHydrated();
   useContinue(state?.continueTo);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   return (
-    <form action={action} className="space-y-5" noValidate>
+    <form action={action} className="space-y-5" noValidate data-ready={ready ? "true" : undefined}>
       {token && <input type="hidden" name="token" value={token} />}
       <div>
         <label htmlFor="password" className="label">New password</label>
