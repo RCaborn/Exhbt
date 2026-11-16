@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { safeNext, supabaseServer } from "@/lib/auth";
+import { recordReferralFromCookie } from "@/lib/referrals";
 import { getStore, isSupabaseConfigured } from "@/lib/store";
 
 /**
@@ -21,8 +22,11 @@ export async function GET(req: NextRequest) {
 
   const store = getStore();
   await store.claimPendingRoadmaps(data.user.email, data.user.id);
-  // Which email the link came from: the roadmap email or the /login email (signInLinkFor).
-  const via = url.searchParams.get("via") === "login" ? "login" : "roadmap_email";
-  await store.logEvent("signup_completed", data.user.id, { via });
+  const via = url.searchParams.get("via");
+  if (via !== "password") {
+    const source = via === "signup" || via === "login" ? via : "roadmap_email";
+    await store.logEvent("signup_completed", data.user.id, { via: source });
+  }
+  await recordReferralFromCookie(data.user.id, data.user.created_at ?? null);
   return NextResponse.redirect(new URL(next, url.origin));
 }

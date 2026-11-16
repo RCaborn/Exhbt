@@ -7,7 +7,7 @@ import { Generating } from "@/components/roadmap/Generating";
 import { RoadmapViews, parseView, type ProjectsState } from "@/components/roadmap/RoadmapViews";
 import { extractContact } from "@/lib/cv-contact";
 import { ENTITLEMENTS } from "@/lib/entitlements";
-import { ideasFor, planDone, projectsUnlocked } from "@/lib/roadmap/ideas";
+import { ideasState, planDone, projectsUnlocked } from "@/lib/roadmap/ideas";
 import type { BuildState } from "@/components/roadmap/BuildThis";
 import { canCreateExhbt, canSaveIdeas, getPlan } from "@/lib/plan";
 import type { SaveState } from "@/components/roadmap/SaveIdea";
@@ -40,10 +40,13 @@ export default async function RoadmapPage({
   let projects: ProjectsState;
   if (projectsUnlocked(record)) {
     const allowed = ENTITLEMENTS.free.projectSwapsPerRoadmap;
+    // Ideas are only read where they're shown. They're made in the background from the moment the
+    // roadmap is saved, so by now they're usually there; if not, the page shows progress.
+    const { ideas, status } = current === "projects" ? await ideasState(record) : { ideas: [], status: "ready" as const };
     projects = {
       unlocked: true,
-      // Ideas are only read (and seeded on first use) where they're shown.
-      ideas: current === "projects" ? await ideasFor(record) : [],
+      ideas,
+      ideasStatus: status,
       swapsLeft: Math.max(0, allowed - record.projectSwapsUsed),
       done: planDone(record, allowed),
     };
@@ -56,7 +59,7 @@ export default async function RoadmapPage({
   let build: BuildState | undefined;
   // Saving an idea to the list kept across roadmaps (Premium and Max); a locked star on Free.
   let save: SaveState | undefined;
-  if (isPhase2Enabled() && current === "projects" && projects.unlocked) {
+  if (isPhase2Enabled() && current === "projects" && projects.unlocked && projects.ideasStatus === "ready") {
     if (!user) build = { state: "signed-out" };
     else {
       const plan = await getPlan(user.id);

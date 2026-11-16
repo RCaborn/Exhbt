@@ -137,6 +137,13 @@ export const JOB_LINKS_LIVE = false;
 /** Exhbts picked for a job-specific link. */
 export const EXHBTS_PER_JOB_LINK = 4;
 
+/**
+ * What a referrer gets when someone they referred makes a first payment: account credit in Stripe
+ * (a customer balance), in pence and as shown. Referrals are built but off (lib/referrals.ts).
+ */
+export const REFERRAL_CREDIT_PENCE = 500;
+export const REFERRAL_CREDIT = "£5";
+
 /** Shown when a free account has used its roadmaps for the month (builder or project-ideas gate). */
 export function freeRoadmapLimitMessage(): string {
   const n = ENTITLEMENTS.free.roadmapsPer30Days;
@@ -153,12 +160,17 @@ export function roadmapLimitMessage(plan: Plan): string {
 }
 
 /**
- * Prices (Rory, 12 Nov 2026: £9 and £15). A launch or new-joiner discount would be a Stripe
+ * Prices (Rory, 12 Nov 2026: £9 and £15; made yearly by the founders, 16 Nov 2026). A launch or new-joiner discount would be a Stripe
  * promotion code on top of these, not a different figure here. Billed per BILLING_PERIOD.
  */
 export const PRICES: Partial<Record<Plan, string>> = { free: "£0", premium: "£9", max: "£15" };
-/** Assumed monthly until Rory confirms. */
-export const BILLING_PERIOD = "month";
+/**
+ * Paid plans are billed once a year (founders, 16 Nov 2026: Premium £9 a year, Max £15 a year).
+ * Every "a year" on the site, in emails and in the terms reads this. The two Stripe prices must be
+ * yearly recurring prices (LAUNCH.md). Roadmap refreshes stay a rolling 30-day allowance: that is
+ * a usage limit, not the billing period.
+ */
+export const BILLING_PERIOD = "year";
 
 function refreshes(n: number): string {
   return n === 1 ? "1 roadmap refresh a month" : `${n} roadmap refreshes a month`;

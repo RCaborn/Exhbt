@@ -3,12 +3,14 @@ import { ArrowLeft, ArrowRight, Check, Mail } from "lucide-react";
 import { WaitlistForm } from "@/components/waitlist/WaitlistForm";
 import { PLAN_NAMES } from "@/lib/entitlements";
 import { isPhase2Enabled } from "@/lib/site";
+import type { IdeasStatus } from "@/lib/roadmap/ideas";
 import { SkillHighlights } from "@/components/charts/SkillHighlights";
 import { SkillRadar } from "@/components/charts/SkillRadar";
 import { BuildThis, type BuildState } from "@/components/roadmap/BuildThis";
 import { IdeaCard } from "@/components/roadmap/IdeaCard";
 import { PlanEditor } from "@/components/roadmap/PlanEditor";
 import { SaveIdea, type SaveState } from "@/components/roadmap/SaveIdea";
+import { IdeasPending } from "@/components/roadmap/IdeasPending";
 import { ProjectsGate } from "@/components/roadmap/ProjectsGate";
 import type { Roadmap } from "@/lib/ai/schemas";
 import type { Contact } from "@/lib/cv-contact";
@@ -44,7 +46,7 @@ export function parseView(v: string | undefined): ViewKey {
 /** The Projects page: the gate (no email yet), the plan being shaped, or the settled plan. */
 export type ProjectsState =
   | { unlocked: false; prefill: Contact; signedInEmail: string | null }
-  | { unlocked: true; ideas: ProjectIdea[]; swapsLeft: number; done: boolean };
+  | { unlocked: true; ideas: ProjectIdea[]; ideasStatus: IdeasStatus; swapsLeft: number; done: boolean };
 
 type Props = {
   id: string;
@@ -137,7 +139,7 @@ function Overview({ roadmap, role, href }: { roadmap: Roadmap; role: string; hre
       {roadmap.summary && <p className="mt-5 max-w-[38rem] text-lg text-graphite">{roadmap.summary}</p>}
       <ul className="mt-8 divide-y divide-line border-y border-line">
         <SummaryRow href={href("gaps")} label={n(roadmap.gaps.length, "gap to close", "gaps to close")} />
-        <SummaryRow href={href("projects")} label={n(roadmap.projects.length, "project to prove them", "projects to prove them")} />
+        <SummaryRow href={href("projects")} label="Project ideas to prove them" />
         <SummaryRow href={href("strengths")} label={n(roadmap.strengths.length, "strength already in your CV", "strengths already in your CV")} />
       </ul>
     </>
@@ -217,13 +219,25 @@ function Projects({
     return (
       <>
         <Context role={role} />
-        <h1 className="mt-2">Your project ideas are ready</h1>
+        <h1 className="mt-2">Your project ideas</h1>
         <p className="mt-3 text-graphite">Tell us who you are and we&rsquo;ll email you a copy.</p>
         <ProjectsGate id={id} prefill={state.prefill} signedInEmail={state.signedInEmail} />
       </>
     );
   }
-  const { ideas, swapsLeft, done } = state;
+  const { ideas, ideasStatus, swapsLeft, done } = state;
+  // The ideas are written in the background (docs/decisions/0019). Until they exist there is a
+  // progress state, or a way to try again, and never an "empty" page.
+  if (ideasStatus !== "ready") {
+    return (
+      <>
+        <Context role={role} />
+        <h1 className="mt-2">Projects that would prove them</h1>
+        <p className="mt-3 text-graphite">Three ideas, each ending in something real you can attach as evidence.</p>
+        <IdeasPending id={id} initial={ideasStatus} />
+      </>
+    );
+  }
   return (
     <>
       <Context role={role} />
@@ -231,9 +245,7 @@ function Projects({
       <p className="mt-3 text-graphite">
         {done ? "Each one ends with something real you can attach as evidence." : "Swap any that don’t fit, then keep your plan."}
       </p>
-      {ideas.length === 0 ? (
-        <Empty>We didn&rsquo;t have enough to suggest projects. Try again with more detail about your experience.</Empty>
-      ) : done ? (
+      {done ? (
         <ol aria-label="Your plan" className="mt-8 space-y-4">
           {ideas.map((p) => (
             <li key={p.id}>

@@ -17,6 +17,10 @@
     // off in an emergency, set EXHBT_PHASE2 to 0 in the Worker's dashboard variables: that holds
     // until the next deploy from main, which sets it back to this value.
     "EXHBT_PHASE2": "1",
+    // Public site: no "Private preview" bar, no noindex, robots.txt open (lib/site.ts). The build
+    // reads this too (next.config.ts), so the production build step needs EXHBT_PUBLIC=1 as well.
+    // env.preview below deliberately leaves it out, so the preview site keeps the bar.
+    "EXHBT_PUBLIC": "1",
     // Stripe price ids for Premium and Max (not secret). Placeholders: replace with the real
     // price_... ids from the Stripe dashboard (LAUNCH.md, Stripe). Keys stay Worker secrets.
     "STRIPE_PRICE_PREMIUM": "price_REPLACE_WITH_PREMIUM",

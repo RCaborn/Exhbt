@@ -157,7 +157,7 @@ function Plan({
   /** Show the action as a button (choosing a paid plan) rather than a text link. */
   button?: boolean;
   price?: string;
-  /** Billing period shown after a paid price, e.g. "month". */
+  /** Billing period shown after a paid price, e.g. "year". */
   per?: string;
   badge?: string;
   features: string[];

@@ -93,22 +93,22 @@ Each service switches on when its environment variables are set; until then the 
 
 | Service | Variables | Without it |
 |---|---|---|
-| **Supabase** (database, sign-in, files), London region | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | In-memory store (lost on restart) and a dev sign-in link. **Production refuses to start without it.** |
+| **Supabase** (database, sign-in, files), EU (Paris, eu-west-3) live; the preview project is London | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | In-memory store (lost on restart), a password kept in memory for `/login`, and a dev sign-in link. **Production refuses to start without it.** |
 | **Anthropic** (roadmap generation, `claude-haiku-5-5`) | `ANTHROPIC_API_KEYS` | Labelled placeholder roadmap |
 | **Resend** (roadmap email) | `RESEND_API_KEY`, `EMAIL_FROM` | Emails go to `/dev/emails` |
 | Cookie and link signing | `EXHBT_COOKIE_SECRET` | Dev default; **required in production** |
 | Public URL (used in email links) | `NEXT_PUBLIC_SITE_URL` | Taken from the request |
 
 Supabase setup:
-1. Create a project in **London (eu-west-2)** and run every file in `supabase/migrations/` in date order.
-2. Under Auth, enable email sign-in, set the Site URL, and add `https://<domain>/auth/callback` and `https://<domain>/auth/confirm` as redirect URLs.
-3. Sign-in emails from `/login` are sent by the app through Resend, like the roadmap email (`sendMagicLink` in `lib/auth.ts`), so they don't depend on Supabase's SMTP or email templates. Their links go to `/auth/confirm` and work on any device.
+1. Create a project in an EU region (live is Paris, eu-west-3; the preview project is London, eu-west-2) and run every file in `supabase/migrations/` in date order.
+2. Under Auth, enable the email provider (password sign-in), set the Site URL, and add `https://<domain>/auth/callback` and `https://<domain>/auth/confirm` as redirect URLs.
+3. `/login` is an email or username plus a password (`lib/password-auth.ts`). A new account gets one confirmation email, and setting a password on an older account gets one reset email. Both are sent by the app through Resend, not by Supabase's SMTP, and their links go to `/auth/confirm` so they work on any device. The roadmap email still includes its own sign-in link (`signInLinkFor` in `lib/auth.ts`).
 4. Verify your sending domain (exhbt.co.uk) in Resend.
 5. When the UK jobs dataset is available, load it with `node scripts/import-jobs.mjs path/to/jobs.csv` (needs the Supabase URL and service-role key in the environment; see the header of the script for the expected columns). Until then a small sample of roles in `lib/jobs/seed.ts` is used.
 
 Then deploy. The intended route is Cloudflare building from GitHub on every push to `main`; **[LAUNCH.md](LAUNCH.md)** has the click-by-click steps. Manual alternative: `npm run deploy`, with secrets set via `npx wrangler secret put <NAME>`.
 
-**Private preview vs public:** the site is private by default: `noindex` everywhere, `robots.txt` disallows all, and a preview bar shows. It only goes public when built with `EXHBT_PUBLIC=1` (`lib/site.ts`). In production a missing `ANTHROPIC_API_KEYS` or `RESEND_API_KEY` fails loudly (logged); it never falls back to placeholder roadmaps or the dev outbox.
+**Private preview vs public:** the site is private by default: `noindex` everywhere, `robots.txt` disallows all, and a preview bar shows. It only goes public when built with `EXHBT_PUBLIC=1` (`lib/site.ts`, `next.config.ts`). Production sets it in `wrangler.jsonc` `vars` (and the production build step must too); the preview Worker does not. In production a missing `ANTHROPIC_API_KEYS` or `RESEND_API_KEY` fails loudly (logged); it never falls back to placeholder roadmaps or the dev outbox.
 
 ## Phase 2: services and settings
 
@@ -166,6 +166,7 @@ Where Phase 2 lives:
   - other-browser protection
   - email sent once
   - Free monthly limit, unsubscribe
+- `password-login.spec.ts`: create an account, log in with the email or the username, and set a new password from the reset link
 - `a11y.spec.ts`: axe WCAG 2.1 AA on every public page, every builder step and every result view.
 - `responsive.spec.ts`: the home CTA is above the fold on desktop and phone; no sideways scrolling.
 - `preview.spec.ts`: private-preview noindex, robots and banner.

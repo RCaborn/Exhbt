@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getStore, type SubscriptionRecord } from "@/lib/store";
+import { applyReferralsOnCheckout } from "@/lib/referrals";
 import { isPaidPlan, planForPrice, stripe, verifyWebhook, type Stripe } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
@@ -29,10 +30,18 @@ export async function POST(req: NextRequest) {
       case "checkout.session.completed": {
         const session = event.data.object;
         if (session.mode !== "subscription" || !session.subscription) break;
-        const id = typeof session.subscription === "string" ? session.subscription : session.subscription.id;
-        // The session doesn't carry the subscription's period or price, so fetch it.
-        const sub = await stripe().subscriptions.retrieve(id);
-        await save(sub, session.client_reference_id, event.created);
+        // The session doesn't carry the subscription's period or price, so fetch it (unless it came expanded).
+        const sub =
+          typeof session.subscription === "string" ? await stripe().subscriptions.retrieve(session.subscription) : session.subscription;
+        const userId = await save(sub, session.client_reference_id, event.created);
+        // Referrals (decision 0020; does nothing while they are off). After the plan is saved, so a
+        // Stripe failure here makes the webhook retry without losing the subscription. A free first
+        // checkout (a 100% code) doesn't count as a payment.
+        if (userId) {
+          const customer = typeof sub.customer === "string" ? sub.customer : (sub.customer?.id ?? null);
+          const paidNow = session.payment_status === "paid" && (session.amount_total ?? 0) > 0;
+          await applyReferralsOnCheckout(userId, customer, paidNow);
+        }
         break;
       }
       case "customer.subscription.updated":
@@ -52,19 +61,23 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ received: true });
 }
 
-/** Writes a subscription to our table and logs the change. */
-async function save(sub: Stripe.Subscription, clientReferenceId: string | null, eventCreated: number, forceStatus?: string) {
+/**
+ * Writes a subscription to our table and logs the change. Returns the user it was for, or null
+ * when the event named no user or a price we don't sell. An event older than the stored one still
+ * returns the user: the plan is already right, but a referral on the checkout still needs doing.
+ */
+async function save(sub: Stripe.Subscription, clientReferenceId: string | null, eventCreated: number, forceStatus?: string): Promise<string | null> {
   // Checkout puts our user id on the session and on the subscription's metadata (billing/actions.ts).
   const userId = clientReferenceId || sub.metadata?.user_id;
   if (!userId) {
     console.warn(`[stripe] subscription without our user id, ignored`);
-    return;
+    return null;
   }
   const item = sub.items?.data?.[0];
   const plan = planForPrice(item?.price?.id) ?? (isPaidPlan(sub.metadata?.plan) ? sub.metadata.plan : null);
   if (!plan) {
     console.warn(`[stripe] subscription for a price we don't sell, ignored`);
-    return;
+    return null;
   }
   // Recent API versions keep the period on each item; older ones on the subscription.
   const periodEnd =
@@ -82,7 +95,8 @@ async function save(sub: Stripe.Subscription, clientReferenceId: string | null, 
   const store = getStore();
   if (!(await store.upsertSubscription(record))) {
     console.warn(`[stripe] event older than the one already applied, ignored`);
-    return;
+    return userId;
   }
   await store.logEvent("subscription_changed", userId, { plan: record.plan, status: record.status });
+  return userId;
 }
