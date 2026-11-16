@@ -75,15 +75,17 @@ export function applyBlock(doc: ExhbtDoc, key: DraftBlock, value: BlockValue): E
   switch (key) {
     case "header": {
       const v = value as BlockValues["header"];
+      // Rewrites no longer write a headline number (decision 0022), so one the doc has is kept unless the value brings its own.
       const { headline: _old, ...rest } = doc;
       void _old;
+      const headline = v.headline ?? doc.headline;
       return {
         ...rest,
         title: v.title,
         context: v.context,
         ...(v.whereWhen !== undefined ? { whereWhen: v.whereWhen } : {}),
         ...(v.summary !== undefined ? { summary: v.summary } : {}),
-        ...(v.headline ? { headline: v.headline } : {}),
+        ...(headline ? { headline } : {}),
       };
     }
     case "gap":

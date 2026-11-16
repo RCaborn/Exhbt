@@ -1,4 +1,4 @@
-import { LIMITS, sectionTexts, words, type Section, type SectionKind, type SectionOf } from "./blocks";
+import { LIMITS, sectionTexts, text, words, type ExhbtDoc, type Section, type SectionKind, type SectionOf } from "./blocks";
 import { newChart } from "./charts";
 
 /**
@@ -64,3 +64,17 @@ export function moveSection<T>(sections: T[], from: number, to: number): T[] {
 
 /** Words a section puts on the page. */
 export const sectionWords = (s: Section): number => sectionTexts(s).reduce((n, t) => n + words(t), 0);
+
+/**
+ * The hook for a key figure picked from the person's upload (e.g. the best graph in their PDF,
+ * decision 0022): the doc with an image section for `fileId` placed straight after "What I
+ * found", so the page draws it beside the findings, or first when there are no findings. A key
+ * figure already there for the same file is left alone. Unchanged when both image slots are used.
+ */
+export function withKeyFigure(doc: ExhbtDoc, figure: { fileId: string; alt: string; caption?: string }): ExhbtDoc {
+  const ss = doc.sections;
+  if (ss.some((s) => s.kind === "image" && s.fileId === figure.fileId) || roomFor(ss, "image") === 0) return doc;
+  const section: SectionOf<"image"> = { ...newImageSection(figure.fileId, ss), alt: figure.alt, caption: text(figure.caption?.trim() ?? "") };
+  const at = ss.findIndex((s) => s.kind === "findings") + 1;
+  return { ...doc, sections: [...ss.slice(0, at), section, ...ss.slice(at)] };
+}

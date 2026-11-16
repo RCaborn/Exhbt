@@ -2,7 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
-import { LIMITS, SCHEMA_VERSION, text, words, type ExhbtDoc, type Section } from "@/lib/exhbt/blocks";
+import { LIMITS, SCHEMA_VERSION, text, withHighlight, words, type ExhbtDoc, type Section } from "@/lib/exhbt/blocks";
 import { CHART_KINDS, hasData, type Chart } from "@/lib/exhbt/charts";
 import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
@@ -33,11 +33,13 @@ Rules:
 - Write for a recruiter's quick read: short, concrete, plain British English. No hype words, no exclamation marks, no first person plural.
 
 Fields:
-- title: what was done and what came of it, at most ${L.titleChars} characters.
-- context: one line under the title, at most ${L.contextChars} characters, e.g. "BSc Economics, final-year project". Empty if the material doesn't say.
-- headline: the one number that sums the project up, with a two-to-four word label. Null if there is no such number.
+- title: the question the work set out to answer, written as a question that ends with "?", at most ${L.titleChars} characters, e.g. "Will banks and fintechs cooperate under open banking?". Use the material's own subject and words.
+- summary: one sentence, at most ${L.summaryWords} words, on what the work found. It goes on portfolio cards, so it must make sense on its own.
+- context: what the work is, at most ${L.contextChars} characters, e.g. "MSc Finance dissertation" or "Year 2 group project". Empty if the material doesn't say.
+- whereWhen: where and when it was done, at most ${L.whereWhenChars} characters, e.g. "University of St Andrews, August 2026". Only what the material states; empty if it doesn't say.
 - skills: up to ${L.skills.max} skills the material shows being used, each at most ${L.skills.wordsEach} words (e.g. "Python", "Regression analysis").
-- gap: the question and why it mattered, at most ${L.gapWords} words, at most 2 short sentences.
+- gap: the line of context under the question: why it matters, at most ${L.gapWords} words, at most 2 short sentences, e.g. "Open banking makes banks share customer data. Nobody knows whether banks and fintechs will then cooperate or compete."
+- gapHighlight: the words in gap that name the gap (what nobody knew or had done), copied exactly from gap, e.g. "Nobody knows whether banks and fintechs will then cooperate or compete." Empty if gap has no such words.
 - flow: ${L.flow.min} to ${L.flow.max} steps of the process, in order, each at most ${L.flow.stepWords} words. "detail" is an optional note of at most ${L.flow.detailWords} words (e.g. "14,200 rows"), or null.
 - findings: ${L.findings.min} to ${L.findings.max} short bullets of what was found or achieved, each at most ${L.findings.wordsEach} words.
 - charts: usually one graph, a second only when the material has a separate set of figures worth one (never more than ${L.charts.max}), only from figures stated in the material, each value copied as written there (no totals, averages or changes you work out). An empty list when the material has no figures worth a graph. Choose the kind that fits the figures:
@@ -77,10 +79,12 @@ export type DraftChart = z.infer<typeof DraftChartSchema>;
 
 const DraftSchema = z.object({
   title: z.string(),
+  summary: z.string(),
   context: z.string(),
-  headline: z.object({ value: z.string(), label: z.string() }).nullable(),
+  whereWhen: z.string(),
   skills: z.array(z.string()),
   gap: z.string(),
+  gapHighlight: z.string(),
   flow: z.array(z.object({ step: z.string(), detail: z.string().nullable() })),
   findings: z.array(z.string()),
   charts: z.array(DraftChartSchema),
@@ -192,10 +196,13 @@ export function toDoc(d: Draft, source: string): ExhbtDoc {
   return {
     schemaVersion: SCHEMA_VERSION,
     title: d.title.trim().slice(0, L.titleChars),
+    // What it is and where and when sit in the sidebar (decision 0022); the summary goes on portfolio cards.
     context: d.context.trim().slice(0, L.contextChars),
-    ...(d.headline && nonEmpty(d.headline.value) ? { headline: { value: d.headline.value.trim(), label: d.headline.label.trim() } } : {}),
+    ...(nonEmpty(d.whereWhen) ? { whereWhen: d.whereWhen.trim().slice(0, L.whereWhenChars) } : {}),
+    ...(nonEmpty(d.summary) ? { summary: d.summary.trim() } : {}),
     skills: d.skills.map((s) => s.trim()).filter(nonEmpty).slice(0, L.skills.max),
-    gap: text(d.gap.trim()),
+    // The highlighted gap only when its words are really in the line.
+    gap: withHighlight(d.gap, d.gapHighlight),
     flow: d.flow
       .filter((s) => nonEmpty(s.step))
       .slice(0, L.flow.max)
@@ -319,11 +326,13 @@ function mockDraft(input: DraftInput): DraftResult {
     costUsd: 0,
     numbers,
     doc: toDoc({
-      title: "Development preview: a placeholder draft",
-      context: "Placeholder context line",
-      headline: null,
+      title: "Development preview: what would the AI draft from your files?",
+      summary: "A placeholder draft, made without an API key.",
+      context: "Placeholder: what the work is",
+      whereWhen: "Placeholder: where and when",
       skills: ["Placeholder skill"],
       gap: `No API key is configured, so this draft is placeholder text. Set ${ANTHROPIC_API_KEYS_ENV} to draft from your files.`,
+      gapHighlight: "this draft is placeholder text",
       flow: [
         { step: "Read the material", detail: null },
         { step: "Drafted the blocks", detail: null },

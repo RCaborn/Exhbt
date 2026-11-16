@@ -402,3 +402,16 @@ export function publicDoc(raw: ExhbtDoc): ExhbtDoc {
 
 /** Plain text to runs, for drafts and for tests. */
 export const text = (t: string): RichText => (t ? [{ t }] : []);
+
+/**
+ * The context line as runs, with `phrase` (the gap) marked: the bold run the page draws as a
+ * highlight (decision 0022). The first place the phrase occurs, as written; plain text when it's
+ * empty or not in the line, so the AI can't highlight words that aren't there.
+ */
+export function withHighlight(line: string, phrase: string): RichText {
+  const t = line.trim();
+  const p = phrase.trim().replace(/^["“‘']+|["”’']+$/g, "").trim();
+  const at = p ? t.indexOf(p) : -1;
+  if (at < 0) return text(t);
+  return [{ t: t.slice(0, at) }, { t: p, b: true }, { t: t.slice(at + p.length) }].filter((r) => r.t.length > 0);
+}

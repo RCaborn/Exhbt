@@ -182,7 +182,7 @@ export function ProjectView({
             </p>
           )}
 
-          <section aria-label="Process" className="mt-8 break-inside-avoid print:mt-5">
+          <section aria-label="Process" data-part="process" className="mt-8 break-inside-avoid print:mt-5">
             <MethodFlow steps={doc.flow} variant="page" />
           </section>
 
@@ -249,7 +249,7 @@ export function SectionsView({ sections, imageUrls, Sub }: { sections: Section[]
         switch (run.kind) {
           case "found":
             return (
-              <div key={run.findings.id} className="xp-section xp-found grid items-center gap-8 @2xl/main:grid-cols-[minmax(0,0.92fr)_minmax(0,1fr)] @2xl/main:gap-9 print:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)] print:gap-5">
+              <div key={run.findings.id} data-found className="xp-section xp-found grid items-center gap-8 @2xl/main:grid-cols-[minmax(0,0.92fr)_minmax(0,1fr)] @2xl/main:gap-9 print:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)] print:gap-5">
                 <Findings s={run.findings} Sub={Sub} />
                 <Figure s={run.figure} imageUrls={imageUrls} />
               </div>
@@ -294,7 +294,7 @@ export function SectionBlock({ s, Sub, imageUrls }: { s: Section; Sub: Sub; imag
       );
     case "quote":
       return (
-        <section aria-labelledby={`${s.id}-h`} className="xp-section break-inside-avoid">
+        <section aria-labelledby={`${s.id}-h`} data-part="quote" className="xp-section break-inside-avoid">
           <Sub id={`${s.id}-h`} className="xp-label">
             Feedback
           </Sub>
@@ -308,7 +308,7 @@ export function SectionBlock({ s, Sub, imageUrls }: { s: Section; Sub: Sub; imag
       );
     case "reflection":
       return (
-        <section aria-labelledby={`${s.id}-h`} className="xp-section xp-next break-inside-avoid border-t pt-6 print:pt-3">
+        <section aria-labelledby={`${s.id}-h`} data-part="reflection" className="xp-section xp-next break-inside-avoid border-t pt-6 print:pt-3">
           <Sub id={`${s.id}-h`} className="xp-label">
             What I&apos;d do next
           </Sub>
@@ -321,7 +321,7 @@ export function SectionBlock({ s, Sub, imageUrls }: { s: Section; Sub: Sub; imag
       const href = safeHref(s.href);
       const label = s.label.trim() || "Link";
       return (
-        <section aria-label="Link" className="xp-section break-inside-avoid">
+        <section aria-label="Link" data-part="link" className="xp-section break-inside-avoid">
           <div className="xp-card px-5 py-4">
             {href ? (
               <a href={href} rel="nofollow ugc noopener" target="_blank" className="xp-link inline-flex items-center gap-1.5 font-semibold">
@@ -342,7 +342,7 @@ export function SectionBlock({ s, Sub, imageUrls }: { s: Section; Sub: Sub; imag
 /** "What I found": a heading over a rule, then the findings as a ruled list. */
 function Findings({ s, Sub }: { s: SectionOf<"findings">; Sub: Sub }) {
   return (
-    <section aria-labelledby={`${s.id}-h`} className="min-w-0 break-inside-avoid">
+    <section aria-labelledby={`${s.id}-h`} data-part="findings" className="min-w-0 break-inside-avoid">
       <Sub id={`${s.id}-h`} className="xp-found-heading xp-display border-b pb-3 text-[1.5rem] leading-tight print:text-[1.35rem]">
         What I found
       </Sub>
@@ -361,7 +361,7 @@ function Findings({ s, Sub }: { s: SectionOf<"findings">; Sub: Sub }) {
 function Figure({ s, imageUrls }: { s: SectionOf<"graph"> | SectionOf<"image">; imageUrls: ImageUrls }) {
   if (s.kind === "graph") {
     return (
-      <div className="xp-figure min-w-0 break-inside-avoid p-5 print:p-3" data-section-kind="graph">
+      <div className="xp-figure min-w-0 break-inside-avoid p-5 print:p-3" data-part="graph">
         <Chart data={s.chart} />
       </div>
     );
@@ -369,7 +369,7 @@ function Figure({ s, imageUrls }: { s: SectionOf<"graph"> | SectionOf<"image">; 
   const src = imageUrls[s.fileId];
   if (!src) return null;
   return (
-    <figure className="xp-figure m-0 min-w-0 break-inside-avoid p-4 print:p-3" data-section-kind="image">
+    <figure className="xp-figure m-0 min-w-0 break-inside-avoid p-4 print:p-3" data-part="image">
       <img src={src} alt={s.alt} className="w-full rounded-[max(0px,calc(var(--xp-radius-card)-8px))] print:max-h-[62mm] print:w-auto" />
       {s.caption.length > 0 && (
         <figcaption className="xp-muted mt-2.5 text-sm leading-snug">
