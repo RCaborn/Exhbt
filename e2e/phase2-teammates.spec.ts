@@ -104,11 +104,13 @@ test.describe("Inviting teammates", () => {
     await page.goto(link);
     await expect(page.getByRole("heading", { level: 1, name: "This invite is for another address" })).toBeVisible();
 
-    // Signing in is the usual magic link, through the dev outbox's stand-in.
+    // A new address has no password yet, so they create an account and come straight back.
     await page.getByRole("link", { name: "Sign in with that address" }).click();
+    await page.getByRole("link", { name: "Create an account" }).click();
     await page.getByLabel("Email address").fill(mate);
-    await page.getByRole("button", { name: "Email me a link" }).click();
-    await page.getByRole("link", { name: "Open the sign-in link" }).click();
+    await page.getByLabel("Password", { exact: true }).fill("correct-horse");
+    await page.getByLabel("Confirm password").fill("correct-horse");
+    await page.getByRole("button", { name: "Create account" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Join a team project" })).toBeVisible();
     await expect(page.getByText(/invited you to Cutting missed GP appointments/)).toBeVisible();
     await axe(page);
