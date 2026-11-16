@@ -240,7 +240,7 @@ export function StepProjects({
         <IconButton label={`Hide ${p.title} from your portfolio`} onClick={() => hide(key)}>
           <EyeOff aria-hidden size={16} strokeWidth={2} />
         </IconButton>
-        <Link href={`/exhbts/${key}/edit`} aria-label={`Edit ${p.title}`} title={`Edit ${p.title}`} className={ICON_BTN}>
+        <Link href={`/exhbts/${key}/edit`} data-icon-button aria-label={`Edit ${p.title}`} title={`Edit ${p.title}`} className={ICON_BTN}>
           <Pencil aria-hidden size={16} strokeWidth={2} />
         </Link>
       </div>
