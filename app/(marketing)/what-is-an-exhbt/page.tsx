@@ -91,7 +91,7 @@ export default function WhatIsAnExhbt() {
             any of them. This one is an example. {demoOwner.name} and the project are made up, so the link to the work is left out.
           </p>
           <div className="mt-12 grid gap-12 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-20">
-            <div className="min-w-0 lg:sticky lg:top-8 lg:self-start">
+            <div className="min-w-0 rounded-[20px] border border-line bg-surface p-5 shadow-pack sm:p-6 lg:sticky lg:top-8 lg:self-start">
               <ProjectView
                 doc={doc}
                 owner={{ name: demoOwner.name, photoUrl: null }}
