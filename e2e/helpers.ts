@@ -38,7 +38,7 @@ export async function buildRoadmap(page: Page, opts: { role?: string; withCv?: b
 /** Opens the Projects view, fills in the details gate and submits it. */
 export async function unlockProjects(page: Page, opts: { email: string; name?: string; linkedin?: string; optIn?: boolean }) {
   await page.goto(`${page.url().split("?")[0]}?view=projects`);
-  await expect(page.getByRole("heading", { level: 1, name: "Your project ideas are ready" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your project ideas" })).toBeVisible();
   await page.getByLabel("Name").fill(opts.name ?? "Test Person");
   await page.getByLabel("Email", { exact: true }).fill(opts.email);
   if (opts.linkedin) await page.getByLabel(/LinkedIn/).fill(opts.linkedin);

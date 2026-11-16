@@ -203,7 +203,7 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     const resultUrl = page.url().split("?")[0];
 
     // Click through the free views with the Next button, up to the project-ideas gate.
-    for (const heading of ["Gaps to close", "Already in your CV", "Your project ideas are ready"]) {
+    for (const heading of ["Gaps to close", "Already in your CV", "Your project ideas"]) {
       await page.locator("a.next-view").click();
       await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
       await expect(page.getByRole("heading", { level: 1, name: heading })).toBeInViewport();
@@ -268,7 +268,7 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await unlockProjects(page, { email });
     const noun = limit === 1 ? "roadmap" : "roadmaps";
     await expect(page.getByText(`You've used this month's ${limit} free ${noun}.`)).toBeVisible();
-    await expect(page.getByRole("heading", { level: 1, name: "Your project ideas are ready" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Your project ideas" })).toBeVisible();
   });
 
   test("the gate prefills name, email and LinkedIn from the CV, and keeps what's typed on an error", async ({ page }) => {

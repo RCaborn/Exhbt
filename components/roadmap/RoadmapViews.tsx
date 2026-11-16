@@ -219,7 +219,7 @@ function Projects({
     return (
       <>
         <Context role={role} />
-        <h1 className="mt-2">Your project ideas are ready</h1>
+        <h1 className="mt-2">Your project ideas</h1>
         <p className="mt-3 text-graphite">Tell us who you are and we&rsquo;ll email you a copy.</p>
         <ProjectsGate id={id} prefill={state.prefill} signedInEmail={state.signedInEmail} />
       </>
