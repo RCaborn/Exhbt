@@ -6,6 +6,7 @@ const uniqueName = (tag: string) => `${tag}${Date.now().toString(36)}${Math.floo
 
 async function createAccount(page: Page, email: string, password: string, next = "/account") {
   await page.goto(`/login/new?next=${encodeURIComponent(next)}`);
+  await expect(page.locator("form[data-ready=true]")).toBeAttached();
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByLabel("Confirm password").fill(password);
@@ -19,6 +20,7 @@ test("rejects a short or mismatched password, then signs in with the email", asy
   const email = uniqueEmail("pw");
   const password = "correct-horse";
   await page.goto("/login/new?next=/account");
+  await expect(page.locator("form[data-ready=true]")).toBeAttached();
   await expect(page.getByRole("button", { name: "Email me a link" })).toHaveCount(0);
 
   await page.getByLabel("Email address").fill(email);
@@ -106,6 +108,9 @@ test("sets a new password from the one-time link, and the old one stops working"
   await page.getByRole("link", { name: "Open the link" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Choose a password" })).toBeVisible();
   await expect(page.getByText(email)).toBeVisible();
+  // The form must be hydrated before the first submit. A submit before that is a plain POST that
+  // re-renders the page with empty fields, so the second submit below would send an empty password.
+  await expect(page.locator("form[data-ready=true]")).toBeAttached();
 
   await page.getByLabel("New password").fill(second);
   await page.getByLabel("Confirm password").fill("not-the-same");
