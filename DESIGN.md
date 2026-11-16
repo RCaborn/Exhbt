@@ -70,7 +70,7 @@ Feedback only: buttons respond to hover and press (Astryx), link underlines dark
 Full rules, sizes and don'ts are in `docs/brand.md`. In short:
 - **Mark** (`components/brand/Logo.tsx`): the kit's Frame route. A mint tile with ink viewfinder brackets and a dot: one piece of work in focus. `app/icon.svg` is the favicon.
 - **Wordmark**: lower-case `exhbt`, Bricolage Grotesque 600. In running text the company is "Exhbt" and the pieces are "exhbts".
-- **Catalogue numbers**: `EX·01`, `EX·02`… on tiles and full exhbts, from the exhbt's position in its portfolio (`catalogueNo` in `lib/exhbt.ts`). They are references an employer can use, so they're allowed; numbering marketing sections is still banned.
+- **Catalogue numbers**: `EX·01`, `EX·02`… on tiles and the demo card (`Exhbt.tsx`), not on the exhbt page itself (decision 0022), from the exhbt's position in its portfolio (`catalogueNo` in `lib/exhbt.ts`). They are references an employer can use, so they're allowed; numbering marketing sections is still banned.
 - **Seal** (`components/brand/Seal.tsx`): mark + "checked by exhbt" + date. Says the checks ran, not that results are true, so never "verified". Links to `/how-to-read-an-exhbt#checks` (except inside a tile, which is already a link).
 - **Brand band**: the portfolio header is the page's one coloured surface (`PortfolioHeader`, slim `PortfolioBar` above a single exhbt). Ink by default, with white and `#C9CBCF` text on it.
 - **Portfolio looks** (`lib/portfolio-themes.ts`, decision 0012): a fixed list of band colourways, each with a heading face (Bricolage Grotesque, Inter Tight, Space Grotesk or Fraunces) and a photo shape (round or rounded square). Colours come only from the tokens above, plus `deep-jade` as a ground. Nobody picks a colour; every look is checked once, and every text on its band must reach WCAG AA (the contrast test in `e2e/phase2-themes.spec.ts`). Only the band and the portfolio's headings change; the rest of the page stays as it is.
@@ -104,19 +104,23 @@ Full rules, sizes and don'ts are in `docs/brand.md`. In short:
 - `SkillRadar`: one axis per skill (3–6, fixed in the job's order), levels 0–4 from the centre. The same pair: "from" as a light fill, "to" as a dark outline. Grid in `line`. Labels are HTML over the SVG and show skill names only: **no numbers** (the levels are AI estimates; Rory, 9 Nov 2026). The meaning is carried in words instead. "Level up next" skills get an ink arrow-up marker, and "In the bag" skills get the same green tick as the strengths screen; both are set in ink semibold. Under the chart, `SkillHighlights` lists the two groups (up to three skills each). One line gives where the skills came from (`SKILLS_SOURCE_NOTE`). A hidden data table holds every level. No animation. Radars exaggerate area, so don't add shading, gradients or a third series.
 
 ## The exhbt in Phase 2
-Phase 2 swaps the card above for a block layout (decisions 0007 and 0015), drawn by `components/portfolio/ProjectView.tsx`. A recruiter skims it, so every part is short and mostly bullets. The core comes first, always, in this order:
-- the person's photo and name top left, skill boxes top right
-- the title, then a one-line context
-- the question: what the gap was and why it mattered
-- the process flowchart (`MethodFlow`), straight after the question
+Phase 2 swaps the card above for the page Rory drew on 16 Nov 2026 (`docs/design/portfolio-and-exhbt-layouts.pdf`, page 2; decisions 0007, 0015 and 0022), drawn by `components/portfolio/ProjectView.tsx`. A recruiter skims it, so every part is short and mostly bullets. No catalogue number and no headline figure on it.
 
-Below the flowchart, sections in the order the person sets: findings as bullets, up to two graphs (any of the kinds above, with their rules), up to two images with captions, a quote, what I'd do next and a link. Graphs next to each other share a row on wide pages and in print, and so do images. Each kind has a small caption-size heading in graphite, like "The question", except graphs, images and the link. The quote sits in curly quotes at body size under the heading "Feedback", with the name and role underneath in graphite; it never gets formatting. The link is one bordered row (14px radius, like other small panels, with a `line` edge): its label as an ink link with the up-right arrow, the description under it in graphite, and no address shown.
+The sidebar, on the left (above the main column on phones and in the editor's preview): a mist card with the photo, the name, the short line under it and "All of <first name>'s work"; then "What it is" and "Where and when" as small graphite labels over semibold values, with hairlines between; "Can you trust it?" with filled jade ticks (hollow and graphite for a check that hasn't happened); "See the work: <file name>" as the one mint button, full width; "Save as PDF" as a text link.
 
-The footer, at the foot of every exhbt: the work, one click away, and the trust badge.
+The main column, in this order, always:
+- skill pills, top right, on mist with no edge
+- the title, which is the question, large in the display face (about 56px on a wide page)
+- the context line in graphite at about 19px, its gap highlighted as a flat block of mint mixed with white (the bold run, drawn as `<mark class="xp-mark">`; not the `.highlight` stroke used on marketing pages)
+- the process flowchart (`MethodFlow variant="page"`): boxes with a `line` edge and 12px corners, arrows between, the last box ink with white text, no step numbers. A row from 42rem of column width and in print, a column below that.
 
-150–200 words, and every word on the page counts, graph labels, captions and the quote's name included; only image alt text and link addresses are left out (decision 0009). The core's order never changes. Limits are `LIMITS` in `lib/exhbt/blocks.ts`.
+Below the flowchart, sections in the order the person sets. "What I found" is a display-face heading over an ink rule, with the points as a ruled list; next to a graph or image (straight before or after it) the two share a row, findings on the left. Graphs and images sit in a white card with a `line` edge (graphs never on mist); two of a kind next to each other share a row. The quote, under "Feedback", has a jade rule down its left; "What I'd do next" has a hairline above and a small graphite label; the link is a mist card with its label as a link and no address shown.
 
-In the editor each section is a card with a visible grip handle (the `GripVertical` icon, a round button), move up and down buttons, and remove. While a card is dragged it takes the `shadow-pack` shadow, and nothing animates for people who ask for less motion (`useReducedMotion` in `components/ui/`).
+Every colour, radius and face on the page is a `--xp-*` variable (`app/globals.css`, listed in decision 0022), so a portfolio look restyles the whole page, ground included. Don't use Tailwind colour classes on it for anything a look might change.
+
+150–200 words, and every word on the page counts, graph labels, captions, the quote's name, the summary and where and when included; only image alt text and link addresses are left out (decision 0009). The core's order never changes. Limits are `LIMITS` in `lib/exhbt/blocks.ts`.
+
+In the editor each section is a card with a visible grip handle (the `GripVertical` icon, a round button), move up and down buttons, and remove. While a card is dragged it takes the `shadow-pack` shadow, and nothing animates for people who ask for less motion (`useReducedMotion` in `components/ui/`). The preview's "Arrange sections" draws the sections one under another with a grip and move buttons on each, a dashed edge round each, and a jade edge on the one being dragged.
 
 ## Flow patterns
 - **Click-through, not long pages**, for the roadmap builder and result. Marketing pages scroll normally.

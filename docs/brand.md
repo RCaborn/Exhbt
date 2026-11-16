@@ -25,7 +25,7 @@ Lower case because it reads as a product and as the URL people will type. In sen
 Every exhbt in a portfolio has a number like a museum accession number: `EX·01`, `EX·02`.
 
 - Derived from its position in the owner's portfolio (`catalogueNo(position)` in `lib/exhbt.ts`). Never stored and never typed by hand.
-- Inter with tabular numbers, semibold, ink. On a tile it sits top left; on a full exhbt it sits above the author line.
+- Inter with tabular numbers, semibold, ink. On a tile it sits top left; on the demo card (`Exhbt.tsx`) it sits above the author line. The exhbt page itself doesn't show one (decision 0022).
 - Use them only for exhbts. Don't number marketing sections, features or steps with them; DESIGN.md still bans decorative numbering.
 - On a job-specific link, the numbers follow that link's order.
 
