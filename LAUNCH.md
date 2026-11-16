@@ -19,7 +19,7 @@ Dashboards change their wording from time to time. If a label below doesn't matc
 
 1. Go to **supabase.com**, sign up, and create a **New project**:
    - Name: `exhbt`
-   - **Region: London (eu-west-2)**. This matters for UK data rules.
+   - **Region: the live project is in Paris (eu-west-3), in the EU, and the privacy policy says so. If you ever create a new live project, pick an EU region and keep the policy in step. The separate preview project is in London.**
    - Save the database password in your password manager. You won't need it for this checklist.
 2. When the project is ready, open **SQL Editor > New query**:
    - Open `supabase/migrations/20261105000000_init.sql` in this repo on GitHub, copy all of it, paste it, and press **Run**. It should say "Success".
@@ -39,7 +39,7 @@ You'll come back to Supabase in step 5 once you know the site's address.
 2. **Who can receive email:**
    - **Without your own domain**, Resend only delivers to the address you signed up with. Use `EMAIL_FROM` = `Exhbt <onboarding@resend.dev>`. Friends can still use the site and see their roadmap on screen; only their email copy won't arrive.
    - **To email anyone**, verify **exhbt.co.uk**: in Resend use **Domains > Add domain** and add the DNS records it shows you at your domain registrar or in Cloudflare DNS. The sender, `EMAIL_FROM` = `Exhbt <hello@exhbt.co.uk>`, is already set in `wrangler.jsonc`, so don't add it in Cloudflare.
-   - **Google Workspace is fine alongside this.** Resend sends from a subdomain it gives you (e.g. `send.exhbt.co.uk`), so your Workspace inboxes and MX records are untouched. Make sure `hello@` and `privacy@exhbt.co.uk` exist in Workspace (or as aliases), because the site tells people to email them.
+   - **Google Workspace is fine alongside this.** Resend sends from a subdomain it gives you (e.g. `send.exhbt.co.uk`), so your Workspace inboxes and MX records are untouched. Make sure `hello@exhbt.co.uk` exists in Workspace, because the site tells people to email it.
 3. Sign-in emails from `/login` go through Resend too, sent by the app, so Supabase's own SMTP settings aren't needed. Their links work on any device.
 
 ## 4. Cloudflare (hosting) · ~10 min
@@ -188,4 +188,4 @@ Do these first:
 - connect your own domain (Worker > Settings > Domains & Routes)
 - verify it in Resend
 
-Then add a **build variable** `EXHBT_PUBLIC` = `1` and redeploy. That removes the preview bar and lets search engines index the public pages. Without it, the site always stays hidden.
+The live site goes public with `EXHBT_PUBLIC` = `1`: it is in `wrangler.jsonc` (top-level `vars`), and the production build step in `.github/workflows/deploy.yml` must set it too, because pages are built with it (the value is read at build time). That removes the preview bar and lets search engines index the public pages. The preview Worker (`env.preview`) leaves it unset, so it keeps the bar and stays hidden. Without the flag a site always stays hidden.
