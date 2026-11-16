@@ -121,7 +121,8 @@ test.describe("Pricing with Phase 2 on", () => {
       await expect(card.getByText("An originality check when you publish (coming soon)")).toBeVisible();
       await expect(card.getByText("Join the waitlist")).toHaveCount(0);
     }
-    await expect(page.locator("section#max").getByText(/best fits \(coming soon\)$/)).toBeVisible();
+    await expect(page.locator("section#max").getByText(/best fits$/)).toBeVisible();
+    await expect(page.locator("section#max").getByText(/best fits \(coming soon\)/)).toHaveCount(0);
     await expect(page.getByText("Coming soon", { exact: true })).toHaveCount(0);
 
     // Signed out, Choose goes through sign-in first.
