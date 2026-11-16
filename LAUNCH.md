@@ -103,8 +103,9 @@ Payments stay off until Phase 2 is switched on. Do all of this in Stripe's **tes
 
 1. Go to **stripe.com** and create an account for the business. Set the account's currency to **GBP**.
 2. **Product catalogue > Add product**, twice:
-   - **Premium**: one recurring price, **monthly**, in GBP.
-   - **Max**: one recurring price, **monthly**, in GBP.
+   - **Premium**: one recurring price, **yearly** (billing period: Yearly), in GBP.
+   - **Max**: one recurring price, **yearly** (billing period: Yearly), in GBP.
+   Prices are billed once a year (founders, 16 Nov 2026), so create them as **yearly** recurring prices, not monthly. The site says "a year" everywhere (`BILLING_PERIOD` in `lib/entitlements.ts`), and the code does not set an interval itself: Checkout charges whatever interval the Stripe price has.
    The amounts must match `PRICES` in `lib/entitlements.ts` (that is what the site shows; Stripe is what actually charges).
 3. Open each price and copy its id (starts `price_`). In `wrangler.jsonc` under `vars`, replace the placeholders:
    - `STRIPE_PRICE_PREMIUM` = the Premium price id

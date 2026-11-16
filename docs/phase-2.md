@@ -27,7 +27,7 @@ Already in the repo:
 
 Phase 2 builds on all of this rather than starting again.
 
-**Layout:** Rory's description of 12 Nov 2026, in section 6 (Blocks). Prices: Premium £9, Max £15, assumed monthly; a launch or new-joiner discount would be a Stripe promotion code. Free gets one AI draft. The originality check is in Premium and Max as "coming soon" and is built later.
+**Layout:** Rory's description of 12 Nov 2026, in section 6 (Blocks). Prices: Premium £9, Max £15, billed yearly (founders, 16 Nov 2026); a launch or new-joiner discount would be a Stripe promotion code. Free gets one AI draft. The originality check is in Premium and Max as "coming soon" and is built later.
 
 ---
 
@@ -228,7 +228,7 @@ Docs:
 - Decided: Free gets one AI draft.
 - Decided: the originality check is in Premium and Max, marked "coming soon" until it's built later. The provider is chosen then.
 - Decided: the layout (section 6).
-- Open: monthly, annual or both? (Assumed monthly; milestone 6.)
+- Decided 16 Nov 2026: yearly only (`BILLING_PERIOD` in `lib/entitlements.ts`). A monthly option is not planned.
 - Open: the placeholder figures in `lib/entitlements.ts` (drafts per month, rewrites per exhbt, file and storage caps, active job links).
 
 ## Verification

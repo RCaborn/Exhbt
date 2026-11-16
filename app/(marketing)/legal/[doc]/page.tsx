@@ -221,8 +221,9 @@ const DOCS: Record<string, Doc> = {
 
         <h2>Paid plans</h2>
         <p>
-          {PAID} are billed each {BILLING_PERIOD} through Stripe and renew automatically until you cancel. You can
-          cancel at any time from the Billing page and keep the plan until the end of the period you paid for.
+          {PAID} are billed once a {BILLING_PERIOD}, in one payment, through Stripe. They renew automatically each {BILLING_PERIOD} until
+          you cancel. You can cancel at any time from the Billing page and keep the plan until the end of the period you
+          paid for.
         </p>
         <p>
           If you move to a smaller plan, or your plan ends, nothing is deleted. Your portfolio shows as many published
