@@ -4,7 +4,6 @@ import { CHECKS_GUIDE } from "@/components/brand/Seal";
 import { ProjectView } from "@/components/portfolio/ProjectView";
 import { PrintAddress, ProjectPager } from "@/components/portfolio/ProjectNav";
 import { TeamByline } from "@/components/portfolio/TeamByline";
-import { themeStyle } from "@/components/portfolio/themeFonts";
 import { exhbtSummary } from "@/lib/exhbt/blocks";
 import { MARKETING_HOST, portfolioHost } from "@/lib/hosts";
 import { previewImage } from "@/lib/og/card";
@@ -36,9 +35,9 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 /**
  * One exhbt, opened from the at-a-glance page (decision 0022): the sidebar leads back to all of the
- * person's work, and the pager goes on to the next. The person's portfolio look carries over:
- * `data-theme` and the look's variables sit on the wrapper, and ProjectView draws every colour,
- * radius and face from them (the --xp-* set in globals.css).
+ * person's work, and the pager goes on to the next. The person's portfolio look carries over: its
+ * variables sit on the frame (layout.tsx, decision 0018), and ProjectView draws every colour,
+ * radius and face from them (the --xp-* names in globals.css read the look's --pf-* set).
  */
 export default async function PortfolioProject({ params }: Params) {
   const { username, slug } = await params;
@@ -53,8 +52,8 @@ export default async function PortfolioProject({ params }: Params) {
   const { imageUrls, evidenceUrl } = await mediaFor(it.doc);
 
   return (
-    // data-exhbt-route puts the page on the look's ground (globals.css); the layout's own ground is mist.
-    <div data-exhbt-route data-theme={p.theme.id} style={themeStyle(p.theme)}>
+    // The look itself is set on the frame around this (layout.tsx), so the ground, pager and sign-off take it too.
+    <div data-exhbt-route>
       <ProjectView
         doc={it.doc}
         owner={{ name: p.displayName, photoUrl: p.photoUrl, shape: p.theme.photo, bio: p.profile.headline, homeHref: p.base || "/" }}

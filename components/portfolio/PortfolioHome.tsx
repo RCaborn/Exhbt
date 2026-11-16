@@ -1,27 +1,27 @@
 /* eslint-disable @next/next/no-img-element -- signed Storage URLs change hourly; next/image would cache the wrong one. */
 import Link from "next/link";
-import { ArrowUpRight, CircleCheck, MapPin } from "lucide-react";
+import { ArrowUpRight, ChevronRight, CircleCheck, MapPin } from "lucide-react";
 import { Chart } from "@/components/charts/Chart";
 import { Logo } from "@/components/brand/Logo";
 import type { PortfolioPerson } from "@/components/portfolio/PortfolioPage";
 import { portfolioHost } from "@/lib/hosts";
-import type { HomeProject, KeyFigure } from "@/lib/portfolio-home";
+import { topSkills, type HomeProject, type KeyFigure } from "@/lib/portfolio-home";
 import { SECTION_HINTS, SECTION_NAMES, splitYear, type SectionKey, type Tiles } from "@/lib/portfolio-layout";
 import { initialsOf } from "@/lib/portfolio-profile";
 import { DEFAULT_THEME, type PortfolioTheme } from "@/lib/portfolio-themes";
-import { themeStyle } from "./themeFonts";
+import { lookAttrs, printStyle, themeStyle } from "./themeFonts";
 
 /**
  * A person's portfolio home, as Rory's layout spec draws it (docs/design/portfolio-and-exhbt-layouts.pdf,
  * page 1; decision 0016): a top bar with their address and "Work, About, Get in touch", a hero with
- * their photo, "Hi, I'm", their name large and their intro, then the sections they arranged:
- * their best piece of work in a band, more of their work as cards, about them with education and
- * tools, experience, a quote and how to get in touch. The top bar and hero are fixed; the sections
- * come in any order, and each one looks right wherever it sits.
+ * their photo, their name large and their intro, then the sections they arranged: their best piece
+ * of work in a band, more of their work, about them with education and tools, experience, a quote
+ * and how to get in touch. The top bar and hero are fixed; the sections come in any order.
  *
- * Every colour, corner and face is a CSS variable set by the look (`themeStyle`: `--pf-*`, `--band-*`,
- * `--font-display`), never a fixed brand class, so a look restyles the whole page. Plain markup, no
- * hooks: the public page renders it on the server and the builder's live preview in the browser,
+ * The look (pages 3 and 4 of the spec; decision 0018) sets every colour, corner and face through CSS
+ * variables (`themeStyle`), and arranges the same words its own way through a few treatments: the
+ * hero (`theme.treatment.hero`), the band, the list of work and the band's button. Plain markup,
+ * no hooks: the public page renders it on the server and the builder's live preview in the browser,
  * where `frame` wraps each section in its drag handle.
  */
 
@@ -44,11 +44,14 @@ export type HomeProps = {
   inertChrome?: boolean;
   /** Only the sections, without the top bar, hero and footer (the lifted section while it is dragged). */
   sectionsOnly?: boolean;
+  /** The top bar, the hero and the best-work band, with no anchors: a picture of the page (the builder's look previews). */
+  thumbnail?: boolean;
 };
 
 const WRAP = "mx-auto w-full max-w-[68rem] px-5 @3xl:px-10";
-const H2 = "font-[family-name:var(--font-display)] text-[1.75rem] leading-tight font-semibold tracking-[-0.025em] text-[color:var(--pf-ink)] @3xl:text-[2rem]";
-const ROWS = "divide-y divide-[color:var(--pf-line)] border-y border-[color:var(--pf-line)]";
+const H2 = "pf-display text-[1.75rem] leading-tight [letter-spacing:calc(var(--pf-tracking)*0.6)] @3xl:text-[2rem]";
+const ROWS = "pf-rows border-y border-[color:var(--pf-line)] [border-style:var(--pf-rule-style)]";
+const CARD = "border-[length:var(--pf-edge-width)] border-[color:var(--pf-edge)] bg-[var(--pf-card)]";
 
 /** What each section needs before visitors see it. */
 export function sectionHasContent(key: SectionKey, p: Pick<HomeProps, "projects" | "featuredId" | "sections" | "tiles" | "person">): boolean {
@@ -87,54 +90,61 @@ export function PortfolioHome(props: HomeProps) {
     (has("featured") || has("work")) && { href: has("featured") ? "#best-work" : "#work", label: "Work" },
     has("about") && { href: "#about", label: "About" },
   ].filter(Boolean) as { href: string; label: string }[];
+  const paper = printStyle(theme);
 
   return (
-    <div data-portfolio-home data-theme={theme.id} style={themeStyle(theme)} className="@container bg-[var(--pf-ground)] text-[color:var(--pf-ink)]">
+    <div data-portfolio-home {...lookAttrs(theme)} style={themeStyle(theme)} className="@container bg-[var(--pf-ground)] text-[color:var(--pf-ink)]">
+      {paper && <style>{paper}</style>}
       {!props.sectionsOnly && (
         <div inert={props.inertChrome || undefined}>
-          <TopBar username={person.username} nav={nav} contact={has("contact")} />
-          <Hero person={person} theme={theme} />
+          <TopBar username={person.username} nav={nav} contact={has("contact")} chip={theme.treatment.hero !== "terminal"} />
+          <Hero {...props} theme={theme} />
         </div>
       )}
-      {shown.map((key) => {
-        const node = <Section key={key} sectionKey={key} {...props} />;
-        return frame ? <div key={key}>{frame(key, node)}</div> : node;
-      })}
-      {!props.sectionsOnly && (
-      <footer inert={props.inertChrome || undefined} className={`${WRAP} pt-10 pb-12`}>
-        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem] text-[color:var(--pf-faint)]">
-          <span className="inline-flex items-center gap-1.5">
-            Made with <Logo size="sm" className="text-[color:var(--pf-ink)]" />
-          </span>
-          <Link href={props.startHref ?? "/start"} className="underline decoration-[color:var(--pf-line)] underline-offset-4 hover:text-[color:var(--pf-ink)]">
-            Build your own roadmap
-          </Link>
-        </p>
-      </footer>
+      {props.thumbnail
+        ? featuredOf(props) && <Featured project={featuredOf(props)!} theme={theme} anchors={false} />
+        : shown.map((key) => {
+            const node = <Section key={key} sectionKey={key} {...props} theme={theme} />;
+            return frame ? <div key={key}>{frame(key, node)}</div> : node;
+          })}
+      {!props.sectionsOnly && !props.thumbnail && (
+        <footer inert={props.inertChrome || undefined} className={`${WRAP} pt-10 pb-12`}>
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem] text-[color:var(--pf-faint)]">
+            <span className="inline-flex items-center gap-1.5">
+              Made with <Logo size="sm" className="text-[color:var(--pf-ink)]" />
+            </span>
+            <Link href={props.startHref ?? "/start"} className="underline decoration-[color:var(--pf-line)] underline-offset-4 hover:text-[color:var(--pf-ink)]">
+              Build your own roadmap
+            </Link>
+          </p>
+        </footer>
       )}
     </div>
   );
 }
 
-function TopBar({ username, nav, contact }: { username: string | null; nav: { href: string; label: string }[]; contact: boolean }) {
+function TopBar({ username, nav, contact, chip }: { username: string | null; nav: { href: string; label: string }[]; contact: boolean; chip: boolean }) {
   return (
     <nav aria-label="Portfolio" className={`${WRAP} flex flex-wrap items-center justify-between gap-3 pt-5 pb-2`}>
-      {username ? (
-        <p className="rounded-full border border-[color:var(--pf-line)] px-3 py-1 text-[0.8125rem] text-[color:var(--pf-soft)]">{portfolioHost(username)}</p>
+      {username && chip ? (
+        <p className="rounded-[var(--pf-radius-button)] border border-[color:var(--pf-line)] px-3 py-1 text-[0.8125rem] text-[color:var(--pf-soft)]">{portfolioHost(username)}</p>
       ) : (
         <span />
       )}
       <ul className="flex items-center gap-1 text-[0.9375rem] font-medium">
         {nav.map((n) => (
           <li key={n.href}>
-            <a href={n.href} className="rounded-full px-3 py-2 hover:bg-[var(--pf-well)]">
+            <a href={n.href} className="rounded-[var(--pf-radius-button)] px-3 py-2 hover:bg-[var(--pf-well)]">
               {n.label}
             </a>
           </li>
         ))}
         {contact && (
           <li>
-            <a href="#contact" className="ml-1 inline-flex rounded-full bg-[var(--pf-button-bg)] px-4 py-2 font-semibold text-[color:var(--pf-button-text)] hover:opacity-90">
+            <a
+              href="#contact"
+              className="ml-1 inline-flex rounded-[var(--pf-radius-button)] bg-[var(--pf-button-bg)] px-4 py-2 font-semibold text-[color:var(--pf-button-text)] hover:opacity-90"
+            >
               Get in touch
             </a>
           </li>
@@ -144,61 +154,281 @@ function TopBar({ username, nav, contact }: { username: string | null; nav: { hr
   );
 }
 
-function Hero({ person, theme }: { person: PortfolioPerson; theme: PortfolioTheme }) {
-  const intro = (person.bio ?? "").split(/\n{2,}/).filter((p) => p.trim());
-  const corners = theme.photo === "round" ? "rounded-full" : "rounded-[var(--pf-radius-lg)]";
-  const face = "size-28 @3xl:size-40 @5xl:size-48";
+/* ---------------- The hero, in the look's arrangement ---------------- */
+
+type HeroProps = HomeProps & { theme: PortfolioTheme };
+
+function Hero(props: HeroProps) {
+  switch (props.theme.treatment.hero) {
+    case "portrait":
+      return <PortraitHero {...props} />;
+    case "greeting":
+      return <PortraitHero {...props} greeting />;
+    case "masthead":
+      return <MastheadHero {...props} />;
+    case "notes":
+      return <NotesHero {...props} />;
+    case "terminal":
+      return <TerminalHero {...props} />;
+    case "block":
+      return <BlockHero {...props} />;
+    case "ledger":
+      return <LedgerHero {...props} />;
+  }
+}
+
+/** The photo, or the initials in the look's colours, in the look's shape. */
+function Face({ person, theme, className, initialsClass = "" }: { person: PortfolioPerson; theme: PortfolioTheme; className: string; initialsClass?: string }) {
+  const corners = theme.photo === "round" ? "rounded-full" : "rounded-[var(--pf-radius)]";
+  if (person.photoUrl) return <img src={person.photoUrl} alt="" width={160} height={160} data-avatar="photo" className={`${className} ${corners} shrink-0 object-cover`} />;
   return (
-    <header className={`${WRAP} grid items-center gap-x-12 gap-y-6 pt-10 pb-14 @3xl:grid-cols-[auto_minmax(0,1fr)] @3xl:pt-14 @3xl:pb-20`}>
-      {person.photoUrl ? (
-        <img src={person.photoUrl} alt="" width={160} height={160} data-avatar="photo" className={`${face} ${corners} object-cover`} />
-      ) : (
-        <span
-          aria-hidden
-          data-avatar="initials"
-          className={`${face} ${corners} inline-flex items-center justify-center bg-[var(--band-initials-bg)] font-[family-name:var(--font-display)] text-[2.5rem] font-semibold text-[color:var(--band-initials-text)] @3xl:text-[3.25rem]`}
-        >
-          {initialsOf(person.name) || "?"}
+    <span
+      aria-hidden
+      data-avatar="initials"
+      className={`${className} ${corners} ${initialsClass} pf-display inline-flex shrink-0 items-center justify-center bg-[var(--pf-avatar)] !text-[color:var(--pf-avatar-ink)]`}
+    >
+      {initialsOf(person.name) || "?"}
+    </span>
+  );
+}
+
+const introOf = (person: PortfolioPerson) => (person.bio ?? "").split(/\n{2,}/).filter((p) => p.trim());
+
+function Intro({ person, className = "" }: { person: PortfolioPerson; className?: string }) {
+  const intro = introOf(person);
+  if (intro.length === 0) return null;
+  return (
+    <div data-intro className={`pf-lead max-w-[38rem] space-y-3 text-[1.125rem] leading-relaxed text-[color:var(--pf-soft)] @3xl:text-[1.3rem] ${className}`}>
+      {intro.map((p, i) => (
+        <p key={i}>{p}</p>
+      ))}
+    </div>
+  );
+}
+
+/** Where they are and what they're looking for, quietly, under the intro. */
+function Meta({ person, className = "mt-5" }: { person: PortfolioPerson; className?: string }) {
+  if (!person.location && !person.lookingFor) return null;
+  return (
+    <p className={`flex flex-wrap items-center gap-x-5 gap-y-1 text-[0.95rem] text-[color:var(--pf-faint)] ${className}`}>
+      {person.location && (
+        <span className="inline-flex items-center gap-1.5">
+          <MapPin aria-hidden size={15} strokeWidth={2} />
+          <span className="sr-only">Based in </span>
+          {person.location}
         </span>
       )}
+      {person.lookingFor && <span data-looking-for>Looking for {lowerFirst(person.lookingFor)}</span>}
+    </p>
+  );
+}
+
+/** Exhbt and Night (the photo beside "Hi, I'm" and the name very large), and Bloom's friendlier greeting. */
+function PortraitHero({ person, theme, greeting = false }: HeroProps & { greeting?: boolean }) {
+  return (
+    <header className={`${WRAP} grid items-center gap-x-12 gap-y-6 pt-10 pb-14 @3xl:grid-cols-[auto_minmax(0,1fr)] @3xl:pt-14 @3xl:pb-20`}>
+      <div className={greeting ? "pf-ring w-fit rounded-full" : "w-fit"}>
+        <Face person={person} theme={theme} className="size-28 @3xl:size-40 @5xl:size-44" initialsClass="text-[2.5rem] @3xl:text-[3.25rem]" />
+      </div>
       <div className="min-w-0">
-        <p className="text-[1rem] text-[color:var(--pf-soft)]">Hi, I&rsquo;m</p>
-        <h1 className="mt-1 font-[family-name:var(--font-display)] text-[clamp(3rem,11.5cqw,8.5rem)] leading-[0.92] font-semibold tracking-[-0.045em] break-words text-[color:var(--pf-ink)]">
+        <p className={greeting ? "text-[1.25rem] text-[color:var(--pf-soft)] @3xl:text-[1.5rem]" : "text-[1rem] text-[color:var(--pf-soft)]"}>Hi, I&rsquo;m</p>
+        <h1
+          className={`pf-display mt-1 break-words ${
+            greeting ? "text-[clamp(2.75rem,8cqw,5.25rem)] leading-[1]" : "text-[clamp(3rem,11.5cqw,8.5rem)] leading-[0.92] [letter-spacing:calc(var(--pf-tracking)-0.01em)]"
+          }`}
+        >
           {person.name}
         </h1>
-        {person.headline && <p className="mt-4 text-[1.0625rem] font-medium text-[color:var(--pf-ink)]">{person.headline}</p>}
-        {intro.length > 0 && (
-          <div data-intro className="mt-6 max-w-[38rem] space-y-3 text-[1.125rem] leading-relaxed text-[color:var(--pf-soft)] @3xl:text-[1.375rem]">
-            {intro.map((p, i) => (
-              <p key={i}>{p}</p>
-            ))}
-          </div>
-        )}
-        {(person.location || person.lookingFor) && (
-          <p className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-1 text-[0.95rem] text-[color:var(--pf-faint)]">
-            {person.location && (
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin aria-hidden size={15} strokeWidth={2} />
-                <span className="sr-only">Based in </span>
-                {person.location}
-              </span>
-            )}
-            {person.lookingFor && <span data-looking-for>Looking for {lowerFirst(person.lookingFor)}</span>}
-          </p>
-        )}
+        {person.headline && <p className="mt-4 text-[1.0625rem] font-medium">{person.headline}</p>}
+        <Intro person={person} className="mt-6" />
+        <Meta person={person} />
       </div>
     </header>
   );
 }
 
-function Section(props: HomeProps & { sectionKey: SectionKey }) {
+/** Classic: a rule over a serif name, the headline in the serif beneath, the photo square at the side. */
+function MastheadHero({ person, theme }: HeroProps) {
+  return (
+    <header className={`${WRAP} pt-10 pb-14 @3xl:pt-14 @3xl:pb-20`}>
+      <div className="grid gap-x-12 gap-y-8 border-t-[3px] border-[color:var(--pf-rule)] pt-8 @3xl:grid-cols-[minmax(0,1fr)_auto] @3xl:pt-10">
+        <div className="min-w-0">
+          <h1 className="pf-display text-[clamp(2.75rem,8.5cqw,6rem)] leading-[1] break-words">{person.name}</h1>
+          {person.headline && <p className="pf-lead mt-4 text-[1.375rem] leading-snug text-[color:var(--pf-soft)] @3xl:text-[1.625rem]">{person.headline}</p>}
+          <Intro person={person} className="mt-6 !text-[1.125rem] @3xl:!text-[1.25rem]" />
+          <Meta person={person} className="mt-6" />
+        </div>
+        <Face person={person} theme={theme} className="size-28 @3xl:size-44" initialsClass="text-[2.5rem] @3xl:text-[3.5rem]" />
+      </div>
+    </header>
+  );
+}
+
+/** Rows of facts under the name: what Notebook and Ledger show. Only the ones the person filled in. */
+function factsOf({ person, tiles, projects }: HeroProps): { label: string; value: React.ReactNode; figure?: string | null }[] {
+  const education = (tiles.education?.lines ?? []).map((l) => l.trim()).filter(Boolean)[0];
+  const skills = topSkills(projects, 4);
+  return [
+    person.lookingFor && { label: "Looking for", value: upperFirst(person.lookingFor.trim().replace(/^looking for\s+/i, "")) },
+    person.location && { label: "Based in", value: person.location },
+    education && { label: "Education", value: splitYear(education).label, figure: splitYear(education).year },
+    skills.length > 0 && {
+      label: "Skills",
+      value: (
+        <span className="flex flex-wrap gap-1.5">
+          {skills.map((s) => (
+            <span key={s} className="rounded-[var(--pf-radius-pill)] border border-[color:var(--pf-pill-edge)] bg-[var(--pf-pill)] px-2 py-0.5 text-[0.9rem] text-[color:var(--pf-pill-ink)]">
+              {s}
+            </span>
+          ))}
+        </span>
+      ),
+    },
+  ].filter(Boolean) as { label: string; value: React.ReactNode; figure?: string | null }[];
+}
+
+/** Notebook: a small photo like a page icon, the name, then property rows, then the intro, as a notes page. */
+function NotesHero(props: HeroProps) {
+  const { person, theme } = props;
+  const facts = factsOf(props);
+  return (
+    <header className={`${WRAP} pt-10 pb-12 @3xl:pt-16 @3xl:pb-16`}>
+      <div className="max-w-[46rem]">
+        <Face person={person} theme={theme} className="size-[4.5rem]" initialsClass="text-[1.6rem]" />
+        <h1 className="pf-display mt-5 text-[clamp(2.5rem,7cqw,4rem)] leading-[1.02] break-words">{person.name}</h1>
+        {person.headline && <p className="mt-2 text-[1.125rem] text-[color:var(--pf-soft)]">{person.headline}</p>}
+        {facts.length > 0 && (
+          <dl className="mt-7 grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-6 gap-y-2.5 text-[1rem] @3xl:grid-cols-[9rem_minmax(0,1fr)]">
+            {facts.map((f) => (
+              <div key={f.label} className="contents">
+                <dt className="pt-0.5 text-[color:var(--pf-faint)]">{f.label}</dt>
+                <dd className="min-w-0">
+                  {f.value}
+                  {f.figure && <span className="text-[color:var(--pf-faint)]">, {f.figure}</span>}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        <Intro person={person} className="mt-8 border-t border-[color:var(--pf-line)] pt-7 !text-[1.0625rem] @3xl:!text-[1.125rem]" />
+      </div>
+    </header>
+  );
+}
+
+/** Mono: the address as a path over the name, the skills in hairline boxes, the photo outlined. */
+function TerminalHero(props: HeroProps) {
+  const { person, theme } = props;
+  const skills = topSkills(props.projects, 5);
+  const path = person.username ? `~/${person.username}` : `~/${person.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+  return (
+    <header className={`${WRAP} pt-10 pb-14 @3xl:pt-14 @3xl:pb-16`}>
+      <div className="grid gap-x-12 gap-y-8 @3xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="min-w-0">
+          <p className="text-[0.95rem] text-[color:var(--pf-faint)]" aria-hidden={!person.username || undefined}>
+            {person.username ? <span className="sr-only">Address: </span> : null}
+            {path}
+          </p>
+          <h1 className="pf-display mt-4 text-[clamp(2.25rem,7cqw,4.25rem)] leading-[1.05] break-words">{person.name}</h1>
+          {person.headline && <p className="mt-4 text-[1.0625rem] text-[color:var(--pf-soft)]">{person.headline}</p>}
+          <Intro person={person} className="mt-6 !text-[1rem] !leading-[1.75] @3xl:!text-[1.0625rem]" />
+          <Meta person={person} className="mt-6" />
+        </div>
+        <Face person={person} theme={theme} className="size-24 border border-[color:var(--pf-edge)] @3xl:size-32" initialsClass="text-[2rem]" />
+      </div>
+      {skills.length > 0 && (
+        <ul aria-label="Skills" className="mt-10 flex flex-wrap gap-2.5 border-b border-dashed border-[color:var(--pf-line)] pb-6">
+          {skills.map((s) => (
+            <li key={s} className="border border-[color:var(--pf-pill-edge)] bg-[var(--pf-pill)] px-3 py-1 text-[0.9rem] text-[color:var(--pf-pill-ink)]">
+              {s}
+            </li>
+          ))}
+        </ul>
+      )}
+    </header>
+  );
+}
+
+/** Studio: one loud block of the person's colour holding their photo or initials, the name very heavy beside it. */
+function BlockHero({ person }: HeroProps) {
+  const words = person.name.trim().split(/\s+/);
+  return (
+    <header className={`${WRAP} pt-6 pb-14 @3xl:pt-8 @3xl:pb-20`}>
+      <div className="grid border-2 border-[color:var(--pf-edge)] @3xl:grid-cols-[minmax(13rem,0.4fr)_minmax(0,1fr)]">
+        <div data-band-block className="relative flex min-h-40 items-end overflow-hidden bg-[var(--band-bg)] p-6 @3xl:min-h-[26rem] @3xl:p-8">
+          {person.photoUrl ? (
+            <img src={person.photoUrl} alt="" data-avatar="photo" className="absolute inset-0 size-full object-cover" />
+          ) : (
+            <span aria-hidden data-avatar="initials" className="pf-display text-[4.5rem] leading-none !text-[color:var(--band-text)] @3xl:text-[7rem]">
+              {initialsOf(person.name) || "?"}
+            </span>
+          )}
+        </div>
+        <div className="min-w-0 border-t-2 border-[color:var(--pf-edge)] p-6 @3xl:border-t-0 @3xl:border-l-2 @3xl:p-10">
+          <h1 className="pf-display text-[clamp(3rem,10cqw,7.5rem)] leading-[0.88] break-words">
+            {words.map((w, i) => (
+              <span key={i} className="block">
+                {w}
+              </span>
+            ))}
+          </h1>
+          {person.headline && <p className="mt-6 text-[1.125rem] font-semibold">{person.headline}</p>}
+          <Intro person={person} className="mt-4" />
+          <Meta person={person} />
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/** Ledger: the name in deep green, then ruled rows with their figures aligned on the right, closed by a double rule. */
+function LedgerHero(props: HeroProps) {
+  const { person, theme, projects } = props;
+  const education = (props.tiles.education?.lines ?? []).map((l) => l.trim()).filter(Boolean).slice(0, 3);
+  const rows: { label: string; figure: string | null }[] = [
+    ...education.map((l) => ({ label: splitYear(l).label, figure: splitYear(l).year })),
+    ...(education.length === 0 && person.lookingFor ? [{ label: `Looking for ${lowerFirst(person.lookingFor)}`, figure: "" }] : []),
+    ...(education.length === 0 && person.location ? [{ label: "Based in", figure: person.location }] : []),
+  ];
+  return (
+    <header className={`${WRAP} pt-10 pb-14 @3xl:pt-14 @3xl:pb-16`}>
+      <div className="grid gap-x-12 gap-y-8 @3xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="min-w-0">
+          <h1 className="pf-display text-[clamp(2.75rem,8cqw,5.5rem)] leading-[1] break-words">{person.name}</h1>
+          {person.headline && <p className="mt-4 text-[1.25rem] text-[color:var(--pf-soft)]">{person.headline}</p>}
+          <Intro person={person} className="mt-5 !text-[1.0625rem] @3xl:!text-[1.1875rem]" />
+          {education.length > 0 && <Meta person={person} />}
+        </div>
+        <Face person={person} theme={theme} className="size-24 @3xl:size-32" initialsClass="text-[2rem]" />
+      </div>
+      <dl data-ledger className="mt-10 border-t border-b-[3px] border-[color:var(--pf-rule)] [border-bottom-style:double] tabular-nums">
+        <div className="pf-rows">
+          {rows.map((r, i) => (
+            <div key={i} className="flex items-baseline justify-between gap-6 py-3.5">
+              <dt className="min-w-0">{r.label}</dt>
+              <dd className="shrink-0 text-right text-[color:var(--pf-faint)]">{r.figure}</dd>
+            </div>
+          ))}
+          <div className="flex items-baseline justify-between gap-6 py-3.5 font-semibold">
+            <dt>Pieces of work</dt>
+            <dd>{projects.length}</dd>
+          </div>
+        </div>
+      </dl>
+    </header>
+  );
+}
+
+/* ---------------- Sections ---------------- */
+
+function Section(props: HomeProps & { sectionKey: SectionKey; theme: PortfolioTheme }) {
   const key = props.sectionKey;
   if (!sectionHasContent(key, props)) return <EmptySection sectionKey={key} />;
   switch (key) {
     case "featured":
-      return <Featured project={featuredOf(props)!} />;
+      return <Featured project={featuredOf(props)!} theme={props.theme} />;
     case "work":
-      return <Work projects={workProjects(props)} more={props.sections.includes("featured")} />;
+      return <Work projects={workProjects(props)} more={props.sections.includes("featured")} theme={props.theme} />;
     case "about":
       return <About tiles={props.tiles} />;
     case "experience":
@@ -214,10 +444,8 @@ function Section(props: HomeProps & { sectionKey: SectionKey }) {
       const q = props.tiles.quote!;
       return (
         <section data-section="quote" aria-label="A quote" className={`${WRAP} py-12 @3xl:py-16`}>
-          <figure className="max-w-[48rem]">
-            <blockquote className="font-[family-name:var(--font-display)] text-[1.6rem] leading-snug font-semibold tracking-[-0.02em] @3xl:text-[2rem]">
-              &ldquo;{q.text.trim()}&rdquo;
-            </blockquote>
+          <figure className="max-w-[48rem] border-l-[3px] border-[color:var(--pf-tick)] pl-6">
+            <blockquote className="pf-display text-[1.6rem] leading-snug [letter-spacing:-0.015em] @3xl:text-[2rem]">&ldquo;{q.text.trim()}&rdquo;</blockquote>
             {(q.name.trim() || q.role.trim()) && (
               <figcaption className="mt-4 text-[color:var(--pf-soft)]">
                 {q.name.trim() && <span className="font-semibold text-[color:var(--pf-ink)]">{q.name.trim()}</span>}
@@ -234,60 +462,136 @@ function Section(props: HomeProps & { sectionKey: SectionKey }) {
   }
 }
 
-function Featured({ project: p }: { project: HomeProject }) {
+/** The band's "See how I did it", in the look's way: the band's colours turned round, the main button, or an underlined link. */
+function SeeHow({ href, cta }: { href: string; cta: PortfolioTheme["treatment"]["cta"] }) {
+  const cls =
+    cta === "link"
+      ? "inline-flex items-center py-1 text-[1rem] font-semibold text-[color:var(--band-text)] underline decoration-[color:var(--band-accent)] decoration-[3px] underline-offset-[6px] hover:decoration-[color:var(--band-text)]"
+      : cta === "action"
+        ? "inline-flex items-center rounded-[var(--pf-radius-button)] bg-[var(--pf-action)] px-6 py-3 text-[0.95rem] font-semibold text-[color:var(--pf-action-ink)] hover:bg-[var(--pf-action-hover)]"
+        : "inline-flex items-center rounded-[var(--pf-radius-button)] bg-[var(--band-text)] px-6 py-3 text-[0.95rem] font-semibold text-[color:var(--band-bg)] hover:opacity-90";
   return (
-    <section data-section="featured" id="best-work" aria-labelledby="best-work-h" data-band className="bg-[var(--band-bg)] text-[color:var(--band-text)]">
-      <div className={`${WRAP} grid items-center gap-x-12 gap-y-8 py-14 @3xl:grid-cols-2 @3xl:py-20`}>
-        <div className="min-w-0">
-          <p className="text-[0.8125rem] font-semibold text-[color:var(--band-accent)]">My best piece of work</p>
-          <h2 id="best-work-h" className="mt-3 font-[family-name:var(--font-display)] text-[clamp(1.85rem,4.4cqw,2.75rem)] leading-[1.08] font-semibold tracking-[-0.03em] text-[color:var(--band-text)]">
-            {p.title}
-          </h2>
-          {p.summary && <p className="mt-4 max-w-[34rem] text-[1.0625rem] leading-relaxed text-[color:var(--band-soft)]">{p.summary}</p>}
-          <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
-            {p.href && (
-              <Link
-                href={p.href}
-                className="inline-flex items-center rounded-full bg-[var(--band-text)] px-5 py-3 text-[0.95rem] font-semibold text-[color:var(--band-bg)] hover:opacity-90"
-              >
-                See how I did it
-              </Link>
-            )}
-            <p className="inline-flex items-center gap-1.5 text-[0.875rem] font-semibold text-[color:var(--band-accent)]">
-              <CircleCheck aria-hidden size={16} strokeWidth={2.25} />
-              {p.sourceAttached ? "Source attached and checked" : "Checked by exhbt"}
-            </p>
-          </div>
-        </div>
-        <div className="min-w-0 rounded-[var(--pf-radius-lg)] bg-[var(--pf-card)] p-5 text-[color:var(--pf-ink)] shadow-pack @3xl:p-7">
-          <Figure project={p} large />
+    <Link href={href} className={cls}>
+      See how I did it
+    </Link>
+  );
+}
+
+function Featured({ project: p, theme, anchors = true }: { project: HomeProject; theme: PortfolioTheme; /** False in a picture of the page, which has no ids. */ anchors?: boolean }) {
+  const ids = anchors ? { id: "best-work", "aria-labelledby": "best-work-h" } : {};
+  const band = theme.treatment.band;
+  const inner = (
+    <div className={`grid items-center gap-x-12 gap-y-8 @3xl:grid-cols-2 ${band === "inset" ? "p-6 @3xl:p-12" : band === "ruled" ? "py-12 @3xl:py-16" : "py-14 @3xl:py-20"}`}>
+      <div className="min-w-0">
+        <p className="text-[0.8125rem] font-semibold text-[color:var(--band-accent)]">My best piece of work</p>
+        <h2 id={anchors ? "best-work-h" : undefined} className="pf-display mt-3 text-[clamp(1.85rem,4.4cqw,2.75rem)] leading-[1.08] text-[color:var(--band-text)] [letter-spacing:calc(var(--pf-tracking)*0.75)]">
+          {p.title}
+        </h2>
+        {p.summary && <p className="pf-lead mt-4 max-w-[34rem] text-[1.0625rem] leading-relaxed text-[color:var(--band-soft)]">{p.summary}</p>}
+        <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
+          {p.href && <SeeHow href={p.href} cta={theme.treatment.cta} />}
+          <p className="inline-flex items-center gap-1.5 text-[0.875rem] font-semibold text-[color:var(--band-accent)]">
+            <CircleCheck aria-hidden size={16} strokeWidth={2.25} />
+            {p.sourceAttached ? "Source attached and checked" : "Checked by exhbt"}
+          </p>
         </div>
       </div>
+      <div
+        className={`min-w-0 rounded-[var(--pf-radius-lg)] border-[length:var(--pf-edge-width)] border-[color:var(--pf-edge)] bg-[var(--pf-figure)] p-5 text-[color:var(--pf-ink)] @3xl:p-7 ${band === "bleed" ? "shadow-pack" : ""}`}
+      >
+        <Figure project={p} large />
+      </div>
+    </div>
+  );
+  if (band === "inset") {
+    return (
+      <section data-section="featured" {...ids} data-band className={`${WRAP} py-6 @3xl:py-8`}>
+        <div className="rounded-[var(--pf-radius-lg)] border-[length:var(--pf-edge-width)] border-[color:var(--band-edge)] bg-[var(--band-bg)] text-[color:var(--band-text)]">{inner}</div>
+      </section>
+    );
+  }
+  if (band === "ruled") {
+    return (
+      <section data-section="featured" {...ids} data-band className={`${WRAP} bg-[var(--band-bg)] text-[color:var(--band-text)]`}>
+        <div className="border-t-2 border-b border-[color:var(--band-edge)]">{inner}</div>
+      </section>
+    );
+  }
+  return (
+    <section data-section="featured" {...ids} data-band className="bg-[var(--band-bg)] text-[color:var(--band-text)]">
+      <div className={WRAP}>{inner}</div>
     </section>
   );
 }
 
-function Work({ projects, more }: { projects: HomeProject[]; more: boolean }) {
+function Work({ projects, more, theme }: { projects: HomeProject[]; more: boolean; theme: PortfolioTheme }) {
+  const heading = (
+    <h2 id="work-h" className={H2}>
+      {more ? "More of my work" : "My work"}
+    </h2>
+  );
+  if (theme.treatment.work !== "cards") {
+    const index = theme.treatment.work === "index";
+    const List = index ? "ol" : "ul";
+    return (
+      <section data-section="work" id="work" aria-labelledby="work-h" className={`${WRAP} py-12 @3xl:py-16`}>
+        {heading}
+        <List className={`mt-6 max-w-[48rem] ${ROWS}`}>
+          {projects.map((p, i) => {
+            const body = (
+              <>
+                {index ? (
+                  <span aria-hidden className="shrink-0 font-semibold text-[color:var(--pf-faint)] tabular-nums">
+                    [{String(i + 1).padStart(2, "0")}]
+                  </span>
+                ) : (
+                  <ChevronRight aria-hidden size={18} strokeWidth={2} className="mt-[0.2em] shrink-0 text-[color:var(--pf-faint)]" />
+                )}
+                <span className="min-w-0">
+                  <span
+                    className={`block text-[1.125rem] leading-snug font-semibold ${p.href ? "underline decoration-[color:var(--pf-line)] decoration-2 underline-offset-[5px] group-hover:decoration-[color:var(--pf-ink)]" : ""}`}
+                  >
+                    {p.title}
+                  </span>
+                  {p.summary && <span className="mt-1 block text-[0.95rem] leading-relaxed text-[color:var(--pf-soft)]">{p.summary}</span>}
+                </span>
+              </>
+            );
+            return (
+              <li key={p.id} data-card={p.id}>
+                {p.href ? (
+                  <Link href={p.href} className="group flex gap-3 py-4">
+                    {body}
+                  </Link>
+                ) : (
+                  <div className="flex gap-3 py-4">{body}</div>
+                )}
+              </li>
+            );
+          })}
+        </List>
+      </section>
+    );
+  }
   return (
     <section data-section="work" id="work" aria-labelledby="work-h" className={`${WRAP} py-12 @3xl:py-16`}>
-      <h2 id="work-h" className={H2}>
-        {more ? "More of my work" : "My work"}
-      </h2>
+      {heading}
       <ul className="mt-6 grid gap-5 @2xl:grid-cols-2">
         {projects.map((p) => {
           const body = (
             <>
-              <div className="flex min-h-48 items-center justify-center border-b border-[color:var(--pf-line)] bg-[var(--pf-well)] p-5">
+              <div
+                className={`flex min-h-48 items-center justify-center border-b border-[color:var(--pf-line)] p-5 ${p.figure.kind === "chart" ? "bg-[var(--pf-figure)]" : "bg-[var(--pf-well)]"}`}
+              >
                 <Figure project={p} />
               </div>
               <div className="p-5">
-                <h3 className="text-[1.0625rem] leading-snug font-semibold tracking-[-0.01em] text-[color:var(--pf-ink)]">{p.title}</h3>
+                <h3 className="pf-display text-[1.125rem] leading-snug [letter-spacing:-0.01em]">{p.title}</h3>
                 {p.summary && <p className="mt-1.5 text-[0.9375rem] leading-relaxed text-[color:var(--pf-soft)]">{p.summary}</p>}
               </div>
             </>
           );
-          const card =
-            "flex h-full flex-col overflow-hidden rounded-[var(--pf-radius)] border border-[color:var(--pf-line)] bg-[var(--pf-card)] transition-[transform,border-color] duration-150";
+          const card = `${CARD} flex h-full flex-col overflow-hidden rounded-[var(--pf-radius)] transition-[transform,border-color] duration-150`;
           return (
             <li key={p.id} data-card={p.id}>
               {p.href ? (
@@ -332,14 +636,14 @@ function Rows({ lines, extra, className = "" }: { lines: string[]; extra?: { lab
           const { label, year } = splitYear(l);
           return (
             <div key={i} className="flex items-baseline justify-between gap-6 py-3">
-              <dt className="min-w-0 font-semibold text-[color:var(--pf-ink)]">{label}</dt>
+              <dt className="min-w-0 font-semibold">{label}</dt>
               <dd className="shrink-0 text-[color:var(--pf-faint)] tabular-nums">{year}</dd>
             </div>
           );
         })}
       {extra && (
         <div className="flex items-baseline justify-between gap-6 py-3">
-          <dt className="font-semibold text-[color:var(--pf-ink)]">{extra.label}</dt>
+          <dt className="font-semibold">{extra.label}</dt>
           <dd className="min-w-0 text-right text-[color:var(--pf-faint)]">{extra.value}</dd>
         </div>
       )}
@@ -376,7 +680,7 @@ function Contact({ rows }: { rows: ContactRow[] }) {
       <dl className={`${ROWS} text-[0.95rem]`} aria-label="Contact">
         {rows.map((r) => (
           <div key={r.label} className="flex items-baseline justify-between gap-6 py-3">
-            <dt className="font-semibold text-[color:var(--pf-ink)]">{r.label}</dt>
+            <dt className="font-semibold">{r.label}</dt>
             <dd className="min-w-0 text-right break-all">
               {r.href ? (
                 <a href={r.href} rel="noopener" target="_blank" className="inline-flex items-center gap-1 text-[color:var(--pf-accent)] underline underline-offset-4">
@@ -400,9 +704,7 @@ function EmptySection({ sectionKey }: { sectionKey: SectionKey }) {
     <section data-section={sectionKey} data-empty className={`${WRAP} py-8`}>
       <div className="rounded-[var(--pf-radius)] border border-dashed border-[color:var(--pf-faint)] px-5 py-8 text-center">
         <p className="font-semibold">{SECTION_NAMES[sectionKey]}</p>
-        <p className="mt-1 text-[0.9375rem] text-[color:var(--pf-soft)]">
-          {SECTION_HINTS[sectionKey]}. Empty, so visitors don&rsquo;t see it.
-        </p>
+        <p className="mt-1 text-[0.9375rem] text-[color:var(--pf-soft)]">{SECTION_HINTS[sectionKey]}. Empty, so visitors don&rsquo;t see it.</p>
       </div>
     </section>
   );
@@ -423,9 +725,14 @@ function KeyFigureView({ figure, imageUrl, large }: { figure: KeyFigure; imageUr
       );
     case "image":
       return imageUrl ? (
-        <img src={imageUrl} alt={figure.alt} data-key-figure="image" className={`w-full rounded-[calc(var(--pf-radius)-6px)] object-contain ${large ? "max-h-[22rem]" : "max-h-56"}`} />
+        <img
+          src={imageUrl}
+          alt={figure.alt}
+          data-key-figure="image"
+          className={`w-full rounded-[max(0px,calc(var(--pf-radius)-6px))] object-contain ${large ? "max-h-[22rem]" : "max-h-56"}`}
+        />
       ) : (
-        <p className="text-[0.875rem] text-[color:var(--pf-faint)]">{figure.alt}</p>
+        <p className="text-[0.875rem] text-[color:var(--pf-soft)]">{figure.alt}</p>
       );
     case "flow":
       return (
@@ -433,10 +740,10 @@ function KeyFigureView({ figure, imageUrl, large }: { figure: KeyFigure; imageUr
           {figure.steps.map((s, i) => (
             <li
               key={`${i}-${s}`}
-              className={`rounded-[calc(var(--pf-radius)-6px)] border px-3 py-2 font-medium ${
+              className={`rounded-[var(--pf-radius-box)] border-[length:var(--pf-edge-width)] px-3 py-2 font-medium ${
                 i === figure.steps.length - 1
-                  ? "border-[color:var(--pf-button-bg)] bg-[var(--pf-button-bg)] text-[color:var(--pf-button-text)]"
-                  : "border-[color:var(--pf-line)] bg-[var(--pf-card)]"
+                  ? "border-[color:var(--pf-flow-end)] bg-[var(--pf-flow-end)] text-[color:var(--pf-flow-end-ink)]"
+                  : "border-[color:var(--pf-edge)] bg-[var(--pf-card)]"
               }`}
             >
               {s}
@@ -452,3 +759,5 @@ function lowerFirst(s: string): string {
   const t = s.trim().replace(/^looking for\s+/i, "");
   return /^[A-Z][a-z]/.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t;
 }
+
+const upperFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

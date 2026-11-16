@@ -48,7 +48,8 @@ type Entitlements = {
   savedIdeas: boolean;
   /**
    * How many of the portfolio looks in lib/portfolio-themes.ts the person can use: that many from
-   * the start of the list, or "all". Free has the default only (decision 0012).
+   * the start of the list, or "all". Free has the default (Exhbt) only; Premium Exhbt, Classic
+   * professional, Notebook and Mono; Max all eight with their colourways (decision 0018).
    */
   portfolioThemes: number | "all";
   /**
@@ -109,8 +110,8 @@ export const ENTITLEMENTS: Record<Plan, Entitlements> = {
     originalityCheck: true,
     projectSwapsPerRoadmap: 10,
     savedIdeas: true,
-    // The Exhbt look went in at the top of the list as the default (16 Nov 2026); one more keeps Premium's set.
-    portfolioThemes: 7,
+    // Exhbt, Classic professional, Notebook and Mono (decision 0018).
+    portfolioThemes: 4,
     extraTiles: true,
   },
   max: MAX,
@@ -184,7 +185,7 @@ function exhbtCount(n: number, hosted: boolean): string {
 }
 
 function looksLine(n: number | "all"): string {
-  return n === "all" ? "Every portfolio look: colours, fonts and photo shape" : `${n} portfolio looks to choose from`;
+  return n === "all" ? "Every portfolio look, in every colour" : `${n} portfolio looks to choose from`;
 }
 
 const SAVED_IDEAS_LINE = "A saved list of project ideas from every roadmap";

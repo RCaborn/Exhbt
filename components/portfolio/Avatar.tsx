@@ -9,7 +9,8 @@ export function Avatar({ name, photoUrl, size = 56, shape = "round" }: { name: s
     .map((w) => w[0]!.toUpperCase())
     .join("");
   const style = { width: size, height: size };
-  const corners = shape === "round" ? "rounded-full" : "rounded-[22%]";
+  // A square photo takes the portfolio look's corner (sharp in Classic, Mono and Studio); 22% elsewhere.
+  const corners = shape === "round" ? "rounded-full" : "rounded-[var(--pf-radius,22%)]";
   if (photoUrl) {
     return <img src={photoUrl} alt="" width={size} height={size} style={style} data-avatar="photo" className={`shrink-0 ${corners} border border-line object-cover`} />;
   }

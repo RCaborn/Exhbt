@@ -12,7 +12,7 @@ import { profileProblems, type ProfileDraft } from "@/lib/portfolio-profile";
 import { DEFAULT_THEME, themeById } from "@/lib/portfolio-themes";
 import { useHydrated } from "@/lib/use-hydrated";
 import { saveBuilderAction } from "./actions";
-import { Preview } from "./Preview";
+import { homeFrom, Preview } from "./Preview";
 import { StepLook } from "./StepLook";
 import { StepProjects } from "./StepProjects";
 import { StepPublish } from "./StepPublish";
@@ -142,9 +142,12 @@ export function Builder(props: Props) {
       return next === s.arrangement ? s : { ...s, arrangement: next };
     }, undoLabel);
   const pickLook = (id: string) => {
-    if (locks[id]) return setLockedPick(id);
+    const look = themeById(id);
+    if (!look) return;
+    // A look the plan doesn't have previews, but isn't saved (the colourways come with their look).
+    if (locks[look.look]) return setLockedPick(look.id);
     setLockedPick(null);
-    changeArrangement((x) => ({ ...x, themeId: id }), `Changed the look to ${themeById(id)?.name ?? id}`);
+    changeArrangement((x) => ({ ...x, themeId: look.id }), `Changed the look to ${look.variant ? `${look.name}, ${look.variant.name}` : look.name}`);
   };
   const parkFocus = () => requestAnimationFrame(() => undoButton.current?.focus({ preventScroll: true }));
 
@@ -255,7 +258,7 @@ export function Builder(props: Props) {
                     onPick={pickLook}
                     locks={locks}
                     savedButLocked={savedButLocked}
-                    person={{ name: person.name, headline: person.headline ?? "", photoUrl }}
+                    page={homeFrom(state, person, projects)}
                     ready={ready}
                   />
                 )}
