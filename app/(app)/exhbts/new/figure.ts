@@ -8,7 +8,7 @@
 import { removeFile, uploadForExhbt } from "@/components/editor/media";
 import type { FigureBox } from "@/lib/exhbt/blocks";
 import type { PageThumb, PdfPages } from "@/lib/figures/pdf";
-import { FIGURE, mayHoldFigure } from "@/lib/figures/rules";
+import { FIGURE, clampBox, mayHoldFigure, withMargin } from "@/lib/figures/rules";
 
 /** A PDF read on the person's device, with its pages drawn. `fileId` once it is uploaded. */
 export type FigureSource = { name: string; file: File; fileId?: string; pages: PdfPages };
@@ -47,8 +47,10 @@ export async function prepareFigure(sources: FigureSource[], signal: AbortSignal
     const chosen = pick ? candidates[pick.image - 1] : undefined;
     if (!pick || !chosen) return null;
 
+    // Cut out with a small margin round it; the box kept is the one cut, so the editor's cropper starts there.
+    const box = withMargin(clampBox(pick.box));
     const { pdfFigure } = await import("@/lib/figures/pdf");
-    const blob = await pdfFigure(new Uint8Array(await chosen.source.file.arrayBuffer()), chosen.thumb.page, pick.box);
+    const blob = await pdfFigure(new Uint8Array(await chosen.source.file.arrayBuffer()), chosen.thumb.page, box, { margin: false });
     if (signal.aborted) return null;
     const file = new File([blob], `${stem(chosen.source.name)}-page-${chosen.thumb.page}.${blob.type === "image/png" ? "png" : "jpg"}`, { type: blob.type });
     fileId = await uploadForExhbt(file, "image");
@@ -60,7 +62,7 @@ export async function prepareFigure(sources: FigureSource[], signal: AbortSignal
       fileId,
       alt: pick.alt,
       caption: pick.caption,
-      picked: { from: chosen.source.name, ...(chosen.source.fileId ? { sourceFileId: chosen.source.fileId } : {}), page: chosen.thumb.page, box: pick.box },
+      picked: { from: chosen.source.name, ...(chosen.source.fileId ? { sourceFileId: chosen.source.fileId } : {}), page: chosen.thumb.page, box },
     };
   } catch {
     if (fileId) void removeFile(fileId);

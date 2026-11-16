@@ -10,7 +10,7 @@ import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { CopyLink } from "@/components/ui/CopyLink";
 import type { Plan } from "@/lib/entitlements";
-import { LIMITS, normaliseDoc, safeHref, validateForPublish, wordCount, type ExhbtDoc } from "@/lib/exhbt/blocks";
+import { LIMITS, normaliseDoc, safeHref, validateForPublish, wordCount, type ExhbtDoc, type Picked } from "@/lib/exhbt/blocks";
 import { hasData } from "@/lib/exhbt/charts";
 import { newImageSection, roomFor } from "@/lib/exhbt/sections";
 import { BlockTools, useDraftTools, type DraftToolsInit } from "./BlockTools";
@@ -53,6 +53,8 @@ export type EditorProps = {
   maxFileMb: number;
   /** Files the live (published) copy uses, so removing one from the draft doesn't break the live page before the next publish. */
   liveFileIds: string[];
+  /** Links to the stored files that picked figures came from, by file id, for cropping again or choosing another page (decision 0017). */
+  figureSources?: Record<string, string | null>;
   /** Rewrite and "Back to the AI version"; null or missing when the exhbt has no kept source text. */
   draftTools?: DraftToolsInit;
 };
@@ -221,6 +223,26 @@ export function Editor(props: EditorProps) {
       setBusy((b) => ({ ...b, work: false }));
       if (workInput.current) workInput.current.value = "";
     }
+  }
+
+  /**
+   * A new picture for an image section, e.g. a picked figure cropped again or another page of its
+   * report (decision 0017): uploaded first, then swapped in, and the old file dropped once the
+   * save without it lands. Throws UploadError with a message to show.
+   */
+  async function replaceImage(sectionId: string, file: File, picked: Picked, opts: { describeAgain: boolean }) {
+    const problem = checkFile(file, "image", maxFileMb);
+    if (problem) throw new UploadError(problem);
+    const old = doc.sections.find((s) => s.id === sectionId && s.kind === "image");
+    const fileId = await uploadForExhbt(file, "image", id);
+    setImageUrls((u) => ({ ...u, [fileId]: URL.createObjectURL(file) }));
+    setDoc((d) => ({
+      ...d,
+      sections: d.sections.map((s) =>
+        s.id === sectionId && s.kind === "image" ? { ...s, fileId, picked, ...(opts.describeAgain ? { alt: "", caption: [] } : {}) } : s,
+      ),
+    }));
+    if (old?.kind === "image" && old.fileId !== fileId) dropFile(old.fileId);
   }
 
   function removeWork() {
@@ -491,6 +513,8 @@ export function Editor(props: EditorProps) {
               imageBusy={Boolean(busy.image)}
               imageError={mediaError.image}
               dropFile={dropFile}
+              figureSources={props.figureSources ?? {}}
+              onReplaceImage={replaceImage}
             />
 
             <Card id="card-evidence" title="The work" words={cw.evidence} hint="One click to the original: a report, a repository, a dashboard. A link, or a file." flagged={flaggedBy("evidence")} heaviest={heaviest === "evidence"}>
