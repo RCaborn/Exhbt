@@ -94,7 +94,7 @@ export function PortfolioMasthead({ person, theme = DEFAULT_THEME }: { person: P
           {person.headline && <p className="mt-3 max-w-[44rem] text-[1.125rem] leading-snug text-[color:var(--band-soft)] sm:text-[1.25rem]">{person.headline}</p>}
 
           {intro.length > 0 && (
-            <div data-intro className="mt-8 max-w-[40rem] space-y-4 text-[1.0625rem] leading-relaxed sm:text-[1.125rem]">
+            <div data-intro className="mt-8 max-w-[40rem] space-y-4 text-[1.0625rem] leading-relaxed sm:text-[1.125rem] [&_p]:text-[color:var(--band-text)]">
               {intro.map((p, i) => (
                 <p key={i}>{p}</p>
               ))}
@@ -104,7 +104,7 @@ export function PortfolioMasthead({ person, theme = DEFAULT_THEME }: { person: P
           {quiet && (
             <div data-contact className="mt-8 space-y-3 text-[0.95rem] text-[color:var(--band-soft)]">
               {(person.location || person.lookingFor) && (
-                <p className="flex flex-wrap items-center gap-x-5 gap-y-1">
+                <p className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[color:var(--band-soft)]">
                   {person.location && (
                     <span className="inline-flex items-center gap-1.5">
                       <MapPin aria-hidden size={15} strokeWidth={2} />
