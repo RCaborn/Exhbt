@@ -129,6 +129,25 @@ test("sets a new password from the one-time link, and the old one stops working"
   await expect(page.getByRole("heading", { level: 1, name: "Account" })).toBeVisible();
 });
 
+test("the email link still logs in, as a fallback beside the password", async ({ page }) => {
+  const email = uniqueEmail("ml");
+  await page.goto("/login?next=/account");
+  await page.getByRole("link", { name: "Email me a link" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Email me a link" })).toBeVisible();
+
+  await page.getByLabel("Email address").fill("not-an-email");
+  await page.getByRole("button", { name: "Email me a link" }).click();
+  await expect(page.getByText("Enter a valid email address.")).toBeVisible();
+
+  await page.getByLabel("Email address").fill(email);
+  await page.getByRole("button", { name: "Email me a link" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Check your email" })).toBeVisible();
+  await expect(page.getByText(/We sent a sign-in link to/)).toBeVisible();
+  await page.getByRole("link", { name: "Open the sign-in link" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Account" })).toBeVisible();
+  await expect(page.getByText(email)).toBeVisible();
+});
+
 test("a reset says the same thing whether or not the address has an account", async ({ page }) => {
   const email = `missing+${Date.now()}@example.com`;
   await page.goto("/login/reset");
