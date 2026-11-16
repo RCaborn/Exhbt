@@ -71,8 +71,8 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await page.goto("/demo");
     await expect(page.getByRole("banner").getByRole("link", { name: "Exhbt home" })).toBeVisible();
     await expect(page.locator("[data-catalogue]")).toHaveText(["EX·01", "EX·02", "EX·03", "EX·04"]);
-    const signOff = page.getByRole("complementary", { name: "Made with exhbt" });
-    await expect(signOff.getByRole("link", { name: /Build your own roadmap/ })).toHaveAttribute("href", "/start");
+    // The demo sits inside the marketing layout, so it has the site footer and no second sign-off.
+    await expect(page.getByRole("complementary", { name: "Made with exhbt" })).toHaveCount(0);
 
     // The full exhbt keeps its number, and its seal explains itself on the employer guide.
     await page.goto("/demo/ae-forecast");
@@ -81,11 +81,6 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await page.getByRole("link", { name: /Checked by exhbt/ }).click();
     await expect(page).toHaveURL(/\/how-to-read-an-exhbt#checks$/);
     await expect(page.locator("#checks")).toBeInViewport();
-  });
-
-  test("footer links to the quick-start page", async ({ page }) => {
-    await page.goto("/pricing");
-    await expect(page.getByRole("contentinfo").getByRole("link", { name: "Quick start" })).toHaveAttribute("href", "/start");
   });
 
   test("builder validates each step and keeps answers on Back", async ({ page }) => {
@@ -203,7 +198,7 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     const resultUrl = page.url().split("?")[0];
 
     // Click through the free views with the Next button, up to the project-ideas gate.
-    for (const heading of ["Gaps to close", "Already in your CV", "Your project ideas are ready"]) {
+    for (const heading of ["Gaps to close", "Already in your CV", "Your project ideas"]) {
       await page.locator("a.next-view").click();
       await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
       await expect(page.getByRole("heading", { level: 1, name: heading })).toBeInViewport();
@@ -268,7 +263,7 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await unlockProjects(page, { email });
     const noun = limit === 1 ? "roadmap" : "roadmaps";
     await expect(page.getByText(`You've used this month's ${limit} free ${noun}.`)).toBeVisible();
-    await expect(page.getByRole("heading", { level: 1, name: "Your project ideas are ready" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Your project ideas" })).toBeVisible();
   });
 
   test("the gate prefills name, email and LinkedIn from the CV, and keeps what's typed on an error", async ({ page }) => {

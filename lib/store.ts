@@ -1,9 +1,12 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { forgetDevPassword } from "./passwords";
 import type { Project, Roadmap, RoadmapInput } from "./ai/schemas";
 import { normaliseDoc, publicDoc, type ExhbtDoc } from "./exhbt/blocks";
 import type { Plan } from "./entitlements";
 import { normaliseLayout, type PortfolioLayout } from "./portfolio-layout";
+import { accountPlan, cleanQuery, type AdminAccountDetail, type AdminAccountRow, type AdminAccountsPage, type AdminRows, type AdminTable } from "./admin-types";
+import { sbAdminAccount, sbAdminAccounts, sbAdminRows, sbIsAdmin } from "./admin-supabase";
 
 export type RoadmapRecord = {
   id: string;
@@ -20,8 +23,17 @@ export type RoadmapRecord = {
   projectSwapsUsed: number;
   /** Set when they keep their plan, or use their last swap. */
   planConfirmedAt: string | null;
+  /** When the plan's ideas were last started (docs/decisions/0019). Null: never. */
+  ideasStartedAt: string | null;
+  /** When the last try failed. Counts only if it is not before `ideasStartedAt`. */
+  ideasFailedAt: string | null;
+  /** How many times they've been started, for the retry limit. */
+  ideasAttempts: number;
   createdAt: string;
 };
+
+/** How `claimIdeasRun` answered. */
+export type IdeasClaim = "claimed" | "running" | "failed" | "limit";
 
 export type NewRoadmap = {
   /** Null for a signed-out builder: the email is asked for at the project-ideas gate. */
@@ -184,9 +196,12 @@ export type EventName =
   | "projects_unlocked"
   | "project_swapped"
   | "plan_kept"
+  | "ideas_completed"
+  | "ideas_failed"
   | "cv_read_ai"
   | "cv_read_failed"
   | "login_link_sent"
+  | "login_attempt"
   | "subscription_changed"
   | "username_claimed"
   | "exhbt_drafted"
@@ -197,7 +212,10 @@ export type EventName =
   | "exhbt_rewritten"
   | "teammate_invited"
   | "teammate_joined"
-  | "file_matched";
+  | "file_matched"
+  | "referral_recorded"
+  | "referral_credited"
+  | "page_view";
 
 /** A Stripe subscription as we keep it (the `subscriptions` table). No amounts or card details. */
 export type SubscriptionRecord = {
@@ -214,6 +232,21 @@ export type SubscriptionRecord = {
    * so an event older than the one already applied is ignored. Null for writes not from an event.
    */
   lastEventAt?: string | null;
+};
+
+/** A referral (decision 0020): pending until the referred person's first payment, then earned, then credited. */
+export type ReferralStatus = "pending" | "earned" | "credited";
+export type ReferralRecord = {
+  id: string;
+  referrerId: string;
+  /** Null once the referred person has deleted their account. */
+  referredId: string | null;
+  status: ReferralStatus;
+  createdAt: string;
+  earnedAt: string | null;
+  creditedAt: string | null;
+  /** Stripe's balance transaction id once credited. */
+  creditRef: string | null;
 };
 
 /** Statuses that keep a paid plan. past_due keeps it while Stripe retries the card. */
@@ -276,6 +309,14 @@ export interface Store {
   /** Adds a roadmap's first ideas (up to three), once: does nothing if it already has some. */
   seedProjectIdeas(roadmapId: string, ideas: Project[]): Promise<void>;
   /**
+   * Takes the one right to make a roadmap's ideas, so two requests racing never pay for two
+   * calls. "running": another try started less than `staleMs` ago and hasn't failed. "failed": the
+   * last try failed and `retry` is false. "limit": `maxAttempts` tries used. Otherwise "claimed".
+   */
+  claimIdeasRun(roadmapId: string, opts: { staleMs: number; maxAttempts: number; retry: boolean }): Promise<IdeasClaim>;
+  /** Records that the try ended in failure (success needs no record: the ideas exist). */
+  failIdeasRun(roadmapId: string): Promise<void>;
+  /**
    * Replaces one idea in place and counts the swap. The last allowed swap also confirms the
    * plan. Returns false, changing nothing, when `limit` swaps have been used (or another swap
    * won a race).
@@ -301,6 +342,8 @@ export interface Store {
   getPortfolioProfile(userId: string): Promise<PortfolioProfile>;
   /** A username to its owner, or to the name it now redirects to (for 30 days after a change). */
   lookupUsername(username: string): Promise<UsernameLookup>;
+  /** The account email for a username, including one that still redirects. Null if nobody has that name. */
+  loginEmailForUsername(username: string): Promise<string | null>;
   /** Sets or changes the username; the old one redirects for 30 days. "taken" if someone else has it. */
   claimUsername(userId: string, username: string): Promise<"ok" | "taken">;
   updatePortfolioProfile(
@@ -439,6 +482,34 @@ export interface Store {
   updateDuplicateMatch(id: string, from: DuplicateOutcome, to: DuplicateOutcome, role?: string | null): Promise<boolean>;
   /** Requests to join waiting on this owner (outcome asked), oldest first; with `exhbtId`, only that exhbt's. */
   listJoinRequests(ownerId: string, exhbtId?: string): Promise<DuplicateMatch[]>;
+
+  /* referrals (decision 0020) */
+  /** The person's referral code, made on first ask. Never changes. */
+  getReferralCode(userId: string): Promise<string>;
+  /** Whose code this is, or null. */
+  findUserByReferralCode(code: string): Promise<string | null>;
+  /** Records that referrer brought in referred. False if referred already has a referrer, or they are the same account. */
+  recordReferral(referrerId: string, referredId: string): Promise<boolean>;
+  /** The referral where this person is the referred one. */
+  getReferralByReferred(referredId: string): Promise<ReferralRecord | null>;
+  /** Pending to earned, once. Returns the referral if it is earned afterwards (so a retry carries on), else null. */
+  markReferralEarned(referredId: string): Promise<ReferralRecord | null>;
+  /** Earned referrals waiting on this referrer being a Stripe customer. */
+  listEarnedReferrals(referrerId: string): Promise<ReferralRecord[]>;
+  /** Earned to credited, once. False if it had already moved on. */
+  markReferralCredited(id: string, creditRef: string): Promise<boolean>;
+  /** The referrer's own side, for the account box. Never says who the referred person is. */
+  referralSummary(referrerId: string): Promise<{ credited: number; waiting: number }>;
+
+  /* admin (decision 0021). Every method re-checks that `actorId` is an exhbt_admin and throws "forbidden" if not. */
+  /** Whether this account's profiles.role is exhbt_admin. */
+  isAdmin(userId: string): Promise<boolean>;
+  /** Lean rows of one table for the overview. `since` (ISO) narrows the tables that have a date, except the all-time ones (ALL_TIME_TABLES). */
+  adminRows<T extends AdminTable>(actorId: string, table: T, since: string | null): Promise<AdminRows<T>>;
+  /** The accounts table: newest first, searched by email or username, one page. */
+  adminAccounts(actorId: string, opts: { q: string; page: number; pageSize: number }): Promise<AdminAccountsPage>;
+  /** One account, read-only; null if there is none. */
+  adminAccount(actorId: string, userId: string): Promise<AdminAccountDetail | null>;
 }
 
 export const isSupabaseConfigured = () =>
@@ -469,8 +540,24 @@ type RoadmapRow = {
   projects_unlocked_at: string | null;
   project_swaps_used: number | null;
   plan_confirmed_at: string | null;
+  ideas_started_at: string | null;
+  ideas_failed_at: string | null;
+  ideas_attempts: number | null;
   created_at: string;
 };
+
+/** The claim decision, shared by both stores: null means "go ahead and claim". */
+function ideasClaimBlock(
+  r: { ideasStartedAt: string | null; ideasFailedAt: string | null; ideasAttempts: number },
+  o: { staleMs: number; maxAttempts: number; retry: boolean },
+): Exclude<IdeasClaim, "claimed"> | null {
+  const started = r.ideasStartedAt ? Date.parse(r.ideasStartedAt) : null;
+  const failed = started !== null && r.ideasFailedAt !== null && Date.parse(r.ideasFailedAt) >= started;
+  if (started !== null && !failed && Date.now() - started < o.staleMs) return "running";
+  if (r.ideasAttempts >= o.maxAttempts) return "limit";
+  if (failed && !o.retry) return "failed";
+  return null;
+}
 
 const fromRow = (r: RoadmapRow): RoadmapRecord => ({
   id: r.id,
@@ -485,6 +572,9 @@ const fromRow = (r: RoadmapRow): RoadmapRecord => ({
   projectsUnlockedAt: r.projects_unlocked_at ?? null,
   projectSwapsUsed: r.project_swaps_used ?? 0,
   planConfirmedAt: r.plan_confirmed_at ?? null,
+  ideasStartedAt: r.ideas_started_at ?? null,
+  ideasFailedAt: r.ideas_failed_at ?? null,
+  ideasAttempts: r.ideas_attempts ?? 0,
   createdAt: r.created_at,
 });
 
@@ -691,6 +781,37 @@ function supabaseStore(): Store {
       // Positions are unique per roadmap, so two first visits at once can't seed twice.
       check(await db.from("project_ideas").upsert(rows, { onConflict: "roadmap_id,position", ignoreDuplicates: true }));
     },
+    async claimIdeasRun(roadmapId, opts) {
+      const row = check(
+        await db
+          .from("roadmaps")
+          .select("ideas_started_at, ideas_failed_at, ideas_attempts")
+          .eq("id", roadmapId)
+          .maybeSingle(),
+      ) as Pick<RoadmapRow, "ideas_started_at" | "ideas_failed_at" | "ideas_attempts"> | null;
+      if (!row) return "limit";
+      const state = {
+        ideasStartedAt: row.ideas_started_at,
+        ideasFailedAt: row.ideas_failed_at,
+        ideasAttempts: row.ideas_attempts ?? 0,
+      };
+      const blocked = ideasClaimBlock(state, opts);
+      if (blocked) return blocked;
+      // Compare-and-set on the attempt count, which only ever goes up: of two callers that read the
+      // same row, only one update matches.
+      const won = check(
+        await db
+          .from("roadmaps")
+          .update({ ideas_started_at: new Date().toISOString(), ideas_failed_at: null, ideas_attempts: state.ideasAttempts + 1 })
+          .eq("id", roadmapId)
+          .eq("ideas_attempts", state.ideasAttempts)
+          .select("id"),
+      ) as { id: string }[];
+      return won.length === 1 ? "claimed" : "running";
+    },
+    async failIdeasRun(roadmapId) {
+      check(await db.from("roadmaps").update({ ideas_failed_at: new Date().toISOString() }).eq("id", roadmapId));
+    },
     async swapProjectIdea(roadmapId, ideaId, idea, limit) {
       const row = check(
         await db.from("roadmaps").select("project_swaps_used, plan_confirmed_at").eq("id", roadmapId).maybeSingle(),
@@ -789,9 +910,16 @@ function supabaseStore(): Store {
           .eq("owner_id", userId)
           .in("outcome", ["asked", "approved", "declined"]),
       ]);
+      // Referrals: only this person's side. Who they referred, and who referred them, stays out.
+      const [referralsMade, referredBy] = await Promise.all([
+        db.from("referrals").select("status, created_at, earned_at, credited_at").eq("referrer_id", userId),
+        db.from("referrals").select("status, created_at").eq("referred_id", userId).maybeSingle(),
+      ]);
       return {
         exportedAt: new Date().toISOString(),
         profile: profile.data,
+        referralsYouMade: referralsMade.data,
+        referralOnYourAccount: referredBy.data,
         roadmaps: roadmaps.data,
         projectIdeas: ideas.data,
         exhbts: exhbts.data,
@@ -816,6 +944,10 @@ function supabaseStore(): Store {
       const address =
         email ?? (check(await db.from("profiles").select("email").eq("id", userId).maybeSingle()) as { email: string | null } | null)?.email;
       if (address) check(await db.from("exhbt_invites").delete().eq("email", address.toLowerCase()));
+      // Referrals: one still waiting on this person's first payment goes with them. An earned or
+      // credited one stays with the link to them cleared (referred_id on delete set null), so the
+      // referrer keeps what they earned.
+      check(await db.from("referrals").delete().eq("referred_id", userId).eq("status", "pending"));
       const { error } = await db.auth.admin.deleteUser(userId);
       if (error) throw new Error(error.message);
     },
@@ -863,6 +995,21 @@ function supabaseStore(): Store {
           .maybeSingle(),
       ) as { user_id: string; profiles: { username: string | null } | null } | null;
       return red?.profiles?.username ? { redirectTo: red.profiles.username } : null;
+    },
+    async loginEmailForUsername(username) {
+      const row = check(await db.from("profiles").select("email").eq("username", username).maybeSingle()) as { email: string } | null;
+      if (row?.email) return row.email;
+      const red = check(
+        await db
+          .from("username_redirects")
+          .select("user_id")
+          .eq("old_username", username)
+          .gt("expires_at", new Date().toISOString())
+          .maybeSingle(),
+      ) as { user_id: string } | null;
+      if (!red) return null;
+      const owner = check(await db.from("profiles").select("email").eq("id", red.user_id).maybeSingle()) as { email: string } | null;
+      return owner?.email ?? null;
     },
     async claimUsername(userId, username) {
       const current = check(await db.from("profiles").select("username").eq("id", userId).maybeSingle()) as { username: string | null } | null;
@@ -1384,7 +1531,117 @@ function supabaseStore(): Store {
       if (exhbtId) q = q.eq("owner_exhbt_id", exhbtId);
       return (check(await q.order("answered_at", { ascending: true })) as MatchRow[]).map(fromMatchRow);
     },
+
+    /* referrals */
+    async getReferralCode(userId) {
+      const read = async () =>
+        (check(await db.from("profiles").select("referral_code").eq("id", userId).maybeSingle()) as { referral_code: string | null } | null)
+          ?.referral_code ?? null;
+      const have = await read();
+      if (have) return have;
+      for (let i = 0; i < 5; i++) {
+        // Only fills an empty code, so two first visits can't give different codes.
+        const res = await db.from("profiles").update({ referral_code: newReferralCode() }).eq("id", userId).is("referral_code", null);
+        if (res.error && res.error.code !== "23505") throw new Error(res.error.message);
+        const now = await read();
+        if (now) return now;
+      }
+      throw new Error("Could not make a referral code.");
+    },
+    async findUserByReferralCode(code) {
+      const r = check(await db.from("profiles").select("id").eq("referral_code", code).maybeSingle()) as { id: string } | null;
+      return r?.id ?? null;
+    },
+    async recordReferral(referrerId, referredId) {
+      if (referrerId === referredId) return false;
+      const res = await db.from("referrals").insert({ referrer_id: referrerId, referred_id: referredId });
+      if (!res.error) return true;
+      if (res.error.code === "23505") return false; // the referred account already has a referrer
+      throw new Error(res.error.message);
+    },
+    async getReferralByReferred(referredId) {
+      const r = check(await db.from("referrals").select(REFERRAL_COLS).eq("referred_id", referredId).maybeSingle()) as ReferralRow | null;
+      return r ? fromReferralRow(r) : null;
+    },
+    async markReferralEarned(referredId) {
+      // One conditional update: only a pending row moves, so two deliveries change it once.
+      check(
+        await db
+          .from("referrals")
+          .update({ status: "earned", earned_at: new Date().toISOString() })
+          .eq("referred_id", referredId)
+          .eq("status", "pending")
+          .select("id"),
+      );
+      const r = check(await db.from("referrals").select(REFERRAL_COLS).eq("referred_id", referredId).maybeSingle()) as ReferralRow | null;
+      return r && r.status === "earned" ? fromReferralRow(r) : null;
+    },
+    async listEarnedReferrals(referrerId) {
+      const rows = check(
+        await db.from("referrals").select(REFERRAL_COLS).eq("referrer_id", referrerId).eq("status", "earned").order("earned_at", { ascending: true }),
+      ) as ReferralRow[];
+      return rows.map(fromReferralRow);
+    },
+    async markReferralCredited(id, creditRef) {
+      const rows = check(
+        await db
+          .from("referrals")
+          .update({ status: "credited", credited_at: new Date().toISOString(), credit_ref: creditRef })
+          .eq("id", id)
+          .eq("status", "earned")
+          .select("id"),
+      ) as { id: string }[];
+      return rows.length > 0;
+    },
+    async referralSummary(referrerId) {
+      const rows = check(await db.from("referrals").select("status").eq("referrer_id", referrerId)) as { status: ReferralStatus }[];
+      return { credited: rows.filter((r) => r.status === "credited").length, waiting: rows.filter((r) => r.status !== "credited").length };
+    },
+
+    /* admin */
+    isAdmin: (userId) => sbIsAdmin(db, userId),
+    async adminRows(actorId, table, since) {
+      if (!(await sbIsAdmin(db, actorId))) throw new Error("forbidden");
+      return sbAdminRows(db, table, since);
+    },
+    async adminAccounts(actorId, opts) {
+      if (!(await sbIsAdmin(db, actorId))) throw new Error("forbidden");
+      return sbAdminAccounts(db, opts, LIVE_SUBSCRIPTION_STATUSES);
+    },
+    async adminAccount(actorId, userId) {
+      if (!(await sbIsAdmin(db, actorId))) throw new Error("forbidden");
+      return sbAdminAccount(db, userId, LIVE_SUBSCRIPTION_STATUSES);
+    },
   };
+}
+
+const REFERRAL_COLS = "id, referrer_id, referred_id, status, created_at, earned_at, credited_at, credit_ref";
+type ReferralRow = {
+  id: string;
+  referrer_id: string;
+  referred_id: string | null;
+  status: ReferralStatus;
+  created_at: string;
+  earned_at: string | null;
+  credited_at: string | null;
+  credit_ref: string | null;
+};
+const fromReferralRow = (r: ReferralRow): ReferralRecord => ({
+  id: r.id,
+  referrerId: r.referrer_id,
+  referredId: r.referred_id,
+  status: r.status,
+  createdAt: r.created_at,
+  earnedAt: r.earned_at,
+  creditedAt: r.credited_at,
+  creditRef: r.credit_ref,
+});
+
+/** Eight characters, no look-alikes (no 0, o, 1, l, i). Short enough to read out. */
+const CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
+function newReferralCode(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
 }
 
 const FILE_COLS = "id, user_id, bucket, path, mime, bytes, kind, sha256";
@@ -1611,10 +1868,10 @@ type Mem = {
   roadmaps: Map<string, MemRoadmap>;
   ideas: Map<string, ProjectIdea[]>;
   optIns: Map<string, boolean>;
-  aiCalls: AICall[];
+  aiCalls: (AICall & { at?: string })[];
   events: { name: string; userId: string | null; props: Record<string, unknown>; at: string }[];
   leads: unknown[];
-  waitlist: { email: string; interest: WaitlistInterest; source: string }[];
+  waitlist: { email: string; interest: WaitlistInterest; source: string; at?: string }[];
   profiles: Map<string, PortfolioProfile>;
   usernameRedirects: Map<string, { userId: string; expiresAt: number }>;
   exhbts: Map<string, ExhbtRecord>;
@@ -1629,6 +1886,11 @@ type Mem = {
   members: Map<string, TeamMember>;
   invites: Map<string, TeamInvite>;
   matches: Map<string, DuplicateMatch>;
+  /** Referral codes by user id, and referrals by id (decision 0020). */
+  referralCodes: Map<string, string>;
+  referrals: Map<string, ReferralRecord>;
+  /** Development and tests only: accounts whose role is exhbt_admin (the Supabase profiles.role). Set from /dev/admin. */
+  admins?: Set<string>;
 };
 const newMem = (): Mem => ({
   roadmaps: new Map(),
@@ -1649,10 +1911,17 @@ const newMem = (): Mem => ({
   members: new Map(),
   invites: new Map(),
   matches: new Map(),
+  referralCodes: new Map(),
+  referrals: new Map(),
 });
 /** A file as the in-memory store keeps it: the record, the exhbt it's attached to, and when it was made. */
 type MemFile = StoredFile & { exhbtId?: string | null; createdAt?: string };
 const g = globalThis as unknown as { __exhbtMem?: Mem };
+
+function emailFromDevUser(userId: string): string | null {
+  if (!userId.startsWith("dev-") || !userId.includes("@")) return null;
+  return userId.slice(4);
+}
 
 function memoryStore(): Store {
   if (process.env.NODE_ENV === "production" && !process.env.EXHBT_ALLOW_MEMORY_STORE) {
@@ -1671,6 +1940,8 @@ function memoryStore(): Store {
   m.members ??= new Map();
   m.invites ??= new Map();
   m.matches ??= new Map();
+  m.referralCodes ??= new Map();
+  m.referrals ??= new Map();
   const files = () => m.files as Map<string, MemFile>;
   const isOpen = (i: TeamInvite) => !i.acceptedAt && !i.cancelledAt;
   const liveSubscription = (userId: string): SubscriptionRecord | null => {
@@ -1701,6 +1972,9 @@ function memoryStore(): Store {
         projectsUnlockedAt: null,
         projectSwapsUsed: 0,
         planConfirmedAt: null,
+        ideasStartedAt: null,
+        ideasFailedAt: null,
+        ideasAttempts: 0,
         createdAt: new Date().toISOString(),
         ipHash: r.ipHash,
         marketingOptIn: false,
@@ -1762,6 +2036,20 @@ function memoryStore(): Store {
         ideas.slice(0, PLAN_SIZE).map((p, i) => ({ ...p, id: crypto.randomUUID(), position: i, source: "roadmap" as const })),
       );
     },
+    async claimIdeasRun(roadmapId, opts) {
+      const r = m.roadmaps.get(roadmapId);
+      if (!r) return "limit";
+      const blocked = ideasClaimBlock(r, opts);
+      if (blocked) return blocked;
+      r.ideasStartedAt = new Date().toISOString();
+      r.ideasFailedAt = null;
+      r.ideasAttempts += 1;
+      return "claimed";
+    },
+    async failIdeasRun(roadmapId) {
+      const r = m.roadmaps.get(roadmapId);
+      if (r) r.ideasFailedAt = new Date().toISOString();
+    },
     async swapProjectIdea(roadmapId, ideaId, idea, limit) {
       const r = m.roadmaps.get(roadmapId);
       const list = m.ideas.get(roadmapId) ?? [];
@@ -1777,7 +2065,7 @@ function memoryStore(): Store {
       if (r && !r.planConfirmedAt) r.planConfirmedAt = new Date().toISOString();
     },
     async logAICall(c) {
-      m.aiCalls.push(c);
+      m.aiCalls.push({ ...c, at: new Date().toISOString() });
     },
     async logEvent(name, userId, props = {}) {
       m.events.push({ name, userId, props, at: new Date().toISOString() });
@@ -1787,11 +2075,11 @@ function memoryStore(): Store {
       return m.events.filter((e) => e.name === name && e.props.ipHash === ipHash && Date.parse(e.at) >= after).length;
     },
     async createLead(lead) {
-      m.leads.push(lead);
+      m.leads.push({ ...lead, at: new Date().toISOString() });
     },
     async joinWaitlist(entry) {
       m.waitlist ??= [];
-      if (!m.waitlist.some((w) => w.email === entry.email && w.interest === entry.interest)) m.waitlist.push(entry);
+      if (!m.waitlist.some((w) => w.email === entry.email && w.interest === entry.interest)) m.waitlist.push({ ...entry, at: new Date().toISOString() });
     },
     async exportUserData(userId, email) {
       // The same parts as the Supabase export: profile (portfolio fields), exhbts with both copies,
@@ -1812,9 +2100,14 @@ function memoryStore(): Store {
         cancelledAt: i.cancelledAt,
       });
       const matches = [...m.matches.values()];
+      const refs = [...m.referrals.values()];
       return {
         exportedAt: new Date().toISOString(),
         profile: p ? { ...p } : null,
+        referralsYouMade: refs
+          .filter((x) => x.referrerId === userId)
+          .map((x) => ({ status: x.status, created_at: x.createdAt, earned_at: x.earnedAt, credited_at: x.creditedAt })),
+        referralOnYourAccount: refs.filter((x) => x.referredId === userId).map((x) => ({ status: x.status, created_at: x.createdAt }))[0] ?? null,
         roadmaps,
         projectIdeas: roadmaps.flatMap((r) => m.ideas.get(r.id) ?? []),
         exhbts: [...m.exhbts.values()]
@@ -1863,8 +2156,19 @@ function memoryStore(): Store {
       for (const [k, i] of m.invites) if (gone.has(i.exhbtId) || (address && i.email.toLowerCase() === address)) m.invites.delete(k);
       for (const [k, x] of m.matches) if (x.uploaderId === userId || x.ownerId === userId) m.matches.delete(k);
       for (const e of m.exhbts.values()) if (e.teamOf && gone.has(e.teamOf)) e.teamOf = null;
+      // Referrals: as the database does. Pending ones on this person go; earned or credited ones keep
+      // the referrer's record with the link to this person cleared; their own code and referrals go.
+      for (const [k, x] of m.referrals) {
+        if (x.referrerId === userId) m.referrals.delete(k);
+        else if (x.referredId === userId) {
+          if (x.status === "pending") m.referrals.delete(k);
+          else x.referredId = null;
+        }
+      }
+      m.referralCodes.delete(userId);
       m.profiles.delete(userId);
       m.plans.delete(userId);
+      if (userId.startsWith("dev-") && userId.includes("@")) forgetDevPassword(userId.slice(4));
     },
 
     async planFor(userId) {
@@ -1884,6 +2188,12 @@ function memoryStore(): Store {
         const now = m.profiles.get(red.userId)?.username;
         if (now) return { redirectTo: now };
       }
+      return null;
+    },
+    async loginEmailForUsername(username) {
+      for (const p of m.profiles.values()) if (p.username === username) return emailFromDevUser(p.userId);
+      const red = m.usernameRedirects.get(username);
+      if (red && red.expiresAt > Date.now()) return emailFromDevUser(red.userId);
       return null;
     },
     async claimUsername(userId, username) {
@@ -2217,6 +2527,74 @@ function memoryStore(): Store {
         .filter((x) => x.ownerId === ownerId && x.outcome === "asked" && (!exhbtId || x.ownerExhbtId === exhbtId))
         .map((x) => ({ ...x }));
     },
+
+    /* referrals */
+    async getReferralCode(userId) {
+      let code = m.referralCodes.get(userId);
+      if (!code) {
+        const taken = new Set(m.referralCodes.values());
+        do code = newReferralCode();
+        while (taken.has(code));
+        m.referralCodes.set(userId, code);
+      }
+      return code;
+    },
+    async findUserByReferralCode(code) {
+      for (const [userId, c] of m.referralCodes) if (c === code) return userId;
+      return null;
+    },
+    async recordReferral(referrerId, referredId) {
+      if (referrerId === referredId) return false;
+      if ([...m.referrals.values()].some((x) => x.referredId === referredId)) return false;
+      const id = crypto.randomUUID();
+      m.referrals.set(id, { id, referrerId, referredId, status: "pending", createdAt: new Date().toISOString(), earnedAt: null, creditedAt: null, creditRef: null });
+      return true;
+    },
+    async getReferralByReferred(referredId) {
+      const r = [...m.referrals.values()].find((x) => x.referredId === referredId);
+      return r ? { ...r } : null;
+    },
+    async markReferralEarned(referredId) {
+      const r = [...m.referrals.values()].find((x) => x.referredId === referredId);
+      if (!r) return null;
+      if (r.status === "pending") {
+        r.status = "earned";
+        r.earnedAt = new Date().toISOString();
+      }
+      return r.status === "earned" ? { ...r } : null;
+    },
+    async listEarnedReferrals(referrerId) {
+      return [...m.referrals.values()].filter((x) => x.referrerId === referrerId && x.status === "earned").map((x) => ({ ...x }));
+    },
+    async markReferralCredited(id, creditRef) {
+      const r = m.referrals.get(id);
+      if (!r || r.status !== "earned") return false;
+      r.status = "credited";
+      r.creditedAt = new Date().toISOString();
+      r.creditRef = creditRef;
+      return true;
+    },
+    async referralSummary(referrerId) {
+      const mine = [...m.referrals.values()].filter((x) => x.referrerId === referrerId);
+      return { credited: mine.filter((x) => x.status === "credited").length, waiting: mine.filter((x) => x.status !== "credited").length };
+    },
+
+    /* admin */
+    async isAdmin(userId) {
+      return (m.admins ??= new Set()).has(userId);
+    },
+    async adminRows(actorId, table, since) {
+      if (!(m.admins ??= new Set()).has(actorId)) throw new Error("forbidden");
+      return memAdminRows(m, table, since) as AdminRows<typeof table>;
+    },
+    async adminAccounts(actorId, opts) {
+      if (!(m.admins ??= new Set()).has(actorId)) throw new Error("forbidden");
+      return memAdminAccounts(m, opts);
+    },
+    async adminAccount(actorId, userId) {
+      if (!(m.admins ??= new Set()).has(actorId)) throw new Error("forbidden");
+      return memAdminAccount(m, userId);
+    },
   };
 }
 
@@ -2242,4 +2620,166 @@ export function setStoredCopiesForDevelopment(id: string, copies: { doc: unknown
 /** Read-only view of the in-memory store, for the dev pages and tests. */
 export function memorySnapshot() {
   return g.__exhbtMem;
+}
+
+/* admin: the in-memory reads (development and tests). The Supabase ones are lib/admin-supabase.ts. */
+
+type MemAccount = { id: string; email: string; createdAt: string };
+
+/** Every account the in-memory store has seen a trace of, with the earliest time it appears. */
+function memAccounts(m: Mem): MemAccount[] {
+  const first = new Map<string, string>();
+  const see = (id: string | null | undefined, at: string | undefined) => {
+    if (!id) return;
+    const t = at ?? new Date().toISOString();
+    const old = first.get(id);
+    if (!old || t < old) first.set(id, t);
+  };
+  for (const id of m.profiles.keys()) see(id, undefined);
+  for (const id of m.plans.keys()) see(id, undefined);
+  for (const id of m.admins ?? []) see(id, undefined);
+  for (const r of m.roadmaps.values()) see(r.userId, r.createdAt);
+  for (const e of m.exhbts.values()) see(e.userId, e.updatedAt);
+  for (const s of m.subscriptions.values()) see(s.userId, s.lastEventAt ?? undefined);
+  for (const e of m.events) if (e.userId && e.name !== "page_view") see(e.userId, e.at);
+  return [...first.entries()].map(([id, createdAt]) => ({ id, email: emailFromDevUser(id) ?? id, createdAt }));
+}
+
+/** Subscriptions as admin sees them: the real ones, plus one per development plan override. */
+function memSubs(m: Mem) {
+  const subs = [...m.subscriptions.values()].map((s) => ({
+    userId: s.userId,
+    plan: s.plan,
+    status: s.status,
+    subscriptionId: s.subscriptionId as string | null,
+    createdAt: s.lastEventAt ?? "1970-01-01T00:00:00.000Z",
+  }));
+  for (const [userId, plan] of m.plans) {
+    if (plan !== "free") subs.push({ userId, plan, status: "active", subscriptionId: "dev-override", createdAt: new Date().toISOString() });
+  }
+  return subs;
+}
+
+function memAdminRows(m: Mem, table: AdminTable, since: string | null): AdminRows<AdminTable> {
+  const after = (at: string | null | undefined) => !since || (at ?? "") >= since;
+  const now = new Date().toISOString();
+  const rows = ((): unknown[] => {
+    switch (table) {
+      case "profiles":
+        return memAccounts(m).map((a) => ({ ...a, username: m.profiles.get(a.id)?.username ?? null, role: m.admins?.has(a.id) ? "exhbt_admin" : "user", institutionActive: false }));
+      case "subscriptions":
+        return memSubs(m);
+      case "roadmaps":
+        return [...m.roadmaps.values()]
+          .filter((r) => after(r.createdAt))
+          .map((r) => ({ id: r.id, userId: r.userId, createdAt: r.createdAt, ideasFailedAt: r.ideasFailedAt, swaps: r.projectSwapsUsed }));
+      case "exhbts":
+        // The in-memory exhbt keeps no created time, so its last save stands in for it.
+        return [...m.exhbts.values()]
+          .filter((e) => after(e.updatedAt) || after(e.publishedAt))
+          .map((e) => ({ id: e.id, userId: e.userId, status: e.status, createdAt: e.updatedAt, publishedAt: e.publishedAt }));
+      case "events":
+        return m.events
+          .filter((e) => e.name !== "page_view" && after(e.at))
+          .map((e) => ({ name: e.name, userId: e.userId, at: e.at, cached: typeof e.props.cached === "boolean" ? e.props.cached : null }));
+      case "pageViews":
+        return m.events
+          .filter((e) => e.name === "page_view" && after(e.at))
+          .map((e) => ({ at: e.at, path: String(e.props.path ?? "/"), referrer: String(e.props.referrer ?? ""), isPortfolio: e.props.is_portfolio === true }));
+      case "aiCalls":
+        return m.aiCalls
+          .filter((c) => after(c.at ?? now))
+          .map((c) => ({ userId: c.userId, step: c.step, model: c.model, inputTokens: c.inputTokens, outputTokens: c.outputTokens, costUsd: c.costUsd, at: c.at ?? now }));
+      case "ideas":
+        return [...m.ideas.entries()]
+          .flatMap(([roadmapId, list]) => list.map((i) => ({ at: m.roadmaps.get(roadmapId)?.createdAt ?? now, source: i.source })))
+          .filter((i) => after(i.at));
+      case "savedIdeas":
+        return [...m.savedIdeas.values()].filter((i) => after(i.createdAt)).map((i) => ({ at: i.createdAt }));
+      case "referrals":
+        return [...m.referrals.values()]
+          .filter((r) => after(r.createdAt))
+          .map((r) => ({ id: r.id, referrerId: r.referrerId, referredId: r.referredId, status: r.status, createdAt: r.createdAt }));
+      case "waitlist":
+        return m.waitlist.filter((w) => after(w.at ?? now)).map((w) => ({ email: w.email, interest: w.interest, source: w.source, at: w.at ?? null }));
+      case "leads":
+        return (m.leads as { name: string; email: string; institution: string; at?: string }[])
+          .filter((l) => after(l.at ?? now))
+          .map((l) => ({ name: l.name, email: l.email, institution: l.institution, at: l.at ?? null }));
+      case "jobLinks":
+        return [...m.jobLinks.values()].map((l) => ({ userId: l.userId, status: l.status, views: l.viewCount, createdAt: l.createdAt }));
+      case "members":
+        return [...m.members.values()].map((x) => ({ exhbtId: x.exhbtId, userId: x.userId, addedAt: x.addedAt }));
+      case "invites":
+        return [...m.invites.values()].map((i) => ({ accepted: Boolean(i.acceptedAt), cancelled: Boolean(i.cancelledAt), createdAt: i.createdAt }));
+      case "files":
+        return [...m.files.values()].map((f) => ({ bucket: f.bucket, bytes: f.bytes }));
+      case "matches":
+        return [...m.matches.values()].filter((x) => after(x.createdAt)).map((x) => ({ id: x.id, outcome: x.outcome, createdAt: x.createdAt }));
+    }
+  })();
+  return { rows: rows as never, truncated: false };
+}
+
+function memAccountRow(m: Mem, a: MemAccount): AdminAccountRow {
+  const mine = memSubs(m).filter((s) => s.userId === a.id).reverse();
+  const { plan, comp } = accountPlan(mine, false, LIVE_SUBSCRIPTION_STATUSES);
+  const roadmaps = [...m.roadmaps.values()].filter((r) => r.userId === a.id);
+  const exhbts = [...m.exhbts.values()].filter((e) => e.userId === a.id);
+  const times = [...roadmaps.map((r) => r.createdAt), ...exhbts.map((e) => e.updatedAt), ...m.events.filter((e) => e.userId === a.id).map((e) => e.at)];
+  return {
+    id: a.id,
+    email: a.email,
+    createdAt: a.createdAt,
+    plan,
+    comp,
+    username: m.profiles.get(a.id)?.username ?? null,
+    roadmaps: roadmaps.length,
+    exhbts: exhbts.length,
+    lastActive: times.sort().at(-1) ?? null,
+  };
+}
+
+function memAdminAccounts(m: Mem, opts: { q: string; page: number; pageSize: number }): AdminAccountsPage {
+  const q = cleanQuery(opts.q);
+  const all = memAccounts(m)
+    .filter((a) => !q || a.email.toLowerCase().includes(q) || (m.profiles.get(a.id)?.username ?? "").includes(q))
+    .sort((x, y) => y.createdAt.localeCompare(x.createdAt) || x.id.localeCompare(y.id));
+  const page = Math.max(1, opts.page);
+  const slice = all.slice((page - 1) * opts.pageSize, page * opts.pageSize);
+  return { rows: slice.map((a) => memAccountRow(m, a)), total: all.length, page, pageSize: opts.pageSize };
+}
+
+function memAdminAccount(m: Mem, userId: string): AdminAccountDetail | null {
+  const a = memAccounts(m).find((x) => x.id === userId);
+  if (!a) return null;
+  const files = [...m.files.values()].filter((f) => f.userId === userId);
+  const calls = m.aiCalls.filter((c) => c.userId === userId);
+  return {
+    ...memAccountRow(m, a),
+    role: m.admins?.has(userId) ? "exhbt_admin" : "user",
+    roadmapList: [...m.roadmaps.values()]
+      .filter((r) => r.userId === userId)
+      .map((r) => ({ id: r.id, createdAt: r.createdAt, ideasFailed: Boolean(r.ideasFailedAt) }))
+      .sort((x, y) => y.createdAt.localeCompare(x.createdAt)),
+    exhbtList: [...m.exhbts.values()].filter((e) => e.userId === userId).map((e) => ({ id: e.id, status: e.status, createdAt: e.updatedAt })),
+    events: m.events
+      .filter((e) => e.userId === userId && e.name !== "page_view")
+      .map((e) => ({ name: e.name, at: e.at }))
+      .sort((x, y) => y.at.localeCompare(x.at))
+      .slice(0, 100),
+    aiCalls: calls.length,
+    aiCostUsd: calls.reduce((n, c) => n + c.costUsd, 0),
+    files: files.length,
+    fileBytes: files.reduce((n, f) => n + f.bytes, 0),
+  };
+}
+
+/** Development and tests only: makes an account an exhbt_admin without touching the database (app/dev/admin). */
+export function setAdminForDevelopment(userId: string, admin = true) {
+  if (process.env.NODE_ENV === "production") throw new Error("Development only.");
+  const mem = (g.__exhbtMem ??= newMem());
+  mem.admins ??= new Set();
+  if (admin) mem.admins.add(userId);
+  else mem.admins.delete(userId);
 }

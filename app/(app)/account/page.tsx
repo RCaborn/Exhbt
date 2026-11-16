@@ -4,7 +4,8 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
-import { PLAN_NAMES } from "@/lib/entitlements";
+import { PLAN_NAMES, REFERRAL_CREDIT } from "@/lib/entitlements";
+import { referralLink, referralsLive } from "@/lib/referrals";
 import { getPlan } from "@/lib/plan";
 import { CopyLink } from "@/components/ui/CopyLink";
 import { portfolioHost } from "@/lib/hosts";
@@ -24,10 +25,21 @@ export default async function AccountPage() {
     headers().then((h) => h.get("x-forwarded-host") ?? h.get("host")),
   ]);
   const username = profile?.username ?? null;
+  // Refer a friend: only while referrals are live (lib/referrals.ts).
+  const referral = referralsLive()
+    ? await (async () => {
+        const store = getStore();
+        const [code, summary] = await Promise.all([store.getReferralCode(user.id), store.referralSummary(user.id)]);
+        return { link: referralLink(code, host), credited: summary.credited };
+      })()
+    : null;
   return (
     <div className="mx-auto max-w-2xl px-4 pt-12 sm:px-8 lg:pt-16">
       <h1 className="">Account</h1>
       <p className="mt-3 text-graphite">Signed in as {user.email}. Plan: {PLAN_NAMES[plan]}.</p>
+      <p className="mt-3">
+        <Link href="/login/password" className="link">Set or change your password</Link>
+      </p>
 
       {phase2 && username && (
         <section aria-labelledby="address" className="mt-6 rounded-[16px] border border-line bg-surface p-5">
@@ -49,6 +61,22 @@ export default async function AccountPage() {
             <li><Link href="/account/billing" className="link">Billing</Link></li>
           </ul>
         </nav>
+      )}
+
+      {referral && (
+        <section aria-labelledby="refer" className="mt-6 rounded-[16px] border border-line bg-surface p-5">
+          <h2 id="refer" className="text-[1.125rem]">Refer a friend</h2>
+          <p className="mt-2">
+            When someone you send here makes their first payment, you get {REFERRAL_CREDIT} credit towards your next payment.
+          </p>
+          <p className="mt-3 break-all font-mono text-sm" data-testid="referral-link">{referral.link}</p>
+          <div className="mt-3">
+            <CopyLink href={referral.link} size="sm" label="Copy referral link" />
+          </div>
+          <p className="mt-3 text-graphite" data-testid="referral-count">
+            Credited so far: {referral.credited} {referral.credited === 1 ? "friend" : "friends"}.
+          </p>
+        </section>
       )}
 
       <section aria-labelledby="data" className="mt-12 border-t border-line pt-8">

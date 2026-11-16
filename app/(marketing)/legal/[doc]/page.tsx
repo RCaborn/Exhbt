@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { BILLING_PERIOD, PLAN_NAMES } from "@/lib/entitlements";
+import { BILLING_PERIOD, PLAN_NAMES, REFERRAL_CREDIT } from "@/lib/entitlements";
 
 const PAID = `${PLAN_NAMES.premium} and ${PLAN_NAMES.max}`;
 
@@ -19,7 +19,7 @@ const DOCS: Record<string, Doc> = {
 
         <h2>What we collect</h2>
         <ul>
-          <li>Your email address, to create your account and send sign-in links.</li>
+          <li>Your email address, and a password you choose, to create your account and sign you in. Supabase Auth stores the password in a form that cannot be read back. We also email you sign-in and password-reset links when you ask for them.</li>
           <li>Your name, and your LinkedIn profile address if you give it.</li>
           <li>
             The text of your CV and what you type into the roadmap form: the job you want, your education and your
@@ -45,10 +45,22 @@ const DOCS: Record<string, Doc> = {
             your subscription. Not your card details.
           </li>
           <li>
+            Referrals are not open yet. When they are, each account gets a short referral code. If you follow
+            someone&rsquo;s referral link and sign up, we keep a record that links your new account to theirs, with its
+            status, until your account is deleted. We tell the person who referred you only that a referral was
+            credited, never who you are. If they get {REFERRAL_CREDIT} credit when you first pay, that credit is
+            applied to their own Stripe balance.
+          </li>
+          <li>
             A record of what the service does, linked to your account: events such as &ldquo;roadmap
             completed&rdquo;, and for each AI request the step, model, tokens used and cost, but not the text. For some
             requests we also keep a one-way hash of your IP address, to limit abuse. We do not use advertising or
             tracking cookies.
+          </li>
+          <li>
+            Anonymous page-view counts: when a page loads we count one view, with the page address (no search
+            terms or personal links) and the site that sent you. We use no cookie, store no IP address or browser
+            details, and do not tie a view to your account. We skip it if your browser sends Do Not Track.
           </li>
           <li>If you join the waitlist or write to us as a university: your email and what you tell us.</li>
         </ul>
@@ -151,7 +163,7 @@ const DOCS: Record<string, Doc> = {
           <li>Supabase: database, sign-in and file storage. Your data is stored in the European Union (Paris, France).</li>
           <li>Cloudflare: hosting and delivery of the website, and Web Analytics, which sets no cookies.</li>
           <li>Anthropic: the AI steps above.</li>
-          <li>Resend: sending sign-in links, roadmap emails and teammate invites.</li>
+          <li>Resend: sending sign-in, confirmation and password-reset emails, roadmap emails and teammate invites.</li>
           <li>
             Stripe, when you buy a paid plan: payments. You pay on Stripe&rsquo;s own page, so your card details go
             straight to Stripe and never reach us.
@@ -221,8 +233,9 @@ const DOCS: Record<string, Doc> = {
 
         <h2>Paid plans</h2>
         <p>
-          {PAID} are billed each {BILLING_PERIOD} through Stripe and renew automatically until you cancel. You can
-          cancel at any time from the Billing page and keep the plan until the end of the period you paid for.
+          {PAID} are billed once a {BILLING_PERIOD}, in one payment, through Stripe. They renew automatically each {BILLING_PERIOD} until
+          you cancel. You can cancel at any time from the Billing page and keep the plan until the end of the period you
+          paid for.
         </p>
         <p>
           If you move to a smaller plan, or your plan ends, nothing is deleted. Your portfolio shows as many published
@@ -235,6 +248,11 @@ const DOCS: Record<string, Doc> = {
           Don&rsquo;t upload anything you don&rsquo;t have the right to share, other people&rsquo;s personal data
           beyond what your project needs, or malicious files. Don&rsquo;t pass off other people&rsquo;s work as yours,
           or try to get round plan limits or reach other people&rsquo;s accounts.
+        </p>
+
+        <h2>Contact</h2>
+        <p>
+          Questions about these terms: <a className="link" href="mailto:hello@exhbt.co.uk">hello@exhbt.co.uk</a>.
         </p>
       </>
     ),
@@ -251,7 +269,7 @@ const DOCS: Record<string, Doc> = {
         <h2>Cookies we set</h2>
         <ul>
           <li>
-            <strong>Sign-in session.</strong> Set when you click a sign-in link and kept fresh while you use the app, to
+            <strong>Sign-in session.</strong> Set when you log in or open a sign-in link, and kept fresh while you use the app, to
             keep you signed in. It is not set on portfolio pages.
           </li>
           <li>
@@ -260,6 +278,14 @@ const DOCS: Record<string, Doc> = {
             to 90 days.
           </li>
         </ul>
+        <h2>Referral cookie (not in use yet)</h2>
+        <p>
+          Referrals are not open, so we set no referral cookie today. When they open, following a referral link will
+          set one cookie, <strong>exhbt_ref</strong>, for 30 days. It holds the referral code from the link and the
+          time you followed it, signed so it can&rsquo;t be altered, and nothing about you. We use it once, when you
+          sign up, to link your new account to the person who sent you, and then remove it. This page will be updated
+          to say how it is used before that happens.
+        </p>
         <h2>What your browser stores</h2>
         <p>
           The exhbt editor keeps a copy of your unsaved changes in your browser&rsquo;s local storage until the server
@@ -268,8 +294,9 @@ const DOCS: Record<string, Doc> = {
         <h2>Statistics</h2>
         <p>
           Cloudflare Web Analytics gives us basic visit counts without cookies or fingerprinting your device. Visits to
-          a job link are counted as a number, with no cookie. If we ever add optional cookies, they will be off until
-          you turn them on.
+          a job link are counted as a number, with no cookie. We also count page views ourselves, anonymously: the page
+          and the site that sent you, with no cookie and no IP address stored. If we ever add optional cookies, they
+          will be off until you turn them on.
         </p>
       </>
     ),

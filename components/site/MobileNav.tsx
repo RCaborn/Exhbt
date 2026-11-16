@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 /**
  * The header links on phones (below `sm`): one "Menu" button that opens a panel under the header.
@@ -11,7 +12,17 @@ import { Menu, X } from "lucide-react";
  * list of links, Escape or a click outside closes it and puts focus back on the button, and so
  * does following a link. Wider screens show the links in a row (SiteHeader).
  */
-export function MobileNav({ items }: { items: { href: string; label: string }[] }) {
+export function MobileNav({
+  items,
+  actions = [],
+  breakpoint = "sm",
+}: {
+  items: { href: string; label: string }[];
+  /** The two calls to action, shown as buttons under the links. */
+  actions?: { href: string; label: string; variant: "primary" | "secondary" }[];
+  /** Where the header switches to its row of links: `sm` (640px) or `lg` (1024px). */
+  breakpoint?: "sm" | "lg";
+}) {
   const [open, setOpen] = useState(false);
   const id = useId();
   const button = useRef<HTMLButtonElement>(null);
@@ -42,7 +53,7 @@ export function MobileNav({ items }: { items: { href: string; label: string }[] 
   }, [open]);
 
   return (
-    <div className="sm:hidden">
+    <div className={breakpoint === "lg" ? "lg:hidden" : "sm:hidden"}>
       <button
         ref={button}
         type="button"
@@ -69,13 +80,27 @@ export function MobileNav({ items }: { items: { href: string; label: string }[] 
           <ul>
             {items.map((n) => (
               <li key={n.href} className="border-t border-line first:border-t-0">
-                <Link href={n.href} onClick={() => setOpen(false)} className="block py-3 text-[1rem] font-medium text-ink">
+                <Link
+                  href={n.href}
+                  onClick={() => setOpen(false)}
+                  aria-current={pathname === n.href ? "page" : undefined}
+                  className={`block py-3 text-[1rem] font-medium text-ink ${pathname === n.href ? "underline decoration-jade decoration-2 underline-offset-8" : ""}`}
+                >
                   {n.label}
                 </Link>
               </li>
             ))}
           </ul>
         </nav>
+        {actions.length > 0 && (
+          <div className="flex flex-col gap-2 border-t border-line pt-3">
+            {actions.map((a) => (
+              <Button key={a.href} href={a.href} variant={a.variant} size="lg">
+                {a.label}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

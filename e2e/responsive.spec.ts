@@ -10,7 +10,7 @@ test("home: the start form is fully visible without scrolling", async ({ page })
   expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
 });
 
-const PAGES = ["/", "/pricing", "/universities", "/how-to-read-an-exhbt", "/roadmap/new", "/demo", "/demo/gp-reminders"];
+const PAGES = ["/", "/what-is-an-exhbt", "/pricing", "/universities", "/how-to-read-an-exhbt", "/roadmap/new", "/demo", "/demo/gp-reminders"];
 
 test("no page scrolls sideways", async ({ page }) => {
   for (const path of PAGES) {

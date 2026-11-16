@@ -6,7 +6,8 @@ import { siteOrigin, signInLinkFor } from "./auth";
 import { sign } from "./access";
 import { sendEmail } from "./email/send";
 import { roadmapReadyEmail } from "./email/templates/roadmap-ready";
-import type { Roadmap } from "./ai/schemas";
+import type { Project, Roadmap } from "./ai/schemas";
+import { startIdeas } from "./roadmap/ideas";
 
 export class GenerationError extends Error {}
 
@@ -43,6 +44,10 @@ export async function ensureRoadmap(record: RoadmapRecord, userId: string | null
     await store.saveRoadmapOutput(record.id, roadmap);
     await store.logEvent("roadmap_completed", userId, { cached: fromCache });
   }
+  // Start the project ideas now, in the background, so they're ready by the time the person
+  // has been through the gate (docs/decisions/0019). Idempotent; a failure here is not fatal,
+  // because the Projects page starts them again if they never began.
+  await startIdeas(record.id).catch((e) => console.error("starting project ideas failed", (e as Error).message));
 
   await emailRoadmapOnce(record, roadmap, userId);
   return roadmap;
@@ -57,7 +62,7 @@ export async function emailRoadmapOnce(record: RoadmapRecord, roadmap: Roadmap, 
   const store = getStore();
   if (!record.pendingEmail || !(await store.markEmailSent(record.id))) return;
   try {
-    await sendRoadmapEmail(record, roadmap);
+    await sendRoadmapEmail(record, roadmap, (await store.listProjectIdeas(record.id)).slice(0, 2));
     await store.logEvent("roadmap_emailed", userId);
   } catch (e) {
     // The roadmap is already on screen; a failed email must not break that.
@@ -65,13 +70,14 @@ export async function emailRoadmapOnce(record: RoadmapRecord, roadmap: Roadmap, 
   }
 }
 
-async function sendRoadmapEmail(record: RoadmapRecord, roadmap: Roadmap) {
+async function sendRoadmapEmail(record: RoadmapRecord, roadmap: Roadmap, projects: Project[]) {
   const to = record.pendingEmail!;
   const origin = await siteOrigin();
   const path = `/roadmap/${record.id}`;
   const unsubscribeUrl = `${origin}/api/email/unsubscribe?token=${encodeURIComponent(await sign(`unsub:${to}`))}`;
   const content = roadmapReadyEmail({
     roadmap,
+    projects,
     signInUrl: await signInLinkFor(to, path),
     viewUrl: `${origin}${path}`,
     unsubscribeUrl,
