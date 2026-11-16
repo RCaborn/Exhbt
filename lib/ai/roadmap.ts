@@ -2,7 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import {
-  RoadmapSchema,
+  RoadmapModelSchema,
   SITUATIONS,
   SKILL_MAP_MAX,
   SKILL_MAP_MIN,
@@ -28,10 +28,7 @@ Rules:
   4 = used repeatedly, with results described
   Score "current" from their input only. Put where it shows in "evidence"; when current is 0, evidence is empty.
 - Every gap's "skill" and every name in a project's "closesGaps" must be one of the skillMap names, spelt exactly the same.
-- Suggest exactly 3 projects: their plan of three. Between them, cover the biggest gaps, each project closing different ones where possible.
-- Fit the projects to their situation (e.g. a current student can use coursework; someone working can use their job).
-- Each suggested project must produce a concrete deliverable the graduate can later attach as evidence (a report, repository, dataset, prototype, recording).
-- Projects must be doable by one person without paid tools, in 1-12 weeks.
+- Do not suggest projects. They are written in a separate step.
 - Write in plain British English. No hype words, no exclamation marks.`;
 
 export type RoadmapResult = {
@@ -53,8 +50,8 @@ export async function generateRoadmap(input: RoadmapInput, job: JobProfile | nul
   const client = new Anthropic({ apiKey });
   const response = await client.messages.parse({
     model: AI_MODEL,
-    max_tokens: 4000,
-    output_config: { effort: "low", format: zodOutputFormat(RoadmapSchema) },
+    max_tokens: 3000,
+    output_config: { effort: "low", format: zodOutputFormat(RoadmapModelSchema) },
     system: SYSTEM,
     messages: [
       {
@@ -78,7 +75,7 @@ export async function generateRoadmap(input: RoadmapInput, job: JobProfile | nul
   }
   const { input_tokens, output_tokens } = response.usage;
   return {
-    roadmap: RoadmapSchema.parse(response.parsed_output),
+    roadmap: { ...RoadmapModelSchema.parse(response.parsed_output), projects: [] },
     model: response.model,
     inputTokens: input_tokens,
     outputTokens: output_tokens,
@@ -118,15 +115,8 @@ function mockRoadmap(input: RoadmapInput, job: JobProfile | null): RoadmapResult
       summary: "Development preview: no API key is configured, so this roadmap is placeholder content.",
       strengths: [{ skill: "Placeholder strength", evidence: `Set ${ANTHROPIC_API_KEYS_ENV} to generate a real roadmap.` }],
       gaps,
-      // Three, as the prompt asks. The third repeats the first gap, so one gap stays open
-      // and the after-projects chart shows both highlight lists.
-      projects: [gaps[0], gaps[1] ?? gaps[0], gaps[0]].map((g, i) => ({
-        title: `Placeholder project ${i + 1}`,
-        brief: "A sample project so the result page renders.",
-        closesGaps: [g.skill],
-        deliverable: "A short report",
-        weeks: 3,
-      })),
+      // The ideas are made separately (mockIdeas in lib/ai/projects.ts).
+      projects: [],
       skillMap,
     },
   };
