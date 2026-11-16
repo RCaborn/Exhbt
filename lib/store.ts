@@ -65,7 +65,6 @@ export type PortfolioProfileField =
   | "headline"
   | "bio"
   | "photoFileId"
-  | "coverFileId"
   | "linkedin"
   | "github"
   | "website"
@@ -88,8 +87,6 @@ export type PortfolioProfile = {
   photoFileId: string | null;
   linkedin: string | null;
   hideFromSearch: boolean;
-  /** exhbt_files.id of the wide cover picture across the top of the portfolio, or null (decision 0016). */
-  coverFileId: string | null;
   /** Where they are, in their words ("Leeds", "London or remote"). */
   location: string | null;
   /** One line on what they want next. */
@@ -873,7 +870,7 @@ function supabaseStore(): Store {
         await db
           .from("profiles")
           .select(
-            "id, username, name, headline, bio, photo_file_id, linkedin_url, hide_from_search, portfolio_theme, featured_exhbt_id, portfolio_layout, cover_file_id, location, looking_for, github_url, website_url, contact_email",
+            "id, username, name, headline, bio, photo_file_id, linkedin_url, hide_from_search, portfolio_theme, featured_exhbt_id, portfolio_layout, location, looking_for, github_url, website_url, contact_email",
           )
           .eq("id", userId)
           .maybeSingle(),
@@ -914,7 +911,6 @@ function supabaseStore(): Store {
       if (f.linkedin !== undefined) row.linkedin_url = f.linkedin;
       if (f.hideFromSearch !== undefined) row.hide_from_search = f.hideFromSearch;
       if (f.themeId !== undefined) row.portfolio_theme = f.themeId;
-      if (f.coverFileId !== undefined) row.cover_file_id = f.coverFileId;
       if (f.location !== undefined) row.location = f.location;
       if (f.lookingFor !== undefined) row.looking_for = f.lookingFor;
       if (f.github !== undefined) row.github_url = f.github;
@@ -1573,7 +1569,6 @@ type ProfileRow = {
   portfolio_theme: string | null;
   featured_exhbt_id: string | null;
   portfolio_layout: unknown;
-  cover_file_id?: string | null;
   location?: string | null;
   looking_for?: string | null;
   github_url?: string | null;
@@ -1592,7 +1587,6 @@ const fromProfileRow = (r: ProfileRow): PortfolioProfile => ({
   themeId: r.portfolio_theme,
   featuredExhbtId: r.featured_exhbt_id ?? null,
   layout: normaliseLayout(r.portfolio_layout),
-  coverFileId: r.cover_file_id ?? null,
   location: r.location ?? null,
   lookingFor: r.looking_for ?? null,
   github: r.github_url ?? null,
@@ -1611,7 +1605,6 @@ const emptyProfile = (userId: string): PortfolioProfile => ({
   themeId: null,
   featuredExhbtId: null,
   layout: normaliseLayout(null),
-  coverFileId: null,
   location: null,
   lookingFor: null,
   github: null,

@@ -10,8 +10,8 @@ import type { PortfolioTheme } from "@/lib/portfolio-themes";
 import type { PortfolioProfile } from "@/lib/store";
 
 /**
- * The at-a-glance page of a real portfolio (decisions 0014 and 0016): the masthead (cover, photo,
- * name, where they are and what they're after, their intro and how to reach them), then a tile per
+ * The at-a-glance page of a real portfolio (decisions 0014 and 0016): the masthead (photo, name,
+ * their intro, and quietly where they are, what they're after and how to reach them), then a tile per
  * exhbt with its catalogue number, seal, result and method strip, and any extra tiles.
  *
  * The builder (app/(app)/portfolio) draws its live preview from the same pieces: `PortfolioMasthead`,
@@ -29,7 +29,7 @@ export const WIDE = "md:col-span-2";
 export function personFrom(
   profile: Pick<PortfolioProfile, "username" | "headline" | "bio" | "linkedin" | "location" | "lookingFor" | "github" | "website" | "contactEmail">,
   displayName: string,
-  media: { photoUrl: string | null; coverUrl: string | null },
+  photoUrl: string | null,
   layout: Pick<PortfolioLayout, "header">,
 ): PortfolioPerson {
   return {
@@ -39,8 +39,7 @@ export function personFrom(
     bio: profile.bio,
     location: profile.location,
     lookingFor: profile.lookingFor,
-    photoUrl: media.photoUrl,
-    coverUrl: media.coverUrl,
+    photoUrl,
     links: {
       linkedin: layout.header.linkedin ? safeHref(profile.linkedin ?? undefined) : null,
       github: safeHref(profile.github ?? undefined),
@@ -50,9 +49,6 @@ export function personFrom(
   };
 }
 
-/** Every skill the exhbts prove, in page order, once each. */
-export const skillsOf = (tiles: { skills: string[] }[]) => [...new Set(tiles.flatMap((t) => t.skills))];
-
 export function GlanceView({
   person,
   items,
@@ -61,7 +57,6 @@ export function GlanceView({
   layout,
   base,
   theme,
-  note,
   empty,
 }: {
   person: PortfolioPerson;
@@ -73,8 +68,6 @@ export function GlanceView({
   layout: PortfolioLayout;
   base: string;
   theme?: PortfolioTheme;
-  /** A line at the top, for the owner's preview of an unpublished page. */
-  note?: React.ReactNode;
   /** What to show where the tiles go when there are none (the owner's preview). */
   empty?: React.ReactNode;
 }) {
@@ -84,14 +77,7 @@ export function GlanceView({
   let projects = 0;
   return (
     <>
-      <PortfolioMasthead
-        person={person}
-        theme={theme}
-        skills={skillsOf(tiles.map((t) => t.tile))}
-        projectCount={tiles.length}
-        showSkills={layout.header.skills}
-        note={note}
-      />
+      <PortfolioMasthead person={person} theme={theme} />
 
       <h2 className="sr-only">Projects</h2>
       {order.length === 0 && empty ? (

@@ -51,7 +51,7 @@ export default async function PortfolioGlance({ params }: Params) {
 
   return (
     <GlanceView
-      person={personFrom(p.profile, p.displayName, { photoUrl: p.photoUrl, coverUrl: p.coverUrl }, p.layout)}
+      person={personFrom(p.profile, p.displayName, p.photoUrl, p.layout)}
       items={p.items}
       order={p.order}
       featuredId={p.featuredId}
@@ -71,7 +71,7 @@ async function OwnerPreview({ userId, base, allHidden }: { userId: string; base:
   const store = getStore();
   const [profile, plan] = await Promise.all([store.getPortfolioProfile(userId), store.planFor(userId)]);
   const name = profile.name?.trim() || profile.username || "Your name";
-  const [photoUrl, coverUrl] = await Promise.all([signedFileUrl(profile.photoFileId), signedFileUrl(profile.coverFileId)]);
+  const photoUrl = await signedFileUrl(profile.photoFileId);
   const isPublic = ENTITLEMENTS[plan].publicPortfolio;
   const message = !isPublic
     ? `This is a preview. Portfolios go public on ${PLAN_NAMES.premium}, so visitors can’t see this page yet.`
@@ -95,7 +95,7 @@ async function OwnerPreview({ userId, base, allHidden }: { userId: string; base:
         </div>
       </div>
       <GlanceView
-        person={personFrom(profile, name, { photoUrl, coverUrl }, profile.layout)}
+        person={personFrom(profile, name, photoUrl, profile.layout)}
         items={[]}
         order={[]}
         featuredId={null}

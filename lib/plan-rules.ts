@@ -110,3 +110,13 @@ export function canUseTheme(plan: Plan, theme: PortfolioTheme): Verdict {
   const upgradeTo = planForTheme(theme);
   return { ok: false, reason: `The ${theme.name} look comes with ${PLAN_NAMES[upgradeTo]}.`, upgradeTo };
 }
+
+/**
+ * Can they claim (or change to) a username, the address of their portfolio? Only on a plan with a
+ * public portfolio (`publicPortfolio` in lib/entitlements.ts): Free has no page to put at an address
+ * (Rory and Alex, 16 Nov 2026). A username someone already has stays theirs after a downgrade.
+ */
+export function canClaimUsername(plan: Plan): Verdict {
+  if (ENTITLEMENTS[plan].publicPortfolio) return { ok: true };
+  return { ok: false, reason: `Your own portfolio address comes with ${PLAN_NAMES.premium}.`, upgradeTo: "premium" };
+}

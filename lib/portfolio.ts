@@ -26,7 +26,6 @@ export type LoadedPortfolio =
       profile: PortfolioProfile & { username: string };
       displayName: string;
       photoUrl: string | null;
-      coverUrl: string | null;
       /** The projects on the at-a-glance page, in the order it shows them (the featured one first). */
       items: PortfolioItem[];
       /** Live at their own link but left off the glance page by the person (decision 0014). */
@@ -97,7 +96,6 @@ export async function loadPortfolio(username: string, rest = ""): Promise<Loaded
     profile: { ...profile, username: found.username },
     displayName: profile.name?.trim() || found.username,
     photoUrl: await signedFileUrl(profile.photoFileId),
-    coverUrl: await signedFileUrl(profile.coverFileId),
     items: await Promise.all(order.filter((k) => byId.has(k)).map((k) => toFull(byId.get(k)!))),
     hiddenItems: await Promise.all(reachable.filter((e) => hidden.has(e.id)).map(toFull)),
     order,

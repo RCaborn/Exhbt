@@ -554,7 +554,7 @@ export function Editor(props: EditorProps) {
                   {!liveBase && (
                     <p className="mt-2 text-graphite">
                       You need a username to publish.{" "}
-                      <Link href="/account/portfolio" className="link font-semibold text-ink">
+                      <Link href="/portfolio?step=publish" className="link font-semibold text-ink">
                         Choose one
                       </Link>
                     </p>

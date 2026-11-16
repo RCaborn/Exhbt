@@ -3,7 +3,7 @@ import type { Plan } from "./entitlements";
 import { HeaderBitsSchema, TILE_KINDS, TilesSchema, type HeaderBits, type Tiles } from "./portfolio-layout";
 
 /**
- * What the portfolio customiser (app/(app)/portfolio/customise) sends to be saved, and what the
+ * What the portfolio builder's arrangement (app/(app)/portfolio, the Projects and Look steps) sends to be saved, and what the
  * server sends back. Pure, so the page, the action and the tests share one definition
  * (docs/decisions/0014). The server re-checks everything in the action; the client uses the same
  * schema to say what is wrong before it sends.

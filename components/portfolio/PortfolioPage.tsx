@@ -1,15 +1,15 @@
 /* eslint-disable @next/next/no-img-element -- signed Storage URLs change hourly; next/image would cache the wrong one. */
-import { ArrowUpRight } from "lucide-react";
-import { portfolioHost } from "@/lib/hosts";
+import { ArrowUpRight, MapPin } from "lucide-react";
 import { initialsOf } from "@/lib/portfolio-profile";
 import { DEFAULT_THEME, type PortfolioTheme } from "@/lib/portfolio-themes";
 import { themeStyle } from "./themeFonts";
 
 /**
- * The top of a person's portfolio: their cover, photo, name, what they do, where they are and what
- * they're after, then their intro in their own words with how to reach them (decision 0016). The
- * public page, the owner's preview and the builder's live preview all draw this, so what the person
- * sees while building is what is published.
+ * The top of a person's portfolio (decision 0016): their photo top left with their name, what they
+ * do and their intro in their own words beside it, then, quietly, where they are, what they're
+ * after and how to reach them. Few labels and plenty of space between the blocks, so it can be
+ * read in a glance. The public page, the owner's preview and the builder's live preview all draw
+ * this, so what the person sees while building is what is published.
  *
  * Every colour and the heading face come from the look's CSS variables (`--band-*`,
  * `--font-display`, set by `themeStyle`), never from fixed brand classes, so a later layout template
@@ -27,7 +27,6 @@ export type PortfolioPerson = {
   location?: string | null;
   lookingFor?: string | null;
   photoUrl?: string | null;
-  coverUrl?: string | null;
   /** Checked https addresses, or null. The email is shown as text, never as a mailto. */
   links?: { linkedin?: string | null; github?: string | null; website?: string | null; email?: string | null };
 };
@@ -35,147 +34,104 @@ export type PortfolioPerson = {
 /** The host and path without the scheme: "github.com/amara". */
 const shown = (href: string) => href.replace(/^https:\/\/(www\.)?/, "").replace(/\/$/, "");
 
-function Face({ person, theme, size }: { person: PortfolioPerson; theme: PortfolioTheme; size: "lg" | "sm" }) {
-  const box = size === "lg" ? "size-24 sm:size-28" : "size-10";
-  const corners = theme.photo === "round" ? "rounded-full" : size === "lg" ? "rounded-[22px]" : "rounded-[10px]";
-  // The ring is the band's own colour, so the photo reads as sitting on the band where it overlaps the cover.
-  const ring = size === "lg" ? "border-4 border-[color:var(--band-bg)]" : "";
+function Face({ person, theme }: { person: PortfolioPerson; theme: PortfolioTheme }) {
+  const box = "size-20 sm:size-28";
+  const corners = theme.photo === "round" ? "rounded-full" : "rounded-[18px] sm:rounded-[22px]";
   if (person.photoUrl) {
-    return <img src={person.photoUrl} alt="" width={112} height={112} data-avatar="photo" className={`${box} ${corners} ${ring} shrink-0 bg-[var(--band-bg)] object-cover`} />;
+    return <img src={person.photoUrl} alt="" width={112} height={112} data-avatar="photo" className={`${box} ${corners} shrink-0 object-cover`} />;
   }
   return (
     <span
       aria-hidden
       data-avatar="initials"
-      className={`${box} ${corners} ${ring} inline-flex shrink-0 items-center justify-center bg-[var(--band-initials-bg)] font-[family-name:var(--font-display)] font-semibold text-[color:var(--band-initials-text)] ${size === "lg" ? "text-[2rem] sm:text-[2.4rem]" : "text-sm"}`}
+      className={`${box} ${corners} inline-flex shrink-0 items-center justify-center bg-[var(--band-initials-bg)] font-[family-name:var(--font-display)] text-[1.75rem] font-semibold text-[color:var(--band-initials-text)] sm:text-[2.4rem]`}
     >
       {initialsOf(person.name) || "?"}
     </span>
   );
 }
 
-function ContactLink({ href }: { href: string }) {
+const LINK = "inline-flex items-center gap-1 underline decoration-[color:var(--band-edge)] underline-offset-4 hover:decoration-[color:var(--band-accent)]";
+
+function ContactLink({ href, label }: { href: string; label: string }) {
   if (!href.startsWith("https://")) return null;
   return (
-    <a href={href} rel="noopener" target="_blank" className="link inline-flex items-center gap-1 break-all">
-      {shown(href)} <ArrowUpRight aria-hidden size={14} strokeWidth={2.25} className="shrink-0" />
+    <a href={href} rel="noopener" target="_blank" className={LINK}>
+      {label} <ArrowUpRight aria-hidden size={14} strokeWidth={2.25} className="shrink-0 text-[color:var(--band-soft)]" />
       <span className="sr-only">(opens in a new tab)</span>
     </a>
   );
 }
 
-/** The contact rows a person has filled in, in a fixed order. */
-function contactRows(links: PortfolioPerson["links"]) {
+/** The ways to reach the person, in a fixed order, each as a short link (the email as text). */
+function contactItems(links: PortfolioPerson["links"]) {
   const l = links ?? {};
   return [
-    l.linkedin && { label: "LinkedIn", node: <ContactLink href={l.linkedin} /> },
-    l.github && { label: "GitHub", node: <ContactLink href={l.github} /> },
-    l.website && { label: "Website", node: <ContactLink href={l.website} /> },
+    l.linkedin && { key: "linkedin", node: <ContactLink href={l.linkedin} label="LinkedIn" /> },
+    l.github && { key: "github", node: <ContactLink href={l.github} label="GitHub" /> },
+    l.website && { key: "website", node: <ContactLink href={l.website} label={shown(l.website)} /> },
     // Text, not a link: a mailto hands the address to every scraper.
-    l.email && { label: "Email", node: <span className="break-all">{l.email}</span> },
-  ].filter(Boolean) as { label: string; node: React.ReactNode }[];
+    l.email && { key: "email", node: <span className="break-all">{l.email}</span> },
+  ].filter(Boolean) as { key: string; node: React.ReactNode }[];
 }
 
-export function PortfolioMasthead({
-  person,
-  theme = DEFAULT_THEME,
-  skills = [],
-  projectCount = 0,
-  showSkills = true,
-  note,
-}: {
-  person: PortfolioPerson;
-  theme?: PortfolioTheme;
-  /** Every skill the shown exhbts prove, in order, without repeats. */
-  skills?: string[];
-  projectCount?: number;
-  showSkills?: boolean;
-  /** A line above everything, for the owner's preview. */
-  note?: React.ReactNode;
-}) {
-  const facts = [
-    person.location && { label: "Based in", value: person.location },
-    person.lookingFor && { label: "Looking for", value: person.lookingFor },
-  ].filter(Boolean) as { label: string; value: string }[];
-  const contact = contactRows(person.links);
+export function PortfolioMasthead({ person, theme = DEFAULT_THEME }: { person: PortfolioPerson; theme?: PortfolioTheme }) {
+  const contact = contactItems(person.links);
   const intro = (person.bio ?? "").split(/\n{2,}/).filter((p) => p.trim());
-  const skillList = showSkills ? skills : [];
-  const hasAbout = intro.length > 0 || contact.length > 0 || skillList.length > 0;
+  const quiet = person.location || person.lookingFor || contact.length > 0;
 
   return (
-    <header data-theme={theme.id} data-masthead style={themeStyle(theme)} className="overflow-hidden rounded-[24px] border border-line bg-surface shadow-pack print:shadow-none">
-      {note}
-      <div className="bg-[var(--band-bg)] text-[color:var(--band-text)]">
-        {person.coverUrl ? (
-          <img src={person.coverUrl} alt="" width={1500} height={500} data-cover className="aspect-[3/1] w-full object-cover" />
-        ) : (
-          <div aria-hidden className="h-10 sm:h-14" />
-        )}
-        <div className="px-5 pb-7 sm:px-10 sm:pb-9">
-          <div className={`flex flex-wrap items-end gap-x-6 gap-y-4 ${person.coverUrl ? "-mt-12 sm:-mt-14" : ""}`}>
-            <Face person={person} theme={theme} size="lg" />
-            {person.username && (
-              <p className="ml-auto self-end rounded-full border border-[color:var(--band-edge)] px-3 py-1 text-[0.8125rem] text-[color:var(--band-soft)] max-sm:hidden">
-                {portfolioHost(person.username)}
-              </p>
-            )}
-          </div>
-          <h1 className="mt-5 text-[2.25rem] leading-[1.05] tracking-[-0.03em] text-[color:var(--band-text)] sm:text-[3.25rem]">{person.name}</h1>
-          {person.headline && <p className="mt-2 max-w-[44rem] text-[1.125rem] leading-snug text-[color:var(--band-soft)] sm:text-[1.25rem]">{person.headline}</p>}
-          {facts.length > 0 && (
-            <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-2 text-[0.95rem]">
-              {facts.map((f) => (
-                <div key={f.label} className="flex flex-wrap gap-x-2">
-                  <dt className="font-semibold text-[color:var(--band-accent)]">{f.label}</dt>
-                  <dd>{f.value}</dd>
-                </div>
+    <header
+      data-theme={theme.id}
+      data-masthead
+      style={themeStyle(theme)}
+      className="overflow-hidden rounded-[24px] border border-line bg-[var(--band-bg)] text-[color:var(--band-text)] shadow-pack print:shadow-none"
+    >
+      <div className="grid gap-x-8 gap-y-6 px-5 py-8 sm:grid-cols-[auto_minmax(0,1fr)] sm:px-10 sm:py-12">
+        <Face person={person} theme={theme} />
+        <div className="min-w-0">
+          <h1 className="text-[2.25rem] leading-[1.05] tracking-[-0.03em] text-[color:var(--band-text)] sm:text-[3rem]">{person.name}</h1>
+          {person.headline && <p className="mt-3 max-w-[44rem] text-[1.125rem] leading-snug text-[color:var(--band-soft)] sm:text-[1.25rem]">{person.headline}</p>}
+
+          {intro.length > 0 && (
+            <div data-intro className="mt-8 max-w-[40rem] space-y-4 text-[1.0625rem] leading-relaxed sm:text-[1.125rem]">
+              {intro.map((p, i) => (
+                <p key={i}>{p}</p>
               ))}
-            </dl>
+            </div>
+          )}
+
+          {quiet && (
+            <div data-contact className="mt-8 space-y-3 text-[0.95rem] text-[color:var(--band-soft)]">
+              {(person.location || person.lookingFor) && (
+                <p className="flex flex-wrap items-center gap-x-5 gap-y-1">
+                  {person.location && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <MapPin aria-hidden size={15} strokeWidth={2} />
+                      <span className="sr-only">Based in </span>
+                      {person.location}
+                    </span>
+                  )}
+                  {person.lookingFor && <span data-looking-for>Looking for {lowerFirst(person.lookingFor)}</span>}
+                </p>
+              )}
+              {contact.length > 0 && (
+                <ul aria-label="Contact" className="flex flex-wrap gap-x-5 gap-y-1 text-[color:var(--band-text)]">
+                  {contact.map((c) => (
+                    <li key={c.key}>{c.node}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </div>
       </div>
-
-      {hasAbout && (
-        <section aria-label={`About ${person.name}`} className="grid gap-x-10 gap-y-6 px-5 py-7 sm:px-10 sm:py-9 lg:grid-cols-[minmax(0,1fr)_16rem]">
-          <div className="min-w-0">
-            {intro.length > 0 && (
-              <div data-intro className="max-w-[40rem] space-y-3 text-[1.125rem] leading-relaxed text-ink sm:text-[1.1875rem]">
-                {intro.map((p, i) => (
-                  <p key={i}>{p}</p>
-                ))}
-              </div>
-            )}
-            {skillList.length > 0 && (
-              <div className={intro.length ? "mt-6" : ""} data-skills>
-                <h2 className="text-[0.95rem] font-semibold font-sans tracking-normal text-graphite">
-                  Skills across {projectCount === 1 ? "my exhbt" : `my ${projectCount} exhbts`}
-                </h2>
-                <ul className="mt-1.5 flex flex-wrap gap-x-1 text-[0.95rem] text-ink" aria-label="Skills proven">
-                  {skillList.map((s, i) => (
-                    <li key={s}>
-                      {s}
-                      {i < skillList.length - 1 && <span aria-hidden className="text-slate">,</span>}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-          {contact.length > 0 && (
-            <div data-contact className="lg:border-l lg:border-line lg:pl-8">
-              <h2 className="text-[0.95rem] font-semibold font-sans tracking-normal text-graphite">Get in touch</h2>
-              <dl className="mt-2 space-y-2">
-                {contact.map((r) => (
-                  <div key={r.label}>
-                    <dt className="text-[0.8125rem] text-slate">{r.label}</dt>
-                    <dd className="min-w-0">{r.node}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          )}
-        </section>
-      )}
     </header>
   );
+}
+
+/** "Graduate data roles" reads on after "Looking for"; a name or acronym ("NHS data roles") keeps its capital. */
+function lowerFirst(s: string): string {
+  const t = s.trim().replace(/^looking for\s+/i, "");
+  return /^[A-Z][a-z]/.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t;
 }

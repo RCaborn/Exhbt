@@ -185,7 +185,7 @@ function fileIdsIn(doc: ExhbtDoc | null | undefined): string[] {
 
 /**
  * Deletes an exhbt and its files: the ones attached to it, and the images or evidence its
- * pages point at unless another of the person's exhbts or their profile photo or cover uses them too.
+ * pages point at unless another of the person's exhbts or their profile photo uses them too.
  * Storage objects go first, then the records, then the exhbt. False if it isn't theirs.
  */
 export async function deleteExhbtWithFiles(userId: string, exhbtId: string): Promise<boolean> {
@@ -201,7 +201,6 @@ export async function deleteExhbtWithFiles(userId: string, exhbtId: string): Pro
   const usedElsewhere = new Set([
     ...all.filter((e) => e.id !== exhbtId).flatMap((e) => [...fileIdsIn(e.doc), ...fileIdsIn(e.published)]),
     ...(profile.photoFileId ? [profile.photoFileId] : []),
-    ...(profile.coverFileId ? [profile.coverFileId] : []),
   ]);
   const files = new Map(attached.map((f) => [f.id, f]));
   for (const id of new Set([...fileIdsIn(exhbt.doc), ...fileIdsIn(exhbt.published)])) {

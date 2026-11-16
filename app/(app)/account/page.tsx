@@ -45,7 +45,7 @@ export default async function AccountPage() {
         <nav aria-label="Account settings" className="mt-6">
           <ul className="flex flex-wrap gap-x-6 gap-y-2 font-semibold">
             <li><Link href="/exhbts" className="link">Your exhbts</Link></li>
-            <li><Link href="/account/portfolio" className="link">Portfolio settings</Link></li>
+            <li><Link href="/portfolio" className="link">Build your portfolio</Link></li>
             <li><Link href="/account/billing" className="link">Billing</Link></li>
           </ul>
         </nav>
