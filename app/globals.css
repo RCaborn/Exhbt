@@ -329,6 +329,8 @@
     padding-block: 0.65rem;
     text-align: center;
     line-height: 1.3;
+    font-size: 0.875rem;
+    padding-inline: 0.75rem;
   }
   .xp .xp-work-button:hover {
     background: var(--xp-accent-hover);

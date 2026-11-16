@@ -63,7 +63,7 @@ function PageFlow({ steps }: { steps: Step[] }) {
               data-last={last || undefined}
               className="xp-flow-box min-w-0 px-3 py-3 @2xl:h-full @2xl:flex-1 print:h-full print:flex-1 print:px-2.5 print:py-2"
             >
-              <span className="block text-[0.875rem] leading-snug font-semibold break-words print:text-[0.85rem]">{s.step}</span>
+              <span className="block text-[0.8125rem] leading-snug font-semibold break-words print:text-[0.85rem]">{s.step}</span>
               {s.detail && <span className="xp-flow-detail mt-1 block text-[0.8125rem] leading-snug">{s.detail}</span>}
             </div>
             {!last && (

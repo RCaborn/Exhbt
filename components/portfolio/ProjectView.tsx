@@ -111,7 +111,7 @@ export function ProjectView({
             </div>
             <div className="min-w-0 @3xl/xp:mt-4 print:mt-3">
               <p className="xp-name xp-display text-[1.5rem] leading-tight @3xl/xp:text-[1.625rem]">{owner.name}</p>
-              {owner.bio?.trim() && <p className="xp-muted mt-1.5 text-[0.9375rem] leading-snug">{owner.bio.trim()}</p>}
+              {owner.bio?.trim() && <p className="xp-muted mt-1.5 text-[0.875rem] leading-snug">{owner.bio.trim()}</p>}
               {owner.homeHref && (
                 <Link href={owner.homeHref} className="xp-outline-button mt-4 hidden h-11 w-full items-center justify-center px-3 text-center text-[0.875rem] leading-tight font-semibold @3xl/xp:flex print:hidden">
                   All of {first}&apos;s work
@@ -149,9 +149,8 @@ export function ProjectView({
 
           {hasWork && (
             <div className="mt-6 print:mt-4">
-              <Button href={evidenceUrl!} variant="primary" size="lg" target="_blank" rel="nofollow ugc noopener" className="xp-work-button w-full" label={`See the work: ${doc.evidence!.label}`}>
+              <Button href={evidenceUrl!} variant="primary" size="md" target="_blank" rel="nofollow ugc noopener" className="xp-work-button w-full" label={`See the work: ${doc.evidence!.label}`}>
                 <span className="min-w-0">See the work: {doc.evidence!.label}</span>
-                <ArrowUpRight aria-hidden size={17} strokeWidth={2.25} className="shrink-0" />
               </Button>
             </div>
           )}
@@ -197,8 +196,8 @@ export function ProjectView({
 function Fact({ term, children, wide = false }: { term: string; children: React.ReactNode; /** Both columns when the facts sit side by side. */ wide?: boolean }) {
   return (
     <div className={`xp-fact border-b py-3 last:border-b-0 @3xl/xp:first:pt-0 print:py-2 ${wide ? "@md/xp:col-span-2" : ""}`}>
-      <dt className="xp-muted text-[0.8125rem]">{term}</dt>
-      <dd className="mt-0.5 text-[0.9375rem] leading-snug font-semibold">{children}</dd>
+      <dt className="xp-muted text-[0.78rem]">{term}</dt>
+      <dd className="mt-0.5 text-[0.875rem] leading-snug font-semibold">{children}</dd>
     </div>
   );
 }
@@ -349,7 +348,7 @@ function Findings({ s, Sub }: { s: SectionOf<"findings">; Sub: Sub }) {
       </Sub>
       <ul>
         {s.items.map((f, i) => (
-          <li key={i} className="xp-finding border-b py-3.5 text-[1rem] leading-relaxed last:border-b-0 print:py-2 print:text-[0.95rem]">
+          <li key={i} className="xp-finding border-b py-3.5 text-[0.9375rem] leading-relaxed last:border-b-0 print:py-2 print:text-[0.95rem]">
             <RichText value={f} />
           </li>
         ))}
