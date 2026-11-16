@@ -27,7 +27,7 @@ export function BagMarker() {
 export function SkillHighlights({ up, bag }: { up: string[]; bag: string[] }) {
   if (up.length === 0 && bag.length === 0) return null;
   return (
-    <div className="mt-6 grid gap-3 sm:grid-cols-2">
+    <div className="mt-6 grid gap-3 sm:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]">
       {up.length > 0 && <Group title="Level up next" marker={<UpMarker />} skills={up} />}
       {bag.length > 0 && <Group title="In the bag" marker={<BagMarker />} skills={bag} />}
     </div>

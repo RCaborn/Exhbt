@@ -19,4 +19,4 @@ export const SKILLS_SOURCE_NOTE = JOBS_DATASET_LOADED
 
 export const SOURCING_LINE = JOBS_DATASET_LOADED
   ? `We’ve read ${roles.toLocaleString("en-GB")} UK job profiles so you don’t have to.`
-  : "Built around the skills UK employers actually ask for.";
+  : "The skills come from the job you describe, picked by AI.";

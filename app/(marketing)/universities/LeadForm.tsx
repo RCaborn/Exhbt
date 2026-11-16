@@ -10,7 +10,7 @@ export function LeadForm() {
   if (state?.ok) {
     return (
       <p role="status" className="rounded border border-line bg-surface px-5 py-4">
-        Thanks. We will be in touch within two working days.
+        Thanks. We&rsquo;ll be in touch.
       </p>
     );
   }
@@ -21,6 +21,7 @@ export function LeadForm() {
       <div aria-hidden className="absolute left-[-9999px]">
         <label>Leave this empty<input name="website" tabIndex={-1} autoComplete="off" /></label>
       </div>
+      <p className="text-sm text-graphite">All fields are required except the last one.</p>
       <Field id="name" label="Your name" error={err.name} autoComplete="name" />
       <Field id="email" label="Work email" type="email" error={err.email} autoComplete="email" />
       <Field id="institution" label="University or college" error={err.institution} autoComplete="organization" />
