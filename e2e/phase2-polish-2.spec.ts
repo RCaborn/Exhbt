@@ -215,9 +215,9 @@ test.describe("Your exhbts list", () => {
 
 test.describe("Profile photo on Free", () => {
   test("a Free user can upload, replace and remove a photo, and it shows on their preview", async ({ page }) => {
-    await signInAs(page, uniqueEmail("freephoto"), "/account/portfolio");
-    await expect(page.getByRole("heading", { level: 1, name: "Portfolio settings" })).toBeVisible();
-    await expect(page.getByText("isn’t public on Free")).toBeVisible();
+    await signInAs(page, uniqueEmail("freephoto"), "/portfolio?step=you");
+    await expect(page.getByRole("heading", { level: 1, name: "Build your portfolio" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "About you" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Upload a photo" })).toBeVisible();
 
     const png = async () =>
@@ -248,7 +248,7 @@ test.describe("Profile photo on Free", () => {
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
     await expect(page.locator('section[aria-label="Preview"] [data-avatar="photo"]')).toBeVisible();
 
-    await page.goto("/account/portfolio");
+    await page.goto("/portfolio?step=you");
     await choose("second.png");
     await expect(page.getByRole("status").filter({ hasText: "Photo saved." })).toBeVisible();
     await page.getByRole("button", { name: "Remove photo" }).click();

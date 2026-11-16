@@ -94,23 +94,30 @@ async function setSubscription(request: APIRequestContext, userId: string, plan:
   expect(res.status()).toBe(200);
 }
 
-/** Seeds a fictional portfolio and signs in as its owner, on the portfolio settings page. */
+/** Seeds a fictional portfolio and signs in as its owner, on the builder's look step. */
 async function openSettings(page: Page, username: string, plan: string) {
   const res = await page.request.get(`/dev/portfolio?username=${username}&plan=${plan}`, { maxRedirects: 0 });
   expect(res.status(), await res.text()).toBe(307);
-  await page.goto(`/auth/dev?email=${encodeURIComponent(`${username}@example.com`)}&next=/account/portfolio`);
-  await expect(page.getByRole("heading", { level: 1, name: "Portfolio settings" })).toBeVisible();
-  await expect(page.locator("form[data-ready=true] [data-testid=theme-preview]")).toBeAttached();
+  await page.goto(`/auth/dev?email=${encodeURIComponent(`${username}@example.com`)}&next=${encodeURIComponent("/portfolio?step=look")}`);
+  await openLook(page);
+}
+
+async function openLook(page: Page) {
+  if (!page.url().includes("step=look")) await page.goto("/portfolio?step=look");
+  await expect(page.getByRole("heading", { level: 1, name: "Build your portfolio" })).toBeVisible();
+  await expect(page.locator("[data-ready=true] [data-testid=preview]")).toBeAttached();
 }
 
 const option = (page: Page, id: string) => page.locator(`[data-theme-option="${id}"]`);
-const preview = (page: Page) => page.getByTestId("theme-preview");
+/** The masthead in the builder's live preview. */
+const preview = (page: Page) => page.locator("[data-testid=preview] header[data-theme]");
+const status = (page: Page) => page.getByTestId("save-status");
 
 async function chooseAndSave(page: Page, id: string) {
   await option(page, id).click();
-  await expect(preview(page)).toHaveAttribute("data-preview-theme", id);
-  await page.getByRole("button", { name: "Save look" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
+  await expect(preview(page)).toHaveAttribute("data-theme", id);
+  await expect(status(page)).not.toHaveText("Saved");
+  await expect(status(page)).toHaveText("Saved");
 }
 
 /** The band on the public portfolio: its data attribute and its background colour. */
@@ -118,7 +125,7 @@ async function band(page: Page, username: string) {
   await page.goto(`/p/${username}`);
   const header = page.locator("header[data-theme]");
   await expect(header).toBeVisible();
-  const bg = await header.locator("> div").first().evaluate((el) => getComputedStyle(el).backgroundColor);
+  const bg = await header.evaluate((el) => getComputedStyle(el).backgroundColor);
   return { id: await header.getAttribute("data-theme"), bg };
 }
 
@@ -132,24 +139,24 @@ test.describe("Portfolio looks (Phase 2)", () => {
     await expect(page.locator("[data-theme-option]:not([data-locked])")).toHaveCount(open);
     await expect(page.locator("[data-theme-option][data-locked]")).toHaveCount(PORTFOLIO_THEMES.length - open);
     // Locked looks say so to a screen reader, and the default is what is shown first.
-    await expect(preview(page)).toHaveAttribute("data-preview-theme", DEFAULT_THEME.id);
+    await expect(preview(page)).toHaveAttribute("data-theme", DEFAULT_THEME.id);
     const lockedId = PORTFOLIO_THEMES[open]!.id;
     await expect(option(page, lockedId)).toContainText("locked");
 
-    // A locked look previews but can't be saved: the upgrade offer replaces the save button.
+    // A locked look previews but isn't saved: the upgrade offer shows instead.
     await option(page, lockedId).click();
-    await expect(preview(page)).toHaveAttribute("data-preview-theme", lockedId);
+    await expect(preview(page)).toHaveAttribute("data-theme", lockedId);
     await expect(page.getByTestId("upgrade-prompt")).toContainText("Max");
-    await expect(page.getByRole("button", { name: "Save look" })).toHaveCount(0);
+    await expect(status(page)).toHaveText("Saved");
 
     // An open look saves, and the portfolio's band changes to it.
     const jade = themeById("jade")!;
     await chooseAndSave(page, jade.id);
     expect(await band(page, username)).toEqual({ id: jade.id, bg: rgb(jade.bg) });
 
-    await page.goto("/account/portfolio");
+    await openLook(page);
     await expect(page.getByRole("radio", { name: /^Jade/ })).toBeChecked();
-    await expect(preview(page)).toHaveAttribute("data-preview-theme", jade.id);
+    await expect(preview(page)).toHaveAttribute("data-theme", jade.id);
   });
 
   test("the radios work from the keyboard", async ({ page }) => {
@@ -158,7 +165,7 @@ test.describe("Portfolio looks (Phase 2)", () => {
     await page.keyboard.press("ArrowRight");
     await expect(page.getByRole("radio", { name: /^Jade/ })).toBeFocused();
     await expect(page.getByRole("radio", { name: /^Jade/ })).toBeChecked();
-    await expect(preview(page)).toHaveAttribute("data-preview-theme", "jade");
+    await expect(preview(page)).toHaveAttribute("data-theme", "jade");
   });
 
   test("Max can pick a Max-only look, and the heading face and photo shape follow it", async ({ page }) => {
@@ -190,37 +197,41 @@ test.describe("Portfolio looks (Phase 2)", () => {
     const seeded = await page.request.get(`/dev/portfolio?username=${username}&plan=subscription`, { maxRedirects: 0 });
     expect(seeded.status()).toBe(307);
     await setSubscription(request, userId, "max");
-    await page.goto(`/auth/dev?email=${encodeURIComponent(`${username}@example.com`)}&next=/account/portfolio`);
-    await expect(page.locator("form[data-ready=true] [data-testid=theme-preview]")).toBeAttached();
+    await page.goto(`/auth/dev?email=${encodeURIComponent(`${username}@example.com`)}&next=${encodeURIComponent("/portfolio?step=look")}`);
+    await openLook(page);
     await chooseAndSave(page, maxOnly.id);
     expect((await band(page, username)).id).toBe(maxOnly.id);
 
     await setSubscription(request, userId, "premium");
     expect(await band(page, username)).toEqual({ id: DEFAULT_THEME.id, bg: rgb(DEFAULT_THEME.bg) });
-    await page.goto("/account/portfolio");
+    await openLook(page);
     await expect(page.getByTestId("look-held")).toContainText(maxOnly.name);
-    await expect(preview(page)).toHaveAttribute("data-preview-theme", DEFAULT_THEME.id);
+    await expect(preview(page)).toHaveAttribute("data-theme", DEFAULT_THEME.id);
     await expect(option(page, maxOnly.id)).toHaveAttribute("data-locked", "true");
 
     await setSubscription(request, userId, "max");
     expect(await band(page, username)).toEqual({ id: maxOnly.id, bg: rgb(maxOnly.bg) });
-    await page.goto("/account/portfolio");
+    await openLook(page);
     await expect(page.getByTestId("look-held")).toHaveCount(0);
     await expect(page.getByRole("radio", { name: new RegExp(`^${maxOnly.name}`) })).toBeChecked();
   });
 
-  test("the saving is checked on the server: a look the plan doesn't have is refused", async ({ page }) => {
-    // The picker hides Save on a locked look, so submit the form by hand to test the action.
-    await openSettings(page, `thr${stamp()}`, "premium");
+  test("a look the plan doesn't have is never saved, even after a wait and a reload", async ({ page }) => {
+    // The server check itself is canUseTheme in saveBuilderAction (covered by the rule tests above);
+    // here the page must not send it.
+    const username = `thr${stamp()}`;
+    await openSettings(page, username, "premium");
     const maxOnly = PORTFOLIO_THEMES[themeAllowance("premium")]!;
     await option(page, maxOnly.id).click();
-    await page.evaluate(() => document.querySelector<HTMLFormElement>("form[data-ready=true]")!.requestSubmit());
-    await expect(page.getByRole("status").filter({ hasText: "Saved." })).toHaveCount(0);
-    await page.goto("/account/portfolio");
-    await expect(preview(page)).toHaveAttribute("data-preview-theme", DEFAULT_THEME.id);
+    await page.waitForTimeout(1500);
+    await expect(status(page)).toHaveText("Saved");
+    await page.reload();
+    await openLook(page);
+    await expect(preview(page)).toHaveAttribute("data-theme", DEFAULT_THEME.id);
+    expect((await band(page, username)).id).toBe(DEFAULT_THEME.id);
   });
 
-  test("axe passes on the settings page and on the portfolio in several looks", async ({ page }) => {
+  test("axe passes on the look step and on the portfolio in several looks", async ({ page }) => {
     const username = `tha${stamp()}`;
     await openSettings(page, username, "max");
     const settings = await new AxeBuilder({ page }).withTags(WCAG).analyze();
@@ -233,8 +244,7 @@ test.describe("Portfolio looks (Phase 2)", () => {
       await expect(page.locator(`header[data-theme="${id}"]`)).toBeVisible();
       const res = await new AxeBuilder({ page }).withTags(WCAG).analyze();
       expect(res.violations, `${id}: ${JSON.stringify(res.violations.map((v) => v.id))}`).toEqual([]);
-      await page.goto("/account/portfolio");
-      await expect(page.locator("form[data-ready=true] [data-testid=theme-preview]")).toBeAttached();
+      await openLook(page);
     }
   });
 });
