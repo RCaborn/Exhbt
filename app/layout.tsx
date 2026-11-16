@@ -6,6 +6,7 @@ import "@fontsource/inter/latin-400.css";
 import "@fontsource/inter/latin-500.css";
 import "@fontsource/inter/latin-600.css";
 import { Providers } from "./providers";
+import { PageViewBeacon } from "@/components/site/PageViewBeacon";
 import { isPrivatePreview } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </p>
           )}
           {children}
+          <PageViewBeacon />
         </Providers>
       </body>
     </html>

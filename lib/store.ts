@@ -5,6 +5,8 @@ import type { Project, Roadmap, RoadmapInput } from "./ai/schemas";
 import { normaliseDoc, publicDoc, type ExhbtDoc } from "./exhbt/blocks";
 import type { Plan } from "./entitlements";
 import { normaliseLayout, type PortfolioLayout } from "./portfolio-layout";
+import { accountPlan, cleanQuery, type AdminAccountDetail, type AdminAccountRow, type AdminAccountsPage, type AdminRows, type AdminTable } from "./admin-types";
+import { sbAdminAccount, sbAdminAccounts, sbAdminRows, sbIsAdmin } from "./admin-supabase";
 
 export type RoadmapRecord = {
   id: string;
@@ -212,7 +214,8 @@ export type EventName =
   | "teammate_joined"
   | "file_matched"
   | "referral_recorded"
-  | "referral_credited";
+  | "referral_credited"
+  | "page_view";
 
 /** A Stripe subscription as we keep it (the `subscriptions` table). No amounts or card details. */
 export type SubscriptionRecord = {
@@ -497,6 +500,16 @@ export interface Store {
   markReferralCredited(id: string, creditRef: string): Promise<boolean>;
   /** The referrer's own side, for the account box. Never says who the referred person is. */
   referralSummary(referrerId: string): Promise<{ credited: number; waiting: number }>;
+
+  /* admin (decision 0021). Every method re-checks that `actorId` is an exhbt_admin and throws "forbidden" if not. */
+  /** Whether this account's profiles.role is exhbt_admin. */
+  isAdmin(userId: string): Promise<boolean>;
+  /** Lean rows of one table for the overview. `since` (ISO) narrows the tables that have a date, except the all-time ones (ALL_TIME_TABLES). */
+  adminRows<T extends AdminTable>(actorId: string, table: T, since: string | null): Promise<AdminRows<T>>;
+  /** The accounts table: newest first, searched by email or username, one page. */
+  adminAccounts(actorId: string, opts: { q: string; page: number; pageSize: number }): Promise<AdminAccountsPage>;
+  /** One account, read-only; null if there is none. */
+  adminAccount(actorId: string, userId: string): Promise<AdminAccountDetail | null>;
 }
 
 export const isSupabaseConfigured = () =>
@@ -1584,6 +1597,21 @@ function supabaseStore(): Store {
       const rows = check(await db.from("referrals").select("status").eq("referrer_id", referrerId)) as { status: ReferralStatus }[];
       return { credited: rows.filter((r) => r.status === "credited").length, waiting: rows.filter((r) => r.status !== "credited").length };
     },
+
+    /* admin */
+    isAdmin: (userId) => sbIsAdmin(db, userId),
+    async adminRows(actorId, table, since) {
+      if (!(await sbIsAdmin(db, actorId))) throw new Error("forbidden");
+      return sbAdminRows(db, table, since);
+    },
+    async adminAccounts(actorId, opts) {
+      if (!(await sbIsAdmin(db, actorId))) throw new Error("forbidden");
+      return sbAdminAccounts(db, opts, LIVE_SUBSCRIPTION_STATUSES);
+    },
+    async adminAccount(actorId, userId) {
+      if (!(await sbIsAdmin(db, actorId))) throw new Error("forbidden");
+      return sbAdminAccount(db, userId, LIVE_SUBSCRIPTION_STATUSES);
+    },
   };
 }
 
@@ -1840,10 +1868,10 @@ type Mem = {
   roadmaps: Map<string, MemRoadmap>;
   ideas: Map<string, ProjectIdea[]>;
   optIns: Map<string, boolean>;
-  aiCalls: AICall[];
+  aiCalls: (AICall & { at?: string })[];
   events: { name: string; userId: string | null; props: Record<string, unknown>; at: string }[];
   leads: unknown[];
-  waitlist: { email: string; interest: WaitlistInterest; source: string }[];
+  waitlist: { email: string; interest: WaitlistInterest; source: string; at?: string }[];
   profiles: Map<string, PortfolioProfile>;
   usernameRedirects: Map<string, { userId: string; expiresAt: number }>;
   exhbts: Map<string, ExhbtRecord>;
@@ -1861,6 +1889,8 @@ type Mem = {
   /** Referral codes by user id, and referrals by id (decision 0020). */
   referralCodes: Map<string, string>;
   referrals: Map<string, ReferralRecord>;
+  /** Development and tests only: accounts whose role is exhbt_admin (the Supabase profiles.role). Set from /dev/admin. */
+  admins?: Set<string>;
 };
 const newMem = (): Mem => ({
   roadmaps: new Map(),
@@ -2035,7 +2065,7 @@ function memoryStore(): Store {
       if (r && !r.planConfirmedAt) r.planConfirmedAt = new Date().toISOString();
     },
     async logAICall(c) {
-      m.aiCalls.push(c);
+      m.aiCalls.push({ ...c, at: new Date().toISOString() });
     },
     async logEvent(name, userId, props = {}) {
       m.events.push({ name, userId, props, at: new Date().toISOString() });
@@ -2045,11 +2075,11 @@ function memoryStore(): Store {
       return m.events.filter((e) => e.name === name && e.props.ipHash === ipHash && Date.parse(e.at) >= after).length;
     },
     async createLead(lead) {
-      m.leads.push(lead);
+      m.leads.push({ ...lead, at: new Date().toISOString() });
     },
     async joinWaitlist(entry) {
       m.waitlist ??= [];
-      if (!m.waitlist.some((w) => w.email === entry.email && w.interest === entry.interest)) m.waitlist.push(entry);
+      if (!m.waitlist.some((w) => w.email === entry.email && w.interest === entry.interest)) m.waitlist.push({ ...entry, at: new Date().toISOString() });
     },
     async exportUserData(userId, email) {
       // The same parts as the Supabase export: profile (portfolio fields), exhbts with both copies,
@@ -2548,6 +2578,23 @@ function memoryStore(): Store {
       const mine = [...m.referrals.values()].filter((x) => x.referrerId === referrerId);
       return { credited: mine.filter((x) => x.status === "credited").length, waiting: mine.filter((x) => x.status !== "credited").length };
     },
+
+    /* admin */
+    async isAdmin(userId) {
+      return (m.admins ??= new Set()).has(userId);
+    },
+    async adminRows(actorId, table, since) {
+      if (!(m.admins ??= new Set()).has(actorId)) throw new Error("forbidden");
+      return memAdminRows(m, table, since) as AdminRows<typeof table>;
+    },
+    async adminAccounts(actorId, opts) {
+      if (!(m.admins ??= new Set()).has(actorId)) throw new Error("forbidden");
+      return memAdminAccounts(m, opts);
+    },
+    async adminAccount(actorId, userId) {
+      if (!(m.admins ??= new Set()).has(actorId)) throw new Error("forbidden");
+      return memAdminAccount(m, userId);
+    },
   };
 }
 
@@ -2573,4 +2620,166 @@ export function setStoredCopiesForDevelopment(id: string, copies: { doc: unknown
 /** Read-only view of the in-memory store, for the dev pages and tests. */
 export function memorySnapshot() {
   return g.__exhbtMem;
+}
+
+/* admin: the in-memory reads (development and tests). The Supabase ones are lib/admin-supabase.ts. */
+
+type MemAccount = { id: string; email: string; createdAt: string };
+
+/** Every account the in-memory store has seen a trace of, with the earliest time it appears. */
+function memAccounts(m: Mem): MemAccount[] {
+  const first = new Map<string, string>();
+  const see = (id: string | null | undefined, at: string | undefined) => {
+    if (!id) return;
+    const t = at ?? new Date().toISOString();
+    const old = first.get(id);
+    if (!old || t < old) first.set(id, t);
+  };
+  for (const id of m.profiles.keys()) see(id, undefined);
+  for (const id of m.plans.keys()) see(id, undefined);
+  for (const id of m.admins ?? []) see(id, undefined);
+  for (const r of m.roadmaps.values()) see(r.userId, r.createdAt);
+  for (const e of m.exhbts.values()) see(e.userId, e.updatedAt);
+  for (const s of m.subscriptions.values()) see(s.userId, s.lastEventAt ?? undefined);
+  for (const e of m.events) if (e.userId && e.name !== "page_view") see(e.userId, e.at);
+  return [...first.entries()].map(([id, createdAt]) => ({ id, email: emailFromDevUser(id) ?? id, createdAt }));
+}
+
+/** Subscriptions as admin sees them: the real ones, plus one per development plan override. */
+function memSubs(m: Mem) {
+  const subs = [...m.subscriptions.values()].map((s) => ({
+    userId: s.userId,
+    plan: s.plan,
+    status: s.status,
+    subscriptionId: s.subscriptionId as string | null,
+    createdAt: s.lastEventAt ?? "1970-01-01T00:00:00.000Z",
+  }));
+  for (const [userId, plan] of m.plans) {
+    if (plan !== "free") subs.push({ userId, plan, status: "active", subscriptionId: "dev-override", createdAt: new Date().toISOString() });
+  }
+  return subs;
+}
+
+function memAdminRows(m: Mem, table: AdminTable, since: string | null): AdminRows<AdminTable> {
+  const after = (at: string | null | undefined) => !since || (at ?? "") >= since;
+  const now = new Date().toISOString();
+  const rows = ((): unknown[] => {
+    switch (table) {
+      case "profiles":
+        return memAccounts(m).map((a) => ({ ...a, username: m.profiles.get(a.id)?.username ?? null, role: m.admins?.has(a.id) ? "exhbt_admin" : "user", institutionActive: false }));
+      case "subscriptions":
+        return memSubs(m);
+      case "roadmaps":
+        return [...m.roadmaps.values()]
+          .filter((r) => after(r.createdAt))
+          .map((r) => ({ id: r.id, userId: r.userId, createdAt: r.createdAt, ideasFailedAt: r.ideasFailedAt, swaps: r.projectSwapsUsed }));
+      case "exhbts":
+        // The in-memory exhbt keeps no created time, so its last save stands in for it.
+        return [...m.exhbts.values()]
+          .filter((e) => after(e.updatedAt) || after(e.publishedAt))
+          .map((e) => ({ id: e.id, userId: e.userId, status: e.status, createdAt: e.updatedAt, publishedAt: e.publishedAt }));
+      case "events":
+        return m.events
+          .filter((e) => e.name !== "page_view" && after(e.at))
+          .map((e) => ({ name: e.name, userId: e.userId, at: e.at, cached: typeof e.props.cached === "boolean" ? e.props.cached : null }));
+      case "pageViews":
+        return m.events
+          .filter((e) => e.name === "page_view" && after(e.at))
+          .map((e) => ({ at: e.at, path: String(e.props.path ?? "/"), referrer: String(e.props.referrer ?? ""), isPortfolio: e.props.is_portfolio === true }));
+      case "aiCalls":
+        return m.aiCalls
+          .filter((c) => after(c.at ?? now))
+          .map((c) => ({ userId: c.userId, step: c.step, model: c.model, inputTokens: c.inputTokens, outputTokens: c.outputTokens, costUsd: c.costUsd, at: c.at ?? now }));
+      case "ideas":
+        return [...m.ideas.entries()]
+          .flatMap(([roadmapId, list]) => list.map((i) => ({ at: m.roadmaps.get(roadmapId)?.createdAt ?? now, source: i.source })))
+          .filter((i) => after(i.at));
+      case "savedIdeas":
+        return [...m.savedIdeas.values()].filter((i) => after(i.createdAt)).map((i) => ({ at: i.createdAt }));
+      case "referrals":
+        return [...m.referrals.values()]
+          .filter((r) => after(r.createdAt))
+          .map((r) => ({ id: r.id, referrerId: r.referrerId, referredId: r.referredId, status: r.status, createdAt: r.createdAt }));
+      case "waitlist":
+        return m.waitlist.filter((w) => after(w.at ?? now)).map((w) => ({ email: w.email, interest: w.interest, source: w.source, at: w.at ?? null }));
+      case "leads":
+        return (m.leads as { name: string; email: string; institution: string; at?: string }[])
+          .filter((l) => after(l.at ?? now))
+          .map((l) => ({ name: l.name, email: l.email, institution: l.institution, at: l.at ?? null }));
+      case "jobLinks":
+        return [...m.jobLinks.values()].map((l) => ({ userId: l.userId, status: l.status, views: l.viewCount, createdAt: l.createdAt }));
+      case "members":
+        return [...m.members.values()].map((x) => ({ exhbtId: x.exhbtId, userId: x.userId, addedAt: x.addedAt }));
+      case "invites":
+        return [...m.invites.values()].map((i) => ({ accepted: Boolean(i.acceptedAt), cancelled: Boolean(i.cancelledAt), createdAt: i.createdAt }));
+      case "files":
+        return [...m.files.values()].map((f) => ({ bucket: f.bucket, bytes: f.bytes }));
+      case "matches":
+        return [...m.matches.values()].filter((x) => after(x.createdAt)).map((x) => ({ id: x.id, outcome: x.outcome, createdAt: x.createdAt }));
+    }
+  })();
+  return { rows: rows as never, truncated: false };
+}
+
+function memAccountRow(m: Mem, a: MemAccount): AdminAccountRow {
+  const mine = memSubs(m).filter((s) => s.userId === a.id).reverse();
+  const { plan, comp } = accountPlan(mine, false, LIVE_SUBSCRIPTION_STATUSES);
+  const roadmaps = [...m.roadmaps.values()].filter((r) => r.userId === a.id);
+  const exhbts = [...m.exhbts.values()].filter((e) => e.userId === a.id);
+  const times = [...roadmaps.map((r) => r.createdAt), ...exhbts.map((e) => e.updatedAt), ...m.events.filter((e) => e.userId === a.id).map((e) => e.at)];
+  return {
+    id: a.id,
+    email: a.email,
+    createdAt: a.createdAt,
+    plan,
+    comp,
+    username: m.profiles.get(a.id)?.username ?? null,
+    roadmaps: roadmaps.length,
+    exhbts: exhbts.length,
+    lastActive: times.sort().at(-1) ?? null,
+  };
+}
+
+function memAdminAccounts(m: Mem, opts: { q: string; page: number; pageSize: number }): AdminAccountsPage {
+  const q = cleanQuery(opts.q);
+  const all = memAccounts(m)
+    .filter((a) => !q || a.email.toLowerCase().includes(q) || (m.profiles.get(a.id)?.username ?? "").includes(q))
+    .sort((x, y) => y.createdAt.localeCompare(x.createdAt) || x.id.localeCompare(y.id));
+  const page = Math.max(1, opts.page);
+  const slice = all.slice((page - 1) * opts.pageSize, page * opts.pageSize);
+  return { rows: slice.map((a) => memAccountRow(m, a)), total: all.length, page, pageSize: opts.pageSize };
+}
+
+function memAdminAccount(m: Mem, userId: string): AdminAccountDetail | null {
+  const a = memAccounts(m).find((x) => x.id === userId);
+  if (!a) return null;
+  const files = [...m.files.values()].filter((f) => f.userId === userId);
+  const calls = m.aiCalls.filter((c) => c.userId === userId);
+  return {
+    ...memAccountRow(m, a),
+    role: m.admins?.has(userId) ? "exhbt_admin" : "user",
+    roadmapList: [...m.roadmaps.values()]
+      .filter((r) => r.userId === userId)
+      .map((r) => ({ id: r.id, createdAt: r.createdAt, ideasFailed: Boolean(r.ideasFailedAt) }))
+      .sort((x, y) => y.createdAt.localeCompare(x.createdAt)),
+    exhbtList: [...m.exhbts.values()].filter((e) => e.userId === userId).map((e) => ({ id: e.id, status: e.status, createdAt: e.updatedAt })),
+    events: m.events
+      .filter((e) => e.userId === userId && e.name !== "page_view")
+      .map((e) => ({ name: e.name, at: e.at }))
+      .sort((x, y) => y.at.localeCompare(x.at))
+      .slice(0, 100),
+    aiCalls: calls.length,
+    aiCostUsd: calls.reduce((n, c) => n + c.costUsd, 0),
+    files: files.length,
+    fileBytes: files.reduce((n, f) => n + f.bytes, 0),
+  };
+}
+
+/** Development and tests only: makes an account an exhbt_admin without touching the database (app/dev/admin). */
+export function setAdminForDevelopment(userId: string, admin = true) {
+  if (process.env.NODE_ENV === "production") throw new Error("Development only.");
+  const mem = (g.__exhbtMem ??= newMem());
+  mem.admins ??= new Set();
+  if (admin) mem.admins.add(userId);
+  else mem.admins.delete(userId);
 }
