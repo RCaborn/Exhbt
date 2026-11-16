@@ -65,16 +65,17 @@ test("a claimed username signs in, including the previous name while it redirect
   const second = uniqueName("b");
   await createAccount(page, email, password);
 
-  await page.goto("/account/portfolio");
+  // A username is a paid feature (decision 0016), and it's claimed in the builder's Publish step.
+  await page.goto(`/dev/plan?plan=premium&next=${encodeURIComponent("/portfolio?step=publish")}`);
   await page.getByRole("textbox", { name: "Username" }).fill(first);
   await expect(page.locator("#username-status")).toHaveText("Available.");
   await page.getByRole("button", { name: "Claim username" }).click();
-  await expect(page.getByText(portfolioHost(first), { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: portfolioHost(first) })).toBeVisible();
 
   await page.getByRole("textbox", { name: "Username" }).fill(second);
   await expect(page.locator("#username-status")).toHaveText("Available.");
   await page.getByRole("button", { name: "Change username" }).click();
-  await expect(page.getByText(portfolioHost(second), { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: portfolioHost(second) })).toBeVisible();
 
   await page.context().clearCookies();
   await page.goto("/login?next=/account");
