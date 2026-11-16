@@ -141,7 +141,7 @@ const DOCS: Record<string, Doc> = {
 
         <h2>Job links ({PLAN_NAMES.max})</h2>
         <p>
-          Links for each job are not open yet; the pricing page will say when they are. When you make one, you paste a
+          When you make one, you paste a
           job description or a link to it. If you give a link, our server reads that web page. We send the job
           description and, for each of your published exhbts, its title, context line, skills and findings to
           Anthropic, which picks the best fits and writes a short reason for each and a draft note to the employer. We
