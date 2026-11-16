@@ -182,7 +182,7 @@ test.describe("Portfolio looks (Phase 2)", () => {
     else expect(radius).toBeLessThan(40);
 
     // A project page takes the look's heading face through --font-display.
-    await page.getByRole("link", { name: /GP|reminder/i }).first().click();
+    await page.getByRole("link", { name: "See how I did it" }).click();
     await page.waitForURL(/\/p\/[^/]+\/[^/]+$/);
     await expect(page.locator(`div[data-theme="${maxOnly.id}"]`)).toBeVisible();
     const h1Font = await page.getByRole("heading", { level: 1 }).evaluate((el) => getComputedStyle(el).fontFamily);
