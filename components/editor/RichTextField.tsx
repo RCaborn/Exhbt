@@ -10,7 +10,7 @@ import Bold from "@tiptap/extension-bold";
 import Italic from "@tiptap/extension-italic";
 import Link from "@tiptap/extension-link";
 import History from "@tiptap/extension-history";
-import { Bold as BoldIcon, Italic as ItalicIcon, Link2, Unlink } from "lucide-react";
+import { Bold as BoldIcon, Highlighter, Italic as ItalicIcon, Link2, Unlink } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { safeHref, type RichText } from "@/lib/exhbt/blocks";
 import { docToRuns, runsToDoc, sameRuns, type TiptapNode } from "@/lib/exhbt/richtext-tiptap";
@@ -33,6 +33,7 @@ export function RichTextField({
   labelId,
   describedBy,
   placeholder,
+  highlight = false,
 }: {
   value: RichText;
   onChange: (runs: RichText) => void;
@@ -41,6 +42,11 @@ export function RichTextField({
   describedBy?: string;
   /** A teaching example shown while the field is empty. */
   placeholder?: string;
+  /**
+   * The exhbt's context line (decision 0022): bold is the highlighted phrase, so the button says
+   * "Highlight" and the field shows it highlighted, as the page does. Stored as bold either way.
+   */
+  highlight?: boolean;
 }) {
   const [linkError, setLinkError] = useState<string | null>(null);
   const editor = useEditor({
@@ -70,7 +76,7 @@ export function RichTextField({
         "aria-labelledby": labelId,
         ...(describedBy ? { "aria-describedby": describedBy } : {}),
         ...(placeholder ? { "aria-placeholder": placeholder } : {}),
-        class: "field min-h-[2.9rem] leading-relaxed whitespace-pre-wrap",
+        class: `field min-h-[2.9rem] leading-relaxed whitespace-pre-wrap${highlight ? " field-highlight" : ""}`,
       },
     },
     onUpdate: ({ editor: e }) => onChange(docToRuns(e.getJSON() as TiptapNode)),
@@ -110,9 +116,16 @@ export function RichTextField({
   return (
     <div>
       <div role="toolbar" aria-label="Formatting" className="mb-1.5 flex justify-end gap-1.5">
-        <Button size="sm" variant={active?.bold ? "ink" : "secondary"} label={active?.bold ? "Bold, on" : "Bold"} onClick={() => editor?.chain().focus().toggleBold().run()}>
-          <BoldIcon aria-hidden size={14} strokeWidth={2.5} />
-        </Button>
+        {highlight ? (
+          <Button size="sm" variant={active?.bold ? "ink" : "secondary"} label={active?.bold ? "Highlight, on" : "Highlight"} onClick={() => editor?.chain().focus().toggleBold().run()}>
+            <Highlighter aria-hidden size={14} strokeWidth={2.5} />
+            Highlight
+          </Button>
+        ) : (
+          <Button size="sm" variant={active?.bold ? "ink" : "secondary"} label={active?.bold ? "Bold, on" : "Bold"} onClick={() => editor?.chain().focus().toggleBold().run()}>
+            <BoldIcon aria-hidden size={14} strokeWidth={2.5} />
+          </Button>
+        )}
         <Button size="sm" variant={active?.italic ? "ink" : "secondary"} label={active?.italic ? "Italic, on" : "Italic"} onClick={() => editor?.chain().focus().toggleItalic().run()}>
           <ItalicIcon aria-hidden size={14} strokeWidth={2.5} />
         </Button>

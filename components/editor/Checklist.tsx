@@ -10,6 +10,8 @@ export function isBlank(doc: ExhbtDoc): boolean {
   return (
     !doc.title.trim() &&
     !doc.context.trim() &&
+    !(doc.whereWhen ?? "").trim() &&
+    !(doc.summary ?? "").trim() &&
     words(plain(doc.gap)) === 0 &&
     doc.flow.every((s) => !s.step.trim() && !(s.detail ?? "").trim()) &&
     doc.skills.length === 0 &&
@@ -27,8 +29,8 @@ export function stepsFor(doc: ExhbtDoc, live: boolean): Step[] {
   const at = doc.sections.findIndex((s) => s.kind === "findings" || s.kind === "graph");
   const shown = findingsOf(doc).filter((f) => words(plain(f)) > 0).length >= 2 || doc.sections.some((s) => s.kind === "graph" && hasData(s.chart));
   return [
-    { key: "title", label: "Give it a title", done: doc.title.trim().length > 0, target: "card-header" },
-    { key: "question", label: "Write the question", done: words(plain(doc.gap)) > 0, target: "card-gap" },
+    { key: "title", label: "Ask your question (the title)", done: doc.title.trim().length > 0, target: "card-header" },
+    { key: "question", label: "Write the context", done: words(plain(doc.gap)) > 0, target: "card-gap" },
     { key: "process", label: "Fill in 3 or more process boxes", done: doc.flow.filter((s) => s.step.trim()).length >= 3, target: "card-flow" },
     { key: "findings", label: "Add 2 or more findings, or a graph", done: shown, target: at >= 0 ? `card-section-${at}` : "add-section" },
     { key: "publish", label: "Publish it", done: live, target: "card-publish" },

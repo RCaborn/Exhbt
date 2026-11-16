@@ -75,9 +75,9 @@ export function useDraftTools(id: string, init: DraftToolsInit, doc: ExhbtDoc, s
  * What the rewrite calls each part. Not `{ ...BLOCK_NAMES, header: … }`: the build inlines that
  * spread into one object literal with "header" twice, and warns.
  */
-const nameOf = (block: DraftBlock): string => (block === "header" ? "title and context line" : BLOCK_NAMES[block]);
+const nameOf = (block: DraftBlock): string => (block === "header" ? "question and details" : BLOCK_NAMES[block]);
 /** What the card is called on the page, for the menu button's name. */
-const CARD_NAMES: Record<DraftBlock, string> = { header: "Title and context", skills: "Skills", gap: "The question", flow: "Process", findings: "Findings" };
+const CARD_NAMES: Record<DraftBlock, string> = { header: "Your question and details", skills: "Skills", gap: "Context", flow: "Process", findings: "Findings" };
 
 const ITEM = "flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 text-left text-[0.95rem] font-medium text-ink hover:bg-mist disabled:opacity-50";
 

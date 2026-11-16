@@ -57,7 +57,7 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
       status={record.status}
       slug={record.slug}
       liveBase={liveBase}
-      owner={{ name: profile.name?.trim() || profile.username || user.email.split("@")[0]!, photoUrl: await signedFileUrl(profile.photoFileId) }}
+      owner={{ name: profile.name?.trim() || profile.username || user.email.split("@")[0]!, photoUrl: await signedFileUrl(profile.photoFileId), bio: profile.headline }}
       imageUrls={imageUrls}
       fileEvidenceUrl={record.doc.evidence?.kind === "file" ? evidenceUrl : null}
       planBlock={verdict.ok ? null : { reason: verdict.reason, upgradeTo: verdict.upgradeTo }}
