@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Undo2 } from "lucide-react";
+import { Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { PortfolioPerson } from "@/components/portfolio/PortfolioPage";
 import type { Plan } from "@/lib/entitlements";
@@ -19,6 +19,7 @@ import { StepPublish } from "./StepPublish";
 import { StepYou } from "./StepYou";
 import { isStep, STEPS, type BuilderPlan, type BuilderProject, type BuilderState, type Step, type ThemeLock } from "./steps";
 import { useBuilder } from "./useBuilder";
+import { Tick } from "@/components/ui/Tick";
 
 /**
  * Build your portfolio (decision 0016): one guided flow, You, Your look, Your projects and Publish,
@@ -183,9 +184,7 @@ export function Builder(props: Props) {
                     <span aria-hidden className={`block h-1.5 rounded-full ${current ? "bg-ink" : done[s.id] ? "bg-jade" : "bg-line"}`} />
                     <span className={`mt-2 flex items-center gap-1.5 text-sm ${current ? "font-semibold text-ink" : "text-graphite group-hover:text-ink"}`}>
                       {done[s.id] && !current ? (
-                        <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-mint text-ink">
-                          <Check aria-hidden size={11} strokeWidth={3} />
-                        </span>
+                        <Tick size="xs" />
                       ) : (
                         <span aria-hidden className="tabular-nums">
                           {i + 1}
@@ -302,7 +301,7 @@ export function Builder(props: Props) {
 
           <aside aria-label="Preview of your portfolio" className="min-w-0 lg:sticky lg:top-4 lg:self-start">
             <p className="mb-2 text-sm font-semibold text-graphite">Preview</p>
-            <div tabIndex={0} aria-label="Preview, scrolls" className="overflow-hidden rounded-[20px] border border-line bg-mist shadow-pack lg:max-h-[calc(100svh-4rem)] lg:overflow-y-auto">
+            <div tabIndex={0} role="region" aria-label="Preview, scrolls" className="overflow-hidden rounded-[20px] border border-line bg-mist shadow-pack lg:max-h-[calc(100svh-4rem)] lg:overflow-y-auto">
               <Preview state={state} person={person} theme={theme} projects={projects} />
             </div>
           </aside>

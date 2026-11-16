@@ -1,9 +1,10 @@
 "use client";
 
-import { Check, X } from "lucide-react";
+import { X } from "lucide-react";
 import { findingsOf, plain, words, type ExhbtDoc } from "@/lib/exhbt/blocks";
 import { hasData } from "@/lib/exhbt/charts";
 import { Button } from "@/components/ui/Button";
+import { Tick } from "@/components/ui/Tick";
 
 /** True for a doc with nothing typed in yet: what "Start from scratch" makes. */
 export function isBlank(doc: ExhbtDoc): boolean {
@@ -54,12 +55,7 @@ export function Checklist({ steps, onDismiss, onJump }: { steps: Step[]; onDismi
       <ol className="mt-4 space-y-2">
         {steps.map((s) => (
           <li key={s.key} data-done={s.done || undefined} className="flex items-center gap-3">
-            <span
-              aria-hidden
-              className={`inline-flex size-[22px] shrink-0 items-center justify-center rounded-full border ${s.done ? "border-ink bg-mint" : "border-field bg-surface"}`}
-            >
-              {s.done && <Check size={13} strokeWidth={3} />}
-            </span>
+            {s.done ? <Tick size="lg" /> : <span aria-hidden className="inline-flex size-[22px] shrink-0 rounded-full border border-field bg-surface" />}
             <a
               href={`#${s.target}`}
               onClick={(e) => {

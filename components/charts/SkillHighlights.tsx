@@ -1,4 +1,5 @@
-import { ArrowUp, Check } from "lucide-react";
+import { ArrowUp } from "lucide-react";
+import { Tick } from "@/components/ui/Tick";
 
 /**
  * The two lists under a skill radar: "Level up next" (the biggest shortfalls) and "In the bag"
@@ -18,9 +19,7 @@ export function UpMarker() {
 /** The green tick used for strengths elsewhere in the roadmap: a skill in the bag. */
 export function BagMarker() {
   return (
-    <span aria-hidden className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-ink bg-mint">
-      <Check size={10} strokeWidth={3} />
-    </span>
+    <Tick size="xs" />
   );
 }
 

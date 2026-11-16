@@ -2,9 +2,9 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { Check } from "lucide-react";
 import { joinWaitlist, type WaitlistState } from "./actions";
 import { Button } from "@/components/ui/Button";
+import { Tick } from "@/components/ui/Tick";
 
 type Props = {
   /** Where the form sits, for analytics (e.g. "pricing", "roadmap-next"). */
@@ -22,9 +22,7 @@ export function WaitlistForm({ source, interest = "max", defaultEmail = "", tone
   if (state?.ok) {
     return (
       <p role="status" className="inline-flex items-center gap-2 font-semibold">
-        <span className="inline-flex size-5 items-center justify-center rounded-full border border-ink bg-mint text-ink">
-          <Check aria-hidden size={12} strokeWidth={3} />
-        </span>
+        <Tick />
         You&rsquo;re on the list. We&rsquo;ll email you when it opens.
       </p>
     );

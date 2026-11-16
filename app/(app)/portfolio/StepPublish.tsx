@@ -1,6 +1,5 @@
 "use client";
 
-import { Check, Circle } from "lucide-react";
 import Link from "next/link";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { CopyLink } from "@/components/ui/CopyLink";
@@ -8,6 +7,7 @@ import type { Plan } from "@/lib/entitlements";
 import { portfolioHost } from "@/lib/hosts";
 import type { BuilderPlan } from "./steps";
 import { UsernameForm } from "./UsernameForm";
+import { Tick } from "@/components/ui/Tick";
 
 /**
  * Step 4, Publish and share: the address (a username, on a paid plan: canClaimUsername), the link to
@@ -58,11 +58,9 @@ export function StepPublish({
           {checks.map((c) => (
             <li key={c.text} className="flex items-start gap-2.5" data-done={c.done ? "true" : undefined}>
               {c.done ? (
-                <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-mint text-ink">
-                  <Check aria-hidden size={13} strokeWidth={3} />
-                </span>
+                <Tick className="mt-0.5" />
               ) : (
-                <Circle aria-hidden size={20} strokeWidth={1.75} className="mt-0.5 shrink-0 text-field" />
+                <span aria-hidden className="mt-0.5 inline-flex size-5 shrink-0 rounded-full border border-field bg-surface" />
               )}
               <span>
                 <span className="sr-only">{c.done ? "Done: " : "To do: "}</span>
