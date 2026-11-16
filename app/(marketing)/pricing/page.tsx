@@ -124,8 +124,8 @@ export default async function PricingPage(props: Props) {
             <div>
               <dt className="font-medium">How does paying work?</dt>
               <dd className="mt-1.5 text-graphite">
-                {PLAN_NAMES.premium} is {PRICES.premium} and {PLAN_NAMES.max} is {PRICES.max} a {BILLING_PERIOD}, paid by card through
-                Stripe. Change plan or cancel from Account, Billing. If you move to a smaller plan, nothing is deleted.
+                {PLAN_NAMES.premium} is {PRICES.premium} and {PLAN_NAMES.max} is {PRICES.max} a {BILLING_PERIOD}, paid by card in one
+                payment through Stripe, and renewing each {BILLING_PERIOD} until you cancel. Change plan or cancel from Account, Billing. If you move to a smaller plan, nothing is deleted.
               </dd>
             </div>
           ) : (

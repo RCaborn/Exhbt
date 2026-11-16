@@ -103,8 +103,9 @@ Payments stay off until Phase 2 is switched on. Do all of this in Stripe's **tes
 
 1. Go to **stripe.com** and create an account for the business. Set the account's currency to **GBP**.
 2. **Product catalogue > Add product**, twice:
-   - **Premium**: one recurring price, **monthly**, in GBP.
-   - **Max**: one recurring price, **monthly**, in GBP.
+   - **Premium**: one recurring price, **yearly** (billing period: Yearly), in GBP.
+   - **Max**: one recurring price, **yearly** (billing period: Yearly), in GBP.
+   Prices are billed once a year (founders, 16 Nov 2026), so create them as **yearly** recurring prices, not monthly. The site says "a year" everywhere (`BILLING_PERIOD` in `lib/entitlements.ts`), and the code does not set an interval itself: Checkout charges whatever interval the Stripe price has.
    The amounts must match `PRICES` in `lib/entitlements.ts` (that is what the site shows; Stripe is what actually charges).
 3. Open each price and copy its id (starts `price_`). In `wrangler.jsonc` under `vars`, replace the placeholders:
    - `STRIPE_PRICE_PREMIUM` = the Premium price id
@@ -125,6 +126,7 @@ Payments stay off until Phase 2 is switched on. Do all of this in Stripe's **tes
 8. Optional, for a new-joiner discount later: **Product catalogue > Coupons**, then add a **promotion code**. Checkout already shows a box for codes.
 9. Open `/api/health`. Under `phase2`, every setting should be `true` and `stripe.ok` should be `true`. (This section doesn't change the overall `ok` until payments are meant to be live.)
 10. Try it in test mode: sign in, open `/account/billing`, choose Premium and pay with card `4242 4242 4242 4242`, any future date and any CVC. Back on the billing page the plan should read Premium within a minute. **Manage billing** should open Stripe's page, where you can cancel; the plan should go back to Free when the subscription ends.
+11. **Referrals stay off.** The code is built (decision 0020) but `REFERRALS_LIVE` in `lib/referrals.ts` is `false`. Before it goes on: Stripe is live, the cookie question in the decision is settled, and the cookie and privacy pages are updated. The credit uses Stripe's customer balance, so it needs no extra Stripe setup; the secret key must be allowed to write customers.
 
 ---
 

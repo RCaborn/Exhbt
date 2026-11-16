@@ -11,7 +11,7 @@ Everything below is on the `phase-2` branch. The live site (`main`) is unchanged
 | Area | What a person can do |
 |---|---|
 | Plans | Free, Premium and Max (figures only in `lib/entitlements.ts`). Upgrade prompts appear where they're needed: publishing on Free, a full plan, drafts used up. |
-| Pricing | Free / £9 / £15 a month. The pricing page and home page show this once Phase 2 is switched on; the waitlist shows until then. The originality check and per-job links are marked "coming soon". |
+| Pricing | Free / £9 a year / £15 a year. The pricing page and home page show this once Phase 2 is switched on; the waitlist shows until then. The originality check and per-job links are marked "coming soon". |
 | Payments | Stripe Checkout, the billing portal, a billing page, and the webhook (signed, repeat-safe, ignores out-of-order events). |
 | Upload and AI draft | Upload PDF, Word, text, CSV, spreadsheets, photos or scans. Haiku drafts an exhbt from the files and flags any number it can't find in them. The progress screen shows each step. |
 | Editor | One card per section, the flowchart edited on the diagram itself, live word count against 200 (every word on the page counts), images and the work as a file, and autosave that can't lose work. Also: "Rewrite this block", "Back to the AI version", publish checks with links to the card at fault, and an "it's live" panel. |

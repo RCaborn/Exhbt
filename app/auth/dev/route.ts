@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { DEV_USER_COOKIE, safeNext } from "@/lib/auth";
+import { recordReferralFromCookie } from "@/lib/referrals";
 import { getStore, isSupabaseConfigured } from "@/lib/store";
 
 /** Local development stand-in for the magic link. Disabled whenever Supabase is configured or in production. */
@@ -12,6 +13,7 @@ export async function GET(req: NextRequest) {
   if (!email.includes("@")) return new NextResponse("Bad request", { status: 400 });
 
   await getStore().claimPendingRoadmaps(email, `dev-${email}`);
+  await recordReferralFromCookie(`dev-${email}`, null);
   const res = NextResponse.redirect(new URL(safeNext(url.searchParams.get("next")), url.origin));
   res.cookies.set(DEV_USER_COOKIE, email, { httpOnly: true, sameSite: "lax", path: "/" });
   return res;

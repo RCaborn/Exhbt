@@ -35,6 +35,8 @@ export default defineConfig({
     env: { NEXT_TELEMETRY_DISABLED: "1", NEXT_DIST_DIR: ".next-e2e", EXHBT_PER_IP_PER_DAY: "100", EXHBT_LOGINS_PER_HOUR: "100",
       STRIPE_SECRET_KEY: "sk_test_dummy", STRIPE_WEBHOOK_SECRET: "whsec_test", STRIPE_PRICE_PREMIUM: "price_test_premium", STRIPE_PRICE_MAX: "price_test_max",
       // "Use a link" on job links may read this server's own /dev/listing page (never in production).
+      // Referrals are off in production; this turns them on here, with the Stripe credit recorded, not sent (lib/referrals.ts).
+      EXHBT_REFERRALS_TEST: "1",
       EXHBT_LISTING_TEST_ORIGIN: `http://localhost:${PORT}` },
   },
 });
