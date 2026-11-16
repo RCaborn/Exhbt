@@ -359,6 +359,6 @@ export function layoutFromSections(sections: readonly SectionKey[], tiles: Tiles
 
 /** "MSc Finance, St Andrews, 2026" to its words and its year, for a row with the year on the right. */
 export function splitYear(line: string): { label: string; year: string | null } {
-  const m = line.trim().match(/^(.*?)[,–—-]?\s*((?:19|20)\d{2}(?:\s*[–—-]\s*(?:(?:19|20)\d{2}|now|present))?)$/i);
+  const m = line.trim().match(/^(.*?)[,–—-]?\s*((?:19|20)\d{2}(?:\s*(?:[–—-]|to)\s*(?:(?:19|20)\d{2}|now|present))?)$/i);
   return m && m[1]!.trim() ? { label: m[1]!.trim().replace(/[,–—-]$/, "").trim(), year: m[2]!.trim() } : { label: line.trim(), year: null };
 }

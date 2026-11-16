@@ -42,6 +42,8 @@ export type HomeProps = {
   startHref?: string;
   /** In the builder's preview: the fixed parts (top bar, hero, footer) are a picture, not links. */
   inertChrome?: boolean;
+  /** Only the sections, without the top bar, hero and footer (the lifted section while it is dragged). */
+  sectionsOnly?: boolean;
 };
 
 const WRAP = "mx-auto w-full max-w-[68rem] px-5 @3xl:px-10";
@@ -88,14 +90,17 @@ export function PortfolioHome(props: HomeProps) {
 
   return (
     <div data-portfolio-home data-theme={theme.id} style={themeStyle(theme)} className="@container bg-[var(--pf-ground)] text-[color:var(--pf-ink)]">
-      <div inert={props.inertChrome || undefined}>
-        <TopBar username={person.username} nav={nav} contact={has("contact")} />
-        <Hero person={person} theme={theme} />
-      </div>
+      {!props.sectionsOnly && (
+        <div inert={props.inertChrome || undefined}>
+          <TopBar username={person.username} nav={nav} contact={has("contact")} />
+          <Hero person={person} theme={theme} />
+        </div>
+      )}
       {shown.map((key) => {
         const node = <Section key={key} sectionKey={key} {...props} />;
         return frame ? <div key={key}>{frame(key, node)}</div> : node;
       })}
+      {!props.sectionsOnly && (
       <footer inert={props.inertChrome || undefined} className={`${WRAP} pt-10 pb-12`}>
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem] text-[color:var(--pf-faint)]">
           <span className="inline-flex items-center gap-1.5">
@@ -106,6 +111,7 @@ export function PortfolioHome(props: HomeProps) {
           </Link>
         </p>
       </footer>
+      )}
     </div>
   );
 }

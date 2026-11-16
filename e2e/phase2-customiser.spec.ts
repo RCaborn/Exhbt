@@ -6,7 +6,11 @@ import { canUseExtraTiles, customisableExhbts, listedOnPortfolio } from "../lib/
 import { checkTiles } from "../lib/portfolio-customise";
 import {
   DEFAULT_LAYOUT,
+  DEFAULT_SECTIONS,
   layoutFromOrder,
+  layoutFromSections,
+  sectionsOf,
+  splitYear,
   normaliseGithub,
   normaliseLayout,
   normaliseWebsite,
@@ -51,11 +55,18 @@ test.describe("Layout rules", () => {
     const layout = normaliseLayout({
       v: 1,
       slots: ["p", "about", "p", "about", "bogus", "p", "quote"],
-      tiles: { about: { text: "Hi" }, education: { lines: ["Not on the page"] }, quote: { text: "Good", name: "A", role: "B" } },
+      tiles: {
+        about: { text: "Hi" },
+        education: { lines: ["Shown under About me"] },
+        experience: { lines: ["Not on the page"] },
+        quote: { text: "Good", name: "A", role: "B" },
+      },
       header: { skills: false },
     });
     expect(layout.slots).toEqual(["p", "about", "p", "p", "quote"]);
-    expect(layout.tiles.education).toBeUndefined();
+    // Education is part of About me on the home page (decision 0016), so it stays while About me does.
+    expect(layout.tiles.education).toEqual({ lines: ["Shown under About me"] });
+    expect(layout.tiles.experience).toBeUndefined();
     expect(layout.header).toEqual({ skills: false, linkedin: true });
     expect(sequence(layout, ["a", "b", "c"])).toEqual(["a", "about", "b", "c", "quote"]);
     // More exhbts than slots: the rest go on the end. Fewer: spare slots are dropped.
@@ -63,6 +74,19 @@ test.describe("Layout rules", () => {
     expect(sequence(layout, ["a"])).toEqual(["a", "about", "quote"]);
     expect(splitOrder(["a", "about", "b"])).toEqual({ slots: ["p", "about", "p"], projectIds: ["a", "b"] });
     expect(layoutFromOrder(["a", "about"], { about: { text: "x" }, quote: { text: "y", name: "", role: "" } }, DEFAULT_LAYOUT.header).tiles).toEqual({ about: { text: "x" } });
+  });
+
+  test("the home page's sections: an old customiser layout reads as the default plus its extra tiles; a new one as saved", () => {
+    expect(sectionsOf(normaliseLayout(null))).toEqual([...DEFAULT_SECTIONS]);
+    expect(sectionsOf(normaliseLayout({ v: 1, slots: ["p", "quote", "p", "about"], tiles: {}, header: {} }))).toEqual(["featured", "work", "about", "quote", "contact"]);
+    const saved = layoutFromSections(["about", "featured", "quote"], { about: { text: "x" }, quote: { text: "y", name: "", role: "" }, experience: { lines: ["gone"] } }, DEFAULT_LAYOUT.header);
+    expect(saved.slots).toEqual(["about", "featured", "quote"]);
+    expect(saved.tiles.experience).toBeUndefined();
+    expect(sectionsOf(normaliseLayout(saved))).toEqual(["about", "featured", "quote"]);
+    expect(splitYear("MSc Finance, St Andrews, 2026")).toEqual({ label: "MSc Finance, St Andrews", year: "2026" });
+    expect(splitYear("Retail supervisor, 2023 to 2025")).toEqual({ label: "Retail supervisor", year: "2023 to 2025" });
+    expect(splitYear("Analyst intern, Example Bank, 2024–2025")).toEqual({ label: "Analyst intern, Example Bank", year: "2024–2025" });
+    expect(splitYear("BA Economics")).toEqual({ label: "BA Economics", year: null });
   });
 
   test("hidden exhbts leave and the featured one goes first; the wide tiles never leave a lone tile", () => {
@@ -214,7 +238,9 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     await openCustomiser(page, `ckc${stamp()}`, "premium");
     await handle(page, GP).focus();
     await page.keyboard.press("Space");
+    await expect(page.locator("[id^=DndLiveRegion]:not(:empty)")).toContainText("Picked up");
     await page.keyboard.press("ArrowDown");
+    await expect(page.locator("[id^=DndLiveRegion]:not(:empty)")).toContainText("is over position");
     await page.keyboard.press("Escape");
     await expect(page.locator("[id^=DndLiveRegion]:not(:empty)")).toContainText("Cancelled.");
     expect(await previewOrder(page)).toEqual([GP, LIBRARY, THIRD, FOURTH]);
@@ -312,10 +338,8 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     await saved(page);
     expect(await sectionOrder(page)).toEqual(["featured", "work", "about", "contact", "experience", "quote"]);
 
-    // The menu offers only what isn't on the page.
-    await page.getByRole("button", { name: "Add a section" }).click();
-    await expect(page.locator("#add-section-menu").getByRole("button")).toHaveCount(0);
-    await page.keyboard.press("Escape");
+    // Every section is on the page, so there's nothing left to add.
+    await expect(page.getByRole("button", { name: "Add a section" })).toBeDisabled();
 
     await page.goto(`/p/${u}`);
     expect(await sectionOrder(page, "main")).toEqual(["featured", "work", "about", "contact", "experience", "quote"]);
@@ -345,7 +369,8 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     await page.waitForTimeout(120);
     await page.keyboard.press("Space");
     await expect(live).toContainText("Dropped About me. Position 1 of 4.");
-    expect(await sectionOrder(page)).toEqual(["about", "featured", "work", "contact"]);
+    await expect(page.getByTestId("lifted-section")).toHaveCount(0);
+    await expect.poll(() => sectionOrder(page)).toEqual(["about", "featured", "work", "contact"]);
     await expect(page.getByRole("button", { name: "Undo: Moved About me" })).toBeEnabled();
     await saved(page);
     await page.goto(`/p/${u}`);
@@ -473,6 +498,9 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     // Moving one there changes the builder's order too.
     const first = titles.find((t) => t !== GP)!;
     await page.getByRole("button", { name: `Move ${first} down` }).click();
+    // Wait for the list to show the move before leaving, so the save has landed.
+    const list = page.locator("ol[aria-label='Your exhbts, in portfolio order'] > li a.link");
+    await expect.poll(async () => (await list.allTextContents()).indexOf(first)).toBeGreaterThan(titles.indexOf(first));
     await page.goto("/portfolio?step=projects");
     const moved = await previewOrder(page);
     expect(moved.indexOf(first)).toBeGreaterThan(0);

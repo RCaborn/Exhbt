@@ -120,6 +120,7 @@ export function Preview({
       mode="preview"
       frame={frame}
       inertChrome
+      sectionsOnly={Boolean(only)}
     />
   );
 
