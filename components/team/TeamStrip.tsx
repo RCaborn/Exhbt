@@ -6,11 +6,12 @@ import { canDraftInto, displayNameFor, teamFilesFor, teamFor } from "@/lib/team"
 import { namesList } from "@/lib/team-rules";
 
 /**
- * A slim line above the editor (decision 0013): who the project is with and a link to the
+ * A slim line under the editor's heading (decision 0013): who the project is with and a link to the
  * Teammates page, or an offer to add some. On a teammate's own, still empty exhbt it offers the
  * team project's files to draft from.
  */
 export async function TeamStrip({ exhbt, userId, skipped = 0 }: { exhbt: ExhbtRecord; userId: string; skipped?: number }) {
+  // Drawn inside the editor, under its heading (the editor gives it the page width).
   const host = (await headers()).get("host");
   const team = await teamFor(exhbt, host);
   const files = exhbt.teamOf && canDraftInto(exhbt, userId) ? await teamFilesFor(userId, exhbt.id) : [];
@@ -18,8 +19,8 @@ export async function TeamStrip({ exhbt, userId, skipped = 0 }: { exhbt: ExhbtRe
   const from = root ? await displayNameFor(root.userId, "Your team") : "Your team";
 
   return (
-    <div className="bg-mist">
-      <div className="mx-auto max-w-[78rem] space-y-3 px-4 pt-6 sm:px-8 xl:max-w-[90rem]">
+    <div>
+      <div className="space-y-3">
         <section aria-label="Team" className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[16px] border border-line bg-surface px-4 py-3" data-team-strip>
           <p className="text-sm">
             {team.length ? (

@@ -54,6 +54,8 @@ export type EditorProps = {
   liveFileIds: string[];
   /** Rewrite and "Back to the AI version"; null or missing when the exhbt has no kept source text. */
   draftTools?: DraftToolsInit;
+  /** Teammates and the file-match prompt (decision 0013), drawn under the heading. */
+  banner?: React.ReactNode;
 };
 
 /** Where the list at the top jumps to for an issue: the card's heading, or the "Add a section" button for the sections as a whole. */
@@ -252,10 +254,11 @@ export function Editor(props: EditorProps) {
         <Link href="/exhbts" className="inline-flex items-center gap-1.5 text-sm font-semibold hover:text-graphite">
           <ArrowLeft aria-hidden size={15} strokeWidth={2.25} /> Your exhbts
         </Link>
-        <div className="mt-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
           <h1 className="text-[2rem] sm:text-[2.5rem]">Edit exhbt</h1>
           <span className="chip">{chip}</span>
         </div>
+        {props.banner && <div className="mt-4">{props.banner}</div>}
 
         <div className="sticky top-0 z-20 -mx-4 mt-4 border-b border-line bg-mist/95 px-4 py-2 backdrop-blur sm:-mx-8 sm:px-8">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
