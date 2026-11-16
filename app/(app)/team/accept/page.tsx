@@ -18,8 +18,8 @@ const masked = (email: string) => {
 
 /**
  * Where an invite email's button lands (decision 0013). Joining needs the person signed in with
- * the address the invite went to, through the usual sign-in link; then one button, so a mail
- * scanner that opens the link never joins anyone.
+ * the address the invite went to, with their password (or a new account at that address); then one
+ * button, so a mail scanner that opens the link never joins anyone.
  */
 export default async function AcceptInvitePage({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
   if (!isPhase2Enabled()) notFound();
@@ -89,7 +89,7 @@ export default async function AcceptInvitePage({ searchParams }: { searchParams:
       <>
         <h1 className="text-[2rem]">Join a team project</h1>
         {summary}
-        <p className="mt-3 text-graphite">Sign in with {masked(view.invite.email)} to accept. We email you a link; there&apos;s no password.</p>
+        <p className="mt-3 text-graphite">Sign in with {masked(view.invite.email)} to accept. If this is your first time, create an account with that address.</p>
         <div className="mt-6">
           <Button href={login} variant="primary">
             Sign in to accept
