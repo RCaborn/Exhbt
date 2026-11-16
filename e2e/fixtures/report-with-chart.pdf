@@ -1,0 +1,97 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R 9 0 R 11 0 R] /Count 4 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 6 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>
+endobj
+6 0 obj
+<< /Length 373 >>
+stream
+BT /F2 16 Tf 60 790 Td (GP appointment reminders) Tj ET
+BT /F1 11 Tf 60 760 Td 15 TL (Final-year project on GP appointment reminders.) Tj T* (The question was whether sending the reminder 3 hours before an appointment) Tj T* (cut missed appointments compared with sending it 24 hours before.) Tj T* (Two practices in Leeds took part over six weeks in spring 2026.) Tj T* ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 8 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>
+endobj
+8 0 obj
+<< /Length 404 >>
+stream
+BT /F2 16 Tf 60 790 Td (Method) Tj ET
+BT /F1 11 Tf 60 760 Td 15 TL (I cleaned 14,200 appointment records from the two practices in Python with pandas.) Tj T* (Each appointment was assigned to the 24-hour or the 3-hour reminder at random.) Tj T* (I fitted a logistic regression with age group and practice as controls.) Tj T* (The practice manager checked the extract before it left the surgery.) Tj T* ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 10 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>
+endobj
+10 0 obj
+<< /Length 1335 >>
+stream
+BT /F2 16 Tf 60 770 Td (Figure 1. Missed appointments by reminder time \(%\)) Tj ET
+0.85 0.85 0.85 RG 0.5 w 100 440.0 m 520 440.0 l S
+BT /F1 9 Tf 78 437.0 Td (0) Tj ET
+0.85 0.85 0.85 RG 0.5 w 100 505.0 m 520 505.0 l S
+BT /F1 9 Tf 78 502.0 Td (3) Tj ET
+0.85 0.85 0.85 RG 0.5 w 100 570.0 m 520 570.0 l S
+BT /F1 9 Tf 78 567.0 Td (6) Tj ET
+0.85 0.85 0.85 RG 0.5 w 100 635.0 m 520 635.0 l S
+BT /F1 9 Tf 78 632.0 Td (9) Tj ET
+0.85 0.85 0.85 RG 0.5 w 100 700.0 m 520 700.0 l S
+BT /F1 9 Tf 78 697.0 Td (12) Tj ET
+0 0 0 RG 1.2 w 100 440 m 520 440 l S 100 440 m 100 700 l S
+0.310 0.914 0.706 rg 125 440 60 171.2 re f
+0 0 0 rg BT /F1 10 Tf 143 617.2 Td (7.9) Tj ET
+BT /F1 9 Tf 125 424 Td (All, 24h) Tj ET
+0 0.459 0.365 rg 225 440 60 140.8 re f
+0 0 0 rg BT /F1 10 Tf 243 586.8 Td (6.5) Tj ET
+BT /F1 9 Tf 225 424 Td (All, 3h) Tj ET
+0.310 0.914 0.706 rg 325 440 60 242.7 re f
+0 0 0 rg BT /F1 10 Tf 343 688.7 Td (11.2) Tj ET
+BT /F1 9 Tf 325 424 Td (Under 30, 24h) Tj ET
+0 0.459 0.365 rg 425 440 60 182.0 re f
+0 0 0 rg BT /F1 10 Tf 443 628.0 Td (8.4) Tj ET
+BT /F1 9 Tf 425 424 Td (Under 30, 3h) Tj ET
+BT /F1 9 Tf 60 400 Td 13 TL (Source: practice records, 14,200 appointments, March to April 2026.) Tj T* ET
+BT /F1 11 Tf 60 360 Td 15 TL (The 3-hour reminder lowered missed appointments in both groups,) Tj T* (and most for patients under 30.) Tj T* ET
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 12 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>
+endobj
+12 0 obj
+<< /Length 287 >>
+stream
+BT /F2 16 Tf 60 790 Td (Results) Tj ET
+BT /F1 11 Tf 60 760 Td 15 TL (Missed appointments fell from 7.9% to 6.5% across all patients.) Tj T* (For patients under 30 they fell from 11.2% to 8.4%.) Tj T* (Next time I would run the trial for a full term, to cover the winter months.) Tj T* ET
+endstream
+endobj
+xref
+0 13
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000134 00000 n 
+0000000204 00000 n 
+0000000279 00000 n 
+0000000415 00000 n 
+0000000839 00000 n 
+0000000975 00000 n 
+0000001430 00000 n 
+0000001567 00000 n 
+0000002955 00000 n 
+0000003093 00000 n 
+trailer
+<< /Size 13 /Root 1 0 R >>
+startxref
+3432
+%%EOF
