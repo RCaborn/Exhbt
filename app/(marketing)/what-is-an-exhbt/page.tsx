@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BrowserFrame } from "@/components/home/BrowserFrame";
-import { ExhbtTile } from "@/components/exhbt/ExhbtTile";
+import { Preview } from "@/components/home/Preview";
+import { PortfolioHome } from "@/components/portfolio/PortfolioHome";
 import { ProjectView } from "@/components/portfolio/ProjectView";
 import { Button } from "@/components/ui/Button";
-import { demoExhbts, demoOwner } from "@/lib/exhbt";
-import { sampleDocs } from "@/lib/exhbt/sample";
+import { demoExhbts, demoHomeProjects, demoOwner, demoPortfolio } from "@/lib/exhbt";
 import { portfolioHost } from "@/lib/hosts";
 import { PLAN_NAMES } from "@/lib/entitlements";
 
@@ -63,7 +62,7 @@ const MAKE: { name: string; body: string }[] = [
 ];
 
 export default function WhatIsAnExhbt() {
-  const doc = sampleDocs[0]!;
+  const example = demoExhbts[0]!;
   const address = portfolioHost("name");
   return (
     <>
@@ -93,9 +92,9 @@ export default function WhatIsAnExhbt() {
           <div className="mt-12 grid gap-12 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-20">
             <div className="min-w-0 rounded-[20px] border border-line bg-surface p-5 shadow-pack sm:p-6 lg:sticky lg:top-8 lg:self-start">
               <ProjectView
-                doc={doc}
-                owner={{ name: demoOwner.name, photoUrl: null }}
-                checkedOn="12 March 2026"
+                doc={example.doc}
+                owner={{ name: demoOwner.name, photoUrl: null, bio: demoOwner.headline }}
+                checkedOn={example.checkedOn}
                 headingLevel="h2"
               />
             </div>
@@ -170,17 +169,20 @@ export default function WhatIsAnExhbt() {
             </p>
           </div>
           <div className="min-w-0">
-            <BrowserFrame url={portfolioHost(demoOwner.username)}>
-              <div className="bg-mist p-4">
-                <ul className="grid gap-3 sm:grid-cols-2">
-                  {demoExhbts.slice(0, 2).map((e, i) => (
-                    <li key={e.slug}>
-                      <ExhbtTile exhbt={e} href={`/demo/${e.slug}`} position={i + 1} maxSkills={2} />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </BrowserFrame>
+            <Preview
+              url={portfolioHost(demoOwner.username)}
+              label={`${demoOwner.name}'s portfolio home page: her photo, name and intro, then her best piece of work.`}
+              crop="h-[30rem] lg:h-[32rem]"
+              className="lg:[zoom:0.6]"
+            >
+              <PortfolioHome
+                person={demoPortfolio.person}
+                projects={demoHomeProjects()}
+                featuredId={null}
+                sections={demoPortfolio.sections}
+                tiles={demoPortfolio.tiles}
+              />
+            </Preview>
             <p className="mt-3 text-sm text-graphite">Example: this address and {demoOwner.name} are made up.</p>
           </div>
         </div>
