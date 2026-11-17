@@ -1,18 +1,25 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { CHECKS_GUIDE } from "@/components/brand/Seal";
 import { ProjectView } from "@/components/portfolio/ProjectView";
 import { PrintAddress, ProjectPager } from "@/components/portfolio/ProjectNav";
 import { TeamByline } from "@/components/portfolio/TeamByline";
+import { JobLinkView } from "@/components/portfolio/JobLinkView";
 import { exhbtSummary } from "@/lib/exhbt/blocks";
-import { MARKETING_HOST, portfolioHost } from "@/lib/hosts";
+import { MARKETING_HOST, parseHost, portfolioHost } from "@/lib/hosts";
+import { jobLinkFor } from "@/lib/job-link-request";
+import { jobLinkBackTarget } from "@/lib/job-links";
 import { previewImage } from "@/lib/og/card";
 import { checkedOnLabel, loadPortfolio, mediaFor } from "@/lib/portfolio";
 
-type Params = { params: Promise<{ username: string; slug: string }> };
+type Params = { params: Promise<{ username: string; slug: string }>; searchParams: Promise<{ for?: string | string[] }> };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { username, slug } = await params;
+  // A per-job page comes first (decision 0008): never indexed, whatever the portfolio's search setting.
+  const job = await jobLinkFor(username, slug);
+  if (job) return { title: { absolute: `For ${job.link.company} · ${job.displayName}` }, robots: { index: false, follow: false } };
   const p = await loadPortfolio(username, `/${slug}`);
   const it = p.status === "ok" ? [...p.items, ...p.hiddenItems].find((x) => x.slug === slug) : undefined;
   if (p.status !== "ok" || !it) return { title: "Project not found", robots: { index: false } };
@@ -39,8 +46,15 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  * variables sit on the frame (layout.tsx, decision 0018), and ProjectView draws every colour,
  * radius and face from them (the --xp-* names in globals.css read the look's --pf-* set).
  */
-export default async function PortfolioProject({ params }: Params) {
+export default async function PortfolioProject({ params, searchParams }: Params) {
   const { username, slug } = await params;
+  // A per-job page (alex.exhbt.co.uk/lloyds) comes before the exhbt checks and their not found. A job link's
+  // slug can't equal one of the person's exhbt slugs: they share one slug space (lib/slugs.ts).
+  const job = await jobLinkFor(username, slug);
+  if (job) {
+    const onPortfolioHost = parseHost((await headers()).get("host")).kind === "portfolio";
+    return <JobLinkView data={job} startHref={onPortfolioHost ? `https://${MARKETING_HOST}/start` : "/start"} />;
+  }
   const p = await loadPortfolio(username, `/${slug}`);
   if (p.status === "redirect") redirect(p.to);
   if (p.status !== "ok") notFound();
@@ -50,6 +64,9 @@ export default async function PortfolioProject({ params }: Params) {
   if (i < 0 && h < 0) notFound();
   const it = i >= 0 ? p.items[i]! : p.hiddenItems[h]!;
   const { imageUrls, evidenceUrl } = await mediaFor(it.doc);
+  // Opened from a job page (?for=<its slug>): offer the way back while that link is live.
+  const forParam = (await searchParams).for;
+  const back = typeof forParam === "string" && forParam ? await jobLinkBackTarget(username, forParam, it.id) : null;
 
   return (
     // The look itself is set on the frame around this (layout.tsx), so the ground, pager and sign-off take it too.
@@ -62,6 +79,7 @@ export default async function PortfolioProject({ params }: Params) {
         checkedOn={checkedOnLabel(it.publishedAt)}
         team={it.team.length > 0 ? <TeamByline team={it.team} /> : undefined}
         saveAsPdf
+        back={back ? { href: back.href, label: `Back to ${back.company}` } : undefined}
         // On alex.exhbt.co.uk a relative guide link would stay on the portfolio host.
         checksHref={p.base ? undefined : `https://${MARKETING_HOST}${CHECKS_GUIDE}`}
       />

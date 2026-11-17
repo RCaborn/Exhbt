@@ -577,35 +577,39 @@ function Work({ projects, more, theme }: { projects: HomeProject[]; more: boolea
     <section data-section="work" id="work" aria-labelledby="work-h" className={`${WRAP} py-12 @3xl:py-16`}>
       {heading}
       <ul className="mt-6 grid gap-5 @2xl:grid-cols-2">
-        {projects.map((p) => {
-          const body = (
-            <>
-              <div
-                className={`flex min-h-48 items-center justify-center border-b border-[color:var(--pf-line)] p-5 ${p.figure.kind === "chart" ? "bg-[var(--pf-figure)]" : "bg-[var(--pf-well)]"}`}
-              >
-                <Figure project={p} />
-              </div>
-              <div className="p-5">
-                <h3 className="pf-display text-[1.125rem] leading-snug [letter-spacing:-0.01em]">{p.title}</h3>
-                {p.summary && <p className="mt-1.5 text-[0.9375rem] leading-relaxed text-[color:var(--pf-soft)]">{p.summary}</p>}
-              </div>
-            </>
-          );
-          const card = `${CARD} flex h-full flex-col overflow-hidden rounded-[var(--pf-radius)] transition-[transform,border-color] duration-150`;
-          return (
-            <li key={p.id} data-card={p.id}>
-              {p.href ? (
-                <Link href={p.href} className={`${card} hover:-translate-y-0.5 hover:border-[color:var(--pf-ink)] motion-reduce:hover:translate-y-0`}>
-                  {body}
-                </Link>
-              ) : (
-                <div className={card}>{body}</div>
-              )}
-            </li>
-          );
-        })}
+        {projects.map((p) => (
+          <li key={p.id} data-card={p.id}>
+            <ProjectCard project={p} />
+          </li>
+        ))}
       </ul>
     </section>
+  );
+}
+
+/** One of the cards under "More of my work": the key figure on top, then the title and one sentence. Also drawn on a per-job page. */
+export function ProjectCard({ project: p }: { project: HomeProject }) {
+  const body = (
+    <>
+      {/* A graph sits on the look's figure ground (graphs never on a grey well, DESIGN.md); a picture or the steps on the well. */}
+      <div
+        className={`flex min-h-48 items-center justify-center border-b border-[color:var(--pf-line)] p-5 ${p.figure.kind === "chart" ? "bg-[var(--pf-figure)]" : "bg-[var(--pf-well)]"}`}
+      >
+        <Figure project={p} />
+      </div>
+      <div className="p-5">
+        <h3 className="pf-display text-[1.125rem] leading-snug [letter-spacing:calc(var(--pf-tracking)*0.3)]">{p.title}</h3>
+        {p.summary && <p className="mt-1.5 text-[0.9375rem] leading-relaxed text-[color:var(--pf-soft)]">{p.summary}</p>}
+      </div>
+    </>
+  );
+  const card = `${CARD} flex h-full flex-col overflow-hidden rounded-[var(--pf-radius)] transition-[transform,border-color] duration-150`;
+  return p.href ? (
+    <Link href={p.href} className={`${card} hover:-translate-y-0.5 hover:border-[color:var(--pf-ink)] motion-reduce:hover:translate-y-0`}>
+      {body}
+    </Link>
+  ) : (
+    <div className={card}>{body}</div>
   );
 }
 
