@@ -1,4 +1,5 @@
 import { plain, words, type ExhbtDoc, type Issue } from "@/lib/exhbt/blocks";
+import { FORMAT_COPY, formatOf, isShown } from "@/lib/exhbt/formats";
 import { sectionLabel, sectionWords } from "@/lib/exhbt/sections";
 
 /**
@@ -72,7 +73,8 @@ export function cardWords(doc: ExhbtDoc): Partial<Record<CardKey, number>> {
     header: sum([doc.title, doc.context, doc.whereWhen ?? "", doc.summary ?? "", ...doc.skills, doc.headline?.value ?? "", doc.headline?.label ?? ""]),
     gap: words(plain(doc.gap)),
     flow: sum(doc.flow.flatMap((s) => [s.step, s.detail ?? ""])),
-    ...Object.fromEntries(doc.sections.map((s, i) => [`section-${i}`, sectionWords(s)])),
+    // A section the layout doesn't draw counts nothing (decision 0024), as in wordCount.
+    ...Object.fromEntries(doc.sections.map((s, i) => [`section-${i}`, isShown(doc, s) ? sectionWords(s) : 0])),
     evidence: words(doc.evidence?.label ?? ""),
   };
 }
@@ -93,12 +95,14 @@ const LABELS: Record<string, string> = {
 export function labelOf(path: string, doc: ExhbtDoc): string {
   const [head, idx, field, sub] = path.split(".");
   const n = idx !== undefined && /^\d+$/.test(idx) ? Number(idx) : null;
-  if (head === "flow") return n !== null ? `Process, box ${n + 1}` : "Process";
+  const f = formatOf(doc);
+  if (head === "title" || head === "gap") return FORMAT_COPY[f][head];
+  if (head === "flow") return n !== null ? `${FORMAT_COPY[f].flow}, box ${n + 1}` : FORMAT_COPY[f].flow;
   if (head === "skills" && n !== null) return `Skill ${n + 1}`;
   if (head === "sections" && n !== null) {
     const s = doc.sections[n];
     if (s?.kind === "findings" && field === "items" && sub !== undefined && /^\d+$/.test(sub)) return `Finding ${Number(sub) + 1}`;
-    return sectionLabel(doc.sections, n);
+    return sectionLabel(doc.sections, n, f);
   }
   return LABELS[head ?? ""] ?? "";
 }

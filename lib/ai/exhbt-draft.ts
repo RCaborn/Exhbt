@@ -4,6 +4,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
 import { LIMITS, SCHEMA_VERSION, text, withHighlight, words, type ExhbtDoc, type Section } from "@/lib/exhbt/blocks";
 import { CHART_KINDS, hasData, type Chart } from "@/lib/exhbt/charts";
+import { squash } from "@/lib/exhbt/references";
 import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
 
@@ -155,7 +156,6 @@ export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
 }
 
 /** For comparing a quote with the material: one space, straight quotes, no case. */
-const squash = (s: string) => s.replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ").trim().toLowerCase();
 
 /**
  * The quote the model proposed, if it's really in the material: its words as written there, and

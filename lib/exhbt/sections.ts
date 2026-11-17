@@ -1,12 +1,26 @@
-import { LIMITS, sectionTexts, text, words, type ExhbtDoc, type Picked, type Section, type SectionKind, type SectionOf } from "./blocks";
+import {
+  formatLimits,
+  SECTION_KINDS,
+  sectionsOf,
+  sectionTexts,
+  text,
+  words,
+  type ExhbtDoc,
+  type Picked,
+  type Section,
+  type SectionKind,
+  type SectionOf,
+} from "./blocks";
 import { newChart } from "./charts";
+import { FORMAT_COPY, FORMAT_RULES, formatOf, hiddenSections, type Format } from "./formats";
 
 /**
  * Adding, naming and moving the sections below the flowchart (decision 0015). Pure, so the
- * editor, the AI draft and the tests share it. The schema and limits are lib/exhbt/blocks.ts.
+ * editor, the AI draft and the tests share it. The schema and limits are lib/exhbt/blocks.ts;
+ * the layouts (case study, gallery, research) are lib/exhbt/formats.ts (decision 0024).
  */
 
-/** What a section is called in the editor; graphs and images also get a number (sectionLabel). */
+/** What a section is called in the editor in a case study; graphs and images also get a number (sectionLabel). */
 export const SECTION_NAMES: Record<SectionKind, string> = {
   findings: "Findings",
   graph: "Graph",
@@ -14,19 +28,51 @@ export const SECTION_NAMES: Record<SectionKind, string> = {
   quote: "Quote",
   reflection: "What I'd do next",
   link: "Link",
+  aim: "Aim or hypothesis",
+  conclusion: "Conclusion",
 };
 
-/** "Graph 2", "Image 1", "Findings", "Quote": the section's name, numbered when there can be two. */
-export function sectionLabel(sections: Section[], i: number): string {
-  const s = sections[i];
-  if (!s) return "";
-  if (LIMITS.sections[s.kind] === 1) return SECTION_NAMES[s.kind];
-  const n = sections.slice(0, i + 1).filter((x) => x.kind === s.kind).length;
-  return `${SECTION_NAMES[s.kind]} ${n}`;
+/** What a layout calls a kind: findings, what I'd do next and the link read the layout's own words. */
+export function sectionName(kind: SectionKind, f: Format = "case-study"): string {
+  switch (kind) {
+    case "findings":
+      return f === "case-study" ? SECTION_NAMES.findings : FORMAT_COPY[f].findings;
+    case "reflection":
+      return FORMAT_COPY[f].reflection;
+    case "link":
+      return FORMAT_COPY[f].link;
+    default:
+      return SECTION_NAMES[kind];
+  }
 }
 
-/** How many more of a kind there's room for. */
-export const roomFor = (sections: Section[], kind: SectionKind): number => Math.max(0, LIMITS.sections[kind] - sections.filter((s) => s.kind === kind).length);
+/**
+ * "Graph 2", "Image 1", "Findings", "Quote": the section's name, numbered when there can be two.
+ * In a gallery the first image is the "Lead image", and in research the first graph or image is
+ * the "Key figure". A case study reads as it always did.
+ */
+export function sectionLabel(sections: Section[], i: number, f: Format = "case-study"): string {
+  const s = sections[i];
+  if (!s) return "";
+  if (f === "gallery" && s.kind === "image" && sections.findIndex((x) => x.kind === "image") === i) return "Lead image";
+  if (f === "research" && (s.kind === "graph" || s.kind === "image") && firstOfKinds(sections, ["graph", "image"]) === i) return "Key figure";
+  if (formatLimits(f).sections[s.kind] <= 1) return sectionName(s.kind, f);
+  const n = sections.slice(0, i + 1).filter((x) => x.kind === s.kind).length;
+  return `${sectionName(s.kind, f)} ${n}`;
+}
+
+/** The index of the first section whose kind is one of `kinds`, or -1. "Make lead image" and "Make key figure" move a section here. */
+export const firstOfKinds = (sections: Section[], kinds: SectionKind[]): number => sections.findIndex((s) => kinds.includes(s.kind));
+
+/** How many more of a kind there's room for. In research a graph or image also respects the cap on figures together. */
+export function roomFor(sections: Section[], kind: SectionKind, f: Format = "case-study"): number {
+  const L = formatLimits(f);
+  let room = Math.max(0, L.sections[kind] - sections.filter((s) => s.kind === kind).length);
+  if (L.maxFigures !== null && (kind === "graph" || kind === "image")) {
+    room = Math.min(room, Math.max(0, L.maxFigures - sections.filter((s) => s.kind === "graph" || s.kind === "image").length));
+  }
+  return room;
+}
 
 /** The first free id for a new section of a kind: "quote-1", "graph-2". */
 export function nextSectionId(kind: SectionKind, sections: Section[]): string {
@@ -48,10 +94,21 @@ export function newSection(kind: Exclude<SectionKind, "image">, sections: Sectio
       return { id, kind, text: [] };
     case "link":
       return { id, kind, href: "", label: "", description: "" };
+    case "aim":
+      return { id, kind, text: [] };
+    case "conclusion":
+      return { id, kind, text: [] };
   }
 }
 
-export const newImageSection = (fileId: string, sections: Section[]): SectionOf<"image"> => ({ id: nextSectionId("image", sections), kind: "image", fileId, alt: "", caption: [] });
+export const newImageSection = (fileId: string, sections: Section[], size?: { w: number; h: number }): SectionOf<"image"> => ({
+  id: nextSectionId("image", sections),
+  kind: "image",
+  fileId,
+  alt: "",
+  caption: [],
+  ...size,
+});
 
 /** The list with the section at `from` moved to `to` (both indexes in the list as it is). */
 export function moveSection<T>(sections: T[], from: number, to: number): T[] {
@@ -66,21 +123,82 @@ export function moveSection<T>(sections: T[], from: number, to: number): T[] {
 export const sectionWords = (s: Section): number => sectionTexts(s).reduce((n, t) => n + words(t), 0);
 
 /**
+ * The shape of an image, width over height: from its size in pixels, clamped to 1:2 to 2.4:1 so
+ * one extreme picture can't take a whole row or column. An image saved before sizes were stored
+ * is drawn in a 4:3 frame, uncropped (decision 0024).
+ */
+export function imageRatio(s: Pick<SectionOf<"image">, "w" | "h">): number {
+  if (!s.w || !s.h) return 4 / 3;
+  return Math.min(2.4, Math.max(0.5, s.w / s.h));
+}
+
+/** The lead image's frame: its shape clamped to 4:3 to 2.2:1, so a portrait poster sits centred on the figure ground rather than running down the page. */
+export const leadRatio = (s: Pick<SectionOf<"image">, "w" | "h">): number => Math.min(2.2, Math.max(4 / 3, imageRatio(s)));
+
+/**
  * The hook for a key figure picked from the person's upload (e.g. the best graph in their PDF,
- * decision 0022): the doc with an image section for `fileId` placed straight after "What I
- * found", so the page draws it beside the findings, or first when there are no findings. A key
- * figure already there for the same file is left alone. Unchanged when both image slots are used.
- * `picked` notes where it came from; publishing then waits for the person's tick (decision 0017).
+ * decision 0022): the doc with an image section for `fileId` placed where the layout puts its
+ * key picture (decision 0024). A case study: straight after "What I found", so the page draws it
+ * beside the findings, or first when there are no findings. A gallery: before the first image
+ * (it becomes the lead), or last when there is none. Research: before the first graph or image
+ * (it becomes the key figure), or last when there is none. A key figure already there for the same
+ * file is left alone. Unchanged when the layout has no room for another image. `picked` notes where
+ * it came from; publishing then waits for the person's tick (decision 0017).
  */
 export function withKeyFigure(doc: ExhbtDoc, figure: { fileId: string; alt: string; caption?: string; picked?: Picked }): ExhbtDoc {
   const ss = doc.sections;
-  if (ss.some((s) => s.kind === "image" && s.fileId === figure.fileId) || roomFor(ss, "image") === 0) return doc;
+  const f = formatOf(doc);
+  if (ss.some((s) => s.kind === "image" && s.fileId === figure.fileId) || roomFor(ss, "image", f) === 0) return doc;
   const section: SectionOf<"image"> = {
     ...newImageSection(figure.fileId, ss),
     alt: figure.alt,
     caption: text(figure.caption?.trim() ?? ""),
     ...(figure.picked ? { picked: figure.picked } : {}),
   };
-  const at = ss.findIndex((s) => s.kind === "findings") + 1;
+  let at: number;
+  if (f === "gallery" || f === "research") {
+    const first = firstOfKinds(ss, f === "gallery" ? ["image"] : ["graph", "image"]);
+    at = first < 0 ? ss.length : first;
+  } else at = ss.findIndex((s) => s.kind === "findings") + 1;
   return { ...doc, sections: [...ss.slice(0, at), section, ...ss.slice(at)] };
+}
+
+/**
+ * What the layout picker tells the person after a switch, and the editor lists under the cards.
+ * Pure: every number comes from formatLimits.
+ *  - hidden: the kinds the layout keeps but doesn't draw ("Aim or hypothesis").
+ *  - over: a drawn kind with more than the layout allows (a publishing error; nothing is hidden).
+ *  - missing: what the layout needs that isn't there yet, with the kind to add where one button fixes it.
+ */
+export function layoutNotes(doc: ExhbtDoc): { hidden: string[]; over: string[]; missing: { text: string; add?: SectionKind }[] } {
+  const f = formatOf(doc);
+  const L = formatLimits(f);
+  const hiddenKinds = new Set(hiddenSections(doc).map(({ s }) => s.kind));
+  const hidden = SECTION_KINDS.filter((k) => hiddenKinds.has(k)).map((k) => SECTION_NAMES[k]);
+  const over: string[] = [];
+  for (const kind of FORMAT_RULES[f].kinds) {
+    const n = sectionsOf(doc, kind).length;
+    const max = L.sections[kind];
+    if (n <= max) continue;
+    const name = kind === "image" ? "images" : kind === "graph" ? "graphs" : kind === "link" ? (f === "research" ? "references" : "links") : null;
+    over.push(
+      name
+        ? `This layout shows up to ${max} ${name}; you have ${n}. Remove some before you publish, or switch back.`
+        : `This layout has room for ${max} ${sectionName(kind, f).toLowerCase()}; you have ${n}. Remove some before you publish, or switch back.`,
+    );
+  }
+  const missing: { text: string; add?: SectionKind }[] = [];
+  const count = (k: SectionKind) => sectionsOf(doc, k).length;
+  const emptyFindings = sectionsOf(doc, "findings").some((s) => s.items.some((it) => !words(it.map((r) => r.t).join(""))));
+  if (f === "gallery") {
+    if (count("image") < L.minImages) missing.push({ text: `Add at least ${L.minImages} images`, add: "image" });
+    if (emptyFindings) missing.push({ text: "Fill in or remove the empty findings" });
+  } else if (f === "research") {
+    if (!count("aim")) missing.push({ text: "Add your aim or hypothesis", add: "aim" });
+    if (!count("conclusion")) missing.push({ text: "Add your conclusion", add: "conclusion" });
+    if (!count("graph") && !count("image")) missing.push({ text: "Add a graph or an image", add: "graph" });
+    if (!count("findings")) missing.push({ text: "Add your results", add: "findings" });
+    if (emptyFindings) missing.push({ text: "Fill in or remove the empty findings" });
+  }
+  return { hidden, over, missing };
 }

@@ -1,4 +1,5 @@
 import { z } from "zod/v4";
+import { FORMAT_COPY, FORMAT_LIMITS, FORMAT_RULES, FORMATS, formatOf, isFormat, isShown, shownSections, type Format } from "./formats";
 import { asChart, CHART_LIMITS, ChartSchema, chartIssues, chartTexts, publicChart, type Chart } from "./charts";
 
 /**
@@ -20,7 +21,8 @@ import { asChart, CHART_LIMITS, ChartSchema, chartIssues, chartTexts, publicChar
 
 export const SCHEMA_VERSION = 2;
 
-export const SECTION_KINDS = ["findings", "graph", "image", "quote", "reflection", "link"] as const;
+/** `aim` and `conclusion` are drawn only by the research layout (decision 0024). Last, so the order of issues for the older kinds is unchanged. */
+export const SECTION_KINDS = ["findings", "graph", "image", "quote", "reflection", "link", "aim", "conclusion"] as const;
 export type SectionKind = (typeof SECTION_KINDS)[number];
 
 /** Hard limits, checked on publish. The editor shows them as it goes. */
@@ -46,13 +48,55 @@ export const LIMITS = {
   reflection: { words: 35 },
   /** A repository, demo or document: https only. */
   link: { labelWords: 8, descriptionWords: 15 },
+  /** Research only (decision 0024). */
+  aim: { words: 20 },
+  conclusion: { words: 25 },
   /** How many of each section an exhbt can have (decision 0015). */
-  sections: { findings: 1, graph: CHART_LIMITS.max, image: 2, quote: 1, reflection: 1, link: 1 } satisfies Record<SectionKind, number>,
+  sections: { findings: 1, graph: CHART_LIMITS.max, image: 2, quote: 1, reflection: 1, link: 1, aim: 1, conclusion: 1 } satisfies Record<SectionKind, number>,
   evidenceCaptionWords: 15,
   /** Every word on the page (see wordCount). 150 is what the editor aims for; 200 is the limit. */
   totalWords: 200,
   targetWords: 150,
 } as const;
+
+type Widen<T> = { -readonly [K in keyof T]: T[K] extends number ? number : T[K] extends object ? Widen<T[K]> : T[K] };
+export type Limits = Omit<Widen<typeof LIMITS>, "sections"> & {
+  sections: Record<SectionKind, number>;
+  /** Fewest images a layout needs (a gallery: two). */
+  minImages: number;
+  /** Most graphs and images together (research: three), or null for no combined cap. */
+  maxFigures: number | null;
+};
+
+/**
+ * LIMITS with a layout's own caps merged over them (decision 0024). A case study's are LIMITS,
+ * unchanged. Not named limitsFor: that's lib/plan-rules.ts.
+ */
+export function formatLimits(f: Format): Limits {
+  const o = FORMAT_LIMITS[f] as {
+    gapWords?: number;
+    findings?: Partial<Limits["findings"]>;
+    images?: Partial<Limits["images"]>;
+    link?: Partial<Limits["link"]>;
+    reflection?: Partial<Limits["reflection"]>;
+    sections?: Partial<Record<SectionKind, number>>;
+    minImages?: number;
+    maxFigures?: number;
+    targetWords?: number;
+  };
+  return {
+    ...LIMITS,
+    gapWords: o.gapWords ?? LIMITS.gapWords,
+    targetWords: o.targetWords ?? LIMITS.targetWords,
+    findings: { ...LIMITS.findings, ...o.findings },
+    images: { ...LIMITS.images, ...o.images },
+    link: { ...LIMITS.link, ...o.link },
+    reflection: { ...LIMITS.reflection, ...o.reflection },
+    sections: { ...LIMITS.sections, ...o.sections },
+    minImages: o.minImages ?? 0,
+    maxFigures: o.maxFigures ?? null,
+  };
+}
 
 /**
  * Text with a little formatting: bold, italic and links, nothing else (decision 0007).
@@ -80,6 +124,9 @@ export const ImageSchema = z.object({
   /** Read aloud by screen readers; required to publish. */
   alt: z.string(),
   caption: RichTextSchema,
+  /** The picture's size in pixels after the browser's resize, so a page knows its shape before it loads. Older images have none. */
+  w: z.number().int().min(1).max(20000).optional(),
+  h: z.number().int().min(1).max(20000).optional(),
 });
 
 export const EvidenceSchema = z.union([
@@ -127,6 +174,10 @@ export const ReflectionSectionSchema = z.object({ id: SectionId, kind: z.literal
 /** `href` is checked by safeHref; only the label and description show (and count). */
 export const LinkSectionSchema = z.object({ id: SectionId, kind: z.literal("link"), href: z.string(), label: z.string(), description: z.string() });
 
+/** Research only: the aim or hypothesis, and the conclusion (decision 0024). Short formatted text, like "What I'd do next". */
+export const AimSectionSchema = z.object({ id: SectionId, kind: z.literal("aim"), text: RichTextSchema, heading: z.enum(["aim", "hypothesis"]).optional() });
+export const ConclusionSectionSchema = z.object({ id: SectionId, kind: z.literal("conclusion"), text: RichTextSchema });
+
 export const SectionSchema = z.discriminatedUnion("kind", [
   FindingsSectionSchema,
   GraphSectionSchema,
@@ -134,12 +185,16 @@ export const SectionSchema = z.discriminatedUnion("kind", [
   QuoteSectionSchema,
   ReflectionSectionSchema,
   LinkSectionSchema,
+  AimSectionSchema,
+  ConclusionSectionSchema,
 ]);
 export type Section = z.output<typeof SectionSchema>;
 export type SectionOf<K extends SectionKind> = Extract<Section, { kind: K }>;
 
 const DocSchema = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
+  /** The exhbt's layout (decision 0024). Absent is a case study; never defaulted, so an old doc parses without it. */
+  format: z.enum(FORMATS).optional(),
   title: z.string(),
   /**
    * "What it is", in the sidebar, e.g. "MSc Finance dissertation" (decision 0022). The key is
@@ -212,7 +267,11 @@ function withIds(sections: unknown[]): unknown[] {
  */
 export function normaliseDoc(raw: unknown): ExhbtDoc {
   if (!isObject(raw)) return raw as ExhbtDoc;
-  if (Array.isArray(raw.sections)) return { ...raw, sections: withIds(raw.sections) } as ExhbtDoc;
+  if (Array.isArray(raw.sections)) {
+    // A layout this code doesn't know (written by a later release) reads as a case study.
+    const { format, ...rest } = raw;
+    return { ...(isFormat(format) ? { ...rest, format } : rest), sections: withIds(raw.sections) } as ExhbtDoc;
+  }
   const { findings, charts, images, ...rest } = raw;
   const sections: unknown[] = [];
   if (Array.isArray(findings) && findings.length) sections.push({ id: "findings", kind: "findings", items: findings });
@@ -276,6 +335,9 @@ export function sectionTexts(s: Section): string[] {
       return [plain(s.text)];
     case "link":
       return [s.label, s.description];
+    case "aim":
+    case "conclusion":
+      return [plain(s.text)];
   }
 }
 
@@ -298,7 +360,8 @@ export function wordCount(d: ExhbtDoc): number {
     d.headline?.label ?? "",
     plain(d.gap),
     ...d.flow.flatMap((s) => [s.step, s.detail ?? ""]),
-    ...d.sections.flatMap(sectionTexts),
+    // A kind the layout doesn't draw is kept but not counted (decision 0024).
+    ...shownSections(d).flatMap(({ s }) => sectionTexts(s)),
     d.evidence?.label ?? "",
   ].reduce((n, s) => n + words(s), 0);
 }
@@ -316,22 +379,33 @@ export function safeHref(href: string | undefined): string | null {
 
 export type Issue = { path: string; message: string };
 
-/** What a person calls a kind, in messages ("Only one quote."). */
-const ONE_OF: Record<SectionKind, string> = {
-  findings: "Only one findings section.",
-  graph: `Up to ${LIMITS.sections.graph} graphs.`,
-  image: `Up to ${LIMITS.sections.image} images.`,
-  quote: "Only one quote.",
-  reflection: "Only one section on what you'd do next.",
-  link: "Only one link.",
-};
+/** What a person calls a kind, in messages ("Only one quote."). The case study's wording is unchanged. */
+function oneOf(kind: SectionKind, L: Limits): string {
+  switch (kind) {
+    case "findings":
+      return "Only one findings section.";
+    case "graph":
+      return L.sections.graph === 1 ? "Only one graph." : `Up to ${L.sections.graph} graphs.`;
+    case "image":
+      return `Up to ${L.sections.image} images.`;
+    case "quote":
+      return "Only one quote.";
+    case "reflection":
+      return "Only one section on what you'd do next.";
+    case "link":
+      return L.sections.link === 1 ? "Only one link." : `Up to ${L.sections.link} links.`;
+    case "aim":
+      return "Only one aim or hypothesis.";
+    case "conclusion":
+      return "Only one conclusion.";
+  }
+}
 
 /**
  * What stops publishing. Each issue has a path the editor can point at
  * (e.g. "flow.2.step", "sections.0.items.1"). Empty means it can be published.
  */
 export function validateForPublish(d: ExhbtDoc): Issue[] {
-  const L = LIMITS;
   const out: Issue[] = [];
   const need = (ok: boolean, path: string, message: string) => {
     if (!ok) out.push({ path, message });
@@ -339,6 +413,10 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
   const parsed = ExhbtDocSchema.safeParse(d);
   if (!parsed.success) return [{ path: "", message: "This exhbt couldn't be read. Reload and try again." }];
   const doc = parsed.data;
+  // The layout sets the caps and which kinds are checked: a kind it doesn't draw is kept but not checked (decision 0024).
+  const F = formatOf(doc);
+  const L = formatLimits(F);
+  const kinds = new Set<SectionKind>(FORMAT_RULES[F].kinds);
   const httpsOnly = (rt: RichText, path: string) => need(!rt.some((r) => r.href !== undefined && safeHref(r.href) === null), path, "Links must start with https://.");
 
   need(doc.title.trim().length > 0, "title", "Add a title.");
@@ -353,7 +431,7 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
     need(words(s) <= L.skills.wordsEach && s.length <= L.skills.charsEach, `skills.${i}`, "Keep each skill short.");
   });
 
-  need(words(plain(doc.gap)) > 0, "gap", "Add the context: why the question matters.");
+  need(words(plain(doc.gap)) > 0, "gap", FORMAT_COPY[F].gapMissing);
   need(words(plain(doc.gap)) <= L.gapWords, "gap", `Keep the context to ${L.gapWords} words.`);
   httpsOnly(doc.gap, "gap");
 
@@ -365,11 +443,24 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
     need(words(s.detail ?? "") <= L.flow.detailWords, `flow.${i}.detail`, `Keep the detail to ${L.flow.detailWords} words.`);
   });
 
-  // Sections: how many of each, and at least findings or a graph to show what came of it.
-  for (const kind of SECTION_KINDS) need(sectionsOf(doc, kind).length <= L.sections[kind], "sections", ONE_OF[kind]);
-  need(doc.sections.some((s) => s.kind === "findings" || s.kind === "graph"), "sections", "Add findings or a graph, so the exhbt shows what came of the work.");
+  // Sections: how many of each (more than the layout allows is an error; nothing is hidden), and what the layout needs.
+  for (const kind of SECTION_KINDS) if (kinds.has(kind)) need(sectionsOf(doc, kind).length <= L.sections[kind], "sections", oneOf(kind, L));
+  const nImages = sectionsOf(doc, "image").length;
+  const nFigures = nImages + sectionsOf(doc, "graph").length;
+  if (F === "case-study") {
+    need(doc.sections.some((s) => s.kind === "findings" || s.kind === "graph"), "sections", "Add findings or a graph, so the exhbt shows what came of the work.");
+  } else if (F === "gallery") {
+    need(nImages >= L.minImages, "sections", `A gallery needs at least ${L.minImages} images.`);
+  } else {
+    need(sectionsOf(doc, "aim").length > 0, "sections", "Add your aim or hypothesis.");
+    need(sectionsOf(doc, "conclusion").length > 0, "sections", "Add your conclusion.");
+    need(nFigures > 0, "sections", "Add a graph or an image: the key figure.");
+    need(L.maxFigures === null || nFigures <= L.maxFigures, "sections", `Up to ${L.maxFigures} figures, graphs and images together.`);
+    need(sectionsOf(doc, "findings").length > 0, "sections", "Add your results.");
+  }
 
   doc.sections.forEach((s, n) => {
+    if (!kinds.has(s.kind)) return;
     const p = `sections.${n}`;
     switch (s.kind) {
       case "findings":
@@ -409,6 +500,16 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
         need(words(s.label) <= L.link.labelWords, `${p}.label`, `Keep the label to ${L.link.labelWords} words.`);
         need(words(s.description) <= L.link.descriptionWords, `${p}.description`, `Keep the description to ${L.link.descriptionWords} words.`);
         break;
+      case "aim":
+        need(words(plain(s.text)) > 0, `${p}.text`, "Write your aim or hypothesis, or remove this.");
+        need(words(plain(s.text)) <= L.aim.words, `${p}.text`, `Keep the aim to ${L.aim.words} words.`);
+        httpsOnly(s.text, `${p}.text`);
+        break;
+      case "conclusion":
+        need(words(plain(s.text)) > 0, `${p}.text`, "Write your conclusion, or remove this.");
+        need(words(plain(s.text)) <= L.conclusion.words, `${p}.text`, `Keep the conclusion to ${L.conclusion.words} words.`);
+        httpsOnly(s.text, `${p}.text`);
+        break;
     }
   });
 
@@ -422,13 +523,15 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
  * The copy employers see, made when an exhbt is published (lib/store.ts publishExhbt): the same
  * doc, except that a graph whose numbers are protected keeps only its index, never the figures
  * typed in (decision 0011), wherever its section sits, and a picked figure's note of where it came
- * from stays in the working copy (decision 0017).
+ * from stays in the working copy (decision 0017). A section the layout doesn't draw (an aim outside
+ * research) stays in the working copy too (decision 0024).
  */
 export function publicDoc(raw: ExhbtDoc): ExhbtDoc {
   const d = normaliseDoc(raw);
   return {
     ...d,
-    sections: d.sections.map((s) => {
+    // A kind the layout doesn't draw stays in the working copy, not in what employers see.
+    sections: d.sections.filter((s) => isShown(d, s)).map((s) => {
       if (s.kind === "graph") return { ...s, chart: publicChart(s.chart) };
       if (s.kind === "image" && s.picked) {
         const rest = { ...s };

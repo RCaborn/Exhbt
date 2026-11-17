@@ -353,6 +353,9 @@ function hintFor(s: Section, maxFileMb: number): string {
       return "One or two lines: what you'd do next, or do differently.";
     case "link":
       return "A repository, a demo or a document. The page shows what it is, and links to it.";
+    case "aim":
+    case "conclusion":
+      return "Only what your report states.";
   }
 }
 

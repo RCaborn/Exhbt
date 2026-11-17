@@ -1,4 +1,5 @@
 import { chartsOf, findingsOf, imagesOf, plain, type Chart, type ExhbtDoc } from "./exhbt/blocks";
+import { formatOf } from "./exhbt/formats";
 
 /**
  * What the portfolio home (Rory's layout spec, 16 Nov 2026; decision 0016) shows of each exhbt:
@@ -45,6 +46,17 @@ export function summaryOf(doc: ExhbtDoc): string {
 }
 
 export function keyFigureOf(doc: ExhbtDoc): KeyFigure {
+  const format = formatOf(doc);
+  if (format === "gallery") {
+    // The lead image, else the graph, else the flow (decision 0024).
+    const lead = imagesOf(doc)[0];
+    if (lead) return { kind: "image", fileId: lead.fileId, alt: lead.alt };
+  } else if (format === "research") {
+    // The key figure is the first graph or image in list order.
+    const first = doc.sections.find((s) => s.kind === "graph" || s.kind === "image");
+    if (first?.kind === "graph") return { kind: "chart", chart: first.chart };
+    if (first?.kind === "image") return { kind: "image", fileId: first.fileId, alt: first.alt };
+  }
   const chart = chartsOf(doc)[0];
   if (chart) return { kind: "chart", chart };
   const image = imagesOf(doc)[0];
