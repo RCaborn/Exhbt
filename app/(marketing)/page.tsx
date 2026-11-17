@@ -230,7 +230,7 @@ export default function Home() {
               // The top of her page and her best work: the whole page is a click away on /demo.
               sections={["featured"]}
             />
-            <p className="mt-4 max-w-[44rem] text-sm text-on-ink">
+            <p className="mt-4 text-sm text-on-ink">
               {PLAN_NAMES.free} has the default look, {PLAN_NAMES.premium} a set of them and {PLAN_NAMES.max} every one.{" "}
               {first} is made up.{" "}
               <Link href="/demo" className="font-semibold text-white underline decoration-graphite decoration-2 underline-offset-4 hover:decoration-mint">
