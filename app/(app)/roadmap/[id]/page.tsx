@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { canView } from "@/lib/access";
-import { getStore } from "@/lib/store";
+import { getStore, type ProjectIdea } from "@/lib/store";
 import { Generating } from "@/components/roadmap/Generating";
 import { RoadmapViews, parseView, type ProjectsState } from "@/components/roadmap/RoadmapViews";
 import { extractContact } from "@/lib/cv-contact";
@@ -38,11 +38,16 @@ export default async function RoadmapPage({
 
   const current = parseView(view);
   let projects: ProjectsState;
+  // The Gaps radar's "After the projects" view reads the plan's ideas, but only once the details
+  // gate is filled in, so nothing from the plan shows before it (docs/decisions/0004, 0023).
+  let planIdeas: ProjectIdea[] = [];
   if (projectsUnlocked(record)) {
     const allowed = ENTITLEMENTS.free.projectSwapsPerRoadmap;
     // Ideas are only read where they're shown. They're made in the background from the moment the
     // roadmap is saved, so by now they're usually there; if not, the page shows progress.
-    const { ideas, status } = current === "projects" ? await ideasState(record) : { ideas: [], status: "ready" as const };
+    const { ideas, status } =
+      current === "projects" || current === "gaps" ? await ideasState(record) : { ideas: [], status: "ready" as const };
+    if (current === "gaps" && status === "ready") planIdeas = ideas;
     projects = {
       unlocked: true,
       ideas,
@@ -82,6 +87,7 @@ export default async function RoadmapPage({
       projects={projects}
       build={build}
       save={save}
+      planIdeas={planIdeas}
     />
   );
 }

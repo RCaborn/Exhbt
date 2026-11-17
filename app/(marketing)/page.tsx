@@ -13,7 +13,11 @@ import { demoExhbts, demoHomeProjects, demoOwner, demoPortfolio } from "@/lib/ex
 import { BILLING_PERIOD, JOB_LINKS_LIVE, ORIGINALITY_CHECK_LIVE, PLAN_NAMES, PRICES } from "@/lib/entitlements";
 import { portfolioHost, portfolioUrl } from "@/lib/hosts";
 import { marketingFeatures } from "@/lib/marketing-features";
+import { marketingMetadata } from "@/lib/seo";
 import { isPhase2Enabled } from "@/lib/site";
+
+// Canonical, description and link preview (lib/seo.ts). The title leads with what Exhbt is.
+export const metadata = marketingMetadata("home");
 
 // Per request: the EXHBT_PHASE2 switch is read at runtime, so the plan cards change to the paid
 // plans (or back to the waitlist) without a rebuild.

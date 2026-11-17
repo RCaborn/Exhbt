@@ -7,10 +7,11 @@ import "@fontsource/inter/latin-500.css";
 import "@fontsource/inter/latin-600.css";
 import { Providers } from "./providers";
 import { PageViewBeacon } from "@/components/site/PageViewBeacon";
+import { HOME_TITLE } from "@/lib/seo";
 import { isPrivatePreview } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: { default: "Exhbt: evidence employers can check", template: "%s · Exhbt" },
+  title: { default: HOME_TITLE, template: "%s · Exhbt" },
   description:
     "A free skills-gap roadmap for graduates, then your own portfolio site at name.exhbt.co.uk, built from short, checked exhbts of your project work.",
   // Private preview: keep every page out of search results (see lib/site.ts).

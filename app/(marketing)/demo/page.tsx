@@ -2,11 +2,9 @@ import type { Metadata } from "next";
 import { PortfolioHome } from "@/components/portfolio/PortfolioHome";
 import { DemoNote } from "@/components/home/DemoNote";
 import { demoHomeProjects, demoOwner, demoPortfolio } from "@/lib/exhbt";
+import { marketingMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Demo portfolio",
-  description: "What an Exhbt portfolio looks like to an employer. A fictional graduate with four projects.",
-};
+export const metadata: Metadata = marketingMetadata("demo");
 
 /**
  * The demo portfolio: Amara's home page drawn by the real portfolio home (`PortfolioHome`,

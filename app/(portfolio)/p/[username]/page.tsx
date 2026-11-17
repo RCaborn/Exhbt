@@ -8,6 +8,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { ENTITLEMENTS, PLAN_NAMES } from "@/lib/entitlements";
 import { signedFileUrl } from "@/lib/files";
 import { previewImage } from "@/lib/og/card";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { personLd, portfolioCanonical } from "@/lib/seo";
 import { MARKETING_HOST, parseHost } from "@/lib/hosts";
 import { loadPortfolio } from "@/lib/portfolio";
 import { EXTRA_SECTIONS, sectionsOf } from "@/lib/portfolio-layout";
@@ -37,9 +39,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return {
     title: { absolute: title },
     description,
+    // Always the person's own host, whichever address this was opened on (localhost, /p/name).
+    alternates: { canonical: portfolioCanonical(p.profile.username) },
     icons: { icon: [{ url: `${p.base}/initials.svg`, type: "image/svg+xml" }] },
     // The link preview (preview.png beside this page) shows whatever the search setting; that only stops indexing.
-    openGraph: { type: "profile", title, description, siteName: "exhbt", images: [image] },
+    openGraph: { type: "profile", url: portfolioCanonical(p.profile.username), title, description, siteName: "exhbt", images: [image] },
     twitter: { card: "summary_large_image", title, description, images: [image] },
     ...(p.profile.hideFromSearch ? { robots: { index: false, follow: false } } : {}),
   };
@@ -66,6 +70,7 @@ export default async function PortfolioGlance({ params }: Params) {
 
   return (
     <main id="main">
+      <JsonLd data={personLd({ name: p.displayName, username: p.profile.username, headline: p.profile.headline, linkedin: p.profile.linkedin, github: p.profile.github })} />
       <PortfolioHome
         person={personFrom(p.profile, p.displayName, p.photoUrl, p.layout)}
         theme={p.theme}

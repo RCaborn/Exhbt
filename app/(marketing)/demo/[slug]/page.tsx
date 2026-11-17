@@ -4,6 +4,7 @@ import { DemoNote } from "@/components/home/DemoNote";
 import { ProjectPager } from "@/components/portfolio/ProjectNav";
 import { ProjectView } from "@/components/portfolio/ProjectView";
 import { demoExhbts, demoOwner } from "@/lib/exhbt";
+import { marketingMetadata } from "@/lib/seo";
 
 export function generateStaticParams() {
   return demoExhbts.map((e) => ({ slug: e.slug }));
@@ -12,7 +13,8 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const e = demoExhbts.find((x) => x.slug === slug);
-  return { title: e ? `${e.doc.title} (demo)` : "Not found" };
+  if (!e) return { title: "Not found" };
+  return marketingMetadata("demo", { title: `${e.doc.title} (demo)`, description: e.doc.summary, path: `/demo/${e.slug}` });
 }
 
 /**

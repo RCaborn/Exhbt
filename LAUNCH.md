@@ -191,3 +191,16 @@ Do these first:
 - verify it in Resend
 
 The live site goes public with `EXHBT_PUBLIC` = `1`: it is in `wrangler.jsonc` (top-level `vars`), and the production build step in `.github/workflows/deploy.yml` must set it too, because pages are built with it (the value is read at build time). That removes the preview bar and lets search engines index the public pages. The preview Worker (`env.preview`) leaves it unset, so it keeps the bar and stays hidden. Without the flag a site always stays hidden.
+
+## Search engines
+
+Google may still show the old "We would like to show you a description here but the site won't allow us" line. It dates from the private preview, when robots.txt blocked everything. robots.txt is open now, and every public page has its own description, a canonical address and a link preview image. Google has to fetch the pages again to notice.
+
+1. Open Google Search Console and add a **Domain** property for `exhbt.co.uk`. Search Console shows a TXT record: add it at Porkbun (DNS records for exhbt.co.uk, type TXT, host left blank) and press Verify. A Domain property covers www and every portfolio subdomain.
+2. Under Sitemaps, submit `https://www.exhbt.co.uk/sitemap.xml`.
+3. Under URL Inspection, paste `https://www.exhbt.co.uk`, then press Request indexing.
+4. Optional: in Bing Webmaster Tools, sign in and choose Import from Google Search Console. It brings the site and the sitemap across.
+
+A snippet takes days to refresh, sometimes a couple of weeks. Requesting indexing speeds it up but doesn't set the date.
+
+Portfolios: each person's host serves its own `/sitemap.xml` and `/robots.txt` (the sitemap lists their live exhbts; "Hide my portfolio from search engines" makes the pages noindex and the sitemap empty). Google finds each sitemap through that host's robots.txt, so there is nothing more to submit. To check one, open `https://name.exhbt.co.uk/sitemap.xml`. Job links are never indexed and never listed.

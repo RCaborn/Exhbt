@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { legalUpdatedLabel } from "@/lib/legal";
+import { marketingMetadata } from "@/lib/seo";
 import { BILLING_PERIOD, PLAN_NAMES, REFERRAL_CREDIT } from "@/lib/entitlements";
 
 const PAID = `${PLAN_NAMES.premium} and ${PLAN_NAMES.max}`;
@@ -9,7 +11,7 @@ type Doc = { title: string; updated: string; body: React.ReactNode };
 const DOCS: Record<string, Doc> = {
   privacy: {
     title: "Privacy policy",
-    updated: "16 November 2026",
+    updated: legalUpdatedLabel("privacy"),
     body: (
       <>
         <p>
@@ -141,7 +143,7 @@ const DOCS: Record<string, Doc> = {
 
         <h2>Job links ({PLAN_NAMES.max})</h2>
         <p>
-          Links for each job are not open yet; the pricing page will say when they are. When you make one, you paste a
+          When you make one, you paste a
           job description or a link to it. If you give a link, our server reads that web page. We send the job
           description and, for each of your published exhbts, its title, context line, skills and findings to
           Anthropic, which picks the best fits and writes a short reason for each and a draft note to the employer. We
@@ -197,7 +199,7 @@ const DOCS: Record<string, Doc> = {
   },
   terms: {
     title: "Terms of use",
-    updated: "16 November 2026",
+    updated: legalUpdatedLabel("terms"),
     body: (
       <>
         <h2>Your content</h2>
@@ -259,7 +261,7 @@ const DOCS: Record<string, Doc> = {
   },
   cookies: {
     title: "Cookie policy",
-    updated: "16 November 2026",
+    updated: legalUpdatedLabel("cookies"),
     body: (
       <>
         <p>
@@ -309,7 +311,8 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ doc: string }> }): Promise<Metadata> {
   const { doc } = await params;
-  return { title: DOCS[doc]?.title ?? "Not found" };
+  if (!Object.hasOwn(DOCS, doc)) return { title: "Not found" };
+  return marketingMetadata(`legal-${doc}` as "legal-privacy" | "legal-terms" | "legal-cookies");
 }
 
 export default async function LegalPage({ params }: { params: Promise<{ doc: string }> }) {
