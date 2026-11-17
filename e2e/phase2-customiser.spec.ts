@@ -428,7 +428,7 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     const u = `ckt${stamp()}`;
     await openCustomiser(page, u, "premium", 4, "/portfolio?step=look");
     const open = themeAllowance("premium");
-    await expect(page.getByRole("radio")).toHaveCount(PORTFOLIO_THEMES.length);
+    await expect(page.locator("input[name=themeId]")).toHaveCount(PORTFOLIO_THEMES.length);
     await expect(page.locator("[data-theme-option]:not([data-locked])")).toHaveCount(open);
     await expect(page.locator("[data-theme-option][data-locked]")).toHaveCount(PORTFOLIO_THEMES.length - open);
 
@@ -441,11 +441,11 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     await expect(page.locator("[data-portfolio-home]")).toHaveAttribute("data-theme", PORTFOLIO_THEMES[0]!.id);
 
     await page.goto("/portfolio?step=look");
-    await page.locator('[data-theme-option="jade"]').click();
-    await expect(page.locator("[data-testid=preview] [data-portfolio-home]")).toHaveAttribute("data-theme", "jade");
+    await page.locator('[data-theme-option="classic"]').click();
+    await expect(page.locator("[data-testid=preview] [data-portfolio-home]")).toHaveAttribute("data-theme", "classic");
     await saved(page);
     await page.goto(`/p/${u}`);
-    await expect(page.locator("[data-portfolio-home]")).toHaveAttribute("data-theme", "jade");
+    await expect(page.locator("[data-portfolio-home]")).toHaveAttribute("data-theme", "classic");
   });
 
   test("Max has every look open", async ({ page }) => {
