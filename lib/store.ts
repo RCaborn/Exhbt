@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { forgetDevPassword } from "./passwords";
 import type { Project, Roadmap, RoadmapInput } from "./ai/schemas";
 import { normaliseDoc, publicDoc, type ExhbtDoc } from "./exhbt/blocks";
+import { fileIdsIn, looksLikeFileId, withoutFiles } from "./exhbt/doc-files";
 import type { Plan } from "./entitlements";
 import { normaliseLayout, type PortfolioLayout } from "./portfolio-layout";
 import { accountPlan, cleanQuery, type AdminAccountDetail, type AdminAccountRow, type AdminAccountsPage, type AdminRows, type AdminTable } from "./admin-types";
@@ -378,7 +379,11 @@ export interface Store {
     userId: string,
     fields: Partial<Pick<PortfolioProfile, PortfolioProfileField>>,
   ): Promise<void>;
-  /** `teamOf`: the team project a teammate's own exhbt is made from (decision 0013). */
+  /**
+   * `createExhbt` and `saveExhbtDraft` are the only ways a doc is written, and both drop any image
+   * or work file that isn't the person's own (stripped, never refused: see lib/exhbt/doc-files.ts).
+   * `teamOf`: the team project a teammate's own exhbt is made from (decision 0013).
+   */
   createExhbt(userId: string, doc: ExhbtDoc, opts?: { teamOf?: string | null }): Promise<string>;
   getExhbt(id: string): Promise<ExhbtRecord | null>;
   /** All of a person's exhbts, drafts included, in portfolio order. */
@@ -401,6 +406,8 @@ export interface Store {
   savePortfolioLayout(userId: string, change: { layout: PortfolioLayout; featuredExhbtId: string | null; hiddenIds: string[]; order: string[] }): Promise<void>;
   deleteExhbt(id: string, userId: string): Promise<boolean>;
   getFile(id: string): Promise<StoredFile | null>;
+  /** Which of these file ids are stored records belonging to this user. The one ownership question. */
+  ownedFileIds(userId: string, ids: string[]): Promise<Set<string>>;
 
   /* billing */
   /**
@@ -672,6 +679,17 @@ function check<T>(res: { data: T; error: { message: string } | null }): T {
 
 function supabaseStore(): Store {
   const db = supabaseAdmin();
+  const ownedIds = async (userId: string, ids: string[]): Promise<Set<string>> => {
+    const valid = ids.filter(looksLikeFileId);
+    if (!valid.length) return new Set();
+    const rows = check(await db.from("exhbt_files").select("id").eq("user_id", userId).in("id", valid)) as { id: string }[];
+    return new Set(rows.map((r) => r.id));
+  };
+  /** The doc without any file that isn't theirs: the one place a write is checked. */
+  const ownDocOnly = async (doc: ExhbtDoc, userId: string): Promise<ExhbtDoc> => {
+    const ids = fileIdsIn(doc);
+    return ids.length ? withoutFiles(doc, await ownedIds(userId, ids)) : doc;
+  };
   const since = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
   return {
     async createRoadmap(r) {
@@ -1077,7 +1095,7 @@ function supabaseStore(): Store {
           .insert({
             user_id: userId,
             title: doc.title.slice(0, 80),
-            blocks: doc,
+            blocks: await ownDocOnly(doc, userId),
             position: (last?.position ?? -1) + 1,
             team_of: opts?.teamOf ?? null,
           })
@@ -1097,6 +1115,7 @@ function supabaseStore(): Store {
       return rows.map(fromExhbtRow);
     },
     async saveExhbtDraft(id, userId, doc) {
+      doc = await ownDocOnly(doc, userId);
       const rows = check(
         await db
           .from("exhbts")
@@ -1144,6 +1163,9 @@ function supabaseStore(): Store {
     async deleteExhbt(id, userId) {
       const rows = check(await db.from("exhbts").delete().eq("id", id).eq("user_id", userId).select("id")) as { id: string }[];
       return rows.length > 0;
+    },
+    async ownedFileIds(userId, ids) {
+      return ownedIds(userId, ids);
     },
     async getFile(id) {
       const r = check(await db.from("exhbt_files").select(FILE_COLS).eq("id", id).maybeSingle()) as FileRow | null;
@@ -1978,6 +2000,11 @@ function memoryStore(): Store {
     throw new Error("Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
   }
   const m = (g.__exhbtMem ??= newMem());
+  const ownedIds = async (userId: string, ids: string[]) => new Set(ids.filter((id) => m.files.get(id)?.userId === userId));
+  const ownDocOnly = async (doc: ExhbtDoc, userId: string): Promise<ExhbtDoc> => {
+    const ids = fileIdsIn(doc);
+    return ids.length ? withoutFiles(doc, await ownedIds(userId, ids)) : doc;
+  };
   m.ideas ??= new Map(); // a store created before ideas existed (hot reload in development)
   m.profiles ??= new Map();
   m.usernameRedirects ??= new Map();
@@ -2263,6 +2290,7 @@ function memoryStore(): Store {
       m.profiles.set(userId, next);
     },
     async createExhbt(userId, doc, opts) {
+      doc = await ownDocOnly(doc, userId);
       const id = crypto.randomUUID();
       const mine = [...m.exhbts.values()].filter((e) => e.userId === userId);
       m.exhbts.set(id, {
@@ -2291,6 +2319,7 @@ function memoryStore(): Store {
     async saveExhbtDraft(id, userId, doc) {
       const e = own(id, userId);
       if (!e) return false;
+      doc = await ownDocOnly(doc, userId);
       e.doc = structuredClone(doc);
       e.updatedAt = new Date().toISOString();
       return true;
@@ -2335,6 +2364,9 @@ function memoryStore(): Store {
       for (const e of m.exhbts.values()) if (e.teamOf === id) e.teamOf = null;
       for (const x of m.matches.values()) if (x.ownerExhbtId === id) x.ownerExhbtId = null;
       return true;
+    },
+    async ownedFileIds(userId, ids) {
+      return ownedIds(userId, ids);
     },
     async getFile(id) {
       return m.files.get(id) ?? null;

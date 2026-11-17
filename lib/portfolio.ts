@@ -24,6 +24,8 @@ export type PortfolioItem = { id: string; slug: string; doc: ExhbtDoc; published
 export type LoadedPortfolio =
   | {
       status: "ok";
+      /** The portfolio owner: every file shown on it must be theirs (lib/files.ts mayShowFile). */
+      userId: string;
       profile: PortfolioProfile & { username: string };
       displayName: string;
       photoUrl: string | null;
@@ -96,14 +98,15 @@ export async function loadPortfolio(username: string, rest = ""): Promise<Loaded
   const projects = await Promise.all(
     shownList.map(async (e) => {
       const p = homeProject(e.id, e.published!, `${base}/${e.slug}`);
-      return p.figure.kind === "image" ? { ...p, imageUrl: await signedFileUrl(p.figure.fileId) } : p;
+      return p.figure.kind === "image" ? { ...p, imageUrl: await signedFileUrl(p.figure.fileId, e.userId) } : p;
     }),
   );
   return {
     status: "ok",
+    userId: found.userId,
     profile: { ...profile, username: found.username },
     displayName: profile.name?.trim() || found.username,
-    photoUrl: await signedFileUrl(profile.photoFileId),
+    photoUrl: await signedFileUrl(profile.photoFileId, found.userId),
     items: await Promise.all(listed.map(toFull)),
     hiddenItems: await Promise.all(reachable.filter((e) => hidden.has(e.id)).map(toFull)),
     projects,
@@ -118,12 +121,15 @@ export async function loadPortfolio(username: string, rest = ""): Promise<Loaded
 
 const toItem = (e: ExhbtRecord): Omit<PortfolioItem, "team"> => ({ id: e.id, slug: e.slug!, doc: e.published!, publishedAt: e.publishedAt });
 
-/** Signed URLs for one exhbt's images and its evidence file (links pass through). */
-export async function mediaFor(doc: ExhbtDoc): Promise<{ imageUrls: Record<string, string | null>; evidenceUrl: string | null }> {
+/**
+ * Signed URLs for one exhbt's images and its evidence file (links pass through). `ownerId` is the exhbt's
+ * owner: a file that isn't theirs gets no URL, so a doc can never show someone else's file.
+ */
+export async function mediaFor(doc: ExhbtDoc, ownerId: string): Promise<{ imageUrls: Record<string, string | null>; evidenceUrl: string | null }> {
   const imageUrls: Record<string, string | null> = {};
-  for (const im of imagesOf(doc)) imageUrls[im.fileId] = await signedFileUrl(im.fileId);
+  for (const im of imagesOf(doc)) imageUrls[im.fileId] = await signedFileUrl(im.fileId, ownerId);
   const ev = doc.evidence;
-  const evidenceUrl = !ev ? null : ev.kind === "link" ? ev.href : await signedFileUrl(ev.fileId);
+  const evidenceUrl = !ev ? null : ev.kind === "link" ? ev.href : await signedFileUrl(ev.fileId, ownerId);
   return { imageUrls, evidenceUrl };
 }
 

@@ -93,7 +93,7 @@ async function OwnerPreview({ userId, allHidden }: { userId: string; base: strin
   const store = getStore();
   const [profile, plan] = await Promise.all([store.getPortfolioProfile(userId), store.planFor(userId)]);
   const name = profile.name?.trim() || profile.username || "Your name";
-  const photoUrl = await signedFileUrl(profile.photoFileId);
+  const photoUrl = await signedFileUrl(profile.photoFileId, userId);
   const isPublic = ENTITLEMENTS[plan].publicPortfolio;
   const message = !isPublic
     ? `This is a preview. Portfolios go public on ${PLAN_NAMES.premium}, so visitors can’t see this page yet.`
