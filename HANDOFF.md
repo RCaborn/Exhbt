@@ -185,4 +185,4 @@ On a machine with Chromium already installed (Claude Code cloud), add `PW_CHROMI
 
 ## What comes next
 
-Phase 2 is above. Still to come: per-job links on Max (in progress), the subdomain routing (being built separately; decision 0001), and the originality check, which is sold as "coming soon" until `ORIGINALITY_CHECK_LIVE` is true in `lib/entitlements.ts`. The decisions are in `docs/decisions/`.
+Phase 2 is above. Per-job links on Max are built and their public page is connected (`JOB_LINKS_LIVE`). Still to come: the subdomain routing (being built separately; decision 0001), and the originality check, which is sold as "coming soon" until `ORIGINALITY_CHECK_LIVE` is true in `lib/entitlements.ts`. The decisions are in `docs/decisions/`.

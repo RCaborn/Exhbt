@@ -53,6 +53,7 @@ export function ProjectView({
   team,
   saveAsPdf = false,
   sectionsSlot,
+  back,
 }: {
   doc: ExhbtDoc;
   owner: Owner;
@@ -73,6 +74,8 @@ export function ProjectView({
   saveAsPdf?: boolean;
   /** Draws the sections instead (the editor's preview, while arranging them). */
   sectionsSlot?: React.ReactNode;
+  /** "← Back to Lloyds", when the page was opened from a job page (?for=<slug>). */
+  back?: { href: string; label: string };
 }) {
   const H = headingLevel;
   const Sub: Sub = headingLevel === "h1" ? "h2" : "h3";
@@ -98,6 +101,14 @@ export function ProjectView({
 
   return (
     <article data-exhbt-page className="xp @container/xp">
+      {back && (
+        <p className="mb-5 print:hidden">
+          <Link href={back.href} data-back-to-job className="xp-link text-[0.9375rem] font-semibold">
+            <span aria-hidden>← </span>
+            {back.label}
+          </Link>
+        </p>
+      )}
       <div className="grid gap-8 @3xl/xp:grid-cols-[13.5rem_minmax(0,1fr)] @3xl/xp:gap-9 print:block">
         <aside aria-label={`About ${first} and this work`} className="xp-aside min-w-0 print:mb-3 print:grid print:grid-cols-[52mm_minmax(0,1fr)] print:gap-x-6 print:border-b print:pb-3">
           <div className="xp-card flex items-center gap-4 p-4 @3xl/xp:flex-col @3xl/xp:items-stretch @3xl/xp:gap-0 @3xl/xp:p-5 print:flex-row print:items-center print:gap-3 print:p-3">
