@@ -865,6 +865,16 @@
   .xp-tile figcaption {
     font-size: 0.7rem;
   }
+  /* A smaller title and context line on these two, so a look with a larger face (Classic's serif, Studio's heavy display) still fits. */
+  [data-format="gallery"] .xp-title,
+  [data-format="research"] .xp-title {
+    font-size: 1.6rem;
+  }
+  [data-format="gallery"] .xp-context,
+  [data-format="research"] .xp-context {
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
   /* Tighter gaps between the parts of a gallery or a research poster, so each fits one page. */
   [data-format="gallery"] .xp-section,
   [data-format="research"] .xp-section {

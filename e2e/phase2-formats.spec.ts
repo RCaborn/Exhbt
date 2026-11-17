@@ -461,6 +461,17 @@ test.describe("Looks and the home page", () => {
         await axe(page, `${t.id} ${slug}`);
       }
     });
+
+    test(`${t.id}: both pages print on one A4 page`, async ({ page }) => {
+      const u = await seed(page, t.id);
+      for (const slug of ["freshers-campaign", "walk-and-recall"]) {
+        await page.goto(`/p/${u}/${slug}`);
+        await page.emulateMedia({ media: "print" });
+        const pdf = await page.pdf({ format: "A4", preferCSSPageSize: true, printBackground: true });
+        expect(pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g)?.length, `${t.id} ${slug}`).toBe(1);
+        await page.emulateMedia({ media: "screen" });
+      }
+    });
   }
 
   test("the portfolio home shows the lead image and the key graph; an old case study is unchanged", async ({ page }) => {
