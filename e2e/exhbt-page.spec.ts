@@ -327,3 +327,43 @@ test.describe("The page in the editor", () => {
     await expect(page.getByRole("region", { name: "Preview" }).locator("article mark")).toHaveText("this draft is placeholder text");
   });
 });
+
+/** The words of every step label that are split across lines (a Range over a word with more than one rect). */
+const splitWords = (page: Page, scope: string) =>
+  page.evaluate((sel) => {
+    const split: string[] = [];
+    for (const label of document.querySelectorAll(`${sel} ol[aria-label="Methodology"] li > div > span:first-child`)) {
+      const node = label.firstChild;
+      if (!node || node.nodeType !== Node.TEXT_NODE) continue;
+      for (const m of (node.textContent ?? "").matchAll(/\S+/g)) {
+        const r = document.createRange();
+        r.setStart(node, m.index!);
+        r.setEnd(node, m.index! + m[0].length);
+        if (r.getClientRects().length !== 1) split.push(m[0]);
+      }
+    }
+    return split;
+  }, scope);
+
+test.describe("The flowchart's row breakpoint follows its number of boxes", () => {
+  test("a six-box case study at 1440 breaks no word, and is a column", async ({ page }) => {
+    const name = unique("six");
+    await page.request.get(`/dev/portfolio?username=${name}&plan=premium&with=flow`, { maxRedirects: 0 });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`/p/${name}/flow-six`);
+    await expect(page.getByRole("list", { name: "Methodology" }).getByRole("listitem")).toHaveCount(6);
+    expect(await splitWords(page, "article")).toEqual([]);
+    // The main column is about 708px, under the 48rem a six-box row needs.
+    expect(await page.locator('ol[aria-label="Methodology"]').evaluate((el) => getComputedStyle(el).flexDirection)).toBe("column");
+  });
+
+  test("a five-box case study at 1440 is a row and breaks no word", async ({ page }) => {
+    const name = unique("five");
+    await page.request.get(`/dev/portfolio?username=${name}&plan=premium&with=flow`, { maxRedirects: 0 });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`/p/${name}/flow-five`);
+    await expect(page.getByRole("list", { name: "Methodology" }).getByRole("listitem")).toHaveCount(5);
+    expect(await page.locator('ol[aria-label="Methodology"]').evaluate((el) => getComputedStyle(el).flexDirection)).toBe("row");
+    expect(await splitWords(page, "article")).toEqual([]);
+  });
+});

@@ -1,7 +1,7 @@
 Status: accepted
 Date: 16 Nov 2026
 Amends: 0007 (what the header holds), 0015 (how the sections are drawn; the sections themselves are unchanged)
-Amended by: 0018 (a look sets the --xp-* names through its --pf-* set, on the frame round the page; graphs take the look's shades), 0024 (the page now has three layouts; the case study is the page described here, unchanged)
+Amended by: 0018 (a look sets the --xp-* names through its --pf-* set, on the frame round the page; graphs take the look's shades), 0024 (the page now has three layouts; the case study is the page described here, unchanged); changed in place on 17 Nov 2026 (the flowchart goes to a row at a width that depends on its number of boxes, below)
 
 # The exhbt page: a sidebar, the title as the question, findings beside the chart
 
@@ -21,7 +21,7 @@ The main column:
 - the skill pills, top right
 - **the title, which is the question** the work set out to answer, large
 - the context line under it, with the gap highlighted (a flat mint block)
-- the flowchart, as before: always there, 3 to 6 boxes, the last one dark. A row from 36rem of column width and in print, a column below that.
+- the flowchart, as before: always there, 3 to 6 boxes, the last one dark. A row in print. On screen it is a row once the column is wide enough for the number of boxes: 36rem for 3 or 4, 42rem for 5, 48rem for 6 (`PAGE_ROW` in `MethodFlow.tsx`), a column below that. On 17 Nov 2026 this replaced a flat 36rem, which squeezed six boxes to about 55px of text each and split words (words now break only when a single word is wider than its box).
 - the sections, in the person's order (decision 0015)
 
 Gone from the page: the `EX·01` catalogue number and the headline figure. `headline` stays in the schema, the word cap, job-link tiles and the link preview, since old exhbts have it; the editor still offers it, labelled as shown on job links. `catalogueNo` stays for the Phase 1 card and the tiles.

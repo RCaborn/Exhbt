@@ -255,3 +255,30 @@ test.describe("Profile photo on Free", () => {
     await expect(page.getByRole("button", { name: "Upload a photo" })).toBeVisible();
   });
 });
+
+test.describe("Editor preview: the flowchart's words", () => {
+  test("a six-box flowchart at 1440 breaks no word in the preview", async ({ page }) => {
+    await draftAndOpen(page, "six");
+    const steps = ["Define bank and fintech strategies", "Set payoff matrix with openness parameter", "Derive replicator equations and rest points", "Classify stability of each equilibrium", "Select outcome via risk dominance", "Compare with the mandate's aims"];
+    const add = page.getByRole("button", { name: "Add a box at the end" });
+    while ((await page.getByLabel(/^Box \d$/).count()) < steps.length) await add.click();
+    for (const [i, step] of steps.entries()) await page.getByLabel(`Box ${i + 1}`, { exact: true }).fill(step);
+    const list = page.locator('section[aria-label="Preview"] ol[aria-label="Methodology"]');
+    await expect(list.getByRole("listitem")).toHaveCount(6);
+    const split = await list.evaluate((ol) => {
+      const out: string[] = [];
+      for (const label of ol.querySelectorAll("li > div > span:first-child")) {
+        const node = label.firstChild;
+        if (!node) continue;
+        for (const m of (node.textContent ?? "").matchAll(/\S+/g)) {
+          const r = document.createRange();
+          r.setStart(node, m.index!);
+          r.setEnd(node, m.index! + m[0].length);
+          if (r.getClientRects().length !== 1) out.push(m[0]);
+        }
+      }
+      return out;
+    });
+    expect(split).toEqual([]);
+  });
+});
