@@ -78,10 +78,8 @@ export function useDraftTools(id: string, init: DraftToolsInit, doc: ExhbtDoc, s
  */
 const nameOf = (block: DraftBlock, f: Format): string => {
   if (f === "case-study") return block === "header" ? "question and details" : BLOCK_NAMES[block];
-  // A gallery or research card has its own name: the brief, background, what I did, method, results.
-  const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
-  const c = FORMAT_COPY[f];
-  return block === "header" ? lower(c.header) : block === "gap" ? lower(c.gap) : block === "flow" ? lower(c.flow) : block === "findings" ? lower(c.findings) : BLOCK_NAMES[block];
+  // A gallery or research part has its own plain noun phrase (no article: the text says "the ...").
+  return block === "skills" ? BLOCK_NAMES.skills : FORMAT_COPY[f].rewriteName[block];
 };
 /** What the card is called on the page, for the menu button's name. */
 const cardNames = (f: Format): Record<DraftBlock, string> => ({ header: FORMAT_COPY[f].header, skills: "Skills", gap: FORMAT_COPY[f].gap, flow: FORMAT_COPY[f].flow, findings: f === "case-study" ? "Findings" : FORMAT_COPY[f].findings });

@@ -563,7 +563,9 @@
      would be cut off: draw it inside, on a layer above the picture (a shadow on the button itself would be painted
      under the image). Ink and ground, so it shows on any picture. */
   .xp-lead .xp-zoom:focus-visible {
-    outline: none;
+    /* Transparent, not none: in Windows High Contrast the outline is drawn in a system colour, so the ring never vanishes. */
+    outline: 2px solid transparent;
+    outline-offset: -2px;
     box-shadow: none;
   }
   .xp-lead .xp-zoom:focus-visible::after {

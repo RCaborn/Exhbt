@@ -902,3 +902,68 @@ test.describe("Research's row of headings", () => {
     }
   });
 });
+
+/* ---------------- Round three ---------------- */
+
+test.describe("A picture the person removed mid-batch is not deleted again by the upload", () => {
+  test("only the normal drop deletes it, once; the later pictures still land", async ({ page }) => {
+    await startEditor(page, `del${stamp()}`);
+    await chooseLayout(page, "Gallery");
+    const deletes: string[] = [];
+    page.on("request", (r) => {
+      if (r.method() === "DELETE" && /\/api\/files\//.test(r.url())) deletes.push(r.url());
+    });
+    const dataUrl = await page.evaluate(() => {
+      const c = document.createElement("canvas");
+      c.width = 3000;
+      c.height = 2000;
+      const x = c.getContext("2d")!;
+      x.fillStyle = "#1a7f64";
+      x.fillRect(0, 0, 3000, 2000);
+      return c.toDataURL("image/png");
+    });
+    const big = Buffer.from(dataUrl.split(",")[1]!, "base64");
+    await page.route("**/api/files/upload-url", async (route) => {
+      const body = route.request().postDataJSON() as { name: string };
+      if (body.name.startsWith("big")) await new Promise((r) => setTimeout(r, 3000));
+      await route.continue();
+    });
+    await pick(page, [png("first.png"), { name: "big.png", mimeType: "image/png", buffer: big }]);
+    // The first lands at once; the person removes it while the big one is still uploading.
+    const lead = sectionsArea(page).getByRole("region", { name: "Lead image", exact: true });
+    await expect(lead).toBeVisible();
+    await lead.getByRole("button", { name: /^Remove/ }).click();
+    // The big one lands when it finishes, and becomes the lead.
+    await expect(previewArticle(page).locator("[data-part=lead] img").first()).toHaveAttribute("width", "2400");
+    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    await page.waitForTimeout(1500);
+    // One delete, for the removed picture, from the normal drop after the save; nothing from the upload (no second one, no false message).
+    expect(deletes.length).toBe(1);
+    expect(new Set(deletes).size).toBe(1);
+    await expect(page.getByText(/there was no room/)).toHaveCount(0);
+  });
+});
+
+test.describe("The rewrite names read right in every layout", () => {
+  test("no 'the the' or 'the your', and each layout's own nouns", async ({ page }) => {
+    await signedIn(page, `rw${stamp()}`);
+    const expected: [string | undefined, string][] = [
+      [undefined, "question and details"],
+      ["gallery", "work and details"],
+      ["research", "research question and details"],
+    ];
+    for (const [layout, header] of expected) {
+      const d = await draft(page, { text: layout === "research" ? `${PLAIN_MATERIAL} The hypothesis was that a second till helps.` : PLAIN_MATERIAL, ...(layout ? { notes: `stand-in: layout ${layout}` } : {}) });
+      await page.goto(`/exhbts/${d.id}/edit`);
+      await expect(page.locator("[data-ready=true]")).toBeAttached();
+      for (const block of ["header", "gap", "flow", "findings"]) {
+        await page.getByTestId(`tools-${block}`).getByRole("button", { name: /^More actions for/ }).click();
+        await page.getByTestId(`tools-${block}`).getByRole("button", { name: "Rewrite this block" }).click();
+        const names = await page.getByTestId(`tools-${block}`).getByRole("button", { name: /^Rewrite the .* now$/ }).evaluateAll((els) => els.map((e) => e.getAttribute("aria-label") ?? ""));
+        expect(names.length, `${layout ?? "case"} ${block}`).toBe(1);
+        expect(names[0], `${layout ?? "case"} ${block}`).not.toMatch(/\bthe (the|your|my|a)\b/i);
+        if (block === "header") expect(names[0]).toBe(`Rewrite the ${header} now`);
+      }
+    }
+  });
+});
