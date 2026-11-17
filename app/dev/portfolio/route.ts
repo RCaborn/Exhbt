@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Plan } from "@/lib/entitlements";
 import { normaliseDoc, type ExhbtDoc } from "@/lib/exhbt/blocks";
 import { fullDoc, openBankingDoc, sampleDocs, sampleSeeds } from "@/lib/exhbt/sample";
+import { devBlobs } from "@/lib/files";
 import { usernameProblem } from "@/lib/hosts";
 import { normaliseLayout } from "@/lib/portfolio-layout";
 import { getStore, isSupabaseConfigured, setPlanForDevelopment, setStoredCopiesForDevelopment } from "@/lib/store";
@@ -61,6 +62,7 @@ export async function GET(req: NextRequest) {
       : {}),
     // hide=1: "hide my portfolio from search engines" is on (the SEO checks).
     hideFromSearch: q.get("hide") === "1",
+    photoFileId: q.get("photo") === "1" ? await placeholderPhoto(userId) : null,
   });
   for (const e of await store.listExhbts(userId)) await store.deleteExhbt(e.id, userId);
   // A fresh arrangement too: the default layout, nothing hidden or featured.
@@ -104,4 +106,17 @@ export async function GET(req: NextRequest) {
     await store.publishExhbt(id, userId, "open-banking-full");
   }
   return NextResponse.redirect(new URL(`/p/${username}`, req.url));
+}
+
+/**
+ * `photo=1`: a stand-in profile photo (a flat head-and-shoulders drawing, not a person), kept in the
+ * in-memory Storage stand-in, so every look can be seen with a photo as well as with initials.
+ */
+async function placeholderPhoto(userId: string): Promise<string> {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" fill="#c8bba9"/><circle cx="200" cy="160" r="78" fill="#6b4f3d"/><path d="M60 400c0-90 62-150 140-150s140 60 140 150z" fill="#34465a"/></svg>`;
+  const bytes = new TextEncoder().encode(svg);
+  const id = crypto.randomUUID();
+  await getStore().createFile({ id, userId, bucket: "evidence", path: `${userId}/${id}/photo.svg`, mime: "image/svg+xml", bytes: bytes.length, kind: "photo" });
+  devBlobs().set(id, bytes);
+  return id;
 }

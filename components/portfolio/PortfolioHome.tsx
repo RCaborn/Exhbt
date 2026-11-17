@@ -8,7 +8,7 @@ import { portfolioHost } from "@/lib/hosts";
 import { topSkills, type HomeProject, type KeyFigure } from "@/lib/portfolio-home";
 import { SECTION_HINTS, SECTION_NAMES, splitYear, type SectionKey, type Tiles } from "@/lib/portfolio-layout";
 import { initialsOf } from "@/lib/portfolio-profile";
-import { DEFAULT_THEME, type PortfolioTheme } from "@/lib/portfolio-themes";
+import { DEFAULT_THEME, type FontKey, type PortfolioTheme } from "@/lib/portfolio-themes";
 import { lookAttrs, printStyle, themeStyle } from "./themeFonts";
 
 /**
@@ -93,7 +93,7 @@ export function PortfolioHome(props: HomeProps) {
   const paper = printStyle(theme);
 
   return (
-    <div data-portfolio-home {...lookAttrs(theme)} style={themeStyle(theme)} className="@container bg-[var(--pf-ground)] text-[color:var(--pf-ink)]">
+    <div data-portfolio-home {...lookAttrs(theme)} style={themeStyle(theme)} className={`@container bg-[var(--pf-ground)] text-[color:var(--pf-ink)] ${mode === "public" && !props.thumbnail && !props.sectionsOnly ? "min-h-svh" : ""}`}>
       {paper && <style>{paper}</style>}
       {!props.sectionsOnly && (
         <div inert={props.inertChrome || undefined}>
@@ -155,6 +155,20 @@ function TopBar({ username, nav, contact, chip }: { username: string | null; nav
 }
 
 /* ---------------- The hero, in the look's arrangement ---------------- */
+
+/** About how wide a face's letters run, in ems, at display size and tracking. */
+const CHAR_EM: Record<FontKey, number> = { bricolage: 0.52, inter: 0.56, "inter-tight": 0.56, newsreader: 0.5, "jetbrains-mono": 0.6, "plex-sans": 0.55, nunito: 0.58 };
+
+/**
+ * Shrinks a very large name so its longest word fits its column instead of breaking mid-word:
+ * `--fit` is 1 for most names and less for a long one ("Adebayo-Montgomery-Fitzwilliam" breaks
+ * after its hyphens). `room` is how many ems of the face's letters the hero's column holds at full size.
+ */
+function nameFit(name: string, theme: PortfolioTheme, room: number): React.CSSProperties {
+  const longest = Math.max(1, ...name.trim().split(/\s+/).flatMap((w) => w.split(/(?<=-)/)).map((w) => w.length));
+  const em = CHAR_EM[theme.type.display] * (theme.type.displayWeight >= 800 ? 1.12 : 1);
+  return { "--fit": Math.min(1, room / (longest * em)).toFixed(3) } as React.CSSProperties;
+}
 
 type HeroProps = HomeProps & { theme: PortfolioTheme };
 
@@ -233,8 +247,11 @@ function PortraitHero({ person, theme, greeting = false }: HeroProps & { greetin
       <div className="min-w-0">
         <p className={greeting ? "text-[1.25rem] text-[color:var(--pf-soft)] @3xl:text-[1.5rem]" : "text-[1rem] text-[color:var(--pf-soft)]"}>Hi, I&rsquo;m</p>
         <h1
+          style={nameFit(person.name, theme, greeting ? 8 : 5.5)}
           className={`pf-display mt-1 break-words ${
-            greeting ? "text-[clamp(2.75rem,8cqw,5.25rem)] leading-[1]" : "text-[clamp(3rem,11.5cqw,8.5rem)] leading-[0.92] [letter-spacing:calc(var(--pf-tracking)-0.01em)]"
+            greeting
+              ? "text-[calc(clamp(2.75rem,8cqw,5.25rem)*var(--fit))] leading-[1]"
+              : "text-[calc(clamp(3rem,11.5cqw,8.5rem)*var(--fit))] leading-[0.92] [letter-spacing:calc(var(--pf-tracking)-0.01em)]"
           }`}
         >
           {person.name}
@@ -253,7 +270,9 @@ function MastheadHero({ person, theme }: HeroProps) {
     <header className={`${WRAP} pt-10 pb-14 @3xl:pt-14 @3xl:pb-20`}>
       <div className="grid gap-x-12 gap-y-8 border-t-[3px] border-[color:var(--pf-rule)] pt-8 @3xl:grid-cols-[minmax(0,1fr)_auto] @3xl:pt-10">
         <div className="min-w-0">
-          <h1 className="pf-display text-[clamp(2.75rem,8.5cqw,6rem)] leading-[1] break-words">{person.name}</h1>
+          <h1 style={nameFit(person.name, theme, 7.5)} className="pf-display text-[calc(clamp(2.75rem,8.5cqw,6rem)*var(--fit))] leading-[1] break-words">
+            {person.name}
+          </h1>
           {person.headline && <p className="pf-lead mt-4 text-[1.375rem] leading-snug text-[color:var(--pf-soft)] @3xl:text-[1.625rem]">{person.headline}</p>}
           <Intro person={person} className="mt-6 !text-[1.125rem] @3xl:!text-[1.25rem]" />
           <Meta person={person} className="mt-6" />
@@ -295,7 +314,9 @@ function NotesHero(props: HeroProps) {
     <header className={`${WRAP} pt-10 pb-12 @3xl:pt-16 @3xl:pb-16`}>
       <div className="max-w-[46rem]">
         <Face person={person} theme={theme} className="size-[4.5rem]" initialsClass="text-[1.6rem]" />
-        <h1 className="pf-display mt-5 text-[clamp(2.5rem,7cqw,4rem)] leading-[1.02] break-words">{person.name}</h1>
+        <h1 style={nameFit(person.name, theme, 10)} className="pf-display mt-5 text-[calc(clamp(2.5rem,7cqw,4rem)*var(--fit))] leading-[1.02] break-words">
+          {person.name}
+        </h1>
         {person.headline && <p className="mt-2 text-[1.125rem] text-[color:var(--pf-soft)]">{person.headline}</p>}
         {facts.length > 0 && (
           <dl className="mt-7 grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-6 gap-y-2.5 text-[1rem] @3xl:grid-cols-[9rem_minmax(0,1fr)]">
@@ -329,7 +350,9 @@ function TerminalHero(props: HeroProps) {
             {person.username ? <span className="sr-only">Address: </span> : null}
             {path}
           </p>
-          <h1 className="pf-display mt-4 text-[clamp(2.25rem,7cqw,4.25rem)] leading-[1.05] break-words">{person.name}</h1>
+          <h1 style={nameFit(person.name, theme, 9)} className="pf-display mt-4 text-[calc(clamp(2.25rem,7cqw,4.25rem)*var(--fit))] leading-[1.05] break-words">
+            {person.name}
+          </h1>
           {person.headline && <p className="mt-4 text-[1.0625rem] text-[color:var(--pf-soft)]">{person.headline}</p>}
           <Intro person={person} className="mt-6 !text-[1rem] !leading-[1.75] @3xl:!text-[1.0625rem]" />
           <Meta person={person} className="mt-6" />
@@ -350,14 +373,14 @@ function TerminalHero(props: HeroProps) {
 }
 
 /** Studio: one loud block of the person's colour holding their photo or initials, the name very heavy beside it. */
-function BlockHero({ person }: HeroProps) {
+function BlockHero({ person, theme }: HeroProps) {
   const words = person.name.trim().split(/\s+/);
   return (
     <header className={`${WRAP} pt-6 pb-14 @3xl:pt-8 @3xl:pb-20`}>
       <div className="grid border-2 border-[color:var(--pf-edge)] @3xl:grid-cols-[minmax(13rem,0.4fr)_minmax(0,1fr)]">
         <div data-band-block className="relative flex min-h-40 items-end overflow-hidden bg-[var(--band-bg)] p-6 @3xl:min-h-[26rem] @3xl:p-8">
           {person.photoUrl ? (
-            <img src={person.photoUrl} alt="" data-avatar="photo" className="absolute inset-0 size-full object-cover" />
+            <img src={person.photoUrl} alt="" data-avatar="photo" className="size-28 border-2 border-[color:var(--band-text)] object-cover @3xl:size-44" />
           ) : (
             <span aria-hidden data-avatar="initials" className="pf-display text-[4.5rem] leading-none !text-[color:var(--band-text)] @3xl:text-[7rem]">
               {initialsOf(person.name) || "?"}
@@ -365,7 +388,7 @@ function BlockHero({ person }: HeroProps) {
           )}
         </div>
         <div className="min-w-0 border-t-2 border-[color:var(--pf-edge)] p-6 @3xl:border-t-0 @3xl:border-l-2 @3xl:p-10">
-          <h1 className="pf-display text-[clamp(3rem,10cqw,7.5rem)] leading-[0.88] break-words">
+          <h1 style={nameFit(person.name, theme, 4.2)} className="pf-display text-[calc(clamp(3rem,10cqw,7.5rem)*var(--fit))] leading-[0.88] break-words">
             {words.map((w, i) => (
               <span key={i} className="block">
                 {w}
@@ -394,7 +417,9 @@ function LedgerHero(props: HeroProps) {
     <header className={`${WRAP} pt-10 pb-14 @3xl:pt-14 @3xl:pb-16`}>
       <div className="grid gap-x-12 gap-y-8 @3xl:grid-cols-[minmax(0,1fr)_auto]">
         <div className="min-w-0">
-          <h1 className="pf-display text-[clamp(2.75rem,8cqw,5.5rem)] leading-[1] break-words">{person.name}</h1>
+          <h1 style={nameFit(person.name, theme, 8.5)} className="pf-display text-[calc(clamp(2.75rem,8cqw,5.5rem)*var(--fit))] leading-[1] break-words">
+            {person.name}
+          </h1>
           {person.headline && <p className="mt-4 text-[1.25rem] text-[color:var(--pf-soft)]">{person.headline}</p>}
           <Intro person={person} className="mt-5 !text-[1.0625rem] @3xl:!text-[1.1875rem]" />
           {education.length > 0 && <Meta person={person} />}
