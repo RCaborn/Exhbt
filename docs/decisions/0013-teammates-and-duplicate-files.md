@@ -31,6 +31,10 @@ The editor's strip offers "Draft from these files". That opens `/exhbts/new?into
 
 Leaving the team, or being removed, clears `team_of` on the teammate's own exhbts of that project. Their exhbt and their copies stay theirs. While they're on the team, both pages say "Team project with" and the other names.
 
+## Whose file may show
+
+A file shows only as part of its owner's exhbt, portfolio or profile: `mayShowFile` in `lib/files.ts` is true only when `StoredFile.userId` is that person, and `signedFileUrl(fileId, ownerId)` needs the owner, so no caller can skip the check. A teammate's copy is their own record, so it passes for them; the original never does. On the write side, `createExhbt` and `saveExhbtDraft` (both stores) drop any image section or work file the writer doesn't own, silently, in every environment (an autosave has nowhere to show an error, and development then behaves as production does). Every write path goes through those two methods.
+
 ## Private matching of identical files
 
 **Where the fingerprint is made.** On the server. Uploads go straight from the browser to Storage, so there is no server step in the upload itself; after the PUT, the browser calls `POST /api/files/[id]/complete`, and the server reads the stored object back and records its SHA-256 in `exhbt_files.sha256` (`completeUpload` in `lib/duplicates.ts`). We didn't take a hash from the browser: a browser can send any value it likes, which would let anyone dodge a match or plant one. Reading the object back costs one download per upload, which is fine at our file sizes. The same step refuses a stored object bigger than the size the upload asked for. Profile photos are fingerprinted but never matched. Helper files the app writes itself have no fingerprint.

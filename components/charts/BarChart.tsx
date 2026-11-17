@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { chartSummary, displayed, protectNote, valueFormatter, type ChartOf } from "@/lib/exhbt/charts";
 import { ChartFrame } from "./ChartFrame";
 import { scaleFor, tickLabel, type Scale } from "./scale";
-import { MUTED_BAR, SERIES_DARK, seriesColour } from "./series";
+import { CHART_STRONG, MUTED_BAR, seriesColour } from "./series";
 
 /**
  * Bars and grouped bars, drawn across the page: a label per row, bars from one zero line, and
@@ -27,7 +27,7 @@ export function BarChart({ data }: { data: ChartOf<"bar"> }) {
         {c.rows.map((r, j) => (
           <Row key={j} label={r.label}>
             <Track scale={s}>
-              <Bar scale={s} value={r.value} colour={hi === undefined || hi === j ? SERIES_DARK : MUTED_BAR} thick />
+              <Bar scale={s} value={r.value} colour={hi === undefined || hi === j ? CHART_STRONG : MUTED_BAR} thick />
               <ValueLabel scale={s} value={r.value} text={f(r.value)} strong={hi === j} />
             </Track>
           </Row>

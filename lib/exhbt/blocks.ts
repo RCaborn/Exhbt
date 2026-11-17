@@ -94,7 +94,33 @@ const SectionId = z.string().min(1).max(40);
 
 export const FindingsSectionSchema = z.object({ id: SectionId, kind: z.literal("findings"), items: z.array(RichTextSchema) });
 export const GraphSectionSchema = z.object({ id: SectionId, kind: z.literal("graph"), chart: ChartSchema });
-export const ImageSectionSchema = ImageSchema.extend({ id: SectionId, kind: z.literal("image") });
+/** Where a picked figure sits on its page: fractions of the page's width and height, from the top left. */
+export const FigureBoxSchema = z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() });
+export type FigureBox = z.infer<typeof FigureBoxSchema>;
+
+/**
+ * A figure Exhbt picked from the person's upload when it drafted the exhbt (decision 0017). It
+ * may be someone else's to share (a supervisor's chart, a company's diagram), so publishing
+ * waits until the person ticks that they may share it (`shareOk`). Only in the working copy:
+ * publicDoc leaves it out of what employers see.
+ */
+export const PickedSchema = z.object({
+  /** The uploaded file's name, for "From report.pdf, page 3". */
+  from: z.string(),
+  /** That file's exhbt_files.id, so the editor can show its other pages. Missing if it wasn't stored. */
+  sourceFileId: z.string().optional(),
+  /** The PDF page it is on, from 1. */
+  page: z.number().int().min(1).optional(),
+  /** A picture inside a Word or PowerPoint file: its path in the file, e.g. "ppt/media/image3.png". */
+  media: z.string().optional(),
+  /** The crop on the page (PDFs only). */
+  box: FigureBoxSchema.optional(),
+  /** Ticked: the person says they may share it. */
+  shareOk: z.boolean(),
+});
+export type Picked = z.infer<typeof PickedSchema>;
+
+export const ImageSectionSchema = ImageSchema.extend({ id: SectionId, kind: z.literal("image"), picked: PickedSchema.optional() });
 /** Someone else's words, so plain text: no formatting to put words in their mouth. */
 export const QuoteSectionSchema = z.object({ id: SectionId, kind: z.literal("quote"), text: z.string(), name: z.string(), role: z.string() });
 export const ReflectionSectionSchema = z.object({ id: SectionId, kind: z.literal("reflection"), text: RichTextSchema });
@@ -359,6 +385,8 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
         out.push(...chartIssues(s.chart, `${p}.chart`));
         break;
       case "image":
+        // A figure picked from their upload may not be theirs to share (decision 0017).
+        need(!s.picked || s.picked.shareOk, `${p}.picked.shareOk`, "Tick that you may share this figure, or remove it.");
         need(s.alt.trim().length > 0, `${p}.alt`, "Describe the image for people who can't see it.");
         need(words(plain(s.caption)) <= L.images.captionWords, `${p}.caption`, `Keep the caption to ${L.images.captionWords} words.`);
         httpsOnly(s.caption, `${p}.caption`);
@@ -393,11 +421,23 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
 /**
  * The copy employers see, made when an exhbt is published (lib/store.ts publishExhbt): the same
  * doc, except that a graph whose numbers are protected keeps only its index, never the figures
- * typed in (decision 0011), wherever its section sits.
+ * typed in (decision 0011), wherever its section sits, and a picked figure's note of where it came
+ * from stays in the working copy (decision 0017).
  */
 export function publicDoc(raw: ExhbtDoc): ExhbtDoc {
   const d = normaliseDoc(raw);
-  return { ...d, sections: d.sections.map((s) => (s.kind === "graph" ? { ...s, chart: publicChart(s.chart) } : s)) };
+  return {
+    ...d,
+    sections: d.sections.map((s) => {
+      if (s.kind === "graph") return { ...s, chart: publicChart(s.chart) };
+      if (s.kind === "image" && s.picked) {
+        const rest = { ...s };
+        delete rest.picked;
+        return rest;
+      }
+      return s;
+    }),
+  };
 }
 
 /** Plain text to runs, for drafts and for tests. */

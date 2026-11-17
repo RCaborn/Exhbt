@@ -174,36 +174,28 @@ test.describe("The exhbt page", () => {
     const name = unique("look");
     await seed(page, name);
     await page.goto(`/p/${name}/open-banking`);
-    await page.addStyleTag({ content: "[data-exhbt-route] { --xp-flow-end: rgb(1, 2, 3); --xp-accent: rgb(4, 5, 6); --xp-radius-box: 0px; } :root { --xp-page-ground: rgb(7, 8, 9); }" });
+    // The --xp-* names still restyle the page directly (a look sets them through --pf-*, decision 0018).
+    await page.addStyleTag({ content: "[data-exhbt-route] { --xp-flow-end: rgb(1, 2, 3); --xp-accent: rgb(4, 5, 6); --xp-radius-box: 0px; }" });
     await expect(page.locator("article [data-last]")).toHaveCSS("background-color", "rgb(1, 2, 3)");
     await expect(page.locator("article [data-last]")).toHaveCSS("border-top-left-radius", "0px");
     await expect(page.getByRole("link", { name: /^See the work/ })).toHaveCSS("background-color", "rgb(4, 5, 6)");
-    expect(await page.locator("main#main").evaluate((m) => getComputedStyle(m.parentElement!).backgroundColor)).toBe("rgb(7, 8, 9)");
+    // The frame round the page carries the look, so the ground behind it is the look's (white in Exhbt).
+    expect(await page.locator("main#main").evaluate((m) => getComputedStyle(m.parentElement!).backgroundColor)).toBe("rgb(255, 255, 255)");
+    await expect(page.locator("main#main").locator("..")).toHaveAttribute("data-look", "exhbt");
   });
 
-  test("a dark look (like Night, PDF page 3) can restyle every part and keep its text readable", async ({ page }) => {
+  test("Night (PDF page 3) restyles every part, its graphs included, and keeps its text readable", async ({ page }) => {
     const name = unique("night");
-    await seed(page, name);
+    const res = await page.request.get(`/dev/portfolio?username=${name}&plan=max&look=night&with=open-banking`, { maxRedirects: 0 });
+    expect(res.status(), await res.text()).toBe(307);
     await page.goto(`/p/${name}/open-banking`);
-    // Only the variables: the figure card stays white, as graphs need.
-    await page.addStyleTag({
-      content: `[data-exhbt-route] {
-        --xp-ground: #0e0f12; --xp-ink: #ffffff; --xp-muted: #c9cbcf; --xp-rule: #3e4044; --xp-rule-strong: #ffffff;
-        --xp-card: #1b1d22; --xp-card-ink: #ffffff; --xp-card-muted: #c9cbcf; --xp-pill: #1b1d22; --xp-pill-ink: #ffffff;
-        --xp-tick: #4fe9b4; --xp-tick-ink: #0e0f12; --xp-link: #4fe9b4; --xp-accent: #ffffff; --xp-accent-hover: #e5e6e8; --xp-accent-ink: #0e0f12;
-        --xp-outline-ground: transparent; --xp-outline-ink: #ffffff; --xp-outline-edge: #6f7278;
-        --xp-highlight: #00513f; --xp-highlight-ink: #ffffff;
-        --xp-flow-ground: #1b1d22; --xp-flow-ink: #ffffff; --xp-flow-edge: #3e4044; --xp-flow-muted: #c9cbcf; --xp-flow-end: #4fe9b4; --xp-flow-end-ink: #0e0f12;
-        --xp-arrow: #c9cbcf; --xp-avatar: #ffffff; --xp-avatar-ink: #0e0f12; --xp-avatar-edge: #ffffff;
-        --xp-radius-card: 0px; --xp-radius-box: 0px; --xp-radius-pill: 0px; --xp-radius-button: 0px;
-      }`,
-    });
     await expect(page.locator("article")).toHaveCSS("background-color", "rgb(14, 15, 18)");
     await expect(page.locator("article h1")).toHaveCSS("color", "rgb(255, 255, 255)");
     await expect(page.locator("article mark")).toHaveCSS("color", "rgb(255, 255, 255)");
-    await expect(page.locator(".xp-pill").first()).toHaveCSS("border-top-left-radius", "0px");
-    // The page's own parts (the portfolio's sign-off and pager sit outside it, on the page ground).
-    const { violations } = await new AxeBuilder({ page }).include("article").withTags(WCAG).analyze();
+    // The graph sits on Night's own dark card, not a white one.
+    await expect(page.locator('[data-part="graph"]').first()).toHaveCSS("background-color", "rgb(23, 25, 29)");
+    // The whole page, the sign-off and the pager included (they sit on the look's ground too).
+    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
     expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
   });
 });

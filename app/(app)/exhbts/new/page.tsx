@@ -37,7 +37,7 @@ export default async function NewExhbtPage({ searchParams }: { searchParams: Pro
     if (!canDraftInto(target, user.id)) redirect(mine ? `/exhbts/${mine}/edit` : "/exhbts/new");
     into = target.id;
     for (const f of await teamFilesFor(user.id, target.id)) {
-      const url = await signedFileUrl(f.id);
+      const url = await signedFileUrl(f.id, user.id);
       if (url) preload.push({ fileId: f.id, name: f.path.split("/").pop() ?? "file", mime: f.mime, url });
     }
   }

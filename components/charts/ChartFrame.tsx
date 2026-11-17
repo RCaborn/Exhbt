@@ -89,7 +89,7 @@ function Key({ item }: { item: LegendItem }) {
   if (item.marker) {
     return (
       <svg aria-hidden width="22" height="10" viewBox="0 0 22 10" className="shrink-0 overflow-visible">
-        <line x1="1" x2="21" y1="5" y2="5" stroke={item.colour} strokeWidth="2" strokeDasharray={item.dash || undefined} strokeLinecap="round" />
+        <line x1="1" x2="21" y1="5" y2="5" style={{ stroke: item.colour }} strokeWidth="2" strokeDasharray={item.dash || undefined} strokeLinecap="round" />
         <MarkerShape marker={item.marker} colour={item.colour} cx={11} cy={5} r={3.5} />
       </svg>
     );
@@ -99,15 +99,16 @@ function Key({ item }: { item: LegendItem }) {
 
 /** A point marker: circle, square, triangle or diamond, so lines differ by shape as well as shade. */
 export function MarkerShape({ marker, colour, cx, cy, r }: { marker: Marker; colour: string; cx: number; cy: number; r: number }) {
-  const ring = { stroke: "var(--color-surface)", strokeWidth: 1.5 };
+  // Colours as style, not attributes: they can be CSS variables (a portfolio look's shades, decision 0018).
+  const ring = { style: { fill: colour, stroke: "var(--color-surface)" }, strokeWidth: 1.5 };
   switch (marker) {
     case "circle":
-      return <circle cx={cx} cy={cy} r={r} fill={colour} {...ring} />;
+      return <circle cx={cx} cy={cy} r={r} {...ring} />;
     case "square":
-      return <rect x={cx - r * 0.9} y={cy - r * 0.9} width={r * 1.8} height={r * 1.8} fill={colour} {...ring} />;
+      return <rect x={cx - r * 0.9} y={cy - r * 0.9} width={r * 1.8} height={r * 1.8} {...ring} />;
     case "triangle":
-      return <polygon points={`${cx},${cy - r * 1.1} ${cx + r * 1.05},${cy + r * 0.8} ${cx - r * 1.05},${cy + r * 0.8}`} fill={colour} {...ring} />;
+      return <polygon points={`${cx},${cy - r * 1.1} ${cx + r * 1.05},${cy + r * 0.8} ${cx - r * 1.05},${cy + r * 0.8}`} {...ring} />;
     case "diamond":
-      return <polygon points={`${cx},${cy - r * 1.2} ${cx + r * 1.2},${cy} ${cx},${cy + r * 1.2} ${cx - r * 1.2},${cy}`} fill={colour} {...ring} />;
+      return <polygon points={`${cx},${cy - r * 1.2} ${cx + r * 1.2},${cy} ${cx},${cy + r * 1.2} ${cx - r * 1.2},${cy}`} {...ring} />;
   }
 }

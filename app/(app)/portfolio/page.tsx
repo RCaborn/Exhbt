@@ -40,7 +40,7 @@ export default async function BuildPortfolioPage({ searchParams }: { searchParam
     store.getPortfolioProfile(user.id),
     headers().then((h) => h.get("x-forwarded-host") ?? h.get("host")),
   ]);
-  const photoUrl = await signedFileUrl(profile.photoFileId);
+  const photoUrl = await signedFileUrl(profile.photoFileId, user.id);
   const isPublic = ENTITLEMENTS[plan].publicPortfolio;
   const tilesVerdict = canUseExtraTiles(plan);
   const held = isPublic ? null : publishVerdict(plan, exhbts, "");
@@ -51,7 +51,7 @@ export default async function BuildPortfolioPage({ searchParams }: { searchParam
     candidates.map(async (e) => {
       const doc = isPublic && e.published ? e.published : e.doc;
       const home = homeProject(e.id, doc, "#");
-      if (home.figure.kind === "image") home.imageUrl = await signedFileUrl(home.figure.fileId);
+      if (home.figure.kind === "image") home.imageUrl = await signedFileUrl(home.figure.fileId, user.id);
       return { id: e.id, title: home.title, home, live: e.status === "published" };
     }),
   );
@@ -78,9 +78,10 @@ export default async function BuildPortfolioPage({ searchParams }: { searchParam
   };
 
   const locks: Record<string, ThemeLock> = {};
+  // By look: a look's colourways come with it.
   for (const t of PORTFOLIO_THEMES) {
     const v = canUseTheme(plan, t);
-    if (!v.ok) locks[t.id] = { reason: v.reason, upgradeTo: v.upgradeTo, planName: PLAN_NAMES[v.upgradeTo ?? "max"] };
+    if (!v.ok) locks[t.look] = { reason: v.reason, upgradeTo: v.upgradeTo, planName: PLAN_NAMES[v.upgradeTo ?? "max"] };
   }
   const storedTheme = themeById(profile.themeId);
   const address = canClaimUsername(plan);

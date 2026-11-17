@@ -59,7 +59,7 @@ Useful dev-only pages:
 | You want to change… | Go to |
 |---|---|
 | Colours, fonts, radius, focus ring | `app/globals.css` (`@theme` tokens) and the rules in `DESIGN.md` |
-| Home page | `app/(marketing)/page.tsx`; product snippets in `components/home/Excerpts.tsx` |
+| Home page | `app/(marketing)/page.tsx`; its sections in `components/home/` (`HowItWorks`, `LookPreview`, `JobLinks`, `Faq`). Product pictures are the real components in `components/home/Preview.tsx`, never copies |
 | Big "describe the job" field + button | `components/home/StartForm.tsx` |
 | Search-only page for ads and links (`/start`, linked as "Quick start" in the footer) | `app/start/page.tsx` |
 | Builder questions, hints, step order | `app/(app)/roadmap/new/RoadmapWizard.tsx` (`STEPS` at the top) |
@@ -75,7 +75,7 @@ Useful dev-only pages:
 | Sign-in | `lib/auth.ts`, `app/auth/*` |
 | Portfolio tiles and header (what employers scan first) | `components/exhbt/ExhbtTile.tsx`, `components/exhbt/PortfolioHeader.tsx` |
 | Logo, seal, "made with exhbt" sign-off, catalogue numbers | `components/brand/` (`Logo.tsx`, `Seal.tsx`, `MadeWith.tsx`), `catalogueNo()` in `lib/exhbt.ts`; rules in `docs/brand.md` |
-| Demo portfolio (`/demo`, fictional person, 4 projects) | `app/(marketing)/demo/`; data in `lib/exhbt.ts` (`demoOwner`, `demoExhbts`) |
+| Demo portfolio (`/demo`, fictional person, 4 projects), also pictured on Home and the what-is page | `app/(marketing)/demo/`, drawn by the real `PortfolioHome` and `ProjectView`; data in `lib/exhbt.ts` (`demoOwner`, `demoExhbts` in the new exhbt shape, `demoPortfolio`), kept within the product's limits by `e2e/home.spec.ts` |
 | Tier checklists (pricing page, home) | `planFeatures()` in `lib/entitlements.ts`, rendered by `components/site/FeatureList.tsx` |
 | The exhbt card (methodology flow, chart, skills) | `components/exhbt/Exhbt.tsx`, `MethodFlow.tsx`, `BeforeAfterChart.tsx`; data shape and example in `lib/exhbt.ts` |
 | The skill radar (roadmap Gaps and Projects screens, home example) | `components/charts/SkillRadar.tsx`; the Now / After switch is in the same component; the rules (markers, lists) in `lib/roadmap/radar.ts`; the after-projects rule in `lib/roadmap/skills.ts`; the level scale in `lib/ai/roadmap.ts`; home data in `components/home/SkillsGapExample.tsx` |
@@ -125,7 +125,7 @@ Phase 2 (portfolios, the exhbt editor, uploads and AI drafts, paid plans) is on 
 Prices and limits are `lib/entitlements.ts`. The Stripe dashboard steps are in `LAUNCH.md`.
 
 Development pages for Phase 2 (all 404 in production and when Supabase is connected):
-- **`/dev/portfolio?username=amara&plan=premium&count=2`**: makes a fictional portfolio with published exhbts and opens it. The owner is the dev sign-in user `<username>@example.com`, so sign in with that address (`/auth/dev?email=amara@example.com`) to edit the same portfolio.
+- **`/dev/portfolio?username=amara&plan=premium&count=2`**: makes a fictional portfolio with published exhbts and opens it. The owner is the dev sign-in user `<username>@example.com`, so sign in with that address (`/auth/dev?email=amara@example.com`) to edit the same portfolio. Add `look=night` (any look or colourway id, decision 0018), `rich=1` (every profile field and section filled in), `name=` (try a long one), `graphs=none` and `with=open-banking` to see every look with real-world content.
 - **`/dev/plan?plan=max&next=/exhbts`**: puts the signed-in dev user on a plan without Stripe.
 - **`/dev/upload/<id>`** and **`/dev/files/<id>`**: the in-memory stand-in for Storage. Uploads PUT to the first; portfolio pages read from the second. Files are gone when the server restarts.
 
@@ -171,7 +171,7 @@ Where Phase 2 lives:
 - `responsive.spec.ts`: the home CTA is above the fold on desktop and phone; no sideways scrolling.
 - `preview.spec.ts`: private-preview noindex, robots and banner.
 
-- Phase 2: `phase2-account.spec.ts` (usernames, profile), `phase2-portfolio.spec.ts` (blocks, plan rules, portfolio pages), `phase2-draft.spec.ts` (uploads, AI draft), `phase2-editor.spec.ts` (editor, publish), `phase2-billing.spec.ts` (Stripe), `phase2-hardening.spec.ts` (account export, privacy and terms).
+- Phase 2: `phase2-account.spec.ts` (usernames, profile), `phase2-portfolio.spec.ts` (blocks, plan rules, portfolio pages), `phase2-draft.spec.ts` (uploads, AI draft), `auto-figure.spec.ts` (the figure picked from an uploaded PDF), `phase2-editor.spec.ts` (editor, publish), `phase2-billing.spec.ts` (Stripe), `phase2-hardening.spec.ts` (account export, privacy and terms).
 
 Tests run against the dev server with no services connected. They use the build folder `.next-e2e`, so they can run while `npm run dev` is up.
 

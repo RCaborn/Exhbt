@@ -1,7 +1,7 @@
 import { chartSummary, displayed, protectNote, valueFormatter, type ChartOf } from "@/lib/exhbt/charts";
 import { ChartFrame, MarkerShape } from "./ChartFrame";
 import { scaleFor, tickLabel } from "./scale";
-import { DASHES, MARKERS, SERIES_RAMP, seriesRank } from "./series";
+import { CHART_RAMP, DASHES, MARKERS, seriesRank } from "./series";
 
 /**
  * Up to four lines over an ordered axis (weeks, months, rounds). The lines are SVG, stretched to
@@ -35,7 +35,7 @@ export function LineChart({ data }: { data: ChartOf<"line"> }) {
     <ChartFrame
       title={c.title}
       summary={chartSummary(data)}
-      legend={c.series.map((_, k) => ({ label: name(k), colour: SERIES_RAMP[rank(k)]!, marker: MARKERS[rank(k)]!, dash: DASHES[rank(k)] }))}
+      legend={c.series.map((_, k) => ({ label: name(k), colour: CHART_RAMP[rank(k)]!, marker: MARKERS[rank(k)]!, dash: DASHES[rank(k)] }))}
       notes={[c.lowerIsBetter ? "Lower is better." : null, protectNote(data)]}
       table={{ head: [c.xTitle || "Point", ...c.series.map((_, k) => name(k))], rows: c.rows.map((r) => [r.label, ...c.series.map((_, k) => f(r.values[k] ?? 0))]) }}
     >
@@ -58,7 +58,7 @@ export function LineChart({ data }: { data: ChartOf<"line"> }) {
                   key={k}
                   points={c.rows.map((r, j) => `${x(j).toFixed(2)},${y(r.values[k] ?? 0).toFixed(2)}`).join(" ")}
                   fill="none"
-                  stroke={SERIES_RAMP[rank(k)]}
+                  style={{ stroke: CHART_RAMP[rank(k)] }}
                   strokeWidth={rank(k) === 0 ? 2.5 : 2}
                   strokeDasharray={DASHES[rank(k)] || undefined}
                   strokeLinejoin="round"
@@ -71,7 +71,7 @@ export function LineChart({ data }: { data: ChartOf<"line"> }) {
           {c.series.map((_, k) =>
             c.rows.map((r, j) => (
               <svg aria-hidden key={`${k}-${j}`} width="10" height="10" viewBox="0 0 10 10" className="absolute -translate-x-1/2 -translate-y-1/2 overflow-visible" style={{ left: `${x(j)}%`, top: `${y(r.values[k] ?? 0)}%` }}>
-                <MarkerShape marker={MARKERS[rank(k)]!} colour={SERIES_RAMP[rank(k)]!} cx={5} cy={5} r={4} />
+                <MarkerShape marker={MARKERS[rank(k)]!} colour={CHART_RAMP[rank(k)]!} cx={5} cy={5} r={4} />
               </svg>
             )),
           )}

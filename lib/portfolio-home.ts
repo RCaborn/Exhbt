@@ -22,7 +22,16 @@ export type HomeProject = {
   imageUrl?: string | null;
   /** The work (a file or a link) is attached, so the badge can say so. */
   sourceAttached: boolean;
+  /** Its skills, for the looks whose top shows them (Notebook's rows, Mono's tags; decision 0018). */
+  skills?: string[];
 };
+
+/** The person's skills across the exhbts shown, most used first, then in order (for a look's hero). */
+export function topSkills(projects: Pick<HomeProject, "skills">[], n: number): string[] {
+  const count = new Map<string, number>();
+  for (const p of projects) for (const s of p.skills ?? []) if (s.trim()) count.set(s.trim(), (count.get(s.trim()) ?? 0) + 1);
+  return [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([s]) => s);
+}
 
 /**
  * One sentence for a card: the exhbt's own summary once it has one (the exhbt page's work adds
@@ -53,5 +62,6 @@ export function homeProject(id: string, doc: ExhbtDoc, href: string | null, imag
     figure,
     imageUrl: figure.kind === "image" ? (imageUrl ?? null) : undefined,
     sourceAttached: Boolean(doc.evidence),
+    skills: doc.skills,
   };
 }

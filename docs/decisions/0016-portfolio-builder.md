@@ -1,6 +1,7 @@
 Status: accepted
 Date: 16 Nov 2026
 Amends: 0012 (where the looks are picked, a new default look), 0014 (where the customiser lives, what it arranges)
+Amended by: 0018 (the look's variables are one set shared with the exhbt page; graphs take the look's shades)
 
 # One guided portfolio builder, and a page that reads as the person's own
 

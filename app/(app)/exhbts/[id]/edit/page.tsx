@@ -7,6 +7,7 @@ import { TeamStrip } from "@/components/team/TeamStrip";
 import { getCurrentUser } from "@/lib/auth";
 import { fileIdsOf } from "@/components/editor/media";
 import { ENTITLEMENTS } from "@/lib/entitlements";
+import { imagesOf } from "@/lib/exhbt/blocks";
 import { loadAiVersion, loadDraftSource } from "@/lib/draft-tools";
 import { signedFileUrl } from "@/lib/files";
 import { parseHost, portfolioHost } from "@/lib/hosts";
@@ -34,7 +35,13 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
 
   const [profile, plan, all] = await Promise.all([store.getPortfolioProfile(user.id), getPlan(user.id), store.listExhbts(user.id)]);
   const verdict = canPublish(plan, all, id);
-  const { imageUrls, evidenceUrl } = await mediaFor(record.doc);
+  const { imageUrls, evidenceUrl } = await mediaFor(record.doc, user.id);
+  // The stored reports picked figures came from, so they can be cropped again or swapped for
+  // another page (decision 0017). Only the person's own files get a link (signedFileUrl checks).
+  const figureSources: Record<string, string | null> = {};
+  for (const sourceId of new Set(imagesOf(record.doc).flatMap((im) => (im.picked?.sourceFileId ? [im.picked.sourceFileId] : [])))) {
+    figureSources[sourceId] = await signedFileUrl(sourceId, user.id);
+  }
   // Production shows the real address (alex.exhbt.co.uk); development and previews serve portfolios at /p/alex.
   const onAppHost = parseHost((await headers()).get("host")).kind === "app";
   const liveBase = profile.username ? (onAppHost ? `https://${portfolioHost(profile.username)}` : `/p/${profile.username}`) : null;
@@ -57,8 +64,9 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
       status={record.status}
       slug={record.slug}
       liveBase={liveBase}
-      owner={{ name: profile.name?.trim() || profile.username || user.email.split("@")[0]!, photoUrl: await signedFileUrl(profile.photoFileId), bio: profile.headline }}
+      owner={{ name: profile.name?.trim() || profile.username || user.email.split("@")[0]!, photoUrl: await signedFileUrl(profile.photoFileId, user.id), bio: profile.headline }}
       imageUrls={imageUrls}
+      figureSources={figureSources}
       fileEvidenceUrl={record.doc.evidence?.kind === "file" ? evidenceUrl : null}
       planBlock={verdict.ok ? null : { reason: verdict.reason, upgradeTo: verdict.upgradeTo }}
       updatedAt={record.updatedAt}

@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { headers } from "next/headers";
 import { imagesOf, type ExhbtDoc } from "./exhbt/blocks";
 import { signedFileUrl } from "./files";
@@ -6,7 +7,7 @@ import { parseHost, portfolioHost } from "./hosts";
 import { ENTITLEMENTS } from "./entitlements";
 import { homeProject, type HomeProject } from "./portfolio-home";
 import { EXTRA_SECTIONS, sectionsOf, type PortfolioLayout, type SectionKey } from "./portfolio-layout";
-import { themeFor, type PortfolioTheme } from "./portfolio-themes";
+import { DEFAULT_THEME, themeFor, type PortfolioTheme } from "./portfolio-themes";
 import { visibleOnPortfolio } from "./plan-rules";
 import { getStore, type ExhbtRecord, type PortfolioProfile } from "./store";
 import { teamFor } from "./team";
@@ -24,6 +25,8 @@ export type PortfolioItem = { id: string; slug: string; doc: ExhbtDoc; published
 export type LoadedPortfolio =
   | {
       status: "ok";
+      /** The portfolio owner: every file shown on it must be theirs (lib/files.ts mayShowFile). */
+      userId: string;
       profile: PortfolioProfile & { username: string };
       displayName: string;
       photoUrl: string | null;
@@ -96,14 +99,15 @@ export async function loadPortfolio(username: string, rest = ""): Promise<Loaded
   const projects = await Promise.all(
     shownList.map(async (e) => {
       const p = homeProject(e.id, e.published!, `${base}/${e.slug}`);
-      return p.figure.kind === "image" ? { ...p, imageUrl: await signedFileUrl(p.figure.fileId) } : p;
+      return p.figure.kind === "image" ? { ...p, imageUrl: await signedFileUrl(p.figure.fileId, e.userId) } : p;
     }),
   );
   return {
     status: "ok",
+    userId: found.userId,
     profile: { ...profile, username: found.username },
     displayName: profile.name?.trim() || found.username,
-    photoUrl: await signedFileUrl(profile.photoFileId),
+    photoUrl: await signedFileUrl(profile.photoFileId, found.userId),
     items: await Promise.all(listed.map(toFull)),
     hiddenItems: await Promise.all(reachable.filter((e) => hidden.has(e.id)).map(toFull)),
     projects,
@@ -118,14 +122,30 @@ export async function loadPortfolio(username: string, rest = ""): Promise<Loaded
 
 const toItem = (e: ExhbtRecord): Omit<PortfolioItem, "team"> => ({ id: e.id, slug: e.slug!, doc: e.published!, publishedAt: e.publishedAt });
 
-/** Signed URLs for one exhbt's images and its evidence file (links pass through). */
-export async function mediaFor(doc: ExhbtDoc): Promise<{ imageUrls: Record<string, string | null>; evidenceUrl: string | null }> {
+/**
+ * Signed URLs for one exhbt's images and its evidence file (links pass through). `ownerId` is the exhbt's
+ * owner: a file that isn't theirs gets no URL, so a doc can never show someone else's file.
+ */
+export async function mediaFor(doc: ExhbtDoc, ownerId: string): Promise<{ imageUrls: Record<string, string | null>; evidenceUrl: string | null }> {
   const imageUrls: Record<string, string | null> = {};
-  for (const im of imagesOf(doc)) imageUrls[im.fileId] = await signedFileUrl(im.fileId);
+  for (const im of imagesOf(doc)) imageUrls[im.fileId] = await signedFileUrl(im.fileId, ownerId);
   const ev = doc.evidence;
-  const evidenceUrl = !ev ? null : ev.kind === "link" ? ev.href : await signedFileUrl(ev.fileId);
+  const evidenceUrl = !ev ? null : ev.kind === "link" ? ev.href : await signedFileUrl(ev.fileId, ownerId);
   return { imageUrls, evidenceUrl };
 }
+
+/**
+ * Just the look a portfolio shows (decision 0018), for the frame around an exhbt page, which
+ * paints the page ground, the sign-off and the pager in it. The default for an unknown name (the
+ * page itself then says not found). Once per request.
+ */
+export const portfolioLook = cache(async (username: string): Promise<PortfolioTheme> => {
+  const store = getStore();
+  const found = await store.lookupUsername(username);
+  if (!found || "redirectTo" in found) return DEFAULT_THEME;
+  const [plan, profile] = await Promise.all([store.planFor(found.userId), store.getPortfolioProfile(found.userId)]);
+  return themeFor(profile, plan);
+});
 
 /** "12 Nov 2026", for the date beside the checks. */
 export const checkedOnLabel = (iso: string | null) =>
