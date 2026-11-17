@@ -40,20 +40,23 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await page.goto("/");
     const section = page.locator("section[aria-labelledby=gaps-example]");
     await expect(section.getByRole("heading", { level: 2 })).toBeVisible();
-    await expect(section.getByText("Example: Amara is fictional.").first()).toBeVisible();
-    const now = section.getByRole("table", { name: /Amara now/ });
-    await expect(now.getByRole("row", { name: /Dashboards 0 of 4 3 of 4/ })).toBeAttached();
-    const after = section.getByRole("table", { name: /After the two suggested projects/ });
-    await expect(after.getByRole("row", { name: /Dashboards 0 of 4 3 of 4/ })).toBeAttached();
-    // Excel isn't covered by a project, so it stays where it is.
-    await expect(after.getByRole("row", { name: /Excel 2 of 4 2 of 4/ })).toBeAttached();
+    await expect(section.getByText("Example: Amara is fictional.")).toBeVisible();
+    // One radar, not two. Its table holds Now, After the projects and what the job asks for.
+    await expect(section.getByRole("table")).toHaveCount(1);
+    const table = section.getByRole("table", { name: /Amara/ });
+    await expect(table.getByRole("row", { name: "Skill Now After the projects What the job asks for" })).toBeAttached();
+    await expect(table.getByRole("row", { name: "Dashboards 0 of 4 2 of 4 2 of 4" })).toBeAttached();
+    // Statistics isn't covered by a project, so it stays where it is.
+    await expect(table.getByRole("row", { name: "Statistics 2 of 4 2 of 4 3 of 4" })).toBeAttached();
 
-    // The good and the bad, in words: biggest shortfalls first, then what already meets the job.
-    expect(await listItems(section.getByRole("list", { name: "Level up next" }).first())).toEqual(["Dashboards", "SQL", "Excel"]);
-    expect(await listItems(section.getByRole("list", { name: "In the bag" }).first())).toEqual(["Python", "Statistics"]);
-    // After the projects, only Excel is still short.
-    expect(await listItems(section.getByRole("list", { name: "Level up next" }).nth(1))).toEqual(["Excel"]);
-    // No numbers on the charts.
+    // Now: everything short of the job is listed, biggest shortfall first, then what already meets it.
+    expect(await listItems(section.getByRole("list", { name: "Level up next" }))).toEqual(["SQL", "Dashboards", "Data visualisation", "Statistics"]);
+    expect(await listItems(section.getByRole("list", { name: "In the bag" }))).toEqual(["Python", "Excel"]);
+    // After the projects, only Statistics is still short.
+    await section.getByRole("button", { name: "After the projects" }).click();
+    expect(await listItems(section.getByRole("list", { name: "Level up next" }))).toEqual(["Statistics"]);
+    expect(await listItems(section.getByRole("list", { name: "In the bag" }))).toEqual(["Python", "SQL", "Data visualisation", "Excel", "Dashboards"]);
+    // No numbers on the chart.
     await expect(section.getByText(/\b(now|job|you) \d\b|\d → \d/)).toHaveCount(0);
   });
 
@@ -136,19 +139,26 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(page.getByRole("list", { name: "Gaps to close" }).getByText("SQL", { exact: true })).toBeVisible();
   });
 
-  test("the skills radar shows the gaps, then where the projects would take you", async ({ page }) => {
+  test("the skills radar is one chart: now against the job, with a switch to after the projects once they're shown", async ({ page }) => {
     await buildRoadmap(page, { role: "Junior data analyst", withCv: true });
     await waitForResult(page);
     const base = page.url().split("?")[0];
+    const radar = () => page.locator("figure");
 
-    // Development placeholder roadmap: SQL shows some evidence (1), Excel none, needed level 3.
+    // Before the details gate there is no plan to look at, so no switch: Now only.
+    // Development placeholder roadmap: the job asks 4, 3, 3, 2, 2, 1. SQL shows some evidence (1), Excel and Data visualisation none.
     await page.goto(`${base}?view=gaps`);
-    const now = page.getByRole("table", { name: "You now, against what the job asks for" });
-    await expect(now.getByRole("row", { name: "SQL 1 of 4 3 of 4" })).toBeAttached();
-    await expect(now.getByRole("row", { name: "Excel 0 of 4 3 of 4" })).toBeAttached();
+    await expect(radar().getByRole("table")).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "After the projects" })).toHaveCount(0);
+    const table = page.getByRole("table", { name: "You, against what the job asks for" });
+    await expect(table.getByRole("row", { name: "Skill Now What the job asks for" })).toBeAttached();
+    await expect(table.getByRole("row", { name: "SQL 1 of 4 4 of 4" })).toBeAttached();
+    await expect(table.getByRole("row", { name: "Excel 0 of 4 3 of 4" })).toBeAttached();
     await expect(page.getByText(/Skills picked by AI/).first()).toBeVisible();
-    // Biggest shortfalls first (Excel and Data visualisation at 0, SQL at 1), then the skills already at the level.
-    expect(await listItems(page.getByRole("list", { name: "Level up next" }))).toEqual(["Excel", "Data visualisation", "SQL"]);
+    // The job's levels vary: it is not a regular shape.
+    expect(await radar().getByRole("row").count()).toBeGreaterThan(3);
+    // Every skill below the job is listed, biggest shortfall first, then every skill that meets it.
+    expect(await listItems(page.getByRole("list", { name: "Level up next" }))).toEqual(["SQL", "Excel", "Data visualisation"]);
     expect(await listItems(page.getByRole("list", { name: "In the bag" }))).toEqual([
       "Python or R",
       "Statistics",
@@ -157,25 +167,33 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     // No numbers on the chart: the levels live in the hidden table only.
     await expect(page.locator("figure").getByText(/\b(now|job|you) \d\b|\d → \d/)).toHaveCount(0);
 
-    // The placeholder projects close SQL and Excel, so both rise to 3; Data visualisation stays at 0.
+    // The placeholder projects close SQL and Excel, so each rises to what the job asks (4 and 3); Data visualisation stays at 0.
     await unlockProjects(page, { email: uniqueEmail("radar") });
-    await expect(page.getByRole("heading", { level: 2, name: "When you’ve finished these projects" })).toBeVisible();
-    const after = page.getByRole("table", { name: "You now, against where the projects would take you" });
-    await expect(after.getByRole("row", { name: "SQL 1 of 4 3 of 4" })).toBeAttached();
-    await expect(after.getByRole("row", { name: "Excel 0 of 4 3 of 4" })).toBeAttached();
-    await expect(after.getByRole("row", { name: "Data visualisation 0 of 4 0 of 4" })).toBeAttached();
-    // Judged on the after levels: SQL and Excel join the bag; Data visualisation is still short.
+    await expect(page.getByRole("button", { name: /^Swap/ }).first()).toBeVisible();
+    await page.goto(`${base}?view=gaps`);
+    await expect(page.getByRole("button", { name: "Now" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "After the projects" })).toHaveAttribute("aria-pressed", "false");
+    const both = page.getByRole("table", { name: "You, against what the job asks for" });
+    await expect(both.getByRole("row", { name: "Skill Now After the projects What the job asks for" })).toBeAttached();
+    await expect(both.getByRole("row", { name: "SQL 1 of 4 4 of 4 4 of 4" })).toBeAttached();
+    await expect(both.getByRole("row", { name: "Excel 0 of 4 3 of 4 3 of 4" })).toBeAttached();
+    await expect(both.getByRole("row", { name: "Data visualisation 0 of 4 0 of 4 3 of 4" })).toBeAttached();
+    await page.getByRole("button", { name: "After the projects" }).click();
+    await expect(page.getByText("If you do the suggested projects.")).toBeVisible();
     expect(await listItems(page.getByRole("list", { name: "Level up next" }))).toEqual(["Data visualisation"]);
-    expect(await listItems(page.getByRole("list", { name: "In the bag" }))).toEqual(["SQL", "Excel", "Python or R"]);
+    expect(await listItems(page.getByRole("list", { name: "In the bag" }))).toEqual(["Python or R", "SQL", "Excel", "Statistics", "Dashboards (Power BI or Tableau)"]);
 
-    // Neither chart widens the page on a small phone.
+    // The Projects page has no second radar, just a way back to this one.
+    await page.goto(`${base}?view=projects`);
+    await expect(page.locator("figure")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "See what these projects do for your skills" })).toBeVisible();
+
+    // The chart doesn't widen the page on a small phone.
     await page.setViewportSize({ width: 375, height: 812 });
-    for (const view of ["gaps", "projects"]) {
-      await page.goto(`${base}?view=${view}`);
-      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-      expect(overflow, view).toBe(false);
-    }
+    await page.goto(`${base}?view=gaps`);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(overflow).toBe(false);
   });
 
   test("pricing shows Free, Plus and Pro, each paid tier with its own waitlist", async ({ page }) => {
@@ -319,7 +337,7 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(plan.getByRole("listitem")).toHaveCount(3);
     await expect(plan.getByText(`Swapped idea ${limit}`, { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /^Swap/ })).toHaveCount(0);
-    await expect(page.getByRole("heading", { level: 2, name: "When you’ve finished your plan" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "See what these projects do for your skills" })).toBeVisible();
   });
 
   test("the plan: keeping it early ends the swaps", async ({ page }) => {
