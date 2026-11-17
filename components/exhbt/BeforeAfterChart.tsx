@@ -1,32 +1,52 @@
 import type { KeyResult } from "@/lib/exhbt";
-import { SERIES_DARK, SERIES_LIGHT } from "@/components/charts/series";
+import { chartSummary, fmtValue } from "@/lib/exhbt/charts";
+import { CHART_SOFT, CHART_STRONG } from "@/components/charts/series";
 
 /**
  * Before/after dumbbell: one row per measure, a light dot (before) joined to a dark dot
  * (after). One hue, two shades (components/charts/series.ts). The light shade sits below
  * 3:1 on white, so every value is printed beside its dot, and a visually hidden table
- * carries the same data.
+ * carries the same data. The drawing is one image with a short summary for screen readers.
  * Built in HTML rather than SVG so text stays crisp and the layout reflows on phones.
+ *
+ * On an exhbt it is drawn through components/charts/Chart.tsx, which passes the values to show
+ * (for a graph with protected numbers, the changes or the index: lib/exhbt/charts.ts) and the
+ * note that explains them.
  */
 
-const BEFORE = SERIES_LIGHT;
-const AFTER = SERIES_DARK;
+const BEFORE = CHART_SOFT;
+const AFTER = CHART_STRONG;
 
-export function BeforeAfterChart({ data }: { data: KeyResult }) {
-  const unit = data.unit ?? "";
+export function BeforeAfterChart({
+  data,
+  summary,
+  note,
+  signed = false,
+  showChange = true,
+}: {
+  data: KeyResult;
+  /** What screen readers hear for the drawing; worked out from the data when left out. */
+  summary?: string;
+  /** A line under the graph, e.g. that the real figures aren't shared. */
+  note?: string | null;
+  /** Print a + on rises, for values that are already changes. */
+  signed?: boolean;
+  /** The % change on the right; off when the values are already changes. */
+  showChange?: boolean;
+}) {
   const values = data.rows.flatMap((r) => [r.before, r.after]);
   const lo0 = Math.min(...values);
   const hi0 = Math.max(...values);
   // Dots encode position, not length, so the scale needn't start at zero. Pad around the
   // data so outward labels have room on both sides.
-  const pad = Math.max((hi0 - lo0) * 0.7, hi0 * 0.15, 1);
-  const dMin = Math.max(0, lo0 - pad);
+  const pad = Math.max((hi0 - lo0) * 0.7, Math.abs(hi0) * 0.15, 1);
+  const dMin = lo0 >= 0 ? Math.max(0, lo0 - pad) : lo0 - pad;
   const dMax = hi0 + pad;
   const x = (v: number) => `${((v - dMin) / (dMax - dMin)) * 100}%`;
-  const fmt = (v: number) => `${Number.isInteger(v) ? v : v.toFixed(1)}${unit}`;
+  const fmt = (v: number) => fmtValue(v, data.unit, signed);
 
   return (
-    <figure className="m-0">
+    <figure className="m-0" data-chart>
       <figcaption className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <span className="text-sm font-semibold text-ink">{data.title}</span>
         <span className="flex gap-4 text-xs text-graphite" aria-hidden>
@@ -35,33 +55,40 @@ export function BeforeAfterChart({ data }: { data: KeyResult }) {
         </span>
       </figcaption>
 
-      <div className="mt-3 space-y-3" aria-hidden>
-        {data.rows.map((r) => {
+      <div role="img" aria-label={summary ?? chartSummary({ kind: "beforeAfter", ...data })} className="@container mt-3 space-y-3">
+        {data.rows.map((r, i) => {
           const lo = Math.min(r.before, r.after);
           const hi = Math.max(r.before, r.after);
           const change = r.after - r.before;
           const improved = data.lowerIsBetter ? change < 0 : change > 0;
           const pct = r.before === 0 ? 0 : Math.round((Math.abs(change) / r.before) * 100);
           return (
-            <div key={r.label} className="grid grid-cols-[5.5rem_1fr_3.5rem] items-center gap-3 sm:grid-cols-[6.5rem_1fr_4rem]">
-              <span className="text-[0.85rem] text-graphite">{r.label}</span>
+            <div
+              key={`${r.label}-${i}`}
+              className={`grid items-center gap-x-3 gap-y-0.5 ${showChange ? "grid-cols-[1fr_3.5rem] @md:grid-cols-[6.5rem_1fr_4rem]" : "grid-cols-1 @md:grid-cols-[6.5rem_1fr]"}`}
+            >
+              <span className={`text-[0.85rem] text-graphite @md:col-span-1 ${showChange ? "col-span-2" : ""}`}>{r.label}</span>
               <div className="relative h-7">
                 {/* Baseline: recessive. */}
                 <span className="absolute top-1/2 right-0 left-0 h-px bg-line" />
                 {/* Connector between the two values. */}
-                <span className="absolute top-1/2 h-[2px] -translate-y-1/2 rounded-full bg-[#a5e6d0]" style={{ left: x(lo), width: `calc(${x(hi)} - ${x(lo)})` }} />
+                <span className="absolute top-1/2 h-[2px] -translate-y-1/2 rounded-full bg-[var(--chart-link,#a5e6d0)]" style={{ left: x(lo), width: `calc(${x(hi)} - ${x(lo)})` }} />
                 {/* Labels sit outside the pair (lower value left, higher right), so they never collide. */}
                 <Dot left={x(r.before)} side={r.before <= r.after ? "left" : "right"} color={BEFORE} title={`${data.beforeLabel}: ${fmt(r.before)}`} label={fmt(r.before)} />
                 <Dot left={x(r.after)} side={r.after < r.before ? "left" : "right"} color={AFTER} title={`${data.afterLabel}: ${fmt(r.after)}`} label={fmt(r.after)} />
               </div>
-              <span className={`text-right text-[0.8rem] font-semibold ${improved ? "text-ink" : "text-graphite"}`}>
-                {change < 0 ? "−" : "+"}
-                {pct}%
-              </span>
+              {showChange && (
+                <span className={`text-right text-[0.8rem] font-semibold ${improved ? "text-ink" : "text-graphite"}`}>
+                  {change < 0 ? "−" : "+"}
+                  {pct}%
+                </span>
+              )}
             </div>
           );
         })}
       </div>
+
+      {note && <p className="mt-2 text-xs text-graphite">{note}</p>}
 
       {/* The wrapper clips the table: a table ignores sr-only's 1px width and would widen the page. */}
       <div className="sr-only">

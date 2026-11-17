@@ -5,9 +5,10 @@ on:
   pull_request:
 
 jobs:
+  # Docs, theme, types, lint and the production build.
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,14 +16,33 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run check:docs
+      - run: npm run check:theme
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
+
+  # The end-to-end suite, split across three runners (by spec file), each with its own dev server.
+  # One runner took close to the old 25-minute limit and then went past it as the suite grew.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/3
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7

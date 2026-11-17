@@ -21,4 +21,4 @@ Why only buttons: Astryx is in beta, its stylesheet adds about 42 KB (compressed
 Costs to know: the theme's built files are committed and `npm run check` fails when they're stale; a major Astryx release may need its codemods (`npm run astryx -- upgrade`).
 
 ## Haiku only
-Every AI call uses Claude Haiku (`claude-haiku-5-5`), named once in `lib/ai/model.ts`. `npm run check:docs` fails if the app's code names any other Claude model. The key itself is the `ANTHROPIC_API_KEY` secret on the Cloudflare Worker; without it the live site refuses to generate, and it never falls back to placeholder roadmaps.
+Every AI call uses Claude Haiku (`claude-haiku-5-5`), named once in `lib/ai/model.ts`. `npm run check:docs` fails if the app's code names any other Claude model. The key itself is the `ANTHROPIC_API_KEYS` secret on the Cloudflare Worker; without it the live site refuses to generate, and it never falls back to placeholder roadmaps.

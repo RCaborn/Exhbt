@@ -10,7 +10,7 @@ export async function joinWaitlist(_prev: WaitlistState, form: FormData): Promis
   const email = z.email().safeParse(String(form.get("email") ?? "").trim().toLowerCase());
   if (!email.success) return { error: "Enter a valid email address." };
   const raw = String(form.get("interest") ?? "");
-  const interest: WaitlistInterest = raw === "plus" || raw === "university" ? raw : "premium";
+  const interest: WaitlistInterest = raw === "premium" || raw === "university" ? raw : "max";
   const source = String(form.get("source") ?? "site").slice(0, 40);
   try {
     const store = getStore();

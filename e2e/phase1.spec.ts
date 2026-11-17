@@ -23,69 +23,76 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(page.getByText("Step 2 of 3")).toBeVisible();
   });
 
-  test("home: search-first hero, example exhbt further down, no removed sections", async ({ page }) => {
+  test("home: search-first hero, one real exhbt further down, no tiles", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText("No card")).toHaveCount(0);
     await expect(page.getByText(/A CV says .analytical.\. An exhbt/)).toHaveCount(0);
     await expect(page.getByText("The same layout, every time")).toHaveCount(0);
-    // A portfolio of example tiles sits below the hero; each tile has its methodology strip.
-    const tiles = page.locator("#example-portfolio > li");
-    await expect(tiles).toHaveCount(4);
+    // One example exhbt below the hero, drawn by the real exhbt page in a frame at its address; the
+    // old tile grid, its catalogue numbers and the editor excerpt are gone (Rory, 16 Nov 2026).
+    const example = page.locator("section[aria-labelledby=one-exhbt]");
+    await expect(example.getByRole("heading", { level: 2, name: "One project, one page" })).toBeVisible();
     const heroBottom = (await page.locator("form:has(#start-hero)").boundingBox())!;
-    expect((await tiles.first().boundingBox())!.y).toBeGreaterThan(heroBottom.y + heroBottom.height);
-    await expect(tiles.first().getByRole("list", { name: "Methodology" })).toBeVisible();
+    expect((await example.boundingBox())!.y).toBeGreaterThan(heroBottom.y + heroBottom.height);
+    await expect(example.locator("[data-exhbt-page]")).toHaveCount(1);
+    await expect(example.getByText(`${portfolioHost("amara")}/gp-reminders`)).toBeVisible();
+    await expect(page.locator("#example-portfolio, [data-catalogue]")).toHaveCount(0);
+    await expect(page.getByText(/EX·\d/)).toHaveCount(0);
+    await expect(example.getByRole("link", { name: "Open this exhbt" })).toHaveAttribute("href", "/demo/gp-reminders");
   });
 
   test("home: an example skills chart, labelled as fictional, with its data in a table", async ({ page }) => {
     await page.goto("/");
     const section = page.locator("section[aria-labelledby=gaps-example]");
     await expect(section.getByRole("heading", { level: 2 })).toBeVisible();
-    await expect(section.getByText("Example: Amara is fictional.").first()).toBeVisible();
-    const now = section.getByRole("table", { name: /Amara now/ });
-    await expect(now.getByRole("row", { name: /Dashboards 0 of 4 3 of 4/ })).toBeAttached();
-    const after = section.getByRole("table", { name: /After the two suggested projects/ });
-    await expect(after.getByRole("row", { name: /Dashboards 0 of 4 3 of 4/ })).toBeAttached();
-    // Excel isn't covered by a project, so it stays where it is.
-    await expect(after.getByRole("row", { name: /Excel 2 of 4 2 of 4/ })).toBeAttached();
+    await expect(section.getByText("Example: Amara is fictional.")).toBeVisible();
+    // One radar, not two. Its table holds Now, After the projects and what the job asks for.
+    await expect(section.getByRole("table")).toHaveCount(1);
+    const table = section.getByRole("table", { name: /Amara/ });
+    await expect(table.getByRole("row", { name: "Skill Now After the projects What the job asks for" })).toBeAttached();
+    await expect(table.getByRole("row", { name: "Dashboards 0 of 4 2 of 4 2 of 4" })).toBeAttached();
+    // Statistics isn't covered by a project, so it stays where it is.
+    await expect(table.getByRole("row", { name: "Statistics 2 of 4 2 of 4 3 of 4" })).toBeAttached();
 
-    // The good and the bad, in words: biggest shortfalls first, then what already meets the job.
-    expect(await listItems(section.getByRole("list", { name: "Level up next" }).first())).toEqual(["Dashboards", "SQL", "Excel"]);
-    expect(await listItems(section.getByRole("list", { name: "In the bag" }).first())).toEqual(["Python", "Statistics"]);
-    // After the projects, only Excel is still short.
-    expect(await listItems(section.getByRole("list", { name: "Level up next" }).nth(1))).toEqual(["Excel"]);
-    // No numbers on the charts.
+    // Now: everything short of the job is listed, biggest shortfall first, then what already meets it.
+    expect(await listItems(section.getByRole("list", { name: "Level up next" }))).toEqual(["SQL", "Dashboards", "Data visualisation", "Statistics"]);
+    expect(await listItems(section.getByRole("list", { name: "In the bag" }))).toEqual(["Python", "Excel"]);
+    // After the projects, only Statistics is still short.
+    await section.getByRole("button", { name: "After the projects" }).click();
+    expect(await listItems(section.getByRole("list", { name: "Level up next" }))).toEqual(["Statistics"]);
+    expect(await listItems(section.getByRole("list", { name: "In the bag" }))).toEqual(["Python", "SQL", "Data visualisation", "Excel", "Dashboards"]);
+    // No numbers on the chart.
     await expect(section.getByText(/\b(now|job|you) \d\b|\d → \d/)).toHaveCount(0);
   });
 
-  test("demo portfolio: header, tiles, and a tile opens the full exhbt with its flow diagram", async ({ page }) => {
+  test("demo portfolio: the real portfolio home, and a card opens the full exhbt with its flowchart", async ({ page }) => {
     await page.goto("/demo");
+    await expect(page.getByText("Example portfolio.")).toBeVisible();
     await expect(page.getByRole("heading", { level: 1, name: "Amara Okafor" })).toBeVisible();
-    await expect(page.getByText(portfolioHost("amara"))).toBeVisible();
-    await page.getByRole("link", { name: /Forecasting A&E waiting times/ }).click();
+    await expect(page.locator("[data-portfolio-home]")).toHaveCount(1);
+    await expect(page.getByText(portfolioHost("amara"), { exact: true })).toBeVisible();
+    await page.getByRole("link", { name: /Can open NHS data forecast A&E/ }).click();
     await expect(page).toHaveURL(/\/demo\/ae-forecast$/);
-    await expect(page.getByRole("heading", { level: 1, name: /Forecasting A&E/ })).toBeVisible();
+    await expect(page.getByText("Example exhbt.")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /Can open NHS data forecast A&E/ })).toBeVisible();
     await expect(page.getByRole("list", { name: "Methodology" }).getByRole("listitem")).toHaveCount(5);
   });
 
-  test("brand: logo in the header, catalogue numbers, seal links to the checks, sign-off", async ({ page }) => {
+  test("brand: logo in the header, no catalogue numbers on the new pages, checks link to the guide", async ({ page }) => {
     await page.goto("/demo");
     await expect(page.getByRole("banner").getByRole("link", { name: "Exhbt home" })).toBeVisible();
-    await expect(page.locator("[data-catalogue]")).toHaveText(["EX·01", "EX·02", "EX·03", "EX·04"]);
-    const signOff = page.getByRole("complementary", { name: "Made with exhbt" });
-    await expect(signOff.getByRole("link", { name: /Build your own roadmap/ })).toHaveAttribute("href", "/start");
+    // The portfolio home and the exhbt page carry no catalogue numbers (decisions 0016 and 0022).
+    await expect(page.locator("[data-catalogue]")).toHaveCount(0);
+    // The demo sits inside the marketing layout, so it has the site footer and no second sign-off.
+    await expect(page.getByRole("complementary", { name: "Made with exhbt" })).toHaveCount(0);
 
-    // The full exhbt keeps its number, and its seal explains itself on the employer guide.
+    // The full exhbt leads back to the portfolio, and its check explains itself on the employer guide.
     await page.goto("/demo/ae-forecast");
-    await expect(page.locator("article [data-catalogue]")).toHaveText("EX·02");
-    await expect(page.getByRole("link", { name: /Amara Okafor’s portfolio/ })).toHaveAttribute("href", "/demo");
+    await expect(page.locator("article [data-catalogue]")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "All of Amara's work" }).first()).toHaveAttribute("href", "/demo");
     await page.getByRole("link", { name: /Checked by exhbt/ }).click();
     await expect(page).toHaveURL(/\/how-to-read-an-exhbt#checks$/);
     await expect(page.locator("#checks")).toBeInViewport();
-  });
-
-  test("footer links to the quick-start page", async ({ page }) => {
-    await page.goto("/pricing");
-    await expect(page.getByRole("contentinfo").getByRole("link", { name: "Quick start" })).toHaveAttribute("href", "/start");
   });
 
   test("builder validates each step and keeps answers on Back", async ({ page }) => {
@@ -141,19 +148,26 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(page.getByRole("list", { name: "Gaps to close" }).getByText("SQL", { exact: true })).toBeVisible();
   });
 
-  test("the skills radar shows the gaps, then where the projects would take you", async ({ page }) => {
+  test("the skills radar is one chart: now against the job, with a switch to after the projects once they're shown", async ({ page }) => {
     await buildRoadmap(page, { role: "Junior data analyst", withCv: true });
     await waitForResult(page);
     const base = page.url().split("?")[0];
+    const radar = () => page.locator("figure");
 
-    // Development placeholder roadmap: SQL shows some evidence (1), Excel none, needed level 3.
+    // Before the details gate there is no plan to look at, so no switch: Now only.
+    // Development placeholder roadmap: the job asks 4, 3, 3, 2, 2, 1. SQL shows some evidence (1), Excel and Data visualisation none.
     await page.goto(`${base}?view=gaps`);
-    const now = page.getByRole("table", { name: "You now, against what the job asks for" });
-    await expect(now.getByRole("row", { name: "SQL 1 of 4 3 of 4" })).toBeAttached();
-    await expect(now.getByRole("row", { name: "Excel 0 of 4 3 of 4" })).toBeAttached();
+    await expect(radar().getByRole("table")).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "After the projects" })).toHaveCount(0);
+    const table = page.getByRole("table", { name: "You, against what the job asks for" });
+    await expect(table.getByRole("row", { name: "Skill Now What the job asks for" })).toBeAttached();
+    await expect(table.getByRole("row", { name: "SQL 1 of 4 4 of 4" })).toBeAttached();
+    await expect(table.getByRole("row", { name: "Excel 0 of 4 3 of 4" })).toBeAttached();
     await expect(page.getByText(/Skills picked by AI/).first()).toBeVisible();
-    // Biggest shortfalls first (Excel and Data visualisation at 0, SQL at 1), then the skills already at the level.
-    expect(await listItems(page.getByRole("list", { name: "Level up next" }))).toEqual(["Excel", "Data visualisation", "SQL"]);
+    // The job's levels vary: it is not a regular shape.
+    expect(await radar().getByRole("row").count()).toBeGreaterThan(3);
+    // Every skill below the job is listed, biggest shortfall first, then every skill that meets it.
+    expect(await listItems(page.getByRole("list", { name: "Level up next" }))).toEqual(["SQL", "Excel", "Data visualisation"]);
     expect(await listItems(page.getByRole("list", { name: "In the bag" }))).toEqual([
       "Python or R",
       "Statistics",
@@ -162,35 +176,44 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     // No numbers on the chart: the levels live in the hidden table only.
     await expect(page.locator("figure").getByText(/\b(now|job|you) \d\b|\d → \d/)).toHaveCount(0);
 
-    // The placeholder projects close SQL and Excel, so both rise to 3; Data visualisation stays at 0.
+    // The placeholder projects close SQL and Excel, so each rises to what the job asks (4 and 3); Data visualisation stays at 0.
     await unlockProjects(page, { email: uniqueEmail("radar") });
-    await expect(page.getByRole("heading", { level: 2, name: "When you’ve finished these projects" })).toBeVisible();
-    const after = page.getByRole("table", { name: "You now, against where the projects would take you" });
-    await expect(after.getByRole("row", { name: "SQL 1 of 4 3 of 4" })).toBeAttached();
-    await expect(after.getByRole("row", { name: "Excel 0 of 4 3 of 4" })).toBeAttached();
-    await expect(after.getByRole("row", { name: "Data visualisation 0 of 4 0 of 4" })).toBeAttached();
-    // Judged on the after levels: SQL and Excel join the bag; Data visualisation is still short.
+    await expect(page.getByRole("button", { name: /^Swap/ }).first()).toBeVisible();
+    await page.goto(`${base}?view=gaps`);
+    await expect(page.getByRole("button", { name: "Now" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "After the projects" })).toHaveAttribute("aria-pressed", "false");
+    const both = page.getByRole("table", { name: "You, against what the job asks for" });
+    await expect(both.getByRole("row", { name: "Skill Now After the projects What the job asks for" })).toBeAttached();
+    await expect(both.getByRole("row", { name: "SQL 1 of 4 4 of 4 4 of 4" })).toBeAttached();
+    await expect(both.getByRole("row", { name: "Excel 0 of 4 3 of 4 3 of 4" })).toBeAttached();
+    await expect(both.getByRole("row", { name: "Data visualisation 0 of 4 0 of 4 3 of 4" })).toBeAttached();
+    await page.getByRole("button", { name: "After the projects" }).click();
+    await expect(page.getByText("If you do the suggested projects.")).toBeVisible();
     expect(await listItems(page.getByRole("list", { name: "Level up next" }))).toEqual(["Data visualisation"]);
-    expect(await listItems(page.getByRole("list", { name: "In the bag" }))).toEqual(["SQL", "Excel", "Python or R"]);
+    expect(await listItems(page.getByRole("list", { name: "In the bag" }))).toEqual(["Python or R", "SQL", "Excel", "Statistics", "Dashboards (Power BI or Tableau)"]);
 
-    // Neither chart widens the page on a small phone.
+    // The Projects page has no second radar, just a way back to this one.
+    await page.goto(`${base}?view=projects`);
+    await expect(page.locator("figure")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "See what these projects do for your skills" })).toBeVisible();
+
+    // The chart doesn't widen the page on a small phone.
     await page.setViewportSize({ width: 375, height: 812 });
-    for (const view of ["gaps", "projects"]) {
-      await page.goto(`${base}?view=${view}`);
-      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-      expect(overflow, view).toBe(false);
-    }
+    await page.goto(`${base}?view=gaps`);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(overflow).toBe(false);
   });
 
   test("pricing shows Free, Plus and Pro, each paid tier with its own waitlist", async ({ page }) => {
-    await page.goto("/pricing", { waitUntil: "networkidle" });
-    for (const tier of [PLAN_NAMES.free, PLAN_NAMES.plus, PLAN_NAMES.premium]) {
+    // The live site's waitlist version (Phase 2 off); in development ?preview=waitlist shows it.
+    await page.goto("/pricing?preview=waitlist", { waitUntil: "networkidle" });
+    for (const tier of [PLAN_NAMES.free, PLAN_NAMES.premium, PLAN_NAMES.max]) {
       await expect(page.getByRole("heading", { level: 2, name: tier, exact: true })).toBeVisible();
     }
-    await page.locator("#waitlist-pricing-plus").fill(`wait+${Date.now()}@example.com`);
-    await page.locator("section#plus").getByRole("button", { name: "Join the waitlist" }).click();
-    await expect(page.locator("section#plus").getByText("You’re on the list.")).toBeVisible();
+    await page.locator("#waitlist-pricing-premium").fill(`wait+${Date.now()}@example.com`);
+    await page.locator("section#premium").getByRole("button", { name: "Join the waitlist" }).click();
+    await expect(page.locator("section#premium").getByText("You’re on the list.")).toBeVisible();
   });
 
   test("roadmap appears straight away, clicks through to the gate, and a copy is emailed", async ({ page, browser }) => {
@@ -202,7 +225,7 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     const resultUrl = page.url().split("?")[0];
 
     // Click through the free views with the Next button, up to the project-ideas gate.
-    for (const heading of ["Gaps to close", "Already in your CV", "Your project ideas are ready"]) {
+    for (const heading of ["Gaps to close", "Already in your CV", "Your project ideas"]) {
       await page.locator("a.next-view").click();
       await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
       await expect(page.getByRole("heading", { level: 1, name: heading })).toBeInViewport();
@@ -267,7 +290,7 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await unlockProjects(page, { email });
     const noun = limit === 1 ? "roadmap" : "roadmaps";
     await expect(page.getByText(`You've used this month's ${limit} free ${noun}.`)).toBeVisible();
-    await expect(page.getByRole("heading", { level: 1, name: "Your project ideas are ready" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Your project ideas" })).toBeVisible();
   });
 
   test("the gate prefills name, email and LinkedIn from the CV, and keeps what's typed on an error", async ({ page }) => {
@@ -323,7 +346,7 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(plan.getByRole("listitem")).toHaveCount(3);
     await expect(plan.getByText(`Swapped idea ${limit}`, { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /^Swap/ })).toHaveCount(0);
-    await expect(page.getByRole("heading", { level: 2, name: "When you’ve finished your plan" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "See what these projects do for your skills" })).toBeVisible();
   });
 
   test("the plan: keeping it early ends the swaps", async ({ page }) => {

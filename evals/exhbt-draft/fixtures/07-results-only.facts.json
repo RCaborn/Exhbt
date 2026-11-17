@@ -1,0 +1,20 @@
+{
+  "fixture": "07-results-only",
+  "shape": "A results spreadsheet only (CSV, three rows) plus a one-paragraph note in the notes box.",
+  "tests": "Drafting from thin material: no invented significance tests, user numbers or business outcomes; findings come straight from the table.",
+  "files": ["07-results-only.csv"],
+  "notesFile": "07-results-only.notes.txt",
+  "link": null,
+  "expect": {"headlineNumber":true,"chart":true,"noNumbers":false},
+  "keyFacts": [
+    {"id":"test","fact":"A four-week A/B test of when a revision app sends study reminders, at an ed-tech start-up internship.","match":["A/B","reminder"]},
+    {"id":"completion","fact":"Evening reminders gave the highest completion rate: 46.7% against 38.1% with no reminder.","match":[["46.7","38.1"],"46.7"]},
+    {"id":"sessions","fact":"Sessions per week 3.1 with evening reminders against 2.3 control.","match":[["3.1","2.3"],"3.1"]},
+    {"id":"tools","fact":"Analysed in Python with pandas.","match":["Python","pandas"]}
+  ],
+  "forbidden": [
+    {"id":"significance","why":"No significance test is in the material.","match":["significant","p-value","p <","p<","confidence interval"]},
+    {"id":"adoption","why":"The note does not say the team adopted or shipped anything.","match":["adopted","rolled out","shipped","launched"]}
+  ],
+  "sourceNumbers": ["412","2.3","38.1%","14.2","0.0%","08","00","398","2.6","41.0%","15.0","4.8%","19","30","405","3.1","46.7%","17.9","3.2%"]
+}

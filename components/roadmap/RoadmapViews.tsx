@@ -2,23 +2,20 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, Mail } from "lucide-react";
 import { WaitlistForm } from "@/components/waitlist/WaitlistForm";
 import { PLAN_NAMES } from "@/lib/entitlements";
-import { SkillHighlights } from "@/components/charts/SkillHighlights";
+import { isPhase2Enabled } from "@/lib/site";
+import type { IdeasStatus } from "@/lib/roadmap/ideas";
 import { SkillRadar } from "@/components/charts/SkillRadar";
+import { BuildThis, type BuildState } from "@/components/roadmap/BuildThis";
 import { IdeaCard } from "@/components/roadmap/IdeaCard";
 import { PlanEditor } from "@/components/roadmap/PlanEditor";
+import { SaveIdea, type SaveState } from "@/components/roadmap/SaveIdea";
+import { IdeasPending } from "@/components/roadmap/IdeasPending";
 import { ProjectsGate } from "@/components/roadmap/ProjectsGate";
 import type { Roadmap } from "@/lib/ai/schemas";
 import type { Contact } from "@/lib/cv-contact";
 import type { ProjectIdea } from "@/lib/store";
 import { SKILLS_SOURCE_NOTE } from "@/lib/jobs/claim";
-import {
-  chartableSkills,
-  highlights,
-  nowVersusAfter,
-  nowVersusNeeded,
-  skillsAfterProjects,
-  sortGapsByShortfall,
-} from "@/lib/roadmap/skills";
+import { chartableSkills, radarSkills, sortGapsByShortfall } from "@/lib/roadmap/skills";
 import { Button } from "@/components/ui/Button";
 
 /**
@@ -41,7 +38,7 @@ export function parseView(v: string | undefined): ViewKey {
 /** The Projects page: the gate (no email yet), the plan being shaped, or the settled plan. */
 export type ProjectsState =
   | { unlocked: false; prefill: Contact; signedInEmail: string | null }
-  | { unlocked: true; ideas: ProjectIdea[]; swapsLeft: number; done: boolean };
+  | { unlocked: true; ideas: ProjectIdea[]; ideasStatus: IdeasStatus; swapsLeft: number; done: boolean };
 
 type Props = {
   id: string;
@@ -50,10 +47,19 @@ type Props = {
   emailedTo: string | null;
   signedIn: boolean;
   projects: ProjectsState;
+  /** Building an idea as an exhbt (Phase 2 only; left out when it's off). */
+  build?: BuildState;
+  /** Saving ideas to the person's list (signed in, Phase 2 only; locked on Free). */
+  save?: SaveState;
+  /**
+   * The plan's ideas, for the Gaps radar's "After the projects" view. Empty until the details gate
+   * is filled in and the ideas exist: the radar then shows Now only (docs/decisions/0023).
+   */
+  planIdeas?: ProjectIdea[];
 };
 
 /** The roadmap as five short click-through screens. Each view is its own URL (?view=). */
-export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn, projects }: Props) {
+export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn, projects, build, save, planIdeas = [] }: Props) {
   const index = VIEWS.findIndex((v) => v.key === view);
   const href = (k: ViewKey) => `/roadmap/${id}?view=${k}`;
   const prev = VIEWS[index - 1];
@@ -87,8 +93,8 @@ export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn, projects 
 
         <div className="mt-6 rounded-[24px] border border-line bg-surface p-6 shadow-pack sm:p-10">
           {view === "overview" && <Overview roadmap={roadmap} role={role} href={href} />}
-          {view === "gaps" && <Gaps roadmap={roadmap} role={role} />}
-          {view === "projects" && <Projects id={id} roadmap={roadmap} role={role} state={projects} />}
+          {view === "gaps" && <Gaps roadmap={roadmap} role={role} planIdeas={planIdeas} />}
+          {view === "projects" && <Projects id={id} roadmap={roadmap} role={role} state={projects} build={build} save={save} />}
           {view === "strengths" && <Strengths roadmap={roadmap} role={role} />}
           {view === "next" && <Next emailedTo={emailedTo} signedIn={signedIn} id={id} unlocked={projects.unlocked} />}
 
@@ -130,7 +136,7 @@ function Overview({ roadmap, role, href }: { roadmap: Roadmap; role: string; hre
       {roadmap.summary && <p className="mt-5 max-w-[38rem] text-lg text-graphite">{roadmap.summary}</p>}
       <ul className="mt-8 divide-y divide-line border-y border-line">
         <SummaryRow href={href("gaps")} label={n(roadmap.gaps.length, "gap to close", "gaps to close")} />
-        <SummaryRow href={href("projects")} label={n(roadmap.projects.length, "project to prove them", "projects to prove them")} />
+        <SummaryRow href={href("projects")} label="Project ideas to prove them" />
         <SummaryRow href={href("strengths")} label={n(roadmap.strengths.length, "strength already in your CV", "strengths already in your CV")} />
       </ul>
     </>
@@ -148,26 +154,20 @@ function SummaryRow({ href, label }: { href: string; label: string }) {
   );
 }
 
-function Gaps({ roadmap, role }: { roadmap: Roadmap; role: string }) {
+function Gaps({ roadmap, role, planIdeas }: { roadmap: Roadmap; role: string; planIdeas: ProjectIdea[] }) {
   const skills = chartableSkills(roadmap);
-  const marked = skills ? highlights(skills) : null;
+  const radar = skills ? radarSkills(skills, { projects: planIdeas }) : null;
+  // The "After the projects" view needs suggested projects that move at least one level.
+  const showAfter = Boolean(radar?.some((s) => s.after > s.now));
   const gaps = skills ? sortGapsByShortfall(roadmap.gaps, skills) : roadmap.gaps;
   return (
     <>
       <Context role={role} />
       <h1 className="mt-2">Gaps to close</h1>
       <p className="mt-3 text-graphite">Skills this role asks for that your CV doesn&rsquo;t show yet, or not enough.</p>
-      {skills && marked && (
+      {radar && (
         <div className="mt-8">
-          <SkillRadar
-            title="You now, against what the job asks for"
-            fromLabel="You now"
-            toLabel="What the job asks for"
-            points={nowVersusNeeded(skills)}
-            note={SKILLS_SOURCE_NOTE}
-            highlight={marked}
-          />
-          <SkillHighlights up={marked.up} bag={marked.bag} />
+          <SkillRadar title="You, against what the job asks for" skills={radar} showAfter={showAfter} note={SKILLS_SOURCE_NOTE} />
         </div>
       )}
       {roadmap.gaps.length === 0 ? (
@@ -191,18 +191,44 @@ function Gaps({ roadmap, role }: { roadmap: Roadmap; role: string }) {
   );
 }
 
-function Projects({ id, roadmap, role, state }: { id: string; roadmap: Roadmap; role: string; state: ProjectsState }) {
+function Projects({
+  id,
+  roadmap,
+  role,
+  state,
+  build,
+  save,
+}: {
+  id: string;
+  roadmap: Roadmap;
+  role: string;
+  state: ProjectsState;
+  build?: BuildState;
+  save?: SaveState;
+}) {
   if (!state.unlocked) {
     return (
       <>
         <Context role={role} />
-        <h1 className="mt-2">Your project ideas are ready</h1>
+        <h1 className="mt-2">Your project ideas</h1>
         <p className="mt-3 text-graphite">Tell us who you are and we&rsquo;ll email you a copy.</p>
         <ProjectsGate id={id} prefill={state.prefill} signedInEmail={state.signedInEmail} />
       </>
     );
   }
-  const { ideas, swapsLeft, done } = state;
+  const { ideas, ideasStatus, swapsLeft, done } = state;
+  // The ideas are written in the background (docs/decisions/0019). Until they exist there is a
+  // progress state, or a way to try again, and never an "empty" page.
+  if (ideasStatus !== "ready") {
+    return (
+      <>
+        <Context role={role} />
+        <h1 className="mt-2">Projects that would prove them</h1>
+        <p className="mt-3 text-graphite">Three ideas, each ending in something real you can attach as evidence.</p>
+        <IdeasPending id={id} initial={ideasStatus} />
+      </>
+    );
+  }
   return (
     <>
       <Context role={role} />
@@ -210,51 +236,43 @@ function Projects({ id, roadmap, role, state }: { id: string; roadmap: Roadmap; 
       <p className="mt-3 text-graphite">
         {done ? "Each one ends with something real you can attach as evidence." : "Swap any that don’t fit, then keep your plan."}
       </p>
-      {ideas.length === 0 ? (
-        <Empty>We didn&rsquo;t have enough to suggest projects. Try again with more detail about your experience.</Empty>
-      ) : done ? (
+      {done ? (
         <ol aria-label="Your plan" className="mt-8 space-y-4">
           {ideas.map((p) => (
             <li key={p.id}>
-              <IdeaCard idea={p} />
+              <IdeaCard
+                idea={p}
+                footer={
+                  (build || save) && (
+                    <div className="flex flex-wrap items-center gap-3">
+                      {build && <BuildThis build={build} roadmapId={id} ideaId={p.id} title={p.title} />}
+                      {save && <SaveIdea save={save} roadmapId={id} ideaId={p.id} title={p.title} />}
+                    </div>
+                  )
+                }
+              />
             </li>
           ))}
         </ol>
       ) : (
-        <PlanEditor id={id} ideas={ideas} swapsLeft={swapsLeft} />
+        <PlanEditor id={id} ideas={ideas} swapsLeft={swapsLeft} build={build} save={save} />
       )}
-      <AfterProjects roadmap={roadmap} ideas={ideas} done={done} />
+      {save && (
+        <p className="mt-6 text-sm text-graphite">
+          <Link href="/roadmap/saved" className="link font-semibold text-ink">
+            Saved ideas
+          </Link>{" "}
+          from all your roadmaps.
+        </p>
+      )}
+      {chartableSkills(roadmap) && (
+        <p className="mt-8 text-graphite">
+          <Link href={`/roadmap/${id}?view=gaps`} className="link font-semibold text-ink">
+            See what these projects do for your skills
+          </Link>
+        </p>
+      )}
     </>
-  );
-}
-
-/** The same radar again, showing where finishing the plan's projects would take them. */
-function AfterProjects({ roadmap, ideas, done }: { roadmap: Roadmap; ideas: ProjectIdea[]; done: boolean }) {
-  const skills = chartableSkills(roadmap);
-  if (!skills) return null;
-  const chosen = { projects: ideas };
-  const points = nowVersusAfter(skills, chosen);
-  if (!points.some((p) => p.to > p.from)) return null;
-  // The lists judge the after-projects levels against what the job asks for.
-  const marked = highlights(skillsAfterProjects(skills, chosen));
-  return (
-    <section aria-labelledby="after-projects" className="mt-10 border-t border-line pt-8">
-      <h2 id="after-projects" className="">
-        {done ? "When you’ve finished your plan" : "When you’ve finished these projects"}
-      </h2>
-      <p className="mt-2 max-w-[38rem] text-graphite">Where you&rsquo;d stand once they&rsquo;re done.</p>
-      <div className="mt-6">
-        <SkillRadar
-          title="You now, against where the projects would take you"
-          fromLabel="You now"
-          toLabel="After the projects"
-          points={points}
-          note={SKILLS_SOURCE_NOTE}
-          highlight={marked}
-        />
-        <SkillHighlights up={marked.up} bag={marked.bag} />
-      </div>
-    </section>
   );
 }
 
@@ -313,14 +331,32 @@ function Next({ emailedTo, signedIn, id, unlocked }: { emailedTo: string | null;
 
       <div className="mt-10 rounded-[16px] bg-ink p-6 text-white sm:p-8">
         <h2 className="">When a project is done, make it count</h2>
-        <p className="mt-3 max-w-[34rem] text-[#c9cbcf]">
-          {PLAN_NAMES.plus} hosts more exhbts on your own link, and helps draft them. {PLAN_NAMES.premium} adds a
-          custom link for each job you apply to, with your best-fit projects, and an originality check when you
-          publish. Both open soon.
-        </p>
-        <div className="mt-6">
-          <WaitlistForm source="roadmap-next" interest="premium" defaultEmail={emailedTo ?? ""} tone="dark" />
-        </div>
+        {isPhase2Enabled() ? (
+          <>
+            <p className="mt-3 max-w-[34rem] text-[#c9cbcf]">
+              Turn a finished project into an exhbt: upload your notes or files and we draft it, you check it, and it goes on your own link.
+              {" "}{PLAN_NAMES.max} adds a custom link for each job you apply to.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+              <Button href="/exhbts/new" variant="primary" size="lg">
+                Make an exhbt
+              </Button>
+              <Link href="/account/billing" className="link font-semibold text-white">
+                See the plans
+              </Link>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="mt-3 max-w-[34rem] text-[#c9cbcf]">
+              {PLAN_NAMES.premium} drafts your exhbts from your files and puts them on your own link. {PLAN_NAMES.max} adds a
+              custom link for each job you apply to, with your best-fit projects. Both include an originality check when you publish (coming soon), and both open soon.
+            </p>
+            <div className="mt-6">
+              <WaitlistForm source="roadmap-next" interest="max" defaultEmail={emailedTo ?? ""} tone="dark" />
+            </div>
+          </>
+        )}
       </div>
 
       <p className="mt-8 text-graphite">

@@ -30,6 +30,8 @@
   /* Two typefaces only: Bricolage Grotesque for display, Inter for everything else.
      Figures use Inter with tabular numbers (.font-mono below). */
   --font-display: "Bricolage Grotesque Variable", "Inter", system-ui, sans-serif;
+  /* The wordmark's face, which a portfolio look's --font-display never changes (decision 0018). */
+  --font-brand: "Bricolage Grotesque Variable", "Inter", system-ui, sans-serif;
   --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "Inter", system-ui, sans-serif;
 
@@ -198,6 +200,369 @@
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone;
   }
+  /* The exhbt page (components/portfolio/ProjectView.tsx, decision 0022). Every colour, radius
+     and face on it is one of these --xp-* variables. Their defaults are the Exhbt look and sit on
+     :root, for the editor's preview, which has no look around it. On a portfolio a look sets the
+     --pf-* set once (themeStyle, decision 0018) and [data-look] below reads the --xp-* names from
+     it. What each one paints is in docs/decisions/0022-exhbt-page-layout.md. */
+  :root {
+    --xp-ground: var(--color-surface);
+    --xp-ink: var(--color-ink);
+    --xp-muted: var(--color-graphite);
+    --xp-rule: var(--color-line);
+    --xp-rule-strong: var(--color-ink);
+    --xp-card: var(--color-mist);
+    --xp-card-ink: var(--color-ink);
+    --xp-card-edge: transparent;
+    --xp-card-muted: var(--color-graphite);
+    /* Graphs sit on white, never mist: the lightest series step is below 2:1 on mist (DESIGN.md). */
+    --xp-figure: var(--color-surface);
+    --xp-figure-edge: var(--color-line);
+    --xp-figure-ink: var(--color-ink);
+    --xp-figure-muted: var(--color-graphite);
+    --xp-pill: var(--color-mist);
+    --xp-pill-ink: var(--color-ink);
+    --xp-pill-edge: transparent;
+    --xp-tick: var(--color-jade);
+    --xp-tick-ink: var(--color-surface);
+    --xp-link: var(--color-jade);
+    --xp-accent: var(--color-mint);
+    --xp-accent-hover: var(--color-mint-press);
+    --xp-accent-ink: var(--color-ink);
+    --xp-outline-ground: var(--color-surface);
+    --xp-outline-ink: var(--color-ink);
+    --xp-outline-edge: var(--color-line);
+    --xp-highlight: color-mix(in srgb, var(--color-mint) 42%, var(--color-surface));
+    --xp-highlight-ink: inherit;
+    --xp-flow-ground: var(--color-surface);
+    --xp-flow-ink: var(--color-ink);
+    --xp-flow-edge: var(--color-line);
+    --xp-flow-muted: var(--color-graphite);
+    --xp-flow-end: var(--color-ink);
+    --xp-flow-end-ink: var(--color-surface);
+    --xp-flow-end-soft: var(--color-on-ink);
+    --xp-arrow: var(--color-slate);
+    --xp-avatar: var(--color-mint);
+    --xp-avatar-ink: var(--color-ink);
+    --xp-avatar-edge: var(--color-ink);
+    --xp-radius-card: 20px;
+    --xp-radius-box: 12px;
+    --xp-radius-pill: 8px;
+    --xp-radius-button: 999px;
+    --xp-title-weight: 600;
+    --xp-title-tracking: -0.035em;
+    /* --xp-title-font and --xp-font have no default here: unset, they follow the look's
+       --font-display (set inline on the route by themeStyle) and the site's Inter. */
+  }
+  /* A portfolio look (decision 0018). The wrapper of a portfolio page carries the look's --pf-*,
+     --band-* and --chart-* values inline (themeStyle); here, on the same element, the exhbt page's
+     --xp-* names and the graphs' text colours are read from them, so a look sets each colour once.
+     (Declared here rather than on :root, where var() would resolve too early to see the look.) */
+  [data-look] {
+    font-family: var(--pf-font-body);
+    --xp-ground: var(--pf-ground);
+    --xp-ink: var(--pf-ink);
+    --xp-heading: var(--pf-heading);
+    --xp-muted: var(--pf-soft);
+    --xp-rule: var(--pf-line);
+    --xp-rule-strong: var(--pf-rule);
+    --xp-card: var(--pf-well);
+    --xp-card-ink: var(--pf-ink);
+    --xp-card-muted: var(--pf-soft);
+    --xp-card-edge: var(--pf-well-edge);
+    --xp-figure: var(--pf-figure);
+    --xp-figure-edge: var(--pf-edge);
+    --xp-figure-ink: var(--pf-ink);
+    --xp-figure-muted: var(--pf-soft);
+    --xp-pill: var(--pf-pill);
+    --xp-pill-ink: var(--pf-pill-ink);
+    --xp-pill-edge: var(--pf-pill-edge);
+    --xp-tick: var(--pf-tick);
+    --xp-tick-ink: var(--pf-tick-ink);
+    --xp-link: var(--pf-accent);
+    --xp-accent: var(--pf-action);
+    --xp-accent-hover: var(--pf-action-hover);
+    --xp-accent-ink: var(--pf-action-ink);
+    --xp-outline-ground: var(--pf-ground);
+    --xp-outline-ink: var(--pf-ink);
+    --xp-outline-edge: var(--pf-edge);
+    --xp-highlight: var(--pf-highlight);
+    --xp-highlight-ink: var(--pf-highlight-ink);
+    --xp-flow-ground: var(--pf-card);
+    --xp-flow-ink: var(--pf-ink);
+    --xp-flow-edge: var(--pf-edge);
+    --xp-flow-muted: var(--pf-soft);
+    --xp-flow-end: var(--pf-flow-end);
+    --xp-flow-end-ink: var(--pf-flow-end-ink);
+    --xp-flow-end-soft: var(--pf-flow-end-soft);
+    --xp-arrow: var(--pf-faint);
+    --xp-avatar: var(--pf-avatar);
+    --xp-avatar-ink: var(--pf-avatar-ink);
+    --xp-avatar-edge: var(--pf-avatar);
+    --xp-radius-card: var(--pf-radius-lg);
+    --xp-radius-box: var(--pf-radius-box);
+    --xp-radius-pill: var(--pf-radius-pill);
+    --xp-radius-button: var(--pf-radius-button);
+    --xp-edge-width: var(--pf-edge-width);
+    --xp-title-weight: var(--pf-display-weight);
+    --xp-title-tracking: var(--pf-tracking);
+    --xp-font: var(--pf-font-body);
+    --xp-lead-font: var(--pf-font-lead);
+    /* Graphs (components/charts): text and grid from the page, the shades from --chart-*. */
+    --chart-ink: var(--pf-ink);
+    --chart-faint: var(--pf-faint);
+    --chart-grid: var(--pf-line);
+    --chart-axis: var(--pf-soft);
+    --chart-ground: var(--pf-figure);
+    --chart-link: color-mix(in srgb, var(--chart-soft) 60%, var(--pf-figure));
+    /* Figures (the font-mono class: tabular numbers) in the look's body face. */
+    --font-mono: var(--pf-font-body);
+  }
+  /* The brand's initials tile keeps its ink edge, and Mono outlines it like every other box. */
+  [data-look="exhbt"],
+  [data-look="mono"] {
+    --xp-avatar-edge: var(--pf-ink);
+  }
+  /* Text inside a look takes the look's colours, not the site's (the base layer sets ink on every
+     heading, and Astryx's reset on every paragraph). Low specificity, so any colour class wins. */
+  :where([data-look]) :is(h1, h2, h3, h4, p, li, dt, dd, blockquote, figcaption) {
+    color: inherit;
+    font-family: inherit;
+  }
+  /* A look's display type: its face, weight, tracking and heading colour (the name, titles, section headings). */
+  .pf-display {
+    font-family: var(--font-display);
+    font-weight: var(--pf-display-weight, 600);
+    letter-spacing: var(--pf-tracking, -0.03em);
+    color: var(--pf-heading, inherit);
+  }
+  /* The intro under the name and the band's sentence: Classic sets them in its serif. */
+  .pf-lead {
+    font-family: var(--pf-font-lead, inherit);
+  }
+  /* Hairlines between rows on the home page, in the look's line and rule style. */
+  .pf-rows > * + * {
+    border-top: 1px var(--pf-rule-style, solid) var(--pf-line);
+  }
+  /* Bloom's photo sits in a dashed ring of its deep colour. */
+  .pf-ring {
+    outline: 2px dashed var(--pf-rule);
+    outline-offset: 6px;
+  }
+  /* The looks' signatures on both pages (the hero treatment names them; decision 0018). */
+  [data-look][data-hero="ledger"] {
+    border-top: 6px solid var(--pf-rule);
+  }
+  /* The exhbt page: Classic's rule over the title; Ledger's double rule closing the facts;
+     Bloom's ringed photo; Mono's dashed hairlines and outlined boxes; Studio's card in the block colour. */
+  [data-hero="masthead"] .xp-title {
+    border-top: 3px solid var(--pf-rule);
+    padding-top: 0.6em;
+  }
+  [data-hero="ledger"] .xp-aside dl {
+    border-bottom: 3px double var(--pf-rule);
+  }
+  [data-hero="greeting"] .xp-avatar {
+    outline: 2px dashed var(--pf-rule);
+    outline-offset: 5px;
+    border-radius: 999px;
+  }
+  [data-hero="block"] .xp-card {
+    background: var(--band-bg);
+    border-color: var(--pf-edge);
+    color: var(--band-text);
+    --xp-heading: var(--band-text);
+    --xp-avatar: var(--pf-ground);
+    --xp-avatar-ink: var(--pf-ink);
+    --xp-avatar-edge: var(--pf-ground);
+  }
+  [data-hero="block"] .xp-card .xp-muted {
+    color: var(--band-soft);
+  }
+  .xp {
+    background: var(--xp-ground);
+    color: var(--xp-ink);
+    font-family: var(--xp-font, var(--font-sans));
+  }
+  /* Headings and paragraphs take the page's ink, not the site's (the base layer sets ink on every
+     heading, and Astryx's reset on every paragraph). Low specificity, so .xp-muted still wins. */
+  :where(.xp) :is(h1, h2, h3, p) {
+    color: inherit;
+  }
+  .xp-display {
+    font-family: var(--xp-title-font, var(--font-display));
+    font-weight: var(--xp-title-weight);
+    letter-spacing: var(--xp-title-tracking);
+    color: var(--xp-heading, inherit);
+  }
+  /* Smaller display text keeps half the look's tracking, so a heavy face (Studio) doesn't crowd. */
+  .xp-name,
+  .xp-found-heading {
+    letter-spacing: calc(var(--xp-title-tracking) * 0.5);
+  }
+  /* The context line: the look's lead face (Classic's serif), else the body face. */
+  .xp-context {
+    font-family: var(--xp-lead-font, inherit);
+  }
+  .xp-muted {
+    color: var(--xp-muted);
+  }
+  /* The sidebar photo (Avatar sets its size inline): 64px beside the name, 88px over it once the
+     sidebar stands beside the work, 56px in the printed band. */
+  .xp-avatar > * {
+    width: 4rem !important;
+    height: 4rem !important;
+    font-size: 1.45rem !important;
+  }
+  @container xp (min-width: 48rem) {
+    .xp-avatar > * {
+      width: 88px !important;
+      height: 88px !important;
+      font-size: 2rem !important;
+    }
+  }
+  @media print {
+    .xp-avatar > * {
+      width: 3.5rem !important;
+      height: 3.5rem !important;
+      font-size: 1.25rem !important;
+    }
+  }
+  .xp-card {
+    background: var(--xp-card);
+    color: var(--xp-card-ink);
+    border: var(--xp-edge-width, 1px) solid var(--xp-card-edge);
+    border-radius: var(--xp-radius-card);
+  }
+  .xp-card .xp-muted {
+    color: var(--xp-card-muted);
+  }
+  .xp-pill {
+    background: var(--xp-pill);
+    color: var(--xp-pill-ink);
+    border: 1px solid var(--xp-pill-edge);
+    border-radius: var(--xp-radius-pill);
+  }
+  .xp-aside,
+  .xp-fact,
+  .xp-finding,
+  .xp-next {
+    border-color: var(--xp-rule);
+    border-style: var(--pf-rule-style, solid);
+  }
+  .xp-found-heading {
+    border-color: var(--xp-rule-strong);
+  }
+  .xp-quote {
+    border-color: var(--xp-tick);
+  }
+  .xp-tick {
+    background: var(--xp-tick);
+    color: var(--xp-tick-ink);
+  }
+  .xp-tick-open {
+    border: 1px dashed var(--xp-muted);
+  }
+  .xp-link {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--xp-link) 55%, transparent);
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 3px;
+  }
+  .xp-link:hover {
+    text-decoration-color: var(--xp-link);
+  }
+  .xp-outline-button {
+    background: var(--xp-outline-ground);
+    border: var(--xp-edge-width, 1px) solid var(--xp-outline-edge);
+    border-radius: var(--xp-radius-button);
+    color: var(--xp-outline-ink);
+    transition: border-color 160ms ease;
+  }
+  .xp-outline-button:hover {
+    border-color: var(--xp-outline-ink);
+  }
+  /* "See the work": an Astryx Button (components/ui/Button.tsx) recoloured by the look. This
+     layer sits above Astryx's, so these win without !important. */
+  .xp .xp-work-button {
+    background: var(--xp-accent);
+    color: var(--xp-accent-ink);
+    border-color: var(--xp-accent);
+    border-radius: var(--xp-radius-button);
+    max-width: 100%;
+    /* A long file name wraps instead of being cut off. */
+    white-space: normal;
+    height: auto;
+    min-height: 3rem;
+    padding-block: 0.65rem;
+    text-align: center;
+    line-height: 1.3;
+    font-size: 0.875rem;
+    padding-inline: 0.75rem;
+  }
+  .xp-figure {
+    color: var(--xp-figure-ink);
+  }
+  .xp-figure .xp-muted {
+    color: var(--xp-figure-muted);
+  }
+  .xp .xp-work-button:hover {
+    background: var(--xp-accent-hover);
+    border-color: var(--xp-accent-hover);
+  }
+  /* The gap in the context line: a flat block behind the words (the bold run, drawn as a mark). */
+  .xp-mark {
+    background: var(--xp-highlight);
+    color: var(--xp-highlight-ink);
+    border-radius: min(4px, var(--xp-radius-box));
+    padding: 0.04em 0.28em;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  .xp-figure {
+    background: var(--xp-figure);
+    border: var(--xp-edge-width, 1px) solid var(--xp-figure-edge);
+    border-radius: var(--xp-radius-card);
+  }
+  .xp-flow-box {
+    background: var(--xp-flow-ground);
+    color: var(--xp-flow-ink);
+    border: var(--xp-edge-width, 1px) solid var(--xp-flow-edge);
+    border-radius: var(--xp-radius-box);
+  }
+  .xp-flow-box[data-last] {
+    background: var(--xp-flow-end);
+    border-color: var(--xp-flow-end);
+    color: var(--xp-flow-end-ink);
+  }
+  .xp-flow-detail {
+    color: var(--xp-flow-muted);
+  }
+  .xp-flow-box[data-last] .xp-flow-detail {
+    color: var(--xp-flow-end-soft);
+  }
+  .xp-flow-arrow {
+    color: var(--xp-arrow);
+  }
+  .xp-section {
+    margin-top: 2.75rem;
+  }
+  .xp-label {
+    font-family: inherit;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1.4;
+    color: var(--xp-muted);
+  }
+  /* In the editor the context field shows its highlighted phrase the way the page does. */
+  .field-highlight strong {
+    font-weight: inherit;
+    background: var(--xp-highlight);
+    border-radius: 4px;
+    padding: 0.04em 0.2em;
+  }
   /* A linked card lifts 2px on hover (the one card motion). */
   .card-link {
     transition:
@@ -212,6 +577,31 @@
   /* Trust ticks fill in sequence on load (hero pack only). */
   .tick-in {
     animation: tick-in 260ms ease-out both;
+  }
+
+  /* The viewfinder pattern (DESIGN.md, "Pattern"): the mark's brackets, turned every other step,
+     with the evidence dot, tiled flat in mint and jade on mist. Behind a product picture only, never
+     behind text. Inline SVG, so nothing downloads; nothing moves. */
+  .pattern-viewfinder {
+    background-color: var(--color-mist);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg fill='none' stroke='%234fe9b4' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M8 15v-5a2 2 0 0 1 2-2h5M24 17v5a2 2 0 0 1-2 2h-5'/%3E%3Cpath d='M49 40h5a2 2 0 0 1 2 2v5M47 56h-5a2 2 0 0 1-2-2v-5'/%3E%3C/g%3E%3Cg fill='%2300755d'%3E%3Ccircle cx='16' cy='16' r='2'/%3E%3Ccircle cx='48' cy='48' r='2'/%3E%3Ccircle cx='48' cy='16' r='1'/%3E%3Ccircle cx='16' cy='48' r='1'/%3E%3C/g%3E%3C/svg%3E");
+    background-position: center;
+  }
+
+  /* Home page questions: a disclosure per question (<details>). The marker is the plus icon in the
+     summary, which turns to a cross when open; the turn rests under reduced motion (below). */
+  .faq summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  .faq summary::-webkit-details-marker {
+    display: none;
+  }
+  .faq [data-faq-icon] {
+    transition: transform 160ms ease;
+  }
+  .faq details[open] [data-faq-icon] {
+    transform: rotate(45deg);
   }
 
   .prose-read h2 {
@@ -254,5 +644,89 @@
   *::after {
     transition: none !important;
     animation: none !important;
+  }
+}
+
+/* The editor on a phone: buttons are at least 44px square (WCAG target size, the audit's E7). */
+@media (pointer: coarse) {
+  .editor-touch button,
+  .editor-touch a[data-astryx-button],
+  .editor-touch a[data-icon-button] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Graphs inside a portfolio look (decision 0018). The chart components draw text, gridlines and
+   the rings round their markers with the brand's utilities (text-ink, bg-line, ring-surface…),
+   which read the brand's colour variables; inside a graph on a portfolio those point at the look's
+   --chart-* set instead, so a dark look's graphs are drawn on its own dark card. Their two shades
+   come in through CHART_* in components/charts/series.ts. */
+[data-look] [data-chart] {
+  --color-ink: var(--chart-ink);
+  --color-graphite: var(--chart-axis);
+  --color-slate: var(--chart-faint);
+  --color-line: var(--chart-grid);
+  --color-surface: var(--chart-ground);
+  --color-wash: var(--chart-wash);
+}
+
+/* Shared components drawn inside the exhbt page, recoloured by the look. Unlayered, because they
+   colour themselves with Tailwind utilities, which outrank the components layer. */
+.xp [data-avatar="initials"] {
+  background: var(--xp-avatar);
+  color: var(--xp-avatar-ink);
+  border-color: var(--xp-avatar-edge);
+}
+.xp [data-avatar="photo"] {
+  border-color: var(--xp-rule);
+}
+.xp [data-team] {
+  border-color: var(--xp-rule);
+  color: var(--xp-ink);
+}
+.xp [data-team] .text-graphite {
+  color: var(--xp-muted);
+}
+.xp [data-team] .text-ink,
+.xp a.link {
+  color: inherit;
+}
+
+/* Print and "Save as PDF" (the project page's button): one A4 page, the exhbt alone. The page
+   chrome hides itself with print:hidden; this sets the paper, a slightly smaller rem so a full
+   200-word exhbt with a graph fits, and keeps the brand fills (ink step, mint ticks and dots). */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  html {
+    font-size: 12px;
+  }
+  /* Mono's face is wider, so its exhbt prints a step smaller to stay on one page (decision 0018). */
+  html:has([data-look="mono"]) {
+    font-size: 11px;
+  }
+  html,
+  body {
+    background: var(--color-surface) !important;
+  }
+  * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  /* The portfolio layout's mist page and padding (app/(portfolio)/layout.tsx). */
+  div:has(> main#main) {
+    background: none !important;
+    min-height: 0 !important;
+  }
+  main#main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  /* The exhbt page: tighter gaps between sections so a full exhbt fits one page. */
+  .xp-section {
+    margin-top: 0.85rem;
   }
 }

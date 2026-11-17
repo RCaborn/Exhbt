@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { APEX, APP_HOST, MARKETING_HOST, toolHostEnabled } from "./hosts";
 import { isSupabaseConfigured } from "./store";
 
 export type SessionUser = { id: string; email: string };
@@ -34,9 +35,14 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 }
 
 export async function siteOrigin() {
+  // Production sets this to https://app.exhbt.co.uk so every email link lands on the tool host.
+  // A workers.dev preview keeps its own URL: replacing it would point the link at production.
   if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
   const h = await headers();
-  return `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const bare = host.toLowerCase().replace(/:\d+$/, "");
+  if (toolHostEnabled() && (bare === APEX || bare === MARKETING_HOST)) return `https://${APP_HOST}`;
+  return `${h.get("x-forwarded-proto") ?? "http"}://${host}`;
 }
 
 /**
@@ -44,7 +50,7 @@ export async function siteOrigin() {
  * Supabase sending a separate email. Production: Supabase admin generateLink, whose
  * hashed token is verified by /auth/confirm. Development: the /auth/dev stand-in.
  */
-export async function signInLinkFor(email: string, next: string): Promise<string> {
+export async function signInLinkFor(email: string, next: string, via = "roadmap_email"): Promise<string> {
   const origin = await siteOrigin();
   const n = encodeURIComponent(next);
   if (!isSupabaseConfigured()) return `${origin}/auth/dev?email=${encodeURIComponent(email)}&next=${n}`;
@@ -60,20 +66,26 @@ export async function signInLinkFor(email: string, next: string): Promise<string
   const props = res.data?.properties;
   if (res.error || !props?.hashed_token) throw new Error(res.error?.message ?? "Could not create sign-in link");
   const type = props.verification_type ?? "magiclink";
-  return `${origin}/auth/confirm?token_hash=${props.hashed_token}&type=${type}&next=${n}`;
+  return `${origin}/auth/confirm?token_hash=${props.hashed_token}&type=${type}&next=${n}&via=${encodeURIComponent(via)}`;
 }
 
 /**
- * Sends a magic link. Returns a dev-only link when Supabase is not configured,
- * so the whole flow can be exercised locally without an email provider.
+ * Sends the "email me a link" sign-in email (the fallback beside the password). We build the link
+ * ourselves (signInLinkFor) and send it through Resend, rather than Supabase's signInWithOtp: that one
+ * is a PKCE link that only works in the browser that asked for it. Returns a dev-only link when
+ * Supabase is not configured.
  */
 export async function sendMagicLink(email: string, next: string): Promise<{ devLink?: string }> {
-  const origin = await siteOrigin();
-  const callback = `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
   if (isSupabaseConfigured()) {
-    const sb = await supabaseServer();
-    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: callback } });
-    if (error) throw new Error(error.message);
+    const origin = await siteOrigin();
+    const { sendEmail } = await import("./email/send");
+    const { signInEmail } = await import("./email/templates/sign-in");
+    const content = signInEmail({
+      signInUrl: await signInLinkFor(email, next, "login"),
+      privacyUrl: `${origin}/legal/privacy`,
+      logoUrl: `${origin}/brand/exhbt-mark.png`,
+    });
+    await sendEmail({ to: email, ...content });
     return {};
   }
   return { devLink: `/auth/dev?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}` };

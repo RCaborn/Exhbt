@@ -3,7 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
 import { ProjectSchema, SITUATIONS, type Project, type Roadmap, type RoadmapInput } from "./schemas";
-import { AI_MODEL, costUsd } from "./model";
+import { PLAN_SIZE } from "@/lib/store";
+import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
 
 /**
  * Swapping one idea in the plan (docs/decisions/0004): a single new project that replaces the
@@ -42,8 +43,9 @@ export type SwapContext = {
 };
 
 export async function generateSwap(ctx: SwapContext): Promise<SwapResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    if (process.env.NODE_ENV === "production") throw new Error("ANTHROPIC_API_KEY is not set.");
+  const apiKey = anthropicApiKey();
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
     return mockSwap(ctx);
   }
 
@@ -51,7 +53,7 @@ export async function generateSwap(ctx: SwapContext): Promise<SwapResult> {
   const skills = (roadmap.skillMap ?? []).map((s) => `${s.skill} (needed ${s.needed}, current ${s.current})`);
   const describe = (p: Project) => `- ${p.title}: ${p.brief} (closes: ${p.closesGaps.join(", ") || "none"})`;
 
-  const client = new Anthropic();
+  const client = new Anthropic({ apiKey });
   const response = await client.messages.parse({
     model: AI_MODEL,
     max_tokens: 1000,
@@ -102,5 +104,118 @@ function mockSwap(ctx: SwapContext): SwapResult {
       deliverable: "A short report",
       weeks: 2,
     },
+  };
+}
+
+/**
+ * The plan's first three ideas (docs/decisions/0019). Their own call, started in the background
+ * the moment the roadmap is saved, so they're usually ready by the time the person has passed the
+ * gate. Same facts-only rule as the roadmap and the swap.
+ */
+const IdeasSchema = z.object({ projects: z.array(ProjectSchema).max(PLAN_SIZE) });
+
+const IDEAS_SYSTEM = `You suggest the three projects that make up a UK graduate's plan to close the skills gaps for the job they want.
+
+Rules:
+- Use only facts present in what the graduate told you (the job they want, their situation, education, skills and optional CV). Never invent experience, grades, employers or results.
+- Suggest exactly ${PLAN_SIZE} projects. Between them, cover the biggest gaps, each project closing different ones where possible.
+- Every name in "closesGaps" must be one of the skill names given, spelt exactly the same.
+- Fit the projects to their situation (e.g. a current student can use coursework; someone working can use their job).
+- Each project must produce a concrete deliverable the graduate can later attach as evidence (a report, repository, dataset, prototype, recording).
+- Each must be doable by one person without paid tools, in 1-12 weeks.
+- Write in plain British English. No hype words, no exclamation marks.`;
+
+export type IdeasResult = { projects: Project[]; model: string; inputTokens: number; outputTokens: number; costUsd: number };
+
+export type IdeasContext = {
+  input: RoadmapInput;
+  roadmap: Roadmap;
+  /** Which try this is (1 for the first), for the development stand-in's failure setting. */
+  attempt: number;
+};
+
+export async function generateIdeas(ctx: IdeasContext): Promise<IdeasResult> {
+  const apiKey = anthropicApiKey();
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
+    return mockIdeas(ctx);
+  }
+
+  const { input, roadmap } = ctx;
+  const skills = (roadmap.skillMap ?? []).map((s) => `${s.skill} (needed ${s.needed}, current ${s.current})`);
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.parse({
+    model: AI_MODEL,
+    max_tokens: 1500,
+    output_config: { effort: "low", format: zodOutputFormat(IdeasSchema) },
+    system: IDEAS_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: [
+          `The job they want: ${input.targetRole}`,
+          `Skills to close (0-4 scale): ${skills.length ? skills.join("; ") : roadmap.gaps.map((g) => g.skill).join("; ")}`,
+          `Gaps found: ${roadmap.gaps.map((g) => g.skill).join("; ") || "(none listed)"}`,
+          `Where they are now: ${SITUATIONS[input.situation]}${input.situationDetail ? ` (${input.situationDetail})` : ""}`,
+          `Education: ${input.education || "(none given)"}`,
+          `Skills they list: ${input.skills || "(none given)"}`,
+          input.cvText ? `CV:\n<cv>\n${input.cvText}\n</cv>` : "No CV given.",
+        ].join("\n"),
+      },
+    ],
+  });
+
+  if (response.stop_reason === "refusal" || !response.parsed_output) {
+    throw new Error(`Project ideas failed (stop_reason: ${response.stop_reason})`);
+  }
+  const projects = IdeasSchema.parse(response.parsed_output).projects;
+  if (projects.length === 0) throw new Error("Project ideas failed (the model returned none)");
+  const { input_tokens, output_tokens } = response.usage;
+  return {
+    projects,
+    model: response.model,
+    inputTokens: input_tokens,
+    outputTokens: output_tokens,
+    costUsd: costUsd(input_tokens, output_tokens),
+  };
+}
+
+/**
+ * The stand-in's settings for slow and failing ideas, so tests can see the waiting and failed
+ * screens. Development and tests only (the stand-in never runs in production). Set
+ * `EXHBT_MOCK_IDEAS_DELAY_MS` and `EXHBT_MOCK_IDEAS_FAIL_FIRST` for the whole server, or put
+ * `[ideas-delay=4000]` and `[ideas-fail=1]` in a roadmap's skills box to set them for that
+ * roadmap alone. `fail=N` fails the first N tries.
+ */
+export function mockIdeasSettings(input: RoadmapInput): { delayMs: number; failFirst: number } {
+  const fromText = (name: string) => {
+    const m = new RegExp(`\\[ideas-${name}=(\\d{1,6})\\]`).exec(input.skills);
+    return m ? Number(m[1]) : undefined;
+  };
+  const fromEnv = (v: string | undefined) => (v && Number.isFinite(Number(v)) ? Math.max(0, Number(v)) : 0);
+  return {
+    delayMs: fromText("delay") ?? fromEnv(process.env.EXHBT_MOCK_IDEAS_DELAY_MS),
+    failFirst: fromText("fail") ?? fromEnv(process.env.EXHBT_MOCK_IDEAS_FAIL_FIRST),
+  };
+}
+
+async function mockIdeas(ctx: IdeasContext): Promise<IdeasResult> {
+  const { delayMs, failFirst } = mockIdeasSettings(ctx.input);
+  if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
+  if (ctx.attempt <= failFirst) throw new Error("Development stand-in: ideas set to fail");
+  const gaps = ctx.roadmap.gaps.length ? ctx.roadmap.gaps : [{ skill: "Placeholder gap one" }];
+  return {
+    model: "mock",
+    inputTokens: 0,
+    outputTokens: 0,
+    costUsd: 0,
+    // The first gap, the second (or the first again), then the first again: one gap stays open.
+    projects: [gaps[0], gaps[1] ?? gaps[0], gaps[0]].map((g, i) => ({
+      title: `Placeholder project ${i + 1}`,
+      brief: "A sample project so the result page renders.",
+      closesGaps: [g.skill],
+      deliverable: "A short report",
+      weeks: 3,
+    })),
   };
 }

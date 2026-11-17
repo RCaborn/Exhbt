@@ -2,12 +2,16 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { canView } from "@/lib/access";
-import { getStore } from "@/lib/store";
+import { getStore, type ProjectIdea } from "@/lib/store";
 import { Generating } from "@/components/roadmap/Generating";
 import { RoadmapViews, parseView, type ProjectsState } from "@/components/roadmap/RoadmapViews";
 import { extractContact } from "@/lib/cv-contact";
 import { ENTITLEMENTS } from "@/lib/entitlements";
-import { ideasFor, planDone, projectsUnlocked } from "@/lib/roadmap/ideas";
+import { ideasState, planDone, projectsUnlocked } from "@/lib/roadmap/ideas";
+import type { BuildState } from "@/components/roadmap/BuildThis";
+import { canCreateExhbt, canSaveIdeas, getPlan } from "@/lib/plan";
+import type { SaveState } from "@/components/roadmap/SaveIdea";
+import { isPhase2Enabled } from "@/lib/site";
 
 export const metadata: Metadata = { title: "Your roadmap", robots: { index: false } };
 
@@ -34,18 +38,43 @@ export default async function RoadmapPage({
 
   const current = parseView(view);
   let projects: ProjectsState;
+  // The Gaps radar's "After the projects" view reads the plan's ideas, but only once the details
+  // gate is filled in, so nothing from the plan shows before it (docs/decisions/0004, 0023).
+  let planIdeas: ProjectIdea[] = [];
   if (projectsUnlocked(record)) {
     const allowed = ENTITLEMENTS.free.projectSwapsPerRoadmap;
+    // Ideas are only read where they're shown. They're made in the background from the moment the
+    // roadmap is saved, so by now they're usually there; if not, the page shows progress.
+    const { ideas, status } =
+      current === "projects" || current === "gaps" ? await ideasState(record) : { ideas: [], status: "ready" as const };
+    if (current === "gaps" && status === "ready") planIdeas = ideas;
     projects = {
       unlocked: true,
-      // Ideas are only read (and seeded on first use) where they're shown.
-      ideas: current === "projects" ? await ideasFor(record) : [],
+      ideas,
+      ideasStatus: status,
       swapsLeft: Math.max(0, allowed - record.projectSwapsUsed),
       done: planDone(record, allowed),
     };
   } else {
     projects = { unlocked: false, prefill: extractContact(record.input.cvText), signedInEmail: user?.email ?? null };
     if (current === "projects") await getStore().logEvent("projects_gate_viewed", user?.id ?? null);
+  }
+
+  // "Build this as an exhbt" (Phase 2): who can, and why not.
+  let build: BuildState | undefined;
+  // Saving an idea to the list kept across roadmaps (Premium and Max); a locked star on Free.
+  let save: SaveState | undefined;
+  if (isPhase2Enabled() && current === "projects" && projects.unlocked && projects.ideasStatus === "ready") {
+    if (!user) build = { state: "signed-out" };
+    else {
+      const plan = await getPlan(user.id);
+      const verdict = canCreateExhbt(plan, await getStore().listExhbts(user.id));
+      build = verdict.ok ? { state: "ok" } : { state: "full", reason: verdict.reason };
+      const canSave = canSaveIdeas(plan);
+      save = canSave.ok
+        ? { state: "ok", saved: await getStore().savedTitlesForRoadmap(user.id, id) }
+        : { state: "locked", reason: canSave.reason, upgradeTo: canSave.upgradeTo };
+    }
   }
 
   return (
@@ -56,6 +85,9 @@ export default async function RoadmapPage({
       emailedTo={record.emailSentAt ? record.pendingEmail : null}
       signedIn={Boolean(user)}
       projects={projects}
+      build={build}
+      save={save}
+      planIdeas={planIdeas}
     />
   );
 }

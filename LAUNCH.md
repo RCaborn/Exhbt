@@ -13,17 +13,17 @@ Dashboards change their wording from time to time. If a label below doesn't matc
 1. Go to **console.anthropic.com** and sign up.
 2. **Billing:** add $5–10 of credit. A roadmap costs roughly $0.001, so this lasts a long time.
 3. Optional: **Limits:** set a monthly spend limit (e.g. $10).
-4. **API keys > Create key**, name it `exhbt`. Copy it somewhere safe for step 4. → this is `ANTHROPIC_API_KEY`
+4. **API keys > Create key**, name it anything you like (e.g. `exhbt`). Copy it somewhere safe for step 4. → this is `ANTHROPIC_API_KEYS`
 
 ## 2. Supabase (database and sign-in) · ~10 min
 
 1. Go to **supabase.com**, sign up, and create a **New project**:
    - Name: `exhbt`
-   - **Region: London (eu-west-2)**. This matters for UK data rules.
+   - **Region: the live project is in Paris (eu-west-3), in the EU, and the privacy policy says so. If you ever create a new live project, pick an EU region and keep the policy in step. The separate preview project is in London.**
    - Save the database password in your password manager. You won't need it for this checklist.
 2. When the project is ready, open **SQL Editor > New query**:
    - Open `supabase/migrations/20261105000000_init.sql` in this repo on GitHub, copy all of it, paste it, and press **Run**. It should say "Success".
-   - Do the same with each remaining file in that folder, **in date order**: `20261106000000_phase1.sql`, then `20261106120000_meeting_updates.sql`, then `20261106150000_tiers_and_methodology.sql`, then `20261110000000_project_ideas.sql`.
+   - Do the same with each remaining file in that folder, **in date order**: `20261106000000_phase1.sql`, then `20261106120000_meeting_updates.sql`, then `20261106150000_tiers_and_methodology.sql`, then `20261110000000_project_ideas.sql`, then `20261112000000_cv_read.sql`.
    - If a file fails with `relation "roadmaps" does not exist`, an earlier file hasn't been run in this project: start again from `20261105000000_init.sql`. A failed file changes nothing, so it's safe to run again once fixed.
    - Optional, when you have it: load the UK jobs dataset (see `HANDOFF.md`). Until then a small sample is used.
 3. **Project Settings > API (or API Keys)**. Copy three values:
@@ -38,9 +38,9 @@ You'll come back to Supabase in step 5 once you know the site's address.
 1. Go to **resend.com**, sign up, then **API Keys > Create**, with "Sending access". → `RESEND_API_KEY`
 2. **Who can receive email:**
    - **Without your own domain**, Resend only delivers to the address you signed up with. Use `EMAIL_FROM` = `Exhbt <onboarding@resend.dev>`. Friends can still use the site and see their roadmap on screen; only their email copy won't arrive.
-   - **To email anyone**, verify **exhbt.co.uk**: in Resend use **Domains > Add domain** and add the DNS records it shows you at your domain registrar or in Cloudflare DNS. Then use `EMAIL_FROM` = `Exhbt <hello@exhbt.co.uk>`.
-   - **Google Workspace is fine alongside this.** Resend sends from a subdomain it gives you (e.g. `send.exhbt.co.uk`), so your Workspace inboxes and MX records are untouched. Make sure `hello@` and `privacy@exhbt.co.uk` exist in Workspace (or as aliases), because the site tells people to email them.
-3. Optional, recommended once you have a domain: in Supabase, under **Authentication > Emails > SMTP settings**, enable custom SMTP with Resend's SMTP details. Without this, Supabase's built-in email only sends the `/login` emails to members of your Supabase team, so friends couldn't log in from another device. Roadmap emails don't depend on this.
+   - **To email anyone**, verify **exhbt.co.uk**: in Resend use **Domains > Add domain** and add the DNS records it shows you at your domain registrar or in Cloudflare DNS. The sender, `EMAIL_FROM` = `Exhbt <hello@exhbt.co.uk>`, is already set in `wrangler.jsonc`, so don't add it in Cloudflare.
+   - **Google Workspace is fine alongside this.** Resend sends from a subdomain it gives you (e.g. `send.exhbt.co.uk`), so your Workspace inboxes and MX records are untouched. Make sure `hello@exhbt.co.uk` exists in Workspace, because the site tells people to email it.
+3. Sign-in emails from `/login` go through Resend too, sent by the app, so Supabase's own SMTP settings aren't needed. Their links work on any device.
 
 ## 4. Cloudflare (hosting) · ~10 min
 
@@ -49,9 +49,10 @@ You'll come back to Supabase in step 5 once you know the site's address.
 3. Settings on that screen:
    - Project name: **`terna`** (must match `"name"` in `wrangler.jsonc`)
    - Production branch: **`main`**
-   - Build command: `npx opennextjs-cloudflare build` (**not** the default `npm run build`, which fails at the deploy step with "Could not find compiled Open Next config")
+   - Build command: `npx opennextjs-cloudflare build` (**not** plain `npm run build` — OpenNext calls that itself for the Next step; pointing both at OpenNext recurses until the job is killed)
    - Deploy command: `npx opennextjs-cloudflare deploy`
-   - If an existing Worker fails with that error, fix the two commands under the Worker's **Settings > Build**, then retry the latest build under **Deployments**.
+   - If an existing Worker fails with "Could not find compiled Open Next config", fix the Build command under **Settings > Build**, then retry under **Deployments**.
+   - Backup path: GitHub Actions workflow **Deploy** on `main` (runs `npm run deploy`). Repo secrets needed: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`. The Supabase URL is set in `wrangler.jsonc` and the keys are read at runtime from the Worker's secrets, and `keep_vars` stops a deploy from wiping variables set in the dashboard. Open `/api/health` after any deploy: it lists any setting that's missing.
 4. Click **Deploy**. The first deploy will build but won't work yet (no keys). That's expected.
 5. In the new Worker, open **Settings**:
    - **Build > Variables and secrets** (used while building). Add:
@@ -64,9 +65,8 @@ You'll come back to Supabase in step 5 once you know the site's address.
      | `NEXT_PUBLIC_SUPABASE_URL` | same as above |
      | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | same as above |
      | `SUPABASE_SERVICE_ROLE_KEY` | from step 2 |
-     | `ANTHROPIC_API_KEY` | from step 1 |
+     | `ANTHROPIC_API_KEYS` | from step 1 |
      | `RESEND_API_KEY` | from step 3 |
-     | `EMAIL_FROM` | from step 3 |
      | `EXHBT_COOKIE_SECRET` | a long random string, see below |
 
      For `EXHBT_COOKIE_SECRET`, on a Mac open Terminal and run `openssl rand -base64 32`, then paste the output. Or generate a 40+ character random password in your password manager.
@@ -93,7 +93,93 @@ You'll come back to Supabase in step 5 once you know the site's address.
 
 Then tell Claude the address. It can run a fuller automated check against the live site.
 
-**If something's wrong:** in Cloudflare open the Worker's **Logs**. A missing key shows a clear message such as `ANTHROPIC_API_KEY is not set.`
+**If something's wrong:** in Cloudflare open the Worker's **Logs**. A missing key shows a clear message such as `ANTHROPIC_API_KEYS is not set.`
+
+---
+
+## Stripe (payments, Phase 2) · ~20 min
+
+Payments stay off until Phase 2 is switched on. Do all of this in Stripe's **test mode** first (the toggle at the top of the dashboard), try it, then repeat in live mode with the live keys and ids.
+
+1. Go to **stripe.com** and create an account for the business. Set the account's currency to **GBP**.
+2. **Product catalogue > Add product**, twice:
+   - **Premium**: one recurring price, **yearly** (billing period: Yearly), in GBP.
+   - **Max**: one recurring price, **yearly** (billing period: Yearly), in GBP.
+   Prices are billed once a year (founders, 16 Nov 2026), so create them as **yearly** recurring prices, not monthly. The site says "a year" everywhere (`BILLING_PERIOD` in `lib/entitlements.ts`), and the code does not set an interval itself: Checkout charges whatever interval the Stripe price has.
+   The amounts must match `PRICES` in `lib/entitlements.ts` (that is what the site shows; Stripe is what actually charges).
+3. Open each price and copy its id (starts `price_`). In `wrangler.jsonc` under `vars`, replace the placeholders:
+   - `STRIPE_PRICE_PREMIUM` = the Premium price id
+   - `STRIPE_PRICE_MAX` = the Max price id
+   Commit that change on a branch. These ids aren't secret.
+4. **Developers > API keys**: copy the **Secret key** (starts `sk_test_` in test mode).
+5. **Developers > Webhooks > Add endpoint**:
+   - URL: `https://app.exhbt.co.uk/api/stripe/webhook`
+   - Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+   - After saving, reveal the **Signing secret** (starts `whsec_`).
+6. Add both as Worker secrets, either in Cloudflare (Worker > **Settings > Variables and Secrets**, type **Secret**) or from a terminal:
+   ```
+   npx wrangler secret put STRIPE_SECRET_KEY
+   npx wrangler secret put STRIPE_WEBHOOK_SECRET
+   ```
+   Never put either in `wrangler.jsonc` or in chat.
+7. **Settings > Billing > Customer portal**: turn it on, and allow customers to update payment methods, see invoices, cancel, and **switch plans** between Premium and Max (add both products). The "Manage billing" and "Switch to" buttons on `/account/billing` open this page.
+8. Optional, for a new-joiner discount later: **Product catalogue > Coupons**, then add a **promotion code**. Checkout already shows a box for codes.
+9. Open `/api/health`. Under `phase2`, every setting should be `true` and `stripe.ok` should be `true`. (This section doesn't change the overall `ok` until payments are meant to be live.)
+10. Try it in test mode: sign in, open `/account/billing`, choose Premium and pay with card `4242 4242 4242 4242`, any future date and any CVC. Back on the billing page the plan should read Premium within a minute. **Manage billing** should open Stripe's page, where you can cancel; the plan should go back to Free when the subscription ends.
+11. **Referrals stay off.** The code is built (decision 0020) but `REFERRALS_LIVE` in `lib/referrals.ts` is `false`. Before it goes on: Stripe is live, the cookie question in the decision is settled, and the cookie and privacy pages are updated. The credit uses Stripe's customer balance, so it needs no extra Stripe setup; the secret key must be allowed to write customers.
+
+---
+
+## Preview site
+
+A second Worker, `exhbt-preview`, runs the `phase-2` branch with Phase 2 switched on, so you can click through it before launch. It never touches the live site: `terna` still deploys from `main`.
+
+- **Address:** `https://exhbt-preview.<your-workers-subdomain>.workers.dev`. The subdomain is the one in your Cloudflare account under **Workers & Pages > Overview** (the `.workers.dev` name shown there). The address also shows on the Worker's page once the first deploy has run.
+- **Deploys itself** on every push to `phase-2` (`.github/workflows/deploy-preview.yml`, using the same two GitHub secrets as the live deploy). You can also run it by hand from the Actions tab.
+- **Data:** it uses the separate preview Supabase project, not the live one. The project URL and anon key are in `wrangler.jsonc` under `env.preview`, because they aren't secret.
+- **Limit:** a person's own address (`alex.exhbt.co.uk`) can't be tried here, because a `workers.dev` address has no subdomains. The `/p/<name>` routes and the app work.
+
+Set these once, in Cloudflare: **Workers & Pages > `exhbt-preview` > Settings > Variables and Secrets > Add**, type **Secret**. The first deploy creates the Worker; add the secrets after it.
+
+| Secret | Value |
+| --- | --- |
+| `SUPABASE_SERVICE_ROLE_KEY` | The preview project's service_role key: Supabase **Project Settings > API Keys**. |
+| `ANTHROPIC_API_KEY` | Your Anthropic key (the same Default-workspace key is fine). |
+| `RESEND_API_KEY` | Your Resend key. |
+| `EXHBT_COOKIE_SECRET` | A new random value, not the live one. For example run `openssl rand -hex 32`. |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Later, from Stripe **test mode** (see the Stripe section). Put the test price ids in `env.preview.vars` in `wrangler.jsonc`. |
+
+Then, in the **preview** Supabase project, **Authentication > URL Configuration**: set **Site URL** to the preview address, and add the same address (with `/**` on the end) under **Redirect URLs**. Sign-in links are built from the address you visit, so no `NEXT_PUBLIC_SITE_URL` is set on the preview.
+
+Check it: open `/api/health` on the preview address. Every setting should read `true` once the secrets are in.
+
+---
+
+## Phase 2 launch day
+
+Do this only when Rory says go, and in this order. Until step 6 the live site is still running `main`, so the Supabase steps must come first and the merge must follow straight after them: the migrations rename the plan keys and change the `exhbts` columns, and Phase 1 code on `main` won't read them.
+
+Before the day: the Stripe section above done and tried in test mode, a full click-through on the preview site (Preview site, above), and the privacy policy and terms read through (they describe Phase 2).
+
+1. **Back up.** In Supabase, **Database > Backups**, check last night's backup is there (or take one if your plan allows).
+2. **Apply the migrations**, in the **live** project's Supabase **SQL Editor > New query**: paste the whole of `supabase/launch/apply-phase-2-live.sql` and press **Run**. It holds every Phase 2 migration (`20261113` to `20261120`) in date order, in one transaction, so it either all applies or nothing changes, and it records each one in the project's migration history. It was checked on 15 Nov 2026 against a copy of the live schema with sample rows: plan names convert (old "plus" becomes "premium", old "premium" becomes "max"), roadmaps and profiles are kept. If a migration is added to `supabase/migrations/` after that file, regenerate it or run the new file on its own afterwards. Never edit a migration that has been applied.
+3. **Check Storage.** Under **Storage**, there should be two buckets, `sources` and `evidence`, both **private** (the `phase2_schema` migration creates them). If one is missing, run the `insert into storage.buckets` lines from `20261114000000_phase2_schema.sql` again; they're safe to repeat. Never make either bucket public.
+4. **Stripe live mode.** Switch the Stripe dashboard to live mode and repeat steps 2–7 of the Stripe section with live products and prices:
+   - replace `STRIPE_PRICE_PREMIUM` and `STRIPE_PRICE_MAX` in `wrangler.jsonc` with the **live** price ids, on the `phase-2` branch
+   - set the Worker secrets `STRIPE_SECRET_KEY` (starts `sk_live_`) and `STRIPE_WEBHOOK_SECRET` (from the live webhook endpoint)
+5. **Phase 2 switches on with the merge.** `EXHBT_PHASE2` = `1` is set in `wrangler.jsonc` (production `vars`), so the deploy from `main` turns it on. Emergency off-switch: set it to `0` in the Worker's **Settings > Variables and Secrets**; that holds until the next deploy from `main`.
+6. **Merge.** Open a pull request from `phase-2` into `main`, wait for CI to pass, and merge it. Cloudflare deploys `main` on its own; watch **Deployments** until it's live.
+7. **Check it's working.**
+   - Open `/api/health`. `ok` should be `true`, and under `phase2`: every setting `true`, `stripe.ok` `true` and `storage.ok` `true`. If a check is false, its `detail` says why.
+   - On your own account, in **live mode**: sign up with a fresh email, upload a project and draft an exhbt, edit it and publish it, then pay for Premium with a real card. Check the plan reads Premium on `/account/billing` and the exhbt shows on your portfolio.
+   - Refund that payment in Stripe (**Payments >** the payment **> Refund**) and cancel the subscription from **Manage billing**.
+   - Delete the test account from `/account` if you don't want to keep it.
+
+**If something goes wrong after the merge:** remove `EXHBT_PHASE2` (or set it to `0`) in Cloudflare. Phase 2 pages go back to 404 straight away, without a redeploy, while you look into it.
+
+### Portfolio subdomains and DNS
+
+Owned by the subdomain work, which is being built separately (decision 0001). That work will fill in this section: DNS records, Worker routes and the checks for portfolio addresses.
 
 ---
 
@@ -104,4 +190,17 @@ Do these first:
 - connect your own domain (Worker > Settings > Domains & Routes)
 - verify it in Resend
 
-Then add a **build variable** `EXHBT_PUBLIC` = `1` and redeploy. That removes the preview bar and lets search engines index the public pages. Without it, the site always stays hidden.
+The live site goes public with `EXHBT_PUBLIC` = `1`: it is in `wrangler.jsonc` (top-level `vars`), and the production build step in `.github/workflows/deploy.yml` must set it too, because pages are built with it (the value is read at build time). That removes the preview bar and lets search engines index the public pages. The preview Worker (`env.preview`) leaves it unset, so it keeps the bar and stays hidden. Without the flag a site always stays hidden.
+
+## Search engines
+
+Google may still show the old "We would like to show you a description here but the site won't allow us" line. It dates from the private preview, when robots.txt blocked everything. robots.txt is open now, and every public page has its own description, a canonical address and a link preview image. Google has to fetch the pages again to notice.
+
+1. Open Google Search Console and add a **Domain** property for `exhbt.co.uk`. Search Console shows a TXT record: add it at Porkbun (DNS records for exhbt.co.uk, type TXT, host left blank) and press Verify. A Domain property covers www and every portfolio subdomain.
+2. Under Sitemaps, submit `https://www.exhbt.co.uk/sitemap.xml`.
+3. Under URL Inspection, paste `https://www.exhbt.co.uk`, then press Request indexing.
+4. Optional: in Bing Webmaster Tools, sign in and choose Import from Google Search Console. It brings the site and the sitemap across.
+
+A snippet takes days to refresh, sometimes a couple of weeks. Requesting indexing speeds it up but doesn't set the date.
+
+Portfolios: each person's host serves its own `/sitemap.xml` and `/robots.txt` (the sitemap lists their live exhbts; "Hide my portfolio from search engines" makes the pages noindex and the sitemap empty). Google finds each sitemap through that host's robots.txt, so there is nothing more to submit. To check one, open `https://name.exhbt.co.uk/sitemap.xml`. Job links are never indexed and never listed.

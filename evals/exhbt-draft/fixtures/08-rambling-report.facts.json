@@ -1,0 +1,21 @@
+{
+  "fixture": "08-rambling-report",
+  "shape": "A long, rambling placement report as plain text (about 3,800 words) with the results buried among digressions and stray figures.",
+  "tests": "Compression to 200 words or fewer, and choosing the few results that matter over the many distracting numbers (tins of tomatoes, emails, laminating).",
+  "files": ["08-rambling-report.txt"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":true,"chart":true,"noNumbers":false},
+  "keyFacts": [
+    {"id":"setting","fact":"Community placement at the (fictional) Eastbrook Community Larder.","match":["Larder","food larder","food bank"]},
+    {"id":"waiting","fact":"Average waiting time fell from 34 to 12 minutes after a tablet sign-in.","match":[["34","12"],"12 minutes"]},
+    {"id":"waste","fact":"Share of donated food thrown away fell from 18% to 7% with colour-coded crates.","match":[["18%","7%"],"7%"]},
+    {"id":"rota","fact":"Shifts filled a week ahead rose from 64% to 89%.","match":[["64%","89%"],"89%"]},
+    {"id":"visits","fact":"2,316 visits recorded between February and June.","match":["2,316"]},
+    {"id":"training","fact":"Trained 14 volunteers; cost under £30.","match":["14 volunteers","£30"]}
+  ],
+  "forbidden": [
+    {"id":"distractors","why":"Stray figures that don't belong in a 30-second read.","match":["214","47 emails","tomatoes"]}
+  ],
+  "sourceNumbers": ["4","2,500","£3.50","£4","2019","2021","40","20","25","2022","1","380","291","£7","34","12","31","2,316","100","21","47","2","18%","7%","214","3","64%","89%","14","£18","£30","160"]
+}

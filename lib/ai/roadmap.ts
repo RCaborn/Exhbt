@@ -2,7 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import {
-  RoadmapSchema,
+  RoadmapModelSchema,
   SITUATIONS,
   SKILL_MAP_MAX,
   SKILL_MAP_MIN,
@@ -10,7 +10,7 @@ import {
   type RoadmapInput,
 } from "./schemas";
 import type { JobProfile } from "@/lib/jobs";
-import { AI_MODEL, costUsd } from "./model";
+import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
 
 const SYSTEM = `You write skills-gap roadmaps for UK graduates.
 
@@ -20,18 +20,16 @@ Rules:
 - Strengths must point to where they appear in what the graduate told you.
 - Gaps are skills the target job needs that the graduate does not show, or shows only weakly. When a job profile from the UK jobs dataset is given, treat its skills list as the authoritative requirements; otherwise use what the job commonly needs.
 - skillMap lists the ${SKILL_MAP_MIN}-${SKILL_MAP_MAX} skills this job asks for most, most important first. Use short names (one to four words). When a job profile is given, take them from its skills list.
-- For each skill, "needed" is the level a junior hire in this job is expected to show, and "current" is the level the graduate's own input shows. Both use this scale:
-  0 = not shown anywhere in what they told you
-  1 = named or listed only, with no use described
-  2 = used in study or coursework
-  3 = used in a project or job, with what they did described
-  4 = used repeatedly, with results described
-  Score "current" from their input only. Put where it shows in "evidence"; when current is 0, evidence is empty.
+- For each skill, "needed" and "current" are levels from 0 to 4. The levels mean:
+  0 = nothing in their material shows it
+  1 = studied it (named in a course or module)
+  2 = used it in a piece of work
+  3 = used it to get a result they describe
+  4 = led or taught it, or used it professionally
+- "current" is the level the graduate's own material shows. Score it only from what they told you, and put where it shows in "evidence" (point to the line, course, project or job). When current is 0, evidence is empty. If you are unsure between two levels, take the lower one. Never score a skill above what a described piece of work supports.
+- "needed" is the level a junior hire in this job is expected to show, and it must vary with how central the skill is to this job. The one or two skills the job is mostly about are 3 or 4. Supporting skills are 1 or 2. Do not give every skill the same level and do not default to 3. "needed" is about the job, not the graduate: do not lower it because they lack the skill.
 - Every gap's "skill" and every name in a project's "closesGaps" must be one of the skillMap names, spelt exactly the same.
-- Suggest exactly 3 projects: their plan of three. Between them, cover the biggest gaps, each project closing different ones where possible.
-- Fit the projects to their situation (e.g. a current student can use coursework; someone working can use their job).
-- Each suggested project must produce a concrete deliverable the graduate can later attach as evidence (a report, repository, dataset, prototype, recording).
-- Projects must be doable by one person without paid tools, in 1-12 weeks.
+- Do not suggest projects. They are written in a separate step.
 - Write in plain British English. No hype words, no exclamation marks.`;
 
 export type RoadmapResult = {
@@ -43,17 +41,18 @@ export type RoadmapResult = {
 };
 
 export async function generateRoadmap(input: RoadmapInput, job: JobProfile | null = null): Promise<RoadmapResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const apiKey = anthropicApiKey();
+  if (!apiKey) {
     // Never hand real visitors a placeholder roadmap.
-    if (process.env.NODE_ENV === "production") throw new Error("ANTHROPIC_API_KEY is not set.");
+    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
     return mockRoadmap(input, job);
   }
 
-  const client = new Anthropic();
+  const client = new Anthropic({ apiKey });
   const response = await client.messages.parse({
     model: AI_MODEL,
-    max_tokens: 4000,
-    output_config: { effort: "low", format: zodOutputFormat(RoadmapSchema) },
+    max_tokens: 3000,
+    output_config: { effort: "low", format: zodOutputFormat(RoadmapModelSchema) },
     system: SYSTEM,
     messages: [
       {
@@ -77,7 +76,7 @@ export async function generateRoadmap(input: RoadmapInput, job: JobProfile | nul
   }
   const { input_tokens, output_tokens } = response.usage;
   return {
-    roadmap: RoadmapSchema.parse(response.parsed_output),
+    roadmap: { ...RoadmapModelSchema.parse(response.parsed_output), projects: [] },
     model: response.model,
     inputTokens: input_tokens,
     outputTokens: output_tokens,
@@ -97,15 +96,24 @@ function mockRoadmap(input: RoadmapInput, job: JobProfile | null): RoadmapResult
         { skill: "Placeholder gap one", whyItMatters: "Shown so the layout can be checked.", currentEvidence: "none" as const },
         { skill: "Placeholder gap two", whyItMatters: "Shown so the layout can be checked.", currentEvidence: "some" as const },
       ];
-  // Fixed placeholder levels so the chart can be checked: the first gap shows some evidence,
-  // the other gaps none, and the remaining skills are already at the level needed.
+  // Fixed placeholder levels so the chart can be checked. The job's needs vary with how central the
+  // skill is (the first is the core one). A gap is a skill below its need (the first shows some
+  // evidence, the others none); the rest meet it, the first of those with a level to spare.
   const skillNames = job
     ? job.skills.slice(0, SKILL_MAP_MAX)
     : [...gaps.map((g) => g.skill), "Placeholder skill three", "Placeholder skill four"];
-  const skillMap = skillNames.map((skill) => {
+  const NEEDED = [4, 3, 3, 2, 2, 1];
+  let spare = true;
+  const skillMap = skillNames.map((skill, i) => {
+    const needed = NEEDED[i] ?? 1;
     const gap = gaps.find((g) => g.skill === skill);
-    const current = !gap ? 3 : gap.currentEvidence === "some" ? 1 : 0;
-    return { skill, needed: 3, current, evidence: current > 0 ? "Placeholder evidence." : "" };
+    let current: number;
+    if (gap) current = gap.currentEvidence === "some" ? 1 : 0;
+    else {
+      current = Math.min(4, needed + (spare ? 1 : 0));
+      spare = false;
+    }
+    return { skill, needed, current, evidence: current > 0 ? "Placeholder evidence." : "" };
   });
   return {
     model: "mock",
@@ -115,17 +123,10 @@ function mockRoadmap(input: RoadmapInput, job: JobProfile | null): RoadmapResult
     roadmap: {
       targetRole: job?.title ?? input.targetRole.slice(0, 80),
       summary: "Development preview: no API key is configured, so this roadmap is placeholder content.",
-      strengths: [{ skill: "Placeholder strength", evidence: "Set ANTHROPIC_API_KEY to generate a real roadmap." }],
+      strengths: [{ skill: "Placeholder strength", evidence: `Set ${ANTHROPIC_API_KEYS_ENV} to generate a real roadmap.` }],
       gaps,
-      // Three, as the prompt asks. The third repeats the first gap, so one gap stays open
-      // and the after-projects chart shows both highlight lists.
-      projects: [gaps[0], gaps[1] ?? gaps[0], gaps[0]].map((g, i) => ({
-        title: `Placeholder project ${i + 1}`,
-        brief: "A sample project so the result page renders.",
-        closesGaps: [g.skill],
-        deliverable: "A short report",
-        weeks: 3,
-      })),
+      // The ideas are made separately (mockIdeas in lib/ai/projects.ts).
+      projects: [],
       skillMap,
     },
   };

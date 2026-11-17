@@ -35,6 +35,16 @@ type Props = {
   value?: string;
   formAction?: (formData: FormData) => void | Promise<void>;
   onClick?: (e: React.MouseEvent) => void;
+  id?: string;
+  /** For a button that opens a panel (a disclosure): whether it's open, and the panel's id. */
+  "aria-expanded"?: boolean;
+  "aria-controls"?: string;
+  /** For a toggle button: whether it's on. */
+  "aria-pressed"?: boolean;
+  "aria-describedby"?: string;
+  /** With `href`: open somewhere else (e.g. "_blank" for a person's file), with its rel. */
+  target?: string;
+  rel?: string;
 };
 
 export function Button({

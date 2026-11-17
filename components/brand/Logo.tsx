@@ -55,7 +55,7 @@ export function Logo({
       <span className="translate-y-[-0.04em]">exhbt</span>
     </>
   );
-  const cls = `inline-flex items-center ${s.gap} ${s.text} font-[family-name:var(--font-display)] leading-none font-semibold tracking-[-0.04em] ${className}`;
+  const cls = `inline-flex items-center ${s.gap} ${s.text} font-[family-name:var(--font-brand)] leading-none font-semibold tracking-[-0.04em] ${className}`;
   return href ? (
     <Link href={href} className={cls} aria-label="Exhbt home">
       {body}

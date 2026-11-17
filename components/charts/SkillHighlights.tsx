@@ -1,9 +1,11 @@
-import { ArrowUp, Check } from "lucide-react";
+import { ArrowUp } from "lucide-react";
+import { Tick } from "@/components/ui/Tick";
 
 /**
- * The two lists under a skill radar: "Level up next" (the biggest shortfalls) and "In the bag"
- * (at or above what the job asks). They carry the chart's meaning in words, so the radar can
- * stay free of numbers. The markers match the ones on the radar's labels.
+ * The two lists under a skill radar: "Level up next" (every skill below what the job asks,
+ * biggest shortfall first) and "In the bag" (every skill at or above it). Together they list each
+ * axis once, for the view the radar is showing. They carry the chart's meaning in words, so the
+ * radar can stay free of numbers. The markers match the ones on the radar's labels.
  */
 
 /** Arrow in an ink ring: a skill to level up. */
@@ -18,16 +20,14 @@ export function UpMarker() {
 /** The green tick used for strengths elsewhere in the roadmap: a skill in the bag. */
 export function BagMarker() {
   return (
-    <span aria-hidden className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-ink bg-mint">
-      <Check size={10} strokeWidth={3} />
-    </span>
+    <Tick size="xs" />
   );
 }
 
 export function SkillHighlights({ up, bag }: { up: string[]; bag: string[] }) {
   if (up.length === 0 && bag.length === 0) return null;
   return (
-    <div className="mt-6 grid gap-3 sm:grid-cols-2">
+    <div className="mt-6 grid gap-3 sm:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]">
       {up.length > 0 && <Group title="Level up next" marker={<UpMarker />} skills={up} />}
       {bag.length > 0 && <Group title="In the bag" marker={<BagMarker />} skills={bag} />}
     </div>

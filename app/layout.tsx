@@ -6,12 +6,14 @@ import "@fontsource/inter/latin-400.css";
 import "@fontsource/inter/latin-500.css";
 import "@fontsource/inter/latin-600.css";
 import { Providers } from "./providers";
+import { PageViewBeacon } from "@/components/site/PageViewBeacon";
+import { HOME_TITLE } from "@/lib/seo";
 import { isPrivatePreview } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: { default: "Exhbt: evidence employers can check", template: "%s · Exhbt" },
+  title: { default: HOME_TITLE, template: "%s · Exhbt" },
   description:
-    "A free skills-gap roadmap for graduates, then a portfolio of short, checked exhbts of your project work that hiring managers can read in 30 seconds.",
+    "A free skills-gap roadmap for graduates, then your own portfolio site at name.exhbt.co.uk, built from short, checked exhbts of your project work.",
   // Private preview: keep every page out of search results (see lib/site.ts).
   ...(isPrivatePreview ? { robots: { index: false, follow: false } } : {}),
 };
@@ -28,11 +30,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             Skip to content
           </a>
           {isPrivatePreview && (
-            <p role="note" className="bg-ink px-4 py-1.5 text-center text-[0.8rem] font-medium text-white">
+            <p role="note" className="bg-ink px-4 py-1.5 text-center text-[0.8rem] font-medium text-white print:hidden">
               Private preview. Exhbt isn&rsquo;t public yet, so please don&rsquo;t share this link widely.
             </p>
           )}
           {children}
+          <PageViewBeacon />
         </Providers>
       </body>
     </html>

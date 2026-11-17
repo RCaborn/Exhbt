@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 import { Exhbt } from "@/components/exhbt/Exhbt";
 import { exampleExhbt } from "@/lib/exhbt";
+import { marketingMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "For employers: how to read an exhbt",
-  description: "A two-minute guide for hiring managers and careers staff to Exhbt portfolios. Free, no account needed.",
-};
+export const metadata: Metadata = marketingMetadata("how-to-read-an-exhbt");
 
 const FIELDS: { id?: string; name: string; body: string }[] = [
   {
@@ -26,7 +24,7 @@ const FIELDS: { id?: string; name: string; body: string }[] = [
   },
   {
     name: "Skills",
-    body: "The skills this project demonstrates, in boxes. On a job-specific link, the exhbts are chosen and ordered by how well these match your advert.",
+    body: "The skills this project demonstrates, in boxes.",
   },
   {
     name: "The work",
@@ -35,7 +33,7 @@ const FIELDS: { id?: string; name: string; body: string }[] = [
   {
     id: "checks",
     name: "Checked by exhbt",
-    body: "The seal and the three ticks are added by Exhbt, not the author. Confirmed by author: they declared it accurate and their own. Source attached: the underlying work is linked. Originality checked: the text and attached work passed a third-party originality check on the date on the seal.",
+    body: "The seal and the ticks are added by Exhbt, not the author. Confirmed by author: they declared it accurate and their own. Source attached: the underlying work is linked. Originality checked (coming soon): when this tick appears, the text and attached work passed a third-party originality check on the date on the seal.",
   },
   {
     name: "Reflection",
@@ -51,7 +49,7 @@ export default function HowToRead() {
         <p className="mt-4 text-lg text-graphite">
           For hiring managers and careers staff. An exhbt is one project from a graduate&rsquo;s portfolio. Every
           one uses the same layout and limits, about 200 words plus a chart, so once you know the parts you can
-          read any of them in about thirty seconds. Free, and you never need an account.
+          read any of them quickly. Free, and you never need an account.
         </p>
       </div>
 
@@ -72,7 +70,7 @@ export default function HowToRead() {
           <section aria-labelledby="not" className="mt-12">
             <h2 id="not">What an exhbt does not tell you</h2>
             <p className="mt-3">
-              The checks confirm that the author stands behind it and that the work is attached and original. They
+              The checks confirm that the author stands behind it and that the work is attached. They
               do not grade the work or verify results with a third party such as a supervisor. Treat an exhbt as
               well-organised evidence to look at and ask about, not as a reference.
             </p>

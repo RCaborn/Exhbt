@@ -25,7 +25,7 @@ Lower case because it reads as a product and as the URL people will type. In sen
 Every exhbt in a portfolio has a number like a museum accession number: `EX·01`, `EX·02`.
 
 - Derived from its position in the owner's portfolio (`catalogueNo(position)` in `lib/exhbt.ts`). Never stored and never typed by hand.
-- Inter with tabular numbers, semibold, ink. On a tile it sits top left; on a full exhbt it sits above the author line.
+- Inter with tabular numbers, semibold, ink. On a tile it sits top left; on the demo card (`Exhbt.tsx`) it sits above the author line. The exhbt page itself doesn't show one (decision 0022).
 - Use them only for exhbts. Don't number marketing sections, features or steps with them; DESIGN.md still bans decorative numbering.
 - On a job-specific link, the numbers follow that link's order.
 
@@ -37,10 +37,18 @@ Every exhbt in a portfolio has a number like a museum accession number: `EX·01`
 - The three mint ticks stay next to it on the full exhbt.
 
 ## Brand band
-One ink surface per portfolio page, at the top: `PortfolioHeader` on the portfolio, the slim `PortfolioBar` above a single exhbt.
+One coloured surface per portfolio page: the "My best piece of work" band on the portfolio home (decision 0016). Its colour comes from the person's look (decision 0018): wash in the default Exhbt look. The demo's slim `PortfolioBar` keeps the dark band.
 
-- Text on ink is white, or `#C9CBCF` for secondary text. Keep everything on the band at 7:1 or more.
-- No other ink blocks on those pages apart from the site footer.
+- Every text on the band reaches WCAG AA (4.5:1) in every look. On a dark band text is white, or `#C9CBCF` for secondary text.
+
+## Portfolio looks
+Eight looks for different people (`lib/portfolio-themes.ts`, decision 0018, from Rory's spec): Exhbt, Classic professional, Notebook, Mono, Night, Studio, Ledger and Bloom. Classic, Studio and Bloom come in a few colourways.
+
+- A portfolio is the person's page, not ours, so a look may leave the brand palette and faces: Classic's deep accents and Newsreader serif, Studio's loud block of colour, Bloom's pastels, Mono's JetBrains Mono. Marketing and app pages keep the kit.
+- The look carries over from the portfolio home to every exhbt, the pager, the sign-off and a per-job page.
+- Every look is fixed and checked once: every pairing on both pages reaches WCAG AA, and its graphs keep one hue in two shades in its own colour. A test works this out for every look, so a new one can't land below it.
+- The mark keeps its own colours in every look, and the wordmark keeps Bricolage Grotesque.
+- The default is Exhbt: white, mint, rounded, as the site is.
 
 ## Sign-off
 `components/brand/MadeWith.tsx`: "Portfolio made with exhbt · Build your own roadmap →", at the foot of every public portfolio and exhbt. Employers read these pages, and it's how the next student finds us. Keep it to one quiet line; no banners or pop-ups.
