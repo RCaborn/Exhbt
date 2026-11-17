@@ -229,7 +229,9 @@ export function Editor(props: EditorProps) {
     // for slower ones, and a stalled upload holds back only the ones picked after it.
     const results: ({ fileId: string; size?: { w: number; h: number } } | null)[] = take.map(() => null);
     const settled: boolean[] = take.map(() => false);
-    const placedIds: string[] = [];
+    // What the updater decided for each file: true placed, false rejected (no room left in the layout by then).
+    // The same answer however many times React runs the updater, so it is safe to read afterwards.
+    const outcome = new Map<string, boolean>();
     let placedUpTo = 0;
     let roomLeft = room;
     const place = () => {
@@ -245,8 +247,11 @@ export function Editor(props: EditorProps) {
         }
         roomLeft--;
         added++;
-        placedIds.push(r.fileId);
-        setDoc((d) => (roomFor(d.sections, "image", formatOf(d)) === 0 ? d : { ...d, sections: [...d.sections, newImageSection(r.fileId, d.sections, r.size)] }));
+        setDoc((d) => {
+          const fits = roomFor(d.sections, "image", formatOf(d)) > 0;
+          outcome.set(r.fileId, fits);
+          return fits ? { ...d, sections: [...d.sections, newImageSection(r.fileId, d.sections, r.size)] } : d;
+        });
       }
     };
     const worker = async () => {
@@ -276,12 +281,13 @@ export function Editor(props: EditorProps) {
     await Promise.all([worker(), worker()]);
     setBusy((b) => ({ ...b, image: false }));
     if (imageInput.current) imageInput.current.value = "";
-    // A picture the layout had no room for after all (it changed while they uploaded) is never kept in storage.
+    // A picture the updater itself refused (the layout had no room by then) was never in any doc, so its file
+    // goes. One that was placed and later removed by the person is theirs to drop: that goes through
+    // dropFile and the save, never through here.
     setTimeout(() => {
-      const have = new Set(fileIdsOf(docRef.current));
-      const lost = placedIds.filter((f) => !have.has(f));
-      for (const f of lost) void removeFile(f);
-      if (lost.length) setMediaError((m) => ({ ...m, image: [m.image, `${lost.length === 1 ? "One picture" : `${lost.length} pictures`} couldn't be added: there was no room in this layout.`].filter(Boolean).join("\n") }));
+      const rejected = [...outcome].filter(([, fits]) => !fits).map(([f]) => f);
+      for (const f of rejected) void removeFile(f);
+      if (rejected.length) setMediaError((m) => ({ ...m, image: [m.image, `${rejected.length === 1 ? "One picture" : `${rejected.length} pictures`} couldn't be added: there was no room in this layout.`].filter(Boolean).join("\n") }));
     }, 300);
     if (problems.length) setMediaError((m) => ({ ...m, image: problems.join("\n") }));
     if (added > 0) {

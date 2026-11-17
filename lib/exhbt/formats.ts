@@ -51,6 +51,8 @@ export const FORMAT_COPY: Record<
     /** The field label and the example inside it, for "what I'd do next" / the limitations. */
     reflectionLabel: string;
     reflectionPlaceholder: string;
+    /** What the rewrite calls each part, as a plain noun phrase with no article ("Rewrite the brief"). */
+    rewriteName: { header: string; gap: string; flow: string; findings: string };
     link: string;
     linkHint: string;
   }
@@ -68,6 +70,7 @@ export const FORMAT_COPY: Record<
     reflection: "What I'd do next",
     reflectionLabel: "What you'd do next, or do differently",
     reflectionPlaceholder: "e.g. Next time I'd time the evening queue too, to see if a second till pays off then.",
+    rewriteName: { header: "question and details", gap: "context", flow: "process", findings: "findings" },
     link: "Link",
     linkHint: "A repository, a demo or a document. The page shows what it is, and links to it.",
   },
@@ -84,6 +87,7 @@ export const FORMAT_COPY: Record<
     reflection: "What I'd do next",
     reflectionLabel: "What you'd do next, or do differently",
     reflectionPlaceholder: "e.g. Next time I'd test the poster on the halls noticeboards a week earlier.",
+    rewriteName: { header: "work and details", gap: "brief", flow: "steps", findings: "outcome" },
     link: "Link",
     linkHint: "The film, the full set of pictures or the deck. The page shows what it is, and links to it.",
   },
@@ -100,6 +104,7 @@ export const FORMAT_COPY: Record<
     reflection: "Limitations and next steps",
     reflectionLabel: "The limits of the study, and what you'd do next",
     reflectionPlaceholder: "e.g. One university and volunteers only. Next I'd test recall a day later.",
+    rewriteName: { header: "research question and details", gap: "background", flow: "method", findings: "results" },
     link: "Reference",
     linkHint: "A paper or source you used. The page shows the citation, and links to it.",
   },
