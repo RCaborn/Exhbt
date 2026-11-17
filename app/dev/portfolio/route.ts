@@ -31,7 +31,7 @@ const MAX_COUNT = sampleSeeds.length + MORE_TITLES.length;
  * stores it already read into sections instead, to compare the two. `with=open-banking` adds the
  * sample in the page layout of decision 0022 at /p/<username>/open-banking; `with=full` the same with
  * every section but an image, near the word cap, at /p/<username>/open-banking-full.
- * `with=gallery` publishes the gallery sample at /p/<username>/freshers-campaign and `with=research`
+ * `with=flow` publishes six-box and five-box case studies at /p/<username>/flow-six and /flow-five. `with=gallery` publishes the gallery sample at /p/<username>/freshers-campaign and `with=research`
  * the research one at /p/<username>/walk-and-recall (decision 0024); `with=formats` both. `with` is a
  * comma list (`with=open-banking,formats`). Their pictures are flat SVG drawings stored as the
  * user's own files, so they go through the same ownership checks as an upload.
@@ -109,6 +109,14 @@ export async function GET(req: NextRequest) {
   if (withs.has("full")) {
     const id = await store.createExhbt(userId, fullDoc);
     await store.publishExhbt(id, userId, "open-banking-full");
+  }
+  // Case studies with five and six boxes of longer wording, to check no word splits (decision 0022): /flow-five and /flow-six.
+  if (withs.has("flow")) {
+    const six = ["Define bank and fintech strategies", "Set payoff matrix with openness parameter", "Derive replicator equations and rest points", "Classify stability of each equilibrium", "Select outcome via risk dominance", "Compare with the mandate's aims"];
+    for (const [slug, steps] of [["flow-six", six], ["flow-five", six.slice(1)]] as const) {
+      const id = await store.createExhbt(userId, { ...openBankingDoc, title: `Flowchart with ${steps.length} boxes`, flow: steps.map((step) => ({ step })) });
+      await store.publishExhbt(id, userId, slug);
+    }
   }
   // The gallery and research layouts (decision 0024), each with pictures that are the user's own stored files.
   if (withs.has("gallery") || withs.has("formats")) {
