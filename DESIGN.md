@@ -40,6 +40,7 @@ Tokens live in the `@theme` block of `app/globals.css`. The same values feed the
 - Mint always takes **ink** text (12.4:1). White on mint fails (1.5:1). Anything mint that has to be read as text or a thin line is jade instead.
 - On a mint band the button switches to ink (`variant="ink"`) and the mark flips (`tone="on-mint"`).
 - One mint band per page at most (Home: the closing band). No blue, purple or orange anywhere.
+- One ink section on Home, and only there: "A site that's all yours", the address section, where the white browser frame round the portfolio stands out. Never next to the ink footer. Text on it is white, or `on-ink` (`#C9CBCF`) for secondary text; the address's name part is mint.
 - The greys are neutral, with no colour cast.
 
 ## Type
@@ -54,7 +55,7 @@ Tokens live in the `@theme` block of `app/globals.css`. The same values feed the
 - One content width on marketing pages (`max-w-[72rem]`), so every section shares its left and right edges.
 
 ## Motion
-Feedback only: buttons respond to hover and press (Astryx), link underlines darken, a linked card lifts 2px (`.card-link`), and on Home the example exhbt's three ticks fill mint in sequence. Nothing moves because the page scrolled. Under `prefers-reduced-motion` everything rests.
+Feedback only: buttons respond to hover and press (Astryx), link underlines darken, a linked card lifts 2px (`.card-link`), and a question's plus turns to a cross as it opens. Nothing moves because the page scrolled. Under `prefers-reduced-motion` everything rests.
 
 ## Focus
 3px jade outline with a white gap and ink halo: visible on white, mist, mint and ink.
@@ -79,8 +80,11 @@ Full rules, sizes and don'ts are in `docs/brand.md`. In short:
 - **Sign-off** (`MadeWith`): "Portfolio made with exhbt · Build your own roadmap" at the foot of every public portfolio and exhbt.
 
 ## Components
-- `StartForm`: the role field + "Build my roadmap" button. GET to `/roadmap/new?role=`. Used in the hero and the closing band; the label never changes.
+- `StartForm`: the role field + "Build my roadmap" button. GET to `/roadmap/new?role=`. Used in the hero and the closing band; the label never changes. The field is the button's height, so the button sits in the pill with the same gap on every side; the field shrinks and the button never does. Below `sm` they stack, the button full width. No icon in the button.
 - `BrowserFrame`: adapted from garden-skills web-design-engineer; shows product screens as pages, not floating cards.
+- `Preview` (`components/home/Preview.tsx`): a real product page as a picture on a marketing page: the real component (`ProjectView`, `PortfolioHome`) with the fictional demo data, in a `BrowserFrame` at its address, inert and hidden from screen readers with a caption that says what it shows. A CSS `zoom` from `lg` draws a wide page smaller in a narrow column while it still lays out wide (its container queries read the unzoomed width); below that it renders at its real size, as a phone shows it. Never a marketing copy of a product screen: it would drift from the product.
+- **Pattern**: the viewfinder pattern (`.pattern-viewfinder` in `globals.css`): the mark's brackets, turned every other step, with the evidence dot, tiled flat in mint and jade on mist, as inline SVG (nothing downloads, nothing moves). Only behind a product picture, never behind text: on Home it is the panel round the example exhbt. It may also sit behind a product picture on another marketing page; not on the app, a portfolio or an exhbt page, and never on mint, ink or wash.
+- `Faq` (`components/home/Faq.tsx`): each question a native `<details>` disclosure, closed to start, with a round plus that turns to a cross. Any number can be open.
 - `Exhbt` / `TrustBadge`: the fixed exhbt template. Order:
   1. catalogue number (when it sits in a portfolio), then who
   2. title (display face)

@@ -1,12 +1,13 @@
 import { Link2 } from "lucide-react";
 import { EXHBTS_PER_JOB_LINK, JOB_LINKS_LIVE, PLAN_NAMES } from "@/lib/entitlements";
-import { portfolioUrl } from "@/lib/hosts";
+import { portfolioHost, portfolioUrl } from "@/lib/hosts";
 
 /**
  * "A link for each job you apply for" (Max; decisions 0001 and 0008, docs/phase-2.md section 8).
- * The words say what the feature does; the sketch beside them shows one person's links side by
- * side, each a path on her own address, with the exhbts the AI picked for that job. "Coming soon"
- * shows until JOB_LINKS_LIVE in lib/entitlements.ts is true, so the section is right either way.
+ * The words say what the feature does (lib/ai/job-match.ts: up to EXHBTS_PER_JOB_LINK picks, best
+ * first, and an intro the person can edit); the sketch beside them shows one person's links, each a
+ * path on her own address, with the exhbt the AI put first for that job. "Coming soon" shows while
+ * JOB_LINKS_LIVE in lib/entitlements.ts is false, so the section is right either way.
  */
 export function JobLinks({ username, owner, picks }: { username: string; owner: string; picks: { slug: string; job: string; lead: string }[] }) {
   const first = owner.split(" ")[0];
@@ -23,12 +24,12 @@ export function JobLinks({ username, owner, picks }: { username: string; owner: 
             </p>
           )}
           <p className="mt-5 max-w-[34rem] text-lg text-graphite">
-            Paste the job description and the AI picks the {EXHBTS_PER_JOB_LINK} exhbts of yours that fit it best, then
-            writes a short intro for that job. Send <span className="font-semibold text-ink">{portfolioUrl(username, picks[0]!.slug)}</span>{" "}
+            Paste the job description. The AI picks your {EXHBTS_PER_JOB_LINK} exhbts that fit it best and drafts a short intro
+            for you to edit. Send <span className="font-semibold text-ink">{portfolioUrl(username, picks[0]!.slug)}</span>{" "}
             with one application and a different link with the next.
           </p>
           <p className="mt-4 max-w-[34rem] text-graphite">
-            On {PLAN_NAMES.max}. Search engines never list these links, and you can switch one off whenever you like.
+            On {PLAN_NAMES.max}. Search engines never list these links, and you can turn one off whenever you like.
           </p>
         </div>
         <figure className="m-0 min-w-0">
@@ -43,7 +44,10 @@ export function JobLinks({ username, owner, picks }: { username: string; owner: 
               >
                 <p className="flex min-w-0 items-center gap-2 text-[0.95rem] font-semibold">
                   <Link2 size={16} strokeWidth={2.25} className="shrink-0 text-jade" />
-                  <span className="min-w-0 truncate font-mono">{portfolioUrl(username, p.slug)}</span>
+                  <span className="min-w-0 truncate font-mono">
+                    <span className="font-medium text-graphite">{portfolioHost(username)}</span>
+                    <span className="text-ink">/{p.slug}</span>
+                  </span>
                 </p>
                 <p className="mt-1 text-[0.875rem] text-graphite">For {p.job}</p>
                 <div className="mt-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-t border-line pt-3">

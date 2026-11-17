@@ -120,11 +120,11 @@ export default function Home() {
     <>
       {/* Hero: the promise, one line under it, and the way in. */}
       <section className="bg-surface">
-        <div className="mx-auto flex max-w-[72rem] flex-col items-center px-4 pt-14 pb-16 text-center sm:px-8 sm:pt-20 lg:pt-24 lg:pb-20">
-          <h1 className="display max-w-[15ch]">
+        <div className="mx-auto flex max-w-[72rem] flex-col items-center px-4 pt-12 pb-14 text-center sm:px-8 sm:pt-16 lg:pt-20 lg:pb-16">
+          <h1 className="display max-w-[21ch]">
             A website of your own, <span className="highlight">built from your projects.</span>
           </h1>
-          <p className="mt-6 max-w-[38rem] text-[1.15rem] text-graphite sm:text-[1.3rem]">
+          <p className="mt-6 max-w-[38rem] text-[1.15rem] text-balance text-graphite sm:text-[1.3rem]">
             Turn your project work into a portfolio at {ADDRESS}. Start with a free roadmap that shows which skills to
             prove first.
           </p>
@@ -169,6 +169,8 @@ export default function Home() {
             <Preview
               url={portfolioUrl(demoOwner.username, featured!.slug)}
               label={`An example exhbt by ${demoOwner.name}, as it looks on her site: ${featured!.doc.title}`}
+              // Below lg it's the page as a phone shows it, cropped to its first screen; from lg the whole page, smaller.
+              crop="max-h-[50rem] lg:max-h-none"
               className="bg-surface p-4 sm:p-6 lg:p-8 lg:[zoom:0.72]"
             >
               <ProjectView
