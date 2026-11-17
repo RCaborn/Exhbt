@@ -174,7 +174,7 @@ test.describe("Portfolio looks (Phase 2)", () => {
     expect(await shown(page, username)).toEqual({ id: "classic-burgundy", band: themeById("classic-burgundy")!.palette.band });
     await page.locator("[data-portfolio-home] a", { hasText: "See how I did it" }).first().click();
     await page.waitForURL(/\/p\/[^/]+\/[^/]+$/);
-    await expect(page.locator('[data-look="classic"][data-theme="classic-burgundy"]')).toContainText("Made with");
+    await expect(page.locator('[data-look="classic"][data-theme="classic-burgundy"]')).toContainText("Portfolio made with");
 
     await openLook(page);
     await expect(lookRadios(page).and(page.locator("[value=classic-burgundy]"))).toBeChecked();

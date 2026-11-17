@@ -401,8 +401,7 @@ function LedgerHero(props: HeroProps) {
         </div>
         <Face person={person} theme={theme} className="size-24 @3xl:size-32" initialsClass="text-[2rem]" />
       </div>
-      <dl data-ledger className="mt-10 border-t border-b-[3px] border-[color:var(--pf-rule)] [border-bottom-style:double] tabular-nums">
-        <div className="pf-rows">
+      <dl data-ledger className="pf-rows mt-10 border-t border-b-[3px] border-[color:var(--pf-rule)] [border-bottom-style:double] tabular-nums">
           {rows.map((r, i) => (
             <div key={i} className="flex items-baseline justify-between gap-6 py-3.5">
               <dt className="min-w-0">{r.label}</dt>
@@ -413,7 +412,6 @@ function LedgerHero(props: HeroProps) {
             <dt>Pieces of work</dt>
             <dd>{projects.length}</dd>
           </div>
-        </div>
       </dl>
     </header>
   );

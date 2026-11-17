@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
   }
   // The exhbt in the page layout of decision 0022 (title as the question, summary, where and when), last.
   if (q.get("with") === "open-banking") {
-    const id = await store.createExhbt(userId, openBankingDoc);
+    const id = await store.createExhbt(userId, noGraphs ? { ...openBankingDoc, sections: openBankingDoc.sections.filter((s) => s.kind !== "graph") } : openBankingDoc);
     await store.publishExhbt(id, userId, "open-banking");
   }
   // The same with every section but an image, near the word cap (the one-page print check).
