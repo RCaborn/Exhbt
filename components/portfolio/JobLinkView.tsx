@@ -29,7 +29,7 @@ export function JobLinkView({
 }) {
   const Main = embedded ? "div" : "main";
   const { link, displayName, photoUrl, items, base, theme } = data;
-  const heading = [link.company, link.roleTitle].map((s) => s.trim()).filter(Boolean).join(" · ");
+  const heading = [link.company, link.roleTitle].map((s) => s.trim()).filter(Boolean).join(" · "); // non-breaking space keeps the "·" on the company's line
   const intro = link.intro.split(/\n{2,}/).filter((p) => p.trim());
   const corners = theme.photo === "round" ? "rounded-full" : "rounded-[var(--pf-radius-lg)]";
   const face = "size-20 @3xl:size-28";
