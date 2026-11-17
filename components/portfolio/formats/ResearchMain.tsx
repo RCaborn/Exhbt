@@ -83,7 +83,7 @@ export function ResearchMain({ doc, imageUrls, Sub }: { doc: ExhbtDoc; imageUrls
 
       {(findings || hasRight) && (
         <div className={`xp-section grid items-start gap-8 ${findings && hasRight && (conclusion || reflection) ? "@2xl/main:grid-cols-2 print:grid-cols-2 print:gap-5" : ""}`}>
-          {findings && <Findings s={findings} Sub={Sub} heading="Results" part="results" />}
+          {findings && <Findings s={findings} Sub={Sub} heading="Results" part="results" kicker />}
           {conclusionAndNext}
         </div>
       )}

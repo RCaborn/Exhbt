@@ -10,18 +10,19 @@ import { safeHref } from "./blocks";
 export const squash = (s: string): string => s.replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ").trim().toLowerCase();
 
 /**
- * The references that are real: each needs an https address that appears in `source` as written
- * and a label. Anything else is dropped (never made up, never http:, never javascript:). At most `max`.
+ * The references that are real: each needs an https address that appears in `source` exactly as
+ * written (same case, whole address: a changed or cut-short one is dropped) and a label. Anything
+ * else is dropped (never made up, never http:, never javascript:). At most `max`.
  */
 export function referencesFrom(refs: { label: string; url: string }[], source: string, max: number): { href: string; label: string }[] {
-  const flat = squash(source);
+  const written = new Set((source.match(/https:\/\/[^\s<>"'()[\]]+/g) ?? []).map((u) => u.replace(/[.,;:!?]+$/, "")));
   const out: { href: string; label: string }[] = [];
   for (const r of refs) {
     if (out.length >= max) break;
     const label = r.label.trim();
     const url = r.url.trim();
     const href = safeHref(url);
-    if (!label || !url || !href || !flat.includes(squash(url))) continue;
+    if (!label || !url || !href || !written.has(url)) continue;
     out.push({ href, label });
   }
   return out;

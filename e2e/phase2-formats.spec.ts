@@ -313,6 +313,15 @@ test.describe("model: references, captions, notes", () => {
     ];
     expect(referencesFrom(refs, source, 5).map((r) => r.label)).toEqual(["Paper", "Other"]);
     expect(referencesFrom(refs, source, 1)).toHaveLength(1);
+    // Exactly as written: a changed case or a cut-short address is not the address in the material.
+    const written = "Read https://example.org/Papers/AbC-2024 and https://example.com.au/x.";
+    const bad = [
+      { label: "Case", url: "https://example.org/papers/abc-2024" },
+      { label: "Short", url: "https://example.org/Papers/AbC" },
+      { label: "Host", url: "https://example.com" },
+    ];
+    expect(referencesFrom(bad, written, 5)).toEqual([]);
+    expect(referencesFrom([{ label: "Ok", url: "https://example.org/Papers/AbC-2024" }, { label: "Au", url: "https://example.com.au/x" }], written, 5)).toHaveLength(2);
   });
 
   test("fitCaption takes a cap", () => {
@@ -505,6 +514,11 @@ const sectionsArea = (page: Page) => page.getByRole("region", { name: "Sections"
 const previewArticle = (page: Page) => page.getByRole("region", { name: "Preview" }).locator("article[data-exhbt-page]");
 const wordsOnBar = async (page: Page) => Number((await page.locator("[data-word-bar]").innerText()).match(/^(\d+) words/)?.[1]);
 const images = (page: Page) => page.locator("input[aria-label='Choose an image']");
+/** As in use: the person pressed "Add a section" > "Add an image", so focus is in the sections when the pictures are chosen. */
+async function pick(page: Page, files: Parameters<ReturnType<typeof images>["setInputFiles"]>[0]) {
+  await page.locator("#add-section").focus();
+  await images(page).setInputFiles(files);
+}
 
 test.describe("The layout choice in the editor", () => {
   test("three radios named Layout; the arrow keys pick Gallery, the preview follows, Undo goes back", async ({ page }) => {
@@ -567,7 +581,7 @@ test.describe("Pictures in the editor", () => {
   test("three at once in a gallery: three cards, the first the lead image, the cursor in the first description", async ({ page }) => {
     await startEditor(page, `gal${stamp()}`);
     await chooseLayout(page, "Gallery");
-    await images(page).setInputFiles([png("a.png"), png("b.png"), png("c.png")]);
+    await pick(page, [png("a.png"), png("b.png"), png("c.png")]);
     const area = sectionsArea(page);
     await expect(area.getByRole("region", { name: "Lead image", exact: true })).toBeVisible();
     await expect(area.getByRole("region", { name: "Image 2", exact: true })).toBeVisible();
@@ -581,7 +595,7 @@ test.describe("Pictures in the editor", () => {
 
   test("a case study with no images takes two of three and says so", async ({ page }) => {
     await startEditor(page, `two${stamp()}`);
-    await images(page).setInputFiles([png("a.png"), png("b.png"), png("c.png")]);
+    await pick(page, [png("a.png"), png("b.png"), png("c.png")]);
     await expect(sectionsArea(page).getByRole("region", { name: /^Image [12]$/ })).toHaveCount(2);
     await expect(page.getByText("Only 2 more fit in this layout. The rest weren't added.")).toBeVisible();
   });
@@ -589,7 +603,7 @@ test.describe("Pictures in the editor", () => {
   test("a file that isn't a picture is named and skipped", async ({ page }) => {
     await startEditor(page, `bad${stamp()}`);
     await chooseLayout(page, "Gallery");
-    await images(page).setInputFiles([png("good.png"), { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hi") }, png("good2.png")]);
+    await pick(page, [png("good.png"), { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hi") }, png("good2.png")]);
     await expect(sectionsArea(page).getByRole("region", { name: /^(Lead image|Image 2)$/ })).toHaveCount(2);
     await expect(page.getByRole("alert").filter({ hasText: "notes.txt: Use a JPEG, PNG, WebP or GIF picture." })).toBeVisible();
   });
@@ -608,7 +622,7 @@ test.describe("Pictures in the editor", () => {
     });
     const buffer = Buffer.from(dataUrl.split(",")[1]!, "base64");
     const sent = page.waitForRequest((r) => r.url().includes("/api/files/upload-url"));
-    await images(page).setInputFiles({ name: "big.png", mimeType: "image/png", buffer });
+    await pick(page, { name: "big.png", mimeType: "image/png", buffer });
     const body = (await sent).postDataJSON() as { name: string; mime: string };
     expect(body.name.endsWith(".webp")).toBe(true);
     expect(body.mime).toBe("image/webp");
@@ -620,7 +634,7 @@ test.describe("Pictures in the editor", () => {
   test("Make lead image moves Image 2 to the front, and the preview follows", async ({ page }) => {
     await startEditor(page, `lead${stamp()}`);
     await chooseLayout(page, "Gallery");
-    await images(page).setInputFiles([png("a.png"), png("b.png"), png("c.png")]);
+    await pick(page, [png("a.png"), png("b.png"), png("c.png")]);
     for (const [n, alt] of ["first", "second", "third"].entries()) await page.locator(`#image-${n}-alt`).fill(alt);
     const preview = previewArticle(page).locator("[data-part=lead] img").first();
     await expect(preview).toHaveAttribute("alt", "first");
@@ -697,5 +711,139 @@ test.describe("The draft suggests a layout", () => {
     expect(((await withSignals.json()) as { format: string }).format).toBe("case-study");
     const bad = await page.request.post("/api/exhbts/draft", { data: { text: PLAIN_MATERIAL, signals: { imageFiles: -1, pdfPages: 0, pdfPicturePages: 0 } } });
     expect(bad.status()).toBe(400);
+  });
+});
+
+/* ---------------- Review fixes ---------------- */
+
+test.describe("Pictures keep the order they were picked in", () => {
+  test("a big first picture that finishes last is still the lead image", async ({ page }) => {
+    await startEditor(page, `ord${stamp()}`);
+    await chooseLayout(page, "Gallery");
+    const dataUrl = await page.evaluate(() => {
+      const c = document.createElement("canvas");
+      c.width = 3000;
+      c.height = 2000;
+      const x = c.getContext("2d")!;
+      x.fillStyle = "#1a7f64";
+      x.fillRect(0, 0, 3000, 2000);
+      return c.toDataURL("image/png");
+    });
+    const big = Buffer.from(dataUrl.split(",")[1]!, "base64");
+    // The first picture's upload is held back, so the second one finishes first.
+    await page.route("**/api/files/upload-url", async (route) => {
+      const body = route.request().postDataJSON() as { name: string };
+      if (body.name.startsWith("big")) await new Promise((r) => setTimeout(r, 2500));
+      await route.continue();
+    });
+    await pick(page, [{ name: "big.png", mimeType: "image/png", buffer: big }, png("small.png")]);
+    // The big one (shrunk to 2400 wide) is Image 1, the lead; the 1-pixel one is Image 2.
+    const lead = previewArticle(page).locator("[data-part=lead] img").first();
+    await expect(lead).toHaveAttribute("width", "2400");
+    await expect(sectionsArea(page).getByRole("region", { name: /^(Lead image|Image 2)$/ })).toHaveCount(2);
+    const sizes = await page.locator("[data-part=grid] img").evaluateAll((els) => els.map((e) => e.getAttribute("width")));
+    expect(sizes).toEqual(["1"]);
+  });
+});
+
+test.describe("The gallery's lead image shows its keyboard focus", () => {
+  test("nothing clips the ring, and the ring is drawn in every look", async ({ page }) => {
+    for (const t of PORTFOLIO_THEMES) {
+      const u = await seed(page, t.id);
+      await page.goto(`/p/${u}/freshers-campaign`);
+      const lead = page.locator("[data-part=lead] button").first();
+      await page.keyboard.press("Tab");
+      await lead.focus();
+      const facts = await lead.evaluate((el) => {
+        const ring = getComputedStyle(el);
+        const clipped: string[] = [];
+        for (let n: HTMLElement | null = el.parentElement; n && n.tagName !== "ARTICLE"; n = n.parentElement) {
+          const o = getComputedStyle(n);
+          if (o.overflowX !== "visible" || o.overflowY !== "visible") clipped.push(n.className);
+        }
+        const fig = el.closest("figure")!;
+        return {
+          focusVisible: el.matches(":focus-visible"),
+          outlineWidth: parseFloat(ring.outlineWidth),
+          shadow: ring.boxShadow,
+          clipped,
+          padding: parseFloat(getComputedStyle(fig).paddingLeft),
+        };
+      });
+      expect(facts.focusVisible, t.id).toBe(true);
+      expect(facts.outlineWidth, t.id).toBeGreaterThan(0);
+      expect(facts.shadow, t.id).not.toBe("none");
+      expect(facts.clipped, `${t.id}: an ancestor clips the ring`).toEqual([]);
+      // The ring (3px outline, 2px offset, 7px outer ring) fits in the figure's padding.
+      expect(facts.padding, t.id).toBeGreaterThanOrEqual(7);
+    }
+  });
+});
+
+test.describe("Research's figure cap", () => {
+  test("the menu says why a figure can't be added, and the picker counts them", async ({ page }) => {
+    await startEditor(page, `fig${stamp()}`);
+    await chooseLayout(page, "Research");
+    for (let i = 0; i < 2; i++) {
+      await page.getByRole("button", { name: "Add a section" }).click();
+      await page.getByRole("button", { name: "Add a graph", exact: true }).click();
+    }
+    await pick(page, png("one.png"));
+    await expect(sectionsArea(page).getByRole("region", { name: /^Image/ })).toHaveCount(1);
+    await page.getByRole("button", { name: "Add a section" }).click();
+    const add = page.getByRole("button", { name: "Add an image", exact: true });
+    await expect(add).toBeDisabled();
+    await expect(add).toHaveAccessibleDescription("Up to 3 figures, graphs and images together.");
+  });
+
+  test("switching a case study with four figures to research says so", () => {
+    const graph = (n: number): Section => ({ id: `graph-${n}`, kind: "graph", chart: { kind: "bar", title: "T", unit: "%", rows: [{ label: "A", value: 1 }, { label: "B", value: 2 }] } });
+    const d: ExhbtDoc = { ...libraryDoc, sections: [...libraryDoc.sections, graph(1), graph(2), image(1), image(2)] };
+    const notes = layoutNotes(withFormat(d, "research"));
+    expect(notes.over).toContain("This layout shows up to 3 figures, graphs and images together; you have 4. Remove some before you publish, or switch back.");
+  });
+});
+
+test.describe("Rewrite and wording by layout", () => {
+  test("the editor's cards use the layout's words", async ({ page }) => {
+    await startEditor(page, `wd${stamp()}`);
+    await chooseLayout(page, "Research");
+    await expect(page.getByRole("region", { name: "Your research question and details" })).toBeVisible();
+    await page.getByRole("button", { name: "Add a section" }).click();
+    await page.getByRole("button", { name: /^Add limitations and next steps/ }).click();
+    await expect(sectionsArea(page).getByText("The limits of the study, and what you'd do next")).toBeVisible();
+    await page.getByRole("button", { name: "Add a section" }).click();
+    await page.getByRole("button", { name: "Add a reference", exact: true }).click();
+    await expect(sectionsArea(page).getByText("A paper or source you used. The page shows the citation, and links to it.")).toBeVisible();
+  });
+
+  test("the arrange list leaves out a kept aim", async ({ page }) => {
+    await startEditor(page, `arl${stamp()}`);
+    await chooseLayout(page, "Research");
+    await page.getByRole("button", { name: "Add a section" }).click();
+    await page.getByRole("button", { name: "Add aim or hypothesis", exact: true }).click();
+    await page.getByRole("button", { name: "Add a section" }).click();
+    await page.getByRole("button", { name: "Add a quote", exact: true }).click();
+    await chooseLayout(page, "Case study");
+    await page.getByRole("button", { name: "Arrange sections" }).click();
+    const list = previewArticle(page).getByRole("list", { name: "Sections in the preview, in page order" });
+    await expect(list.locator("xpath=./li")).toHaveCount(2);
+    await expect(list.getByText("Aim or hypothesis")).toHaveCount(0);
+  });
+});
+
+test.describe("Research's row of headings", () => {
+  test("Results, Conclusion and Limitations all use the small label, in every look", async ({ page }) => {
+    for (const t of PORTFOLIO_THEMES) {
+      const u = await seed(page, t.id);
+      await page.goto(`/p/${u}/walk-and-recall`);
+      const sizes = await page.evaluate(() =>
+        ["results", "conclusion", "reflection"].map((p) => {
+          const h = document.querySelector(`[data-part=${p}] h2`)!;
+          return [h.className.includes("xp-label"), getComputedStyle(h).fontSize];
+        }),
+      );
+      expect(sizes, t.id).toEqual([[true, sizes[0]![1]], [true, sizes[0]![1]], [true, sizes[0]![1]]]);
+    }
   });
 });

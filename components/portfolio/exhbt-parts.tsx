@@ -5,6 +5,7 @@ import { RichText } from "@/components/exhbt/RichText";
 import { ImageZoom } from "@/components/portfolio/ImageZoom";
 import { safeHref, type Section, type SectionOf } from "@/lib/exhbt/blocks";
 import { FORMAT_COPY, type Format } from "@/lib/exhbt/formats";
+import { imageRatio } from "@/lib/exhbt/sections";
 
 /**
  * The parts of an exhbt page that more than one layout draws (decision 0024): the findings, a
@@ -17,13 +18,19 @@ export type Sub = "h2" | "h3";
 export type ImageUrls = Record<string, string | null>;
 
 /** A heading over a rule, then the findings as a ruled list. "What I found", "What happened" or "Results". */
-export function Findings({ s, Sub, heading = "What I found", part = "findings" }: { s: SectionOf<"findings">; Sub: Sub; heading?: string; part?: string }) {
+export function Findings({ s, Sub, heading = "What I found", part = "findings", kicker = false }: { s: SectionOf<"findings">; Sub: Sub; heading?: string; part?: string; /** The small label heading (research's row of Results, Conclusion and Limitations all use it) instead of the large ruled one. */ kicker?: boolean }) {
   return (
     <section aria-labelledby={`${s.id}-h`} data-part={part} className="min-w-0 break-inside-avoid">
-      <Sub id={`${s.id}-h`} className="xp-found-heading xp-display border-b pb-3 text-[1.5rem] leading-tight print:pb-1.5 print:text-[1.25rem]">
-        {heading}
-      </Sub>
-      <ul>
+      {kicker ? (
+        <Sub id={`${s.id}-h`} className="xp-label">
+          {heading}
+        </Sub>
+      ) : (
+        <Sub id={`${s.id}-h`} className="xp-found-heading xp-display border-b pb-3 text-[1.5rem] leading-tight print:pb-1.5 print:text-[1.25rem]">
+          {heading}
+        </Sub>
+      )}
+      <ul className={kicker ? "mt-1" : undefined}>
         {s.items.map((f, i) => (
           <li key={i} className="xp-finding border-b py-3.5 text-[0.9375rem] leading-relaxed last:border-b-0 print:py-1 print:text-[0.9rem] print:leading-snug">
             <RichText value={f} />
@@ -60,6 +67,8 @@ export function Figure({ s, imageUrls, zoom = false, big = false }: { s: Section
           w={s.w}
           h={s.h}
           className="mx-auto w-full cursor-zoom-in"
+          // An image stored before sizes were kept has none: reserve a 4:3 box (uncropped), so the page doesn't jump as it loads.
+          imgStyle={!s.w || !s.h ? { aspectRatio: imageRatio(s), width: "100%" } : undefined}
           imgClassName={`mx-auto h-auto max-h-[34rem] w-auto max-w-full object-contain ${radius} ${big ? "print:max-h-[68mm]" : "print:max-h-[34mm]"}`}
         />
       ) : (

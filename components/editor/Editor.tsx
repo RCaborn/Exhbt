@@ -221,11 +221,14 @@ export function Editor(props: EditorProps) {
     }
     setBusy((b) => ({ ...b, image: true }));
     let done = 0;
-    let added = 0;
     let next = 0;
+    // Each result goes in its place in the order the person picked, whichever finishes first, so
+    // the first picture they chose is the lead image (a big one takes longer than a small one).
+    const results: ({ fileId: string; size?: { w: number; h: number } } | null)[] = take.map(() => null);
     const worker = async () => {
       while (next < take.length) {
-        const file = take[next++]!;
+        const at = next++;
+        const file = take[at]!;
         setImageStatus(`Uploading ${Math.min(done + 1, take.length)} of ${take.length}`);
         try {
           const typeProblem = checkFile(file, "image", Infinity);
@@ -234,10 +237,8 @@ export function Editor(props: EditorProps) {
           const sizeProblem = checkFile(prepared.file, "image", maxFileMb);
           if (sizeProblem) throw new UploadError(sizeProblem);
           const fileId = await uploadForExhbt(prepared.file, "image", id);
-          const size = prepared.w && prepared.h ? { w: prepared.w, h: prepared.h } : undefined;
           setImageUrls((u) => ({ ...u, [fileId]: URL.createObjectURL(prepared.file) }));
-          setDoc((d) => (roomFor(d.sections, "image", formatOf(d)) === 0 ? d : { ...d, sections: [...d.sections, newImageSection(fileId, d.sections, size)] }));
-          added++;
+          results[at] = { fileId, size: prepared.w && prepared.h ? { w: prepared.w, h: prepared.h } : undefined };
         } catch (e) {
           problems.push(`${file.name}: ${e instanceof UploadError ? e.message : "We couldn't upload that picture."}`);
         } finally {
@@ -247,15 +248,35 @@ export function Editor(props: EditorProps) {
       }
     };
     await Promise.all([worker(), worker()]);
+    // Add them in picked order, as many as the layout has room for now (it may have changed while they uploaded).
+    const uploaded = results.flatMap((r, at) => (r ? [{ ...r, name: take[at]!.name }] : []));
+    const fits = Math.min(uploaded.length, roomFor(docRef.current.sections, "image", formatOf(docRef.current)));
+    const placed = uploaded.slice(0, fits);
+    if (placed.length) {
+      setDoc((d) => {
+        let ss = d.sections;
+        for (const r of placed) if (roomFor(ss, "image", formatOf(d)) > 0) ss = [...ss, newImageSection(r.fileId, ss, r.size)];
+        return { ...d, sections: ss };
+      });
+    }
+    // A file that has no section to go in is never kept: it would only use up storage.
+    for (const r of uploaded.slice(fits)) {
+      void removeFile(r.fileId);
+      problems.push(`${r.name}: there was no room for it in this layout.`);
+    }
+    const added = placed.length;
     setBusy((b) => ({ ...b, image: false }));
     if (imageInput.current) imageInput.current.value = "";
     if (problems.length) setMediaError((m) => ({ ...m, image: problems.join("\n") }));
     if (added > 0) {
       setImageStatus(`${added === 1 ? "1 image" : `${added} images`} added. Each one needs a description for people who can't see it.`);
-      // After the new cards are drawn: the cursor goes to the first empty description.
+      // After the new cards are drawn: the cursor goes to the first empty description, unless the
+      // person has already moved on to something else (the status line says what to do).
       setTimeout(() => {
-        const imgs = docRef.current.sections.filter((s) => s.kind === "image");
-        const n = imgs.findIndex((s) => s.kind === "image" && !s.alt.trim());
+        const a = document.activeElement;
+        if (a && a !== document.body && a !== imageInput.current && !a.closest("#card-sections") && !a.closest('[aria-labelledby="card-sections"]')) return;
+        const imgs = docRef.current.sections.filter((x) => x.kind === "image");
+        const n = imgs.findIndex((x) => x.kind === "image" && !x.alt.trim());
         if (n >= 0) document.getElementById(`image-${n}-alt`)?.focus();
       }, 120);
     }
@@ -310,7 +331,7 @@ export function Editor(props: EditorProps) {
 
   const evidenceHref = doc.evidence?.kind === "link" ? safeHref(doc.evidence.href) : doc.evidence?.kind === "file" ? workUrl : null;
   // Graphs show in the preview once something is typed in them.
-  const previewDoc: ExhbtDoc = { ...doc, title: doc.title.trim() || "Your question", sections: doc.sections.filter((s) => s.kind !== "graph" || hasData(s.chart)) };
+  const previewDoc: ExhbtDoc = { ...doc, title: doc.title.trim() || copy.emptyTitle, sections: doc.sections.filter((s) => s.kind !== "graph" || hasData(s.chart)) };
   const liveUrl = liveBase && slug ? `${liveBase}/${slug}` : null;
   const arrangeable = f === "case-study" && doc.sections.length > 1;
   const justLiveUrl = liveBase && justLive ? `${liveBase}/${justLive.slug}` : null;
@@ -454,7 +475,7 @@ export function Editor(props: EditorProps) {
               />
             )}
             <LayoutPicker doc={doc} setDoc={setDoc} draftedAs={props.draftedAs} />
-            <Card id="card-header" title="Your question and details" words={cw.header} flagged={flaggedBy("header")} heaviest={heaviest === "header"}>
+            <Card id="card-header" title={copy.header} words={cw.header} flagged={flaggedBy("header")} heaviest={heaviest === "header"}>
               {flags.length > 0 && (
                 <ul aria-label="Numbers to check" className="mb-4 space-y-2">
                   {flags.map((n) => (

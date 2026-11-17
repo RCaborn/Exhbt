@@ -187,6 +187,11 @@ export function layoutNotes(doc: ExhbtDoc): { hidden: string[]; over: string[]; 
         : `This layout has room for ${max} ${sectionName(kind, f).toLowerCase()}; you have ${n}. Remove some before you publish, or switch back.`,
     );
   }
+  // Graphs and images together (research): over the cap even when each kind is within its own.
+  const figures = sectionsOf(doc, "graph").length + sectionsOf(doc, "image").length;
+  if (L.maxFigures !== null && figures > L.maxFigures) {
+    over.push(`This layout shows up to ${L.maxFigures} figures, graphs and images together; you have ${figures}. Remove some before you publish, or switch back.`);
+  }
   const missing: { text: string; add?: SectionKind }[] = [];
   const count = (k: SectionKind) => sectionsOf(doc, k).length;
   const emptyFindings = sectionsOf(doc, "findings").some((s) => s.items.some((it) => !words(it.map((r) => r.t).join(""))));

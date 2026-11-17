@@ -555,7 +555,8 @@
     position: relative;
     width: 100%;
     max-height: min(70dvh, 34rem);
-    overflow: hidden;
+    /* No overflow: hidden: the picture is object-fit: contain in an exact-size button, so nothing needs
+       clipping, and the focus ring (outside the button) must show. The figure's padding has room for it. */
     background: var(--xp-figure);
     border-radius: max(0px, calc(var(--xp-radius-card) - 8px));
   }

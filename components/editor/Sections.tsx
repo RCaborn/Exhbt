@@ -21,7 +21,7 @@ import { PickedFigure, type ReplaceFigure } from "./PickedFigure";
 import { Button } from "@/components/ui/Button";
 import { useReducedMotion } from "@/components/ui/useReducedMotion";
 import { formatLimits, LIMITS, plain, wordCount, words, type ExhbtDoc, type Issue, type Limits, type Section, type SectionKind, type SectionOf } from "@/lib/exhbt/blocks";
-import { FORMAT_RULES, formatOf, isShown, type Format } from "@/lib/exhbt/formats";
+import { FORMAT_COPY, FORMAT_RULES, formatOf, isShown, type Format } from "@/lib/exhbt/formats";
 import { firstOfKinds, layoutNotes, moveSection, newSection, roomFor, sectionLabel } from "@/lib/exhbt/sections";
 import { BlockTools, type DraftTools } from "./BlockTools";
 import { ChartEditor } from "./ChartEditor";
@@ -65,8 +65,16 @@ function menuFor(f: Format): { kind: SectionKind; add: string; icon: LucideIcon;
   return sorted.filter((m) => kinds.includes(m.kind));
 }
 
-/** Why a kind can't be added: there's one already, or every one is used. */
-const fullReason = (kind: SectionKind, f: Format) => (formatLimits(f).sections[kind] === 1 ? "Already on the page." : `All ${formatLimits(f).sections[kind]} used.`);
+/** Why a kind can't be added: there's one already, every one is used, or (research) the figures together are at their cap. */
+function fullReason(kind: SectionKind, f: Format, sections: Section[]): string {
+  const L = formatLimits(f);
+  const figures = sections.filter((s) => s.kind === "graph" || s.kind === "image").length;
+  const ofKind = sections.filter((s) => s.kind === kind).length;
+  if (L.maxFigures !== null && (kind === "graph" || kind === "image") && figures >= L.maxFigures && ofKind < L.sections[kind]) {
+    return `Up to ${L.maxFigures} figures, graphs and images together.`;
+  }
+  return L.sections[kind] === 1 ? "Already on the page." : `All ${L.sections[kind]} used.`;
+}
 
 /** "Graph 1" → "graph 1", for "Move graph 1 up". */
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
@@ -272,7 +280,7 @@ export function Sections({
                         title={label}
                         words={cw[key]}
                         limit={s.kind === "reflection" ? L.reflection.words : s.kind === "aim" ? L.aim.words : s.kind === "conclusion" ? L.conclusion.words : undefined}
-                        hint={hintFor(s, maxFileMb, L)}
+                        hint={hintFor(s, maxFileMb, L, f)}
                         flagged={flaggedBy(key)}
                         heaviest={heaviest === key}
                         controls={{
@@ -404,7 +412,7 @@ function SortableSection({
   );
 }
 
-function hintFor(s: Section, maxFileMb: number, L: Limits): string {
+function hintFor(s: Section, maxFileMb: number, L: Limits, f: Format): string {
   switch (s.kind) {
     case "findings":
       return `${L.findings.min} to ${L.findings.max} bullets, up to ${L.findings.wordsEach} words each.`;
@@ -417,7 +425,7 @@ function hintFor(s: Section, maxFileMb: number, L: Limits): string {
     case "reflection":
       return "One or two lines: what you'd do next, or do differently.";
     case "link":
-      return "A repository, a demo or a document. The page shows what it is, and links to it.";
+      return FORMAT_COPY[f].linkHint;
     case "aim":
     case "conclusion":
       return "Only what your report states.";
@@ -564,14 +572,14 @@ function SectionBody({
       return (
         <div>
           <span id={`${pid}-text`} className="label">
-            What you&apos;d do next, or do differently
+            {FORMAT_COPY[f].reflectionLabel}
           </span>
           <RichTextField
             labelId={`${pid}-text`}
             describedBy={`${pid}-text-issues`}
             value={s.text}
             onChange={(text) => patch<"reflection">(s.id, (x) => ({ ...x, text }))}
-            placeholder="e.g. Next time I'd time the evening queue too, to see if a second till pays off then."
+            placeholder={FORMAT_COPY[f].reflectionPlaceholder}
           />
           <FieldIssues id={`${pid}-text-issues`} issues={issuesAt(issues, `${p}.text`)} />
         </div>
@@ -802,7 +810,7 @@ function AddSection({ doc, onAdd, onAddImage, imageBusy }: { doc: ExhbtDoc; onAd
                     <span>
                       <span className="block font-semibold">{add}</span>
                       <span id={hintId} className="block text-sm text-graphite">
-                        {room === 0 ? fullReason(kind, f) : hint}
+                        {room === 0 ? fullReason(kind, f, doc.sections) : hint}
                         {room > 0 && formatLimits(f).sections[kind] > 1 && ` ${room} of ${formatLimits(f).sections[kind]} left.`}
                       </span>
                     </span>

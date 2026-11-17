@@ -36,40 +36,72 @@ export const FORMAT_RULES: Record<Format, { name: string; bestFor: string; kinds
 /** The words the editor and the page use, per layout. */
 export const FORMAT_COPY: Record<
   Format,
-  { title: string; titleHint: string; gap: string; gapHint: string; gapMissing: string; flow: string; findings: string; reflection: string; link: string }
+  {
+    title: string;
+    titleHint: string;
+    /** The editor's first card, and what the preview shows for a title not typed yet. */
+    header: string;
+    emptyTitle: string;
+    gap: string;
+    gapHint: string;
+    gapMissing: string;
+    flow: string;
+    findings: string;
+    reflection: string;
+    /** The field label and the example inside it, for "what I'd do next" / the limitations. */
+    reflectionLabel: string;
+    reflectionPlaceholder: string;
+    link: string;
+    linkHint: string;
+  }
 > = {
   "case-study": {
     title: "Your question (the title)",
     titleHint: "The question the work answers.",
+    header: "Your question and details",
+    emptyTitle: "Your question",
     gap: "Context",
     gapHint: "Why the question matters. Make the gap bold to highlight it.",
     gapMissing: "Add the context: why the question matters.",
     flow: "Process",
     findings: "What I found",
     reflection: "What I'd do next",
+    reflectionLabel: "What you'd do next, or do differently",
+    reflectionPlaceholder: "e.g. Next time I'd time the evening queue too, to see if a second till pays off then.",
     link: "Link",
+    linkHint: "A repository, a demo or a document. The page shows what it is, and links to it.",
   },
   gallery: {
     title: "Name of the work (the title)",
     titleHint: "For example, Freshers' Week campaign for the Law Society.",
+    header: "The work and details",
+    emptyTitle: "Name of the work",
     gap: "The brief",
     gapHint: "What you were asked to do, and for whom. Make the ask bold to highlight it.",
     gapMissing: "Add the brief: what you were asked to do, and for whom.",
     flow: "What I did",
     findings: "What happened",
     reflection: "What I'd do next",
+    reflectionLabel: "What you'd do next, or do differently",
+    reflectionPlaceholder: "e.g. Next time I'd test the poster on the halls noticeboards a week earlier.",
     link: "Link",
+    linkHint: "The film, the full set of pictures or the deck. The page shows what it is, and links to it.",
   },
   research: {
     title: "Your research question (the title)",
     titleHint: "The question the study set out to answer.",
+    header: "Your research question and details",
+    emptyTitle: "Your research question",
     gap: "Background",
     gapHint: "What was known, and what wasn't. Make the gap bold to highlight it.",
     gapMissing: "Add the background: what was known, and the gap.",
     flow: "Method",
     findings: "Results",
     reflection: "Limitations and next steps",
+    reflectionLabel: "The limits of the study, and what you'd do next",
+    reflectionPlaceholder: "e.g. One university and volunteers only. Next I'd test recall a day later.",
     link: "Reference",
+    linkHint: "A paper or source you used. The page shows the citation, and links to it.",
   },
 };
 
