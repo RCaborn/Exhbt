@@ -200,7 +200,7 @@ export type UsernameLookup = { userId: string; username: string } | { redirectTo
 
 export type AICall = {
   userId: string | null;
-  step: "roadmap" | "exhbt_draft" | "exhbt_rewrite" | "originality" | "link_ranking" | "project_ideas" | "cv_read" | "file_transcribe" | "portfolio_intro";
+  step: "roadmap" | "exhbt_draft" | "exhbt_rewrite" | "originality" | "link_ranking" | "project_ideas" | "cv_read" | "file_transcribe" | "portfolio_intro" | "figure_pick";
   model: string;
   inputTokens: number;
   outputTokens: number;
@@ -232,6 +232,8 @@ export type EventName =
   | "exhbt_drafted"
   | "file_uploaded"
   | "file_read_ai"
+  | "figure_picked"
+  | "figure_added"
   | "job_link_created"
   | "job_link_fetched"
   | "exhbt_rewritten"

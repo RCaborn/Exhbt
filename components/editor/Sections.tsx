@@ -17,6 +17,7 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown, ArrowUp, ChartBar, GripVertical, ImageIcon, Lightbulb, Link2, ListChecks, Plus, Quote, X, type LucideIcon } from "lucide-react";
+import { PickedFigure, type ReplaceFigure } from "./PickedFigure";
 import { Button } from "@/components/ui/Button";
 import { useReducedMotion } from "@/components/ui/useReducedMotion";
 import { LIMITS, plain, wordCount, words, type ExhbtDoc, type Issue, type Section, type SectionKind, type SectionOf } from "@/lib/exhbt/blocks";
@@ -87,6 +88,8 @@ export function Sections({
   imageBusy,
   imageError,
   dropFile,
+  figureSources,
+  onReplaceImage,
 }: {
   doc: ExhbtDoc;
   setDoc: SetDoc;
@@ -103,6 +106,10 @@ export function Sections({
   imageError?: string;
   /** Takes an image's file out of the draft (deleted once the save without it lands). */
   dropFile: (fileId: string) => void;
+  /** Links to the stored files picked figures came from, by file id (decision 0017). */
+  figureSources: Record<string, string | null>;
+  /** Puts a new picture in an image section (a picked figure cropped again, or another page). */
+  onReplaceImage: (sectionId: string, ...args: Parameters<ReplaceFigure>) => Promise<void>;
 }) {
   const sections = doc.sections;
   const [status, setStatus] = useState<{ text: string; undo?: { section: Section; index: number; label: string } } | null>(null);
@@ -239,7 +246,17 @@ export function Sections({
                           ),
                         }}
                       >
-                        <SectionBody s={s} i={i} sections={sections} patch={patch} issues={issues} dt={dt} imageUrls={imageUrls} />
+                        <SectionBody
+                          s={s}
+                          i={i}
+                          sections={sections}
+                          patch={patch}
+                          issues={issues}
+                          dt={dt}
+                          imageUrls={imageUrls}
+                          figureSources={figureSources}
+                          onReplaceImage={onReplaceImage}
+                        />
                       </Card>
                     )}
                   </SortableSection>
@@ -351,6 +368,8 @@ function SectionBody({
   issues,
   dt,
   imageUrls,
+  figureSources,
+  onReplaceImage,
 }: {
   s: Section;
   i: number;
@@ -359,6 +378,8 @@ function SectionBody({
   issues: Issue[];
   dt: DraftTools;
   imageUrls: Record<string, string | null>;
+  figureSources: Record<string, string | null>;
+  onReplaceImage: (sectionId: string, ...args: Parameters<ReplaceFigure>) => Promise<void>;
 }) {
   const p = `sections.${i}`;
   const pid = `s-${s.id}`;
@@ -378,8 +399,20 @@ function SectionBody({
           onChange={(chart) => patch<"graph">(s.id, (x) => ({ ...x, chart }))}
         />
       );
-    case "image":
+    case "image": {
+      const picked = s.picked;
       return (
+        <div className="space-y-4">
+        {picked && (
+          <PickedFigure
+            s={{ ...s, picked }}
+            path={p}
+            issues={issues}
+            sourceUrl={picked.sourceFileId ? (figureSources[picked.sourceFileId] ?? null) : null}
+            onTick={(shareOk) => patch<"image">(s.id, (x) => (x.picked ? { ...x, picked: { ...x.picked, shareOk } } : x))}
+            onReplace={(...args) => onReplaceImage(s.id, ...args)}
+          />
+        )}
         <div className="grid gap-3 sm:grid-cols-[9rem_1fr]">
           {imageUrls[s.fileId] ? (
             <img src={imageUrls[s.fileId]!} alt="" className="w-full rounded-[12px] border border-line" />
@@ -413,7 +446,9 @@ function SectionBody({
             </div>
           </div>
         </div>
+        </div>
       );
+    }
     case "quote":
       return (
         <div className="space-y-4">

@@ -1,20 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Circle, FileText, Loader2, Upload, X } from "lucide-react";
 import { DOC_ACCEPT, DocError, DocNeedsServer, countWords, extractTextInBrowser, readOnServer } from "@/lib/doc-readers";
+import { removeFile } from "@/components/editor/media";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { finishUpload } from "@/components/team/finish-upload";
 import { Button } from "@/components/ui/Button";
 import type { Plan } from "@/lib/entitlements";
+import type { PdfPages } from "@/lib/figures/pdf";
 import { Tick } from "@/components/ui/Tick";
+import { candidatesOf, drawPages, placeFigure, prepareFigure, type FigureSource, type ReadyFigure } from "./figure";
 
 /**
  * The upload step: files are read on the device as they're added (scans and photos ask before
  * being sent to the AI reader), uploaded straight to Storage with a signed URL, then "Draft my
  * exhbt" sends the text, notes and link to /api/exhbts/draft and opens the editor.
+ *
+ * A PDF read on the device also has its first pages drawn small. While the draft is written, the
+ * pages that draw a chart, diagram or table go to /api/exhbts/figure-pick; the figure picked is
+ * cut out, uploaded and put beside What I found before the editor opens (decision 0017, ./figure.ts).
+ * A scan is never sent for this, and a pick that fails or finds nothing leaves no trace.
  */
+
+/** How long, after the draft is saved, the page waits for the figure before opening the editor without it. */
+const FIGURE_WAIT_MS = 20_000;
+const isPdfFile = (f: File) => f.type === "application/pdf" || /\.pdf$/i.test(f.name);
 
 type Item = {
   key: string;
@@ -63,6 +75,14 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
   // Drafting progress: which step is under way, and whether the answer has arrived (all done).
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
+  // Picking a figure from a PDF, beside the draft: not tried, under way, or finished (found or not).
+  const [figure, setFigure] = useState<"none" | "working" | "done">("none");
+  // Each PDF's pages, drawn once it has been read on the device (decision 0017).
+  const pages = useRef(new Map<string, Promise<PdfPages | null>>());
+  useEffect(() => {
+    const drawn = pages.current;
+    return () => drawn.forEach((p) => void p.then((x) => x?.pages.forEach((t) => URL.revokeObjectURL(t.url))));
+  }, []);
   useEffect(() => {
     if (!busy) return;
     setStep(0);
@@ -102,6 +122,8 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
       const text = await extractTextInBrowser(file);
       patch(key, { status: "ready", text });
       if (uploadAfter) void upload(key, file);
+      // Read on the device, so its pages can be drawn here for picking a figure. Scans never are.
+      if (isPdfFile(file)) pages.current.set(key, drawPages(file));
     } catch (e) {
       if (e instanceof DocNeedsServer) {
         patch(key, { status: "consent", needs: e.kind });
@@ -162,6 +184,9 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
 
   async function remove(it: Item) {
     setItems((l) => l.filter((x) => x.key !== it.key));
+    const drawn = pages.current.get(it.key);
+    pages.current.delete(it.key);
+    void drawn?.then((x) => x?.pages.forEach((t) => URL.revokeObjectURL(t.url)));
     if (it.fileId && !it.kept) await fetch(`/api/files/${it.fileId}`, { method: "DELETE" }).catch(() => undefined);
   }
 
@@ -175,6 +200,28 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
     if (!canDraft) return;
     setBusy(true);
     setError(null);
+    // The figure, picked beside the draft from the PDFs read on this device (decision 0017).
+    const stop = new AbortController();
+    const drawn = material.filter((it) => pages.current.has(it.key));
+    setFigure(drawn.length ? "working" : "none");
+    const figureJob: Promise<ReadyFigure | null> = drawn.length
+      ? (async () => {
+          const sources: FigureSource[] = [];
+          for (const it of drawn) {
+            const p = await pages.current.get(it.key);
+            if (p) sources.push({ name: it.file.name, file: it.file, fileId: it.upload === "done" ? it.fileId : undefined, pages: p });
+          }
+          return candidatesOf(sources).length ? prepareFigure(sources, stop.signal) : null;
+        })().catch(() => null)
+      : Promise.resolve(null);
+    let placed = false;
+    // Whatever happens to the draft, a figure that was uploaded but never placed is deleted.
+    const dropUnplaced = () => {
+      stop.abort();
+      void figureJob.then((f) => {
+        if (f && !placed) void removeFile(f.fileId);
+      });
+    };
     try {
       const res = await fetch("/api/exhbts/draft", {
         method: "POST",
@@ -192,13 +239,22 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
         // A plan limit (403/429) gets the upgrade offer; anything else is a plain error.
         const limit = res.status === 403 || res.status === 429;
         setError({ message: data.error ?? "We couldn't draft your exhbt just now. Try again in a moment.", limit, upgradeTo: data.upgradeTo ?? undefined });
+        dropUnplaced();
+        setFigure("none");
         setBusy(false);
         return;
       }
+      // The figure goes on before the editor opens, so the editor's first save already has it.
+      const fig = await Promise.race([figureJob, new Promise<null>((r) => setTimeout(() => r(null), FIGURE_WAIT_MS))]);
+      if (fig) placed = await placeFigure(data.id, fig);
+      dropUnplaced();
+      setFigure((f) => (f === "none" ? f : "done"));
       setDone(true);
       // A beat to see every step ticked, then the editor.
       setTimeout(() => router.push(`/exhbts/${data.id}/edit`), 600);
     } catch {
+      dropUnplaced();
+      setFigure("none");
       setError({ message: "We couldn't reach the server. Check your connection and try again." });
       setBusy(false);
     }
@@ -206,7 +262,7 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
 
   return (
     <form onSubmit={submit} noValidate data-ready={ready ? "true" : undefined} className="mt-8 space-y-6">
-      {busy && <DraftingView step={step} done={done} words={totalWords} />}
+      {busy && <DraftingView step={step} done={done} words={totalWords} figure={figure} />}
       <div className={busy ? "hidden" : "space-y-6"}>
       <div>
         <label
@@ -370,8 +426,16 @@ function statusText(it: Item): React.ReactNode {
  * The wait, made calm (audit U1): three steps that advance on a timer and finish when the answer
  * arrives, with the usual time. The steps are a guide to what the draft does, not live progress.
  */
-function DraftingView({ step, done, words }: { step: number; done: boolean; words: number }) {
+function DraftingView({ step, done, words, figure }: { step: number; done: boolean; words: number; figure: "none" | "working" | "done" }) {
   const current = done ? DRAFT_STEPS.length : step;
+  type State = "done" | "active" | "waiting";
+  const rows: { label: string; state: State; current: boolean }[] = DRAFT_STEPS.map((s, i) => ({
+    label: s.label,
+    state: i < current ? "done" : i === current ? "active" : "waiting",
+    current: i === current,
+  }));
+  // Beside the draft, not after it: under way until the pick is in (decision 0017).
+  if (figure !== "none") rows.push({ label: "Picking a figure from your report", state: figure === "done" ? "done" : "active", current: false });
   return (
     <section aria-labelledby="drafting-title" data-testid="drafting" className="rounded-[14px] bg-mist px-5 py-6">
       <h2 id="drafting-title" className="text-[1.375rem]">
@@ -384,10 +448,9 @@ function DraftingView({ step, done, words }: { step: number; done: boolean; word
         <span className="block h-full w-1/3 rounded-full bg-jade motion-safe:animate-[indeterminate_1.6s_ease-in-out_infinite]" />
       </div>
       <ol className="mt-5 space-y-2">
-        {DRAFT_STEPS.map((s, i) => {
-          const state = i < current ? "done" : i === current ? "active" : "waiting";
+        {rows.map(({ label, state, current: now }) => {
           return (
-            <li key={s.label} data-state={state} aria-current={state === "active" ? "step" : undefined} className={`flex items-center gap-2.5 ${state === "waiting" ? "text-graphite" : "font-semibold"}`}>
+            <li key={label} data-state={state} aria-current={now && state === "active" ? "step" : undefined} className={`flex items-center gap-2.5 ${state === "waiting" ? "text-graphite" : "font-semibold"}`}>
               {state === "done" ? (
                 <Tick />
               ) : state === "active" ? (
@@ -396,7 +459,7 @@ function DraftingView({ step, done, words }: { step: number; done: boolean; word
                 <Circle aria-hidden size={20} strokeWidth={1.5} />
               )}
               <span>
-                {s.label}
+                {label}
                 <span className="sr-only">{state === "done" ? ", done" : state === "active" ? ", under way" : ", waiting"}</span>
               </span>
             </li>

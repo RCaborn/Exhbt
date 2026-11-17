@@ -30,8 +30,12 @@ export function checkFile(file: File, kind: "image" | "evidence", maxMb: number)
   return null;
 }
 
-/** Uploads one file for an exhbt and returns its exhbt_files id. Throws UploadError with a message to show. */
-export async function uploadForExhbt(file: File, kind: "image" | "evidence", exhbtId: string): Promise<string> {
+/**
+ * Uploads one file for an exhbt and returns its exhbt_files id. Throws UploadError with a message
+ * to show. Without `exhbtId` (a figure picked while the exhbt is still being drafted) the file is
+ * attached to the exhbt later, when it is put on it.
+ */
+export async function uploadForExhbt(file: File, kind: "image" | "evidence", exhbtId?: string): Promise<string> {
   let res: Response;
   try {
     res = await fetch("/api/files/upload-url", {
