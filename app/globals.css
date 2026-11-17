@@ -555,10 +555,26 @@
     position: relative;
     width: 100%;
     max-height: min(70dvh, 34rem);
-    /* No overflow: hidden: the picture is object-fit: contain in an exact-size button, so nothing needs
-       clipping, and the focus ring (outside the button) must show. The figure's padding has room for it. */
+    overflow: hidden;
     background: var(--xp-figure);
     border-radius: max(0px, calc(var(--xp-radius-card) - 8px));
+  }
+  /* The lead's keyboard focus ring. The frame clips (it rounds the picture), so the global ring outside the button
+     would be cut off: draw it inside, on a layer above the picture (a shadow on the button itself would be painted
+     under the image). Ink and ground, so it shows on any picture. */
+  .xp-lead .xp-zoom:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+  .xp-lead .xp-zoom:focus-visible::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: max(0px, calc(var(--xp-radius-card) - 8px));
+    box-shadow:
+      inset 0 0 0 3px var(--xp-ink),
+      inset 0 0 0 6px var(--xp-ground);
   }
   /* The rest of the pictures in justified rows: each tile grows to share its row's spare width, in
      proportion to its shape (--r, width over height), so a row's pictures come out the same height

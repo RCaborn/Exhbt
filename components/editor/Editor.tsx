@@ -222,9 +222,33 @@ export function Editor(props: EditorProps) {
     setBusy((b) => ({ ...b, image: true }));
     let done = 0;
     let next = 0;
-    // Each result goes in its place in the order the person picked, whichever finishes first, so
-    // the first picture they chose is the lead image (a big one takes longer than a small one).
+    let added = 0;
+    // Results are kept by the position the person picked them in. As each upload settles, the
+    // settled prefix is placed in that order (a failure is skipped), so the first picture picked is
+    // the lead image whichever finishes first, finished pictures land and autosave without waiting
+    // for slower ones, and a stalled upload holds back only the ones picked after it.
     const results: ({ fileId: string; size?: { w: number; h: number } } | null)[] = take.map(() => null);
+    const settled: boolean[] = take.map(() => false);
+    const placedIds: string[] = [];
+    let placedUpTo = 0;
+    let roomLeft = room;
+    const place = () => {
+      while (placedUpTo < take.length && settled[placedUpTo]) {
+        const r = results[placedUpTo];
+        const name = take[placedUpTo]!.name;
+        placedUpTo++;
+        if (!r) continue;
+        if (roomLeft <= 0) {
+          void removeFile(r.fileId);
+          problems.push(`${name}: there was no room for it in this layout.`);
+          continue;
+        }
+        roomLeft--;
+        added++;
+        placedIds.push(r.fileId);
+        setDoc((d) => (roomFor(d.sections, "image", formatOf(d)) === 0 ? d : { ...d, sections: [...d.sections, newImageSection(r.fileId, d.sections, r.size)] }));
+      }
+    };
     const worker = async () => {
       while (next < take.length) {
         const at = next++;
@@ -242,39 +266,32 @@ export function Editor(props: EditorProps) {
         } catch (e) {
           problems.push(`${file.name}: ${e instanceof UploadError ? e.message : "We couldn't upload that picture."}`);
         } finally {
+          settled[at] = true;
           done++;
+          place();
           setImageStatus(done < take.length ? `Uploading ${done + 1} of ${take.length}` : "");
         }
       }
     };
     await Promise.all([worker(), worker()]);
-    // Add them in picked order, as many as the layout has room for now (it may have changed while they uploaded).
-    const uploaded = results.flatMap((r, at) => (r ? [{ ...r, name: take[at]!.name }] : []));
-    const fits = Math.min(uploaded.length, roomFor(docRef.current.sections, "image", formatOf(docRef.current)));
-    const placed = uploaded.slice(0, fits);
-    if (placed.length) {
-      setDoc((d) => {
-        let ss = d.sections;
-        for (const r of placed) if (roomFor(ss, "image", formatOf(d)) > 0) ss = [...ss, newImageSection(r.fileId, ss, r.size)];
-        return { ...d, sections: ss };
-      });
-    }
-    // A file that has no section to go in is never kept: it would only use up storage.
-    for (const r of uploaded.slice(fits)) {
-      void removeFile(r.fileId);
-      problems.push(`${r.name}: there was no room for it in this layout.`);
-    }
-    const added = placed.length;
     setBusy((b) => ({ ...b, image: false }));
     if (imageInput.current) imageInput.current.value = "";
+    // A picture the layout had no room for after all (it changed while they uploaded) is never kept in storage.
+    setTimeout(() => {
+      const have = new Set(fileIdsOf(docRef.current));
+      const lost = placedIds.filter((f) => !have.has(f));
+      for (const f of lost) void removeFile(f);
+      if (lost.length) setMediaError((m) => ({ ...m, image: [m.image, `${lost.length === 1 ? "One picture" : `${lost.length} pictures`} couldn't be added: there was no room in this layout.`].filter(Boolean).join("\n") }));
+    }, 300);
     if (problems.length) setMediaError((m) => ({ ...m, image: problems.join("\n") }));
     if (added > 0) {
       setImageStatus(`${added === 1 ? "1 image" : `${added} images`} added. Each one needs a description for people who can't see it.`);
-      // After the new cards are drawn: the cursor goes to the first empty description, unless the
-      // person has already moved on to something else (the status line says what to do).
+      // After the new cards are drawn: the cursor goes to the first empty description, but only if the
+      // person hasn't gone anywhere else: they are still where they pressed "Add an image".
       setTimeout(() => {
         const a = document.activeElement;
-        if (a && a !== document.body && a !== imageInput.current && !a.closest("#card-sections") && !a.closest('[aria-labelledby="card-sections"]')) return;
+        const stayed = !a || a === document.body || a === imageInput.current || a.id === "add-section" || a.closest("[data-layout-todo]");
+        if (!stayed) return;
         const imgs = docRef.current.sections.filter((x) => x.kind === "image");
         const n = imgs.findIndex((x) => x.kind === "image" && !x.alt.trim());
         if (n >= 0) document.getElementById(`image-${n}-alt`)?.focus();

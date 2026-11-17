@@ -321,6 +321,19 @@ test.describe("model: references, captions, notes", () => {
       { label: "Host", url: "https://example.com" },
     ];
     expect(referencesFrom(bad, written, 5)).toEqual([]);
+    // A DOI with brackets in it is kept whole, but not cut short at the bracket; an address in curly quotes is kept.
+    const doi = "Horton (2020). https://doi.org/10.1016/S0140-6736(20)30183-5. Also “https://example.org/a” and (https://x.org/other).";
+    const kept = referencesFrom(
+      [
+        { label: "Lancet", url: "https://doi.org/10.1016/S0140-6736(20)30183-5" },
+        { label: "Cut", url: "https://doi.org/10.1016/S0140-6736" },
+        { label: "Curly", url: "https://example.org/a" },
+        { label: "Bracketed", url: "https://x.org/other" },
+      ],
+      doi,
+      5,
+    ).map((r) => r.label);
+    expect(kept).toEqual(["Lancet", "Curly", "Bracketed"]);
     expect(referencesFrom([{ label: "Ok", url: "https://example.org/Papers/AbC-2024" }, { label: "Au", url: "https://example.com.au/x" }], written, 5)).toHaveLength(2);
   });
 
@@ -737,6 +750,9 @@ test.describe("Pictures keep the order they were picked in", () => {
       await route.continue();
     });
     await pick(page, [{ name: "big.png", mimeType: "image/png", buffer: big }, png("small.png")]);
+    // While the first is held back, the second (already uploaded) is not placed ahead of it.
+    await page.waitForTimeout(900);
+    await expect(sectionsArea(page).getByRole("region", { name: /^(Lead image|Image \d)$/ })).toHaveCount(0);
     // The big one (shrunk to 2400 wide) is Image 1, the lead; the 1-pixel one is Image 2.
     const lead = previewArticle(page).locator("[data-part=lead] img").first();
     await expect(lead).toHaveAttribute("width", "2400");
@@ -746,8 +762,42 @@ test.describe("Pictures keep the order they were picked in", () => {
   });
 });
 
+test.describe("Pictures land as each picked prefix settles", () => {
+  test("the first picture lands at once, later ones wait for the held-back one, in picked order", async ({ page }) => {
+    await startEditor(page, `pre${stamp()}`);
+    await chooseLayout(page, "Gallery");
+    const dataUrl = await page.evaluate(() => {
+      const c = document.createElement("canvas");
+      c.width = 3000;
+      c.height = 2000;
+      const x = c.getContext("2d")!;
+      x.fillStyle = "#1a7f64";
+      x.fillRect(0, 0, 3000, 2000);
+      return c.toDataURL("image/png");
+    });
+    const big = Buffer.from(dataUrl.split(",")[1]!, "base64");
+    await page.route("**/api/files/upload-url", async (route) => {
+      const body = route.request().postDataJSON() as { name: string };
+      if (body.name.startsWith("big")) await new Promise((r) => setTimeout(r, 3000));
+      await route.continue();
+    });
+    await pick(page, [png("first.png"), { name: "big.png", mimeType: "image/png", buffer: big }, png("third.png")]);
+    // The first is placed without waiting for the slow second; the third waits behind it.
+    await expect(sectionsArea(page).getByRole("region", { name: "Lead image", exact: true })).toBeVisible();
+    await expect(sectionsArea(page).getByRole("region", { name: "Image 2", exact: true })).toHaveCount(0);
+    await expect(sectionsArea(page).getByRole("region", { name: "Image 3", exact: true })).toHaveCount(0);
+    // When the held-back one finishes, it and the third follow, in picked order: 1px, the shrunk big one (2400), 1px.
+    await expect(sectionsArea(page).getByRole("region", { name: "Image 3", exact: true })).toBeVisible();
+    const widths = await sectionsArea(page).locator("[data-kind=image]").evaluateAll((els) => els.length);
+    expect(widths).toBe(3);
+    await expect(previewArticle(page).locator("[data-part=lead] img").first()).toHaveAttribute("width", "1");
+    const grid = await page.locator("[data-part=grid] img").evaluateAll((els) => els.map((e) => e.getAttribute("width")));
+    expect(grid).toEqual(["2400", "1"]);
+  });
+});
+
 test.describe("The gallery's lead image shows its keyboard focus", () => {
-  test("nothing clips the ring, and the ring is drawn in every look", async ({ page }) => {
+  test("the ring is drawn inside the rounded frame, above the picture, in every look", async ({ page }) => {
     for (const t of PORTFOLIO_THEMES) {
       const u = await seed(page, t.id);
       await page.goto(`/p/${u}/freshers-campaign`);
@@ -755,27 +805,32 @@ test.describe("The gallery's lead image shows its keyboard focus", () => {
       await page.keyboard.press("Tab");
       await lead.focus();
       const facts = await lead.evaluate((el) => {
-        const ring = getComputedStyle(el);
-        const clipped: string[] = [];
-        for (let n: HTMLElement | null = el.parentElement; n && n.tagName !== "ARTICLE"; n = n.parentElement) {
-          const o = getComputedStyle(n);
-          if (o.overflowX !== "visible" || o.overflowY !== "visible") clipped.push(n.className);
-        }
-        const fig = el.closest("figure")!;
+        const ring = getComputedStyle(el, "::after");
+        const frame = getComputedStyle(el.closest(".xp-lead")!);
+        const box = el.getBoundingClientRect();
         return {
           focusVisible: el.matches(":focus-visible"),
-          outlineWidth: parseFloat(ring.outlineWidth),
+          content: ring.content,
+          position: ring.position,
           shadow: ring.boxShadow,
-          clipped,
-          padding: parseFloat(getComputedStyle(fig).paddingLeft),
+          events: ring.pointerEvents,
+          ringBox: [parseFloat(ring.width), parseFloat(ring.height)],
+          button: [box.width, box.height],
+          clips: frame.overflow,
+          radius: parseFloat(frame.borderTopLeftRadius),
         };
       });
       expect(facts.focusVisible, t.id).toBe(true);
-      expect(facts.outlineWidth, t.id).toBeGreaterThan(0);
-      expect(facts.shadow, t.id).not.toBe("none");
-      expect(facts.clipped, `${t.id}: an ancestor clips the ring`).toEqual([]);
-      // The ring (3px outline, 2px offset, 7px outer ring) fits in the figure's padding.
-      expect(facts.padding, t.id).toBeGreaterThanOrEqual(7);
+      // The ring is a layer over the whole button (so over the picture), made of inset shadows, that never takes clicks.
+      expect(facts.content, t.id).toBe('""');
+      expect(facts.position, t.id).toBe("absolute");
+      expect(facts.shadow, t.id).toContain("inset");
+      expect(facts.events, t.id).toBe("none");
+      expect(Math.abs(facts.ringBox[0]! - facts.button[0]!), t.id).toBeLessThan(1);
+      expect(Math.abs(facts.ringBox[1]! - facts.button[1]!), t.id).toBeLessThan(1);
+      // The frame still clips, so the picture keeps its rounded corners.
+      expect(facts.clips, t.id).toBe("hidden");
+      if (t.id === "exhbt") expect(facts.radius, t.id).toBeGreaterThan(0);
     }
   });
 });
@@ -811,7 +866,7 @@ test.describe("Rewrite and wording by layout", () => {
     await expect(page.getByRole("region", { name: "Your research question and details" })).toBeVisible();
     await page.getByRole("button", { name: "Add a section" }).click();
     await page.getByRole("button", { name: /^Add limitations and next steps/ }).click();
-    await expect(sectionsArea(page).getByText("The limits of the study, and what you'd do next")).toBeVisible();
+    await expect(sectionsArea(page).getByText("The limits of the study, and what you'd do next", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Add a section" }).click();
     await page.getByRole("button", { name: "Add a reference", exact: true }).click();
     await expect(sectionsArea(page).getByText("A paper or source you used. The page shows the citation, and links to it.")).toBeVisible();

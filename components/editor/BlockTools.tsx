@@ -76,7 +76,13 @@ export function useDraftTools(id: string, init: DraftToolsInit, doc: ExhbtDoc, s
  * What the rewrite calls each part. Not `{ ...BLOCK_NAMES, header: … }`: the build inlines that
  * spread into one object literal with "header" twice, and warns.
  */
-const nameOf = (block: DraftBlock): string => (block === "header" ? "question and details" : BLOCK_NAMES[block]);
+const nameOf = (block: DraftBlock, f: Format): string => {
+  if (f === "case-study") return block === "header" ? "question and details" : BLOCK_NAMES[block];
+  // A gallery or research card has its own name: the brief, background, what I did, method, results.
+  const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+  const c = FORMAT_COPY[f];
+  return block === "header" ? lower(c.header) : block === "gap" ? lower(c.gap) : block === "flow" ? lower(c.flow) : block === "findings" ? lower(c.findings) : BLOCK_NAMES[block];
+};
 /** What the card is called on the page, for the menu button's name. */
 const cardNames = (f: Format): Record<DraftBlock, string> => ({ header: FORMAT_COPY[f].header, skills: "Skills", gap: FORMAT_COPY[f].gap, flow: FORMAT_COPY[f].flow, findings: f === "case-study" ? "Findings" : FORMAT_COPY[f].findings });
 
@@ -111,7 +117,7 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
 
   if (!dt.enabled) return null;
 
-  const name = nameOf(block);
+  const name = nameOf(block, formatOf(dt.doc));
   const current = blockValue(dt.doc, block) as BlockValue;
   const ai = dt.ai.blocks[block];
   const edited = ai !== undefined && !sameBlock(current, ai);
