@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 import { Exhbt } from "@/components/exhbt/Exhbt";
 import { exampleExhbt } from "@/lib/exhbt";
+import { marketingMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "How to read an exhbt",
-  description: "A short guide for hiring managers and careers staff to Exhbt portfolios. Free, no account needed.",
-};
+export const metadata: Metadata = marketingMetadata("how-to-read-an-exhbt");
 
 const FIELDS: { id?: string; name: string; body: string }[] = [
   {
