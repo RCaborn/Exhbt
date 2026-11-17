@@ -78,7 +78,7 @@ export function useDraftTools(id: string, init: DraftToolsInit, doc: ExhbtDoc, s
  */
 const nameOf = (block: DraftBlock): string => (block === "header" ? "question and details" : BLOCK_NAMES[block]);
 /** What the card is called on the page, for the menu button's name. */
-const cardNames = (f: Format): Record<DraftBlock, string> => ({ header: FORMAT_COPY[f].header, skills: "Skills", gap: FORMAT_COPY[f].gap, flow: FORMAT_COPY[f].flow, findings: FORMAT_COPY[f].findings });
+const cardNames = (f: Format): Record<DraftBlock, string> => ({ header: FORMAT_COPY[f].header, skills: "Skills", gap: FORMAT_COPY[f].gap, flow: FORMAT_COPY[f].flow, findings: f === "case-study" ? "Findings" : FORMAT_COPY[f].findings });
 
 const ITEM = "flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 text-left text-[0.95rem] font-medium text-ink hover:bg-mist disabled:opacity-50";
 
