@@ -1,7 +1,7 @@
 Status: accepted
 Date: 15 Nov 2026
 Amends: 0007 (which parts are fixed, and their order), 0009 (the new sections' words count)
-Amended by: 0022 (how the sections are drawn on the page; the sections are unchanged)
+Amended by: 0022 (how the sections are drawn on the page; the sections are unchanged), 0024 (two new kinds, aim and conclusion, used by research only; caps per layout; in a gallery or research page the page sets where each kind goes)
 
 # The flowchart stays; what goes below it is up to the person
 
