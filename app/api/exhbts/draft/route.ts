@@ -6,6 +6,7 @@ import { saveAiVersion, saveDraftSource } from "@/lib/draft-tools";
 import { draftVerdict } from "@/lib/drafting";
 import { aiVersionOf } from "@/lib/exhbt/draft-blocks";
 import { safeHref } from "@/lib/exhbt/blocks";
+import { formatOf } from "@/lib/exhbt/formats";
 import { normaliseNumber, unverifiedNumbers } from "@/lib/exhbt/verify";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
@@ -15,7 +16,8 @@ import { canDraftInto } from "@/lib/team";
  * Drafts an exhbt from the person's material and saves it as a new draft exhbt
  * (docs/phase-2.md section 6). Signed in, Phase 2 on. Order: plan checks (drafts left, room for
  * another exhbt), the AI draft, the number check, then save and attach the uploaded files.
- * Body: { text, notes?, link?, fileIds? } → { id, unverified }.
+ * Body: { text, notes?, link?, fileIds?, signals? } → { id, unverified, format }. `signals` are counts from the
+ * upload (picture files, PDF pages, pages with pictures), so the AI can choose a layout; never the pages.
  */
 
 const Body = z.object({
@@ -25,6 +27,7 @@ const Body = z.object({
   fileIds: z.array(z.string().max(64)).max(20).optional(),
   /** Draft into this exhbt instead of a new one: a teammate's own, still empty, exhbt (decision 0013). */
   into: z.string().max(64).optional(),
+  signals: z.object({ imageFiles: z.number().int().min(0).max(50), pdfPages: z.number().int().min(0).max(5000), pdfPicturePages: z.number().int().min(0).max(5000) }).optional(),
 });
 
 /** Too little to draft from: the AI would have nothing true to say. */
@@ -57,7 +60,7 @@ export async function POST(req: Request) {
 
   let result;
   try {
-    result = await draftExhbt({ text, notes, link });
+    result = await draftExhbt({ text, notes, link, signals: parsed.data.signals });
   } catch (e) {
     console.error("exhbt draft failed", (e as Error).message);
     return fail("We couldn't draft your exhbt just now. Your files are saved: try again in a moment.", 502);
@@ -116,5 +119,5 @@ export async function POST(req: Request) {
     console.error("draft source save failed", (e as Error).message);
   }
 
-  return NextResponse.json({ id, unverified });
+  return NextResponse.json({ id, unverified, format: formatOf(doc) });
 }

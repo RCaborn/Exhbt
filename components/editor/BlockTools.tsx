@@ -6,6 +6,7 @@ import { MoreHorizontal, RotateCcw, Wand2 } from "lucide-react";
 import { rewriteBlockAction } from "@/app/(app)/exhbts/[id]/draft-tools-actions";
 import { Button } from "@/components/ui/Button";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
+import { FORMAT_COPY, formatOf, type Format } from "@/lib/exhbt/formats";
 import { BLOCK_NAMES, blockValue, replaceBlock, sameBlock, type AiVersion, type BlockValue, type DraftBlock } from "@/lib/exhbt/draft-blocks";
 
 /**
@@ -77,7 +78,7 @@ export function useDraftTools(id: string, init: DraftToolsInit, doc: ExhbtDoc, s
  */
 const nameOf = (block: DraftBlock): string => (block === "header" ? "question and details" : BLOCK_NAMES[block]);
 /** What the card is called on the page, for the menu button's name. */
-const CARD_NAMES: Record<DraftBlock, string> = { header: "Your question and details", skills: "Skills", gap: "Context", flow: "Process", findings: "Findings" };
+const cardNames = (f: Format): Record<DraftBlock, string> => ({ header: FORMAT_COPY[f].header, skills: "Skills", gap: FORMAT_COPY[f].gap, flow: FORMAT_COPY[f].flow, findings: f === "case-study" ? "Findings" : FORMAT_COPY[f].findings });
 
 const ITEM = "flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 text-left text-[0.95rem] font-medium text-ink hover:bg-mist disabled:opacity-50";
 
@@ -126,7 +127,7 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
         <button
           ref={trigger}
           type="button"
-          aria-label={`More actions for ${CARD_NAMES[block]}`}
+          aria-label={`More actions for ${cardNames(formatOf(dt.doc))[block]}`}
           aria-expanded={menu}
           aria-controls={menuId}
           onClick={() => setMenu((m) => !m)}

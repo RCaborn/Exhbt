@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { getCurrentUser } from "@/lib/auth";
 import { loadDraftSource } from "@/lib/draft-tools";
-import { FigureBoxSchema, normaliseDoc } from "@/lib/exhbt/blocks";
+import { FigureBoxSchema, formatLimits, normaliseDoc } from "@/lib/exhbt/blocks";
+import { formatOf } from "@/lib/exhbt/formats";
 import { withKeyFigure } from "@/lib/exhbt/sections";
 import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { clampBox, fitAlt, fitCaption } from "@/lib/figures/rules";
@@ -52,7 +53,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const doc = normaliseDoc(exhbt.doc);
-  const shown = fitCaption(caption);
+  // The caption is cut to the layout's cap; withKeyFigure puts the picture where the layout wants its key picture.
+  const shown = fitCaption(caption, formatLimits(formatOf(doc)).images.captionWords);
   const next = withKeyFigure(doc, {
     fileId,
     alt: fitAlt(alt),

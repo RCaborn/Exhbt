@@ -16,12 +16,13 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowDown, ArrowUp, ChartBar, GripVertical, ImageIcon, Lightbulb, Link2, ListChecks, Plus, Quote, X, type LucideIcon } from "lucide-react";
+import { ArrowDown, ArrowUp, ChartBar, Flag, GripVertical, ImageIcon, Lightbulb, Link2, ListChecks, Plus, Quote, Target, X, type LucideIcon } from "lucide-react";
 import { PickedFigure, type ReplaceFigure } from "./PickedFigure";
 import { Button } from "@/components/ui/Button";
 import { useReducedMotion } from "@/components/ui/useReducedMotion";
-import { LIMITS, plain, wordCount, words, type ExhbtDoc, type Issue, type Section, type SectionKind, type SectionOf } from "@/lib/exhbt/blocks";
-import { moveSection, newSection, roomFor, sectionLabel } from "@/lib/exhbt/sections";
+import { formatLimits, LIMITS, plain, wordCount, words, type ExhbtDoc, type Issue, type Limits, type Section, type SectionKind, type SectionOf } from "@/lib/exhbt/blocks";
+import { FORMAT_COPY, FORMAT_RULES, formatOf, isShown, type Format } from "@/lib/exhbt/formats";
+import { firstOfKinds, layoutNotes, moveSection, newSection, roomFor, sectionLabel } from "@/lib/exhbt/sections";
 import { BlockTools, type DraftTools } from "./BlockTools";
 import { ChartEditor } from "./ChartEditor";
 import { FieldIssues } from "./FieldIssues";
@@ -36,18 +37,44 @@ const RichTextField = dynamic(() => import("./RichTextField").then((m) => m.Rich
 
 type SetDoc = React.Dispatch<React.SetStateAction<ExhbtDoc>>;
 
-/** The order the "Add a section" menu lists the kinds in, with what each is for. */
-const MENU: { kind: SectionKind; add: string; icon: LucideIcon; hint: string }[] = [
-  { kind: "findings", add: "Add findings", icon: ListChecks, hint: `${LIMITS.findings.min} to ${LIMITS.findings.max} bullets of what you found or achieved.` },
-  { kind: "graph", add: "Add a graph", icon: ChartBar, hint: "Figures from your work, typed in by hand." },
-  { kind: "image", add: "Add an image", icon: ImageIcon, hint: `A screenshot or figure, with a caption of up to ${LIMITS.images.captionWords} words.` },
-  { kind: "quote", add: "Add a quote", icon: Quote, hint: `Feedback someone gave, up to ${LIMITS.quote.words} words, with their name.` },
-  { kind: "reflection", add: "Add what I'd do next", icon: Lightbulb, hint: `One or two lines, up to ${LIMITS.reflection.words} words.` },
-  { kind: "link", add: "Add a link", icon: Link2, hint: "A repository, a demo or a document." },
-];
+/**
+ * The "Add a section" menu for a layout, in order, with what each kind is for: only the kinds the
+ * layout draws, named in its own words, with hints and caps from formatLimits (decision 0024).
+ * A case study's menu is as it always was.
+ */
+function menuFor(f: Format): { kind: SectionKind; add: string; icon: LucideIcon; hint: string }[] {
+  const L = formatLimits(f);
+  const all: { kind: SectionKind; add: string; icon: LucideIcon; hint: string }[] = [
+    { kind: "aim", add: "Add aim or hypothesis", icon: Target, hint: `What the study set out to test, up to ${L.aim.words} words.` },
+    {
+      kind: "findings",
+      add: f === "research" ? "Add results" : f === "gallery" ? "Add what happened" : "Add findings",
+      icon: ListChecks,
+      hint: `${L.findings.min} to ${L.findings.max} bullets of ${f === "research" ? "what the study found" : "what you found or achieved"}.`,
+    },
+    { kind: "graph", add: "Add a graph", icon: ChartBar, hint: "Figures from your work, typed in by hand." },
+    { kind: "image", add: "Add an image", icon: ImageIcon, hint: `A screenshot or figure, with a caption of up to ${L.images.captionWords} words.` },
+    { kind: "conclusion", add: "Add conclusion", icon: Flag, hint: `What the work concludes, up to ${L.conclusion.words} words.` },
+    { kind: "quote", add: "Add a quote", icon: Quote, hint: `Feedback someone gave, up to ${L.quote.words} words, with their name.` },
+    { kind: "reflection", add: `Add ${f === "research" ? "limitations and next steps" : "what I'd do next"}`, icon: Lightbulb, hint: `One or two lines, up to ${L.reflection.words} words.` },
+    { kind: "link", add: f === "research" ? "Add a reference" : "Add a link", icon: Link2, hint: f === "research" ? "A paper or source you used, as a link." : "A repository, a demo or a document." },
+  ];
+  const kinds = FORMAT_RULES[f].kinds;
+  const order: SectionKind[] = ["findings", "graph", "image", "quote", "reflection", "link", "aim", "conclusion"];
+  const sorted = f === "research" ? all : [...all].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+  return sorted.filter((m) => kinds.includes(m.kind));
+}
 
-/** Why a kind can't be added: there's one already, or both graphs or images are used. */
-const fullReason = (kind: SectionKind) => (LIMITS.sections[kind] === 1 ? "Already on the page." : `All ${LIMITS.sections[kind]} used.`);
+/** Why a kind can't be added: there's one already, every one is used, or (research) the figures together are at their cap. */
+function fullReason(kind: SectionKind, f: Format, sections: Section[]): string {
+  const L = formatLimits(f);
+  const figures = sections.filter((s) => s.kind === "graph" || s.kind === "image").length;
+  const ofKind = sections.filter((s) => s.kind === kind).length;
+  if (L.maxFigures !== null && (kind === "graph" || kind === "image") && figures >= L.maxFigures && ofKind < L.sections[kind]) {
+    return `Up to ${L.maxFigures} figures, graphs and images together.`;
+  }
+  return L.sections[kind] === 1 ? "Already on the page." : `All ${L.sections[kind]} used.`;
+}
 
 /** "Graph 1" → "graph 1", for "Move graph 1 up". */
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
@@ -87,6 +114,7 @@ export function Sections({
   onAddImage,
   imageBusy,
   imageError,
+  imageStatus,
   dropFile,
   figureSources,
   onReplaceImage,
@@ -104,6 +132,8 @@ export function Sections({
   onAddImage: () => void;
   imageBusy: boolean;
   imageError?: string;
+  /** Progress and the result of adding pictures ("Uploading 3 of 6"). */
+  imageStatus?: string;
   /** Takes an image's file out of the draft (deleted once the save without it lands). */
   dropFile: (fileId: string) => void;
   /** Links to the stored files picked figures came from, by file id (decision 0017). */
@@ -112,6 +142,8 @@ export function Sections({
   onReplaceImage: (sectionId: string, ...args: Parameters<ReplaceFigure>) => Promise<void>;
 }) {
   const sections = doc.sections;
+  const f = formatOf(doc);
+  const L = formatLimits(f);
   const [status, setStatus] = useState<{ text: string; undo?: { section: Section; index: number; label: string } } | null>(null);
   const dndId = useId();
   const reduced = useReducedMotion();
@@ -121,7 +153,7 @@ export function Sections({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const indexOf = (id: UniqueIdentifier) => sections.findIndex((s) => s.id === id);
-  const nameOf = (id: UniqueIdentifier) => (indexOf(id) >= 0 ? sectionLabel(sections, indexOf(id)) : "The section");
+  const nameOf = (id: UniqueIdentifier) => (indexOf(id) >= 0 ? sectionLabel(sections, indexOf(id), f) : "The section");
   // dnd-kit reports the section over its own place straight after it's picked up; that isn't
   // read out (it would cut off "Picked up"), only places after it, and coming back to it.
   const leftStart = useRef(false);
@@ -156,7 +188,7 @@ export function Sections({
     const next = moveSection(sections, i, to);
     setSections(() => next);
     // A drag is read out by dnd-kit itself (announcements above); a button press is said here.
-    setStatus(by === "keys" ? { text: `${sectionLabel(sections, i)} moved ${to < i ? "up" : "down"}: now ${to + 1} of ${sections.length}.` } : null);
+    setStatus(by === "keys" ? { text: `${sectionLabel(sections, i, f)} moved ${to < i ? "up" : "down"}: now ${to + 1} of ${sections.length}.` } : null);
     if (by === "keys") {
       // Focus stays on the button that was pressed, or the other one when that end is reached.
       const dir = to < i ? "up" : "down";
@@ -170,9 +202,22 @@ export function Sections({
     }
   }
 
+  /** "Make lead image" (gallery) and "Make key figure" (research): moves the section to the front of its kind. */
+  function makeFirst(i: number) {
+    const s = sections[i]!;
+    const to = firstOfKinds(sections, f === "gallery" ? ["image"] : ["graph", "image"]);
+    if (to < 0 || to === i) return;
+    setSections((ss) => moveSection(ss, i, to));
+    setStatus({ text: f === "gallery" ? "That image is now the lead image." : "That is now the key figure." });
+    requestAnimationFrame(() => {
+      const card = document.querySelector(`[data-section-id="${s.id}"]`);
+      card?.querySelector<HTMLButtonElement>('[data-move="down"] button')?.focus();
+    });
+  }
+
   function remove(i: number) {
     const s = sections[i]!;
-    const label = sectionLabel(sections, i);
+    const label = sectionLabel(sections, i, f);
     if (s.kind === "image") dropFile(s.fileId);
     setSections((ss) => ss.filter((x) => x.id !== s.id));
     // An image's file goes once the save lands, so it can't come back; anything else can.
@@ -190,7 +235,7 @@ export function Sections({
 
   function add(kind: Exclude<SectionKind, "image">) {
     const index = sections.length;
-    setSections((ss) => (roomFor(ss, kind) > 0 ? [...ss, newSection(kind, ss)] : ss));
+    setSections((ss) => (roomFor(ss, kind, f) > 0 ? [...ss, newSection(kind, ss)] : ss));
     setStatus(null);
     focusCard(`card-section-${index}`);
   }
@@ -202,7 +247,13 @@ export function Sections({
           Sections
         </h2>
         {/* On the mist page, not a white card: graphite, since the hint's slate is under 4.5:1 here. */}
-        <p className="mt-1 text-sm text-graphite">Below the flowchart, in this order. Add the ones that suit the project; drag them, or use the arrows, to change the order.</p>
+        <p className="mt-1 text-sm text-graphite">
+          {f === "case-study"
+            ? "Below the flowchart, in this order. Add the ones that suit the project; drag them, or use the arrows, to change the order."
+            : f === "gallery"
+              ? "In a gallery, the page sets where each part goes. The order of your images sets the gallery: the first is the lead."
+              : "In research, the page sets where each part goes. The order of your graphs and images sets the poster: the first is the key figure."}
+        </p>
       </div>
 
       {sections.length > 0 && (
@@ -211,8 +262,15 @@ export function Sections({
             <ol aria-label="Sections, in page order" className="space-y-5">
               {sections.map((s, i) => {
                 const key = `section-${i}` as CardKey;
-                const label = sectionLabel(sections, i);
+                const label = sectionLabel(sections, i, f);
                 const lower = lowerFirst(label);
+                const hidden = !isShown(doc, s);
+                const makes =
+                  f === "gallery" && s.kind === "image" && i !== firstOfKinds(sections, ["image"])
+                    ? "Make lead image"
+                    : f === "research" && (s.kind === "graph" || s.kind === "image") && i !== firstOfKinds(sections, ["graph", "image"])
+                      ? "Make key figure"
+                      : null;
                 return (
                   <SortableSection key={s.id} id={s.id} kind={s.kind} label={lower} reduced={reduced}>
                     {(handle) => (
@@ -221,14 +279,21 @@ export function Sections({
                         level="h3"
                         title={label}
                         words={cw[key]}
-                        limit={s.kind === "reflection" ? LIMITS.reflection.words : undefined}
-                        hint={hintFor(s, maxFileMb)}
+                        limit={s.kind === "reflection" ? L.reflection.words : s.kind === "aim" ? L.aim.words : s.kind === "conclusion" ? L.conclusion.words : undefined}
+                        hint={hintFor(s, maxFileMb, L, f)}
                         flagged={flaggedBy(key)}
                         heaviest={heaviest === key}
                         controls={{
                           before: handle,
                           after: (
-                            <span className="flex items-center gap-1">
+                            <span className="flex flex-wrap items-center gap-1">
+                              {makes && (
+                                <span data-make>
+                                  <Button size="sm" label={`${makes}: ${lower}`} onClick={() => makeFirst(i)}>
+                                    {makes}
+                                  </Button>
+                                </span>
+                              )}
                               <span data-move="up">
                                 <Button size="sm" label={`Move ${lower} up`} disabled={i === 0} onClick={() => move(i, i - 1, "keys")}>
                                   <ArrowUp aria-hidden size={14} strokeWidth={2.25} />
@@ -246,10 +311,17 @@ export function Sections({
                           ),
                         }}
                       >
+                        {hidden && (
+                          <p className="mb-4 rounded-[10px] bg-mist px-3 py-2 text-sm text-graphite" data-hidden-tag>
+                            Not shown in this layout. It&apos;s kept if you switch back.
+                          </p>
+                        )}
                         <SectionBody
                           s={s}
                           i={i}
                           sections={sections}
+                          f={f}
+                          L={L}
                           patch={patch}
                           issues={issues}
                           dt={dt}
@@ -278,12 +350,13 @@ export function Sections({
             )}
           </p>
         )}
-        {imageBusy && <p className="text-graphite">Uploading the image…</p>}
+        {imageBusy && <p className="text-graphite">{imageStatus || "Uploading the image…"}</p>}
+        {!imageBusy && imageStatus && <p>{imageStatus}</p>}
       </div>
 
       <AddSection doc={doc} onAdd={add} onAddImage={onAddImage} imageBusy={imageBusy} />
       {imageError && (
-        <p role="alert" className="text-sm text-error">
+        <p role="alert" className="text-sm whitespace-pre-line text-error">
           {imageError}
         </p>
       )}
@@ -339,20 +412,23 @@ function SortableSection({
   );
 }
 
-function hintFor(s: Section, maxFileMb: number): string {
+function hintFor(s: Section, maxFileMb: number, L: Limits, f: Format): string {
   switch (s.kind) {
     case "findings":
-      return `${LIMITS.findings.min} to ${LIMITS.findings.max} bullets, up to ${LIMITS.findings.wordsEach} words each.`;
+      return `${L.findings.min} to ${L.findings.max} bullets, up to ${L.findings.wordsEach} words each.`;
     case "graph":
       return "From figures in your work, typed in by hand. To keep figures confidential, protect the real numbers: the page then shows only the change. Anything else can go in as an image.";
     case "image":
-      return `A caption of up to ${LIMITS.images.captionWords} words. JPEG, PNG, WebP or GIF, up to ${maxFileMb} MB.`;
+      return `A caption of up to ${L.images.captionWords} words. JPEG, PNG, WebP or GIF, up to ${maxFileMb} MB.`;
     case "quote":
-      return `Feedback someone gave on the work, in their own words: up to ${LIMITS.quote.words} words, with their name.`;
+      return `Feedback someone gave on the work, in their own words: up to ${L.quote.words} words, with their name.`;
     case "reflection":
       return "One or two lines: what you'd do next, or do differently.";
     case "link":
-      return "A repository, a demo or a document. The page shows what it is, and links to it.";
+      return FORMAT_COPY[f].linkHint;
+    case "aim":
+    case "conclusion":
+      return "Only what your report states.";
   }
 }
 
@@ -364,6 +440,8 @@ function SectionBody({
   s,
   i,
   sections,
+  f,
+  L,
   patch,
   issues,
   dt,
@@ -374,6 +452,8 @@ function SectionBody({
   s: Section;
   i: number;
   sections: Section[];
+  f: Format;
+  L: Limits;
   patch: Patch;
   issues: Issue[];
   dt: DraftTools;
@@ -387,7 +467,7 @@ function SectionBody({
   const nth = sections.slice(0, i).filter((x) => x.kind === s.kind).length;
   switch (s.kind) {
     case "findings":
-      return <FindingsFields s={s} p={p} patch={patch} issues={issues} dt={dt} />;
+      return <FindingsFields s={s} p={p} patch={patch} issues={issues} dt={dt} L={L} />;
     case "graph":
       return (
         <ChartEditor
@@ -413,11 +493,11 @@ function SectionBody({
             onReplace={(...args) => onReplaceImage(s.id, ...args)}
           />
         )}
-        <div className="grid gap-3 sm:grid-cols-[9rem_1fr]">
+        <div className={`grid gap-3 ${f === "gallery" ? "grid-cols-[4.5rem_1fr]" : "sm:grid-cols-[9rem_1fr]"}`}>
           {imageUrls[s.fileId] ? (
-            <img src={imageUrls[s.fileId]!} alt="" className="w-full rounded-[12px] border border-line" />
+            <img src={imageUrls[s.fileId]!} alt="" className={`rounded-[12px] border border-line ${f === "gallery" ? "size-[4.5rem] object-cover" : "w-full"}`} />
           ) : (
-            <div className="flex aspect-[4/3] items-center justify-center rounded-[12px] border border-dashed border-field bg-mist text-slate">
+            <div className={`flex items-center justify-center rounded-[12px] border border-dashed border-field bg-mist text-slate ${f === "gallery" ? "size-[4.5rem]" : "aspect-[4/3]"}`}>
               <ImageIcon aria-hidden size={24} />
               <span className="sr-only">Image {nth + 1} (preview not available)</span>
             </div>
@@ -492,14 +572,59 @@ function SectionBody({
       return (
         <div>
           <span id={`${pid}-text`} className="label">
-            What you&apos;d do next, or do differently
+            {FORMAT_COPY[f].reflectionLabel}
           </span>
           <RichTextField
             labelId={`${pid}-text`}
             describedBy={`${pid}-text-issues`}
             value={s.text}
             onChange={(text) => patch<"reflection">(s.id, (x) => ({ ...x, text }))}
-            placeholder="e.g. Next time I'd time the evening queue too, to see if a second till pays off then."
+            placeholder={FORMAT_COPY[f].reflectionPlaceholder}
+          />
+          <FieldIssues id={`${pid}-text-issues`} issues={issuesAt(issues, `${p}.text`)} />
+        </div>
+      );
+    case "aim":
+      return (
+        <div className="space-y-4">
+          <fieldset>
+            <legend className="label">This is the</legend>
+            <div className="flex gap-5">
+              {(["aim", "hypothesis"] as const).map((h) => (
+                <label key={h} className="flex items-center gap-2">
+                  <input type="radio" name={`${pid}-heading`} checked={(s.heading ?? "aim") === h} onChange={() => patch<"aim">(s.id, (x) => ({ ...x, heading: h }))} className="size-4 accent-jade" />
+                  {h === "aim" ? "Aim" : "Hypothesis"}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div>
+            <span id={`${pid}-text`} className="label">
+              What the study set out to do or test
+            </span>
+            <RichTextField
+              labelId={`${pid}-text`}
+              describedBy={`${pid}-text-issues`}
+              value={s.text}
+              onChange={(text) => patch<"aim">(s.id, (x) => ({ ...x, text }))}
+              placeholder="e.g. Students who walk before a test will recall more words than students who sit."
+            />
+            <FieldIssues id={`${pid}-text-issues`} issues={issuesAt(issues, `${p}.text`)} />
+          </div>
+        </div>
+      );
+    case "conclusion":
+      return (
+        <div>
+          <span id={`${pid}-text`} className="label">
+            What the work concludes
+          </span>
+          <RichTextField
+            labelId={`${pid}-text`}
+            describedBy={`${pid}-text-issues`}
+            value={s.text}
+            onChange={(text) => patch<"conclusion">(s.id, (x) => ({ ...x, text }))}
+            placeholder="e.g. A short walk gave a small rise in recall."
           />
           <FieldIssues id={`${pid}-text-issues`} issues={issuesAt(issues, `${p}.text`)} />
         </div>
@@ -526,7 +651,7 @@ function SectionBody({
               issues={issuesAt(issues, `${p}.label`)}
             />
             <p className="mt-1">
-              <WordsOf n={words(s.label)} limit={LIMITS.link.labelWords} />
+              <WordsOf n={words(s.label)} limit={L.link.labelWords} />
             </p>
           </div>
           <div>
@@ -539,7 +664,7 @@ function SectionBody({
               issues={issuesAt(issues, `${p}.description`)}
             />
             <p className="mt-1">
-              <WordsOf n={words(s.description)} limit={LIMITS.link.descriptionWords} />
+              <WordsOf n={words(s.description)} limit={L.link.descriptionWords} />
             </p>
           </div>
         </div>
@@ -547,10 +672,10 @@ function SectionBody({
   }
 }
 
-function FindingsFields({ s, p, patch, issues, dt }: { s: SectionOf<"findings">; p: string; patch: Patch; issues: Issue[]; dt: DraftTools }) {
+function FindingsFields({ s, p, patch, issues, dt, L }: { s: SectionOf<"findings">; p: string; patch: Patch; issues: Issue[]; dt: DraftTools; L: Limits }) {
   const set = (fn: (items: SectionOf<"findings">["items"]) => SectionOf<"findings">["items"]) => patch<"findings">(s.id, (x) => ({ ...x, items: fn(x.items) }));
   const swap = (i: number, j: number) => set((items) => moveSection(items, i, j));
-  const { min, max, wordsEach } = LIMITS.findings;
+  const { min, max, wordsEach } = L.findings;
   return (
     <>
       <BlockTools dt={dt} block="findings" />
@@ -600,6 +725,9 @@ function FindingsFields({ s, p, patch, issues, dt }: { s: SectionOf<"findings">;
 const ITEM = "flex w-full items-start gap-2.5 rounded-[10px] px-2.5 py-2 text-left text-ink hover:bg-mist disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent";
 
 function AddSection({ doc, onAdd, onAddImage, imageBusy }: { doc: ExhbtDoc; onAdd: (kind: Exclude<SectionKind, "image">) => void; onAddImage: () => void; imageBusy: boolean }) {
+  const f = formatOf(doc);
+  const menu = menuFor(f);
+  const missing = layoutNotes(doc).missing;
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const panelId = useId();
@@ -627,6 +755,28 @@ function AddSection({ doc, onAdd, onAddImage, imageBusy }: { doc: ExhbtDoc; onAd
 
   return (
     <div ref={wrap}>
+      {missing.length > 0 && (
+        <div className="mb-4 rounded-[16px] border border-line bg-surface p-4" data-layout-todo>
+          <p className="font-semibold">To finish this layout</p>
+          <ul className="mt-2 space-y-2">
+            {missing.map((m) => (
+              <li key={m.text} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span>{m.text}</span>
+                {m.add && (
+                  <Button
+                    size="sm"
+                    label={`${m.text}: add`}
+                    disabled={roomFor(doc.sections, m.add, f) === 0 || (m.add === "image" && imageBusy)}
+                    onClick={() => (m.add === "image" ? onAddImage() : onAdd(m.add as Exclude<SectionKind, "image">))}
+                  >
+                    Add
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <Button id="add-section" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((o) => !o)} label="Add a section">
         <Plus aria-hidden size={16} strokeWidth={2.25} /> Add a section
       </Button>
@@ -638,8 +788,8 @@ function AddSection({ doc, onAdd, onAddImage, imageBusy }: { doc: ExhbtDoc; onAd
               : `${-left} ${left === -1 ? "word" : "words"} over the ${LIMITS.totalWords}-word limit. Trim something before you publish.`}
           </p>
           <ul className="mt-2 space-y-0.5">
-            {MENU.map(({ kind, add, icon: Icon, hint }) => {
-              const room = roomFor(doc.sections, kind);
+            {menu.map(({ kind, add, icon: Icon, hint }) => {
+              const room = roomFor(doc.sections, kind, f);
               const busy = kind === "image" && imageBusy;
               const hintId = `${panelId}-${kind}`;
               return (
@@ -660,8 +810,8 @@ function AddSection({ doc, onAdd, onAddImage, imageBusy }: { doc: ExhbtDoc; onAd
                     <span>
                       <span className="block font-semibold">{add}</span>
                       <span id={hintId} className="block text-sm text-graphite">
-                        {room === 0 ? fullReason(kind) : hint}
-                        {room > 0 && LIMITS.sections[kind] > 1 && ` ${room} of ${LIMITS.sections[kind]} left.`}
+                        {room === 0 ? fullReason(kind, f, doc.sections) : hint}
+                        {room > 0 && formatLimits(f).sections[kind] > 1 && ` ${room} of ${formatLimits(f).sections[kind]} left.`}
                       </span>
                     </span>
                   </button>

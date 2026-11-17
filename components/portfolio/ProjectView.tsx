@@ -1,14 +1,19 @@
-/* eslint-disable @next/next/no-img-element -- signed Storage URLs; see Avatar.tsx. */
 import Link from "next/link";
-import { ArrowUpRight, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { CHECKS_GUIDE } from "@/components/brand/Seal";
-import { Chart } from "@/components/charts/Chart";
 import { MethodFlow } from "@/components/exhbt/MethodFlow";
 import { RichText } from "@/components/exhbt/RichText";
 import { Avatar } from "@/components/portfolio/Avatar";
+import { Figure, Findings, SectionBlock, type ImageUrls, type Sub } from "@/components/portfolio/exhbt-parts";
+import { GalleryMain } from "@/components/portfolio/formats/GalleryMain";
+import { ResearchMain } from "@/components/portfolio/formats/ResearchMain";
 import { PrintButton } from "@/components/portfolio/PrintButton";
 import { Button } from "@/components/ui/Button";
-import { safeHref, type ExhbtDoc, type Section, type SectionOf } from "@/lib/exhbt/blocks";
+import type { ExhbtDoc, Section, SectionOf } from "@/lib/exhbt/blocks";
+import { formatOf, shownSections } from "@/lib/exhbt/formats";
+
+/** The editor's arrange preview imports this from here. */
+export { SectionBlock };
 
 export type Owner = {
   name: string;
@@ -20,9 +25,6 @@ export type Owner = {
   /** Where "All of <name>'s work" goes: the portfolio's home. No button without it. */
   homeHref?: string;
 };
-
-type Sub = "h2" | "h3";
-type ImageUrls = Record<string, string | null>;
 
 /**
  * One exhbt, in the layout Rory drew on 16 Nov 2026 (docs/design/portfolio-and-exhbt-layouts.pdf,
@@ -78,6 +80,7 @@ export function ProjectView({
   back?: { href: string; label: string };
 }) {
   const H = headingLevel;
+  const format = formatOf(doc);
   const Sub: Sub = headingLevel === "h1" ? "h2" : "h3";
   const first = owner.name.trim().split(/\s+/)[0] || owner.name;
   const hasWork = Boolean(doc.evidence && evidenceUrl);
@@ -100,7 +103,7 @@ export function ProjectView({
   ];
 
   return (
-    <article data-exhbt-page className="xp @container/xp">
+    <article data-exhbt-page data-format={format} className="xp @container/xp">
       {back && (
         <p className="mb-5 print:hidden">
           <Link href={back.href} data-back-to-job className="xp-link text-[0.9375rem] font-semibold">
@@ -180,20 +183,28 @@ export function ProjectView({
           )}
           {team}
 
-          <H className="xp-title xp-display mt-5 text-[clamp(2rem,7cqi,3.4rem)] leading-[1.02] text-balance print:mt-2 print:text-[2rem]">
+          <H className={`xp-title xp-display ${format === "gallery" ? "mt-3 @2xl/main:mt-5" : "mt-5"} text-[clamp(2rem,7cqi,3.4rem)] leading-[1.02] text-balance print:mt-2 print:text-[2rem]`}>
             {doc.title}
           </H>
           {doc.gap.length > 0 && (
-            <p className="xp-context mt-5 max-w-[42rem] text-[1.0625rem] leading-[1.6] @2xl/main:text-[1.1875rem] print:mt-2 print:text-[1rem]">
+            <p className={`xp-context ${format === "gallery" ? "mt-3 @2xl/main:mt-5" : "mt-5"} max-w-[42rem] text-[1.0625rem] leading-[1.6] @2xl/main:text-[1.1875rem] print:mt-2 print:text-[1rem]`}>
               <RichText value={doc.gap} highlight />
             </p>
           )}
 
-          <section aria-label="Process" data-part="process" className="mt-8 break-inside-avoid print:mt-3">
-            <MethodFlow steps={doc.flow} variant="page" />
-          </section>
+          {format === "gallery" ? (
+            <GalleryMain doc={doc} imageUrls={imageUrls} Sub={Sub} />
+          ) : format === "research" ? (
+            <ResearchMain doc={doc} imageUrls={imageUrls} Sub={Sub} />
+          ) : (
+            <>
+              <section aria-label="Process" data-part="process" className="mt-8 break-inside-avoid print:mt-3">
+                <MethodFlow steps={doc.flow} variant="page" />
+              </section>
 
-          {sectionsSlot ?? <SectionsView sections={doc.sections} imageUrls={imageUrls} Sub={Sub} />}
+              {sectionsSlot ?? <SectionsView sections={shownSections(doc).map((x) => x.s)} imageUrls={imageUrls} Sub={Sub} />}
+            </>
+          )}
         </div>
       </div>
     </article>
@@ -280,109 +291,5 @@ export function SectionsView({ sections, imageUrls, Sub }: { sections: Section[]
         }
       })}
     </>
-  );
-}
-
-/** One section on its own, in the page's style: what SectionsView draws for a lone section, and the editor's preview while arranging. */
-export function SectionBlock({ s, Sub, imageUrls }: { s: Section; Sub: Sub; imageUrls: ImageUrls }) {
-  switch (s.kind) {
-    case "findings":
-      return (
-        <div className="xp-section">
-          <Findings s={s} Sub={Sub} />
-        </div>
-      );
-    case "graph":
-    case "image":
-      return s.kind === "image" && !imageUrls[s.fileId] ? null : (
-        <div className="xp-section">
-          <Figure s={s} imageUrls={imageUrls} />
-        </div>
-      );
-    case "quote":
-      return (
-        <section aria-labelledby={`${s.id}-h`} data-part="quote" className="xp-section break-inside-avoid">
-          <Sub id={`${s.id}-h`} className="xp-label">
-            Feedback
-          </Sub>
-          <figure className="xp-quote m-0 mt-2 border-l-[3px] pl-4">
-            <blockquote className="text-[1.125rem] leading-relaxed">“{s.text.trim()}”</blockquote>
-            {(s.name.trim() || s.role.trim()) && (
-              <figcaption className="xp-muted mt-1.5 text-sm">{[s.name.trim(), s.role.trim()].filter(Boolean).join(", ")}</figcaption>
-            )}
-          </figure>
-        </section>
-      );
-    case "reflection":
-      return (
-        <section aria-labelledby={`${s.id}-h`} data-part="reflection" className="xp-section xp-next break-inside-avoid border-t pt-6 print:pt-2">
-          <Sub id={`${s.id}-h`} className="xp-label">
-            What I&apos;d do next
-          </Sub>
-          <p className="mt-2 max-w-[42rem] text-[1.125rem] leading-relaxed">
-            <RichText value={s.text} />
-          </p>
-        </section>
-      );
-    case "link": {
-      const href = safeHref(s.href);
-      const label = s.label.trim() || "Link";
-      return (
-        <section aria-label="Link" data-part="link" className="xp-section break-inside-avoid">
-          <div className="xp-card px-5 py-4 print:px-3 print:py-2">
-            {href ? (
-              <a href={href} rel="nofollow ugc noopener" target="_blank" className="xp-link inline-flex items-center gap-1.5 font-semibold">
-                {label}
-                <ArrowUpRight aria-hidden size={16} strokeWidth={2.25} />
-              </a>
-            ) : (
-              <p className="font-semibold">{label}</p>
-            )}
-            {s.description.trim() && <p className="xp-muted mt-0.5 text-sm">{s.description.trim()}</p>}
-          </div>
-        </section>
-      );
-    }
-  }
-}
-
-/** "What I found": a heading over a rule, then the findings as a ruled list. */
-function Findings({ s, Sub }: { s: SectionOf<"findings">; Sub: Sub }) {
-  return (
-    <section aria-labelledby={`${s.id}-h`} data-part="findings" className="min-w-0 break-inside-avoid">
-      <Sub id={`${s.id}-h`} className="xp-found-heading xp-display border-b pb-3 text-[1.5rem] leading-tight print:pb-1.5 print:text-[1.25rem]">
-        What I found
-      </Sub>
-      <ul>
-        {s.items.map((f, i) => (
-          <li key={i} className="xp-finding border-b py-3.5 text-[0.9375rem] leading-relaxed last:border-b-0 print:py-1 print:text-[0.9rem] print:leading-snug">
-            <RichText value={f} />
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/** A graph or an image in its card: the key chart beside the findings, or on its own. */
-function Figure({ s, imageUrls }: { s: SectionOf<"graph"> | SectionOf<"image">; imageUrls: ImageUrls }) {
-  if (s.kind === "graph") {
-    return (
-      <div className="xp-figure min-w-0 break-inside-avoid p-5 print:p-3" data-part="graph">
-        <Chart data={s.chart} />
-      </div>
-    );
-  }
-  const src = imageUrls[s.fileId];
-  if (!src) return null;
-  return (
-    <figure className="xp-figure m-0 min-w-0 break-inside-avoid p-4 print:p-3" data-part="image">
-      <img src={src} alt={s.alt} className="w-full rounded-[max(0px,calc(var(--xp-radius-card)-8px))] print:max-h-[62mm] print:w-auto" />
-      {s.caption.length > 0 && (
-        <figcaption className="xp-muted mt-2.5 text-sm leading-snug">
-          <RichText value={s.caption} />
-        </figcaption>
-      )}
-    </figure>
   );
 }

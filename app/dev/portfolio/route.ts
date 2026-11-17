@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { Plan } from "@/lib/entitlements";
 import { normaliseDoc, type ExhbtDoc } from "@/lib/exhbt/blocks";
-import { fullDoc, openBankingDoc, sampleDocs, sampleSeeds } from "@/lib/exhbt/sample";
+import { fullDoc, GALLERY_IMAGES, galleryDoc, openBankingDoc, RESEARCH_IMAGE, researchDoc, sampleDocs, sampleSeeds } from "@/lib/exhbt/sample";
 import { devBlobs } from "@/lib/files";
 import { usernameProblem } from "@/lib/hosts";
 import { normaliseLayout } from "@/lib/portfolio-layout";
@@ -31,6 +31,10 @@ const MAX_COUNT = sampleSeeds.length + MORE_TITLES.length;
  * stores it already read into sections instead, to compare the two. `with=open-banking` adds the
  * sample in the page layout of decision 0022 at /p/<username>/open-banking; `with=full` the same with
  * every section but an image, near the word cap, at /p/<username>/open-banking-full.
+ * `with=gallery` publishes the gallery sample at /p/<username>/freshers-campaign and `with=research`
+ * the research one at /p/<username>/walk-and-recall (decision 0024); `with=formats` both. `with` is a
+ * comma list (`with=open-banking,formats`). Their pictures are flat SVG drawings stored as the
+ * user's own files, so they go through the same ownership checks as an upload.
  */
 export async function GET(req: NextRequest) {
   if (isSupabaseConfigured() || process.env.NODE_ENV === "production") return new NextResponse("Not found", { status: 404 });
@@ -83,6 +87,7 @@ export async function GET(req: NextRequest) {
   await store.savePortfolioLayout(userId, { layout, featuredExhbtId: null, hiddenIds: [], order: [] });
   // `graphs=none` drops the graphs from the samples, for a portfolio whose key figures are all flowcharts.
   const noGraphs = q.get("graphs") === "none";
+  const withs = new Set((q.get("with") ?? "").split(",").map((x) => x.trim()).filter(Boolean));
   for (let i = 0; i < count; i++) {
     const seed = i < sampleSeeds.length ? sampleSeeds[i] : undefined;
     const base = sampleDocs[i % sampleDocs.length]!;
@@ -96,14 +101,26 @@ export async function GET(req: NextRequest) {
     }
   }
   // The exhbt in the page layout of decision 0022 (title as the question, summary, where and when), last.
-  if (q.get("with") === "open-banking") {
+  if (withs.has("open-banking")) {
     const id = await store.createExhbt(userId, noGraphs ? { ...openBankingDoc, sections: openBankingDoc.sections.filter((s) => s.kind !== "graph") } : openBankingDoc);
     await store.publishExhbt(id, userId, "open-banking");
   }
   // The same with every section but an image, near the word cap (the one-page print check).
-  if (q.get("with") === "full") {
+  if (withs.has("full")) {
     const id = await store.createExhbt(userId, fullDoc);
     await store.publishExhbt(id, userId, "open-banking-full");
+  }
+  // The gallery and research layouts (decision 0024), each with pictures that are the user's own stored files.
+  if (withs.has("gallery") || withs.has("formats")) {
+    const ids: string[] = [];
+    for (const [i, im] of GALLERY_IMAGES.entries()) ids.push(await placeholderPicture(userId, im.w, im.h, `Picture ${i + 1}`, i));
+    const id = await store.createExhbt(userId, galleryDoc(ids));
+    await store.publishExhbt(id, userId, "freshers-campaign");
+  }
+  if (withs.has("research") || withs.has("formats")) {
+    const fileId = await placeholderPicture(userId, RESEARCH_IMAGE.w, RESEARCH_IMAGE.h, "Walking route", 1);
+    const id = await store.createExhbt(userId, researchDoc(fileId));
+    await store.publishExhbt(id, userId, "walk-and-recall");
   }
   return NextResponse.redirect(new URL(`/p/${username}`, req.url));
 }
@@ -117,6 +134,31 @@ async function placeholderPhoto(userId: string): Promise<string> {
   const bytes = new TextEncoder().encode(svg);
   const id = crypto.randomUUID();
   await getStore().createFile({ id, userId, bucket: "evidence", path: `${userId}/${id}/photo.svg`, mime: "image/svg+xml", bytes: bytes.length, kind: "photo" });
+  devBlobs().set(id, bytes);
+  return id;
+}
+
+/**
+ * A stand-in picture of a given size (a flat drawing of a few shapes and a label, in greys and one
+ * colour), stored as one of the user's files in the in-memory Storage stand-in, so a gallery's
+ * pictures are real stored files the ownership checks accept. Its viewBox matches `w` and `h`, so
+ * it has the shape the sample says.
+ */
+async function placeholderPicture(userId: string, w: number, h: number, label: string, n: number): Promise<string> {
+  const greys = ["#d9dbe0", "#c3c6cd", "#aeb2ba"];
+  const m = Math.min(w, h);
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">` +
+    `<rect width="${w}" height="${h}" fill="${greys[n % 3]}"/>` +
+    `<rect x="${w * 0.1}" y="${h * 0.12}" width="${w * 0.8}" height="${h * 0.5}" fill="#f4f5f7"/>` +
+    `<circle cx="${w * 0.7}" cy="${h * 0.37}" r="${m * 0.16}" fill="#00755d"/>` +
+    `<rect x="${w * 0.14}" y="${h * 0.7}" width="${w * 0.5}" height="${m * 0.04}" fill="#5b616b"/>` +
+    `<rect x="${w * 0.14}" y="${h * 0.78}" width="${w * 0.35}" height="${m * 0.03}" fill="#8a909a"/>` +
+    `<text x="${w * 0.14}" y="${h * 0.9}" font-family="sans-serif" font-size="${m * 0.05}" fill="#2b2f36">${label}</text>` +
+    `</svg>`;
+  const bytes = new TextEncoder().encode(svg);
+  const id = crypto.randomUUID();
+  await getStore().createFile({ id, userId, bucket: "evidence", path: `${userId}/${id}/image.svg`, mime: "image/svg+xml", bytes: bytes.length, kind: "image" });
   devBlobs().set(id, bytes);
   return id;
 }
