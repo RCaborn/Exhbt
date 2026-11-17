@@ -2,27 +2,35 @@ import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { getCurrentUser } from "@/lib/auth";
 import { loadDraftSource } from "@/lib/draft-tools";
-import { FigureBoxSchema, formatLimits, normaliseDoc } from "@/lib/exhbt/blocks";
+import { FIGURE_KINDS, FigureBoxSchema, formatLimits, normaliseDoc } from "@/lib/exhbt/blocks";
 import { formatOf } from "@/lib/exhbt/formats";
-import { withKeyFigure } from "@/lib/exhbt/sections";
+import { withWorkVisual } from "@/lib/exhbt/sections";
 import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { clampBox, fitAlt, fitCaption } from "@/lib/figures/rules";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
 
 /**
- * Puts the figure picked from the person's upload on the exhbt just drafted (decision 0017): an
- * image section straight after What I found (withKeyFigure), marked as picked, so publishing
+ * Puts the visual picked from the person's upload on the exhbt just drafted (decisions 0017 and
+ * 0025): an image section where the layout wants its key figure, marked as picked, so publishing
  * waits for the person to tick that they may share it. The draft page calls this after
  * /api/exhbts/draft and /api/exhbts/figure-pick, and after uploading the cropped picture, and
  * only then opens the editor, so the editor's first save already has the figure.
- * Body: { fileId, alt, caption, picked: { from, sourceFileId?, page?, media?, box? } } → 204.
+ *
+ * This is where the work's own graph takes the place of the one the draft drew (withWorkVisual):
+ * the draft and the pick run side by side, so neither knows the other's answer until here. A
+ * picked graph, chart or results table removes the drafted graph sections; another visual keeps
+ * them while the layout has room. A layout that takes nothing from the work gets nothing.
+ *
+ * Body: { fileId, alt, caption, kind?, picked: { from, sourceFileId?, page?, media?, box? } } → 204.
+ * `kind` is "graph", "table" or "other". Without one it is "other": nothing is removed.
  */
 
 const Body = z.object({
   fileId: z.string().max(64),
   alt: z.string().max(2_000),
   caption: z.string().max(1_000).default(""),
+  kind: z.enum(FIGURE_KINDS).default("other"),
   picked: z.object({
     from: z.string().max(200),
     sourceFileId: z.string().max(64).optional(),
@@ -40,7 +48,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!user) return fail("Sign in first.", 401);
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return fail("That request wasn't complete.", 400);
-  const { fileId, alt, caption, picked } = parsed.data;
+  const { fileId, alt, caption, kind, picked } = parsed.data;
 
   const store = getStore();
   const { id } = await params;
@@ -53,10 +61,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const doc = normaliseDoc(exhbt.doc);
-  // The caption is cut to the layout's cap; withKeyFigure puts the picture where the layout wants its key picture.
+  // The caption is cut to the layout's cap; withWorkVisual applies the rule and puts the picture where the layout wants it.
   const shown = fitCaption(caption, formatLimits(formatOf(doc)).images.captionWords);
-  const next = withKeyFigure(doc, {
+  const result = withWorkVisual(doc, {
     fileId,
+    kind,
     alt: fitAlt(alt),
     caption: shown,
     picked: {
@@ -69,8 +78,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       shareOk: false,
     },
   });
-  // Both image slots used: nothing to add. The page deletes the picture it uploaded.
-  if (next === doc) return fail("There's no room for another image on this exhbt.", 409);
+  // Sent twice: it is on the exhbt already, and nothing changes.
+  if (result.why === "already") return new NextResponse(null, { status: 204 });
+  // The layout takes nothing from the work, or its images are full. The page deletes the picture it uploaded.
+  if (result.why === "not-wanted") return fail("This layout doesn't take a figure from your files.", 409);
+  if (!result.placed) return fail("There's no room for another image on this exhbt.", 409);
+  const next = result.doc;
 
   // The caption is the AI's words on the page, so its numbers get the draft's check
   // (lib/exhbt/verify.ts): any not in the person's material is flagged in the editor to confirm.
@@ -86,6 +99,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   if (!(await store.saveExhbtDraft(id, user.id, { ...next, unverified }))) return fail("Exhbt not found.", 404);
   await store.attachFiles(user.id, id, [fileId]);
-  await store.logEvent("figure_added", user.id, { exhbtId: id, from: picked.page ? "pdf" : "office" });
+  await store.logEvent("figure_added", user.id, { exhbtId: id, from: picked.page ? "pdf" : "office", kind, graphsRemoved: result.removed.length });
   return new NextResponse(null, { status: 204 });
 }

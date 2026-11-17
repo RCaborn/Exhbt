@@ -9,9 +9,11 @@ import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { finishUpload } from "@/components/team/finish-upload";
 import { Button } from "@/components/ui/Button";
 import type { Plan } from "@/lib/entitlements";
+import { FORMAT_RULES, isFormat } from "@/lib/exhbt/formats";
+import { isLayoutReason, type FigureNews } from "@/lib/exhbt/drafted";
 import type { PdfPages } from "@/lib/figures/pdf";
 import { Tick } from "@/components/ui/Tick";
-import { candidatesOf, drawPages, placeFigure, prepareFigure, type FigureSource, type ReadyFigure } from "./figure";
+import { candidatesOf, drawPages, placeFigure, prepareFigure, type FigureOutcome, type FigureSource } from "./figure";
 
 /**
  * The upload step: files are read on the device as they're added (scans and photos ask before
@@ -20,8 +22,10 @@ import { candidatesOf, drawPages, placeFigure, prepareFigure, type FigureSource,
  *
  * A PDF read on the device also has its first pages drawn small. While the draft is written, the
  * pages that draw a chart, diagram or table go to /api/exhbts/figure-pick; the figure picked is
- * cut out, uploaded and put beside What I found before the editor opens (decision 0017, ./figure.ts).
- * A scan is never sent for this, and a pick that fails or finds nothing leaves no trace.
+ * cut out, uploaded and put on the exhbt before the editor opens, in place of the graph the draft
+ * drew when it is a graph itself (decisions 0017 and 0025, ./figure.ts). A scan's pages are drawn
+ * and sent only once the person has agreed to send the scan. The editor then says, once, which
+ * layout was chosen and why, and what came of looking for a figure.
  */
 
 /** How long, after the draft is saved, the page waits for the figure before opening the editor without it. */
@@ -69,7 +73,8 @@ async function uploadSignals(files: Item[], pages: Map<string, Promise<PdfPages 
       const read = p ? await Promise.race([p.catch(() => null), deadline]) : null;
       if (!read) return;
       pdfPages += read.pageCount;
-      pdfPicturePages += read.pages.filter((pg) => pg.marks.pictures > 0).length;
+      // Every page of a scan is a picture of a page, which says nothing about how visual the work is.
+      if (it.needs !== "scan") pdfPicturePages += read.pages.filter((pg) => pg.marks.pictures > 0).length;
     }),
   );
   return { imageFiles: Math.min(50, imageFiles), pdfPages: Math.min(5000, pdfPages), pdfPicturePages: Math.min(5000, pdfPicturePages) };
@@ -140,7 +145,7 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
       const text = await extractTextInBrowser(file);
       patch(key, { status: "ready", text });
       if (uploadAfter) void upload(key, file);
-      // Read on the device, so its pages can be drawn here for picking a figure. Scans never are.
+      // Read on the device, so its pages can be drawn here for picking a figure. A scan's are drawn only once the person agrees to send it (readOnServerFor).
       if (isPdfFile(file)) pages.current.set(key, drawPages(file));
     } catch (e) {
       if (e instanceof DocNeedsServer) {
@@ -191,8 +196,18 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
   }, []);
 
+  /** Lets a file's drawn pages go, so they can't be sent for a figure. */
+  function forgetPages(key: string) {
+    const drawn = pages.current.get(key);
+    pages.current.delete(key);
+    void drawn?.then((x) => x?.pages.forEach((t) => URL.revokeObjectURL(t.url)));
+  }
+
   async function readOnServerFor(it: Item) {
     patch(it.key, { status: "transcribing", error: undefined });
+    // They've agreed to send the scan, to be read and to be looked at for a figure (decision 0025).
+    // Its pages are drawn here, on the device, and go with the draft like any other PDF's.
+    if (it.needs === "scan" && !pages.current.has(it.key)) pages.current.set(it.key, drawPages(it.file));
     try {
       patch(it.key, { status: "ready", text: await readOnServer(it.file, "/api/files/transcribe") });
     } catch (e) {
@@ -202,9 +217,7 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
 
   async function remove(it: Item) {
     setItems((l) => l.filter((x) => x.key !== it.key));
-    const drawn = pages.current.get(it.key);
-    pages.current.delete(it.key);
-    void drawn?.then((x) => x?.pages.forEach((t) => URL.revokeObjectURL(t.url)));
+    forgetPages(it.key);
     if (it.fileId && !it.kept) await fetch(`/api/files/${it.fileId}`, { method: "DELETE" }).catch(() => undefined);
   }
 
@@ -218,20 +231,23 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
     if (!canDraft) return;
     setBusy(true);
     setError(null);
-    // The figure, picked beside the draft from the PDFs read on this device (decision 0017).
+    // The figure, picked beside the draft from the PDFs whose pages were drawn on this device
+    // (decision 0017): those read here, and scans the person agreed to send (decision 0025).
     const stop = new AbortController();
     const drawn = material.filter((it) => pages.current.has(it.key));
     setFigure(drawn.length ? "working" : "none");
-    const figureJob: Promise<ReadyFigure | null> = drawn.length
-      ? (async () => {
+    const figureJob: Promise<FigureOutcome> | null = drawn.length
+      ? (async (): Promise<FigureOutcome> => {
           const sources: FigureSource[] = [];
           for (const it of drawn) {
             const p = await pages.current.get(it.key);
             if (p) sources.push({ name: it.file.name, file: it.file, fileId: it.upload === "done" ? it.fileId : undefined, pages: p });
           }
-          return candidatesOf(sources).length ? prepareFigure(sources, stop.signal) : null;
-        })().catch(() => null)
-      : Promise.resolve(null);
+          // A PDF whose pages couldn't be drawn wasn't looked at: that isn't "no figure".
+          if (!sources.length) return { status: "failed" };
+          return prepareFigure(candidatesOf(sources), stop.signal);
+        })().catch((): FigureOutcome => ({ status: "failed" }))
+      : null;
     // Counts from the upload for the AI's choice of layout (decision 0024): picture files, PDF pages, and
     // pages with pictures on them. Never the pages. Waits at most two seconds and sends what is known.
     const signals = await uploadSignals(items.filter((it) => it.status === "ready"), pages.current);
@@ -239,8 +255,8 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
     // Whatever happens to the draft, a figure that was uploaded but never placed is deleted.
     const dropUnplaced = () => {
       stop.abort();
-      void figureJob.then((f) => {
-        if (f && !placed) void removeFile(f.fileId);
+      void figureJob?.then((f) => {
+        if (f.status === "ready" && !placed) void removeFile(f.figure.fileId);
       });
     };
     try {
@@ -256,7 +272,7 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
           ...(into ? { into } : {}),
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string; upgradeTo?: Plan | null; format?: string };
+      const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string; upgradeTo?: Plan | null; format?: string; formatReason?: string };
       if (!res.ok || !data.id) {
         // A plan limit (403/429) gets the upgrade offer; anything else is a plain error.
         const limit = res.status === 403 || res.status === 429;
@@ -266,16 +282,35 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
         setBusy(false);
         return;
       }
-      // The figure goes on before the editor opens, so the editor's first save already has it.
-      const fig = await Promise.race([figureJob, new Promise<null>((r) => setTimeout(() => r(null), FIGURE_WAIT_MS))]);
-      if (fig) placed = await placeFigure(data.id, fig);
+      const format = isFormat(data.format) ? data.format : "case-study";
+      // What the editor says about the figure when none goes on: none found, it couldn't look, or
+      // there was no PDF to look in. A figure that does go on is read from the exhbt itself.
+      let news: FigureNews | undefined;
+      if (FORMAT_RULES[format].fromWork === "none") {
+        // The layout takes nothing from the work (decision 0025): the pick is dropped below, nothing is placed, nothing is said.
+      } else if (!figureJob) {
+        const files = items.filter((it) => it.status === "ready");
+        if (files.length && !files.some((it) => isPdfFile(it.file))) news = "unread";
+      } else {
+        // The figure goes on before the editor opens, so the editor's first save already has it.
+        // A pick that takes longer than the wait is one that couldn't look, not one that found nothing.
+        const late = new Promise<FigureOutcome>((r) => setTimeout(() => r({ status: "failed" }), FIGURE_WAIT_MS));
+        const fig = await Promise.race([figureJob, late]);
+        if (fig.status === "ready") {
+          placed = await placeFigure(data.id, fig.figure);
+          if (!placed) news = "failed";
+        } else news = fig.status;
+      }
       dropUnplaced();
       setFigure((f) => (f === "none" ? f : "done"));
       setDone(true);
+      // The editor says, once, which layout was chosen and why, and what came of looking for a figure
+      // (lib/exhbt/drafted.ts). It reads these and takes them off the address.
+      const said = new URLSearchParams({ drafted: format });
+      if (isLayoutReason(data.formatReason)) said.set("why", data.formatReason);
+      if (news) said.set("fig", news);
       // A beat to see every step ticked, then the editor.
-      // A layout other than the case study is said once in the editor ("Drafted as a gallery").
-      const drafted = data.format && data.format !== "case-study" ? `?drafted=${encodeURIComponent(data.format)}` : "";
-      setTimeout(() => router.push(`/exhbts/${data.id}/edit${drafted}`), 600);
+      setTimeout(() => router.push(`/exhbts/${data.id}/edit?${said.toString()}`), 600);
     } catch {
       dropUnplaced();
       setFigure("none");
@@ -353,13 +388,22 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
                     {it.needs === "image" ? "That's a photo, so we can't read it on your device." : "That PDF looks like a scan, so we can't read it on your device."}
                   </p>
                   <p className="mt-1 text-sm text-graphite">
-                    We can send it to our AI reader to turn it into text. Only the text comes back, and the file stays private to you.
+                    {it.needs === "image"
+                      ? "We can send it to our AI reader to turn it into text. Only the text comes back, and the file stays private to you."
+                      : "We can send it to our AI reader to turn it into text and to look for a figure, such as a graph, for your exhbt. Only the text and where the figure is come back, and the file stays private to you."}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-3">
                     <Button variant="primary" size="sm" onClick={() => void readOnServerFor(it)}>
                       Read it for me
                     </Button>
-                    <Button size="sm" onClick={() => patch(it.key, { status: "ready", text: "" })}>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        // Not sent to be read, so not looked at for a figure either.
+                        forgetPages(it.key);
+                        patch(it.key, { status: "ready", text: "" });
+                      }}
+                    >
                       {it.needs === "image" ? "Keep it as a picture" : "Keep it without reading"}
                     </Button>
                   </div>

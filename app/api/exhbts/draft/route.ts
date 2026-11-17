@@ -16,8 +16,9 @@ import { canDraftInto } from "@/lib/team";
  * Drafts an exhbt from the person's material and saves it as a new draft exhbt
  * (docs/phase-2.md section 6). Signed in, Phase 2 on. Order: plan checks (drafts left, room for
  * another exhbt), the AI draft, the number check, then save and attach the uploaded files.
- * Body: { text, notes?, link?, fileIds?, signals? } → { id, unverified, format }. `signals` are counts from the
+ * Body: { text, notes?, link?, fileIds?, signals? } → { id, unverified, format, formatReason }. `signals` are counts from the
  * upload (picture files, PDF pages, pages with pictures), so the AI can choose a layout; never the pages.
+ * `formatReason` is why that layout: one of a fixed set of signals, said once in the editor (lib/exhbt/drafted.ts).
  */
 
 const Body = z.object({
@@ -119,5 +120,5 @@ export async function POST(req: Request) {
     console.error("draft source save failed", (e as Error).message);
   }
 
-  return NextResponse.json({ id, unverified, format: formatOf(doc) });
+  return NextResponse.json({ id, unverified, format: formatOf(doc), formatReason: result.formatReason });
 }

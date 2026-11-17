@@ -135,8 +135,9 @@ const DOCS: Record<string, Doc> = {
           <li>drafting an exhbt from your project material, and rewriting a block when you ask;</li>
           <li>
             choosing a figure for an exhbt: when you draft one from a PDF, images of the pages with charts, diagrams or
-            pictures on them (from the first 30) are sent to pick the one that best shows your result. We keep the figure
-            cut out of the page, not the page images.
+            pictures on them (from the first 30) are sent to pick the one that best shows your result. A scanned PDF is
+            made of pictures of its pages, so its page images are sent only if you choose to send the scan to be read. We
+            keep the figure cut out of the page, not the page images.
           </li>
         </ul>
         <p>

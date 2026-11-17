@@ -146,6 +146,15 @@ export const FigureBoxSchema = z.object({ x: z.number(), y: z.number(), w: z.num
 export type FigureBox = z.infer<typeof FigureBoxSchema>;
 
 /**
+ * What a visual picked from the person's work is (decision 0025): a results graph or chart, a
+ * results table, or another visual (a photo, a screenshot, a diagram, a poster, a map). A graph or
+ * a table takes the place of the graph the draft drew; another visual sits beside it.
+ */
+export const FIGURE_KINDS = ["graph", "table", "other"] as const;
+export type FigureKind = (typeof FIGURE_KINDS)[number];
+export const isFigureKind = (v: unknown): v is FigureKind => typeof v === "string" && (FIGURE_KINDS as readonly string[]).includes(v);
+
+/**
  * A figure Exhbt picked from the person's upload when it drafted the exhbt (decision 0017). It
  * may be someone else's to share (a supervisor's chart, a company's diagram), so publishing
  * waits until the person ticks that they may share it (`shareOk`). Only in the working copy:
@@ -162,6 +171,11 @@ export const PickedSchema = z.object({
   media: z.string().optional(),
   /** The crop on the page (PDFs only). */
   box: FigureBoxSchema.optional(),
+  /**
+   * What the AI said it is when it picked it (decision 0025). Dropped when the person chooses
+   * another page, and read as nothing if a later release wrote a kind this code doesn't know.
+   */
+  kind: z.enum(FIGURE_KINDS).optional().catch(undefined),
   /** Ticked: the person says they may share it. */
   shareOk: z.boolean(),
 });

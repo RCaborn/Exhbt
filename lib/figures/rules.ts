@@ -59,6 +59,38 @@ export function withMargin(b: FigureBox, m: number = FIGURE.margin): FigureBox {
   return { x, y, w: Math.min(1, b.x + b.w + m) - x, h: Math.min(1, b.y + b.h + m) - y };
 }
 
+/** Where the AI says a figure is: its edges in pixels of the image it was sent, counted from the image's top-left corner. */
+export type PixelBox = { left: number; top: number; right: number; bottom: number };
+export type PixelSize = { width: number; height: number };
+
+/**
+ * The AI's box as fractions of the page, kept on the page (decision 0025). The one place pixels
+ * become fractions, so the way the AI is asked for a box can change here and nowhere else. Edges
+ * given the wrong way round are put right. An answer in fractions after all (every edge between 0
+ * and 1) is read as fractions. Anything that makes no sense is the whole page, as clampBox has it.
+ */
+export function boxFromPixels(b: PixelBox | null | undefined, size: PixelSize): FigureBox {
+  if (!b || !(size.width > 0) || !(size.height > 0)) return clampBox(null);
+  const edges = [b.left, b.top, b.right, b.bottom];
+  if (!edges.every((n) => Number.isFinite(n))) return clampBox(null);
+  const fractions = edges.every((n) => n >= 0 && n <= 1);
+  const sx = fractions ? 1 : size.width;
+  const sy = fractions ? 1 : size.height;
+  const x1 = clamp01(Math.min(b.left, b.right) / sx);
+  const x2 = clamp01(Math.max(b.left, b.right) / sx);
+  const y1 = clamp01(Math.min(b.top, b.bottom) / sy);
+  const y2 = clamp01(Math.max(b.top, b.bottom) / sy);
+  return clampBox({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 });
+}
+
+/** A box in fractions as pixels of an image: the other way round, for the stand-in and the tests. */
+export const pixelsFromBox = (b: FigureBox, size: PixelSize): PixelBox => ({
+  left: Math.round(b.x * size.width),
+  top: Math.round(b.y * size.height),
+  right: Math.round((b.x + b.w) * size.width),
+  bottom: Math.round((b.y + b.h) * size.height),
+});
+
 /** A caption cut to the word limit for image captions, so a picked figure never blocks publishing on length. */
 export function fitCaption(s: string, max: number = LIMITS.images.captionWords): string {
   const w = s.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
