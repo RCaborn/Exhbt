@@ -279,7 +279,7 @@ async function describe(userId: string, role: string, host: string | null | unde
     userId,
     name: profile.name?.trim() || profile.username || "Teammate",
     role,
-    photoUrl: await signedFileUrl(profile.photoFileId),
+    photoUrl: await signedFileUrl(profile.photoFileId, userId),
     href: hasPortfolio ? portfolioHref(profile.username!, host) : null,
   };
 }

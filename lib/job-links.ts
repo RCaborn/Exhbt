@@ -61,7 +61,7 @@ async function assemble(link: JobLink, username: string): Promise<LoadedJobLink 
         (async (): Promise<JobLinkItem> => {
           // The same card the portfolio home draws; each opens the project with ?for=<link>, so it can offer the way back.
           const card = homeProject(id, doc, `${base}/${slug}${forParam}`);
-          const project = card.figure.kind === "image" ? { ...card, imageUrl: await signedFileUrl(card.figure.fileId) } : card;
+          const project = card.figure.kind === "image" ? { ...card, imageUrl: await signedFileUrl(card.figure.fileId, link.userId) } : card;
           return { id, slug, doc, reason: p.reason, project };
         })(),
       ];
@@ -73,7 +73,7 @@ async function assemble(link: JobLink, username: string): Promise<LoadedJobLink 
     link,
     username,
     displayName: profile.name?.trim() || username,
-    photoUrl: await signedFileUrl(profile.photoFileId),
+    photoUrl: await signedFileUrl(profile.photoFileId, link.userId),
     theme: themeFor(profile, plan),
     items,
     base,

@@ -68,7 +68,7 @@ export default async function PortfolioProject({ params, searchParams }: Params)
   const h = i < 0 ? p.hiddenItems.findIndex((x) => x.slug === slug) : -1;
   if (i < 0 && h < 0) notFound();
   const it = i >= 0 ? p.items[i]! : p.hiddenItems[h]!;
-  const { imageUrls, evidenceUrl } = await mediaFor(it.doc);
+  const { imageUrls, evidenceUrl } = await mediaFor(it.doc, p.userId);
   // Opened from a job page (?for=<its slug>): offer the way back while that link is live.
   const forParam = (await searchParams).for;
   const back = typeof forParam === "string" && forParam ? await jobLinkBackTarget(username, forParam, it.id) : null;
