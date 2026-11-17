@@ -223,9 +223,21 @@ export type PortfolioTheme = {
 
 type Base = Omit<PortfolioTheme, "id" | "variant" | "bg" | "text" | "soft" | "accent" | "edge" | "initials" | "face">;
 
-/** A ramp of four steps from the strong shade towards the soft one, for multi-series graphs. */
-const ramp = (strong: string, soft: string, end = 0.82): Palette["chartRamp"] =>
-  [strong, mix(strong, soft, end / 3), mix(strong, soft, (2 * end) / 3), mix(strong, soft, end)] as const;
+/**
+ * A ramp of four steps from the strong shade towards the soft one, for multi-series graphs. The
+ * first step is the widest: saturated reds and pinks barely change in lightness at the strong end.
+ */
+function ramp(strong: string, soft: string, end = 0.82): Palette["chartRamp"] {
+  // The lightest step: towards the soft shade, then on towards white while it still clears 2.1:1 on
+  // a white card (DESIGN.md asks for 2:1), so a saturated colour still gets four distinct steps.
+  let light = mix(strong, soft, end);
+  for (let t = 0.02; t <= 1; t += 0.02) {
+    const next = mix(mix(strong, soft, end), WHITE, t);
+    if (contrastRatio(next, WHITE) < 2.1) break;
+    light = next;
+  }
+  return [strong, mix(strong, light, 0.42), mix(strong, light, 0.72), light] as const;
+}
 
 /** A light page in one deep colour: shared by Classic, Ledger and the light Studio colourways. */
 function lightPalette(p: Partial<Palette> & { deep: string }): Palette {

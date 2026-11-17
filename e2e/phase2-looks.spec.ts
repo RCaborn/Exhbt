@@ -60,6 +60,14 @@ test.describe("Every look's colours", () => {
     // The highlighted series is the lighter shade on a dark card.
     expect(contrastRatio(night.chartStrong, night.figure)).toBeGreaterThan(contrastRatio(night.chartSoft, night.figure));
   });
+
+  test("every look's graph ramp steps away from its strongest shade in order (one hue, four distinct steps)", () => {
+    // The dataviz palette validator passed every ramp as ordinal on its card (decision 0018); this keeps the order.
+    for (const t of ALL_THEMES) {
+      const r = t.palette.chartRamp.map((c) => contrastRatio(c, t.palette.figure));
+      for (let i = 1; i < r.length; i++) expect(r[i]!, `${t.id} step ${i + 1}`).toBeLessThan(r[i - 1]! - 0.2);
+    }
+  });
 });
 
 test.describe("Every look on both pages", () => {
