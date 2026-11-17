@@ -606,3 +606,73 @@ test.describe("Pictures in the editor", () => {
     await expect(page.getByText("That image is now the lead image.")).toBeVisible();
   });
 });
+
+/* ---------------- The AI draft (the stand-in, no API key) ---------------- */
+
+const PLAIN_MATERIAL =
+  "We timed lunchtime queues at the union cafe for two weeks, then tried a second till at the busiest hour. The queue fell, and staff said the rush felt calmer.";
+
+async function signedIn(page: Page, username: string) {
+  await page.goto(`/dev/portfolio?username=${username}&plan=max&count=0`);
+  await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
+  await expect(page.getByRole("heading", { level: 1, name: "Your exhbts" })).toBeVisible();
+}
+
+const draft = async (page: Page, data: Record<string, string>) => {
+  const res = await page.request.post("/api/exhbts/draft", { data });
+  expect(res.status(), await res.text()).toBe(200);
+  return (await res.json()) as { id: string; format: string };
+};
+
+test.describe("The draft suggests a layout", () => {
+  test("notes can name a gallery: the editor opens on it and says so once", async ({ page }) => {
+    await signedIn(page, `dg${stamp()}`);
+    const d = await draft(page, { text: PLAIN_MATERIAL, notes: "stand-in: layout gallery" });
+    expect(d.format).toBe("gallery");
+    await page.goto(`/exhbts/${d.id}/edit?drafted=${d.format}`);
+    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await expect(page.getByRole("radio", { name: /^Gallery/ })).toBeChecked();
+    await expect(page.getByText("Drafted as a gallery. Change it any time; nothing is lost.")).toBeVisible();
+    await expect(previewArticle(page)).toHaveAttribute("data-format", "gallery");
+    // Not said again on a plain visit.
+    await page.goto(`/exhbts/${d.id}/edit`);
+    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await expect(page.getByText("Drafted as a gallery.")).toHaveCount(0);
+  });
+
+  test("a hypothesis and an https link draft as research, with an aim and one reference; an http link is dropped", async ({ page }) => {
+    await signedIn(page, `dr${stamp()}`);
+    const material = `${PLAIN_MATERIAL} Our hypothesis was that walking helps recall. We built on https://example.com/paper and an old note at http://plain.example/x.`;
+    const d = await draft(page, { text: material });
+    expect(d.format).toBe("research");
+    await page.goto(`/exhbts/${d.id}/edit?drafted=research`);
+    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await expect(page.getByRole("radio", { name: /^Research/ })).toBeChecked();
+    const area = sectionsArea(page);
+    await expect(area.getByRole("region", { name: "Aim or hypothesis", exact: true })).toBeVisible();
+    await expect(area.getByRole("region", { name: /^Reference/ })).toHaveCount(1);
+    await expect(area.getByLabel("Web address")).toHaveValue("https://example.com/paper");
+  });
+
+  test("a link that is only in the notes is kept: the notes are material", async ({ page }) => {
+    await signedIn(page, `dn${stamp()}`);
+    const d = await draft(page, { text: `${PLAIN_MATERIAL} The hypothesis was that a second till helps.`, notes: "Read https://example.com/notes-only too." });
+    await page.goto(`/exhbts/${d.id}/edit`);
+    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await expect(sectionsArea(page).getByLabel("Web address")).toHaveValue("https://example.com/notes-only");
+  });
+
+  test("plain material is a case study, and its doc has no layout key", async ({ page }) => {
+    await signedIn(page, `dc${stamp()}`);
+    const d = await draft(page, { text: PLAIN_MATERIAL });
+    expect(d.format).toBe("case-study");
+    const html = await (await page.request.get(`/exhbts/${d.id}/edit`)).text();
+    expect(html).not.toMatch(/\\?"format\\?":\\?"(gallery|research|case-study)/);
+    // Counts from the upload are accepted and change nothing for the stand-in.
+    const withSignals = await page.request.post("/api/exhbts/draft", { data: { text: PLAIN_MATERIAL, signals: { imageFiles: 9, pdfPages: 12, pdfPicturePages: 11 } } });
+    expect(withSignals.status()).toBe(200);
+    expect(((await withSignals.json()) as { format: string }).format).toBe("case-study");
+    const bad = await page.request.post("/api/exhbts/draft", { data: { text: PLAIN_MATERIAL, signals: { imageFiles: -1, pdfPages: 0, pdfPicturePages: 0 } } });
+    expect(bad.status()).toBe(400);
+  });
+});

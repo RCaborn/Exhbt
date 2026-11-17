@@ -2,9 +2,10 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
-import { LIMITS, SCHEMA_VERSION, text, withHighlight, words, type ExhbtDoc, type Section } from "@/lib/exhbt/blocks";
+import { formatLimits, LIMITS, SCHEMA_VERSION, text, withHighlight, words, type ExhbtDoc, type Section } from "@/lib/exhbt/blocks";
+import { FORMATS, isFormat } from "@/lib/exhbt/formats";
 import { CHART_KINDS, hasData, type Chart } from "@/lib/exhbt/charts";
-import { squash } from "@/lib/exhbt/references";
+import { referencesFrom, squash } from "@/lib/exhbt/references";
 import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
 
@@ -22,6 +23,8 @@ import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./mo
  */
 
 const L = LIMITS;
+const G = formatLimits("gallery");
+const R = formatLimits("research");
 /** Roughly 15-20k tokens of material: enough for a report, and keeps a draft well under a penny. */
 export const MAX_MATERIAL_CHARS = 80_000;
 
@@ -34,7 +37,8 @@ Rules:
 - Write for a recruiter's quick read: short, concrete, plain British English. No hype words, no exclamation marks, no first person plural.
 
 Fields:
-- title: the question the work set out to answer, written as a question that ends with "?", at most ${L.titleChars} characters, e.g. "Will banks and fintechs cooperate under open banking?". Use the material's own subject and words.
+- format: the layout of the page (see Layout below).
+- title: the question the work set out to answer, written as a question that ends with "?", at most ${L.titleChars} characters, e.g. "Will banks and fintechs cooperate under open banking?". Use the material's own subject and words. For a gallery it is instead the plain name of the work, not a question, e.g. "Freshers' Week campaign for the Law Society".
 - summary: one sentence, at most ${L.summaryWords} words, on what the work found. It goes on portfolio cards, so it must make sense on its own.
 - context: what the work is, at most ${L.contextChars} characters, e.g. "MSc Finance dissertation" or "Year 2 group project". Empty if the material doesn't say.
 - whereWhen: where and when it was done, at most ${L.whereWhenChars} characters, e.g. "University of St Andrews, August 2026". Only what the material states; empty if it doesn't say.
@@ -55,7 +59,19 @@ Fields:
   Fill only the fields the kind uses; leave the rest as empty lists or null. Labels at most ${L.charts.labelChars} characters.
 - quote: feedback someone gave on the work (a supervisor, a client, a user), only if the material contains it: "text" copied word for word from the material, at most ${L.quote.words} words; "name" as the material gives it; "role" as the material gives it, or empty. Never write, shorten, join or reword a quote; if the only one is longer than ${L.quote.words} words, or nobody is named, null.
 - next: what the person says they would do next or do differently, at most ${L.reflection.words} words, only if the material says so. Empty otherwise.
-- In total, aim for about ${L.targetWords} words across everything you write (graph labels, the quote and its name included), and never more than ${L.totalWords}.`;
+- aim: research only. The aim or hypothesis as the material states it, at most ${R.aim.words} words, empty if the material states none. aimIsHypothesis is true only if the material itself calls it a hypothesis.
+- conclusion: research only. What the material itself concludes, at most ${R.conclusion.words} words. Never a conclusion the material doesn't draw. Empty otherwise.
+- references: research only, up to ${R.sections.link}. Each is an https address that appears in the material, copied exactly, with "label" the citation as the material gives it (at most ${R.link.labelWords} words). Never make up a DOI or an address. An empty list otherwise.
+- In total, aim for about ${L.targetWords} words across everything you write (graph labels, the quote and its name included), ${R.targetWords} for research, and never more than ${L.totalWords}.
+
+Layout (the "format" field):
+- "research" only when the material is an experiment, a lab report, a study or a dissertation, with a research question or hypothesis, a method and results.
+- "gallery" only when the material is mostly visual work (a campaign, posters, a brand, a design, drawings, a building, a film, a product) and what came of it is shown by the work itself. Many pictures and little text in the upload facts point that way.
+- "case-study" otherwise, and whenever you are unsure.
+- If the person's notes name a layout, use that one. The subject of the course alone is not evidence of a layout.
+- For a gallery: gap is the brief (what was asked, and for whom), at most ${G.gapWords} words, with gapHighlight the ask; findings are 0 to ${G.findings.max} bullets of what happened, each at most ${G.findings.wordsEach} words, only if the material says what happened, otherwise an empty list; at most ${G.sections.graph} graph. aim, conclusion and references stay empty. You never see the pictures: do not describe them.
+- For research: gap is the background and the gap, at most ${R.gapWords} words; findings are the results, ${R.findings.min} to ${R.findings.max} bullets, each at most ${R.findings.wordsEach} words; next holds the limitations the material itself states and what the person would do next, at most ${R.reflection.words} words. Never invent a limitation: leave it empty if the material states none.
+- Fields that belong to another layout stay empty.`;
 
 /**
  * A graph as the model writes it: one flat shape for every kind (structured outputs keep enums
@@ -79,6 +95,7 @@ const DraftChartSchema = z.object({
 export type DraftChart = z.infer<typeof DraftChartSchema>;
 
 const DraftSchema = z.object({
+  format: z.enum(FORMATS),
   title: z.string(),
   summary: z.string(),
   context: z.string(),
@@ -91,11 +108,21 @@ const DraftSchema = z.object({
   charts: z.array(DraftChartSchema),
   quote: z.object({ text: z.string(), name: z.string(), role: z.string() }).nullable(),
   next: z.string(),
+  aim: z.string(),
+  aimIsHypothesis: z.boolean(),
+  conclusion: z.string(),
+  references: z.array(z.object({ label: z.string(), url: z.string() })),
   numbers: z.array(z.object({ value: z.string(), sourceQuote: z.string() })),
 });
 type Draft = z.infer<typeof DraftSchema>;
 
-export type DraftInput = { text: string; notes?: string; link?: string };
+export type DraftInput = {
+  text: string;
+  notes?: string;
+  link?: string;
+  /** Counts from the upload (never the pages themselves), so the AI can tell mostly-pictures material from text. */
+  signals?: { imageFiles: number; pdfPages: number; pdfPicturePages: number };
+};
 export type DraftNumber = { value: string; sourceQuote: string };
 export type DraftResult = {
   doc: ExhbtDoc;
@@ -135,6 +162,9 @@ export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
           `<material>\n${input.text.trim().slice(0, MAX_MATERIAL_CHARS) || "(no files)"}\n</material>`,
           input.notes?.trim() ? `<notes>\n${input.notes.trim()}\n</notes>` : "No notes.",
           input.link?.trim() ? `Link to the work: ${input.link.trim()}` : "No link.",
+          ...(input.signals
+            ? [`<upload_facts>Picture files: ${input.signals.imageFiles}. PDF pages read: ${input.signals.pdfPages}, of which ${input.signals.pdfPicturePages} have pictures on them.</upload_facts>`]
+            : []),
         ].join("\n\n"),
       },
     ],
@@ -179,22 +209,50 @@ export function quoteFrom(q: Draft["quote"], source: string): { text: string; na
  */
 export function toDoc(d: Draft, source: string): ExhbtDoc {
   const nonEmpty = (s: string) => s.trim().length > 0;
-  const findings = d.findings.map((f) => f.trim()).filter(nonEmpty).slice(0, L.findings.max).map(text);
+  // The layout the draft chose; the caps are that layout's (decision 0024).
+  const f = isFormat(d.format) ? d.format : "case-study";
+  const FL = formatLimits(f);
+  const findings = d.findings.map((x) => x.trim()).filter(nonEmpty).slice(0, FL.findings.max).map(text);
   const charts = d.charts
     .map(toChart)
     .filter((c): c is Chart => c !== null && hasData(c))
-    .slice(0, L.charts.max);
+    .slice(0, FL.sections.graph);
   const quote = quoteFrom(d.quote, source);
   const next = d.next.trim();
-  // Below the flowchart, in this order (decision 0015): findings, the graphs, the quote, what I'd do next.
-  const sections: Section[] = [
-    ...(findings.length ? [{ id: "findings", kind: "findings" as const, items: findings }] : []),
-    ...charts.map((chart, i) => ({ id: `graph-${i + 1}`, kind: "graph" as const, chart })),
-    ...(quote ? [{ id: "quote-1", kind: "quote" as const, ...quote }] : []),
-    ...(next ? [{ id: "reflection-1", kind: "reflection" as const, text: text(next) }] : []),
-  ];
+  const findingsSection: Section[] = findings.length ? [{ id: "findings", kind: "findings" as const, items: findings }] : [];
+  const graphs: Section[] = charts.map((chart, i) => ({ id: `graph-${i + 1}`, kind: "graph" as const, chart }));
+  const quoteSection: Section[] = quote ? [{ id: "quote-1", kind: "quote" as const, ...quote }] : [];
+  const nextSection: Section[] = next ? [{ id: "reflection-1", kind: "reflection" as const, text: text(next) }] : [];
+  let sections: Section[];
+  if (f === "research") {
+    // Research poster order: the aim, the results, the graphs, the conclusion, feedback, limitations, then the references.
+    const aim = d.aim.trim();
+    const conclusion = d.conclusion.trim();
+    const refs = referencesFrom(d.references, source, FL.sections.link);
+    sections = [
+      ...(aim ? [{ id: "aim-1", kind: "aim" as const, text: text(aim), ...(d.aimIsHypothesis ? { heading: "hypothesis" as const } : {}) }] : []),
+      ...findingsSection,
+      ...graphs,
+      ...(conclusion ? [{ id: "conclusion-1", kind: "conclusion" as const, text: text(conclusion) }] : []),
+      ...quoteSection,
+      ...nextSection,
+      ...refs.map((r, i) => ({
+        id: `link-${i + 1}`,
+        kind: "link" as const,
+        href: r.href,
+        label: r.label.split(/\s+/).slice(0, FL.link.labelWords).join(" "),
+        description: "",
+      })),
+    ];
+  } else {
+    // Below the flowchart, in this order (decision 0015): findings, the graphs, the quote, what I'd do next.
+    // A gallery or a case study keeps nothing for the aim, the conclusion or references: they aren't stored hidden.
+    sections = [...findingsSection, ...graphs, ...quoteSection, ...nextSection];
+  }
   return {
     schemaVersion: SCHEMA_VERSION,
+    // Only when it isn't a case study, so a case-study draft is the same doc as before layouts.
+    ...(f === "case-study" ? {} : { format: f }),
     title: d.title.trim().slice(0, L.titleChars),
     // What it is and where and when sit in the sidebar (decision 0022); the summary goes on portfolio cards.
     context: d.context.trim().slice(0, L.contextChars),
@@ -289,6 +347,11 @@ export function toChart(g: DraftChart): Chart | null {
  */
 function mockDraft(input: DraftInput): DraftResult {
   const source = materialText(input).replace(/^File: .*$/gm, "");
+  // The stand-in's layout: named in the notes, else research when the material says "hypothesis", else a case study.
+  // It ignores the upload signals, and never keys on "method", "results", "aim" or "abstract": other specs upload such files.
+  const named = input.notes?.match(/stand-in: layout (gallery|research)/i)?.[1]?.toLowerCase();
+  const format: Draft["format"] = named === "gallery" || named === "research" ? named : /\bhypothes[ie]s\b/i.test(source) ? "research" : "case-study";
+  const links = [...new Set((source.match(/https:\/\/[^\s)\]>"'<]+/g) ?? []).map((u) => u.replace(/[.,;:]+$/, "")))];
   const firstSentence = (source.replace(/\s+/g, " ").match(/[^.!?]{12,}[.!?]/)?.[0] ?? source.slice(0, 120)).trim();
   const quote = firstSentence.split(" ").slice(0, L.findings.wordsEach).join(" ");
   const numbers = numbersIn(quote).map((value) => ({ value, sourceQuote: quote }));
@@ -327,7 +390,12 @@ function mockDraft(input: DraftInput): DraftResult {
     costUsd: 0,
     numbers,
     doc: toDoc({
-      title: "Development preview: what would the AI draft from your files?",
+      format,
+      aim: format === "research" ? "Placeholder aim: what the material set out to test." : "",
+      aimIsHypothesis: false,
+      conclusion: format === "research" ? "Placeholder conclusion." : "",
+      references: format === "research" ? links.map((url) => ({ label: "Placeholder: a reference from your files", url })) : [],
+      title: format === "gallery" ? "Development preview: a gallery drafted from your files" : "Development preview: what would the AI draft from your files?",
       summary: "A placeholder draft, made without an API key.",
       context: "Placeholder: what the work is",
       whereWhen: "Placeholder: where and when",
@@ -339,7 +407,7 @@ function mockDraft(input: DraftInput): DraftResult {
         { step: "Drafted the blocks", detail: null },
         { step: "Checked every number", detail: null },
       ],
-      findings: [quote, "This finding is a placeholder."],
+      findings: format === "gallery" ? [quote] : [quote, "This finding is a placeholder."],
       charts,
       quote: feedback,
       next,

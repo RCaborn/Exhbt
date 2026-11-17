@@ -56,6 +56,24 @@ const MB = 1024 * 1024;
 /** Enough material to draft from; the server asks for the same. */
 const MIN_WORDS = 20;
 const isImage = (f: File) => f.type.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
+
+/** Counts from the files being drafted from, waiting at most two seconds for the PDF pages that are still being drawn. */
+async function uploadSignals(files: Item[], pages: Map<string, Promise<PdfPages | null>>) {
+  const imageFiles = files.filter((it) => isImage(it.file)).length;
+  let pdfPages = 0;
+  let pdfPicturePages = 0;
+  const deadline = new Promise<null>((r) => setTimeout(() => r(null), 2000));
+  await Promise.all(
+    files.map(async (it) => {
+      const p = pages.get(it.key);
+      const read = p ? await Promise.race([p.catch(() => null), deadline]) : null;
+      if (!read) return;
+      pdfPages += read.pageCount;
+      pdfPicturePages += read.pages.filter((pg) => pg.marks.pictures > 0).length;
+    }),
+  );
+  return { imageFiles: Math.min(50, imageFiles), pdfPages: Math.min(5000, pdfPages), pdfPicturePages: Math.min(5000, pdfPicturePages) };
+}
 const sizeLabel = (b: number) => (b < MB ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / MB).toFixed(1)} MB`);
 
 /**
@@ -214,6 +232,9 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
           return candidatesOf(sources).length ? prepareFigure(sources, stop.signal) : null;
         })().catch(() => null)
       : Promise.resolve(null);
+    // Counts from the upload for the AI's choice of layout (decision 0024): picture files, PDF pages, and
+    // pages with pictures on them. Never the pages. Waits at most two seconds and sends what is known.
+    const signals = await uploadSignals(items.filter((it) => it.status === "ready"), pages.current);
     let placed = false;
     // Whatever happens to the draft, a figure that was uploaded but never placed is deleted.
     const dropUnplaced = () => {
@@ -231,10 +252,11 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
           notes,
           link: link.trim() || undefined,
           fileIds: items.filter((it) => it.upload === "done" && it.fileId).map((it) => it.fileId),
+          signals,
           ...(into ? { into } : {}),
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string; upgradeTo?: Plan | null };
+      const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string; upgradeTo?: Plan | null; format?: string };
       if (!res.ok || !data.id) {
         // A plan limit (403/429) gets the upgrade offer; anything else is a plain error.
         const limit = res.status === 403 || res.status === 429;
@@ -251,7 +273,9 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
       setFigure((f) => (f === "none" ? f : "done"));
       setDone(true);
       // A beat to see every step ticked, then the editor.
-      setTimeout(() => router.push(`/exhbts/${data.id}/edit`), 600);
+      // A layout other than the case study is said once in the editor ("Drafted as a gallery").
+      const drafted = data.format && data.format !== "case-study" ? `?drafted=${encodeURIComponent(data.format)}` : "";
+      setTimeout(() => router.push(`/exhbts/${data.id}/edit${drafted}`), 600);
     } catch {
       dropUnplaced();
       setFigure("none");
