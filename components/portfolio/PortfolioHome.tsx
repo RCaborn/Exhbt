@@ -258,7 +258,7 @@ function MastheadHero({ person, theme }: HeroProps) {
           <Intro person={person} className="mt-6 !text-[1.125rem] @3xl:!text-[1.25rem]" />
           <Meta person={person} className="mt-6" />
         </div>
-        <Face person={person} theme={theme} className="size-28 @3xl:size-44" initialsClass="text-[2.5rem] @3xl:text-[3.5rem]" />
+        <Face person={person} theme={theme} className="order-first size-20 @3xl:order-none @3xl:size-44" initialsClass="text-[1.8rem] @3xl:text-[3.5rem]" />
       </div>
     </header>
   );
@@ -334,7 +334,7 @@ function TerminalHero(props: HeroProps) {
           <Intro person={person} className="mt-6 !text-[1rem] !leading-[1.75] @3xl:!text-[1.0625rem]" />
           <Meta person={person} className="mt-6" />
         </div>
-        <Face person={person} theme={theme} className="size-24 border border-[color:var(--pf-edge)] @3xl:size-32" initialsClass="text-[2rem]" />
+        <Face person={person} theme={theme} className="order-first size-20 border border-[color:var(--pf-edge)] @3xl:order-none @3xl:size-32" initialsClass="text-[1.6rem] @3xl:text-[2rem]" />
       </div>
       {skills.length > 0 && (
         <ul aria-label="Skills" className="mt-10 flex flex-wrap gap-2.5 border-b border-dashed border-[color:var(--pf-line)] pb-6">
@@ -399,7 +399,7 @@ function LedgerHero(props: HeroProps) {
           <Intro person={person} className="mt-5 !text-[1.0625rem] @3xl:!text-[1.1875rem]" />
           {education.length > 0 && <Meta person={person} />}
         </div>
-        <Face person={person} theme={theme} className="size-24 @3xl:size-32" initialsClass="text-[2rem]" />
+        <Face person={person} theme={theme} className="order-first size-20 @3xl:order-none @3xl:size-32" initialsClass="text-[1.6rem] @3xl:text-[2rem]" />
       </div>
       <dl data-ledger className="pf-rows mt-10 border-t border-b-[3px] border-[color:var(--pf-rule)] [border-bottom-style:double] tabular-nums">
           {rows.map((r, i) => (
