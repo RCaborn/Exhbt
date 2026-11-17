@@ -1,4 +1,6 @@
-import { expect, test } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test, type Page } from "@playwright/test";
+import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import { cardWords } from "../components/editor/model";
 import {
   emptyDoc,
@@ -18,7 +20,7 @@ import { formatOf, FORMATS, hiddenSections, shownSections, withFormat } from "..
 import { fitCaption } from "../lib/figures/rules";
 import { keyFigureOf } from "../lib/portfolio-home";
 import { referencesFrom } from "../lib/exhbt/references";
-import { fullDoc, galleryDoc, libraryDoc, openBankingDoc, researchDoc, sampleDocs, sampleSeeds } from "../lib/exhbt/sample";
+import { fullDoc, GALLERY_IMAGES, galleryDoc, libraryDoc, openBankingDoc, researchDoc, sampleDocs, sampleSeeds } from "../lib/exhbt/sample";
 import { firstOfKinds, layoutNotes, leadRatio, imageRatio, sectionLabel, withKeyFigure } from "../lib/exhbt/sections";
 import { unverifiedNumbers } from "../lib/exhbt/verify";
 
@@ -328,5 +330,138 @@ test.describe("model: references, captions, notes", () => {
     expect(n.hidden).toEqual(["Aim or hypothesis", "Conclusion"]);
     const g = layoutNotes(withFormat(gallery(), "case-study"));
     expect(g.over[0]).toBe("This layout shows up to 2 images; you have 8. Remove some before you publish, or switch back.");
+  });
+});
+
+/* ---------------- The pages (seeded by /dev/portfolio?with=formats) ---------------- */
+
+const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
+const stamp = () => Date.now().toString(36).slice(-5) + Math.floor(Math.random() * 1000);
+
+async function seed(page: Page, look = "", withs = "formats") {
+  const username = `fm${look.replace(/[^a-z]/g, "").slice(0, 6)}${stamp()}`;
+  const res = await page.request.get(`/dev/portfolio?username=${username}&plan=max${look ? `&look=${look}` : ""}&with=${withs}`, { maxRedirects: 0 });
+  expect(res.status(), await res.text()).toBe(307);
+  return username;
+}
+
+const axe = async (page: Page, where: string) => {
+  const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  expect(violations.map((v) => `${where} ${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
+};
+
+/** The data-part names on the page, in document order. */
+const parts = (page: Page) => page.locator("[data-exhbt-page] [data-part]").evaluateAll((els) => els.map((e) => e.getAttribute("data-part")!));
+const orderOf = (all: string[], names: string[]) => names.map((n) => all.indexOf(n));
+const ascending = (xs: number[]) => xs.every((x, i) => x >= 0 && (i === 0 || x > xs[i - 1]!));
+
+test.describe("The gallery page", () => {
+  test("the parts come in the page's order; nothing is cropped or lazy; axe is clean", async ({ page }) => {
+    const u = await seed(page);
+    await page.goto(`/p/${u}/freshers-campaign`);
+    await expect(page.locator("article[data-format=gallery]")).toBeVisible();
+    expect(ascending(orderOf(await parts(page), ["lead", "did", "happened", "grid", "link"]))).toBe(true);
+    const lead = page.locator("[data-part=lead] img").first();
+    await expect(lead).toHaveAttribute("alt", GALLERY_IMAGES[0]!.alt);
+    await expect(page.locator(".xp-tile")).toHaveCount(7);
+    const imgs = page.locator("[data-exhbt-page] img[src*='/api/files'], [data-exhbt-page] [data-part=lead] img, [data-exhbt-page] .xp-tile img");
+    const facts = await imgs.evaluateAll((els) => els.map((e) => ({ lazy: e.getAttribute("loading"), fit: getComputedStyle(e).objectFit, w: e.getAttribute("width"), h: e.getAttribute("height") })));
+    expect(facts.length).toBeGreaterThanOrEqual(8);
+    for (const f of facts) {
+      expect(f.lazy).not.toBe("lazy");
+      expect(f.fit).not.toBe("cover");
+      expect(f.w).toBeTruthy();
+      expect(f.h).toBeTruthy();
+    }
+    await axe(page, "gallery");
+  });
+
+  test("a picture opens larger: Enter or a click, no Previous or Next, Escape returns focus; axe is clean on two looks", async ({ page }) => {
+    for (const look of ["", "night"]) {
+      const u = await seed(page, look);
+      await page.goto(`/p/${u}/freshers-campaign`);
+      const tile = page.locator(".xp-tile button").first();
+      await tile.focus();
+      await page.keyboard.press("Enter");
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      await expect(dialog).toHaveAccessibleName(GALLERY_IMAGES[1]!.caption);
+      expect(await dialog.evaluate((d) => d.contains(document.activeElement))).toBe(true);
+      await expect(dialog.getByRole("button", { name: /previous|next/i })).toHaveCount(0);
+      const src = await dialog.locator("img").getAttribute("src");
+      await page.keyboard.press("ArrowRight");
+      expect(await dialog.locator("img").getAttribute("src")).toBe(src);
+      await axe(page, `dialog ${look || "default"}`);
+      await page.keyboard.press("Escape");
+      await expect(dialog).toBeHidden();
+      await expect(tile).toBeFocused();
+      // A click opens it too, and a click on the backdrop closes it.
+      await tile.click();
+      await expect(dialog).toBeVisible();
+      await page.mouse.click(4, 4);
+      await expect(dialog).toBeHidden();
+    }
+  });
+
+  test("it prints on one A4 page, and the zoom chips and dialog stay out of the print", async ({ page }) => {
+    const u = await seed(page);
+    await page.goto(`/p/${u}/freshers-campaign`);
+    await page.emulateMedia({ media: "print" });
+    await expect(page.locator(".xp-zoom-chip").first()).toBeHidden();
+    const pdf = await page.pdf({ format: "A4", preferCSSPageSize: true, printBackground: true });
+    expect(pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g)?.length).toBe(1);
+  });
+});
+
+test.describe("The research page", () => {
+  test("the page sets the order, the key figure is the first graph, references are plain links; axe is clean", async ({ page }) => {
+    const u = await seed(page);
+    await page.goto(`/p/${u}/walk-and-recall`);
+    await expect(page.locator("article[data-format=research]")).toBeVisible();
+    const all = await parts(page);
+    // The aim is stored after the findings and the conclusion, yet drawn first.
+    expect(ascending(orderOf(all, ["aim", "process", "key-figure", "figures", "results", "conclusion", "reflection", "references"]))).toBe(true);
+    const key = page.locator("[data-part=key-figure]");
+    await expect(key.locator("[data-part=graph]")).toBeVisible();
+    await expect(key.getByText("21.4").first()).toBeVisible();
+    expect(await key.locator("table").count()).toBeGreaterThan(0);
+    const refs = page.locator("[data-part=references] a");
+    await expect(refs).toHaveCount(1);
+    await expect(refs.first()).toHaveAttribute("rel", "nofollow ugc noopener");
+    expect(await page.locator("[data-part=references] ol").count()).toBe(0);
+    expect(await page.locator("[data-part=references]").innerText()).not.toMatch(/example\.com/);
+    expect(await page.locator("[data-exhbt-page]").innerText()).not.toMatch(/Figure \d/);
+    await axe(page, "research");
+  });
+
+  test("it prints on one A4 page", async ({ page }) => {
+    const u = await seed(page);
+    await page.goto(`/p/${u}/walk-and-recall`);
+    await page.emulateMedia({ media: "print" });
+    const pdf = await page.pdf({ format: "A4", preferCSSPageSize: true, printBackground: true });
+    expect(pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g)?.length).toBe(1);
+  });
+});
+
+test.describe("Looks and the home page", () => {
+  for (const t of PORTFOLIO_THEMES) {
+    test(`${t.id}: both pages pass axe`, async ({ page }) => {
+      const u = await seed(page, t.id);
+      for (const slug of ["freshers-campaign", "walk-and-recall"]) {
+        await page.goto(`/p/${u}/${slug}`);
+        await axe(page, `${t.id} ${slug}`);
+      }
+    });
+  }
+
+  test("the portfolio home shows the lead image and the key graph; an old case study is unchanged", async ({ page }) => {
+    const u = await seed(page, "", "open-banking,formats");
+    await page.goto(`/p/${u}`);
+    const g = page.getByRole("link", { name: /Freshers' Week campaign/ }).first();
+    await expect(g).toBeVisible();
+    await expect(g.locator("img").first()).toHaveAttribute("alt", GALLERY_IMAGES[0]!.alt);
+    const r = page.getByRole("link", { name: /Does a 10-minute walk/ }).first();
+    await expect(r).toContainText("21.4");
+    await expect(page.getByRole("link", { name: /open banking/i }).first()).toBeVisible();
   });
 });
