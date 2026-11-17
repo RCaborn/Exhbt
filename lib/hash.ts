@@ -3,8 +3,9 @@ import type { RoadmapInput } from "./ai/schemas";
 /**
  * Version of the roadmap output shape. Bump it when the output gains fields, so cached
  * outputs from before the change aren't reused for new requests. 2: added skillMap.
+ * 3: level anchors in the skillMap prompt (docs/decisions/0023-skill-radar.md).
  */
-const OUTPUT_VERSION = 2;
+const OUTPUT_VERSION = 3;
 
 /** SHA-256 as 64 lower-case hex characters: of a file's bytes, or of a string's UTF-8. */
 export async function sha256Hex(data: Uint8Array | string): Promise<string> {

@@ -12,6 +12,7 @@ import {
 import { FeatureList } from "@/components/site/FeatureList";
 import { Button } from "@/components/ui/Button";
 import { marketingFeatures } from "@/lib/marketing-features";
+import { marketingMetadata, pricingDescription } from "@/lib/seo";
 import { isPhase2Enabled } from "@/lib/site";
 
 // Per request: the EXHBT_PHASE2 switch is read at runtime, so the paid plans appear (or go back
@@ -35,10 +36,7 @@ const maxExtra = (sell: boolean) =>
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const sell = await selling(props);
-  return {
-    title: "Pricing",
-    description: `Free includes the roadmap and an exhbt to try. ${PLAN_NAMES.premium} puts your exhbts on your own link, and ${PLAN_NAMES.max} ${maxExtra(sell)}. Employers never pay.`,
-  };
+  return marketingMetadata("pricing", { description: pricingDescription(sell, maxExtra(sell)) });
 }
 
 const { free, premium, max } = ENTITLEMENTS;

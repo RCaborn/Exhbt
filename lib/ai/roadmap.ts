@@ -20,13 +20,14 @@ Rules:
 - Strengths must point to where they appear in what the graduate told you.
 - Gaps are skills the target job needs that the graduate does not show, or shows only weakly. When a job profile from the UK jobs dataset is given, treat its skills list as the authoritative requirements; otherwise use what the job commonly needs.
 - skillMap lists the ${SKILL_MAP_MIN}-${SKILL_MAP_MAX} skills this job asks for most, most important first. Use short names (one to four words). When a job profile is given, take them from its skills list.
-- For each skill, "needed" is the level a junior hire in this job is expected to show, and "current" is the level the graduate's own input shows. Both use this scale:
-  0 = not shown anywhere in what they told you
-  1 = named or listed only, with no use described
-  2 = used in study or coursework
-  3 = used in a project or job, with what they did described
-  4 = used repeatedly, with results described
-  Score "current" from their input only. Put where it shows in "evidence"; when current is 0, evidence is empty.
+- For each skill, "needed" and "current" are levels from 0 to 4. The levels mean:
+  0 = nothing in their material shows it
+  1 = studied it (named in a course or module)
+  2 = used it in a piece of work
+  3 = used it to get a result they describe
+  4 = led or taught it, or used it professionally
+- "current" is the level the graduate's own material shows. Score it only from what they told you, and put where it shows in "evidence" (point to the line, course, project or job). When current is 0, evidence is empty. If you are unsure between two levels, take the lower one. Never score a skill above what a described piece of work supports.
+- "needed" is the level a junior hire in this job is expected to show, and it must vary with how central the skill is to this job. The one or two skills the job is mostly about are 3 or 4. Supporting skills are 1 or 2. Do not give every skill the same level and do not default to 3. "needed" is about the job, not the graduate: do not lower it because they lack the skill.
 - Every gap's "skill" and every name in a project's "closesGaps" must be one of the skillMap names, spelt exactly the same.
 - Do not suggest projects. They are written in a separate step.
 - Write in plain British English. No hype words, no exclamation marks.`;
@@ -95,15 +96,24 @@ function mockRoadmap(input: RoadmapInput, job: JobProfile | null): RoadmapResult
         { skill: "Placeholder gap one", whyItMatters: "Shown so the layout can be checked.", currentEvidence: "none" as const },
         { skill: "Placeholder gap two", whyItMatters: "Shown so the layout can be checked.", currentEvidence: "some" as const },
       ];
-  // Fixed placeholder levels so the chart can be checked: the first gap shows some evidence,
-  // the other gaps none, and the remaining skills are already at the level needed.
+  // Fixed placeholder levels so the chart can be checked. The job's needs vary with how central the
+  // skill is (the first is the core one). A gap is a skill below its need (the first shows some
+  // evidence, the others none); the rest meet it, the first of those with a level to spare.
   const skillNames = job
     ? job.skills.slice(0, SKILL_MAP_MAX)
     : [...gaps.map((g) => g.skill), "Placeholder skill three", "Placeholder skill four"];
-  const skillMap = skillNames.map((skill) => {
+  const NEEDED = [4, 3, 3, 2, 2, 1];
+  let spare = true;
+  const skillMap = skillNames.map((skill, i) => {
+    const needed = NEEDED[i] ?? 1;
     const gap = gaps.find((g) => g.skill === skill);
-    const current = !gap ? 3 : gap.currentEvidence === "some" ? 1 : 0;
-    return { skill, needed: 3, current, evidence: current > 0 ? "Placeholder evidence." : "" };
+    let current: number;
+    if (gap) current = gap.currentEvidence === "some" ? 1 : 0;
+    else {
+      current = Math.min(4, needed + (spare ? 1 : 0));
+      spare = false;
+    }
+    return { skill, needed, current, evidence: current > 0 ? "Placeholder evidence." : "" };
   });
   return {
     model: "mock",

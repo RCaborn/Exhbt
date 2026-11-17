@@ -2,9 +2,10 @@ import { ArrowUp } from "lucide-react";
 import { Tick } from "@/components/ui/Tick";
 
 /**
- * The two lists under a skill radar: "Level up next" (the biggest shortfalls) and "In the bag"
- * (at or above what the job asks). They carry the chart's meaning in words, so the radar can
- * stay free of numbers. The markers match the ones on the radar's labels.
+ * The two lists under a skill radar: "Level up next" (every skill below what the job asks,
+ * biggest shortfall first) and "In the bag" (every skill at or above it). Together they list each
+ * axis once, for the view the radar is showing. They carry the chart's meaning in words, so the
+ * radar can stay free of numbers. The markers match the ones on the radar's labels.
  */
 
 /** Arrow in an ink ring: a skill to level up. */

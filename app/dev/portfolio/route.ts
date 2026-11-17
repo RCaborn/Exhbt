@@ -59,6 +59,8 @@ export async function GET(req: NextRequest) {
     ...(rich
       ? { location: "Leeds", lookingFor: "Graduate data roles in the NHS or local government", github: "https://github.com/example", contactEmail: "amara@example.com" }
       : {}),
+    // hide=1: "hide my portfolio from search engines" is on (the SEO checks).
+    hideFromSearch: q.get("hide") === "1",
   });
   for (const e of await store.listExhbts(userId)) await store.deleteExhbt(e.id, userId);
   // A fresh arrangement too: the default layout, nothing hidden or featured.
