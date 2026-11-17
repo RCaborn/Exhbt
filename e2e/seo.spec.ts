@@ -16,6 +16,12 @@ const PUBLIC = process.env.EXHBT_PUBLIC === "1";
 const PORT = Number(process.env.E2E_PORT) || 3200;
 const unique = (tag: string) => `${tag}${Date.now().toString(36)}${Math.floor(Math.random() * 1e3)}`;
 
+const DESCRIPTION =
+  "We are hiring a graduate data analyst for our customer insight team. You will write SQL against our sales data, " +
+  "build time series forecasts of weekly demand, and keep the reporting in Excel up to date. Some Python is useful but " +
+  "not essential. You will explain what you find to managers who are not analysts, so clear writing matters. The role " +
+  "suits someone who checks their numbers and likes turning messy data into a plain answer. Training is provided.";
+
 const decode = (s: string) =>
   s.replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 
@@ -127,7 +133,7 @@ test.describe("marketing pages", () => {
     const xml = await (await request.get("/sitemap.xml")).text();
     expect(xml).toContain(`<loc>https://${MARKETING_HOST}</loc>`);
     expect(xml).toContain(`<loc>https://${MARKETING_HOST}/pricing</loc>`);
-    expect(xml).toMatch(new RegExp(`<loc>https://${MARKETING_HOST.replace(/\./g, "\\.")}/legal/privacy</loc><lastmod>2026-\\d\\d-\\d\\d</lastmod>`));
+    expect(xml).toMatch(new RegExp(`<loc>https://${MARKETING_HOST.replace(/\./g, "\\.")}/legal/privacy</loc>\\s*<lastmod>2026-\\d\\d-\\d\\d</lastmod>`));
     expect(xml).not.toContain("/start");
     expect(xml).not.toContain("/roadmap");
   });
@@ -241,9 +247,7 @@ test.describe("job links", () => {
     await expect(page.locator("form[data-ready=true]")).toBeAttached();
     await page.getByLabel("Company", { exact: true }).fill("Acme");
     await page.getByLabel("Role title", { exact: true }).fill("Graduate Data Analyst");
-    await page
-      .getByLabel("Job description", { exact: true })
-      .fill("We are hiring a graduate data analyst to write SQL, build time series forecasts and keep our Excel reporting up to date.");
+    await page.getByLabel("Job description", { exact: true }).fill(DESCRIPTION);
     await page.getByRole("radio", { name: /^Clean/ }).check();
     await page.getByRole("button", { name: "Pick my exhbts" }).click();
     await page.waitForURL(/\/job-links\/[0-9a-f-]{36}$/);

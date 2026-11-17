@@ -16,6 +16,8 @@ flowchart LR
 
 The bare apex (exhbt.co.uk) redirects to www with a 308, keeping the path and query, because sign-in cookies are host-only (`canonicalRedirectUrl` in `lib/hosts.ts`, called first in `middleware.ts`). Register the Stripe webhook on www.
 
+**Search engines and link previews.** `lib/seo.ts` is the one table of marketing pages (address, title, description, preview-image words) and builds each page's canonical, Open Graph and Twitter metadata and the JSON-LD (Organization and WebSite in the marketing layout, Person on a portfolio home, CreativeWork on an exhbt). `metadataBase` is set in `app/(marketing)/layout.tsx` only; portfolio pages give absolute addresses on the person's own host (`portfolioCanonical`). Marketing previews are `/og/<page>.png` (`app/(marketing)/og/[key]/route.tsx`, `marketingCard` in `lib/og/card.tsx`); portfolio previews are the `preview.png` routes. Each portfolio host serves its own `/sitemap.xml` and `/robots.txt` (`app/(portfolio)/p/[username]/`; the middleware matcher no longer skips robots.txt). Hidden-from-search portfolios, exhbts left off the home page, job links and owner previews are noindex and out of the sitemap. Rory's Search Console steps are in `LAUNCH.md`.
+
 At launch, with `EXHBT_TOOL_HOST=1` set, www and the apex send /login, /roadmap and /auth to the app host (until then sign-in stays on www, and email links use the request host); a person's host is their portfolio. Localhost and a workers.dev preview stay one origin, so development is unchanged. Employer links are a path on the person's host. Cookies for sign-in stay on the app host. The Worker routes that attach those domains are not in `wrangler.jsonc` yet: a deploy cannot add them until exhbt.co.uk is a zone on this Cloudflare account.
 
 ## Plans
@@ -89,3 +91,5 @@ Phase 2 is the paid product: build exhbts, publish them to a portfolio, pay for 
 | The admin panel (team only, read-only), its role check, and the anonymous page-view beacon | `app/(app)/admin/`, `lib/admin.ts`, `lib/admin-supabase.ts`, the `/* admin */` block in `lib/store.ts`, `app/api/pv/route.ts`, `components/site/PageViewBeacon.tsx`, decision 0021 |
 | What the account export includes | `exportUserData` in `lib/store.ts` (both implementations) |
 | Privacy policy, terms, cookies | `app/(marketing)/legal/[doc]/page.tsx` |
+| A marketing page's title, description or link-preview image, canonical addresses, JSON-LD, sitemaps, robots.txt | `lib/seo.ts`, `lib/og/card.tsx`, `app/(marketing)/og/[key]/route.tsx`, `app/sitemap.ts`, `app/robots.ts`, `app/(portfolio)/p/[username]/sitemap.xml/route.ts` and `robots.txt/route.ts`, `e2e/seo.spec.ts` |
+| When a legal page last changed (printed on the page, and the sitemap's lastmod) | `lib/legal.ts` |

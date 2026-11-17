@@ -46,7 +46,7 @@ export const MARKETING_PAGES: Record<MarketingKey, MarketingPage> = {
     title: HOME_TITLE,
     description:
       "Get a free skills-gap roadmap for the job you want, then turn your projects into exhbts: short, checked write-ups on a website at your own address.",
-    card: { headline: "Your own website, built from your projects", sub: "A free skills-gap roadmap, then checked exhbts to send to employers" },
+    card: { headline: "Your own website, built from your projects", sub: "A free skills-gap roadmap, then checked exhbts for employers" },
   },
   "what-is-an-exhbt": {
     path: "/what-is-an-exhbt",
