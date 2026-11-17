@@ -1,4 +1,4 @@
-import { normaliseDoc, SCHEMA_VERSION, text, type Chart, type ExhbtDoc, type ExhbtDocV1 } from "./blocks";
+import { normaliseDoc, SCHEMA_VERSION, text, type Chart, type ExhbtDoc, type ExhbtDocV1, type Section } from "./blocks";
 
 /**
  * Fictional exhbts, for development, previews and tests (app/dev/portfolio). Same fictional
@@ -159,6 +159,112 @@ export const fullDoc: ExhbtDoc = {
     { id: "link-1", kind: "link", href: "https://example.com/open-banking-code", label: "Model code", description: "The replicator equations in SymPy" },
   ],
 };
+
+/**
+ * The gallery sample (decision 0024): a campaign shown by its pictures. Fictional. Pictures need
+ * stored files owned by the user, so it is a function of file ids (app/dev/portfolio makes the
+ * files). Mixed shapes on purpose: a tall poster, story frames, a banner, a square. Not in
+ * sampleSeeds, which other specs loop over: app/dev/portfolio adds it with `with=gallery`.
+ */
+export const GALLERY_IMAGES = [
+  { w: 1200, h: 1600, alt: "A tall poster: a bold question in white on green, with the Law Society crest at the bottom.", caption: "The main poster, in the union and library" },
+  { w: 1080, h: 1920, alt: "A phone story frame asking a question in large type over a green background.", caption: "Story frame one: the question" },
+  { w: 1080, h: 1920, alt: "A phone story frame giving the answer and a sign-up link on a pale background.", caption: "Story frame two: the answer" },
+  { w: 1600, h: 1200, alt: "The poster pinned to a noticeboard beside other society notices.", caption: "Poster on the union noticeboard" },
+  { w: 2400, h: 800, alt: "A wide stall banner with the society name and a short slogan.", caption: "Stall banner at the freshers' fair" },
+  { w: 1600, h: 1200, alt: "Three rough pencil sketches of poster ideas on one sheet.", caption: "Early sketch of the three ideas" },
+  { w: 1080, h: 1080, alt: "A square grid of nine Instagram posts in matching green and white.", caption: "Instagram grid after week one" },
+  { w: 1200, h: 1700, alt: "A flyer with the question on the front and a map of the stall on the back.", caption: "Flyer handed out at halls" },
+];
+
+export function galleryDoc(fileIds: string[]): ExhbtDoc {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    format: "gallery",
+    title: "Freshers' Week campaign for the Law Society",
+    context: "BA Marketing, Year 2 module",
+    whereWhen: "University of Leeds, October 2026",
+    summary: "A poster and Instagram campaign that nearly doubled sign-ups.",
+    skills: ["Campaign planning", "Canva", "Instagram", "Copywriting"],
+    gap: [{ t: "The Law Society asked for a Freshers' Week campaign to reach " }, { t: "first-years who don't study law", b: true }, { t: "." }],
+    flow: [
+      { step: "Read the brief and past sign-ups" },
+      { step: "Sketched three poster ideas" },
+      { step: "Tested two with 20 students" },
+      { step: "Ran posters and stories", detail: "two weeks" },
+    ],
+    sections: [
+      { id: "findings", kind: "findings", items: [text("Sign-ups rose from 64 last year to 112."), text("41 of the 112 were not law students.")] },
+      ...GALLERY_IMAGES.map((im, i): Section => ({ id: `image-${i + 1}`, kind: "image", fileId: fileIds[i] ?? `missing-${i + 1}`, alt: im.alt, caption: text(im.caption), w: im.w, h: im.h })),
+      { id: "link-1", kind: "link", href: "https://example.com/law-society-film", label: "Watch the 30-second film", description: "Posted on the society's Instagram" },
+      { id: "link-2", kind: "link", href: "https://example.com/law-society-posters", label: "See every poster", description: "" },
+    ],
+    evidence: { kind: "link", href: "https://example.com/law-society-campaign-deck.pdf", label: "Campaign deck (PDF)" },
+  };
+}
+
+/**
+ * The research sample (decision 0024): a small experiment shown as a poster. Fictional. It is a
+ * function of one file id (its one picture). Stored in an order that is not the page's on purpose
+ * (the aim is stored late), so the tests prove the page sets where each kind goes while the list
+ * still picks the key figure: the graph, the first figure. About 193 words with no quote.
+ */
+export const RESEARCH_IMAGE = { w: 1600, h: 1100, alt: "A map of the quad with the ten-minute walking route drawn as a loop.", caption: "The walking route, 10 minutes round the quad" };
+
+export function researchDoc(imageFileId: string): ExhbtDoc {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    format: "research",
+    title: "Does a 10-minute walk before a test improve recall in first-year students?",
+    context: "BSc Psychology final-year project",
+    whereWhen: "University of Sheffield, March 2026",
+    summary: "Walking first gave a small rise in recall.",
+    skills: ["Experimental design", "R", "t-tests", "Literature review"],
+    gap: [{ t: "Exercise is known to lift mood. " }, { t: "Whether a short walk helps recall straight after is less clear.", b: true }],
+    flow: [
+      { step: "Recruited 48 first-years", detail: "volunteers, two groups" },
+      { step: "Walk or sit, 10 minutes" },
+      { step: "Word-list recall test", detail: "40 words" },
+      { step: "Compared groups in R", detail: "t-test" },
+    ],
+    sections: [
+      {
+        id: "findings",
+        kind: "findings",
+        items: [
+          text("The walking group recalled 21.4 words on average; the sitting group 19.1."),
+          text("The difference was significant, t(46) = 2.1, p = .04."),
+          text("The gap was largest for words in the first half of the list."),
+        ],
+      },
+      { id: "conclusion-1", kind: "conclusion", text: text("A short walk before a test gave a small rise in recall, so the hypothesis was supported.") },
+      {
+        id: "graph-1",
+        kind: "graph",
+        chart: {
+          kind: "bar",
+          title: "Words recalled (mean of 40)",
+          yTitle: "Words",
+          rows: [
+            { label: "Walked", value: 21.4 },
+            { label: "Sat", value: 19.1 },
+          ],
+        },
+      },
+      { id: "image-1", kind: "image", fileId: imageFileId, alt: RESEARCH_IMAGE.alt, caption: text(RESEARCH_IMAGE.caption), w: RESEARCH_IMAGE.w, h: RESEARCH_IMAGE.h },
+      { id: "aim-1", kind: "aim", heading: "hypothesis", text: text("Students who walk for 10 minutes before a word-list test will recall more words than students who sit.") },
+      { id: "reflection-1", kind: "reflection", text: text("One university and volunteers only, and the test came straight after. Next I'd test recall a day later.") },
+      {
+        id: "link-1",
+        kind: "link",
+        href: "https://example.com/smith-lee-2021",
+        label: "Smith and Lee 2021, Journal of Cognitive Psychology",
+        description: "The recall test I adapted",
+      },
+    ],
+    evidence: { kind: "link", href: "https://example.com/walk-recall-report.pdf", label: "Final report (PDF)" },
+  };
+}
 
 /** The samples as they're stored by app/dev/portfolio: the GP one in the old layout. */
 export const sampleSeeds: unknown[] = [legacyGpDoc, libraryDoc];

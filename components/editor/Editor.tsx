@@ -10,15 +10,17 @@ import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { CopyLink } from "@/components/ui/CopyLink";
 import type { Plan } from "@/lib/entitlements";
-import { LIMITS, normaliseDoc, safeHref, validateForPublish, wordCount, type ExhbtDoc, type Picked } from "@/lib/exhbt/blocks";
+import { formatLimits, LIMITS, normaliseDoc, safeHref, validateForPublish, wordCount, type ExhbtDoc, type Picked } from "@/lib/exhbt/blocks";
+import { FORMAT_COPY, formatOf, type Format } from "@/lib/exhbt/formats";
 import { hasData } from "@/lib/exhbt/charts";
 import { newImageSection, roomFor } from "@/lib/exhbt/sections";
+import { LayoutPicker } from "./LayoutPicker";
 import { BlockTools, useDraftTools, type DraftToolsInit } from "./BlockTools";
 import { ConfirmAction } from "./ConfirmAction";
 import { FieldIssues } from "./FieldIssues";
 import { FlowEditor } from "./FlowEditor";
 import { Checklist, isBlank, stepsFor } from "./Checklist";
-import { IMAGE_ACCEPT, WORK_ACCEPT, checkFile, fileIdsOf, removeFile, UploadError, uploadForExhbt } from "./media";
+import { IMAGE_ACCEPT, WORK_ACCEPT, checkFile, fileIdsOf, prepareImage, readSize, removeFile, UploadError, uploadForExhbt } from "./media";
 import { cardOf, cardWords, confirmNumber, issuesAt, labelOf, unverifiedOf, visibleIssues, type CardKey } from "./model";
 import { Card, TextInput } from "./parts";
 import { PreviewArrange } from "./PreviewArrange";
@@ -57,6 +59,8 @@ export type EditorProps = {
   figureSources?: Record<string, string | null>;
   /** Rewrite and "Back to the AI version"; null or missing when the exhbt has no kept source text. */
   draftTools?: DraftToolsInit;
+  /** The layout the AI draft chose, right after drafting (?drafted=gallery): a one-off line under the layout choice. */
+  draftedAs?: Format;
 };
 
 /** Where the list at the top jumps to for an issue: the card's heading, or the "Add a section" button for the sections as a whole. */
@@ -83,6 +87,11 @@ const GUIDE_KEY = "exhbt-guide-hidden";
 export function Editor(props: EditorProps) {
   const { id, status, slug, liveBase, owner, planBlock, canGoLive, maxFileMb } = props;
   const [doc, setDoc] = useState<ExhbtDoc>(props.initialDoc);
+  const docRef = useRef(doc);
+  docRef.current = doc;
+  const f = formatOf(doc);
+  const L = formatLimits(f);
+  const copy = FORMAT_COPY[f];
   const [triedPublish, setTriedPublish] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -99,6 +108,7 @@ export function Editor(props: EditorProps) {
   const [workUrl, setWorkUrl] = useState<string | null>(props.fileEvidenceUrl);
   const [busy, setBusy] = useState<{ image?: boolean; work?: boolean }>({});
   const [mediaError, setMediaError] = useState<{ image?: string; work?: string }>({});
+  const [imageStatus, setImageStatus] = useState("");
   const imageInput = useRef<HTMLInputElement>(null);
   const workInput = useRef<HTMLInputElement>(null);
   const problemsRef = useRef<HTMLDivElement>(null);
@@ -146,7 +156,7 @@ export function Editor(props: EditorProps) {
   const total = wordCount(doc);
   const cw = cardWords(doc);
   const flags = unverifiedOf(doc);
-  const over = total > LIMITS.totalWords;
+  const over = total > L.totalWords;
   // When the whole exhbt is over, the card with the most words is where to trim.
   const heaviest = over ? (Object.entries(cw).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))[0]?.[0] as CardKey | undefined) : undefined;
   const flaggedBy = (card: CardKey) => issues.some((i) => cardOf(i.path) === card) || heaviest === card;
@@ -172,7 +182,12 @@ export function Editor(props: EditorProps) {
         setJustLive({ slug: r.slug, changed: status === "published" });
       } else {
         setResult({ ok: false, lines: r.reasons });
-        setTimeout(() => problemsRef.current?.focus(), 0);
+        // Focus goes to the list of problems, unless the person has already moved on (jumped to a card from the list)
+        // while the server was answering: that choice is theirs.
+        setTimeout(() => {
+          const a = document.activeElement;
+          if (!a || a === document.body || a.closest('[aria-labelledby="card-publish"]')) problemsRef.current?.focus();
+        }, 0);
       }
     } catch {
       setResult({ ok: false, lines: ["Couldn't reach the server. Try again in a moment."] });
@@ -186,22 +201,107 @@ export function Editor(props: EditorProps) {
     drops.current.add(fileId);
   }
 
-  async function addImage(file: File | undefined) {
-    if (!file) return;
+  /**
+   * Adds pictures, several at once (decision 0024). As many as the layout has room for, two at a
+   * time: each is type-checked, shrunk in the browser (prepareImage), size-checked, uploaded, and
+   * becomes an image section with its size. A failure says which file and why; the rest still go up.
+   * Afterwards the cursor goes to the first empty description.
+   */
+  async function addImages(files: File[]) {
+    if (!files.length) return;
     setMediaError((e) => ({ ...e, image: undefined }));
-    const problem = checkFile(file, "image", maxFileMb);
-    if (problem) return setMediaError((e) => ({ ...e, image: problem }));
-    setBusy((b) => ({ ...b, image: true }));
-    try {
-      const fileId = await uploadForExhbt(file, "image", id);
-      setImageUrls((u) => ({ ...u, [fileId]: URL.createObjectURL(file) }));
-      // A new image section at the end, if there's still room for one.
-      setDoc((d) => (roomFor(d.sections, "image") === 0 ? d : { ...d, sections: [...d.sections, newImageSection(fileId, d.sections)] }));
-    } catch (e) {
-      setMediaError((m) => ({ ...m, image: e instanceof UploadError ? e.message : "We couldn't upload that picture." }));
-    } finally {
-      setBusy((b) => ({ ...b, image: false }));
+    setImageStatus("");
+    const room = roomFor(docRef.current.sections, "image", formatOf(docRef.current));
+    const take = files.slice(0, room);
+    const problems: string[] = [];
+    if (files.length > take.length) problems.push(room === 0 ? "There's no room for another image in this layout." : `Only ${room} more ${room === 1 ? "fits" : "fit"} in this layout. The rest weren't added.`);
+    if (!take.length) {
       if (imageInput.current) imageInput.current.value = "";
+      return setMediaError((e) => ({ ...e, image: problems.join(" ") }));
+    }
+    setBusy((b) => ({ ...b, image: true }));
+    let done = 0;
+    let next = 0;
+    let added = 0;
+    // Results are kept by the position the person picked them in. As each upload settles, the
+    // settled prefix is placed in that order (a failure is skipped), so the first picture picked is
+    // the lead image whichever finishes first, finished pictures land and autosave without waiting
+    // for slower ones, and a stalled upload holds back only the ones picked after it.
+    const results: ({ fileId: string; size?: { w: number; h: number } } | null)[] = take.map(() => null);
+    const settled: boolean[] = take.map(() => false);
+    // What the updater decided for each file: true placed, false rejected (no room left in the layout by then).
+    // The same answer however many times React runs the updater, so it is safe to read afterwards.
+    const outcome = new Map<string, boolean>();
+    let placedUpTo = 0;
+    let roomLeft = room;
+    const place = () => {
+      while (placedUpTo < take.length && settled[placedUpTo]) {
+        const r = results[placedUpTo];
+        const name = take[placedUpTo]!.name;
+        placedUpTo++;
+        if (!r) continue;
+        if (roomLeft <= 0) {
+          void removeFile(r.fileId);
+          problems.push(`${name}: there was no room for it in this layout.`);
+          continue;
+        }
+        roomLeft--;
+        added++;
+        setDoc((d) => {
+          const fits = roomFor(d.sections, "image", formatOf(d)) > 0;
+          outcome.set(r.fileId, fits);
+          return fits ? { ...d, sections: [...d.sections, newImageSection(r.fileId, d.sections, r.size)] } : d;
+        });
+      }
+    };
+    const worker = async () => {
+      while (next < take.length) {
+        const at = next++;
+        const file = take[at]!;
+        setImageStatus(`Uploading ${Math.min(done + 1, take.length)} of ${take.length}`);
+        try {
+          const typeProblem = checkFile(file, "image", Infinity);
+          if (typeProblem) throw new UploadError(typeProblem);
+          const prepared = await prepareImage(file);
+          const sizeProblem = checkFile(prepared.file, "image", maxFileMb);
+          if (sizeProblem) throw new UploadError(sizeProblem);
+          const fileId = await uploadForExhbt(prepared.file, "image", id);
+          setImageUrls((u) => ({ ...u, [fileId]: URL.createObjectURL(prepared.file) }));
+          results[at] = { fileId, size: prepared.w && prepared.h ? { w: prepared.w, h: prepared.h } : undefined };
+        } catch (e) {
+          problems.push(`${file.name}: ${e instanceof UploadError ? e.message : "We couldn't upload that picture."}`);
+        } finally {
+          settled[at] = true;
+          done++;
+          place();
+          setImageStatus(done < take.length ? `Uploading ${done + 1} of ${take.length}` : "");
+        }
+      }
+    };
+    await Promise.all([worker(), worker()]);
+    setBusy((b) => ({ ...b, image: false }));
+    if (imageInput.current) imageInput.current.value = "";
+    // A picture the updater itself refused (the layout had no room by then) was never in any doc, so its file
+    // goes. One that was placed and later removed by the person is theirs to drop: that goes through
+    // dropFile and the save, never through here.
+    setTimeout(() => {
+      const rejected = [...outcome].filter(([, fits]) => !fits).map(([f]) => f);
+      for (const f of rejected) void removeFile(f);
+      if (rejected.length) setMediaError((m) => ({ ...m, image: [m.image, `${rejected.length === 1 ? "One picture" : `${rejected.length} pictures`} couldn't be added: there was no room in this layout.`].filter(Boolean).join("\n") }));
+    }, 300);
+    if (problems.length) setMediaError((m) => ({ ...m, image: problems.join("\n") }));
+    if (added > 0) {
+      setImageStatus(`${added === 1 ? "1 image" : `${added} images`} added. Each one needs a description for people who can't see it.`);
+      // After the new cards are drawn: the cursor goes to the first empty description, but only if the
+      // person hasn't gone anywhere else: they are still where they pressed "Add an image".
+      setTimeout(() => {
+        const a = document.activeElement;
+        const stayed = !a || a === document.body || a === imageInput.current || a.id === "add-section" || a.closest("[data-layout-todo]");
+        if (!stayed) return;
+        const imgs = docRef.current.sections.filter((x) => x.kind === "image");
+        const n = imgs.findIndex((x) => x.kind === "image" && !x.alt.trim());
+        if (n >= 0) document.getElementById(`image-${n}-alt`)?.focus();
+      }, 120);
     }
   }
 
@@ -235,11 +335,12 @@ export function Editor(props: EditorProps) {
     if (problem) throw new UploadError(problem);
     const old = doc.sections.find((s) => s.id === sectionId && s.kind === "image");
     const fileId = await uploadForExhbt(file, "image", id);
+    const size = await readSize(file);
     setImageUrls((u) => ({ ...u, [fileId]: URL.createObjectURL(file) }));
     setDoc((d) => ({
       ...d,
       sections: d.sections.map((s) =>
-        s.id === sectionId && s.kind === "image" ? { ...s, fileId, picked, ...(opts.describeAgain ? { alt: "", caption: [] } : {}) } : s,
+        s.id === sectionId && s.kind === "image" ? { ...s, fileId, picked, ...(size ?? {}), ...(opts.describeAgain ? { alt: "", caption: [] } : {}) } : s,
       ),
     }));
     if (old?.kind === "image" && old.fileId !== fileId) dropFile(old.fileId);
@@ -253,8 +354,9 @@ export function Editor(props: EditorProps) {
 
   const evidenceHref = doc.evidence?.kind === "link" ? safeHref(doc.evidence.href) : doc.evidence?.kind === "file" ? workUrl : null;
   // Graphs show in the preview once something is typed in them.
-  const previewDoc: ExhbtDoc = { ...doc, title: doc.title.trim() || "Your question", sections: doc.sections.filter((s) => s.kind !== "graph" || hasData(s.chart)) };
+  const previewDoc: ExhbtDoc = { ...doc, title: doc.title.trim() || copy.emptyTitle, sections: doc.sections.filter((s) => s.kind !== "graph" || hasData(s.chart)) };
   const liveUrl = liveBase && slug ? `${liveBase}/${slug}` : null;
+  const arrangeable = f === "case-study" && doc.sections.length > 1;
   const justLiveUrl = liveBase && justLive ? `${liveBase}/${justLive.slug}` : null;
   const shownLive = canGoLive && status === "published";
 
@@ -292,7 +394,7 @@ export function Editor(props: EditorProps) {
                 Preview
               </Button>
             </div>
-            <WordBar total={total} />
+            <WordBar total={total} target={L.targetWords} limit={L.totalWords} />
             {problems.length > 0 && (
               <a
                 href={`#${problems[0]!.target}`}
@@ -395,7 +497,8 @@ export function Editor(props: EditorProps) {
                 }}
               />
             )}
-            <Card id="card-header" title="Your question and details" words={cw.header} flagged={flaggedBy("header")} heaviest={heaviest === "header"}>
+            <LayoutPicker doc={doc} setDoc={setDoc} draftedAs={props.draftedAs} />
+            <Card id="card-header" title={copy.header} words={cw.header} flagged={flaggedBy("header")} heaviest={heaviest === "header"}>
               {flags.length > 0 && (
                 <ul aria-label="Numbers to check" className="mb-4 space-y-2">
                   {flags.map((n) => (
@@ -415,12 +518,19 @@ export function Editor(props: EditorProps) {
               <div className="space-y-4">
                 <TextInput
                   id="title"
-                  label="Your question (the title)"
+                  label={copy.title}
                   value={doc.title}
                   max={LIMITS.titleChars}
                   onChange={(title) => update({ title })}
                   issues={issuesAt(issues, "title")}
-                  placeholder="The question your work answers. e.g. Would a second till cut lunchtime queues?"
+                  hint={f === "case-study" ? undefined : copy.titleHint}
+                  placeholder={
+                    f === "gallery"
+                      ? "e.g. Freshers' Week campaign for the Law Society"
+                      : f === "research"
+                        ? "e.g. Does a 10-minute walk before a test improve recall?"
+                        : "The question your work answers. e.g. Would a second till cut lunchtime queues?"
+                  }
                 />
                 <TextInput
                   id="summary"
@@ -473,10 +583,10 @@ export function Editor(props: EditorProps) {
 
             <Card
               id="card-gap"
-              title="Context"
+              title={copy.gap}
               words={cw.gap}
-              limit={LIMITS.gapWords}
-              hint="Why the question matters, in one or two short sentences. Select the gap nobody has filled yet and press Highlight."
+              limit={L.gapWords}
+              hint={f === "case-study" ? "Why the question matters, in one or two short sentences. Select the gap nobody has filled yet and press Highlight." : `${copy.gapHint} Select the words and press Highlight.`}
               flagged={flaggedBy("gap")}
               heaviest={heaviest === "gap"}
             >
@@ -487,18 +597,24 @@ export function Editor(props: EditorProps) {
                 value={doc.gap}
                 onChange={(gap) => update({ gap })}
                 highlight
-                placeholder="e.g. Lunchtime queues ran past ten minutes. Nobody had timed what a second till would save."
+                placeholder={
+                  f === "gallery"
+                    ? "e.g. The Law Society asked for a Freshers' Week campaign to reach first-years who don't study law."
+                    : f === "research"
+                      ? "e.g. Exercise is known to lift mood. Whether a short walk helps recall straight after is less clear."
+                      : "e.g. Lunchtime queues ran past ten minutes. Nobody had timed what a second till would save."
+                }
               />
               <FieldIssues id="gap-issues" issues={issuesAt(issues, "gap")} />
             </Card>
 
-            <Card id="card-flow" title="Process" words={cw.flow} hint="How you did it, as a flowchart. Type in the boxes. Every exhbt has one." flagged={flaggedBy("flow")} heaviest={heaviest === "flow"}>
+            <Card id="card-flow" title={copy.flow} words={cw.flow} hint="How you did it, as a flowchart. Type in the boxes. Every exhbt has one." flagged={flaggedBy("flow")} heaviest={heaviest === "flow"}>
               <BlockTools dt={dt} block="flow" />
               <FlowEditor steps={doc.flow} onChange={(flow) => update({ flow })} issues={issues} />
               <FieldIssues id="flow-issues" issues={issuesAt(issues, "flow")} />
             </Card>
 
-            <input ref={imageInput} type="file" hidden tabIndex={-1} aria-label="Choose an image" accept={IMAGE_ACCEPT} onChange={(e) => void addImage(e.target.files?.[0])} />
+            <input ref={imageInput} type="file" hidden tabIndex={-1} aria-label="Choose an image" accept={IMAGE_ACCEPT} multiple onChange={(e) => void addImages(Array.from(e.target.files ?? []))} />
             <Sections
               doc={doc}
               setDoc={setDoc}
@@ -512,6 +628,7 @@ export function Editor(props: EditorProps) {
               onAddImage={() => imageInput.current?.click()}
               imageBusy={Boolean(busy.image)}
               imageError={mediaError.image}
+              imageStatus={imageStatus}
               dropFile={dropFile}
               figureSources={props.figureSources ?? {}}
               onReplaceImage={replaceImage}
@@ -671,7 +788,7 @@ export function Editor(props: EditorProps) {
           >
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-graphite">Preview</p>
-              {doc.sections.length > 1 && (
+              {arrangeable && (
                 <Button size="sm" variant={arranging ? "ink" : "secondary"} aria-pressed={arranging} onClick={() => setArranging((a) => !a)} label={arranging ? "Done arranging" : "Arrange sections"}>
                   {arranging ? "Done arranging" : "Arrange sections"}
                 </Button>
@@ -686,7 +803,7 @@ export function Editor(props: EditorProps) {
                 evidenceUrl={evidenceHref}
                 headingLevel="h2"
                 confirmed={confirmed}
-                sectionsSlot={arranging && doc.sections.length > 1 ? <PreviewArrange doc={doc} setDoc={setDoc} imageUrls={imageUrls} /> : undefined}
+                sectionsSlot={arranging && arrangeable ? <PreviewArrange doc={doc} setDoc={setDoc} imageUrls={imageUrls} /> : undefined}
               />
             </div>
           </section>
@@ -697,8 +814,9 @@ export function Editor(props: EditorProps) {
 }
 
 /** The total towards the target (150) and the limit (200): the figures and a bar. */
-function WordBar({ total }: { total: number }) {
-  const { targetWords, totalWords } = LIMITS;
+function WordBar({ total, target, limit }: { total: number; target: number; limit: number }) {
+  const targetWords = target;
+  const totalWords = limit;
   const over = total > totalWords;
   const pct = Math.min(100, (total / totalWords) * 100);
   return (

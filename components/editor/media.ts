@@ -79,3 +79,63 @@ export function fileIdsOf(doc: ExhbtDoc): string[] {
   if (doc.evidence?.kind === "file" && doc.evidence.fileId) ids.push(doc.evidence.fileId);
   return ids;
 }
+
+/** The longest side an uploaded picture keeps, and the weight above which it is re-encoded (decision 0024). */
+export const IMAGE_LONG_EDGE = 2400;
+export const IMAGE_HEAVY_BYTES = 1.5 * MB;
+
+/** A picture's size in pixels, as the browser would draw it (EXIF orientation applied), or nothing if it can't be read. */
+export async function readSize(file: Blob): Promise<{ w: number; h: number } | undefined> {
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const size = { w: bmp.width, h: bmp.height };
+    bmp.close();
+    return size;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Shrinks a picture in the browser before it goes up, so a gallery of pictures stays well inside
+ * the plan's storage: over 2,400 pixels on the long edge, or over 1.5 MB, it is drawn to a canvas
+ * (scaled down, never up) and re-encoded: JPEG stays JPEG, PNG and WebP become WebP, at 0.86. A GIF
+ * is never changed. The original is kept when it wasn't scaled down and the result isn't smaller.
+ * The file is named from the encoded type (so the server's extension check agrees). Returns the
+ * final size too. On any error the original goes up and the server's caps still apply.
+ */
+export async function prepareImage(file: File): Promise<{ file: File; w?: number; h?: number }> {
+  try {
+    const gif = file.type === "image/gif" || ext(file.name) === "gif";
+    const bmp = await createImageBitmap(file, gif ? undefined : { imageOrientation: "from-image" });
+    const w0 = bmp.width;
+    const h0 = bmp.height;
+    const long = Math.max(w0, h0);
+    if (gif || (long <= IMAGE_LONG_EDGE && file.size <= IMAGE_HEAVY_BYTES)) {
+      bmp.close();
+      return { file, w: w0, h: h0 };
+    }
+    const scale = Math.min(1, IMAGE_LONG_EDGE / long);
+    const w = Math.max(1, Math.round(w0 * scale));
+    const h = Math.max(1, Math.round(h0 * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bmp.close();
+      return { file, w: w0, h: h0 };
+    }
+    ctx.drawImage(bmp, 0, 0, w, h);
+    bmp.close();
+    const jpeg = file.type === "image/jpeg" || ["jpg", "jpeg"].includes(ext(file.name));
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, jpeg ? "image/jpeg" : "image/webp", 0.86));
+    if (!blob || (scale === 1 && blob.size >= file.size)) return { file, w: w0, h: h0 };
+    const type = blob.type === "image/jpeg" || blob.type === "image/webp" ? blob.type : "image/png";
+    const e = type === "image/jpeg" ? "jpg" : type === "image/webp" ? "webp" : "png";
+    const base = file.name.replace(/\.[^.]+$/, "") || "image";
+    return { file: new File([blob], `${base}.${e}`, { type }), w, h };
+  } catch {
+    return { file };
+  }
+}

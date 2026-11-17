@@ -6,6 +6,7 @@ import { MoreHorizontal, RotateCcw, Wand2 } from "lucide-react";
 import { rewriteBlockAction } from "@/app/(app)/exhbts/[id]/draft-tools-actions";
 import { Button } from "@/components/ui/Button";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
+import { FORMAT_COPY, formatOf, type Format } from "@/lib/exhbt/formats";
 import { BLOCK_NAMES, blockValue, replaceBlock, sameBlock, type AiVersion, type BlockValue, type DraftBlock } from "@/lib/exhbt/draft-blocks";
 
 /**
@@ -75,9 +76,13 @@ export function useDraftTools(id: string, init: DraftToolsInit, doc: ExhbtDoc, s
  * What the rewrite calls each part. Not `{ ...BLOCK_NAMES, header: … }`: the build inlines that
  * spread into one object literal with "header" twice, and warns.
  */
-const nameOf = (block: DraftBlock): string => (block === "header" ? "question and details" : BLOCK_NAMES[block]);
+const nameOf = (block: DraftBlock, f: Format): string => {
+  if (f === "case-study") return block === "header" ? "question and details" : BLOCK_NAMES[block];
+  // A gallery or research part has its own plain noun phrase (no article: the text says "the ...").
+  return block === "skills" ? BLOCK_NAMES.skills : FORMAT_COPY[f].rewriteName[block];
+};
 /** What the card is called on the page, for the menu button's name. */
-const CARD_NAMES: Record<DraftBlock, string> = { header: "Your question and details", skills: "Skills", gap: "Context", flow: "Process", findings: "Findings" };
+const cardNames = (f: Format): Record<DraftBlock, string> => ({ header: FORMAT_COPY[f].header, skills: "Skills", gap: FORMAT_COPY[f].gap, flow: FORMAT_COPY[f].flow, findings: f === "case-study" ? "Findings" : FORMAT_COPY[f].findings });
 
 const ITEM = "flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 text-left text-[0.95rem] font-medium text-ink hover:bg-mist disabled:opacity-50";
 
@@ -110,7 +115,7 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
 
   if (!dt.enabled) return null;
 
-  const name = nameOf(block);
+  const name = nameOf(block, formatOf(dt.doc));
   const current = blockValue(dt.doc, block) as BlockValue;
   const ai = dt.ai.blocks[block];
   const edited = ai !== undefined && !sameBlock(current, ai);
@@ -126,7 +131,7 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
         <button
           ref={trigger}
           type="button"
-          aria-label={`More actions for ${CARD_NAMES[block]}`}
+          aria-label={`More actions for ${cardNames(formatOf(dt.doc))[block]}`}
           aria-expanded={menu}
           aria-controls={menuId}
           onClick={() => setMenu((m) => !m)}

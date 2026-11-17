@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { useReducedMotion } from "@/components/ui/useReducedMotion";
 import type { ExhbtDoc, Section } from "@/lib/exhbt/blocks";
 import { hasData } from "@/lib/exhbt/charts";
+import { shownSections } from "@/lib/exhbt/formats";
 import { moveSection, sectionLabel } from "@/lib/exhbt/sections";
 
 type SetDoc = React.Dispatch<React.SetStateAction<ExhbtDoc>>;
@@ -28,7 +29,9 @@ const DRAG_INSTRUCTIONS =
  * arranging is done.
  */
 export function PreviewArrange({ doc, setDoc, imageUrls }: { doc: ExhbtDoc; setDoc: SetDoc; imageUrls: Record<string, string | null> }) {
-  const sections = doc.sections;
+  // Only the sections the layout draws are listed (decision 0024): a kept aim in a case study has nothing to arrange.
+  // Positions below are in this list; a move is turned into a move in the whole list.
+  const sections = shownSections(doc).map((x) => x.s);
   const dndId = useId();
   const reduced = useReducedMotion();
   const [status, setStatus] = useState("");
@@ -57,7 +60,10 @@ export function PreviewArrange({ doc, setDoc, imageUrls }: { doc: ExhbtDoc; setD
   function move(i: number, to: number, by: "keys" | "drag") {
     if (to < 0 || to >= sections.length || to === i) return;
     const s = sections[i]!;
-    setDoc((d) => ({ ...d, sections: moveSection(d.sections, i, to) }));
+    setDoc((d) => {
+      const at = shownSections(d).map((x) => x.i);
+      return at[i] === undefined || at[to] === undefined ? d : { ...d, sections: moveSection(d.sections, at[i]!, at[to]!) };
+    });
     setStatus(by === "keys" ? `${sectionLabel(sections, i)} moved ${to < i ? "up" : "down"}: now ${to + 1} of ${sections.length}.` : "");
     if (by === "keys") {
       const dir = to < i ? "up" : "down";

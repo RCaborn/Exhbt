@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { fileIdsOf } from "@/components/editor/media";
 import { ENTITLEMENTS } from "@/lib/entitlements";
 import { imagesOf } from "@/lib/exhbt/blocks";
+import { isFormat } from "@/lib/exhbt/formats";
 import { loadAiVersion, loadDraftSource } from "@/lib/draft-tools";
 import { signedFileUrl } from "@/lib/files";
 import { parseHost, portfolioHost } from "@/lib/hosts";
@@ -19,14 +20,17 @@ import { getStore } from "@/lib/store";
 
 export const metadata: Metadata = { title: "Edit exhbt", robots: { index: false } };
 
-type Params = { params: Promise<{ id: string }>; searchParams: Promise<{ skipped?: string }> };
+type Params = { params: Promise<{ id: string }>; searchParams: Promise<{ skipped?: string; drafted?: string }> };
 
 /** The exhbt editor (docs/phase-2.md section 6). Only the owner sees it; anyone else gets a 404. */
 export default async function EditExhbtPage({ params, searchParams }: Params) {
   if (!isPhase2Enabled()) notFound();
   const { id } = await params;
   // Files a teammate's plan couldn't hold when they made their own exhbt (lib/team.ts makeOwnExhbt).
-  const skipped = Math.max(0, Math.min(99, Number((await searchParams).skipped) || 0));
+  const query = await searchParams;
+  const skipped = Math.max(0, Math.min(99, Number(query.skipped) || 0));
+  // The layout the AI draft chose, said once in the editor (decision 0024).
+  const draftedAs = isFormat(query.drafted) ? query.drafted : undefined;
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(`/exhbts/${id}/edit`)}`);
   const store = getStore();
@@ -59,6 +63,7 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
     <Editor
       draftTools={hasSource && aiVersion ? { aiVersion, rewritesLeft: allowance.left, rewritesLimit: allowance.limit } : null}
       id={record.id}
+      draftedAs={draftedAs}
       // The store reads every doc into the current shape (sections, graph kinds; decision 0015).
       initialDoc={record.doc}
       status={record.status}
