@@ -35,7 +35,7 @@ export function StartForm({
           maxLength={120}
           autoComplete="organization-title"
           placeholder="Describe the job you want"
-          className="h-14 w-full min-w-0 flex-1 rounded-full bg-transparent px-5 text-left text-[1.125rem] font-medium text-ink placeholder:font-normal placeholder:text-slate focus-visible:shadow-none focus-visible:outline-none sm:text-[1.2rem]"
+          className="h-14 min-h-14 w-full min-w-0 flex-1 rounded-full bg-transparent px-5 text-left text-[1.125rem] font-medium text-ink placeholder:font-normal placeholder:text-slate focus-visible:shadow-none focus-visible:outline-none sm:text-[1.2rem]"
         />
         <Button type="submit" size="xl" variant={tone === "band" ? "ink" : "primary"} className="w-full shrink-0 whitespace-nowrap sm:w-auto">
           Build my roadmap

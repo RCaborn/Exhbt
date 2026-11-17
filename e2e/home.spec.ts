@@ -118,6 +118,9 @@ test.describe("Home: the start form", () => {
         const pill = (await page.locator(`form:has(${id}) > div`).boundingBox())!;
         const button = page.locator(`form:has(${id}) button[type=submit]`);
         const b = (await button.boundingBox())!;
+        // The field is as tall as the button, stacked or in a row (a flex-basis of 0 once collapsed it on phones).
+        const field = (await page.locator(id).boundingBox())!;
+        expect(field.height, `${id} field height`).toBeGreaterThanOrEqual(b.height - 1);
         expect(pill.x + pill.width, `${id} stays on screen`).toBeLessThanOrEqual(width);
         // Equal gaps above and below the button (1px for rounding), and on the right once it sits in a row.
         const top = b.y - pill.y;
