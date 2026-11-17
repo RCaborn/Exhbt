@@ -465,3 +465,144 @@ test.describe("Looks and the home page", () => {
     await expect(page.getByRole("link", { name: /open banking/i }).first()).toBeVisible();
   });
 });
+
+/* ---------------- The editor ---------------- */
+
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+const png = (name: string) => ({ name, mimeType: "image/png", buffer: PNG });
+
+async function startEditor(page: Page, username: string) {
+  await page.goto(`/dev/portfolio?username=${username}&plan=premium&count=0`);
+  await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
+  await expect(page.getByRole("heading", { level: 1, name: "Your exhbts" })).toBeVisible();
+  await page.getByRole("button", { name: "Start from scratch" }).click();
+  await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
+  await expect(page.locator("[data-ready=true]")).toBeAttached();
+}
+
+const chooseLayout = (page: Page, name: "Case study" | "Gallery" | "Research") => page.getByRole("radio", { name: new RegExp(`^${name}`) }).check();
+const sectionsArea = (page: Page) => page.getByRole("region", { name: "Sections", exact: true });
+const previewArticle = (page: Page) => page.getByRole("region", { name: "Preview" }).locator("article[data-exhbt-page]");
+const wordsOnBar = async (page: Page) => Number((await page.locator("[data-word-bar]").innerText()).match(/^(\d+) words/)?.[1]);
+const images = (page: Page) => page.locator("input[aria-label='Choose an image']");
+
+test.describe("The layout choice in the editor", () => {
+  test("three radios named Layout; the arrow keys pick Gallery, the preview follows, Undo goes back", async ({ page }) => {
+    await startEditor(page, `lay${stamp()}`);
+    const group = page.getByRole("radiogroup", { name: "Layout" });
+    await expect(group.getByRole("radio")).toHaveCount(3);
+    await expect(previewArticle(page)).toHaveAttribute("data-format", "case-study");
+    await page.getByRole("radio", { name: /^Case study/ }).focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("radio", { name: /^Gallery/ })).toBeChecked();
+    await expect(previewArticle(page)).toHaveAttribute("data-format", "gallery");
+    await expect(page.getByText("Switched to Gallery. Nothing was deleted.")).toBeVisible();
+    await page.getByRole("button", { name: /^Undo/ }).click();
+    await expect(page.getByRole("radio", { name: /^Case study/ })).toBeChecked();
+    await expect(previewArticle(page)).toHaveAttribute("data-format", "case-study");
+    await axe(page, "layout picker");
+  });
+
+  test("an aim kept in a case study is tagged not shown, and stops counting", async ({ page }) => {
+    await startEditor(page, `aim${stamp()}`);
+    await chooseLayout(page, "Research");
+    await page.getByRole("button", { name: "Add a section" }).click();
+    await page.getByRole("button", { name: "Add aim or hypothesis", exact: true }).click();
+    await page.getByRole("textbox", { name: "What the study set out to do or test" }).fill("Walkers will recall more words than sitters.");
+    const withAim = await wordsOnBar(page);
+    await chooseLayout(page, "Case study");
+    const card = sectionsArea(page).getByRole("region", { name: "Aim or hypothesis", exact: true });
+    await expect(card.getByText("Not shown in this layout. It's kept if you switch back.")).toBeVisible();
+    expect(await wordsOnBar(page)).toBe(withAim - 7);
+    await chooseLayout(page, "Research");
+    await expect(card.getByText("Not shown in this layout")).toHaveCount(0);
+    expect(await wordsOnBar(page)).toBe(withAim);
+    // Each is offered once, then disabled.
+    await page.getByRole("button", { name: "Add a section" }).click();
+    await page.getByRole("button", { name: "Add conclusion", exact: true }).click();
+    await page.getByRole("button", { name: "Add a section" }).click();
+    for (const n of ["Add aim or hypothesis", "Add conclusion"]) {
+      const b = page.getByRole("button", { name: n, exact: true });
+      await expect(b).toBeDisabled();
+      await expect(b).toHaveAccessibleDescription("Already on the page.");
+    }
+  });
+
+  test("Arrange sections is for the case study only", async ({ page }) => {
+    await startEditor(page, `arr${stamp()}`);
+    await page.getByRole("button", { name: "Add a section" }).click();
+    await page.getByRole("button", { name: "Add a quote", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Arrange sections" })).toBeVisible();
+    await chooseLayout(page, "Gallery");
+    await expect(page.getByRole("button", { name: "Arrange sections" })).toHaveCount(0);
+    await chooseLayout(page, "Research");
+    await expect(page.getByRole("button", { name: "Arrange sections" })).toHaveCount(0);
+  });
+});
+
+test.describe("Pictures in the editor", () => {
+  test("three at once in a gallery: three cards, the first the lead image, the cursor in the first description", async ({ page }) => {
+    await startEditor(page, `gal${stamp()}`);
+    await chooseLayout(page, "Gallery");
+    await images(page).setInputFiles([png("a.png"), png("b.png"), png("c.png")]);
+    const area = sectionsArea(page);
+    await expect(area.getByRole("region", { name: "Lead image", exact: true })).toBeVisible();
+    await expect(area.getByRole("region", { name: "Image 2", exact: true })).toBeVisible();
+    await expect(area.getByRole("region", { name: "Image 3", exact: true })).toBeVisible();
+    await expect(page.getByText("3 images added. Each one needs a description for people who can't see it.")).toBeVisible();
+    await expect(page.locator("#image-0-alt")).toBeFocused();
+    await page.getByLabel("This is my work, and the numbers are true").check();
+    await page.getByRole("button", { name: "Publish", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Things to fix before publishing" }).getByText("Describe the image for people who can't see it.").first()).toBeVisible();
+  });
+
+  test("a case study with no images takes two of three and says so", async ({ page }) => {
+    await startEditor(page, `two${stamp()}`);
+    await images(page).setInputFiles([png("a.png"), png("b.png"), png("c.png")]);
+    await expect(sectionsArea(page).getByRole("region", { name: /^Image [12]$/ })).toHaveCount(2);
+    await expect(page.getByText("Only 2 more fit in this layout. The rest weren't added.")).toBeVisible();
+  });
+
+  test("a file that isn't a picture is named and skipped", async ({ page }) => {
+    await startEditor(page, `bad${stamp()}`);
+    await chooseLayout(page, "Gallery");
+    await images(page).setInputFiles([png("good.png"), { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hi") }, png("good2.png")]);
+    await expect(sectionsArea(page).getByRole("region", { name: /^(Lead image|Image 2)$/ })).toHaveCount(2);
+    await expect(page.getByRole("alert").filter({ hasText: "notes.txt: Use a JPEG, PNG, WebP or GIF picture." })).toBeVisible();
+  });
+
+  test("a big picture is shrunk in the browser before it goes up", async ({ page }) => {
+    await startEditor(page, `big${stamp()}`);
+    await chooseLayout(page, "Gallery");
+    const dataUrl = await page.evaluate(() => {
+      const c = document.createElement("canvas");
+      c.width = 3000;
+      c.height = 2000;
+      const x = c.getContext("2d")!;
+      x.fillStyle = "#1a7f64";
+      x.fillRect(0, 0, 3000, 2000);
+      return c.toDataURL("image/png");
+    });
+    const buffer = Buffer.from(dataUrl.split(",")[1]!, "base64");
+    const sent = page.waitForRequest((r) => r.url().includes("/api/files/upload-url"));
+    await images(page).setInputFiles({ name: "big.png", mimeType: "image/png", buffer });
+    const body = (await sent).postDataJSON() as { name: string; mime: string };
+    expect(body.name.endsWith(".webp")).toBe(true);
+    expect(body.mime).toBe("image/webp");
+    const lead = previewArticle(page).locator("[data-part=lead] img").first();
+    await expect(lead).toHaveAttribute("width", "2400");
+    await expect(lead).toHaveAttribute("height", "1600");
+  });
+
+  test("Make lead image moves Image 2 to the front, and the preview follows", async ({ page }) => {
+    await startEditor(page, `lead${stamp()}`);
+    await chooseLayout(page, "Gallery");
+    await images(page).setInputFiles([png("a.png"), png("b.png"), png("c.png")]);
+    for (const [n, alt] of ["first", "second", "third"].entries()) await page.locator(`#image-${n}-alt`).fill(alt);
+    const preview = previewArticle(page).locator("[data-part=lead] img").first();
+    await expect(preview).toHaveAttribute("alt", "first");
+    await sectionsArea(page).getByRole("region", { name: "Image 2", exact: true }).getByRole("button", { name: /^Make lead image/ }).click();
+    await expect(preview).toHaveAttribute("alt", "second");
+    await expect(page.getByText("That image is now the lead image.")).toBeVisible();
+  });
+});

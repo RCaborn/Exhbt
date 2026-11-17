@@ -81,6 +81,7 @@ export function TextInput({
   placeholder,
   type = "text",
   multiline = false,
+  hint,
 }: {
   id: string;
   label: string;
@@ -92,6 +93,8 @@ export function TextInput({
   type?: "text" | "url";
   /** A textarea that grows with its text, for long answers such as image descriptions. */
   multiline?: boolean;
+  /** A line under the label, e.g. what this layout's title is for. */
+  hint?: string;
 }) {
   const common = {
     id,
@@ -99,7 +102,7 @@ export function TextInput({
     value,
     placeholder,
     "aria-invalid": issues.length > 0 || undefined,
-    "aria-describedby": `${id}-issues`,
+    "aria-describedby": hint ? `${id}-hint ${id}-issues` : `${id}-issues`,
   };
   return (
     <div>
@@ -113,6 +116,11 @@ export function TextInput({
           </span>
         )}
       </div>
+      {hint && (
+        <p id={`${id}-hint`} className="hint mb-1">
+          {hint}
+        </p>
+      )}
       {multiline ? (
         <textarea rows={2} {...common} onChange={(e) => onChange(e.target.value.replace(/\n/g, " "))} />
       ) : (
