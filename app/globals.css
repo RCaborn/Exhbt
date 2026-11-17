@@ -579,6 +579,31 @@
     animation: tick-in 260ms ease-out both;
   }
 
+  /* The viewfinder pattern (DESIGN.md, "Pattern"): the mark's brackets, turned every other step,
+     with the evidence dot, tiled flat in mint and jade on mist. Behind a product picture only, never
+     behind text. Inline SVG, so nothing downloads; nothing moves. */
+  .pattern-viewfinder {
+    background-color: var(--color-mist);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg fill='none' stroke='%234fe9b4' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M8 15v-5a2 2 0 0 1 2-2h5M24 17v5a2 2 0 0 1-2 2h-5'/%3E%3Cpath d='M49 40h5a2 2 0 0 1 2 2v5M47 56h-5a2 2 0 0 1-2-2v-5'/%3E%3C/g%3E%3Cg fill='%2300755d'%3E%3Ccircle cx='16' cy='16' r='2'/%3E%3Ccircle cx='48' cy='48' r='2'/%3E%3Ccircle cx='48' cy='16' r='1'/%3E%3Ccircle cx='16' cy='48' r='1'/%3E%3C/g%3E%3C/svg%3E");
+    background-position: center;
+  }
+
+  /* Home page questions: a disclosure per question (<details>). The marker is the plus icon in the
+     summary, which turns to a cross when open; the turn rests under reduced motion (below). */
+  .faq summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  .faq summary::-webkit-details-marker {
+    display: none;
+  }
+  .faq [data-faq-icon] {
+    transition: transform 160ms ease;
+  }
+  .faq details[open] [data-faq-icon] {
+    transform: rotate(45deg);
+  }
+
   .prose-read h2 {
     font-size: 1.6rem;
     margin: 2.5rem 0 0.75rem;

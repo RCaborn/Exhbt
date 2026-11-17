@@ -32,7 +32,7 @@ Organic visits start on the home page. Ads, social, and QR codes use `/start`. B
 
 The result is five screens, listed as `VIEWS` in `components/roadmap/RoadmapViews.tsx`: Overview, Gaps, Already strong, Projects, What next. Gaps opens with the one skill radar: the job's levels always, and you, switchable between Now and After the projects (the switch needs the plan's ideas, so it shows after the gate). Projects is behind a gate that asks for a name, an email and optionally LinkedIn, prefilled from the CV. Behind it are three project ideas, each swappable, which become the plan, with a link back to the radar. The ideas are written in the background right after the roadmap, and the page shows progress, or a Try again, until they exist (`docs/decisions/0019-project-ideas-loading.md`). The gate and the plan are in `docs/decisions/0004-email-gate-and-plan.md`. The skill map is in `docs/decisions/0003-cv-step-and-skill-radar.md`; the radar's one-chart design, level anchors and after-projects rule are in `docs/decisions/0023-skill-radar.md` (`lib/roadmap/skills.ts`, `lib/roadmap/radar.ts`).
 
-An exhbt is title, outcome, methodology flow, key-result chart, skill boxes, the work, verification, reflection. The component is `components/exhbt/Exhbt.tsx`. Phase 2 replaces this layout with the block layout below; the demo portfolio still uses the old one.
+An exhbt is title, outcome, methodology flow, key-result chart, skill boxes, the work, verification, reflection. The component is `components/exhbt/Exhbt.tsx`. Phase 2 replaces this layout with the block layout below; the demo portfolio, Home and the what-is page already show the new one, and the employer guide (`/how-to-read-an-exhbt`) still shows the old card.
 
 ## Phase 2 (on the `phase-2` branch)
 

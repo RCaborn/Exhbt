@@ -23,17 +23,22 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(page.getByText("Step 2 of 3")).toBeVisible();
   });
 
-  test("home: search-first hero, example exhbt further down, no removed sections", async ({ page }) => {
+  test("home: search-first hero, one real exhbt further down, no tiles", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText("No card")).toHaveCount(0);
     await expect(page.getByText(/A CV says .analytical.\. An exhbt/)).toHaveCount(0);
     await expect(page.getByText("The same layout, every time")).toHaveCount(0);
-    // A portfolio of example tiles sits below the hero; each tile has its methodology strip.
-    const tiles = page.locator("#example-portfolio > li");
-    await expect(tiles).toHaveCount(4);
+    // One example exhbt below the hero, drawn by the real exhbt page in a frame at its address; the
+    // old tile grid, its catalogue numbers and the editor excerpt are gone (Rory, 16 Nov 2026).
+    const example = page.locator("section[aria-labelledby=one-exhbt]");
+    await expect(example.getByRole("heading", { level: 2, name: "One project, one page" })).toBeVisible();
     const heroBottom = (await page.locator("form:has(#start-hero)").boundingBox())!;
-    expect((await tiles.first().boundingBox())!.y).toBeGreaterThan(heroBottom.y + heroBottom.height);
-    await expect(tiles.first().getByRole("list", { name: "Methodology" })).toBeVisible();
+    expect((await example.boundingBox())!.y).toBeGreaterThan(heroBottom.y + heroBottom.height);
+    await expect(example.locator("[data-exhbt-page]")).toHaveCount(1);
+    await expect(example.getByText(`${portfolioHost("amara")}/gp-reminders`)).toBeVisible();
+    await expect(page.locator("#example-portfolio, [data-catalogue]")).toHaveCount(0);
+    await expect(page.getByText(/EX·\d/)).toHaveCount(0);
+    await expect(example.getByRole("link", { name: "Open this exhbt" })).toHaveAttribute("href", "/demo/gp-reminders");
   });
 
   test("home: an example skills chart, labelled as fictional, with its data in a table", async ({ page }) => {
@@ -60,27 +65,31 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await expect(section.getByText(/\b(now|job|you) \d\b|\d → \d/)).toHaveCount(0);
   });
 
-  test("demo portfolio: header, tiles, and a tile opens the full exhbt with its flow diagram", async ({ page }) => {
+  test("demo portfolio: the real portfolio home, and a card opens the full exhbt with its flowchart", async ({ page }) => {
     await page.goto("/demo");
+    await expect(page.getByText("Example portfolio.")).toBeVisible();
     await expect(page.getByRole("heading", { level: 1, name: "Amara Okafor" })).toBeVisible();
-    await expect(page.getByText(portfolioHost("amara"))).toBeVisible();
-    await page.getByRole("link", { name: /Forecasting A&E waiting times/ }).click();
+    await expect(page.locator("[data-portfolio-home]")).toHaveCount(1);
+    await expect(page.getByText(portfolioHost("amara"), { exact: true })).toBeVisible();
+    await page.getByRole("link", { name: /Can open NHS data forecast A&E/ }).click();
     await expect(page).toHaveURL(/\/demo\/ae-forecast$/);
-    await expect(page.getByRole("heading", { level: 1, name: /Forecasting A&E/ })).toBeVisible();
+    await expect(page.getByText("Example exhbt.")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /Can open NHS data forecast A&E/ })).toBeVisible();
     await expect(page.getByRole("list", { name: "Methodology" }).getByRole("listitem")).toHaveCount(5);
   });
 
-  test("brand: logo in the header, catalogue numbers, seal links to the checks, sign-off", async ({ page }) => {
+  test("brand: logo in the header, no catalogue numbers on the new pages, checks link to the guide", async ({ page }) => {
     await page.goto("/demo");
     await expect(page.getByRole("banner").getByRole("link", { name: "Exhbt home" })).toBeVisible();
-    await expect(page.locator("[data-catalogue]")).toHaveText(["EX·01", "EX·02", "EX·03", "EX·04"]);
+    // The portfolio home and the exhbt page carry no catalogue numbers (decisions 0016 and 0022).
+    await expect(page.locator("[data-catalogue]")).toHaveCount(0);
     // The demo sits inside the marketing layout, so it has the site footer and no second sign-off.
     await expect(page.getByRole("complementary", { name: "Made with exhbt" })).toHaveCount(0);
 
-    // The full exhbt keeps its number, and its seal explains itself on the employer guide.
+    // The full exhbt leads back to the portfolio, and its check explains itself on the employer guide.
     await page.goto("/demo/ae-forecast");
-    await expect(page.locator("article [data-catalogue]")).toHaveText("EX·02");
-    await expect(page.getByRole("link", { name: /Amara Okafor’s portfolio/ })).toHaveAttribute("href", "/demo");
+    await expect(page.locator("article [data-catalogue]")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "All of Amara's work" }).first()).toHaveAttribute("href", "/demo");
     await page.getByRole("link", { name: /Checked by exhbt/ }).click();
     await expect(page).toHaveURL(/\/how-to-read-an-exhbt#checks$/);
     await expect(page.locator("#checks")).toBeInViewport();

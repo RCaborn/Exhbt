@@ -60,7 +60,7 @@ export function SiteHeader({
           )}
           {!signedIn && (
             <>
-              <Link href="/login" className="link font-medium">
+              <Link href="/login" className="link font-medium whitespace-nowrap">
                 Log in
               </Link>
               <span className="hidden items-center gap-2 lg:inline-flex">
