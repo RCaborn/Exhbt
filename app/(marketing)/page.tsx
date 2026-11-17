@@ -139,15 +139,15 @@ export default function Home() {
 
       {/* One real exhbt, drawn by the product's own page (ProjectView) with the fictional demo, and what each part is for. */}
       <section aria-labelledby="one-exhbt" className="bg-surface">
-        <div className="mx-auto grid max-w-[72rem] gap-10 px-4 pb-20 sm:px-8 lg:grid-cols-[minmax(0,15.5rem)_minmax(0,1fr)] lg:gap-12 lg:pb-28">
-          <div className="lg:pt-8">
+        <div className="mx-auto grid max-w-[72rem] gap-10 px-4 pb-20 sm:px-8 lg:pb-28 xl:grid-cols-[minmax(0,15.5rem)_minmax(0,1fr)] xl:gap-12">
+          <div className="xl:pt-8">
             <h2 id="one-exhbt" className="display-2 max-w-[12ch]">
               One project, one page
             </h2>
             <p className="mt-4 max-w-[34rem] text-lg text-graphite">
               That&rsquo;s an exhbt: a piece of your work written up so an employer can read it in a minute and check it.
             </p>
-            <dl className="mt-8 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-1">
+            <dl className="mt-8 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-1">
               {PARTS.map((p) => (
                 <div key={p.name} className="border-t border-line pt-3">
                   <dt className="font-semibold">{p.name}</dt>
@@ -165,13 +165,14 @@ export default function Home() {
             </p>
             <p className="mt-3 text-sm text-slate">{demoOwner.name} and her projects are made up.</p>
           </div>
-          <div className="pattern-viewfinder min-w-0 rounded-[28px] p-3 sm:p-6 lg:p-8">
+          <div className="pattern-viewfinder min-w-0 rounded-[24px] p-3 sm:p-6 lg:p-8">
             <Preview
               url={portfolioUrl(demoOwner.username, featured!.slug)}
               label={`An example exhbt by ${demoOwner.name}, as it looks on her site: ${featured!.doc.title}`}
-              // Below lg it's the page as a phone shows it, cropped to its first screen; from lg the whole page, smaller.
+              // Below lg it's the page as a phone shows it, cropped to its first screen; from lg the whole page,
+              // smaller, so it keeps its sidebar layout (48rem of its own width) beside the words at xl.
               crop="max-h-[50rem] lg:max-h-none"
-              className="bg-surface p-4 sm:p-6 lg:p-8 lg:[zoom:0.72]"
+              className="bg-surface p-4 sm:p-6 lg:p-8 lg:[zoom:0.8] xl:[zoom:0.72]"
             >
               <ProjectView
                 doc={featured!.doc}
@@ -226,9 +227,11 @@ export default function Home() {
               person={demoPortfolio.person}
               projects={demoHomeProjects()}
               tiles={demoPortfolio.tiles}
-              sections={demoPortfolio.sections}
+              // The top of her page and her best work: the whole page is a click away on /demo.
+              sections={["featured"]}
             />
-            <p className="mt-4 text-sm text-on-ink">
+            <p className="mt-4 max-w-[44rem] text-sm text-on-ink">
+              {PLAN_NAMES.free} has the default look, {PLAN_NAMES.premium} a set of them and {PLAN_NAMES.max} every one.{" "}
               {first} is made up.{" "}
               <Link href="/demo" className="font-semibold text-white underline decoration-graphite decoration-2 underline-offset-4 hover:decoration-mint">
                 Open her portfolio

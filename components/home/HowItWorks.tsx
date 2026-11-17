@@ -30,7 +30,7 @@ export function HowItWorks({ username, fileName, question, slug }: { username: s
     {
       title: "It goes live on your site",
       body: `At ${portfolioHost("name")}, on ${PLAN_NAMES.premium} and ${PLAN_NAMES.max}. Until you publish, only you can see it.`,
-      sketch: <LiveSketch host={portfolioHost(username)} path={slug} />,
+      sketch: <LiveSketch name={username} host={portfolioHost(username)} path={slug} />,
       last: true,
     },
   ];
@@ -49,7 +49,7 @@ export function HowItWorks({ username, fileName, question, slug }: { username: s
               <ArrowRight size={20} strokeWidth={2} className="hidden lg:block" />
             </span>
           )}
-          <div aria-hidden className={`flex h-40 items-center justify-center rounded-t-[19px] px-5 ${s.last ? "" : "border-b border-line bg-mist"}`}>
+          <div aria-hidden className={`flex h-40 items-center justify-center rounded-t-[19px] px-3 xl:px-5 ${s.last ? "" : "border-b border-line bg-mist"}`}>
             {s.sketch}
           </div>
           <div className="p-5 pt-4">
@@ -65,8 +65,8 @@ export function HowItWorks({ username, fileName, question, slug }: { username: s
 function UploadSketch({ fileName }: { fileName: string }) {
   return (
     <div className="w-full max-w-[15rem] rounded-[14px] border border-line bg-surface p-3 shadow-pack">
-      <div className="flex items-center gap-3">
-        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-wash text-jade">
+      <div className="flex items-center gap-2.5 xl:gap-3">
+        <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-wash text-jade xl:size-10">
           <FileText size={20} strokeWidth={2} />
         </span>
         <span className="min-w-0">
@@ -113,15 +113,17 @@ function ArrangeSketch() {
   );
 }
 
-function LiveSketch({ host, path }: { host: string; path: string }) {
+function LiveSketch({ name, host, path }: { name: string; host: string; path: string }) {
   return (
     <div className="w-full max-w-[15rem] rounded-[14px] border border-graphite px-4 py-3.5">
       <p className="flex items-center gap-2 text-[0.75rem] font-semibold text-mint">
         <span className="size-2 shrink-0 rounded-full bg-mint" />
         Live
       </p>
-      <p className="mt-2 font-[family-name:var(--font-display)] text-[1.2rem] leading-tight font-semibold tracking-[-0.02em] [overflow-wrap:anywhere] text-white">
-        {host}
+      {/* A narrow card breaks the host after the name, never mid-word. */}
+      <p className="mt-2 font-[family-name:var(--font-display)] text-[1.2rem] leading-tight font-semibold tracking-[-0.02em] text-white">
+        {name}.<wbr />
+        {host.slice(name.length + 1)}
       </p>
       <p className="mt-0.5 font-mono text-[0.875rem] [overflow-wrap:anywhere] text-on-ink">/{path}</p>
     </div>

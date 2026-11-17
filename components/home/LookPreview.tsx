@@ -15,7 +15,7 @@ const LOOKS_SHOWN = 8;
 
 /**
  * The home page's portfolio, with the looks to try on it: the real `PortfolioHome` with Amara's
- * fictional page, in a browser frame at her address, and a radio group of looks under it that
+ * fictional page, in a browser frame at her address, and a radio group of looks above it that
  * restyles the page (the same `themeStyle` variables a live portfolio uses). The looks are read from
  * `PORTFOLIO_THEMES` by position and drawn from `themeStyle`, so a change to the list or its shape
  * doesn't need this file to change.
@@ -36,15 +36,9 @@ export function LookPreview({
   const theme = looks.find((t) => t.id === id) ?? DEFAULT_THEME;
   return (
     <div>
-      <Preview
-        url={portfolioHost(person.username ?? "name")}
-        label={`${person.name}'s portfolio home page, in the ${theme.name} look: her photo, name and intro, then her best piece of work.`}
-        crop="h-[34rem] sm:h-[38rem] lg:h-[44rem]"
-        className="lg:[zoom:0.7]"
-      >
-        <PortfolioHome person={person} theme={theme} projects={projects} featuredId={null} sections={sections} tiles={tiles} />
-      </Preview>
-      <fieldset className="mt-6">
+      {/* The looks sit above the picture, so they stay put while the page under them changes height
+          (a heading face can wrap the name to two lines). */}
+      <fieldset>
         <legend className="text-[0.95rem] font-semibold text-white">Try a look</legend>
         <div className="mt-3 flex flex-wrap gap-2">
           {looks.map((t) => {
@@ -67,6 +61,16 @@ export function LookPreview({
           })}
         </div>
       </fieldset>
+      <div className="mt-6">
+        <Preview
+          url={portfolioHost(person.username ?? "name")}
+          label={`${person.name}'s portfolio home page, in the ${theme.name} look: her photo, name and intro, then her best piece of work.`}
+          // Smaller on a phone too, so the band, where a look shows most, is in view.
+          className="[zoom:0.62] sm:[zoom:0.75] lg:[zoom:0.7]"
+        >
+          <PortfolioHome person={person} theme={theme} projects={projects} featuredId={null} sections={sections} tiles={tiles} />
+        </Preview>
+      </div>
     </div>
   );
 }

@@ -24,7 +24,7 @@ export function JobLinks({ username, owner, picks }: { username: string; owner: 
             </p>
           )}
           <p className="mt-5 max-w-[34rem] text-lg text-graphite">
-            Paste the job description. The AI picks your {EXHBTS_PER_JOB_LINK} exhbts that fit it best and drafts a short intro
+            Paste the job description. The AI picks up to {EXHBTS_PER_JOB_LINK} of your exhbts that fit it best and drafts a short intro
             for you to edit. Send <span className="font-semibold text-ink">{portfolioUrl(username, picks[0]!.slug)}</span>{" "}
             with one application and a different link with the next.
           </p>
@@ -33,9 +33,6 @@ export function JobLinks({ username, owner, picks }: { username: string; owner: 
           </p>
         </div>
         <figure className="m-0 min-w-0">
-          <figcaption className="sr-only">
-            Example: {first}&rsquo;s links for {picks.length} jobs, each with the exhbts picked for it. {owner} is fictional.
-          </figcaption>
           <ul aria-hidden className="grid gap-3">
             {picks.map((p, i) => (
               <li
@@ -60,6 +57,9 @@ export function JobLinks({ username, owner, picks }: { username: string; owner: 
               </li>
             ))}
           </ul>
+          <figcaption className="mt-3 text-sm text-slate">
+            Example: {first}&rsquo;s links for {picks.length} jobs. {owner} and her applications are made up.
+          </figcaption>
         </figure>
       </div>
     </section>

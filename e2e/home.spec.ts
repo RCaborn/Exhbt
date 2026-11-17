@@ -79,7 +79,8 @@ test.describe("Home: sections", () => {
     const section = page.locator("section[aria-labelledby=job-links]");
     await expect(section.getByRole("heading", { level: 2, name: "A link for each job you apply for" })).toBeVisible();
     await expect(section).toContainText(portfolioUrl("amara", "lloyds"));
-    await expect(section).toContainText(`picks your ${EXHBTS_PER_JOB_LINK} exhbts`);
+    await expect(section).toContainText(`picks up to ${EXHBTS_PER_JOB_LINK} of your exhbts`);
+    await expect(section.getByText(/Amara Okafor and her applications are made up/)).toBeVisible();
     await expect(section).toContainText(`On ${PLAN_NAMES.max}.`);
     await expect(section.getByText("Coming soon", { exact: true })).toHaveCount(JOB_LINKS_LIVE ? 0 : 1);
   });
