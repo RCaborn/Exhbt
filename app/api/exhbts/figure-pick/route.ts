@@ -40,6 +40,7 @@ export async function POST(req: Request) {
   const files = form.getAll("image").filter((f): f is File => f instanceof File);
   if (!files.length || files.length > FIGURE.maxImages || labels.length !== files.length) return fail("Send between 1 and 30 page images.", 400);
   if (files.some((f) => f.size === 0 || f.size > FIGURE.maxImageBytes)) return fail("A page image is empty or too big.", 413);
+  if (files.reduce((n, f) => n + f.size, 0) > FIGURE.maxTotalBytes) return fail("The page images are too big together.", 413);
 
   const images: PageImage[] = [];
   for (const [i, f] of files.entries()) {

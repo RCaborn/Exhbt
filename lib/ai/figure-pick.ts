@@ -68,13 +68,15 @@ export async function pickFigure(images: PageImage[]): Promise<FigurePickResult>
   const client = new Anthropic({ apiKey });
   const response = await client.messages.parse({
     model: AI_MODEL,
-    max_tokens: 1000,
+    // Room for the model's thinking as well as the short answer, as the draft has.
+    max_tokens: 4000,
     output_config: { effort: "low", format: zodOutputFormat(AnswerSchema) },
     system: SYSTEM,
     messages: [{ role: "user", content }],
   });
 
-  if (response.stop_reason === "refusal" || !response.parsed_output) {
+  if (response.stop_reason !== "end_turn" || !response.parsed_output) {
+    // Every failure looks like "no figure" to the person, so the reason is logged by the route.
     throw new Error(`Figure pick failed (stop_reason: ${response.stop_reason})`);
   }
   const { input_tokens, output_tokens } = response.usage;

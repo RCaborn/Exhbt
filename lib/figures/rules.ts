@@ -14,6 +14,8 @@ export const FIGURE = {
   /** The most page images one pick may send, and the largest one the server takes. */
   maxImages: 30,
   maxImageBytes: 1_500_000,
+  /** All the page images of one pick together: 30 thumbnails of a busy report fit in well under this. */
+  maxTotalBytes: 6_000_000,
   /**
    * A page is worth sending when it draws something besides text: at least this many shapes, or
    * any picture. A page of plain text has none and is never sent (and can't be a figure).

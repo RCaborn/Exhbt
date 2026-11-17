@@ -23,9 +23,22 @@ export type ReadyFigure = {
 
 type Candidate = { source: FigureSource; thumb: PageThumb };
 
-/** The pages worth sending: those that draw shapes or pictures, in file and page order, at most FIGURE.maxImages. */
+/**
+ * The pages worth sending: those that draw shapes or pictures, in file and page order, at most
+ * FIGURE.maxImages and FIGURE.maxTotalBytes together (the route refuses more).
+ */
 export function candidatesOf(sources: FigureSource[]): Candidate[] {
-  return sources.flatMap((source) => source.pages.pages.filter((t) => mayHoldFigure(t.marks)).map((thumb) => ({ source, thumb }))).slice(0, FIGURE.maxImages);
+  const all = sources.flatMap((source) =>
+    source.pages.pages.filter((t) => mayHoldFigure(t.marks) && t.jpeg.size <= FIGURE.maxImageBytes).map((thumb) => ({ source, thumb })),
+  );
+  const out: Candidate[] = [];
+  let bytes = 0;
+  for (const c of all) {
+    if (out.length === FIGURE.maxImages || bytes + c.thumb.jpeg.size > FIGURE.maxTotalBytes) break;
+    out.push(c);
+    bytes += c.thumb.jpeg.size;
+  }
+  return out;
 }
 
 const stem = (name: string) => name.replace(/\.[^.]+$/, "").replace(/[^\w-]+/g, "-").slice(0, 60) || "report";

@@ -199,6 +199,27 @@ test.describe("Drafts with no figure", () => {
     await expect(page.locator("[data-picked]")).toHaveCount(0);
     // Nothing shown as an error (Next's route announcer is always there, and says nothing here).
     await expect(page.locator("[role=alert]:not(#__next-route-announcer__)")).toHaveCount(0);
+
+    // A figure placed with a caption: its numbers get the draft's check. 2.3% isn't in the
+    // report, so it is flagged to confirm; 30 is, so it isn't.
+    const exhbtId = new URL(page.url()).pathname.split("/")[2]!;
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+    const ticket = (await (await page.request.post("/api/files/upload-url", { data: { name: "figure.png", mime: "image/png", bytes: png.length, kind: "image" } })).json()) as {
+      fileId: string;
+      uploadUrl: string;
+      headers: Record<string, string>;
+    };
+    expect((await page.request.put(ticket.uploadUrl, { headers: ticket.headers, data: png })).ok()).toBe(true);
+    const placed = await page.request.post(`/api/exhbts/${exhbtId}/figure`, {
+      data: { fileId: ticket.fileId, alt: "A bar chart", caption: "Missed appointments fell to 2.3% for patients under 30", picked: { from: "report-text-only.pdf", page: 2 } },
+    });
+    expect(placed.status()).toBe(204);
+    await page.reload();
+    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    const toCheck = page.getByRole("list", { name: "Numbers to check" });
+    await expect(toCheck.getByText("2.3%", { exact: true })).toBeVisible();
+    await expect(toCheck.getByText("30", { exact: true })).toHaveCount(0);
+    await expect(page.locator("[data-picked]").getByText("From report-text-only.pdf, page 2.", { exact: false })).toBeVisible();
   });
 
   test("a pick that fails leaves the draft as it is, with nothing shown", async ({ page }) => {

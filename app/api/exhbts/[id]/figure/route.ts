@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { getCurrentUser } from "@/lib/auth";
+import { loadDraftSource } from "@/lib/draft-tools";
 import { FigureBoxSchema, normaliseDoc } from "@/lib/exhbt/blocks";
 import { withKeyFigure } from "@/lib/exhbt/sections";
+import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { clampBox, fitAlt, fitCaption } from "@/lib/figures/rules";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
@@ -50,10 +52,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const doc = normaliseDoc(exhbt.doc);
+  const shown = fitCaption(caption);
   const next = withKeyFigure(doc, {
     fileId,
     alt: fitAlt(alt),
-    caption: fitCaption(caption),
+    caption: shown,
     picked: {
       from: picked.from.trim() || "your file",
       ...(picked.sourceFileId ? { sourceFileId: picked.sourceFileId } : {}),
@@ -66,7 +69,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   });
   // Both image slots used: nothing to add. The page deletes the picture it uploaded.
   if (next === doc) return fail("There's no room for another image on this exhbt.", 409);
-  if (!(await store.saveExhbtDraft(id, user.id, next))) return fail("Exhbt not found.", 404);
+
+  // The caption is the AI's words on the page, so its numbers get the draft's check
+  // (lib/exhbt/verify.ts): any not in the person's material is flagged in the editor to confirm.
+  const source = await loadDraftSource(user.id, id).catch(() => null);
+  const known = new Set(numbersIn(source ?? "").map(normaliseNumber));
+  const flagged = new Set((next.unverified ?? []).map((n) => normaliseNumber(n) ?? n));
+  const unverified = [...(next.unverified ?? [])];
+  for (const n of numbersIn(shown)) {
+    const v = normaliseNumber(n);
+    if (v === null || known.has(v) || flagged.has(v)) continue;
+    flagged.add(v);
+    unverified.push(n);
+  }
+  if (!(await store.saveExhbtDraft(id, user.id, { ...next, unverified }))) return fail("Exhbt not found.", 404);
   await store.attachFiles(user.id, id, [fileId]);
   await store.logEvent("figure_added", user.id, { exhbtId: id, from: picked.page ? "pdf" : "office" });
   return new NextResponse(null, { status: 204 });
