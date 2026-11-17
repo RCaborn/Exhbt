@@ -118,6 +118,8 @@ export function SectionBlock({ s, Sub, imageUrls, format = "case-study" }: { s: 
       );
     case "aim":
     case "conclusion":
+      // Only research draws these; elsewhere they are kept but not shown (decision 0024).
+      if (format !== "research") return null;
       return (
         <section aria-labelledby={`${s.id}-h`} data-part={s.kind} className="xp-section break-inside-avoid">
           <Sub id={`${s.id}-h`} className="xp-label">

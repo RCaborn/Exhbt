@@ -118,7 +118,7 @@ Layouts are on every plan, and `lib/entitlements.ts` doesn't change. How many im
 ## Consequences
 
 - Every exhbt saved before this is a case study and looks exactly as it did. Its doc gains no field until the person picks another layout.
-- Code from before this decision can't read a doc that holds an aim or a conclusion. Phase 2 is live, so this matters as soon as someone uses research: the layouts ship together and are not cherry-picked apart. `normaliseDoc` and every reader tolerate a kind or a layout they don't know (a layout is dropped and read as a case study), so a doc written by a later release never breaks the page.
+- Code from before this decision can't read a doc that holds an aim or a conclusion. Phase 2 is live, so this matters as soon as someone uses research: the layouts ship together and are not cherry-picked apart. `normaliseDoc`, which the store runs on every read, drops a layout it doesn't know (read as a case study) and leaves out a section kind it doesn't know, so a doc written by a later release never breaks the page. The cost is that saving such a doc from this code loses the kinds it left out.
 - A layout switch reaches the live page when the person republishes, like any other edit, because employers see `published_blocks`.
 - `validateForPublish`, `wordCount` and `publicDoc` now read the layout. The number check, file clean-up and file signing still read every section, so a hidden section's numbers are still checked and its files are never orphaned.
 - The "Exhbt layout" line in `AGENTS.md` describes the case study only and needs a pointer to this decision.

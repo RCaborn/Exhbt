@@ -182,7 +182,12 @@ export function Editor(props: EditorProps) {
         setJustLive({ slug: r.slug, changed: status === "published" });
       } else {
         setResult({ ok: false, lines: r.reasons });
-        setTimeout(() => problemsRef.current?.focus(), 0);
+        // Focus goes to the list of problems, unless the person has already moved on (jumped to a card from the list)
+        // while the server was answering: that choice is theirs.
+        setTimeout(() => {
+          const a = document.activeElement;
+          if (!a || a === document.body || a.closest('[aria-labelledby="card-publish"]')) problemsRef.current?.focus();
+        }, 0);
       }
     } catch {
       setResult({ ok: false, lines: ["Couldn't reach the server. Try again in a moment."] });

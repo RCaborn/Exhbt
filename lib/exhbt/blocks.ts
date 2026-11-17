@@ -268,9 +268,11 @@ function withIds(sections: unknown[]): unknown[] {
 export function normaliseDoc(raw: unknown): ExhbtDoc {
   if (!isObject(raw)) return raw as ExhbtDoc;
   if (Array.isArray(raw.sections)) {
-    // A layout this code doesn't know (written by a later release) reads as a case study.
+    // A layout this code doesn't know (written by a later release) reads as a case study, and a
+    // section kind it doesn't know is left out of what is read, so no reader or schema ever meets one.
     const { format, ...rest } = raw;
-    return { ...(isFormat(format) ? { ...rest, format } : rest), sections: withIds(raw.sections) } as ExhbtDoc;
+    const known = raw.sections.filter((s) => !isObject(s) || (SECTION_KINDS as readonly string[]).includes(s.kind as string));
+    return { ...(isFormat(format) ? { ...rest, format } : rest), sections: withIds(known) } as ExhbtDoc;
   }
   const { findings, charts, images, ...rest } = raw;
   const sections: unknown[] = [];

@@ -10,7 +10,7 @@ import { ResearchMain } from "@/components/portfolio/formats/ResearchMain";
 import { PrintButton } from "@/components/portfolio/PrintButton";
 import { Button } from "@/components/ui/Button";
 import type { ExhbtDoc, Section, SectionOf } from "@/lib/exhbt/blocks";
-import { formatOf } from "@/lib/exhbt/formats";
+import { formatOf, shownSections } from "@/lib/exhbt/formats";
 
 /** The editor's arrange preview imports this from here. */
 export { SectionBlock };
@@ -202,7 +202,7 @@ export function ProjectView({
                 <MethodFlow steps={doc.flow} variant="page" />
               </section>
 
-              {sectionsSlot ?? <SectionsView sections={doc.sections} imageUrls={imageUrls} Sub={Sub} />}
+              {sectionsSlot ?? <SectionsView sections={shownSections(doc).map((x) => x.s)} imageUrls={imageUrls} Sub={Sub} />}
             </>
           )}
         </div>

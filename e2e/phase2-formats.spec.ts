@@ -102,6 +102,15 @@ test.describe("model: the layout field", () => {
     expect(() => normaliseDoc(null)).not.toThrow();
   });
 
+  test("a section kind this code doesn't know is left out of what is read, and nothing throws", () => {
+    const raw = { ...libraryDoc, sections: [...libraryDoc.sections, { id: "x-1", kind: "build", repo: "https://example.com" }] };
+    const d = normaliseDoc(raw);
+    expect(d.sections.map((s) => s.kind)).toEqual(["findings"]);
+    expect(ExhbtDocSchema.safeParse(raw).success).toBe(true);
+    expect(() => [wordCount(d), publicDoc(d), keyFigureOf(d), validateForPublish(raw as unknown as ExhbtDoc), unverifiedNumbers(d, "")]).not.toThrow();
+    expect(wordCount(d)).toBe(wordCount(libraryDoc));
+  });
+
   test("a doc without a layout parses without one", () => {
     expect("format" in ExhbtDocSchema.parse(libraryDoc)).toBe(false);
     expect("format" in ExhbtDocSchema.parse(sampleSeeds[0])).toBe(false);
@@ -510,7 +519,10 @@ test.describe("The layout choice in the editor", () => {
     await page.getByRole("button", { name: "Add aim or hypothesis", exact: true }).click();
     await page.getByRole("textbox", { name: "What the study set out to do or test" }).fill("Walkers will recall more words than sitters.");
     const withAim = await wordsOnBar(page);
+    await expect(previewArticle(page).locator("[data-part=aim]")).toHaveCount(1);
     await chooseLayout(page, "Case study");
+    // Kept in the editor, not drawn on the page.
+    await expect(previewArticle(page).locator("[data-part=aim]")).toHaveCount(0);
     const card = sectionsArea(page).getByRole("region", { name: "Aim or hypothesis", exact: true });
     await expect(card.getByText("Not shown in this layout. It's kept if you switch back.")).toBeVisible();
     expect(await wordsOnBar(page)).toBe(withAim - 7);
