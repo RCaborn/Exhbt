@@ -169,14 +169,14 @@ export default function WhatIsAnExhbt() {
             <Preview
               url={portfolioHost(demoOwner.username)}
               label={`${demoOwner.name}'s portfolio home page: her photo, name and intro, then her best piece of work.`}
-              crop="h-[30rem] lg:h-[32rem]"
-              className="lg:[zoom:0.6]"
+              className="[zoom:0.62] sm:[zoom:0.75] lg:[zoom:0.6]"
             >
               <PortfolioHome
                 person={demoPortfolio.person}
                 projects={demoHomeProjects()}
                 featuredId={null}
-                sections={demoPortfolio.sections}
+                // The top of her page and her best work, uncropped; the whole page is on /demo.
+                sections={["featured"]}
                 tiles={demoPortfolio.tiles}
               />
             </Preview>

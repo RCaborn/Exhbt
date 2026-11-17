@@ -75,7 +75,7 @@ export default function Home() {
       a: (
         <>
           Yes: {ADDRESS}, with the name you choose. It&rsquo;s a name on exhbt.co.uk rather than a domain you buy, so
-          there&rsquo;s nothing to set up or renew. If you move down to {PLAN_NAMES.free}, the name stays yours and
+          there&rsquo;s nothing to set up. If you move down to {PLAN_NAMES.free}, the name stays yours and
           the page is hidden until you&rsquo;re back on {PLAN_NAMES.premium} or {PLAN_NAMES.max}.
         </>
       ),
