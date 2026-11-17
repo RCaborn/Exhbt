@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { legalUpdatedLabel } from "@/lib/legal";
+import { marketingMetadata } from "@/lib/seo";
 import { BILLING_PERIOD, PLAN_NAMES, REFERRAL_CREDIT } from "@/lib/entitlements";
 
 const PAID = `${PLAN_NAMES.premium} and ${PLAN_NAMES.max}`;
@@ -9,7 +11,7 @@ type Doc = { title: string; updated: string; body: React.ReactNode };
 const DOCS: Record<string, Doc> = {
   privacy: {
     title: "Privacy policy",
-    updated: "16 November 2026",
+    updated: legalUpdatedLabel("privacy"),
     body: (
       <>
         <p>
@@ -202,7 +204,7 @@ const DOCS: Record<string, Doc> = {
   },
   terms: {
     title: "Terms of use",
-    updated: "16 November 2026",
+    updated: legalUpdatedLabel("terms"),
     body: (
       <>
         <h2>Your content</h2>
@@ -264,7 +266,7 @@ const DOCS: Record<string, Doc> = {
   },
   cookies: {
     title: "Cookie policy",
-    updated: "16 November 2026",
+    updated: legalUpdatedLabel("cookies"),
     body: (
       <>
         <p>
@@ -314,7 +316,8 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ doc: string }> }): Promise<Metadata> {
   const { doc } = await params;
-  return { title: DOCS[doc]?.title ?? "Not found" };
+  if (!Object.hasOwn(DOCS, doc)) return { title: "Not found" };
+  return marketingMetadata(`legal-${doc}` as "legal-privacy" | "legal-terms" | "legal-cookies");
 }
 
 export default async function LegalPage({ params }: { params: Promise<{ doc: string }> }) {

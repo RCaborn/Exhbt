@@ -75,8 +75,8 @@ export const RoadmapSchema = z.object({
     .array(
       z.object({
         skill: z.string(),
-        needed: z.number().int().min(0).max(4).describe("Level a junior hire in this job is expected to show, 0-4."),
-        current: z.number().int().min(0).max(4).describe("Level the graduate's own input shows, 0-4, on the evidence scale."),
+        needed: z.number().int().min(0).max(4).describe("Level a junior hire in this job is expected to show, 0-4. Varies with how central the skill is: core skills 3-4, supporting skills 1-2."),
+        current: z.number().int().min(0).max(4).describe("Level the graduate's own input shows, 0-4: 0 not shown, 1 studied, 2 used in a piece of work, 3 used to get a result they describe, 4 led, taught or used professionally."),
         evidence: z.string().describe("Where in their input the current level shows. Empty when current is 0."),
       }),
     )

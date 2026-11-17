@@ -78,7 +78,7 @@ Useful dev-only pages:
 | Demo portfolio (`/demo`, fictional person, 4 projects) | `app/(marketing)/demo/`; data in `lib/exhbt.ts` (`demoOwner`, `demoExhbts`) |
 | Tier checklists (pricing page, home) | `planFeatures()` in `lib/entitlements.ts`, rendered by `components/site/FeatureList.tsx` |
 | The exhbt card (methodology flow, chart, skills) | `components/exhbt/Exhbt.tsx`, `MethodFlow.tsx`, `BeforeAfterChart.tsx`; data shape and example in `lib/exhbt.ts` |
-| The skill radar (roadmap Gaps and Projects screens, home example) | `components/charts/SkillRadar.tsx`; levels and the after-projects rule in `lib/roadmap/skills.ts`; home data in `components/home/SkillsGapExample.tsx` |
+| The skill radar (roadmap Gaps and Projects screens, home example) | `components/charts/SkillRadar.tsx`; the Now / After switch is in the same component; the rules (markers, lists) in `lib/roadmap/radar.ts`; the after-projects rule in `lib/roadmap/skills.ts`; the level scale in `lib/ai/roadmap.ts`; home data in `components/home/SkillsGapExample.tsx` |
 | Plans and limits (Free, Premium, Max, Universities), tier names | `lib/entitlements.ts`; pricing page `app/(marketing)/pricing/page.tsx` |
 | "We've read N UK job profiles" line | `lib/jobs/claim.ts` (shows only when `NEXT_PUBLIC_JOBS_DATASET_ROLES` ≥ 1,000) |
 | Premium waitlist (interest value `premium`) | `components/waitlist/` (form + server action), `waitlist` table |

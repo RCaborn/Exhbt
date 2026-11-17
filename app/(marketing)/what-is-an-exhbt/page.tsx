@@ -8,12 +8,9 @@ import { demoExhbts, demoOwner } from "@/lib/exhbt";
 import { sampleDocs } from "@/lib/exhbt/sample";
 import { portfolioHost } from "@/lib/hosts";
 import { PLAN_NAMES } from "@/lib/entitlements";
+import { marketingMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "What is an exhbt?",
-  description:
-    "An exhbt is one project written up on a single page, with the method, the findings and the work behind it, so an employer can check it. A few make a portfolio at your own address.",
-};
+export const metadata: Metadata = marketingMetadata("what-is-an-exhbt");
 
 /** The parts of the example above, top to bottom. */
 const PARTS: { name: string; body: string }[] = [
