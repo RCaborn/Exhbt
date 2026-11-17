@@ -39,7 +39,7 @@ export function JobLinks({ username, owner, picks }: { username: string; owner: 
             {picks.map((p, i) => (
               <li
                 key={p.slug}
-                className={`rounded-[20px] border bg-surface p-5 ${i === 0 ? "border-ink shadow-pack" : "border-line"}`}
+                className={`min-w-0 rounded-[20px] border bg-surface p-5 ${i === 0 ? "border-ink shadow-pack" : "border-line"}`}
               >
                 <p className="flex min-w-0 items-center gap-2 text-[0.95rem] font-semibold">
                   <Link2 size={16} strokeWidth={2.25} className="shrink-0 text-jade" />
