@@ -206,7 +206,6 @@
      --pf-* set once (themeStyle, decision 0018) and [data-look] below reads the --xp-* names from
      it. What each one paints is in docs/decisions/0022-exhbt-page-layout.md. */
   :root {
-    --xp-page-ground: var(--color-surface);
     --xp-ground: var(--color-surface);
     --xp-ink: var(--color-ink);
     --xp-muted: var(--color-graphite);
@@ -261,7 +260,6 @@
      (Declared here rather than on :root, where var() would resolve too early to see the look.) */
   [data-look] {
     font-family: var(--pf-font-body);
-    --xp-page-ground: var(--pf-ground);
     --xp-ground: var(--pf-ground);
     --xp-ink: var(--pf-ink);
     --xp-heading: var(--pf-heading);

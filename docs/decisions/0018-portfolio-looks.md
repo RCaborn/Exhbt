@@ -63,7 +63,31 @@ The set, with the palette key in `lib/portfolio-themes.ts` it comes from:
 | `--band-initials-bg`, `--band-initials-text` | `avatar…` | the same as `--pf-avatar`, kept for the demo's `PortfolioHeader` |
 | `--chart-strong`, `--chart-soft`, `--chart-1` to `--chart-4`, `--chart-wash` | `chart…` | the graphs' two shades, their ramp, a highlighted table row |
 
-Removed: none of 0016's names. Gone from the exhbt page's own list is `--xp-page-ground` on the root (the frame paints the ground). New on it: `--xp-heading`, `--xp-flow-end-soft`, `--xp-edge-width`, `--xp-lead-font`.
+Removed: none of 0016's names. Gone from the exhbt page's list is `--xp-page-ground` (the frame paints the ground with `--pf-ground`). New on it: `--xp-heading`, `--xp-flow-end-soft`, `--xp-edge-width`, `--xp-lead-font`.
+
+### The exhbt page's names, and what they read
+
+For anyone building on the exhbt page (the coming gallery and research formats included): draw with the `--xp-*` names below, never a Tailwind colour class. On a portfolio each one is the `--pf-*` value on the right, set by the look on the frame; in the editor's preview (no look) it is the Exhbt default on `:root`.
+
+| `--xp-*` | reads | `--xp-*` | reads |
+|---|---|---|---|
+| `ground` | `--pf-ground` | `accent`, `accent-hover`, `accent-ink` | `--pf-action`, `-action-hover`, `-action-ink` |
+| `ink` | `--pf-ink` | `outline-ground`, `outline-ink`, `outline-edge` | `--pf-ground`, `--pf-ink`, `--pf-edge` |
+| `heading` | `--pf-heading` | `highlight`, `highlight-ink` | `--pf-highlight`, `-highlight-ink` |
+| `muted` | `--pf-soft` | `flow-ground`, `flow-ink`, `flow-edge`, `flow-muted` | `--pf-card`, `--pf-ink`, `--pf-edge`, `--pf-soft` |
+| `rule`, `rule-strong` | `--pf-line`, `--pf-rule` | `flow-end`, `flow-end-ink`, `flow-end-soft` | `--pf-flow-end…` |
+| `card`, `card-ink`, `card-muted`, `card-edge` | `--pf-well`, `--pf-ink`, `--pf-soft`, `--pf-well-edge` | `arrow` | `--pf-faint` |
+| `figure`, `figure-ink`, `figure-muted`, `figure-edge` | `--pf-figure`, `--pf-ink`, `--pf-soft`, `--pf-edge` | `avatar`, `avatar-ink`, `avatar-edge` | `--pf-avatar…` (the edge is the avatar's own colour, ink in Exhbt and Mono) |
+| `pill`, `pill-ink`, `pill-edge` | `--pf-pill…` | `radius-card`, `radius-box`, `radius-pill`, `radius-button` | `--pf-radius-lg`, `-radius-box`, `-radius-pill`, `-radius-button` |
+| `tick`, `tick-ink` | `--pf-tick…` | `edge-width` | `--pf-edge-width` |
+| `link` | `--pf-accent` | `font`, `title-font`, `lead-font`, `title-weight`, `title-tracking` | `--pf-font-body`, `--font-display`, `--pf-font-lead`, `--pf-display-weight`, `--pf-tracking` |
+
+### What in decision 0022 no longer holds
+
+- "Keep the figure ground white or near it, even on a dark look: the graphs colour themselves for white." Graphs now take the look's shades and sit on the look's own figure card (Night's is dark).
+- "Set `--xp-page-ground` from the root with `:root:has(…)`." The variable is gone; the frame round the page carries the look and paints `--pf-ground`.
+- "The sign-off and the previous and next cards keep their own colours; a dark look has to restyle those as well." They sit inside the frame now and take the look.
+- "A look overrides the `--xp-*` names on `[data-theme="<id>"]`." A look sets `--pf-*` only; the `--xp-*` names are read from them on `[data-look]`. Setting an `--xp-*` name directly on an element inside the page still works.
 
 The few things a token can't carry are **treatments** (`Treatment` in `lib/portfolio-themes.ts`): `hero` (portrait, masthead, notes, terminal, block, ledger, greeting), `band` (bleed, inset, ruled), `work` (cards, list, index) and `cta` (the band's "See how I did it" as the band turned round, the main button, or a link). `PortfolioHome` switches markup on them; `globals.css` has the exhbt page's few signatures keyed on `data-hero` (Classic's rule over the title, Ledger's bar and double rule, Bloom's ringed photo, Studio's sidebar card in the block colour). A new look picks from these or adds one.
 
@@ -123,4 +147,7 @@ Each look is drawn large as the top of the person's own page (`PortfolioHome` wi
 
 ## Not decided here
 
-The marketing home's "Looks" section reads `PORTFOLIO_THEMES` (being redone on its own branch). The demo keeps its own band (`PortfolioHeader`), now through the old `ink` id, which shows Night.
+- The marketing home's "Looks" section reads `PORTFOLIO_THEMES`, and on this branch it still filters by decision 0012's ids, so it lists nothing until the new home page (its own branch) lands, which reads the list without ids.
+- The demo passes the old `ink` id to `PortfolioHeader`, which now shows Night: a dark band and an Inter Tight name on that fictional portfolio. The demo is being redone on the same branch.
+- The exhbt frame looks up the username, plan and profile to find the look, and the page looks them up again (both once per request). A shared loader would save a round trip.
+- Axe runs on the eight looks in their first colourway; the other colourways are checked by the contrast maths only.
