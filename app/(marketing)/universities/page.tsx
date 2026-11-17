@@ -3,12 +3,10 @@ import Link from "next/link";
 import { FeatureList } from "@/components/site/FeatureList";
 import { PLAN_NAMES } from "@/lib/entitlements";
 import { marketingFeatures } from "@/lib/marketing-features";
+import { marketingMetadata } from "@/lib/seo";
 import { LeadForm } from "./LeadForm";
 
-export const metadata: Metadata = {
-  title: "For universities",
-  description: "Give your students a free roadmap and a portfolio of their own. Get in touch about a licence.",
-};
+export const metadata: Metadata = marketingMetadata("universities");
 
 export default function UniversitiesPage() {
   return (

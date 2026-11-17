@@ -203,3 +203,21 @@ export function projectCard({
     { ...OG_SIZE, fonts: loadFonts() },
   );
 }
+
+/**
+ * A marketing page's preview: the page's headline and one line under it, on the brand band (the
+ * same frame as the portfolio cards, so it draws with the same bundled fonts on the Worker).
+ */
+export function marketingCard({ host, headline, sub }: { host: string; headline: string; sub: string }) {
+  return new ImageResponse(
+    (
+      <Frame host={host}>
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, justifyContent: "center", paddingBottom: 24 }}>
+          <div style={{ fontFamily: "Bricolage", fontWeight: 600, fontSize: headline.length > 28 ? 88 : 108, lineHeight: 1.02, letterSpacing: "-0.035em" }}>{clip(headline, 70)}</div>
+          <div style={{ marginTop: 32, fontSize: 38, lineHeight: 1.3, color: SOFT }}>{clip(sub, 90)}</div>
+        </div>
+      </Frame>
+    ),
+    { ...OG_SIZE, fonts: loadFonts() },
+  );
+}

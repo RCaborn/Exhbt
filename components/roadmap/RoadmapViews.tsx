@@ -4,7 +4,6 @@ import { WaitlistForm } from "@/components/waitlist/WaitlistForm";
 import { PLAN_NAMES } from "@/lib/entitlements";
 import { isPhase2Enabled } from "@/lib/site";
 import type { IdeasStatus } from "@/lib/roadmap/ideas";
-import { SkillHighlights } from "@/components/charts/SkillHighlights";
 import { SkillRadar } from "@/components/charts/SkillRadar";
 import { BuildThis, type BuildState } from "@/components/roadmap/BuildThis";
 import { IdeaCard } from "@/components/roadmap/IdeaCard";
@@ -16,14 +15,7 @@ import type { Roadmap } from "@/lib/ai/schemas";
 import type { Contact } from "@/lib/cv-contact";
 import type { ProjectIdea } from "@/lib/store";
 import { SKILLS_SOURCE_NOTE } from "@/lib/jobs/claim";
-import {
-  chartableSkills,
-  highlights,
-  nowVersusAfter,
-  nowVersusNeeded,
-  skillsAfterProjects,
-  sortGapsByShortfall,
-} from "@/lib/roadmap/skills";
+import { chartableSkills, radarSkills, sortGapsByShortfall } from "@/lib/roadmap/skills";
 import { Button } from "@/components/ui/Button";
 
 /**
@@ -59,10 +51,15 @@ type Props = {
   build?: BuildState;
   /** Saving ideas to the person's list (signed in, Phase 2 only; locked on Free). */
   save?: SaveState;
+  /**
+   * The plan's ideas, for the Gaps radar's "After the projects" view. Empty until the details gate
+   * is filled in and the ideas exist: the radar then shows Now only (docs/decisions/0023).
+   */
+  planIdeas?: ProjectIdea[];
 };
 
 /** The roadmap as five short click-through screens. Each view is its own URL (?view=). */
-export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn, projects, build, save }: Props) {
+export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn, projects, build, save, planIdeas = [] }: Props) {
   const index = VIEWS.findIndex((v) => v.key === view);
   const href = (k: ViewKey) => `/roadmap/${id}?view=${k}`;
   const prev = VIEWS[index - 1];
@@ -96,7 +93,7 @@ export function RoadmapViews({ id, roadmap, view, emailedTo, signedIn, projects,
 
         <div className="mt-6 rounded-[24px] border border-line bg-surface p-6 shadow-pack sm:p-10">
           {view === "overview" && <Overview roadmap={roadmap} role={role} href={href} />}
-          {view === "gaps" && <Gaps roadmap={roadmap} role={role} />}
+          {view === "gaps" && <Gaps roadmap={roadmap} role={role} planIdeas={planIdeas} />}
           {view === "projects" && <Projects id={id} roadmap={roadmap} role={role} state={projects} build={build} save={save} />}
           {view === "strengths" && <Strengths roadmap={roadmap} role={role} />}
           {view === "next" && <Next emailedTo={emailedTo} signedIn={signedIn} id={id} unlocked={projects.unlocked} />}
@@ -157,26 +154,20 @@ function SummaryRow({ href, label }: { href: string; label: string }) {
   );
 }
 
-function Gaps({ roadmap, role }: { roadmap: Roadmap; role: string }) {
+function Gaps({ roadmap, role, planIdeas }: { roadmap: Roadmap; role: string; planIdeas: ProjectIdea[] }) {
   const skills = chartableSkills(roadmap);
-  const marked = skills ? highlights(skills) : null;
+  const radar = skills ? radarSkills(skills, { projects: planIdeas }) : null;
+  // The "After the projects" view needs suggested projects that move at least one level.
+  const showAfter = Boolean(radar?.some((s) => s.after > s.now));
   const gaps = skills ? sortGapsByShortfall(roadmap.gaps, skills) : roadmap.gaps;
   return (
     <>
       <Context role={role} />
       <h1 className="mt-2">Gaps to close</h1>
       <p className="mt-3 text-graphite">Skills this role asks for that your CV doesn&rsquo;t show yet, or not enough.</p>
-      {skills && marked && (
+      {radar && (
         <div className="mt-8">
-          <SkillRadar
-            title="You now, against what the job asks for"
-            fromLabel="You now"
-            toLabel="What the job asks for"
-            points={nowVersusNeeded(skills)}
-            note={SKILLS_SOURCE_NOTE}
-            highlight={marked}
-          />
-          <SkillHighlights up={marked.up} bag={marked.bag} />
+          <SkillRadar title="You, against what the job asks for" skills={radar} showAfter={showAfter} note={SKILLS_SOURCE_NOTE} />
         </div>
       )}
       {roadmap.gaps.length === 0 ? (
@@ -274,38 +265,14 @@ function Projects({
           from all your roadmaps.
         </p>
       )}
-      <AfterProjects roadmap={roadmap} ideas={ideas} done={done} />
+      {chartableSkills(roadmap) && (
+        <p className="mt-8 text-graphite">
+          <Link href={`/roadmap/${id}?view=gaps`} className="link font-semibold text-ink">
+            See what these projects do for your skills
+          </Link>
+        </p>
+      )}
     </>
-  );
-}
-
-/** The same radar again, showing where finishing the plan's projects would take them. */
-function AfterProjects({ roadmap, ideas, done }: { roadmap: Roadmap; ideas: ProjectIdea[]; done: boolean }) {
-  const skills = chartableSkills(roadmap);
-  if (!skills) return null;
-  const chosen = { projects: ideas };
-  const points = nowVersusAfter(skills, chosen);
-  if (!points.some((p) => p.to > p.from)) return null;
-  // The lists judge the after-projects levels against what the job asks for.
-  const marked = highlights(skillsAfterProjects(skills, chosen));
-  return (
-    <section aria-labelledby="after-projects" className="mt-10 border-t border-line pt-8">
-      <h2 id="after-projects" className="">
-        {done ? "When you’ve finished your plan" : "When you’ve finished these projects"}
-      </h2>
-      <p className="mt-2 max-w-[38rem] text-graphite">Where you&rsquo;d stand once they&rsquo;re done.</p>
-      <div className="mt-6">
-        <SkillRadar
-          title="You now, against where the projects would take you"
-          fromLabel="You now"
-          toLabel="After the projects"
-          points={points}
-          note={SKILLS_SOURCE_NOTE}
-          highlight={marked}
-        />
-        <SkillHighlights up={marked.up} bag={marked.bag} />
-      </div>
-    </section>
   );
 }
 

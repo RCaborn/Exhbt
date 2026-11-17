@@ -4,11 +4,9 @@ import { ExhbtTile } from "@/components/exhbt/ExhbtTile";
 import { PortfolioHeader } from "@/components/exhbt/PortfolioHeader";
 import { demoExhbts, demoOwner } from "@/lib/exhbt";
 import { themeById } from "@/lib/portfolio-themes";
+import { marketingMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Demo portfolio",
-  description: "What an Exhbt portfolio looks like to an employer. A fictional graduate with four projects.",
-};
+export const metadata: Metadata = marketingMetadata("demo");
 
 /** A full demo of a public portfolio. The real host is portfolioHost() in lib/hosts.ts. */
 export default function DemoPortfolio() {

@@ -51,6 +51,8 @@ export async function GET(req: NextRequest) {
     headline: "Data analyst, health and public services",
     bio: "Final-year Data Science student. I like problems where a small change saves real time or money.",
     linkedin: "https://www.linkedin.com/in/example",
+    // hide=1: "hide my portfolio from search engines" is on (the SEO checks).
+    hideFromSearch: q.get("hide") === "1",
   });
   for (const e of await store.listExhbts(userId)) await store.deleteExhbt(e.id, userId);
   // A fresh arrangement too: the default layout, nothing hidden or featured.
