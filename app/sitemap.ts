@@ -1,11 +1,12 @@
 import type { MetadataRoute } from "next";
 import { demoExhbts } from "@/lib/exhbt";
-import { MARKETING_HOST } from "@/lib/hosts";
+import { marketingSitemapPages, marketingUrl } from "@/lib/seo";
 
-/** The public marketing pages. Roadmaps, accounts and /start (ads only) are left out. */
-const PAGES = ["/", "/what-is-an-exhbt", "/pricing", "/universities", "/how-to-read-an-exhbt", "/demo", "/legal/privacy", "/legal/terms", "/legal/cookies"];
-
+/**
+ * The public marketing pages, with `lastmod` where a date is recorded (the legal pages; lib/legal.ts).
+ * Roadmaps, accounts and /start (ads only) are left out. Each portfolio host has its own sitemap
+ * (app/(portfolio)/p/[username]/sitemap.xml).
+ */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = `https://${MARKETING_HOST}`;
-  return [...PAGES, ...demoExhbts.map((e) => `/demo/${e.slug}`)].map((path) => ({ url: `${base}${path === "/" ? "" : path}` }));
+  return [...marketingSitemapPages(), ...demoExhbts.map((e) => ({ url: marketingUrl(`/demo/${e.slug}`) }))];
 }

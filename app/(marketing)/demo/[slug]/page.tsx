@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Exhbt } from "@/components/exhbt/Exhbt";
 import { PortfolioBar } from "@/components/exhbt/PortfolioHeader";
 import { demoExhbts, demoOwner } from "@/lib/exhbt";
+import { marketingMetadata } from "@/lib/seo";
 
 export function generateStaticParams() {
   return demoExhbts.map((e) => ({ slug: e.slug }));
@@ -11,7 +12,8 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const e = demoExhbts.find((x) => x.slug === slug);
-  return { title: e ? `${e.title} (demo)` : "Not found" };
+  if (!e) return { title: "Not found" };
+  return marketingMetadata("demo", { title: `${e.title} (demo)`, description: e.outcome, path: `/demo/${e.slug}` });
 }
 
 /** One exhbt opened from the demo portfolio. */

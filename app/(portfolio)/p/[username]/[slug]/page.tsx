@@ -12,6 +12,8 @@ import { MARKETING_HOST, parseHost, portfolioHost } from "@/lib/hosts";
 import { jobLinkFor } from "@/lib/job-link-request";
 import { jobLinkBackTarget } from "@/lib/job-links";
 import { previewImage } from "@/lib/og/card";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { creativeWorkLd, portfolioCanonical } from "@/lib/seo";
 import { checkedOnLabel, loadPortfolio, mediaFor } from "@/lib/portfolio";
 
 type Params = { params: Promise<{ username: string; slug: string }>; searchParams: Promise<{ for?: string | string[] }> };
@@ -33,9 +35,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return {
     title: { absolute: title },
     description,
+    // Always the person's own host, whichever address this was opened on (localhost, /p/name).
+    alternates: { canonical: portfolioCanonical(p.profile.username, `/${slug}`) },
     icons: { icon: [{ url: `${p.base}/initials.svg`, type: "image/svg+xml" }] },
     // The link preview (preview.png beside this page) shows whatever the search setting; that only stops indexing.
-    openGraph: { type: "article", title, description, siteName: "exhbt", images: [image] },
+    openGraph: { type: "article", url: portfolioCanonical(p.profile.username, `/${slug}`), title, description, siteName: "exhbt", images: [image] },
     twitter: { card: "summary_large_image", title, description, images: [image] },
     ...(p.profile.hideFromSearch || unlisted ? { robots: { index: false, follow: false } } : {}),
   };
@@ -72,6 +76,18 @@ export default async function PortfolioProject({ params, searchParams }: Params)
   return (
     // data-exhbt-route puts the page on the look's ground (globals.css); the layout's own ground is mist.
     <div data-exhbt-route data-theme={p.theme.id} style={themeStyle(p.theme)}>
+      <JsonLd
+        data={creativeWorkLd({
+          title: it.doc.title,
+          description: [exhbtSummary(it.doc), it.doc.context.trim()].filter(Boolean).join(" ") || undefined,
+          username: p.profile.username,
+          slug,
+          authorName: p.displayName,
+          modified: it.publishedAt,
+          skills: it.doc.skills,
+          image: `${portfolioCanonical(p.profile.username, `/${slug}`)}/preview.png`,
+        })}
+      />
       <ProjectView
         doc={it.doc}
         owner={{ name: p.displayName, photoUrl: p.photoUrl, shape: p.theme.photo, bio: p.profile.headline, homeHref: p.base || "/" }}
