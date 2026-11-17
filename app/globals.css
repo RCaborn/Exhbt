@@ -681,6 +681,10 @@
   html {
     font-size: 12px;
   }
+  /* Mono's face is wider, so its exhbt prints a step smaller to stay on one page (decision 0018). */
+  html:has([data-look="mono"]) {
+    font-size: 11px;
+  }
   html,
   body {
     background: var(--color-surface) !important;

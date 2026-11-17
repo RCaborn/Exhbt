@@ -1,4 +1,4 @@
-Status: accepted
+Status: superseded by 0018 (the eight looks, their faces and colours, the token set), 17 Nov 2026
 Date: 13 Nov 2026
 
 # Portfolio looks

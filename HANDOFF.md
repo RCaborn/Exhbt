@@ -125,7 +125,7 @@ Phase 2 (portfolios, the exhbt editor, uploads and AI drafts, paid plans) is on 
 Prices and limits are `lib/entitlements.ts`. The Stripe dashboard steps are in `LAUNCH.md`.
 
 Development pages for Phase 2 (all 404 in production and when Supabase is connected):
-- **`/dev/portfolio?username=amara&plan=premium&count=2`**: makes a fictional portfolio with published exhbts and opens it. The owner is the dev sign-in user `<username>@example.com`, so sign in with that address (`/auth/dev?email=amara@example.com`) to edit the same portfolio.
+- **`/dev/portfolio?username=amara&plan=premium&count=2`**: makes a fictional portfolio with published exhbts and opens it. The owner is the dev sign-in user `<username>@example.com`, so sign in with that address (`/auth/dev?email=amara@example.com`) to edit the same portfolio. Add `look=night` (any look or colourway id, decision 0018), `rich=1` (every profile field and section filled in), `name=` (try a long one), `graphs=none` and `with=open-banking` to see every look with real-world content.
 - **`/dev/plan?plan=max&next=/exhbts`**: puts the signed-in dev user on a plan without Stripe.
 - **`/dev/upload/<id>`** and **`/dev/files/<id>`**: the in-memory stand-in for Storage. Uploads PUT to the first; portfolio pages read from the second. Files are gone when the server restarts.
 
