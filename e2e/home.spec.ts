@@ -52,9 +52,16 @@ test.describe("Home: sections", () => {
     const looks = section.getByRole("group", { name: "Try a look" }).getByRole("radio");
     await expect(looks.first()).toBeChecked();
     expect(await looks.count()).toBeGreaterThan(1);
+    // Click a look's label (the radio itself is visually hidden inside it).
     const other = PORTFOLIO_THEMES[1]!;
-    await section.getByRole("radio", { name: other.name, exact: true }).check();
+    const radio = section.getByRole("radio", { name: other.name, exact: true });
+    await radio.locator("xpath=ancestor::label").click();
+    await expect(radio).toBeChecked();
     await expect(section.locator("[data-portfolio-home]")).toHaveAttribute("data-theme", other.id);
+    // The arrow keys move along the group, like any radio group.
+    await radio.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(section.locator("[data-portfolio-home]")).toHaveAttribute("data-theme", PORTFOLIO_THEMES[2]!.id);
   });
 
   test("how it works is a flow of four steps, ending on the person's own site", async ({ page }) => {
