@@ -57,7 +57,7 @@ function menuFor(f: Format): { kind: SectionKind; add: string; icon: LucideIcon;
     { kind: "conclusion", add: "Add conclusion", icon: Flag, hint: `What the work concludes, up to ${L.conclusion.words} words.` },
     { kind: "quote", add: "Add a quote", icon: Quote, hint: `Feedback someone gave, up to ${L.quote.words} words, with their name.` },
     { kind: "reflection", add: `Add ${f === "research" ? "limitations and next steps" : "what I'd do next"}`, icon: Lightbulb, hint: `One or two lines, up to ${L.reflection.words} words.` },
-    { kind: "link", add: f === "research" ? "Add a reference" : "Add a link", icon: Link2, hint: f === "research" ? "A paper or source you used, as a link." : "A repository, a demo or a document." },
+    { kind: "link", add: f === "research" ? "Add a reference" : "Add a link", icon: Link2, hint: f === "research" ? "A paper or source you used, as a link." : f === "gallery" ? "The film, the full set of pictures or the deck." : "A repository, a demo or a document." },
   ];
   const kinds = FORMAT_RULES[f].kinds;
   const order: SectionKind[] = ["findings", "graph", "image", "quote", "reflection", "link", "aim", "conclusion"];
@@ -423,7 +423,7 @@ function hintFor(s: Section, maxFileMb: number, L: Limits, f: Format): string {
     case "quote":
       return `Feedback someone gave on the work, in their own words: up to ${L.quote.words} words, with their name.`;
     case "reflection":
-      return "One or two lines: what you'd do next, or do differently.";
+      return f === "research" ? "One or two lines: the limits of the study, and what you'd do next." : "One or two lines: what you'd do next, or do differently.";
     case "link":
       return FORMAT_COPY[f].linkHint;
     case "aim":
