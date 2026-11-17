@@ -64,7 +64,7 @@ export const MARKETING_PAGES: Record<MarketingKey, MarketingPage> = {
   universities: {
     path: "/universities",
     title: "For universities",
-    description: `A university licence gives every student ${PLAN_NAMES.max}: a skills roadmap for the job they want and a portfolio of exhbts. Get in touch to ask about one.`,
+    description: `Students get a free skills-gap roadmap for the job they want and a personal website of checked project write-ups to send employers. A university licence gives every student ${PLAN_NAMES.max}. Get in touch.`,
     card: { headline: "Exhbt for universities", sub: "A roadmap and a portfolio for every student" },
   },
   "how-to-read-an-exhbt": {
