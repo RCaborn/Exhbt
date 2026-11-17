@@ -11,14 +11,14 @@ Everything below is on the `phase-2` branch. The live site (`main`) is unchanged
 | Area | What a person can do |
 |---|---|
 | Plans | Free, Premium and Max (figures only in `lib/entitlements.ts`). Upgrade prompts appear where they're needed: publishing on Free, a full plan, drafts used up. |
-| Pricing | Free / £9 a year / £15 a year. The pricing page and home page show this once Phase 2 is switched on; the waitlist shows until then. The originality check and per-job links are marked "coming soon". |
+| Pricing | Free / £9 a year / £15 a year. The pricing page and home page show this once Phase 2 is switched on; the waitlist shows until then. The originality check is marked "coming soon"; per-job links are live (`JOB_LINKS_LIVE`). |
 | Payments | Stripe Checkout, the billing portal, a billing page, and the webhook (signed, repeat-safe, ignores out-of-order events). |
 | Upload and AI draft | Upload PDF, Word, text, CSV, spreadsheets, photos or scans. Haiku drafts an exhbt from the files and flags any number it can't find in them. The progress screen shows each step. |
 | Editor | One card per section, the flowchart edited on the diagram itself, live word count against 200 (every word on the page counts), images and the work as a file, and autosave that can't lose work. Also: "Rewrite this block", "Back to the AI version", publish checks with links to the card at fault, and an "it's live" panel. |
 | Portfolio | An at-a-glance page and a page per project in the agreed layout, with photo, link previews (LinkedIn, Slack, email), "Save as PDF" and the brand design. |
 | Usernames and profile | Claim an address; a renamed address redirects for 30 days. Name, headline, bio, LinkedIn, photo, and hiding from search engines. |
 | Roadmaps | "My roadmaps" for switching careers. A new roadmap for a different job reuses your details. Saved ideas (Premium and Max) keep ideas from any roadmap in one list. "Build this as an exhbt" works from any idea. |
-| Per-job links (Max) | Paste a job description or link one. The AI picks the 4 best exhbts with reasons and an intro; the person reorders, swaps, chooses `/lloyds` or `/lloyds-x7k2`, and can switch a link off. **The public page isn't connected yet** (see "For the subdomain work"). |
+| Per-job links (Max) | Paste a job description or link one. The AI picks the 4 best exhbts with reasons and an intro; the person reorders, swaps, chooses `/lloyds` or `/lloyds-x7k2`, and can switch a link off. The public page is connected (`p/[username]/[slug]/page.tsx`, `components/portfolio/JobLinkView.tsx`), with "Back to <company>" on a project opened from it. |
 | Customise portfolio | Drag tiles into order (mouse, touch, keyboard), hide or feature an exhbt, pick a look, switch the skills strip and LinkedIn button, and add extra tiles (Premium and Max). Saves itself, with undo (decision 0014). |
 | Teammates | Invite teammates by email with a role; they show under the author on the project and its tile, can leave, and can make their own exhbt from the project with copies of its files. An upload that matches a file on someone else's exhbt gets a private "Were you on that project together?", never a public label (decision 0013). |
 | Privacy and safety | Privacy and terms describe only what's built. Deletes remove stored files. Account export covers everything. `/api/health` reports Phase 2 settings and Storage. |
@@ -58,16 +58,6 @@ Nothing above has run with real Stripe, real Supabase Storage, or the real Haiku
 
 ## For the subdomain work (Rory's friend)
 Nothing in `middleware.ts`, `lib/hosts.ts`, `app/(portfolio)/layout.tsx` or Worker routes was changed by this work. Left for that work:
-- **Connect the per-job link pages.** In `app/(portfolio)/p/[username]/[slug]/page.tsx`, check for a job link first:
-  ```tsx
-  import { cache } from "react";
-  import { JobLinkView } from "@/components/portfolio/JobLinkView";
-  import { loadJobLink } from "@/lib/job-links";
-  const jobLinkFor = cache(loadJobLink); // counts the view once
-  // generateMetadata: if (job) return { title: { absolute: `For ${job.link.company} · ${job.displayName}` }, robots: { index: false, follow: false } };
-  // page: const job = await jobLinkFor(username, slug); if (job) return <JobLinkView data={job} />;
-  ```
-  Then, on the project page, `?for=<slug>` should show "← Back to <company>" when that link is live.
 - **Middleware:** keep rewriting `/preview.png` and `/<slug>/preview.png` on portfolio hosts; the link previews use them.
 - **Portfolio layout:**
   - a full-width brand band (the glance page uses a framed panel until then)

@@ -19,20 +19,22 @@ export default async function JobLinkPreviewPage({ params }: { params: Promise<{
   const data = await loadJobLinkPreview(id, user.id);
 
   return (
-    <div className="bg-mist">
-      <div className="mx-auto max-w-[64rem] px-4 pt-8 pb-16 sm:px-8 sm:pt-12">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-line bg-surface px-4 py-3 text-sm">
+    <>
+      <div className="bg-mist px-4 pt-8 pb-8 sm:px-8 sm:pt-12">
+        <div className="mx-auto flex max-w-[64rem] flex-wrap items-center justify-between gap-3 rounded-[14px] border border-line bg-surface px-4 py-3 text-sm">
           <span className="font-semibold">Preview: this is what the employer sees.</span>
           <Link href={`/job-links/${id}`} className="inline-flex items-center gap-1.5 font-semibold hover:text-graphite">
             <ArrowLeft aria-hidden size={15} strokeWidth={2.25} /> Back to editing
           </Link>
         </div>
-        {data ? (
-          <JobLinkView data={data} />
-        ) : (
-          <p role="status">Nothing to show yet: none of this link&apos;s exhbts is live.</p>
-        )}
       </div>
-    </div>
+      {data ? (
+        <JobLinkView data={data} embedded />
+      ) : (
+        <p role="status" className="bg-mist px-4 pb-16 text-center sm:px-8">
+          Nothing to show yet: none of this link&apos;s exhbts is live.
+        </p>
+      )}
+    </>
   );
 }
