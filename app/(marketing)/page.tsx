@@ -75,8 +75,8 @@ export default function Home() {
       a: (
         <>
           Yes: {ADDRESS}, with the name you choose. It&rsquo;s a name on exhbt.co.uk rather than a domain you buy, so
-          there&rsquo;s nothing to set up or renew. If you move down to {PLAN_NAMES.free}, the name stays yours, and
-          your page shows again when you&rsquo;re back on {PLAN_NAMES.premium} or {PLAN_NAMES.max}.
+          there&rsquo;s nothing to set up or renew. If you move down to {PLAN_NAMES.free}, the name stays yours and
+          the page is hidden until you&rsquo;re back on {PLAN_NAMES.premium} or {PLAN_NAMES.max}.
         </>
       ),
     },
@@ -192,7 +192,7 @@ export default function Home() {
             How it works
           </h2>
           <p className="mt-4 max-w-[40rem] text-lg text-graphite">From the file you already have to a page on your own site.</p>
-          <HowItWorks fileName={featured!.doc.evidence?.label ?? "Dissertation.pdf"} question={featured!.doc.title} slug={featured!.slug} />
+          <HowItWorks username={demoOwner.username} fileName={featured!.doc.evidence?.label ?? "Dissertation.pdf"} question={featured!.doc.title} slug={featured!.slug} />
         </div>
       </section>
 

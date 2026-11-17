@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowRight, FileText, GripVertical } from "lucide-react";
 import { PLAN_NAMES } from "@/lib/entitlements";
-import { portfolioHost, portfolioUrl } from "@/lib/hosts";
+import { portfolioHost } from "@/lib/hosts";
 
 /**
  * How an exhbt gets made, drawn the way an exhbt draws its own method (MethodFlow): boxes joined by
@@ -10,7 +10,7 @@ import { portfolioHost, portfolioUrl } from "@/lib/hosts";
  */
 type Step = { title: string; body: string; sketch: React.ReactNode; last?: boolean };
 
-export function HowItWorks({ fileName, question, slug }: { fileName: string; question: string; slug: string }) {
+export function HowItWorks({ username, fileName, question, slug }: { username: string; fileName: string; question: string; slug: string }) {
   const steps: Step[] = [
     {
       title: "Upload your project",
@@ -30,7 +30,7 @@ export function HowItWorks({ fileName, question, slug }: { fileName: string; que
     {
       title: "It goes live on your site",
       body: `At ${portfolioHost("name")}, on ${PLAN_NAMES.premium} and ${PLAN_NAMES.max}. Until you publish, only you can see it.`,
-      sketch: <LiveSketch address={portfolioUrl("amara", slug)} />,
+      sketch: <LiveSketch host={portfolioHost(username)} path={slug} />,
       last: true,
     },
   ];
@@ -113,13 +113,17 @@ function ArrangeSketch() {
   );
 }
 
-function LiveSketch({ address }: { address: string }) {
+function LiveSketch({ host, path }: { host: string; path: string }) {
   return (
-    <div className="w-full max-w-[15rem] rounded-full border border-graphite px-3.5 py-2.5">
-      <p className="flex items-center gap-2 text-[0.8125rem] text-white">
+    <div className="w-full max-w-[15rem] rounded-[14px] border border-graphite px-4 py-3.5">
+      <p className="flex items-center gap-2 text-[0.75rem] font-semibold text-mint">
         <span className="size-2 shrink-0 rounded-full bg-mint" />
-        <span className="min-w-0 truncate font-mono">{address}</span>
+        Live
       </p>
+      <p className="mt-2 font-[family-name:var(--font-display)] text-[1.2rem] leading-tight font-semibold tracking-[-0.02em] [overflow-wrap:anywhere] text-white">
+        {host}
+      </p>
+      <p className="mt-0.5 font-mono text-[0.875rem] [overflow-wrap:anywhere] text-on-ink">/{path}</p>
     </div>
   );
 }

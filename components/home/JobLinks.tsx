@@ -13,7 +13,7 @@ export function JobLinks({ username, owner, picks }: { username: string; owner: 
   const first = owner.split(" ")[0];
   return (
     <section aria-labelledby="job-links" className="bg-surface">
-      <div className="mx-auto grid max-w-[72rem] gap-12 px-4 py-20 sm:px-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-16 lg:py-28">
+      <div className="mx-auto grid max-w-[72rem] gap-12 px-4 py-20 sm:px-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start lg:gap-16 lg:py-28">
         <div>
           <h2 id="job-links" className="display-2 max-w-[14ch]">
             A link for each job you apply for
@@ -42,21 +42,21 @@ export function JobLinks({ username, owner, picks }: { username: string; owner: 
                 key={p.slug}
                 className={`min-w-0 rounded-[20px] border bg-surface p-5 ${i === 0 ? "border-ink shadow-pack" : "border-line"}`}
               >
-                <p className="flex min-w-0 items-center gap-2 text-[0.95rem] font-semibold">
-                  <Link2 size={16} strokeWidth={2.25} className="shrink-0 text-jade" />
-                  <span className="min-w-0 truncate font-mono">
-                    <span className="font-medium text-graphite">{portfolioHost(username)}</span>
-                    <span className="text-ink">/{p.slug}</span>
-                  </span>
-                </p>
-                <p className="mt-1 text-[0.875rem] text-graphite">For {p.job}</p>
-                <div className="mt-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-t border-line pt-3">
-                  <p className="min-w-0 text-[0.875rem]">
-                    <span className="text-graphite">Leads with </span>
-                    <span className="font-semibold">{p.lead}</span>
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                  <p className="flex min-w-0 items-center gap-2 text-[0.95rem] font-semibold">
+                    <Link2 size={16} strokeWidth={2.25} className="shrink-0 text-jade" />
+                    <span className="min-w-0 truncate font-mono">
+                      <span className="font-medium text-graphite">{portfolioHost(username)}</span>
+                      <span className="text-ink">/{p.slug}</span>
+                    </span>
                   </p>
-                  <span className="chip shrink-0">{EXHBTS_PER_JOB_LINK} picked</span>
+                  <span className="chip shrink-0">{EXHBTS_PER_JOB_LINK} exhbts picked</span>
                 </div>
+                <p className="mt-1 text-[0.875rem] text-graphite">For {p.job}</p>
+                <p className="mt-4 border-t border-line pt-3 text-[0.875rem]">
+                  <span className="text-graphite">Leads with </span>
+                  <span className="font-semibold">{p.lead}</span>
+                </p>
               </li>
             ))}
           </ul>
