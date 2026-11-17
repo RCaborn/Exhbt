@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { ProjectCard } from "@/components/portfolio/PortfolioHome";
-import { themeStyle } from "@/components/portfolio/themeFonts";
+import { lookAttrs, themeStyle } from "@/components/portfolio/themeFonts";
 import type { LoadedJobLink } from "@/lib/job-links";
 import { initialsOf } from "@/lib/portfolio-profile";
 
@@ -35,7 +35,7 @@ export function JobLinkView({
   const face = "size-20 @3xl:size-28";
 
   return (
-    <div data-job-page data-theme={theme.id} style={themeStyle(theme)} className="@container min-h-svh bg-[var(--pf-ground)] text-[color:var(--pf-ink)]">
+    <div data-job-page {...lookAttrs(theme)} style={themeStyle(theme)} className="@container min-h-svh bg-[var(--pf-ground)] text-[color:var(--pf-ink)]">
       <Main id={embedded ? undefined : "main"} className="mx-auto w-full max-w-[68rem] px-5 pt-8 pb-6 @3xl:px-10 @3xl:pt-12">
         <header className="grid items-center gap-x-8 gap-y-5 @3xl:grid-cols-[auto_minmax(0,1fr)]">
           {photoUrl ? (

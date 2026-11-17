@@ -1,6 +1,7 @@
 Status: accepted
 Date: 16 Nov 2026
 Amends: 0007 (what the header holds), 0015 (how the sections are drawn; the sections themselves are unchanged)
+Amended by: 0018 (a look sets the --xp-* names through its --pf-* set, on the frame round the page; graphs take the look's shades)
 
 # The exhbt page: a sidebar, the title as the question, findings beside the chart
 

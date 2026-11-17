@@ -30,6 +30,8 @@
   /* Two typefaces only: Bricolage Grotesque for display, Inter for everything else.
      Figures use Inter with tabular numbers (.font-mono below). */
   --font-display: "Bricolage Grotesque Variable", "Inter", system-ui, sans-serif;
+  /* The wordmark's face, which a portfolio look's --font-display never changes (decision 0018). */
+  --font-brand: "Bricolage Grotesque Variable", "Inter", system-ui, sans-serif;
   --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "Inter", system-ui, sans-serif;
 
@@ -199,15 +201,11 @@
     box-decoration-break: clone;
   }
   /* The exhbt page (components/portfolio/ProjectView.tsx, decision 0022). Every colour, radius
-     and face on it is one of these variables. The defaults are the Exhbt look and sit on :root, so
-     a portfolio look overrides any of them on an ancestor, e.g.
-       [data-theme="night"] { --xp-ground: #0e0f12; --xp-ink: #ffffff; ... }
-     (the route's wrapper carries data-theme). The ground behind the whole page is --xp-page-ground,
-     read where the layout's div is, so a look sets it from the root:
-       :root:has([data-exhbt-route][data-theme="night"]) { --xp-page-ground: #0e0f12; }
-     The list, and what each one paints, is in docs/decisions/0022-exhbt-page-layout.md. */
+     and face on it is one of these --xp-* variables. Their defaults are the Exhbt look and sit on
+     :root, for the editor's preview, which has no look around it. On a portfolio a look sets the
+     --pf-* set once (themeStyle, decision 0018) and [data-look] below reads the --xp-* names from
+     it. What each one paints is in docs/decisions/0022-exhbt-page-layout.md. */
   :root {
-    --xp-page-ground: var(--color-surface);
     --xp-ground: var(--color-surface);
     --xp-ink: var(--color-ink);
     --xp-muted: var(--color-graphite);
@@ -242,6 +240,7 @@
     --xp-flow-muted: var(--color-graphite);
     --xp-flow-end: var(--color-ink);
     --xp-flow-end-ink: var(--color-surface);
+    --xp-flow-end-soft: var(--color-on-ink);
     --xp-arrow: var(--color-slate);
     --xp-avatar: var(--color-mint);
     --xp-avatar-ink: var(--color-ink);
@@ -254,6 +253,131 @@
     --xp-title-tracking: -0.035em;
     /* --xp-title-font and --xp-font have no default here: unset, they follow the look's
        --font-display (set inline on the route by themeStyle) and the site's Inter. */
+  }
+  /* A portfolio look (decision 0018). The wrapper of a portfolio page carries the look's --pf-*,
+     --band-* and --chart-* values inline (themeStyle); here, on the same element, the exhbt page's
+     --xp-* names and the graphs' text colours are read from them, so a look sets each colour once.
+     (Declared here rather than on :root, where var() would resolve too early to see the look.) */
+  [data-look] {
+    font-family: var(--pf-font-body);
+    --xp-ground: var(--pf-ground);
+    --xp-ink: var(--pf-ink);
+    --xp-heading: var(--pf-heading);
+    --xp-muted: var(--pf-soft);
+    --xp-rule: var(--pf-line);
+    --xp-rule-strong: var(--pf-rule);
+    --xp-card: var(--pf-well);
+    --xp-card-ink: var(--pf-ink);
+    --xp-card-muted: var(--pf-soft);
+    --xp-card-edge: var(--pf-well-edge);
+    --xp-figure: var(--pf-figure);
+    --xp-figure-edge: var(--pf-edge);
+    --xp-figure-ink: var(--pf-ink);
+    --xp-figure-muted: var(--pf-soft);
+    --xp-pill: var(--pf-pill);
+    --xp-pill-ink: var(--pf-pill-ink);
+    --xp-pill-edge: var(--pf-pill-edge);
+    --xp-tick: var(--pf-tick);
+    --xp-tick-ink: var(--pf-tick-ink);
+    --xp-link: var(--pf-accent);
+    --xp-accent: var(--pf-action);
+    --xp-accent-hover: var(--pf-action-hover);
+    --xp-accent-ink: var(--pf-action-ink);
+    --xp-outline-ground: var(--pf-ground);
+    --xp-outline-ink: var(--pf-ink);
+    --xp-outline-edge: var(--pf-edge);
+    --xp-highlight: var(--pf-highlight);
+    --xp-highlight-ink: var(--pf-highlight-ink);
+    --xp-flow-ground: var(--pf-card);
+    --xp-flow-ink: var(--pf-ink);
+    --xp-flow-edge: var(--pf-edge);
+    --xp-flow-muted: var(--pf-soft);
+    --xp-flow-end: var(--pf-flow-end);
+    --xp-flow-end-ink: var(--pf-flow-end-ink);
+    --xp-flow-end-soft: var(--pf-flow-end-soft);
+    --xp-arrow: var(--pf-faint);
+    --xp-avatar: var(--pf-avatar);
+    --xp-avatar-ink: var(--pf-avatar-ink);
+    --xp-avatar-edge: var(--pf-avatar);
+    --xp-radius-card: var(--pf-radius-lg);
+    --xp-radius-box: var(--pf-radius-box);
+    --xp-radius-pill: var(--pf-radius-pill);
+    --xp-radius-button: var(--pf-radius-button);
+    --xp-edge-width: var(--pf-edge-width);
+    --xp-title-weight: var(--pf-display-weight);
+    --xp-title-tracking: var(--pf-tracking);
+    --xp-font: var(--pf-font-body);
+    --xp-lead-font: var(--pf-font-lead);
+    /* Graphs (components/charts): text and grid from the page, the shades from --chart-*. */
+    --chart-ink: var(--pf-ink);
+    --chart-faint: var(--pf-faint);
+    --chart-grid: var(--pf-line);
+    --chart-axis: var(--pf-soft);
+    --chart-ground: var(--pf-figure);
+    --chart-link: color-mix(in srgb, var(--chart-soft) 60%, var(--pf-figure));
+    /* Figures (the font-mono class: tabular numbers) in the look's body face. */
+    --font-mono: var(--pf-font-body);
+  }
+  /* The brand's initials tile keeps its ink edge, and Mono outlines it like every other box. */
+  [data-look="exhbt"],
+  [data-look="mono"] {
+    --xp-avatar-edge: var(--pf-ink);
+  }
+  /* Text inside a look takes the look's colours, not the site's (the base layer sets ink on every
+     heading, and Astryx's reset on every paragraph). Low specificity, so any colour class wins. */
+  :where([data-look]) :is(h1, h2, h3, h4, p, li, dt, dd, blockquote, figcaption) {
+    color: inherit;
+    font-family: inherit;
+  }
+  /* A look's display type: its face, weight, tracking and heading colour (the name, titles, section headings). */
+  .pf-display {
+    font-family: var(--font-display);
+    font-weight: var(--pf-display-weight, 600);
+    letter-spacing: var(--pf-tracking, -0.03em);
+    color: var(--pf-heading, inherit);
+  }
+  /* The intro under the name and the band's sentence: Classic sets them in its serif. */
+  .pf-lead {
+    font-family: var(--pf-font-lead, inherit);
+  }
+  /* Hairlines between rows on the home page, in the look's line and rule style. */
+  .pf-rows > * + * {
+    border-top: 1px var(--pf-rule-style, solid) var(--pf-line);
+  }
+  /* Bloom's photo sits in a dashed ring of its deep colour. */
+  .pf-ring {
+    outline: 2px dashed var(--pf-rule);
+    outline-offset: 6px;
+  }
+  /* The looks' signatures on both pages (the hero treatment names them; decision 0018). */
+  [data-look][data-hero="ledger"] {
+    border-top: 6px solid var(--pf-rule);
+  }
+  /* The exhbt page: Classic's rule over the title; Ledger's double rule closing the facts;
+     Bloom's ringed photo; Mono's dashed hairlines and outlined boxes; Studio's card in the block colour. */
+  [data-hero="masthead"] .xp-title {
+    border-top: 3px solid var(--pf-rule);
+    padding-top: 0.6em;
+  }
+  [data-hero="ledger"] .xp-aside dl {
+    border-bottom: 3px double var(--pf-rule);
+  }
+  [data-hero="greeting"] .xp-avatar {
+    outline: 2px dashed var(--pf-rule);
+    outline-offset: 5px;
+    border-radius: 999px;
+  }
+  [data-hero="block"] .xp-card {
+    background: var(--band-bg);
+    border-color: var(--pf-edge);
+    color: var(--band-text);
+    --xp-heading: var(--band-text);
+    --xp-avatar: var(--pf-ground);
+    --xp-avatar-ink: var(--pf-ink);
+    --xp-avatar-edge: var(--pf-ground);
+  }
+  [data-hero="block"] .xp-card .xp-muted {
+    color: var(--band-soft);
   }
   .xp {
     background: var(--xp-ground);
@@ -269,6 +393,16 @@
     font-family: var(--xp-title-font, var(--font-display));
     font-weight: var(--xp-title-weight);
     letter-spacing: var(--xp-title-tracking);
+    color: var(--xp-heading, inherit);
+  }
+  /* Smaller display text keeps half the look's tracking, so a heavy face (Studio) doesn't crowd. */
+  .xp-name,
+  .xp-found-heading {
+    letter-spacing: calc(var(--xp-title-tracking) * 0.5);
+  }
+  /* The context line: the look's lead face (Classic's serif), else the body face. */
+  .xp-context {
+    font-family: var(--xp-lead-font, inherit);
   }
   .xp-muted {
     color: var(--xp-muted);
@@ -297,7 +431,7 @@
   .xp-card {
     background: var(--xp-card);
     color: var(--xp-card-ink);
-    border: 1px solid var(--xp-card-edge);
+    border: var(--xp-edge-width, 1px) solid var(--xp-card-edge);
     border-radius: var(--xp-radius-card);
   }
   .xp-card .xp-muted {
@@ -314,6 +448,7 @@
   .xp-finding,
   .xp-next {
     border-color: var(--xp-rule);
+    border-style: var(--pf-rule-style, solid);
   }
   .xp-found-heading {
     border-color: var(--xp-rule-strong);
@@ -340,7 +475,7 @@
   }
   .xp-outline-button {
     background: var(--xp-outline-ground);
-    border: 1px solid var(--xp-outline-edge);
+    border: var(--xp-edge-width, 1px) solid var(--xp-outline-edge);
     border-radius: var(--xp-radius-button);
     color: var(--xp-outline-ink);
     transition: border-color 160ms ease;
@@ -387,13 +522,13 @@
   }
   .xp-figure {
     background: var(--xp-figure);
-    border: 1px solid var(--xp-figure-edge);
+    border: var(--xp-edge-width, 1px) solid var(--xp-figure-edge);
     border-radius: var(--xp-radius-card);
   }
   .xp-flow-box {
     background: var(--xp-flow-ground);
     color: var(--xp-flow-ink);
-    border: 1px solid var(--xp-flow-edge);
+    border: var(--xp-edge-width, 1px) solid var(--xp-flow-edge);
     border-radius: var(--xp-radius-box);
   }
   .xp-flow-box[data-last] {
@@ -405,7 +540,7 @@
     color: var(--xp-flow-muted);
   }
   .xp-flow-box[data-last] .xp-flow-detail {
-    color: color-mix(in srgb, var(--xp-flow-end-ink) 78%, transparent);
+    color: var(--xp-flow-end-soft);
   }
   .xp-flow-arrow {
     color: var(--xp-arrow);
@@ -497,11 +632,20 @@
   }
 }
 
-/* The public exhbt page sits on the look's ground; the portfolio layout's own is mist (app/(portfolio)/layout.tsx).
-   Unlayered, so it wins over the layout's bg-mist utility. */
-div:has(> main#main > [data-exhbt-route]) {
-  background: var(--xp-page-ground);
+/* Graphs inside a portfolio look (decision 0018). The chart components draw text, gridlines and
+   the rings round their markers with the brand's utilities (text-ink, bg-line, ring-surface…),
+   which read the brand's colour variables; inside a graph on a portfolio those point at the look's
+   --chart-* set instead, so a dark look's graphs are drawn on its own dark card. Their two shades
+   come in through CHART_* in components/charts/series.ts. */
+[data-look] [data-chart] {
+  --color-ink: var(--chart-ink);
+  --color-graphite: var(--chart-axis);
+  --color-slate: var(--chart-faint);
+  --color-line: var(--chart-grid);
+  --color-surface: var(--chart-ground);
+  --color-wash: var(--chart-wash);
 }
+
 /* Shared components drawn inside the exhbt page, recoloured by the look. Unlayered, because they
    colour themselves with Tailwind utilities, which outrank the components layer. */
 .xp [data-avatar="initials"] {
@@ -534,6 +678,10 @@ div:has(> main#main > [data-exhbt-route]) {
   }
   html {
     font-size: 12px;
+  }
+  /* Mono's face is wider, so its exhbt prints a step smaller to stay on one page (decision 0018). */
+  html:has([data-look="mono"]) {
+    font-size: 11px;
   }
   html,
   body {

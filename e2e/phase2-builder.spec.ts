@@ -87,8 +87,8 @@ test.describe("Build your portfolio", () => {
     await page.getByRole("button", { name: "Continue to your look" }).click();
     await expect(page).toHaveURL(/step=look/);
     await expect(stepHeading(page)).toBeFocused();
-    await page.locator('[data-theme-option="jade"]').click();
-    await expect(preview.locator("[data-portfolio-home]")).toHaveAttribute("data-theme", "jade");
+    await page.locator('[data-theme-option="classic"]').click();
+    await expect(preview.locator("[data-portfolio-home]")).toHaveAttribute("data-theme", "classic");
     await saved(page);
     await axe(page);
 
@@ -127,7 +127,7 @@ test.describe("Build your portfolio", () => {
     const svg = await page.request.get(icon!);
     expect(svg.headers()["content-type"]).toContain("image/svg+xml");
     expect(await svg.text()).toContain(">JM<");
-    await expect(page.locator("[data-portfolio-home]")).toHaveAttribute("data-theme", "jade");
+    await expect(page.locator("[data-portfolio-home]")).toHaveAttribute("data-theme", "classic");
     await expect(page.locator("[data-intro]")).toContainText("taught myself Python");
     await expect(page.getByText("Based in Leeds")).toBeVisible();
     await expect(page.locator("[data-section=contact]").getByRole("link", { name: /github\.com\/jordan-m/ })).toHaveAttribute("href", "https://github.com/jordan-m");

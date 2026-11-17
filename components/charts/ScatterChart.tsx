@@ -1,7 +1,7 @@
 import { chartSummary, fmtValue, type ChartOf } from "@/lib/exhbt/charts";
 import { ChartFrame } from "./ChartFrame";
 import { scaleFor, tickLabel } from "./scale";
-import { SERIES_DARK } from "./series";
+import { CHART_STRONG } from "./series";
 
 /**
  * x/y points: one 8px jade dot each with a 2px white ring, on a scale per axis. Labels the
@@ -43,7 +43,7 @@ export function ScatterChart({ data }: { data: ChartOf<"scatter"> }) {
           ))}
           {c.points.map((p, j) => (
             <span key={j} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${sx.at(p.x)}%`, top: `${100 - sy.at(p.y)}%` }}>
-              <span className={`block rounded-full ${j === hi ? "size-3 ring-2 ring-ink" : "size-2 ring-2 ring-surface"}`} style={{ background: SERIES_DARK }} />
+              <span className={`block rounded-full ${j === hi ? "size-3 ring-2 ring-ink" : "size-2 ring-2 ring-surface"}`} style={{ background: CHART_STRONG }} />
               {(p.label?.trim() || j === hi) && (
                 <span
                   className={`absolute top-1/2 -translate-y-1/2 text-[0.7rem] whitespace-nowrap text-ink ${j === hi ? "font-semibold" : ""} ${

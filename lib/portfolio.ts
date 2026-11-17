@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { headers } from "next/headers";
 import { imagesOf, type ExhbtDoc } from "./exhbt/blocks";
 import { signedFileUrl } from "./files";
@@ -6,7 +7,7 @@ import { parseHost, portfolioHost } from "./hosts";
 import { ENTITLEMENTS } from "./entitlements";
 import { homeProject, type HomeProject } from "./portfolio-home";
 import { EXTRA_SECTIONS, sectionsOf, type PortfolioLayout, type SectionKey } from "./portfolio-layout";
-import { themeFor, type PortfolioTheme } from "./portfolio-themes";
+import { DEFAULT_THEME, themeFor, type PortfolioTheme } from "./portfolio-themes";
 import { visibleOnPortfolio } from "./plan-rules";
 import { getStore, type ExhbtRecord, type PortfolioProfile } from "./store";
 import { teamFor } from "./team";
@@ -132,6 +133,19 @@ export async function mediaFor(doc: ExhbtDoc, ownerId: string): Promise<{ imageU
   const evidenceUrl = !ev ? null : ev.kind === "link" ? ev.href : await signedFileUrl(ev.fileId, ownerId);
   return { imageUrls, evidenceUrl };
 }
+
+/**
+ * Just the look a portfolio shows (decision 0018), for the frame around an exhbt page, which
+ * paints the page ground, the sign-off and the pager in it. The default for an unknown name (the
+ * page itself then says not found). Once per request.
+ */
+export const portfolioLook = cache(async (username: string): Promise<PortfolioTheme> => {
+  const store = getStore();
+  const found = await store.lookupUsername(username);
+  if (!found || "redirectTo" in found) return DEFAULT_THEME;
+  const [plan, profile] = await Promise.all([store.planFor(found.userId), store.getPortfolioProfile(found.userId)]);
+  return themeFor(profile, plan);
+});
 
 /** "12 Nov 2026", for the date beside the checks. */
 export const checkedOnLabel = (iso: string | null) =>

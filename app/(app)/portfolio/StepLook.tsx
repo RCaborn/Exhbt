@@ -1,38 +1,47 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- signed Storage URLs change hourly; next/image would cache the wrong one. */
-import { Lock } from "lucide-react";
-import { headingFamily } from "@/components/portfolio/themeFonts";
+import { useEffect, useRef, useState } from "react";
+import { Check, Lock } from "lucide-react";
+import { PortfolioHome, type HomeProps } from "@/components/portfolio/PortfolioHome";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
-import { initialsOf } from "@/lib/portfolio-profile";
-import { HEADING_FACES, PORTFOLIO_THEMES, type PortfolioTheme } from "@/lib/portfolio-themes";
+import { FONTS, PORTFOLIO_THEMES, themeById, variantsOf, type LookId, type PortfolioTheme } from "@/lib/portfolio-themes";
 import type { ThemeLock } from "./steps";
 
+/** What the swatches under a look are called, as Rory's spec words them. */
+const SWATCH_LABEL: Partial<Record<LookId, string>> = { classic: "Your accent", studio: "Your colour", bloom: "Your pastel" };
+
+/** The width a preview is drawn at before it is scaled down to its card: a laptop's page, so it shows the wide layout. */
+const PAGE_WIDTH = 1120;
+
 /**
- * Step 2, Your look (decision 0012): every look as a small page with the person's own name, photo
- * and headline in it, as a radio group (arrow keys move between looks, the big preview follows).
- * A look the plan doesn't have still previews, shows a lock and the upgrade offer, and isn't saved;
- * the server checks the plan again on every save.
+ * Step 2, Your look (decisions 0016 and 0018): every look drawn as the top of the person's own
+ * page (their name, photo, headline, intro and best piece of work), large, as a radio group. Arrow
+ * keys move between looks and the big preview beside the steps follows at once. Classic, Studio and
+ * Bloom have swatches for their colourways. A look the plan doesn't have still previews, says which
+ * plan it comes with and shows the upgrade offer, and isn't saved; the server checks every save.
  */
 export function StepLook({
   picked,
   onPick,
   locks,
   savedButLocked,
-  person,
+  page,
   ready,
 }: {
   picked: string;
   onPick: (id: string) => void;
+  /** By look id. */
   locks: Record<string, ThemeLock>;
   savedButLocked: string | null;
-  person: { name: string; headline: string; photoUrl: string | null };
+  /** The person's own page, as the live preview draws it. */
+  page: Omit<HomeProps, "theme">;
   ready: boolean;
 }) {
-  const lock = locks[picked];
+  const current = themeById(picked) ?? PORTFOLIO_THEMES[0]!;
+  const lock = locks[current.look];
   return (
     <div>
-      <p className="text-graphite">Colours, the heading font and the shape of your photo. Your words and projects stay the same in every look.</p>
+      <p className="text-graphite">Colours, type and how the page is laid out. Your words and projects stay the same in every look, on your page and on every exhbt.</p>
       {savedButLocked && (
         <p className="mt-4 text-graphite" data-testid="look-held">
           Your saved look, {savedButLocked}, comes with a plan you&rsquo;re not on now. Your portfolio shows the default until you&rsquo;re back on it, then it returns.
@@ -40,26 +49,70 @@ export function StepLook({
       )}
       {lock && <UpgradePrompt className="mt-4" reason={lock.reason} upgradeTo={lock.upgradeTo} primary={false} />}
 
-      <div role="radiogroup" aria-labelledby="step-heading" className="mt-6 grid grid-cols-2 gap-x-3 gap-y-5">
-        {PORTFOLIO_THEMES.map((t) => {
-          const locked = locks[t.id];
+      <div role="radiogroup" aria-labelledby="step-heading" className="mt-6 grid gap-y-8">
+        {PORTFOLIO_THEMES.map((base) => {
+          const locked = locks[base.look];
+          const on = current.look === base.look;
+          // The colourway shown: the picked one for the picked look, else the look's default.
+          const shown = on ? current : base;
+          const variants = variantsOf(base.look);
           return (
-            <label key={t.id} className="group relative block cursor-pointer" data-theme-option={t.id} data-locked={locked ? "true" : undefined}>
-              <input type="radio" name="themeId" value={t.id} checked={picked === t.id} onChange={() => onPick(t.id)} disabled={!ready} className="peer sr-only" />
-              <MiniPage theme={t} person={person} locked={Boolean(locked)} />
-              <span className="mt-2 block text-sm font-semibold">
-                {t.name}
-                {locked && <span className="sr-only"> (locked: comes with {locked.planName})</span>}
-              </span>
-              <span className="block text-[0.8125rem] text-graphite">
-                {HEADING_FACES[t.face].label}
-                {locked && <span aria-hidden>, {locked.planName}</span>}
-              </span>
-              <span
-                aria-hidden
-                className="pointer-events-none absolute inset-x-0 top-0 aspect-[4/3] rounded-[14px] outline-offset-2 peer-checked:outline peer-checked:outline-[3px] peer-checked:outline-ink peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-jade"
-              />
-            </label>
+            <div key={base.look} data-look-card={base.look}>
+              <label className="group relative block cursor-pointer" data-theme-option={base.id} data-locked={locked ? "true" : undefined}>
+                <input type="radio" name="themeId" value={shown.id} checked={on} onChange={() => onPick(shown.id)} disabled={!ready} className="peer sr-only" />
+                <PagePicture theme={shown} page={page} />
+                {locked && (
+                  <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-full bg-ink px-2.5 py-1 text-[0.8125rem] font-semibold text-white">
+                    <Lock aria-hidden size={13} strokeWidth={2.5} /> {locked.planName}
+                  </span>
+                )}
+                {on && (
+                  <span aria-hidden className="absolute top-2.5 left-2.5 inline-flex size-7 items-center justify-center rounded-full bg-ink text-white">
+                    <Check size={16} strokeWidth={3} />
+                  </span>
+                )}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 top-0 aspect-[16/10] rounded-[14px] outline-offset-[3px] peer-checked:outline peer-checked:outline-[3px] peer-checked:outline-ink peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-jade"
+                />
+                <span className="mt-3 flex flex-wrap items-baseline justify-between gap-x-3">
+                  <span className="text-[1.0625rem] font-semibold">
+                    {base.name}
+                    {locked && <span className="sr-only"> (locked: comes with {locked.planName})</span>}
+                  </span>
+                  <span className="text-[0.8125rem] text-graphite">
+                    {FONTS[base.type.display].label}
+                    {base.type.body !== base.type.display && ` and ${FONTS[base.type.body].label}`}
+                  </span>
+                </span>
+                <span className="mt-0.5 block text-[0.9375rem] text-graphite">
+                  {base.blurb} {base.suits}.
+                </span>
+              </label>
+              {variants.length > 1 && (
+                <div role="radiogroup" aria-label={`${base.name}: ${SWATCH_LABEL[base.look] ?? "Colour"}`} className="mt-3 flex flex-wrap items-center gap-2.5">
+                  <span aria-hidden className="mr-1 text-[0.875rem] text-graphite">
+                    {SWATCH_LABEL[base.look] ?? "Colour"}
+                  </span>
+                  {variants.map((v) => {
+                    const checked = current.id === v.id;
+                    return (
+                      <label key={v.id} className="relative cursor-pointer" title={v.variant!.name} data-variant-option={v.id}>
+                        <input type="radio" name={`colourway-${base.look}`} value={v.id} checked={checked} onChange={() => onPick(v.id)} disabled={!ready} className="peer sr-only" />
+                        <span className="sr-only">{v.variant!.name}</span>
+                        <span
+                          aria-hidden
+                          className={`block size-8 border border-black/15 outline-offset-2 peer-checked:outline peer-checked:outline-[3px] peer-checked:outline-ink peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-jade ${
+                            base.look === "studio" ? "rounded-[3px]" : "rounded-full"
+                          }`}
+                          style={{ background: v.variant!.swatch }}
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
@@ -67,39 +120,29 @@ export function StepLook({
   );
 }
 
-/** A look drawn as a tiny page: the masthead in the look's colours and face, then two tile outlines. */
-function MiniPage({ theme: t, person, locked }: { theme: PortfolioTheme; person: { name: string; headline: string; photoUrl: string | null }; locked: boolean }) {
-  const shape = t.photo === "round" ? "rounded-full" : "rounded-[7px]";
+/**
+ * The top of the person's page in a look: drawn at a laptop's width (so it shows the wide layout,
+ * which lays itself out by its container) and scaled down to the card. A picture: hidden from screen
+ * readers, nothing in it takes focus. It draws only once it knows its size, so it never flashes the
+ * phone layout.
+ */
+function PagePicture({ theme, page }: { theme: PortfolioTheme; page: Omit<HomeProps, "theme"> }) {
+  const box = useRef<HTMLSpanElement>(null);
+  const [scale, setScale] = useState(0);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const measure = () => setScale(el.clientWidth / PAGE_WIDTH);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   return (
-    <span aria-hidden className="relative flex aspect-[4/3] flex-col overflow-hidden rounded-[14px] border border-line bg-mist">
-      <span className="flex flex-1 items-start gap-2 px-3 pt-3" style={{ background: t.bg, color: t.text }}>
-        {person.photoUrl ? (
-          <img src={person.photoUrl} alt="" width={28} height={28} className={`size-7 shrink-0 object-cover ${shape}`} />
-        ) : (
-          <span className={`inline-flex size-7 shrink-0 items-center justify-center text-[0.65rem] font-semibold ${shape}`} style={{ background: t.initials.bg, color: t.initials.text }}>
-            {initialsOf(person.name) || "?"}
-          </span>
-        )}
-        <span className="min-w-0">
-          <span className="block truncate text-[0.95rem] leading-tight font-semibold tracking-[-0.02em]" style={{ fontFamily: headingFamily(t) }}>
-            {person.name}
-          </span>
-          {person.headline && (
-            <span className="mt-0.5 block truncate text-[0.68rem]" style={{ color: t.soft }}>
-              {person.headline}
-            </span>
-          )}
-          <span className="mt-1.5 block h-1 w-16 rounded-full opacity-40" style={{ background: t.text }} />
-          <span className="mt-1 block h-1 w-12 rounded-full opacity-40" style={{ background: t.text }} />
-        </span>
-      </span>
-      <span className="grid h-[34%] grid-cols-2 gap-1.5 p-2">
-        <span className="rounded-[5px] border border-line bg-surface" />
-        <span className="rounded-[5px] border border-line bg-surface" />
-      </span>
-      {locked && (
-        <span className="absolute top-1.5 right-1.5 inline-flex size-6 items-center justify-center rounded-full" style={{ background: t.text, color: t.bg }}>
-          <Lock size={12} strokeWidth={2.5} />
+    <span ref={box} aria-hidden className="relative block aspect-[16/10] overflow-hidden rounded-[14px] border border-line" style={{ background: theme.palette.ground }}>
+      {scale > 0 && (
+        <span inert className="pointer-events-none absolute top-0 left-0 block origin-top-left" style={{ width: PAGE_WIDTH, transform: `scale(${scale})` }}>
+          <PortfolioHome {...page} theme={theme} mode="public" thumbnail inertChrome />
         </span>
       )}
     </span>

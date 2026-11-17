@@ -1,6 +1,6 @@
 import type { KeyResult } from "@/lib/exhbt";
 import { chartSummary, fmtValue } from "@/lib/exhbt/charts";
-import { SERIES_DARK, SERIES_LIGHT } from "@/components/charts/series";
+import { CHART_SOFT, CHART_STRONG } from "@/components/charts/series";
 
 /**
  * Before/after dumbbell: one row per measure, a light dot (before) joined to a dark dot
@@ -14,8 +14,8 @@ import { SERIES_DARK, SERIES_LIGHT } from "@/components/charts/series";
  * note that explains them.
  */
 
-const BEFORE = SERIES_LIGHT;
-const AFTER = SERIES_DARK;
+const BEFORE = CHART_SOFT;
+const AFTER = CHART_STRONG;
 
 export function BeforeAfterChart({
   data,
@@ -72,7 +72,7 @@ export function BeforeAfterChart({
                 {/* Baseline: recessive. */}
                 <span className="absolute top-1/2 right-0 left-0 h-px bg-line" />
                 {/* Connector between the two values. */}
-                <span className="absolute top-1/2 h-[2px] -translate-y-1/2 rounded-full bg-[#a5e6d0]" style={{ left: x(lo), width: `calc(${x(hi)} - ${x(lo)})` }} />
+                <span className="absolute top-1/2 h-[2px] -translate-y-1/2 rounded-full bg-[var(--chart-link,#a5e6d0)]" style={{ left: x(lo), width: `calc(${x(hi)} - ${x(lo)})` }} />
                 {/* Labels sit outside the pair (lower value left, higher right), so they never collide. */}
                 <Dot left={x(r.before)} side={r.before <= r.after ? "left" : "right"} color={BEFORE} title={`${data.beforeLabel}: ${fmt(r.before)}`} label={fmt(r.before)} />
                 <Dot left={x(r.after)} side={r.after < r.before ? "left" : "right"} color={AFTER} title={`${data.afterLabel}: ${fmt(r.after)}`} label={fmt(r.after)} />

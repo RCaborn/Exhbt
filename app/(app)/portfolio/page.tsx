@@ -78,9 +78,10 @@ export default async function BuildPortfolioPage({ searchParams }: { searchParam
   };
 
   const locks: Record<string, ThemeLock> = {};
+  // By look: a look's colourways come with it.
   for (const t of PORTFOLIO_THEMES) {
     const v = canUseTheme(plan, t);
-    if (!v.ok) locks[t.id] = { reason: v.reason, upgradeTo: v.upgradeTo, planName: PLAN_NAMES[v.upgradeTo ?? "max"] };
+    if (!v.ok) locks[t.look] = { reason: v.reason, upgradeTo: v.upgradeTo, planName: PLAN_NAMES[v.upgradeTo ?? "max"] };
   }
   const storedTheme = themeById(profile.themeId);
   const address = canClaimUsername(plan);

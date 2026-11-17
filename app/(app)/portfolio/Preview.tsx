@@ -16,7 +16,7 @@ import {
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, X } from "lucide-react";
-import { PortfolioHome } from "@/components/portfolio/PortfolioHome";
+import { PortfolioHome, type HomeProps } from "@/components/portfolio/PortfolioHome";
 import type { PortfolioPerson } from "@/components/portfolio/PortfolioPage";
 import { checkTiles } from "@/lib/portfolio-customise";
 import { SECTION_NAMES, tileKindsShownBy, type SectionKey, type Tiles } from "@/lib/portfolio-layout";
@@ -196,6 +196,20 @@ function SortableSection({ id, reduced, onRemove, children }: { id: SectionKey; 
       <div inert>{children}</div>
     </div>
   );
+}
+
+/** The person's page as the builder draws it (the live preview and the look step's pictures): what's shown, in their order. */
+export function homeFrom(state: BuilderState, person: PortfolioPerson, projects: BuilderProject[]): Omit<HomeProps, "theme"> {
+  const a = state.arrangement;
+  const byId = new Map(projects.map((p) => [p.id, p]));
+  const hidden = new Set(a.hidden);
+  return {
+    person,
+    projects: a.order.filter((id) => byId.has(id) && !hidden.has(id)).map((id) => byId.get(id)!.home),
+    featuredId: a.featured,
+    sections: a.sections,
+    tiles: tidy(a.tiles, a.sections),
+  };
 }
 
 /** The tiles as the page will show them: each kind's words tidied by the same rules as saving, or as typed if they don't pass yet. */
