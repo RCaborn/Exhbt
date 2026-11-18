@@ -11,7 +11,7 @@ import { sectionLabel } from "@/lib/exhbt/sections";
 import { lineFor, makePlan, measurePlace, placeAt, type Box, type Measured, type Plan } from "./drag-plan";
 import { EASE, MOVE_MS } from "./LabFlow";
 import { rowClass, rowsOf } from "./layout";
-import type { Version } from "./options";
+import { sectionStyle, type DragStyle, type Version } from "./options";
 import { FLOW_ID } from "./samples";
 import { SectionContent, StaticSection } from "./sections";
 import { kindOf, useLab, useLabStore, useRenderCount, type InsertKind, type ItemKind } from "./store";
@@ -32,6 +32,8 @@ type Lift = { id: string; mode: "pointer" | "keys"; box: Box; tile: boolean };
 type Live = {
   plan: Plan;
   mode: "pointer" | "keys";
+  /** Whether this drag slides the page or draws a line: the version's choice for this section. */
+  style: DragStyle;
   place: number;
   els: Record<string, HTMLElement>;
   /** What the page would look like at each place tried so far. */
@@ -50,9 +52,10 @@ type Live = {
  * the grip, and from then on the page's layout doesn't change until it is dropped: every section
  * keeps its box, and what moves, moves by a transform.
  *
- *  - Version A, slide: the other sections slide to where they would sit, and a dashed box shows
+ *  - Slide (version A): the other sections slide to where they would sit, and a dashed box shows
  *    the room made for the lifted one.
- *  - Version B, line: the page stays still and a line shows where the lifted one would go.
+ *  - Line (version B): the page stays still and a line shows where the lifted one would go.
+ *  - Mix, the default: sections slide and the flowchart uses the line (sectionStyle in options.ts).
  *
  * In both, the pointer carries a lifted copy; dropped, the section moves from where it was let go
  * to its place and any neighbours that pair up again move with it (180ms, transforms only, none
@@ -110,7 +113,7 @@ export function Board({ version }: { version: Version }) {
     const { plan, place } = l;
     el.dataset.labPlace = String(place);
     const at = measured(l, place);
-    if (now.current.version === "a") {
+    if (l.style === "slide") {
       const base = measured(l, plan.home);
       for (const id of plan.rest) {
         const dx = Math.round(at[id]!.x - base[id]!.x);
@@ -160,7 +163,8 @@ export function Board({ version }: { version: Version }) {
     if (!boxes[id]) return;
     const plan = makePlan(id, doc.order, boxes, kinds, doc.sections, origin.width);
     const grab = pointer ? { x: pointer.x - origin.left, y: pointer.y - origin.top } : { x: boxes[id]!.x, y: boxes[id]!.y };
-    live.current = { plan, mode, place: plan.home, els, seen: new Map(), grab, sections: doc.sections };
+    const style = sectionStyle(now.current.version, id === FLOW_ID);
+    live.current = { plan, mode, style, place: plan.home, els, seen: new Map(), grab, sections: doc.sections };
     const tile = rowsOf(doc.order, doc.sections).some((r) => r.type === "grid" && r.ids.includes(id));
     setLift({ id, mode, box: boxes[id]!, tile });
     const name = labels[id] ?? "Section";
@@ -172,12 +176,13 @@ export function Board({ version }: { version: Version }) {
     const l = live.current;
     const el = wrap.current;
     if (!lift || !l || !el) return;
-    const { version: v, reduced: still } = now.current;
+    const still = now.current.reduced;
     el.dataset.labLifting = l.mode;
+    el.dataset.labStyle = l.style;
     const mine = l.els[l.plan.id]!;
-    if (l.mode === "pointer") mine.style.opacity = v === "a" ? "0" : "0.35";
+    if (l.mode === "pointer") mine.style.opacity = l.style === "slide" ? "0" : "0.35";
     else mine.dataset.lifted = "";
-    if (v === "a" && !still) {
+    if (l.style === "slide" && !still) {
       for (const id of l.plan.order) if (id !== l.plan.id || l.mode === "keys") l.els[id]!.style.transition = `transform ${MOVE_MS}ms ${EASE}`;
     }
     show();
@@ -235,6 +240,7 @@ export function Board({ version }: { version: Version }) {
       delete s.dataset.lifted;
     }
     delete el.dataset.labLifting;
+    delete el.dataset.labStyle;
     if (line.current) line.current.hidden = true;
     if (landing.current) landing.current.hidden = true;
     if (host.current) host.current.textContent = "";
@@ -290,7 +296,7 @@ export function Board({ version }: { version: Version }) {
       e.preventDefault();
       goTo(Math.max(0, Math.min(l.plan.rest.length, l.place + by)));
       // Keep where it would land on the screen.
-      const target = now.current.version === "a" ? l.els[id] : l.place === l.plan.home ? l.els[id] : line.current;
+      const target = l.style === "slide" ? l.els[id] : l.place === l.plan.home ? l.els[id] : line.current;
       const r = target?.getBoundingClientRect();
       if (!r) return;
       const margin = 96;

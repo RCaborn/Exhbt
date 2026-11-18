@@ -14,8 +14,11 @@ import { isLabEnabled } from "../lib/site";
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const LAB = "/lab/editor";
 const SAMPLES = ["case-study", "gallery", "research"] as const;
-const VERSIONS = ["a", "b"] as const;
-const NAME = { a: "A (slide)", b: "B (line)" };
+const VERSIONS = ["mix", "a", "b"] as const;
+type Version = (typeof VERSIONS)[number];
+const NAME = { mix: "Mix", a: "A (slide)", b: "B (line)" };
+/** How a section drags in a version: Mix slides every section but the flowchart, which uses the line. */
+const styleOf = (v: Version, id: string) => (v === "a" ? "slide" : v === "b" ? "line" : id === "flow" ? "line" : "slide");
 
 const SECTIONS = "[data-lab-rows] [data-lab-section]";
 const board = (page: Page) => page.locator("[data-lab-board]");
@@ -24,7 +27,8 @@ const status = (page: Page) => page.locator("[data-lab-status]");
 
 async function open(page: Page, query = "") {
   await page.goto(`${LAB}${query}`);
-  await expect(page.locator("[data-lab][data-ready]")).toBeAttached();
+  // The development server can take a while over the first load of the page.
+  await expect(page.locator("[data-lab][data-ready]")).toBeAttached({ timeout: 60_000 });
   if (!query.includes("read=1")) await expect(page.locator('[data-lab-context="field"]')).toBeAttached();
   await page.evaluate(() => document.fonts.ready);
 }
@@ -116,7 +120,9 @@ test.describe("The lab's gate", () => {
     await open(page);
     await expect(page.locator('meta[name="robots"]').first()).toHaveAttribute("content", /noindex/);
     await expect(page.getByText("A try-out. Nothing here is saved.")).toBeVisible();
-    await expect(page.getByRole("radio", { name: "A, slide" })).toBeChecked();
+    // Mix is the version it opens in: Rory's choice of 18 Nov 2026.
+    await expect(page.getByRole("radio", { name: "Mix" })).toBeChecked();
+    await expect(board(page)).toHaveAttribute("data-version", "mix");
   });
 });
 
@@ -155,6 +161,58 @@ test.describe("Desktop", () => {
         expect(Math.abs(a.h - b.h), where).toBeLessThan(0.05);
       }
     }
+  });
+
+  test("the switches at the top change the version, the sample and the look, and the address keeps them", async ({ page }) => {
+    await open(page);
+    await expect(board(page)).toHaveAttribute("data-version", "mix");
+    await expect(page.locator("[data-lab-version-note]")).toContainText("The flowchart, and the boxes in it, stay still");
+    await page.getByRole("radio", { name: "A, slide" }).check();
+    await expect(board(page)).toHaveAttribute("data-version", "a");
+    await expect(page.locator("[data-lab-version-note]")).toContainText("everything slides");
+    await page.getByRole("radio", { name: "B, line" }).check();
+    await expect(board(page)).toHaveAttribute("data-version", "b");
+    await page.getByRole("radio", { name: "Gallery" }).check();
+    expect((await order(page)).filter((id) => id.startsWith("image-")).length).toBe(7);
+    await page.getByRole("radio", { name: "Research" }).check();
+    expect(await order(page)).toEqual(["aim-1", "flow", "graph-1", "findings", "conclusion-1", "image-1", "reflection-1", "link-1"]);
+    // The key figure comes before the results it pairs with, and is drawn first: a pair is in the doc's own order.
+    const pair = await drawn(page);
+    expect(pair["graph-1"]!.x).toBeLessThan(pair.findings!.x);
+    expect(pair["graph-1"]!.y).toBeLessThan(pair.findings!.y + pair.findings!.h);
+    await page.getByRole("radio", { name: "Night" }).check();
+    await expect(page.locator("[data-look]")).toHaveAttribute("data-look", "night");
+    await expect(page).toHaveURL(/sample=research/);
+    await expect(page).toHaveURL(/look=night/);
+    await expect(page).toHaveURL(/v=b/);
+    // A link with the choices in it opens the same page.
+    await open(page, "?sample=gallery&look=classic&v=b");
+    await expect(page.getByRole("radio", { name: "Gallery" })).toBeChecked();
+    await expect(page.getByRole("radio", { name: "Classic" })).toBeChecked();
+    await expect(page.getByRole("radio", { name: "B, line" })).toBeChecked();
+  });
+
+  test("a click on a grip, or a nudge under 6px, is not a drag; the section's own words can still be selected", async ({ page }) => {
+    await open(page);
+    const grip = section(page, "quote-1").locator("[data-grip]");
+    await grip.scrollIntoViewIfNeeded();
+    const g = (await grip.boundingBox())!;
+    const before = await drawn(page);
+    await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(g.x + g.width / 2 + 3, g.y + g.height / 2 + 3, { steps: 3 });
+    await expect(board(page)).not.toHaveAttribute("data-lab-lifting");
+    await page.mouse.up();
+    await expect(board(page)).not.toHaveAttribute("data-lab-place");
+    expect(await drawn(page)).toEqual(before);
+    // Dragging across a section's words selects them; it doesn't pick the section up.
+    const quote = (await section(page, "quote-1").locator("blockquote").boundingBox())!;
+    await page.mouse.move(quote.x + 4, quote.y + quote.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(quote.x + 220, quote.y + quote.height / 2, { steps: 8 });
+    await page.mouse.up();
+    expect((await page.evaluate(() => window.getSelection()?.toString() ?? "")).length).toBeGreaterThan(5);
+    await expect(board(page)).not.toHaveAttribute("data-lab-place");
   });
 
   test("typing in one section re-renders only that section", async ({ page }) => {
@@ -261,7 +319,7 @@ test.describe("Desktop", () => {
           const now = await drawn(page);
           const moved = ids.filter((id) => Math.abs(now[id]!.x - drawnBefore[id]!.x) > 0.5 || Math.abs(now[id]!.y - drawnBefore[id]!.y) > 0.5);
           slid += moved.length;
-          if (v === "b") expect(moved, `version B keeps the page still (step ${i})`).toEqual([]);
+          if (styleOf(v, last) === "line") expect(moved, `the line keeps the page still (step ${i})`).toEqual([]);
           // A slide never resizes anything. (A transformed box's size comes back with rounding noise in the fifth decimal place.)
           for (const id of ids) {
             expect(now[id]!.w, id).toBeCloseTo(drawnBefore[id]!.w, 2);
@@ -269,7 +327,7 @@ test.describe("Desktop", () => {
           }
           if (await page.locator("[data-lab-line]").isVisible()) lines++;
         }
-        if (v === "a") {
+        if (styleOf(v, last) === "slide") {
           expect(slid).toBeGreaterThan(0);
           await expect(page.locator("[data-lab-landing]")).toBeVisible();
           expect(lines).toBe(0);
@@ -306,6 +364,124 @@ test.describe("Desktop", () => {
     }
   }
 
+  for (const sample of SAMPLES) {
+    test(`Mix, ${sample}: the flowchart is carried over a still page with a line; every other section slides`, async ({ page }) => {
+      await page.setViewportSize(TALL);
+      await open(page, `?sample=${sample}`);
+      await expect(board(page)).toHaveAttribute("data-version", "mix");
+      const ids = await order(page);
+      const before = await drawn(page);
+      const boxes = await layout(page);
+      const last = ids[ids.length - 1]!;
+
+      // The flowchart: nothing moves when it lifts, nothing moves as it is carried, and a line shows the place.
+      const from = await pickUp(page, "flow");
+      await expect(board(page)).toHaveAttribute("data-lab-style", "line");
+      expect(await drawn(page)).toEqual(before);
+      const end = before[last]!;
+      const to = { x: end.x + end.w / 2, y: end.y + end.h + 30 };
+      for (let i = 1; i <= 6; i++) {
+        await page.mouse.move(from.x + ((to.x - from.x) * i) / 6, from.y + ((to.y - from.y) * i) / 6, { steps: 6 });
+        await page.waitForTimeout(60);
+        expect(await drawn(page), `still page at step ${i}`).toEqual(before);
+        expect(await layout(page)).toEqual(boxes);
+      }
+      await expect(page.locator("[data-lab-line]")).toBeVisible();
+      await expect(page.locator("[data-lab-landing]")).toBeHidden();
+      await expect(status(page)).toHaveText(`Flowchart would go to place ${ids.length} of ${ids.length}.`);
+      await page.mouse.up();
+      expect(await order(page)).toEqual([...ids.filter((id) => id !== "flow"), "flow"]);
+      await settled(page);
+
+      // Any other section: the page makes room.
+      const now = await order(page);
+      const drawnNow = await drawn(page);
+      const boxesNow = await layout(page);
+      const other = now[0]!;
+      const start = await pickUp(page, other);
+      await expect(board(page)).toHaveAttribute("data-lab-style", "slide");
+      expect(await drawn(page)).toEqual(drawnNow);
+      const flow = drawnNow.flow!;
+      await page.mouse.move(flow.x + flow.w / 2, flow.y + flow.h + 30, { steps: 30 });
+      await page.waitForTimeout(250);
+      expect(start.y).toBeLessThan(flow.y);
+      expect(await layout(page)).toEqual(boxesNow);
+      await expect(page.locator("[data-lab-landing]")).toBeVisible();
+      await expect(page.locator("[data-lab-line]")).toBeHidden();
+      const mid = await drawn(page);
+      expect(now.filter((id) => Math.abs(mid[id]!.y - drawnNow[id]!.y) > 0.5).length).toBeGreaterThan(0);
+      await page.mouse.up();
+      expect((await order(page)).at(-1)).toBe(other);
+      await settled(page);
+
+      // From the keyboard the flowchart keeps its place and the line moves.
+      await section(page, "flow").locator("> .lab-tools [data-grip]").focus();
+      const rest = await layout(page);
+      await page.keyboard.press("Space");
+      await page.keyboard.press("ArrowUp");
+      await expect(board(page)).toHaveAttribute("data-lab-style", "line");
+      await expect(page.locator("[data-lab-line]")).toBeVisible();
+      expect(await layout(page)).toEqual(rest);
+      expect(await page.locator(SECTIONS).evaluateAll((els) => els.filter((e) => (e as HTMLElement).style.transform).length)).toBe(0);
+      await page.keyboard.press("Escape");
+    });
+  }
+
+  for (const v of VERSIONS) {
+    test(`version ${NAME[v]}: a flow box ${v === "a" ? "slides the others aside" : "is carried over a still flowchart with a line"}`, async ({ page }) => {
+      await open(page, `?v=${v}`);
+      const boxes = () => page.locator("[data-flow-step]").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.flowStep));
+      const places = () => page.locator("[data-flow-step]").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
+      const still = await places();
+      const sectionsBefore = await drawn(page);
+      const grip = page.locator('[data-flow-step="step-1"] [data-flow-grip]');
+      const g = (await grip.boundingBox())!;
+      const third = (await page.locator('[data-flow-step="step-3"] .xp-flow-box').boundingBox())!;
+      await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(g.x + g.width / 2 + 10, g.y + g.height / 2, { steps: 3 });
+      await page.mouse.move(third.x + third.width * 0.7, third.y + third.height / 2, { steps: 15 });
+      await page.waitForTimeout(250);
+      await expect(page.locator('[data-flow-step="step-1"]')).toHaveAttribute("data-dragging", "true");
+      // The sections round the flowchart never move while a box is dragged.
+      expect(await drawn(page)).toEqual(sectionsBefore);
+      if (v === "a") {
+        await expect(page.locator("[data-part=process]")).toHaveAttribute("data-flow-style", "slide");
+        expect(await places()).not.toEqual(still);
+        await expect(page.locator("[data-flow-copy]")).toHaveCount(0);
+        await expect(page.locator("[data-flow-step][data-line]")).toHaveCount(0);
+      } else {
+        await expect(page.locator("[data-part=process]")).toHaveAttribute("data-flow-style", "line");
+        // Every box is where it was; the line is in the gap after the third; a copy the size of the box is under the pointer.
+        expect(await places()).toEqual(still);
+        await expect(page.locator('[data-flow-step="step-3"]')).toHaveAttribute("data-line", "after");
+        await expect(page.locator("[data-flow-step][data-line]")).toHaveCount(1);
+        const copy = (await page.locator("[data-flow-copy] .xp-flow-box").boundingBox())!;
+        const source = (await page.locator('[data-flow-step="step-1"] .xp-flow-box').boundingBox())!;
+        expect(copy.width).toBeCloseTo(source.width, 0);
+        expect(copy.height).toBeCloseTo(source.height, 0);
+        expect(Math.abs(copy.x + copy.width / 2 - (third.x + third.width * 0.7))).toBeLessThan(third.width);
+      }
+      await page.mouse.up();
+      expect(await boxes()).toEqual(["step-2", "step-3", "step-1", "step-4", "step-5"]);
+      await settled(page);
+      await expect(page.locator("[data-flow-copy]")).toHaveCount(0);
+      await expect(page.locator("[data-flow-step][data-line]")).toHaveCount(0);
+      // Back again, towards the start: the line goes before the box it is over.
+      if (v !== "a") {
+        const back = (await page.locator('[data-flow-step="step-1"] [data-flow-grip]').boundingBox())!;
+        const firstBox = (await page.locator('[data-flow-step="step-2"] .xp-flow-box').boundingBox())!;
+        await page.mouse.move(back.x + back.width / 2, back.y + back.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(back.x + back.width / 2 - 10, back.y + back.height / 2, { steps: 3 });
+        await page.mouse.move(firstBox.x + firstBox.width * 0.3, firstBox.y + firstBox.height / 2, { steps: 15 });
+        await expect(page.locator('[data-flow-step="step-2"]')).toHaveAttribute("data-line", "before");
+        await page.mouse.up();
+        expect(await boxes()).toEqual(["step-1", "step-2", "step-3", "step-4", "step-5"]);
+      }
+    });
+  }
+
   for (const v of VERSIONS) {
     test(`version ${NAME[v]}: dropped into a pair and into the image grid, the order is the place shown`, async ({ page }) => {
       await page.setViewportSize(TALL);
@@ -317,7 +493,7 @@ test.describe("Desktop", () => {
       const g = before["graph-1"]!;
       await page.mouse.move((f.x + f.w + g.x) / 2, f.y + f.h / 2, { steps: 20 });
       await expect(status(page)).toContainText("would go to place 3 of 7");
-      if (v === "b") {
+      if (styleOf(v, "quote-1") === "line") {
         // The line stands upright in the gap between the two.
         const line = (await page.locator("[data-lab-line]").boundingBox())!;
         expect(line.height).toBeGreaterThan(line.width * 10);
@@ -339,7 +515,7 @@ test.describe("Desktop", () => {
       const b = before["image-6"]!;
       await page.mouse.move((a.x + a.w + b.x) / 2, a.y + a.h / 2, { steps: 20 });
       await expect(status(page)).toContainText("would go to place 8 of 11");
-      if (v === "a") {
+      if (styleOf(v, "image-2") === "slide") {
         // The tiles between shuffle along by one slot; a tile that changes row moves across and up.
         await page.waitForTimeout(250);
         const mid = await drawn(page);
@@ -448,7 +624,7 @@ test.describe("Desktop", () => {
       await expect(status(page)).toHaveText("Quote would go to place 2 of 7.");
       // Still nothing has changed its layout box: version A has slid things, version B has drawn a line.
       expect(await layout(page)).toEqual(before);
-      if (v === "b") await expect(page.locator("[data-lab-line]")).toBeVisible();
+      if (styleOf(v, "quote-1") === "line") await expect(page.locator("[data-lab-line]")).toBeVisible();
       else await expect(section(page, "findings")).toHaveAttribute("style", /translate/);
       await page.keyboard.press("Space");
       await expect(status(page)).toHaveText("Quote dropped in place 2 of 7.");
@@ -784,7 +960,7 @@ test.describe("Touch (Pixel 7)", () => {
       expect(await layout(page)).toEqual(boxes);
       expect(Math.abs((await page.evaluate(() => window.scrollY)) - scrollBefore)).toBeLessThan(2);
       await expect(status(page)).toContainText("would go to place 7 of 11");
-      if (v === "b") await expect(page.locator("[data-lab-line]")).toBeVisible();
+      if (styleOf(v, "image-3") === "line") await expect(page.locator("[data-lab-line]")).toBeVisible();
       else await expect(page.locator("[data-lab-landing]")).toBeVisible();
       await touch.up();
       expect(await order(page)).toEqual(["image-1", "flow", "findings", "link-1", "image-2", "image-4", "image-3", "image-5", "image-6", "image-7", "link-2"]);

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Lab } from "@/components/lab/Lab";
-import { isLabLook } from "@/components/lab/options";
+import { isLabLook, isVersion } from "@/components/lab/options";
 import { isSampleId } from "@/components/lab/samples";
 import { isLabEnabled } from "@/lib/site";
 
@@ -27,12 +27,13 @@ export default async function LabEditorPage({ searchParams }: { searchParams: Pr
   const q = await searchParams;
   const sample = one(q.sample);
   const look = one(q.look);
+  const version = one(q.v);
   return (
     <Lab
       initial={{
         sample: isSampleId(sample) ? sample : "case-study",
         look: isLabLook(look) ? look : "exhbt",
-        version: one(q.v) === "b" ? "b" : "a",
+        version: isVersion(version) ? version : "mix",
         read: one(q.read) === "1",
         grow: one(q.grow) === "mirror" ? "mirror" : "css",
       }}

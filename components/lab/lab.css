@@ -98,7 +98,11 @@
   }
   .lab-grip {
     cursor: grab;
+    /* A press on the grip is the drag's, not the browser's: no scrolling from it, no text selection, no long-press menu. */
     touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
   }
   .lab-grip:active {
     cursor: grabbing;
@@ -252,12 +256,65 @@
     width: 1.5rem;
     height: 1.5rem;
   }
-  .lab-flow-item[data-dragging] {
+  /* Slide style: the box itself is carried, as a lifted card. */
+  [data-flow-style="slide"] .lab-flow-item[data-dragging] {
     z-index: 15;
   }
-  .lab-flow-item[data-dragging] > .xp-flow-box {
+  [data-flow-style="slide"] .lab-flow-item[data-dragging] > .xp-flow-box,
+  .lab-flow-lifted {
     outline: 2px solid var(--xp-link);
     box-shadow: var(--shadow-pack);
+  }
+  /* Line style: the box stays where it is, dimmed, a copy is carried, and a line in the gap shows
+     where it will go. The gap between two boxes is the arrow's 27px, so the line sits 13.5px out. */
+  [data-flow-style="line"] .lab-flow-item[data-dragging] {
+    opacity: 0.35;
+  }
+  .lab-flow-item[data-line]::after {
+    content: "";
+    position: absolute;
+    z-index: 12;
+    left: 0;
+    right: 0;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--xp-link);
+    pointer-events: none;
+  }
+  .lab-flow-item[data-line="before"]::after {
+    top: -15.5px;
+  }
+  .lab-flow-item[data-line="before"]:first-child::after {
+    top: -10px;
+  }
+  .lab-flow-item[data-line="after"]::after {
+    bottom: 11.5px;
+  }
+  .lab-flow-item[data-line="after"]:last-child::after {
+    bottom: -10px;
+  }
+  /* From 36rem of column width the flowchart is a row, and the line stands upright. */
+  @container (min-width: 36rem) {
+    .lab-flow-item[data-line]::after {
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      height: auto;
+    }
+    .lab-flow-item[data-line="before"]::after {
+      left: -15.5px;
+      right: auto;
+    }
+    .lab-flow-item[data-line="before"]:first-child::after {
+      left: -10px;
+    }
+    .lab-flow-item[data-line="after"]::after {
+      left: auto;
+      right: 11.5px;
+    }
+    .lab-flow-item[data-line="after"]:last-child::after {
+      right: -10px;
+    }
   }
 
   /* The context line's Highlight button: above the line's right end, only while the line is being typed in. */

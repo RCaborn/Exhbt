@@ -2,7 +2,42 @@
 
 Status: work in progress (18 Nov 2026). This note is filled in as the prototype is built, so a later reader gets what was learned even if the build stops part-way. Sections marked "to come" have no result yet.
 
-The lab page is `/lab/editor` (`app/lab/editor/page.tsx`, `components/lab/`). No sign-in, nothing stored. The address carries the choices: `?sample=case-study|gallery|research`, `?look=exhbt|classic|night`, `?v=a|b`.
+The lab page is `/lab/editor` (`app/lab/editor/page.tsx`, `components/lab/`). No sign-in, nothing stored. The address carries the choices: `?sample=case-study|gallery|research`, `?look=exhbt|classic|night`, `?v=mix|a|b`.
+
+## The owner's decision (18 Nov 2026)
+
+Rory tried versions A and B on the preview site and said: **"Flowchart on b works better, rest on a is better!"**
+
+That is now the default, **Mix** (`?v=mix`): sections slide to make room, as in A; the flowchart is carried over a still page with a line, as in B; and the boxes inside the flowchart are carried over a still flowchart with a line too. A and B stay on the switch for comparing, and each now applies its own way to everything: in A sections and flow boxes all slide, in B sections and flow boxes all use a line. One line under the switch says what the chosen version does.
+
+One thing to know when reading his verdict. When he tried it, the boxes inside the flowchart dragged the same way in A and in B (they slid in both). So what he felt as different can only have been moving the flowchart section itself. Carrying a box with a line is new in Mix and B, and he has not felt it yet. It was built because his words were read as "anything to do with the flowchart"; if he meant only the section, the boxes should go back to sliding (`boxStyle` in `components/lab/options.ts`, one line).
+
+### Why the flowchart feels worse in A
+
+Measured on the case study, on a Pixel 7 screen (412 by 839):
+
+| Section | Height on the phone | Share of the screen | Height at 1440 wide |
+|---|---|---|---|
+| Flowchart (a column of five boxes on a phone) | 327px | 39% | 115px (a row) |
+| Findings | 300px | 36% | 300px |
+| Graph 2 | 278px | 33% | 310px |
+| Graph 1 | 239px | 28% | 239px |
+| Quote | 111px | 13% | 81px |
+
+Three things follow from the flowchart being the tallest block on a phone and the first one on the page.
+
+1. **Each slide is as big as the lifted section.** When the flowchart passes one section, that section jumps 371px (the flowchart's height and one gap) in 180ms. That is 44% of the screen. A quote passing a section moves it 155px.
+2. **The finger has to travel most of the screen before anything happens.** The grip is at the section's top corner, and the place is worked out from where the finger is. To move the flowchart down one place the finger has to go past the flowchart's own 327px, the 44px gap, and half of the next section: about 520px, or 62% of the screen. The bottom fifth of the screen is where the page starts scrolling itself, so it cannot be done without the page starting to move. In A that is the page scrolling and sections jumping at once. In B it is only the page scrolling, and a line.
+3. **A bug made it worse, in both versions, and is fixed.** The lifted copy made the page longer as it was carried past the foot of the page, so the page went on scrolling into empty space and the place ran on to the end by itself. A tall section reaches the foot first, because it hangs below the finger by its whole height. The lab page is now clipped at its own edges; a section held at the bottom edge stops the page at its real end (checked: page height 2999px before and during, scroll stops at 2160 of 2160).
+
+So the cause is height, and where the place is measured from, more than anything about the flowchart as such. On a 1440px screen the flowchart is one of the shortest sections (115px) and none of this applies. A rule that follows from the cause, not built: **a section taller than about a third of the screen is carried with a line; shorter ones slide.** On a phone that is the flowchart, the findings and a large graph. On a desktop the flowchart is short and would slide, where Mix uses a line. The other way to fix A would be to work out the place from the lifted copy's leading edge instead of the finger, so a tall section needs no more travel than a short one. Neither has been tried on a real phone.
+
+### Where the builder would differ
+
+Built exactly as decided. Two places where the evidence points somewhere else:
+
+- **Boxes in the flowchart.** They are all one size in one line, which is the case where sliding is exact and cannot mislead (finding 1 below is about sections changing shape; boxes never do). A line there shows less than the slide did. Worth Rory comparing A's boxes with Mix's before this is settled.
+- **The flowchart on a desktop.** It is short there, and the reasons above do not apply. If the rule were by height, it would slide on a desktop and use the line on a phone.
 
 ## The gate
 
@@ -20,6 +55,8 @@ With the lab on, a portfolio host (`amara.exhbt.co.uk`) still gets 404, because 
 ## What the two versions do
 
 Both freeze the page when a section is picked up. Every section keeps its layout box until the drop; anything that moves, moves by a transform. The place the section would go is worked out from the page as it stood at pick-up and from where the pointer is, and from nothing that is shown during the drag (`components/lab/drag-plan.ts`). That is the reason neither version can flicker between two places: what the page shows never feeds back into where the pointer is taken to be, and another place has to be nearer by 10px before it takes over.
+
+(Written before Mix. "Version A" and "version B" below are the two ways of dragging, which Mix combines.)
 
 - **Version A, slide.** The other sections slide (180ms, translate only) to where they would sit, and a dashed box shows the room made for the lifted one. Where they would sit is measured, not guessed: at pick-up each section's size is noted, and for each place tried, empty boxes of those sizes are laid out in a hidden copy of the page's own rows, so the pairing, the grid and the gaps are the real CSS.
 - **Version B, line.** The page stays still. A line shows where the section would go: across the column between two rows, or upright beside a neighbour when the section would share that neighbour's row.

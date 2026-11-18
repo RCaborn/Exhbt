@@ -14,11 +14,18 @@ import { Board } from "./Board";
 import { ContextField } from "./ContextField";
 import { AutoText, GrowContext } from "./fields";
 import type { LabInitial, LabLook, Version } from "./options";
+import { VersionContext } from "./version-context";
 import { FLOW_ID, SAMPLE_NAMES, type LabDoc } from "./samples";
 import { LabContext, LabStore, useLab, useLabStore, useRenderCount } from "./store";
 
 const LOOK_NAMES: Record<LabLook, string> = { exhbt: "Exhbt", classic: "Classic", night: "Night" };
-const VERSION_NAMES: Record<Version, string> = { a: "A, slide", b: "B, line" };
+const VERSION_NAMES: Record<Version, string> = { mix: "Mix", a: "A, slide", b: "B, line" };
+/** What each version does, said under the switch. */
+const VERSION_NOTES: Record<Version, string> = {
+  mix: "Mix: sections slide to make room. The flowchart, and the boxes in it, stay still and a line shows the place.",
+  a: "A: everything slides to make room, sections and flow boxes alike.",
+  b: "B: the page stays still and a line shows the place, for sections and flow boxes alike.",
+};
 
 /** The fictional demo person (lib/exhbt.ts). */
 const OWNER = { name: demoOwner.name, bio: demoOwner.headline };
@@ -51,7 +58,9 @@ export function Lab({ initial }: { initial: LabInitial }) {
   return (
     <LabContext.Provider value={store}>
       <GrowContext.Provider value={initial.grow}>
-        <div className="editor-touch" data-lab data-ready={ready || undefined}>
+       <VersionContext.Provider value={version}>
+        {/* Clipped at its own edges, so a section carried past the foot of the page can't make the page longer. */}
+        <div className="editor-touch overflow-clip" data-lab data-ready={ready || undefined}>
           <header className="border-b border-line bg-mist print:hidden">
             <div className="mx-auto flex max-w-[64rem] flex-wrap items-end gap-x-8 gap-y-3 px-4 py-4 sm:px-8">
               <div className="min-w-[11rem] flex-1">
@@ -73,6 +82,9 @@ export function Lab({ initial }: { initial: LabInitial }) {
               <Button size="sm" onClick={() => store.reset(sample)}>
                 Reset
               </Button>
+              <p className="basis-full text-sm text-graphite" data-lab-version-note>
+                {VERSION_NOTES[version]}
+              </p>
             </div>
           </header>
           <div {...lookAttrs(theme)} style={themeStyle(theme)} className="min-h-svh bg-[var(--pf-ground)] text-[color:var(--pf-ink)]">
@@ -81,6 +93,7 @@ export function Lab({ initial }: { initial: LabInitial }) {
             </main>
           </div>
         </div>
+       </VersionContext.Provider>
       </GrowContext.Provider>
     </LabContext.Provider>
   );
