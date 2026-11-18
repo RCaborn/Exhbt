@@ -1,0 +1,199 @@
+[
+  {
+    "id": "01-bar-chart",
+    "file": "01-bar-chart.pdf",
+    "what": "A four-page report with one bar chart of the results on page 3, drawn in vector shapes.",
+    "pages": 4,
+    "expect": {
+      "page": 3,
+      "kind": "graph",
+      "box": {
+        "x": 0.1801,
+        "y": 0.1965,
+        "w": 0.6297,
+        "h": 0.2645
+      }
+    }
+  },
+  {
+    "id": "02-line-chart",
+    "file": "02-line-chart.pdf",
+    "what": "A three-page report with a line chart of two series over eight weeks on page 2.",
+    "pages": 3,
+    "expect": {
+      "page": 2,
+      "kind": "graph",
+      "box": {
+        "x": 0.1675,
+        "y": 0.1965,
+        "w": 0.6543,
+        "h": 0.2752
+      }
+    }
+  },
+  {
+    "id": "03-results-table",
+    "file": "03-results-table.pdf",
+    "what": "A three-page dissertation extract whose only figure is a table of regression results on page 3.",
+    "pages": 3,
+    "expect": {
+      "page": 3,
+      "kind": "table",
+      "box": {
+        "x": 0.2244,
+        "y": 0.1713,
+        "w": 0.5511,
+        "h": 0.089
+      }
+    }
+  },
+  {
+    "id": "04-method-then-results",
+    "file": "04-method-then-results.pdf",
+    "what": "A five-page lab report: a diagram of the method on page 2, the results chart on page 4. The results chart is the one to choose.",
+    "pages": 5,
+    "expect": {
+      "page": 4,
+      "kind": "graph",
+      "box": {
+        "x": 0.2053,
+        "y": 0.1758,
+        "w": 0.5793,
+        "h": 0.2752
+      }
+    }
+  },
+  {
+    "id": "05-three-charts",
+    "file": "05-three-charts.pdf",
+    "what": "A five-page report with three charts: the sample on page 2, the headline result on page 3 and a further check in an appendix on page 5. The headline result is the one to choose.",
+    "pages": 5,
+    "expect": {
+      "page": 3,
+      "kind": "graph",
+      "box": {
+        "x": 0.2116,
+        "y": 0.1965,
+        "w": 0.5668,
+        "h": 0.2645
+      }
+    }
+  },
+  {
+    "id": "06-bitmap-chart",
+    "file": "06-bitmap-chart.pdf",
+    "what": "A three-page report whose results chart on page 2 is a picture pasted in, not vector shapes.",
+    "pages": 3,
+    "expect": {
+      "page": 2,
+      "kind": "graph",
+      "box": {
+        "x": 0.1776,
+        "y": 0.1713,
+        "w": 0.6448,
+        "h": 0.2778
+      }
+    }
+  },
+  {
+    "id": "07-two-column",
+    "file": "07-two-column.pdf",
+    "what": "A two-page paper set in two columns, with a small figure in the right-hand column of page 1.",
+    "pages": 2,
+    "expect": {
+      "page": 1,
+      "kind": "graph",
+      "box": {
+        "x": 0.5416,
+        "y": 0.2941,
+        "w": 0.3514,
+        "h": 0.1443
+      }
+    }
+  },
+  {
+    "id": "08-text-only",
+    "file": "08-text-only.pdf",
+    "what": "A three-page history essay of plain text: no figure, and no page that draws anything but text.",
+    "pages": 3,
+    "expect": null
+  },
+  {
+    "id": "09-cover-logo",
+    "file": "09-cover-logo.pdf",
+    "what": "A cover page with a university crest and a ruled title, then two pages of text: no figure, though the cover draws shapes.",
+    "pages": 3,
+    "expect": null
+  },
+  {
+    "id": "10-slides",
+    "file": "10-slides.pdf",
+    "what": "Five landscape slides exported to PDF, with the results chart on slide 4. The chart is the figure, not the whole slide.",
+    "pages": 5,
+    "expect": {
+      "page": 4,
+      "kind": "graph",
+      "box": {
+        "x": 0.0563,
+        "y": 0.2042,
+        "w": 0.5359,
+        "h": 0.5847
+      }
+    }
+  },
+  {
+    "id": "11-diagram-only",
+    "file": "11-diagram-only.pdf",
+    "what": "A three-page software report whose only figure is a diagram of the system on page 2: a visual, but not a graph or a table.",
+    "pages": 3,
+    "expect": {
+      "page": 2,
+      "kind": "other",
+      "box": {
+        "x": 0.1209,
+        "y": 0.1749,
+        "w": 0.7531,
+        "h": 0.0481
+      }
+    }
+  },
+  {
+    "id": "12-scan",
+    "file": "12-scan.pdf",
+    "what": "The report of 01-bar-chart as a scan: every page is a picture, with no text behind it. The chart is on page 3.",
+    "pages": 4,
+    "expect": {
+      "page": 3,
+      "kind": "graph",
+      "box": {
+        "x": 0.1801,
+        "y": 0.1965,
+        "w": 0.6297,
+        "h": 0.2645
+      }
+    }
+  },
+  {
+    "id": "13-essay-styled",
+    "file": "13-essay-styled.pdf",
+    "what": "A two-page essay with ruled headings, a shaded quotation and a boxed note, so its pages are sent, and no figure on them.",
+    "pages": 2,
+    "expect": null
+  },
+  {
+    "id": "14-poster",
+    "file": "14-poster.pdf",
+    "what": "A three-page design project whose key visual is the finished poster on page 2, pasted in as a picture: a visual, but not a graph or a table.",
+    "pages": 3,
+    "expect": {
+      "page": 2,
+      "kind": "other",
+      "box": {
+        "x": 0.228,
+        "y": 0.1713,
+        "w": 0.5441,
+        "h": 0.5396
+      }
+    }
+  }
+]

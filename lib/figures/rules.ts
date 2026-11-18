@@ -64,10 +64,18 @@ export type PixelBox = { left: number; top: number; right: number; bottom: numbe
 export type PixelSize = { width: number; height: number };
 
 /**
+ * A thin figure's side, as fractions of the page's side: below `least` it is a slip, not a figure;
+ * from there up to FIGURE.minSide it is widened to `widened`, a little over FIGURE.minSide.
+ */
+const THIN = { least: 0.01, widened: 0.06 } as const;
+
+/**
  * The AI's box as fractions of the page, kept on the page (decision 0025). The one place pixels
  * become fractions, so the way the AI is asked for a box can change here and nowhere else. Edges
  * given the wrong way round are put right. An answer in fractions after all (every edge between 0
- * and 1) is read as fractions. Anything that makes no sense is the whole page, as clampBox has it.
+ * and 1) is read as fractions. A thin figure (a one-row diagram, a short table) is real, so a side
+ * between 1% of the page and FIGURE.minSide is widened to FIGURE.minSide about its middle, where
+ * clampBox would give up and take the whole page. Anything that makes no sense is the whole page.
  */
 export function boxFromPixels(b: PixelBox | null | undefined, size: PixelSize): FigureBox {
   if (!b || !(size.width > 0) || !(size.height > 0)) return clampBox(null);
@@ -76,10 +84,16 @@ export function boxFromPixels(b: PixelBox | null | undefined, size: PixelSize): 
   const fractions = edges.every((n) => n >= 0 && n <= 1);
   const sx = fractions ? 1 : size.width;
   const sy = fractions ? 1 : size.height;
-  const x1 = clamp01(Math.min(b.left, b.right) / sx);
-  const x2 = clamp01(Math.max(b.left, b.right) / sx);
-  const y1 = clamp01(Math.min(b.top, b.bottom) / sy);
-  const y2 = clamp01(Math.max(b.top, b.bottom) / sy);
+  /** One side: its two edges on the page, widened to the least side when it is thin but not a sliver. */
+  const side = (a: number, z: number): [number, number] => {
+    const from = clamp01(Math.min(a, z));
+    const to = clamp01(Math.max(a, z));
+    if (to - from >= FIGURE.minSide || to - from < THIN.least) return [from, to];
+    const start = Math.min(Math.max(0, (from + to) / 2 - THIN.widened / 2), 1 - THIN.widened);
+    return [start, start + THIN.widened];
+  };
+  const [x1, x2] = side(b.left / sx, b.right / sx);
+  const [y1, y2] = side(b.top / sy, b.bottom / sy);
   return clampBox({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 });
 }
 

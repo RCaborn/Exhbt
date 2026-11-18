@@ -10,7 +10,7 @@
  * A request that failed is an error, never a pass and never "no figure".
  */
 import type { FigureBox, FigureKind } from "../../lib/exhbt/blocks";
-import { clampBox, withMargin } from "../../lib/figures/rules";
+import { boxFromPixels, clampBox, pixelsFromBox, withMargin } from "../../lib/figures/rules";
 
 /** The least of the true box the cut must hold, and the most the cut may be, against a perfect cut. */
 export const CONTAIN_MIN = 0.95;
@@ -68,7 +68,7 @@ export function grade(c: EvalCase, a: Answer): Verdict {
   if (a.page !== c.expect.page) return { result: "fail", why: [`page ${a.page}; expected page ${c.expect.page}`], cut };
   if (a.kind !== c.expect.kind) why.push(`kind "${a.kind}"; expected "${c.expect.kind}"`);
   const contains = overlap(cut, c.expect.box) / area(c.expect.box);
-  const areaRatio = area(cut) / area(withMargin(clampBox(c.expect.box)));
+  const areaRatio = area(cut) / area(withMargin(c.expect.box));
   if (contains < CONTAIN_MIN) why.push(`the cut holds ${Math.round(contains * 100)}% of the figure; at least ${CONTAIN_MIN * 100}% is needed`);
   if (areaRatio > AREA_MAX) why.push(`the cut is ${areaRatio.toFixed(2)} times a perfect cut; at most ${AREA_MAX} is allowed`);
   return { result: why.length ? "fail" : "pass", why: why.length ? why : ["right page, right kind, the whole figure and little else"], cut, contains: round(contains), areaRatio: round(areaRatio) };
@@ -84,6 +84,9 @@ export function selfTest(cases: EvalCase[]): string[] {
     if (got.result !== result) problems.push(`${id}: ${name} marked ${got.result}, should be ${result} (${got.why.join("; ")})`);
   };
   const whole: FigureBox = { x: 0, y: 0, w: 1, h: 1 };
+  // A box as the route would answer with it: given in pixels of an image, then through the server's own check.
+  const image = { width: 1000, height: 1000 };
+  const served = (b: FigureBox) => boxFromPixels(pixelsFromBox(b, image), image);
   for (const c of cases) {
     want(c.id, "a request that failed", grade(c, { status: "failed", error: "HTTP 502" }), "error");
     if (!c.expect) {
@@ -92,16 +95,17 @@ export function selfTest(cases: EvalCase[]): string[] {
       want(c.id, "a pick", grade(c, { status: "picked", page: 1, kind: "other", box: whole }), "fail");
       continue;
     }
-    const { page, kind, box } = c.expect;
+    const { page, kind } = c.expect;
+    const box = served(c.expect.box);
     want(c.id, "the true box", grade(c, { status: "picked", page, kind, box }), "pass");
     want(c.id, "no figure", grade(c, { status: "none" }), "fail");
     want(c.id, "nothing sent", grade(c, { status: "skipped" }), "fail");
     want(c.id, "the wrong page", grade(c, { status: "picked", page: page === 1 ? 2 : page - 1, kind, box }), "fail");
     want(c.id, "the wrong kind", grade(c, { status: "picked", page, kind: kind === "other" ? "graph" : "other", box }), "fail");
     // Half the figure, cut down the middle: part of it is lost.
-    want(c.id, "half the figure", grade(c, { status: "picked", page, kind, box: { ...box, w: box.w / 2 } }), "fail");
+    want(c.id, "half the figure", grade(c, { status: "picked", page, kind, box: served({ ...c.expect.box, w: c.expect.box.w / 2 }) }), "fail");
     // The whole page: the figure with all the text round it. Only a figure that fills most of its page gets away with it.
-    if (area(withMargin(box)) < 1 / AREA_MAX) want(c.id, "the whole page", grade(c, { status: "picked", page, kind, box: whole }), "fail");
+    if (area(withMargin(c.expect.box)) < 1 / AREA_MAX) want(c.id, "the whole page", grade(c, { status: "picked", page, kind, box: whole }), "fail");
   }
   return problems;
 }

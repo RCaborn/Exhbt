@@ -105,6 +105,13 @@ test.describe("Picked figure rules", () => {
     expect(boxFromPixels({ left: -20, top: 77, right: 900, bottom: 384 }, size)).toMatchObject({ x: 0, w: 1 });
     // An answer in fractions after all is read as fractions.
     expect(boxFromPixels({ left: 0.1, top: 0.2, right: 0.6, bottom: 0.7 }, size)).toEqual({ x: 0.1, y: 0.2, w: expect.closeTo(0.5, 6), h: expect.closeTo(0.5, 6) });
+    // A thin figure (a one-row diagram, a short table) is real: its short side is widened a
+    // little about its middle, not swapped for the whole page.
+    const thin = boxFromPixels({ left: 60, top: 300, right: 480, bottom: 330 }, size);
+    expect(thin.w).toBeCloseTo(420 / 543, 6);
+    expect(thin.h).toBeCloseTo(0.06, 6);
+    expect(thin.y + thin.h / 2).toBeCloseTo(315 / 768, 6);
+    expect(boxFromPixels({ left: 60, top: 0, right: 480, bottom: 30 }, size)).toMatchObject({ y: 0, h: expect.closeTo(0.06, 6) });
     // Nothing sensible is the whole page, never a sliver.
     const whole = { x: 0, y: 0, w: 1, h: 1 };
     expect(boxFromPixels(null, size)).toEqual(whole);

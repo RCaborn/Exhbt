@@ -81,3 +81,6 @@ playwright-report/
 # exhbt draft eval runs (evals/exhbt-draft/README.md)
 /evals/exhbt-draft/runs/*
 !/evals/exhbt-draft/runs/.gitkeep
+
+# figure eval runs (evals/figure-pick/README.md)
+/evals/figure-pick/runs/

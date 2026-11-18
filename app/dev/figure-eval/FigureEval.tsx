@@ -9,6 +9,7 @@ import type { FigureBox } from "@/lib/exhbt/blocks";
  * `window.figureEval`, each working from a PDF's bytes in base64, and each calling the code the
  * draft page calls (app/(app)/exhbts/new/figure.ts, lib/figures/pdf.ts):
  *
+ *   pages draws the pages and says which would be sent, without asking anything.
  *   pick  draws the pages, chooses the ones to send, asks /api/exhbts/figure-pick once, and cuts
  *         the answer out as the draft page would before uploading it. A request that failed, an
  *         answer of no figure, and a PDF with no page worth sending are told apart.
@@ -44,6 +45,7 @@ export type Outline = { box: FigureBox; token: "jade" | "error" };
 declare global {
   interface Window {
     figureEval?: {
+      pages: (pdfBase64: string, name: string) => Promise<{ pageCount: number; pages: EvalPage[] } | null>;
       pick: (pdfBase64: string, name: string) => Promise<EvalPick>;
       draw: (pdfBase64: string, name: string, page: number, box: FigureBox | null, outlines?: Outline[]) => Promise<string>;
     };
@@ -59,16 +61,27 @@ const dataUrl = (blob: Blob) =>
     reader.readAsDataURL(blob);
   });
 
+/** The PDF's pages as the draft page draws them, and the ones it would send. Null when they can't be drawn. */
+async function drawn(file: File, name: string) {
+  const read = await drawPages(file);
+  if (!read) return null;
+  const candidates = candidatesOf([{ name, file, pages: read }]);
+  const sentPages = new Set(candidates.map((c) => c.page));
+  const pages: EvalPage[] = read.pages.map((p) => ({ page: p.page, width: p.width, height: p.height, shapes: p.marks.shapes, pictures: p.marks.pictures, bytes: p.jpeg.size, sent: sentPages.has(p.page) }));
+  return { candidates, pageCount: read.pageCount, pages, sent: candidates.map((c, i) => ({ image: i + 1, label: c.label, page: c.page ?? 0 })) };
+}
+
+async function pages(pdfBase64: string, name: string): Promise<{ pageCount: number; pages: EvalPage[] } | null> {
+  const d = await drawn(toFile(pdfBase64, name), name);
+  return d ? { pageCount: d.pageCount, pages: d.pages } : null;
+}
+
 async function pick(pdfBase64: string, name: string): Promise<EvalPick> {
   const t0 = performance.now();
-  const file = toFile(pdfBase64, name);
-  const drawn = await drawPages(file);
-  if (!drawn) return { pageCount: 0, pages: [], sent: [], status: "failed", http: null, error: "The PDF's pages couldn't be drawn.", ms: Math.round(performance.now() - t0) };
-  const candidates = candidatesOf([{ name, file, pages: drawn }]);
-  const sentPages = new Set(candidates.map((c) => c.page));
-  const pages: EvalPage[] = drawn.pages.map((p) => ({ page: p.page, width: p.width, height: p.height, shapes: p.marks.shapes, pictures: p.marks.pictures, bytes: p.jpeg.size, sent: sentPages.has(p.page) }));
-  const sent = candidates.map((c, i) => ({ image: i + 1, label: c.label, page: c.page ?? 0 }));
-  const base = { pageCount: drawn.pageCount, pages, sent };
+  const d = await drawn(toFile(pdfBase64, name), name);
+  if (!d) return { pageCount: 0, pages: [], sent: [], status: "failed", http: null, error: "The PDF's pages couldn't be drawn.", ms: Math.round(performance.now() - t0) };
+  const { candidates } = d;
+  const base = { pageCount: d.pageCount, pages: d.pages, sent: d.sent };
   const done = () => Math.round(performance.now() - t0);
   if (!candidates.length) return { ...base, status: "skipped", http: null, ms: done() };
 
@@ -106,7 +119,7 @@ async function draw(pdfBase64: string, name: string, page: number, box: FigureBo
 export function FigureEval() {
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    window.figureEval = { pick, draw };
+    window.figureEval = { pages, pick, draw };
     setReady(true);
     return () => {
       delete window.figureEval;
