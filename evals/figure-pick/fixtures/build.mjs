@@ -179,7 +179,7 @@ const REPORT_CSS = `
   figure { margin: 16px 0 14px; }
   .drawing { display: inline-block; line-height: 0; }
   figcaption { font-size: 13px; color: #333; margin-top: 7px; line-height: 1.4; }
-  table.results { border-collapse: collapse; font-size: 13.5px; margin: 0 auto; }
+  table.results { border-collapse: collapse; font-size: 13.5px; line-height: 1.4; margin: 0 auto; }
   table.results caption { font-weight: bold; padding-bottom: 8px; font-size: 14px; }
   table.results th, table.results td { border: 1px solid #555; padding: 6px 13px; text-align: right; }
   table.results th:first-child, table.results td:first-child { text-align: left; }

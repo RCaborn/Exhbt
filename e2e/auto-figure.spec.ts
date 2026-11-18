@@ -18,6 +18,7 @@ const CHART_PDF = "e2e/fixtures/report-with-chart.pdf";
 const TEXT_PDF = "e2e/fixtures/report-text-only.pdf";
 const DIAGRAM_PDF = "e2e/fixtures/report-with-diagram.pdf";
 const SCAN_PDF = "e2e/fixtures/scan-report.pdf";
+const PRINTED_ESSAY_PDF = "evals/figure-pick/fixtures/08-text-only.pdf";
 const WARNING = "Picked from your report. Check you're allowed to share it.";
 const TICK = "I may share this figure on my portfolio";
 const NEEDS_TICK = "Tick that you may share this figure, or remove it.";
@@ -551,6 +552,18 @@ test.describe("Drafts with no figure", () => {
     await expect(line).toContainText("We couldn't look for a figure in your files this time. You can add an image yourself.");
     await expect(line).not.toContainText("No figure was found");
     await expect(page.locator("[role=alert]:not(#__next-route-announcer__)")).toHaveCount(0);
+  });
+
+  test("a text-only PDF printed by a browser: its clipping paths and page background are not figures, so nothing is sent", async ({ page }) => {
+    // The essay from the figure eval, printed to PDF by Chromium: every page has clipping paths
+    // round the text and a white page background, as PDFs from browsers and Word do, and no figure.
+    await signInFree(page, "figclip");
+    const seen = countPicks(page);
+    await addFile(page, PRINTED_ESSAY_PDF);
+    await draft(page);
+    expect(seen.picks).toBe(0);
+    expect(await sectionKinds(page)).not.toContain("image");
+    await expect(draftedLine(page)).toContainText("No figure was found in your files");
   });
 
   test("a file that isn't a PDF: nothing is sent, and the line says a figure needs a PDF", async ({ page }) => {
