@@ -91,6 +91,9 @@ const GUIDE_KEY = "exhbt-guide-hidden";
 export function Editor(props: EditorProps) {
   const { id, status, slug, liveBase, owner, planBlock, canGoLive, maxFileMb } = props;
   const [doc, setDoc] = useState<ExhbtDoc>(props.initialDoc);
+  // What the draft page passed on, kept from the first render: it comes off the address below, so a
+  // later render of this page on the server (after publishing, say) no longer carries it.
+  const [drafted] = useState(props.drafted);
   const docRef = useRef(doc);
   docRef.current = doc;
   const f = formatOf(doc);
@@ -153,7 +156,7 @@ export function Editor(props: EditorProps) {
       else clearBackup(id);
     }
     // What the draft page passed on is said once: it comes off the address, so a reload doesn't repeat it.
-    if (props.drafted && window.location.search) window.history.replaceState(null, "", window.location.pathname);
+    if (drafted && window.location.search) window.history.replaceState(null, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -503,7 +506,7 @@ export function Editor(props: EditorProps) {
                 }}
               />
             )}
-            <LayoutPicker doc={doc} setDoc={setDoc} drafted={props.drafted} />
+            <LayoutPicker doc={doc} setDoc={setDoc} drafted={drafted} />
             <Card id="card-header" title={copy.header} words={cw.header} flagged={flaggedBy("header")} heaviest={heaviest === "header"}>
               {flags.length > 0 && (
                 <ul aria-label="Numbers to check" className="mb-4 space-y-2">

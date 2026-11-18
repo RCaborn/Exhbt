@@ -417,6 +417,10 @@ test.describe("Draft from a PDF with a chart", () => {
     await expect(line).not.toContainText("Tick that you may share it");
     await page.getByRole("button", { name: "Publish", exact: true }).click();
     await expect(page.getByText("It's live.")).toBeVisible();
+    // Publishing saves and renders the page again on the server, with nothing left in the address:
+    // the line stays for this visit all the same.
+    await expect(line).toContainText(CASE_STUDY_LINE);
+    await expect(line).toContainText("The figure is from page 3 of report-with-chart.pdf.");
 
     // The live page shows the figure beside the findings, and nothing about where it came from.
     const href = await page.getByRole("link", { name: new RegExp(`^/p/${username}/`) }).getAttribute("href");
