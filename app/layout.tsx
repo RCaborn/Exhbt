@@ -7,9 +7,11 @@ import "@fontsource/inter/latin-500.css";
 import "@fontsource/inter/latin-600.css";
 import { Providers } from "./providers";
 import { PageViewBeacon } from "@/components/site/PageViewBeacon";
+import { MARKETING_HOST } from "@/lib/hosts";
 import { isPrivatePreview } from "@/lib/site";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(`https://${MARKETING_HOST}`),
   title: { default: "Exhbt: evidence employers can check", template: "%s · Exhbt" },
   description:
     "A free skills-gap roadmap for graduates, then your own portfolio site at name.exhbt.co.uk, built from short, checked exhbts of your project work.",

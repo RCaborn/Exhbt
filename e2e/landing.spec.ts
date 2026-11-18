@@ -59,8 +59,15 @@ test.describe("Landing: pages", () => {
   });
 
   test("the sitemap lists the marketing pages", async ({ request }) => {
-    const body = await (await request.get("/sitemap.xml")).text();
-    for (const path of ["/what-is-an-exhbt", "/pricing", "/universities", "/how-to-read-an-exhbt"]) expect(body).toContain(path);
+    const xml = await (await request.get("/sitemap.xml")).text();
+    const text = await (await request.get("/sitemap.txt")).text();
+    for (const path of ["/what-is-an-exhbt", "/pricing", "/universities", "/how-to-read-an-exhbt"]) {
+      expect(xml).toContain(path);
+      expect(text).toContain(`https://www.exhbt.co.uk${path}`);
+    }
+    expect(text.split("\n").filter(Boolean)).toEqual(
+      [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]),
+    );
   });
 });
 
