@@ -116,7 +116,7 @@ The main column, in this order, always:
 - skill pills, top right, on mist with no edge
 - the title, which is the question, large in the display face (about 56px on a wide page)
 - the context line in graphite at about 19px, its gap highlighted as a flat block of mint mixed with white (the bold run, drawn as `<mark class="xp-mark">`; not the `.highlight` stroke used on marketing pages)
-- the process flowchart (`MethodFlow variant="page"`): boxes with a `line` edge and 12px corners, arrows between, the last box ink with white text, no step numbers. A row from 36rem of column width and in print, a column below that.
+- the process flowchart (`MethodFlow variant="page"`): boxes with a `line` edge and 12px corners, arrows between, the last box ink with white text, no step numbers. A row in print. On screen it is a row once the column is wide enough for the boxes: 36rem for 3 or 4, 42rem for 5, 48rem for 6, a column below that (decision 0022).
 
 Below the flowchart, sections in the order the person sets. "What I found" is a display-face heading over an ink rule, with the points as a ruled list; next to a graph or image (straight before or after it) the two share a row, findings on the left. Graphs and images sit in a white card with a `line` edge (graphs never on mist); two of a kind next to each other share a row. The quote, under "Feedback", has a jade rule down its left; "What I'd do next" has a hairline above and a small graphite label; the link is a mist card with its label as a link and no address shown.
 
