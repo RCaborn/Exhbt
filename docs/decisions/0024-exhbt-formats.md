@@ -1,6 +1,7 @@
 Status: accepted
 Date: 17 Nov 2026
 Amends: 0015 (two new section kinds, used by research only; caps per layout; in a gallery or research page the page sets where each kind goes), 0017 (where a picked figure lands), 0022 (the page now has three layouts; the case study is the page 0022 describes, unchanged)
+Amended by: 0025 (each layout says what it takes from the person's work: a figure, pictures or nothing; the editor's line after a draft now gives the layout, why it was chosen and what came of looking for a figure, for a case study too)
 
 # Exhbt layouts: case study, gallery and research
 

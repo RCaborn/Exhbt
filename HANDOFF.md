@@ -52,6 +52,7 @@ npm run test:e2e       # e2e only (starts its own server on :3200)
 
 Useful dev-only pages:
 - **`/dev/emails`**: every email the app sent while no email provider is configured. Use it to see and restyle emails.
+- **`/dev/figure-eval`**: the page the figure eval drives. It runs the draft page's own code on a PDF (draw the pages, choose which to send, ask the pick, cut the answer out). Start it with `npm run eval:figures`, not by hand (`evals/figure-pick/README.md`).
 - The roadmap you get locally is a labelled placeholder until `ANTHROPIC_API_KEYS` is set.
 
 ## Where things live
@@ -172,9 +173,11 @@ Where Phase 2 lives:
 - `responsive.spec.ts`: the home CTA is above the fold on desktop and phone; no sideways scrolling.
 - `preview.spec.ts`: private-preview noindex, robots and banner.
 
-- Phase 2: `phase2-account.spec.ts` (usernames, profile), `phase2-portfolio.spec.ts` (blocks, plan rules, portfolio pages), `phase2-draft.spec.ts` (uploads, AI draft), `auto-figure.spec.ts` (the figure picked from an uploaded PDF), `phase2-editor.spec.ts` (editor, publish), `phase2-billing.spec.ts` (Stripe), `phase2-hardening.spec.ts` (account export, privacy and terms).
+- Phase 2: `phase2-account.spec.ts` (usernames, profile), `phase2-portfolio.spec.ts` (blocks, plan rules, portfolio pages), `phase2-draft.spec.ts` (uploads, AI draft), `auto-figure.spec.ts` (the figure picked from an uploaded PDF: the work's own graph taking the place of the drafted one, scans, and the line the editor says after a draft), `phase2-editor.spec.ts` (editor, publish), `phase2-billing.spec.ts` (Stripe), `phase2-hardening.spec.ts` (account export, privacy and terms).
 
 Tests run against the dev server with no services connected. They use the build folder `.next-e2e`, so they can run while `npm run dev` is up.
+
+The e2e tests use the stand-in for every AI call, so they say nothing about how well the model does. Two evals measure that with the real model, and never run on a push because each run is paid for: the draft eval (`npm run eval:drafts`, `evals/exhbt-draft/README.md`) and the figure eval (`npm run eval:figures`, `evals/figure-pick/README.md`). Both run from the Actions workflow "Exhbt draft eval", which asks which suite to run.
 
 To run the suite beside another one (a second worktree, or a dev server on the default port), give it its own port and keep it to one browser at a time:
 
