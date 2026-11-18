@@ -34,7 +34,7 @@ export default async function LabEditorPage({ searchParams }: { searchParams: Pr
         look: isLabLook(look) ? look : "exhbt",
         version: one(q.v) === "b" ? "b" : "a",
         read: one(q.read) === "1",
-        grow: one(q.grow) === "js" ? "script" : "css",
+        grow: one(q.grow) === "mirror" ? "mirror" : "css",
       }}
     />
   );

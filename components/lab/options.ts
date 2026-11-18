@@ -20,6 +20,6 @@ export type LabInitial = {
   version: Version;
   /** `?read=1`: the sample as the published page draws it (the real ProjectView), for comparing against. */
   read: boolean;
-  /** `?grow=js`: text fields grow by script, as they do in a browser without `field-sizing`. */
-  grow: "css" | "script";
+  /** `?grow=mirror`: text fields grow by the fallback, as they do in a browser without `field-sizing`. */
+  grow: "css" | "mirror";
 };

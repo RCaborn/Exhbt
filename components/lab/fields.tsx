@@ -1,15 +1,13 @@
 "use client";
 
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 /**
  * How the lab's text fields grow: by CSS (`field-sizing: content`) where the browser has it, or
- * by script where it doesn't. `?grow=js` forces the script, so the fallback can be tested in a
- * browser that has the CSS.
+ * with a hidden mirror of their words where it doesn't. `?grow=mirror` forces the mirror, so the
+ * fallback can be tested in a browser that has the CSS.
  */
-export const GrowContext = createContext<"css" | "script">("css");
-
-const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+export const GrowContext = createContext<"css" | "mirror">("css");
 
 /**
  * A line or two of plain text typed in place, in the type of whatever it sits in: a textarea with
@@ -19,6 +17,11 @@ const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayout
  *
  * It never changes size or place when it takes focus: the focus ring is an outline, which takes
  * no room. Enter doesn't start a new line; these are one-paragraph texts.
+ *
+ * The fallback for browsers without `field-sizing` is a mirror, not a script: the same words in a
+ * hidden element sharing the field's grid cell, so the cell is exactly as tall as the words and
+ * the field fills it. (Setting the height from scrollHeight was tried first and was up to 3px out:
+ * scrollHeight is whole pixels and counts the overhang of a tight line height.)
  */
 export function AutoText({
   value,
@@ -37,44 +40,34 @@ export function AutoText({
   id?: string;
 }) {
   const forced = useContext(GrowContext);
-  const ref = useRef<HTMLTextAreaElement>(null);
   const [supported, setSupported] = useState(true);
   useEffect(() => setSupported(typeof CSS !== "undefined" && CSS.supports("field-sizing", "content")), []);
-  const script = forced === "script" || !supported;
+  const mirror = forced === "mirror" || !supported;
 
-  // The fallback: as tall as the words, set again when they change or the field's width does.
-  useIsoLayoutEffect(() => {
-    const el = ref.current;
-    if (!script || !el) return;
-    const fit = () => {
-      el.style.height = "0px";
-      el.style.height = `${el.scrollHeight}px`;
-    };
-    fit();
-    let width = el.clientWidth;
-    const watch = new ResizeObserver(() => {
-      if (el.clientWidth === width) return;
-      width = el.clientWidth;
-      fit();
-    });
-    watch.observe(el);
-    return () => watch.disconnect();
-  }, [script, value]);
-
-  return (
+  const field = (
     <textarea
-      ref={ref}
       id={id}
       rows={1}
       aria-label={label}
       value={value}
       placeholder={placeholder}
-      data-grow={script ? "script" : "css"}
+      data-grow={mirror ? "mirror" : "css"}
       onChange={(e) => onChange(e.target.value.replace(/\n/g, " "))}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.preventDefault();
       }}
-      className={`lab-text ${script ? "" : "[field-sizing:content]"} ${className}`}
+      className={`lab-text ${mirror ? "" : "[field-sizing:content]"} ${className}`}
     />
+  );
+  if (!mirror) return field;
+  return (
+    <span className="lab-grow">
+      {/* The zero-width space keeps a last, empty line as tall as a line. */}
+      <span aria-hidden className={`lab-text lab-grow-mirror ${className}`}>
+        {value || placeholder || ""}
+        {"​"}
+      </span>
+      {field}
+    </span>
   );
 }

@@ -27,6 +27,22 @@
     color: var(--xp-muted);
     opacity: 0.75;
   }
+  /* Where the browser has no `field-sizing`: a hidden mirror of the words shares the field's grid
+     cell, so the cell is as tall as the words and the field fills it. */
+  .lab-grow {
+    display: grid;
+  }
+  .lab-grow > * {
+    grid-area: 1 / 1;
+    min-width: 0;
+  }
+  .lab-grow-mirror {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .lab-grow > textarea {
+    height: 100%;
+  }
 
   /* A section's frame: an outline, so it takes no room. Shown when the pointer is on the section
      or the focus is in it. */

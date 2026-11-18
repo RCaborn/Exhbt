@@ -202,13 +202,13 @@ test.describe("Desktop", () => {
     }
   });
 
-  test("a field grows with its words, by CSS or by the script fallback, and both come out the same size", async ({ page }) => {
+  test("a field grows with its words, by CSS or by the fallback, and both come out the same size", async ({ page }) => {
     await open(page, "?sample=research");
     await expect(page.getByLabel("Title")).toHaveAttribute("data-grow", "css");
     const css = await drawn(page);
     const title = await page.getByLabel("Title").boundingBox();
-    await open(page, "?sample=research&grow=js");
-    await expect(page.getByLabel("Title")).toHaveAttribute("data-grow", "script");
+    await open(page, "?sample=research&grow=mirror");
+    await expect(page.getByLabel("Title")).toHaveAttribute("data-grow", "mirror");
     expect(await drawn(page)).toEqual(css);
     expect(await page.getByLabel("Title").boundingBox()).toEqual(title);
     // Typing a long finding makes the field taller, and it never scrolls inside itself.
@@ -262,8 +262,11 @@ test.describe("Desktop", () => {
           const moved = ids.filter((id) => Math.abs(now[id]!.x - drawnBefore[id]!.x) > 0.5 || Math.abs(now[id]!.y - drawnBefore[id]!.y) > 0.5);
           slid += moved.length;
           if (v === "b") expect(moved, `version B keeps the page still (step ${i})`).toEqual([]);
-          // A slide never resizes anything.
-          for (const id of ids) expect([now[id]!.w, now[id]!.h], id).toEqual([drawnBefore[id]!.w, drawnBefore[id]!.h]);
+          // A slide never resizes anything. (A transformed box's size comes back with rounding noise in the fifth decimal place.)
+          for (const id of ids) {
+            expect(now[id]!.w, id).toBeCloseTo(drawnBefore[id]!.w, 2);
+            expect(now[id]!.h, id).toBeCloseTo(drawnBefore[id]!.h, 2);
+          }
           if (await page.locator("[data-lab-line]").isVisible()) lines++;
         }
         if (v === "a") {
@@ -279,11 +282,16 @@ test.describe("Desktop", () => {
         await page.mouse.up();
         // Dropped: it is first, the page is laid out again, and what slides into place does so by transform alone, in 180ms.
         expect(await order(page)).toEqual([last, ...ids.slice(0, -1)]);
-        const motion = await page.evaluate(() =>
-          document.getAnimations().map((a) => {
-            const effect = a.effect as KeyframeEffect;
-            return { ms: effect.getTiming().duration, props: [...new Set(effect.getKeyframes().flatMap((k) => Object.keys(k)))].filter((k) => !["offset", "computedOffset", "easing", "composite"].includes(k)) };
-          }),
+        const motion = await page.evaluate((sel) =>
+          document
+            .getAnimations()
+            // The sections' own motion. (A handle's hover colour also fades, in 160ms; that is feedback, not the drop.)
+            .filter((a) => (a.effect as KeyframeEffect).target?.matches(sel))
+            .map((a) => {
+              const effect = a.effect as KeyframeEffect;
+              return { ms: effect.getTiming().duration, props: [...new Set(effect.getKeyframes().flatMap((k) => Object.keys(k)))].filter((k) => !["offset", "computedOffset", "easing", "composite"].includes(k)) };
+            }),
+          SECTIONS,
         );
         expect(motion.length).toBeGreaterThan(0);
         for (const m of motion) expect(m).toEqual({ ms: 180, props: ["transform"] });
@@ -400,8 +408,8 @@ test.describe("Desktop", () => {
       const g = at["graph-1"]!;
       const mid = f.y + f.h / 2;
       await restOnBoundary({ x: f.x + f.w * 0.55, y: mid }, { x: g.x + g.w * 0.45, y: mid }, "across the pair's gap");
-      // And down its side: from beside the pair to below it.
-      await restOnBoundary({ x: g.x + g.w * 0.5, y: g.y + g.h * 0.6 }, { x: g.x + g.w * 0.5, y: at["graph-2"]!.y + 30 }, "below the pair");
+      // And down its left side: from before the pair to after it.
+      await restOnBoundary({ x: f.x + f.w * 0.2, y: f.y + f.h * 0.3 }, { x: f.x + f.w * 0.2, y: f.y + f.h + 30 }, "down the side of the pair");
       await page.keyboard.press("Escape");
       await expect(board(page)).not.toHaveAttribute("data-lab-lifting");
       expect(await order(page)).toEqual(["flow", "findings", "graph-1", "graph-2", "quote-1", "reflection-1", "link-1"]);
@@ -615,8 +623,11 @@ test.describe("Desktop", () => {
     // By keyboard: Space, right arrow, Space.
     await page.locator('[data-flow-step="step-2"] [data-flow-grip]').focus();
     await page.keyboard.press("Space");
+    await expect(page.getByText("Picked up box 1 of 5.")).toBeAttached();
     await page.keyboard.press("ArrowRight");
+    await expect(page.getByText("The box would go to place 2 of 5.")).toBeAttached();
     await page.keyboard.press("Space");
+    await expect(page.getByText("Box dropped in place 2 of 5.")).toBeAttached();
     expect(await boxes()).toEqual(["step-3", "step-2", "step-1", "step-4", "step-5"]);
     // "+" on the second arrow: an empty box there, with the cursor in it.
     await page.getByRole("button", { name: "Add a box after box 2" }).click();
