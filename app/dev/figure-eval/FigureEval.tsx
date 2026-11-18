@@ -106,14 +106,22 @@ async function draw(pdfBase64: string, name: string, page: number, box: FigureBo
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("No canvas");
   ctx.drawImage(bitmap, 0, 0);
-  const style = getComputedStyle(document.documentElement);
   ctx.lineWidth = 4;
   for (const o of outlines) {
-    // The outline colours are the brand's own: jade for what was expected, the error red for what was cut.
-    ctx.strokeStyle = style.getPropertyValue(`--color-${o.token}`).trim() || "black";
+    ctx.strokeStyle = tokenColour(o.token);
     ctx.strokeRect(o.box.x * canvas.width, o.box.y * canvas.height, o.box.w * canvas.width, o.box.h * canvas.height);
   }
   return canvas.toDataURL("image/png");
+}
+
+/** The outline colours are the brand's own, read from its text classes: jade for what was expected, the error red for what was cut. */
+function tokenColour(token: Outline["token"]): string {
+  const probe = document.createElement("span");
+  probe.className = token === "jade" ? "text-jade" : "text-error";
+  document.body.appendChild(probe);
+  const colour = getComputedStyle(probe).color;
+  probe.remove();
+  return colour;
 }
 
 export function FigureEval() {
