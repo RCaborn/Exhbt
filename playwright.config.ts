@@ -23,7 +23,8 @@ export default defineConfig({
   },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
-    { name: "mobile", use: { ...devices["Pixel 7"] }, testMatch: /responsive\.spec\.ts/ },
+    // The lab's touch tests (e2e/lab-editor.spec.ts) run here too; its other tests skip themselves on a phone.
+    { name: "mobile", use: { ...devices["Pixel 7"] }, testMatch: /(responsive|lab-editor)\.spec\.ts/ },
   ],
   webServer: {
     command: `npx next dev -p ${PORT}`,

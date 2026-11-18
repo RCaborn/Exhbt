@@ -7,8 +7,8 @@ import { APEX } from "./hosts";
  * nothing is trusted from the client.
  */
 
-/** Pages that are not counted: the admin panel, the API and the dev, auth and build routes. */
-const SKIP = ["/admin", "/api", "/dev", "/auth", "/_next"];
+/** Pages that are not counted: the admin panel, the API, the lab's try-out pages and the dev, auth and build routes. */
+const SKIP = ["/admin", "/api", "/dev", "/lab", "/auth", "/_next"];
 export const isCountedPath = (path: string) => !SKIP.some((p) => path === p || path.startsWith(`${p}/`));
 
 /** A segment that is, or may be, someone's own id: a UUID, a number, or a short code with a digit in it. */

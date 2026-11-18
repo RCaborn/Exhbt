@@ -74,7 +74,8 @@ const EDGE = 12;
 
 function anchorFor(plan: Plan, place: number): Plan["anchors"][number] {
   const { rest, boxes, lineOf, lines, rowOf, width } = plan;
-  if (place === plan.home) return { segs: [], box: boxes[plan.id] };
+  // Home is the lifted section's own box, and also the gap it sits in: the end of the line before it and the start of the one after.
+  const box = place === plan.home ? boxes[plan.id] : undefined;
   const a = rest[place - 1];
   const b = rest[place];
   const A = a ? boxes[a]! : null;
@@ -84,7 +85,7 @@ function anchorFor(plan: Plan, place: number): Plan["anchors"][number] {
     // Between two items that sit side by side: the gap between them.
     const x = (A.x + A.w + B.x) / 2;
     segs.push({ x1: x, y1: Math.min(A.y, B.y), x2: x, y2: Math.max(A.y + A.h, B.y + B.h) });
-    return { segs };
+    return { segs, box };
   }
   const lineA = a ? lines[lineOf[a]!]! : null;
   const lineB = b ? lines[lineOf[b]!]! : null;
@@ -101,7 +102,7 @@ function anchorFor(plan: Plan, place: number): Plan["anchors"][number] {
       segs.push({ x1: 0, y1: y, x2: width, y2: y });
     }
   }
-  return { segs };
+  return { segs, box };
 }
 
 function distToSeg(px: number, py: number, s: Seg): number {
