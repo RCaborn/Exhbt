@@ -15,3 +15,11 @@ export const isPrivatePreview = !isPublicLaunch;
  * the second safety switch after the merge. Pages call notFound() when it's off.
  */
 export const isPhase2Enabled = () => process.env.NODE_ENV !== "production" || process.env.EXHBT_PHASE2 === "1";
+
+/**
+ * The lab (try-out pages under /lab, such as the edit-on-page drag prototype at /lab/editor).
+ * On in development and tests; in production only with the runtime setting EXHBT_LAB=1, which is
+ * set for the preview Worker alone (env.preview in wrangler.jsonc) and never for the live site.
+ * Pages call notFound() when it's off.
+ */
+export const isLabEnabled = () => process.env.NODE_ENV !== "production" || process.env.EXHBT_LAB === "1";

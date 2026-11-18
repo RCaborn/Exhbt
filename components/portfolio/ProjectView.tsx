@@ -211,7 +211,7 @@ export function ProjectView({
   );
 }
 
-function Fact({ term, children, wide = false }: { term: string; children: React.ReactNode; /** Both columns when the facts sit side by side. */ wide?: boolean }) {
+export function Fact({ term, children, wide = false }: { term: string; children: React.ReactNode; /** Both columns when the facts sit side by side. */ wide?: boolean }) {
   return (
     <div className={`xp-fact border-b py-3 last:border-b-0 @3xl/xp:first:pt-0 print:border-b-0 print:py-0 ${wide ? "@md/xp:col-span-2 print:col-span-1" : ""}`}>
       <dt className="xp-muted text-[0.78rem]">{term}</dt>

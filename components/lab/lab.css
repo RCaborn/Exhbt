@@ -1,0 +1,277 @@
+/* The editor lab (/lab/editor): the page chrome an edit-on-page editor adds to an exhbt. Every
+   colour, corner and edge here is one of the page's --xp-* variables (app/globals.css), so the
+   frames, handles, the line and the lifted copy follow the portfolio look, dark ones included.
+   In the components layer, so Tailwind utilities still win. */
+@layer components {
+  /* A text field typed in place: no box of its own, the type of whatever it sits in. */
+  .lab-text {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-align: inherit;
+    text-wrap: inherit;
+    resize: none;
+    overflow: hidden;
+    /* A textarea's own default, kept: runs of spaces are typed as they are. */
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+  .lab-text::placeholder {
+    color: var(--xp-muted);
+    opacity: 0.75;
+  }
+
+  /* A section's frame: an outline, so it takes no room. Shown when the pointer is on the section
+     or the focus is in it. */
+  .lab-shell {
+    outline: 1.5px dashed transparent;
+    outline-offset: 8px;
+    border-radius: 2px;
+  }
+  .lab-shell:hover {
+    outline-color: color-mix(in srgb, var(--xp-link) 55%, transparent);
+  }
+  .lab-shell:focus-within {
+    outline-color: var(--xp-link);
+  }
+
+  /* The corner toolbar: the grip, move up, move down. Above the section's top right corner, in
+     the gap between sections; inside the corner of a graph or an image, which have a card. */
+  .lab-tools {
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    z-index: 10;
+    display: flex;
+    gap: 0.25rem;
+    padding-bottom: 0.25rem;
+    opacity: 0;
+  }
+  .lab-shell[data-tools="inside"] > .lab-tools {
+    top: 0.5rem;
+    right: 0.5rem;
+    bottom: auto;
+    padding-bottom: 0;
+  }
+  .lab-shell:hover > .lab-tools,
+  .lab-shell:focus-within > .lab-tools {
+    opacity: 1;
+  }
+  .lab-tool {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex: none;
+  }
+  .lab-tool:disabled {
+    color: var(--xp-muted);
+    opacity: 0.55;
+    cursor: default;
+  }
+  .lab-tool:disabled:hover {
+    border-color: var(--xp-outline-edge);
+  }
+  .lab-grip {
+    cursor: grab;
+    touch-action: none;
+  }
+  .lab-grip:active {
+    cursor: grabbing;
+  }
+
+  /* "+" between sections: a strip over the gap above a row, with the button in its middle. */
+  .lab-insert {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    z-index: 9;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 2.75rem;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .lab-row:first-child > .lab-insert {
+    height: 2rem;
+  }
+  .lab-insert > * {
+    pointer-events: auto;
+  }
+  /* After the last section: under the board, in the page's own bottom padding. */
+  .lab-insert[data-end] {
+    top: 100%;
+    bottom: auto;
+  }
+  .lab-row:hover > .lab-insert,
+  .lab-row:hover + .lab-row > .lab-insert,
+  .lab-row:last-child:hover ~ .lab-insert[data-end],
+  [data-lab-rows]:hover + .lab-insert[data-end],
+  .lab-insert:hover,
+  .lab-insert:focus-within,
+  .lab-insert[data-open] {
+    opacity: 1;
+  }
+  .lab-menu {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    z-index: 30;
+    display: flex;
+    gap: 0.375rem;
+    padding: 0.5rem;
+    translate: -50% 0;
+    background: var(--xp-ground);
+    border: var(--xp-edge-width, 1px) solid var(--xp-rule-strong);
+    border-radius: var(--xp-radius-box);
+    box-shadow: var(--shadow-pack);
+  }
+
+  /* On a touch screen there is no hover: the toolbars and the "+" buttons are always there. */
+  @media (hover: none), (pointer: coarse) {
+    .lab-tools,
+    .lab-insert,
+    .lab-insert[data-end],
+    .lab-flow-tool {
+      opacity: 1;
+    }
+  }
+
+  /* While a section is lifted nothing else offers itself. */
+  [data-lab-lifting] .lab-tools,
+  [data-lab-lifting] .lab-insert,
+  [data-lab-lifting] .lab-flow-tool {
+    opacity: 0 !important;
+    pointer-events: none;
+  }
+  [data-lab-lifting] .lab-shell {
+    outline-color: transparent;
+  }
+  [data-lab-lifting] .lab-shell[data-lifted] > .lab-tools {
+    opacity: 1 !important;
+  }
+
+  /* The lifted section keeps its look on a card of the page's ground, with the pack shadow and an
+     outline in the look's link colour (jade in the Exhbt look). It never scales. The card is 12px
+     larger than the section all round, so the section's own words don't move when it lifts. */
+  .lab-card {
+    position: absolute;
+    inset: -0.75rem;
+    background: var(--xp-ground);
+    border-radius: var(--xp-radius-card);
+    outline: 2px solid var(--xp-link);
+    box-shadow: var(--shadow-pack);
+  }
+  .lab-lift {
+    position: absolute;
+    z-index: 30;
+    pointer-events: none;
+    cursor: grabbing;
+  }
+  /* Lifted from the keyboard, and while a dropped section settles, the section itself is the card. */
+  .lab-shell[data-lifted],
+  .lab-shell[data-settling] {
+    z-index: 20;
+    outline-color: transparent;
+  }
+  .lab-shell[data-lifted]::before,
+  .lab-shell[data-settling]::before {
+    content: "";
+    position: absolute;
+    inset: -0.75rem;
+    z-index: -1;
+    background: var(--xp-ground);
+    border-radius: var(--xp-radius-card);
+    outline: 2px solid var(--xp-link);
+    box-shadow: var(--shadow-pack);
+  }
+  .lab-shell[data-lifted],
+  .lab-shell[data-settling] {
+    isolation: isolate;
+  }
+
+  /* Version B: the line that shows where the lifted section will land. */
+  .lab-line {
+    position: absolute;
+    z-index: 25;
+    pointer-events: none;
+    background: var(--xp-link);
+    border-radius: 999px;
+  }
+  /* Version A: the room the page makes for the lifted section. */
+  .lab-landing {
+    position: absolute;
+    z-index: 5;
+    pointer-events: none;
+    border: 2px dashed var(--xp-link);
+    border-radius: var(--xp-radius-box);
+    background: color-mix(in srgb, var(--xp-link) 9%, transparent);
+  }
+
+  /* Flow boxes: a grip on each box, and a "+" on each arrow. */
+  .lab-flow-tool {
+    position: absolute;
+    z-index: 8;
+    opacity: 0;
+  }
+  .lab-flow-item:hover .lab-flow-tool,
+  .lab-flow-item:focus-within .lab-flow-tool,
+  .lab-flow-tool:focus-visible {
+    opacity: 1;
+  }
+  .lab-flow-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+  .lab-flow-item[data-dragging] {
+    z-index: 15;
+  }
+  .lab-flow-item[data-dragging] > .xp-flow-box {
+    outline: 2px solid var(--xp-link);
+    box-shadow: var(--shadow-pack);
+  }
+
+  /* The context line's Highlight button: above the line's right end, only while the line is being typed in. */
+  .lab-context-tools {
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    z-index: 10;
+    padding-bottom: 0.25rem;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .lab-context:focus-within .lab-context-tools {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* Tiptap's own stylesheet is switched off for this field (injectCSS: false): it sets
+     `white-space: break-spaces`, which breaks lines in different places from the published
+     paragraph, and turns ligatures off. These are the rules the field still needs. */
+  .lab-context .ProseMirror {
+    position: relative;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    outline-offset: 4px;
+  }
+  /* Tiptap's own paragraph takes the line's type, not the reset's 16px. */
+  .lab-context .ProseMirror p {
+    margin: 0;
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+  }
+}

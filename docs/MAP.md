@@ -62,6 +62,8 @@ Phase 2 is the paid product: build exhbts, publish them to a portfolio, pay for 
 
 **Privacy.** The account export (`/api/account/export`, `exportUserData` in `lib/store.ts`) includes the portfolio profile, every exhbt with both copies, file details (not the files), subscriptions, saved ideas, team memberships and invites, and the person's own side of any file match. The privacy policy and terms are `app/(marketing)/legal/[doc]/page.tsx`.
 
+**The lab.** `/lab/editor` is a try-out page, not part of the product: a prototype of editing an exhbt on the page itself, with two versions of drag and drop, on sample exhbts held in memory (`app/lab/editor/`, `components/lab/`). No sign-in, nothing stored, never indexed. It is on in development, in tests and on the preview site (`EXHBT_LAB=1` in the preview Worker's vars only) and not found on the live site (`isLabEnabled()` in `lib/site.ts`). What it found is `docs/briefs/edit-on-page/drag-prototype.md`.
+
 ## Where to change something
 
 | You want to change | Open |
@@ -94,4 +96,5 @@ Phase 2 is the paid product: build exhbts, publish them to a portfolio, pay for 
 | What the account export includes | `exportUserData` in `lib/store.ts` (both implementations) |
 | Privacy policy, terms, cookies | `app/(marketing)/legal/[doc]/page.tsx` |
 | A marketing page's title, description or link-preview image, canonical addresses, JSON-LD, sitemaps, robots.txt | `lib/seo.ts`, `lib/og/card.tsx`, `app/(marketing)/og/[key]/route.tsx`, `app/sitemap.ts`, `app/robots.ts`, `app/(portfolio)/p/[username]/sitemap.xml/route.ts` and `robots.txt/route.ts`, `e2e/seo.spec.ts` |
+| The editor lab (the edit-on-page drag prototype), its samples and its switch | `app/lab/editor/page.tsx`, `components/lab/`, `isLabEnabled()` in `lib/site.ts`, `docs/briefs/edit-on-page/drag-prototype.md` |
 | When a legal page last changed (printed on the page, and the sitemap's lastmod) | `lib/legal.ts` |
