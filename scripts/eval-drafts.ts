@@ -607,7 +607,7 @@ async function selfTest(banned: Banned): Promise<boolean> {
   const f = loadFixtures(["08"])[0]!;
   const { input } = await loadInput(f);
   const source = materialText(input);
-  const asResult = (doc: ExhbtDoc): DraftResult => ({ doc, numbers: [], model: "self-test", inputTokens: 0, outputTokens: 0, costUsd: 0 });
+  const asResult = (doc: ExhbtDoc): DraftResult => ({ doc, formatReason: "default", numbers: [], model: "self-test", inputTokens: 0, outputTokens: 0, costUsd: 0 });
   const empty: ExhbtDoc = { ...ORACLE_08, title: "", headline: undefined, skills: [], gap: [], flow: [], sections: [] };
   const cases: { name: string; doc: ExhbtDoc; want: Partial<Record<Criterion, number>> }[] = [
     { name: "oracle", doc: ORACLE_08, want: { C1: 2, C2: 2, C5: 2, C8: 2 } },

@@ -646,23 +646,54 @@ const PLAIN_MATERIAL =
 const draft = async (page: Page, data: Record<string, string>) => {
   const res = await page.request.post("/api/exhbts/draft", { data });
   expect(res.status(), await res.text()).toBe(200);
-  return (await res.json()) as { id: string; format: string };
+  return (await res.json()) as { id: string; format: string; formatReason: string };
 };
 
 test.describe("The draft suggests a layout", () => {
-  test("notes can name a gallery: the editor opens on it and says so once", async ({ page }) => {
+  test("notes can name a gallery: the editor opens on it and says so, with why, once", async ({ page }) => {
     await signInAs(page, `dg${stamp()}`, "max");
     const d = await draft(page, { text: PLAIN_MATERIAL, notes: "stand-in: layout gallery" });
     expect(d.format).toBe("gallery");
-    await page.goto(`/exhbts/${d.id}/edit?drafted=${d.format}`);
+    // Why: a fixed signal, not the AI's words (decision 0025). The notes named the layout.
+    expect(d.formatReason).toBe("notes");
+    await page.goto(`/exhbts/${d.id}/edit?drafted=${d.format}&why=${d.formatReason}`);
     await expect(page.locator("[data-ready=true]")).toBeAttached();
     await expect(page.getByRole("radio", { name: /^Gallery/ })).toBeChecked();
-    await expect(page.getByText("Drafted as a gallery. Change it any time; nothing is lost.")).toBeVisible();
+    const line = page.locator("[data-drafted]");
+    await expect(line).toContainText("Laid out as Gallery because your notes name this layout.");
+    await expect(line.getByRole("link", { name: "Change layout" })).toBeVisible();
     await expect(previewArticle(page)).toHaveAttribute("data-format", "gallery");
-    // Not said again on a plain visit.
+    // Said once: the editor takes it off the address, so a reload doesn't repeat it, and nor does a plain visit.
+    await expect(page).toHaveURL(new RegExp(`/exhbts/${d.id}/edit$`));
+    // Switching the layout takes the line's place.
+    await page.getByRole("radio", { name: /^Case study/ }).check();
+    await expect(page.getByText("Switched to Case study. Nothing was deleted.")).toBeVisible();
+    await expect(page.getByText("Laid out as")).toHaveCount(0);
     await page.goto(`/exhbts/${d.id}/edit`);
     await expect(page.locator("[data-ready=true]")).toBeAttached();
-    await expect(page.getByText("Drafted as a gallery.")).toHaveCount(0);
+    await expect(page.locator("[data-drafted]")).toHaveCount(0);
+  });
+
+  test("the reason is fixed wording: one that doesn't fit the layout, or isn't on the list, is left out", async ({ page }) => {
+    await signInAs(page, `dw${stamp()}`, "max");
+    const d = await draft(page, { text: PLAIN_MATERIAL });
+    expect(d.format).toBe("case-study");
+    expect(d.formatReason).toBe("question-findings");
+    await page.goto(`/exhbts/${d.id}/edit?drafted=case-study&why=${d.formatReason}`);
+    await expect(page.locator("[data-drafted]")).toContainText("Laid out as Case study because your work sets out a question and what you found.");
+    // A research reason on a case study, and words typed into the address, say nothing.
+    for (const why of ["aim-results", encodeURIComponent("because the AI is always right")]) {
+      await page.goto(`/exhbts/${d.id}/edit?drafted=case-study&why=${why}&fig=${encodeURIComponent("we lost your figure")}`);
+      await expect(page.locator("[data-ready=true]")).toBeAttached();
+      const line = page.locator("[data-drafted]");
+      await expect(line).toContainText("Laid out as Case study.");
+      await expect(line).not.toContainText("because");
+      await expect(line).not.toContainText("figure");
+    }
+    // The layout named in the address must be the exhbt's own.
+    await page.goto(`/exhbts/${d.id}/edit?drafted=research&why=aim-results`);
+    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await expect(page.locator("[data-drafted]")).toHaveCount(0);
   });
 
   test("a hypothesis and an https link draft as research, with an aim and one reference; an http link is dropped", async ({ page }) => {
@@ -670,9 +701,11 @@ test.describe("The draft suggests a layout", () => {
     const material = `${PLAIN_MATERIAL} Our hypothesis was that walking helps recall. We built on https://example.com/paper and an old note at http://plain.example/x.`;
     const d = await draft(page, { text: material });
     expect(d.format).toBe("research");
-    await page.goto(`/exhbts/${d.id}/edit?drafted=research`);
+    expect(d.formatReason).toBe("aim-results");
+    await page.goto(`/exhbts/${d.id}/edit?drafted=research&why=${d.formatReason}`);
     await expect(page.locator("[data-ready=true]")).toBeAttached();
     await expect(page.getByRole("radio", { name: /^Research/ })).toBeChecked();
+    await expect(page.locator("[data-drafted]")).toContainText("Laid out as Research because your work has an aim and results.");
     const area = sectionsArea(page);
     await expect(area.getByRole("region", { name: "Aim or hypothesis", exact: true })).toBeVisible();
     await expect(area.getByRole("region", { name: /^Reference/ })).toHaveCount(1);

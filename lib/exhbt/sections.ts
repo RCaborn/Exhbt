@@ -6,13 +6,15 @@ import {
   text,
   words,
   type ExhbtDoc,
+  type FigureKind,
   type Picked,
   type Section,
   type SectionKind,
   type SectionOf,
 } from "./blocks";
 import { newChart } from "./charts";
-import { FORMAT_COPY, FORMAT_RULES, formatOf, hiddenSections, type Format } from "./formats";
+import { FORMAT_COPY, FORMAT_RULES, formatOf, hiddenSections, type Format, type FromWork } from "./formats";
+import { normaliseNumber, numbersInDoc } from "./verify";
 
 /**
  * Adding, naming and moving the sections below the flowchart (decision 0015). Pure, so the
@@ -145,7 +147,12 @@ export const leadRatio = (s: Pick<SectionOf<"image">, "w" | "h">): number => Mat
  * file is left alone. Unchanged when the layout has no room for another image. `picked` notes where
  * it came from; publishing then waits for the person's tick (decision 0017).
  */
-export function withKeyFigure(doc: ExhbtDoc, figure: { fileId: string; alt: string; caption?: string; picked?: Picked }): ExhbtDoc {
+export function withKeyFigure(
+  doc: ExhbtDoc,
+  figure: { fileId: string; alt: string; caption?: string; picked?: Picked },
+  /** Where it goes when a gallery or research page has no picture or figure to go before. The end, unless said. */
+  instead?: number,
+): ExhbtDoc {
   const ss = doc.sections;
   const f = formatOf(doc);
   if (ss.some((s) => s.kind === "image" && s.fileId === figure.fileId) || roomFor(ss, "image", f) === 0) return doc;
@@ -158,9 +165,86 @@ export function withKeyFigure(doc: ExhbtDoc, figure: { fileId: string; alt: stri
   let at: number;
   if (f === "gallery" || f === "research") {
     const first = firstOfKinds(ss, f === "gallery" ? ["image"] : ["graph", "image"]);
-    at = first < 0 ? ss.length : first;
+    at = first < 0 ? Math.min(Math.max(0, instead ?? ss.length), ss.length) : first;
   } else at = ss.findIndex((s) => s.kind === "findings") + 1;
   return { ...doc, sections: [...ss.slice(0, at), section, ...ss.slice(at)] };
+}
+
+/** A visual picked from the person's work, ready to go on the exhbt (decisions 0017 and 0025). */
+export type WorkVisual = { fileId: string; alt: string; caption?: string; picked?: Picked; kind: FigureKind };
+
+export type WorkVisualResult = {
+  /** The doc with the visual on it; the doc as it was when `placed` is false. */
+  doc: ExhbtDoc;
+  placed: boolean;
+  /**
+   * Why it wasn't placed: the layout takes nothing from the work, the layout's images are full, or
+   * the same picture is already on the exhbt.
+   */
+  why?: "not-wanted" | "no-room" | "already";
+  /** The graph sections the draft made that it took the place of. */
+  removed: SectionOf<"graph">[];
+};
+
+/** A graph, a chart or a results table from the work is the work's own results figure: it takes the place of a graph the draft drew. */
+export const replacesDraftedGraph = (kind: FigureKind): boolean => kind === "graph" || kind === "table";
+
+/**
+ * The rule for a visual picked from the person's work (decision 0025): the work's own graph wins.
+ *
+ *  - The layout says what it takes from the work (`fromWork` in lib/exhbt/formats.ts). One that
+ *    takes nothing gets nothing: the doc comes back as it was.
+ *  - A graph, a chart or a results table: the graph sections go, then the figure is put where the
+ *    layout wants its key figure (withKeyFigure). The exhbt has the real graph and no drawn one.
+ *  - Another visual (a photo, a diagram): it is put there too, and the graphs stay while the layout
+ *    has room for both. When it hasn't, the picked visual comes first: graphs go, last first,
+ *    until it fits. In research a drafted graph that stays is still the key figure, and the picked
+ *    visual goes straight after it.
+ *  - A person's own pictures are never taken off to make room. A layout whose images are full
+ *    leaves the doc, graphs included, as it was.
+ *
+ * It runs once, straight after the draft and before the editor opens, so every graph on the exhbt
+ * is one the draft made. Numbers flagged to check that were only on a graph it removed are no longer
+ * on the page, so they leave the list. `opts.wants` is for a layout that isn't in FORMAT_RULES yet.
+ */
+export function withWorkVisual(doc: ExhbtDoc, visual: WorkVisual, opts: { wants?: FromWork } = {}): WorkVisualResult {
+  const f = formatOf(doc);
+  const wants = opts.wants ?? FORMAT_RULES[f].fromWork;
+  const unchanged = (why: NonNullable<WorkVisualResult["why"]>): WorkVisualResult => ({ doc, placed: false, why, removed: [] });
+  if (wants === "none") return unchanged("not-wanted");
+  if (doc.sections.some((s) => s.kind === "image" && s.fileId === visual.fileId)) return unchanged("already");
+
+  let sections = doc.sections;
+  const removed: SectionOf<"graph">[] = [];
+  /** Where the first graph taken off was, so the figure can take its place when the layout has nothing else to put it before. */
+  let gap: number | undefined;
+  const takeOff = (i: number) => {
+    removed.unshift(sections[i] as SectionOf<"graph">);
+    sections = sections.filter((_, k) => k !== i);
+    gap = i;
+  };
+  const lastGraph = () => sections.reduce((at, s, i) => (s.kind === "graph" ? i : at), -1);
+  if (replacesDraftedGraph(visual.kind)) {
+    for (let i = lastGraph(); i >= 0; i = lastGraph()) takeOff(i);
+  } else {
+    for (let i = lastGraph(); i >= 0 && roomFor(sections, "image", f) === 0; i = lastGraph()) takeOff(i);
+  }
+  if (roomFor(sections, "image", f) === 0) return unchanged("no-room");
+
+  const { kind, ...figure } = visual;
+  let next = withKeyFigure({ ...doc, sections }, { ...figure, ...(figure.picked ? { picked: { ...figure.picked, kind } } : {}) }, gap);
+  // Research reads figure first, and its key figure is the results: a drafted graph stays first and
+  // a picked diagram or photo follows it (decided in the build, 19 Nov 2026; open for Rory to confirm). With no graph left, the picked visual leads.
+  if (f === "research" && !replacesDraftedGraph(kind)) {
+    const image = next.sections.findIndex((s) => s.kind === "image" && s.fileId === visual.fileId);
+    const graph = next.sections.findIndex((s) => s.kind === "graph");
+    if (image >= 0 && graph > image) next = { ...next, sections: moveSection(next.sections, image, graph) };
+  }
+  if (!removed.length || !next.unverified) return { doc: next, placed: true, removed };
+  // A number can't be normalised only if something else wrote the list; leave what can't be judged.
+  const onPage = new Set(numbersInDoc(next).map(normaliseNumber));
+  const unverified = next.unverified.filter((n) => normaliseNumber(n) === null || onPage.has(normaliseNumber(n)));
+  return { doc: { ...next, unverified }, placed: true, removed };
 }
 
 /**

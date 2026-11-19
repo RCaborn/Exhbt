@@ -11,10 +11,10 @@ import { Button } from "@/components/ui/Button";
 import { CopyLink } from "@/components/ui/CopyLink";
 import type { Plan } from "@/lib/entitlements";
 import { formatLimits, LIMITS, normaliseDoc, safeHref, validateForPublish, wordCount, type ExhbtDoc, type Picked } from "@/lib/exhbt/blocks";
-import { FORMAT_COPY, formatOf, type Format } from "@/lib/exhbt/formats";
+import { FORMAT_COPY, formatOf } from "@/lib/exhbt/formats";
 import { hasData } from "@/lib/exhbt/charts";
 import { newImageSection, roomFor } from "@/lib/exhbt/sections";
-import { LayoutPicker } from "./LayoutPicker";
+import { LayoutPicker, type Drafted } from "./LayoutPicker";
 import { BlockTools, useDraftTools, type DraftToolsInit } from "./BlockTools";
 import { ConfirmAction } from "./ConfirmAction";
 import { FieldIssues } from "./FieldIssues";
@@ -59,8 +59,12 @@ export type EditorProps = {
   figureSources?: Record<string, string | null>;
   /** Rewrite and "Back to the AI version"; null or missing when the exhbt has no kept source text. */
   draftTools?: DraftToolsInit;
-  /** The layout the AI draft chose, right after drafting (?drafted=gallery): a one-off line under the layout choice. */
-  draftedAs?: Format;
+  /**
+   * What the draft page passed on, right after drafting (?drafted=research&why=aim-results&fig=none): the
+   * layout chosen, why, and what came of looking for a figure. Said in one line under the layout choice,
+   * once: the editor takes it off the address, so a reload doesn't say it again (decision 0025).
+   */
+  drafted?: Drafted;
 };
 
 /** Where the list at the top jumps to for an issue: the card's heading, or the "Add a section" button for the sections as a whole. */
@@ -87,6 +91,9 @@ const GUIDE_KEY = "exhbt-guide-hidden";
 export function Editor(props: EditorProps) {
   const { id, status, slug, liveBase, owner, planBlock, canGoLive, maxFileMb } = props;
   const [doc, setDoc] = useState<ExhbtDoc>(props.initialDoc);
+  // What the draft page passed on, kept from the first render: it comes off the address below, so a
+  // later render of this page on the server (after publishing, say) no longer carries it.
+  const [drafted] = useState(props.drafted);
   const docRef = useRef(doc);
   docRef.current = doc;
   const f = formatOf(doc);
@@ -148,6 +155,8 @@ export function Editor(props: EditorProps) {
       if (b.at > Date.parse(props.updatedAt) && JSON.stringify(b.doc) !== JSON.stringify(props.initialDoc)) setOffer(b);
       else clearBackup(id);
     }
+    // What the draft page passed on is said once: it comes off the address, so a reload doesn't repeat it.
+    if (drafted && window.location.search) window.history.replaceState(null, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -504,7 +513,7 @@ export function Editor(props: EditorProps) {
                 }}
               />
             )}
-            <LayoutPicker doc={doc} setDoc={setDoc} draftedAs={props.draftedAs} />
+            <LayoutPicker doc={doc} setDoc={setDoc} drafted={drafted} />
             <Card id="card-header" title={copy.header} words={cw.header} flagged={flaggedBy("header")} heaviest={heaviest === "header"}>
               {flags.length > 0 && (
                 <ul aria-label="Numbers to check" className="mb-4 space-y-2">

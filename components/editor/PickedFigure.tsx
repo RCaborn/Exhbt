@@ -103,8 +103,11 @@ export function PickedFigure({
     replace(async (bytes) => {
       const { pdfFigure } = await import("@/lib/figures/pdf");
       const blob = await pdfFigure(bytes, page, null);
-      // Another page is another figure: the tick, the description and the caption start again.
-      return { file: asFile(blob, p.from, page), picked: { ...p, page, box: { x: 0, y: 0, w: 1, h: 1 }, shareOk: false }, describeAgain: true };
+      // Another page is another figure: the tick, the description and the caption start again, and
+      // what the AI said the first one was (a graph, a table) no longer holds.
+      const { kind: _kind, ...rest } = p;
+      void _kind;
+      return { file: asFile(blob, p.from, page), picked: { ...rest, page, box: { x: 0, y: 0, w: 1, h: 1 }, shareOk: false }, describeAgain: true };
     }, `Page ${page} is in. Crop it to the figure, then describe it.`);
 
   return (

@@ -26,12 +26,32 @@ export function withFormat<T extends ExhbtDoc>(doc: T, f: Format): T {
 
 const SIX = ["findings", "graph", "image", "quote", "reflection", "link"] as const satisfies readonly SectionKind[];
 
-/** The kinds each layout draws. A kind it doesn't draw is kept in the doc but not shown, counted or checked. */
-export const FORMAT_RULES: Record<Format, { name: string; bestFor: string; kinds: readonly SectionKind[] }> = {
-  "case-study": { name: "Case study", bestFor: "A question, how you answered it and what you found. Analysis, business, data and software.", kinds: SIX },
-  gallery: { name: "Gallery", bestFor: "Pictures first, with the brief and what happened. Campaigns, design, architecture, film and products.", kinds: SIX },
-  research: { name: "Research", bestFor: "Question, aim, method, one key figure, results and conclusion. Lab work, experiments and dissertations.", kinds: [...SIX, "aim", "conclusion"] },
+/**
+ * What a layout takes from the person's own work when an exhbt is drafted (decision 0025):
+ *  - "figure": its one key figure, the main graph or visual in the work;
+ *  - "pictures": the work's pictures, the first of them the lead image;
+ *  - "none": nothing. Nothing is looked for and nothing is placed (an essay, say).
+ */
+export const FROM_WORK = ["figure", "pictures", "none"] as const;
+export type FromWork = (typeof FROM_WORK)[number];
+
+/**
+ * The kinds each layout draws, and what it takes from the work. A kind it doesn't draw is kept in
+ * the doc but not shown, counted or checked.
+ */
+export const FORMAT_RULES: Record<Format, { name: string; bestFor: string; kinds: readonly SectionKind[]; fromWork: FromWork }> = {
+  "case-study": { name: "Case study", bestFor: "A question, how you answered it and what you found. Analysis, business, data and software.", kinds: SIX, fromWork: "figure" },
+  gallery: { name: "Gallery", bestFor: "Pictures first, with the brief and what happened. Campaigns, design, architecture, film and products.", kinds: SIX, fromWork: "pictures" },
+  research: {
+    name: "Research",
+    bestFor: "Question, aim, method, one key figure, results and conclusion. Lab work, experiments and dissertations.",
+    kinds: [...SIX, "aim", "conclusion"],
+    fromWork: "figure",
+  },
 };
+
+/** What a doc's layout takes from the work. A layout this code doesn't know reads as a case study, as everywhere. */
+export const fromWorkOf = (d: { format?: unknown }): FromWork => FORMAT_RULES[formatOf(d)].fromWork;
 
 /** The words the editor and the page use, per layout. */
 export const FORMAT_COPY: Record<

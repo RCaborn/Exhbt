@@ -2,56 +2,84 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
-import type { FigureBox } from "@/lib/exhbt/blocks";
-import { LIMITS } from "@/lib/exhbt/blocks";
-import { clampBox, fitAlt, fitCaption } from "@/lib/figures/rules";
+import type { FigureBox, FigureKind } from "@/lib/exhbt/blocks";
+import { FIGURE_KINDS, isFigureKind, LIMITS } from "@/lib/exhbt/blocks";
+import { boxFromPixels, fitAlt, fitCaption, pixelsFromBox, type PixelSize } from "@/lib/figures/rules";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
 
 /**
- * Picks the one figure in a person's report that best shows its result (decision 0017): the
- * browser sends small images of the pages that draw something besides text, and the model
- * answers with which image, where the figure is on it, and alt text and a caption taken only
- * from what the page shows. Or no figure at all. Part of the draft: it doesn't use a draft or a
- * rewrite from the person's allowance. Logged as its own step, 'figure_pick'.
+ * Picks the one visual in a person's work that best shows its result (decisions 0017 and 0025):
+ * the browser sends small images of the pages that draw something besides text, and the model
+ * answers with which image, what the visual is (a graph, a table or something else), where it is
+ * on the image, and alt text and a caption taken only from what the page shows. Or nothing at
+ * all. Part of the draft: it doesn't use a draft or a rewrite from the person's allowance. Logged
+ * as its own step, 'figure_pick'.
  */
 
-export type PageImage = { label: string; data: Uint8Array; mediaType: "image/jpeg" | "image/png" };
-export type FigurePick = { image: number; box: FigureBox; alt: string; caption: string };
-export type FigurePickResult = { pick: FigurePick | null; model: string; inputTokens: number; outputTokens: number; costUsd: number };
+/** One image the figure could be on, with its size in pixels (read from the file by the route, not sent by the browser). */
+export type PageImage = { label: string; data: Uint8Array; mediaType: "image/jpeg" | "image/png"; width: number; height: number };
+export type FigurePick = { image: number; kind: FigureKind; box: FigureBox; alt: string; caption: string };
+export type FigurePickResult = {
+  pick: FigurePick | null;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  /** The model's answer before the server's checks, for the eval (evals/figure-pick). Never sent to a browser in production. */
+  raw: Answer | null;
+};
 
-const SYSTEM = `You look at pages from a UK student's or graduate's project report and choose the one figure that best shows what the project found. It will sit beside the findings on a short portfolio page that recruiters read in 30 seconds.
+const SYSTEM = `You look at page images from a UK student's or graduate's project (a report, a dissertation, slides, a poster) and choose the one visual from the work itself that best shows what the project found or made. It is cut out of the page and shown on a short portfolio page that recruiters read in 30 seconds, so it has to be the work's key result, readable when it stands alone.
 
-What counts as a figure: a chart or graph, a diagram (a flowchart, an architecture or process diagram), or a table laid out as a figure with a title. What does not: a page of plain text, a logo, a cover page, a photo of a person, decoration, a page header or footer, a contents page, a form.
+What to choose, in this order:
+1. The main results graph or chart: the one that answers the project's question or shows its headline result. When there are several, choose the one the work itself treats as the main result (its title, its caption or the heading over it says so), not a chart that only describes the data or the sample, a check on the method, or one in an appendix.
+2. A table of results, when no graph or chart shows the main result.
+3. Another visual that shows what was made or found: a photo or a render of the thing made, a screenshot, a poster, a map, a design.
+4. A diagram of the method or the system (a flowchart, an architecture diagram), only when none of the above is there.
 
-Rules:
-- Choose at most one figure. If no page has a real figure, set "found" to false and leave the other fields empty or null.
-- Prefer a figure that shows a result (what changed, what was measured, a results table) over a method diagram, and a method diagram over anything else.
-- "image": the number of the image it is on, as labelled ("Image 3" is 3).
-- "box": where the figure is on that image, as fractions of the image's width and height from its top-left corner: "x" and "y" for the top-left corner of the box, "w" and "h" for its width and height. Include the figure's own title, axis labels, legend and any source line under it. Leave out the body text around it.
-- "alt": a description for someone who can't see it, in one or two sentences of at most 40 words: what kind of figure it is, what it measures, and the values it shows, only as printed on it.
-- "caption": one line of at most ${LIMITS.images.captionWords} words saying what the figure shows, using only words and figures printed in the report. No claims the report doesn't make.
-- Use only what you can see in the images. Never invent numbers, labels or conclusions. Plain British English, no hype words.`;
+Never choose a page or a block of plain text, a logo, a cover or title page, a contents page, a page header or footer, decoration, a photo of a person, an equation, a form or a list of references. If no image has a visual worth showing, set "found" to false: an essay or a report of plain text has none, and nothing is better than a logo or a page of text.
 
-/** One flat shape: structured outputs keep it simple, and the server checks every value. */
+The pages may be scans or photos of pages, or slides. Treat them the same way.
+
+Your answer:
+- "found": true when you chose a visual, false when there is none.
+- "image": the number of the image it is on, as labelled ("Image 3" is 3). null when "found" is false.
+- "kind": "graph" for a graph or chart of results; "table" for a table of results; "other" for anything else (a photo, a screenshot, a diagram, a poster, a map). "none" when "found" is false.
+- "box": where the visual is on that image, in pixels of that image, counted from its top-left corner. Each image's size in pixels is in its label. "left" and "top" are the box's top-left corner; "right" and "bottom" are its bottom-right corner. The box holds the whole visual: its own title, both axes with their tick labels and axis titles, the legend, every label printed on it, and a caption or source line directly above or below it. It leaves out the paragraphs of body text around it, the page's header and footer, and any other figure. On a slide, the box is the chart, not the whole slide. If you are unsure where an edge is, make the box slightly too big: a figure with part cut off is no use. null when "found" is false.
+- "alt": a description for someone who can't see it, in one or two sentences of at most 40 words: what kind of visual it is, what it shows or measures, and the values printed on it, only as printed. Empty when "found" is false.
+- "caption": one line of at most ${LIMITS.images.captionWords} words saying what it shows, using only words and figures printed on the page. No claim the work doesn't make. Empty when "found" is false.
+- Use only what you can see in the images. Never invent or work out numbers, labels or conclusions. Plain British English, no hype words.`;
+
+/**
+ * One flat shape: structured outputs keep it simple, and the server checks every value. Each field
+ * is a shape the draft's schema already uses (a plain enum, a nullable number or object), so the
+ * kind has "none" for no figure, not null.
+ */
 const AnswerSchema = z.object({
   found: z.boolean(),
   image: z.number().nullable(),
-  box: z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }).nullable(),
+  kind: z.enum([...FIGURE_KINDS, "none"]),
+  box: z.object({ left: z.number(), top: z.number(), right: z.number(), bottom: z.number() }).nullable(),
   alt: z.string(),
   caption: z.string(),
 });
-type Answer = z.infer<typeof AnswerSchema>;
+export type Answer = z.infer<typeof AnswerSchema>;
 
-/** The answer made safe: an image that was sent, a box on the page, text within its limits. */
-export function toPick(a: Answer, count: number): FigurePick | null {
-  if (!a.found || a.image === null || !Number.isInteger(a.image) || a.image < 1 || a.image > count) return null;
+/**
+ * The answer made safe: an image that was sent, a kind from the fixed list, a box on the page (in
+ * fractions, from the pixels the model gives), text within its limits. A visual with no kind is
+ * "other": the kind that takes nothing off the exhbt (decision 0025).
+ */
+export function toPick(a: Answer, sizes: PixelSize[]): FigurePick | null {
+  if (!a.found || a.image === null || !Number.isInteger(a.image) || a.image < 1 || a.image > sizes.length) return null;
   const alt = fitAlt(a.alt);
   if (!alt) return null;
-  return { image: a.image, box: clampBox(a.box), alt, caption: fitCaption(a.caption) };
+  const kind: FigureKind = isFigureKind(a.kind) ? a.kind : "other";
+  return { image: a.image, kind, box: boxFromPixels(a.box, sizes[a.image - 1]!), alt, caption: fitCaption(a.caption) };
 }
 
 export async function pickFigure(images: PageImage[]): Promise<FigurePickResult> {
-  if (!images.length) return { pick: null, model: "none", inputTokens: 0, outputTokens: 0, costUsd: 0 };
+  if (!images.length) return { pick: null, model: "none", inputTokens: 0, outputTokens: 0, costUsd: 0, raw: null };
   const apiKey = anthropicApiKey();
   if (!apiKey) {
     // Never hand real people a placeholder figure.
@@ -60,10 +88,10 @@ export async function pickFigure(images: PageImage[]): Promise<FigurePickResult>
   }
 
   const content: Anthropic.ContentBlockParam[] = images.flatMap((im, i): Anthropic.ContentBlockParam[] => [
-    { type: "text", text: `Image ${i + 1}: ${im.label}` },
+    { type: "text", text: `Image ${i + 1}: ${im.label}. ${im.width} by ${im.height} pixels.` },
     { type: "image", source: { type: "base64", media_type: im.mediaType, data: Buffer.from(im.data).toString("base64") } },
   ]);
-  content.push({ type: "text", text: "Choose the figure." });
+  content.push({ type: "text", text: "Choose the visual, or say there is none." });
 
   const client = new Anthropic({ apiKey });
   const response = await client.messages.parse({
@@ -76,39 +104,42 @@ export async function pickFigure(images: PageImage[]): Promise<FigurePickResult>
   });
 
   if (response.stop_reason !== "end_turn" || !response.parsed_output) {
-    // Every failure looks like "no figure" to the person, so the reason is logged by the route.
+    // The route logs the reason and answers with an error; the draft page then says it couldn't look.
     throw new Error(`Figure pick failed (stop_reason: ${response.stop_reason})`);
   }
   const { input_tokens, output_tokens } = response.usage;
+  const raw = AnswerSchema.parse(response.parsed_output);
   return {
-    pick: toPick(AnswerSchema.parse(response.parsed_output), images.length),
+    pick: toPick(raw, images),
     model: response.model,
     inputTokens: input_tokens,
     outputTokens: output_tokens,
     costUsd: costUsd(input_tokens, output_tokens),
+    raw,
   };
 }
+
+/** The stand-in's kind, from the file's name: the word "diagram", "photo", "poster", "screenshot" or "map" is another visual, "table" a table, anything else a graph. */
+const mockKind = (label: string): FigureKind => {
+  const has = (words: string) => new RegExp(`(^|[^a-z])(${words})([^a-z]|$)`, "i").test(label);
+  return has("diagram|photo|poster|screenshot|map") ? "other" : has("table") ? "table" : "graph";
+};
 
 /**
  * The stand-in without an API key (development and tests): the first page image sent, which is
  * the first page that draws shapes or pictures (the browser sends no others), with a box that
- * covers the chart in e2e/fixtures/report-with-chart.pdf. Labelled as a placeholder.
+ * covers the chart in e2e/fixtures/report-with-chart.pdf, and a kind read from the file's name
+ * (mockKind), so each path of the rule can be tried. Labelled as a placeholder.
  */
 function mockPick(images: PageImage[]): FigurePickResult {
-  return {
-    model: "mock",
-    inputTokens: 0,
-    outputTokens: 0,
-    costUsd: 0,
-    pick: toPick(
-      {
-        found: true,
-        image: 1,
-        box: { x: 0.06, y: 0.05, w: 0.88, h: 0.48 },
-        alt: `Development preview: no API key is configured, so this description of ${images[0]!.label} is a placeholder. Describe the figure here.`,
-        caption: "Placeholder caption for the figure picked from your report",
-      },
-      images.length,
-    ),
+  const first = images[0]!;
+  const raw: Answer = {
+    found: true,
+    image: 1,
+    kind: mockKind(first.label),
+    box: pixelsFromBox({ x: 0.06, y: 0.05, w: 0.88, h: 0.48 }, first),
+    alt: `Development preview: no API key is configured, so this description of ${first.label} is a placeholder. Describe the figure here.`,
+    caption: "Placeholder caption for the figure picked from your report",
   };
+  return { model: "mock", inputTokens: 0, outputTokens: 0, costUsd: 0, pick: toPick(raw, images), raw };
 }

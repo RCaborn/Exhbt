@@ -1,13 +1,24 @@
-# Runs the exhbt draft eval (evals/exhbt-draft/README.md) against the real model.
-# Manual only: Actions tab > "Exhbt draft eval" > Run workflow. Never on push or pull request,
-# because every run makes paid API calls.
+# Runs the evals that call the real model:
+#   - the exhbt draft eval (evals/exhbt-draft/README.md), and
+#   - the figure eval (evals/figure-pick/README.md): does the pick choose the right figure in a
+#     report and cut it out whole?
+# Manual only: Actions tab > "Exhbt draft eval" > Run workflow, and choose which to run. Never on
+# push or pull request, because every run makes paid API calls.
 name: Exhbt draft eval
 
 on:
   workflow_dispatch:
     inputs:
+      suite:
+        description: "Which eval to run: the drafts, the figure pick, or both"
+        type: choice
+        options:
+          - drafts
+          - figures
+          - both
+        default: drafts
       judge:
-        description: "Also ask Haiku to score the rubric (AI-judged scores)"
+        description: "Drafts only: also ask Haiku to score the rubric (AI-judged scores)"
         type: boolean
         default: true
 
@@ -16,6 +27,7 @@ permissions:
 
 jobs:
   eval:
+    if: inputs.suite != 'figures'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -68,5 +80,73 @@ jobs:
         if: always() && steps.run.outputs.dir != ''
         with:
           name: exhbt-draft-eval
+          path: ${{ steps.run.outputs.dir }}
+          retention-days: 30
+
+  # The figure eval: the app runs in development with the key, and a real browser draws each
+  # report's pages, sends them to /api/exhbts/figure-pick and cuts the answer out, as the draft
+  # page does. One model call per report. The step "Run the figure eval" prints one line of JSON
+  # per report and fails unless every report passed.
+  figures:
+    if: inputs.suite != 'drafts'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Check the API key secret is set
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::The repository secret ANTHROPIC_API_KEY is not set. Add it under Settings > Secrets and variables > Actions, then run this workflow again."
+            exit 1
+          fi
+
+      - run: npx playwright install --with-deps chromium
+
+      - name: Check the marking (no API calls)
+        run: npm run eval:figures -- --self-test
+
+      - name: Run the figure eval
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npm run eval:figures
+
+      - name: Find the run folder
+        id: run
+        if: always()
+        run: |
+          dir=$(ls -1d evals/figure-pick/runs/*/ 2>/dev/null | sort | tail -n 1)
+          echo "dir=${dir%/}" >> "$GITHUB_OUTPUT"
+
+      - name: Add the results to the job page
+        if: always() && steps.run.outputs.dir != ''
+        env:
+          RUN_DIR: ${{ steps.run.outputs.dir }}
+        run: |
+          if [ -f "$RUN_DIR/results.jsonl" ]; then
+            {
+              echo "## Figure eval"
+              echo
+              echo "One line per report. The pictures of every cut are in the artifact figure-pick-eval."
+              echo
+              echo '```json'
+              cat "$RUN_DIR/results.jsonl"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "The figure eval stopped before writing results.jsonl; see the run log." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.run.outputs.dir != ''
+        with:
+          name: figure-pick-eval
           path: ${{ steps.run.outputs.dir }}
           retention-days: 30
