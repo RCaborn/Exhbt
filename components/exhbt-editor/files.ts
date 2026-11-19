@@ -13,8 +13,13 @@ import type { Store } from "./store-core";
  * pictures by hand"), ported from the classic editor (components/editor/Editor.tsx). The uploads go
  * through components/editor/media.ts, unchanged.
  *
- * No stored file is ever deleted here yet: the rule that decides when one may go (0026, "Saving, and
- * what may delete a file") comes with the editor's second milestone, and keeping a file is always safe.
+ * What may delete a stored file (0026, "Saving, and what may delete a file"): a file this visit has
+ * seen is deleted only when all four are true: the last doc the server saved does not point at it;
+ * the published copy does not; the doc in the editor now does not; and no undo entry could put it
+ * back. The rule runs after each save lands, when an undo entry falls off the end of the list, on a
+ * `pagehide` that does not keep the page, and when the editor unmounts; never when the page is merely
+ * hidden, so a removed picture can be put back with Undo for as long as the visit lasts. The server
+ * has the last word: it deletes nothing any of the person's exhbts still uses.
  */
 
 export type Files = {
@@ -53,17 +58,41 @@ export type FilesController = Methods & {
   live(): ReadonlySet<string>;
   /** Where the last pick() asked for the pictures to go. */
   pickAt(): number;
+  /** A save landed: the server holds this doc. Runs the rule. */
+  noteSaved(doc: ExhbtDoc): void;
+  /** Runs the rule that deletes files (with `keepalive` when the page is going). */
+  settle(opts?: { keepalive?: boolean }): void;
 };
 
-export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: number; imageUrls: Record<string, string | null>; liveFileIds: string[] }): FilesController {
+/** Deletes a stored file. Never throws: a leftover file is harmless, a stuck editor isn't. With `keepalive`, the request outlives the page. */
+function deleteFile(fileId: string, keepalive: boolean) {
+  void fetch(`/api/files/${encodeURIComponent(fileId)}`, { method: "DELETE", keepalive }).catch(() => {});
+}
+
+export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: number; imageUrls: Record<string, string | null>; liveFileIds: string[]; initialDoc: ExhbtDoc }): FilesController {
   const { store, exhbtId, maxFileMb } = opts;
   const state = atom<State>({ imageUrls: { ...opts.imageUrls }, busy: { image: false, work: false }, error: {}, status: "" });
   let input: HTMLInputElement | null = null;
   let pickAt = 0;
   let live = new Set(opts.liveFileIds);
+  let serverDoc = opts.initialDoc;
+  // Every stored file this visit has seen: the rule decides about these and nothing else.
+  const seen = new Set([...fileIdsOf(opts.initialDoc), ...opts.liveFileIds]);
 
   const set = (patch: Partial<State> | ((s: State) => Partial<State>)) => state.set((s) => ({ ...s, ...(typeof patch === "function" ? patch(s) : patch) }));
   const addUrl = (fileId: string, blob: Blob) => set((s) => ({ imageUrls: { ...s.imageUrls, [fileId]: URL.createObjectURL(blob) } }));
+
+  /** The four-part rule (decision 0026). */
+  function settle(o: { keepalive?: boolean } = {}) {
+    for (const f of fileIdsOf(store.get())) seen.add(f);
+    const keep = new Set([...fileIdsOf(serverDoc), ...live, ...fileIdsOf(store.get()), ...store.entries().flatMap((e) => e.files)]);
+    for (const f of [...seen]) {
+      if (!f || keep.has(f)) continue;
+      seen.delete(f);
+      deleteFile(f, Boolean(o.keepalive));
+    }
+  }
+  store.onDropped(() => settle());
 
   /**
    * Several pictures at once (decision 0024), as many as the layout has room for, two at a time: each
@@ -120,6 +149,8 @@ export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: nu
           const sizeProblem = checkFile(prepared.file, "image", maxFileMb);
           if (sizeProblem) throw new UploadError(sizeProblem);
           const fileId = await uploadForExhbt(prepared.file, "image", exhbtId);
+          // Seen, so a picture that finds no room on the page goes at the next run of the rule.
+          seen.add(fileId);
           addUrl(fileId, prepared.file);
           results[i] = { fileId, ...(prepared.w && prepared.h ? { w: prepared.w, h: prepared.h } : {}) };
         } catch (e) {
@@ -162,6 +193,7 @@ export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: nu
       const problem = checkFile(file, "image", maxFileMb);
       if (problem) throw new UploadError(problem);
       const fileId = await uploadForExhbt(file, "image", exhbtId);
+      seen.add(fileId);
       const size = await readSize(file);
       addUrl(fileId, file);
       // Not an undo entry (decision 0026): the old picture goes once the save without it lands.
@@ -174,6 +206,7 @@ export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: nu
       set((s) => ({ busy: { ...s.busy, work: true } }));
       try {
         const fileId = await uploadForExhbt(file, "evidence", exhbtId);
+        seen.add(fileId);
         store.patchDoc((d) => ({ ...d, evidence: { kind: "file", fileId, label: file.name } }));
       } catch (e) {
         set((s) => ({ error: { ...s.error, work: e instanceof UploadError ? e.message : "We couldn't upload that file." } }));
@@ -190,7 +223,10 @@ export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: nu
       }, "remove the work");
     },
     markPublished(doc) {
+      // Publishing saves the doc too: the server and the live copy both hold it now.
       live = new Set(fileIdsOf(doc));
+      serverDoc = doc;
+      settle();
     },
   };
 
@@ -202,6 +238,11 @@ export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: nu
     },
     live: () => live,
     pickAt: () => pickAt,
+    noteSaved(doc) {
+      serverDoc = doc;
+      settle();
+    },
+    settle,
   };
 }
 

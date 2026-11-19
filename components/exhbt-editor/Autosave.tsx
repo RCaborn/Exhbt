@@ -6,6 +6,7 @@ import { useAutosave, type SaveResult } from "@/components/editor/useAutosave";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
 import { STALE_EDITOR, useRuntime, type SaveApi } from "./context";
 import { noteSaved, registerSender } from "./pending";
+import { useFilesController } from "./files";
 import { useDoc } from "./store";
 
 /*
@@ -36,8 +37,15 @@ async function send(id: string, doc: ExhbtDoc): Promise<SaveResult> {
 
 export function Autosave() {
   const { env, save } = useRuntime();
+  const files = useFilesController();
   const doc = useDoc((d) => d);
-  const a = useAutosave({ id: env.id, doc, initial: env.initialDoc, save: (d) => send(env.id, d), onSavedDoc: noteSaved });
+  const a = useAutosave({ id: env.id, doc, initial: env.initialDoc, save: (d) => send(env.id, d),
+    // The server has it: noted for the crash fallback, and the rule that deletes files runs.
+    onSavedDoc: (d) => {
+      noteSaved(d);
+      files.noteSaved(d);
+    },
+  });
   const latest = useRef(a);
   latest.current = a;
 

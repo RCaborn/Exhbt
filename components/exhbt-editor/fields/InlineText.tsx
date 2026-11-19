@@ -3,6 +3,7 @@
 import { createContext, useContext, useLayoutEffect, useRef, useSyncExternalStore } from "react";
 import type { TextSlot } from "@/components/portfolio/page-ctx";
 import { useStore } from "../store";
+import { IssueNote, issueId, useFieldIssue } from "./issues";
 
 /*
  * Plain text typed in the page's own type (decision 0026, "Typing in the page's own type"): a field
@@ -38,14 +39,28 @@ function useFieldSizing(): boolean {
 
 const oneLine = (s: string) => s.replace(/\r?\n/g, " ");
 
+type Props = { path: string; value: string; label: string; placeholder: string; id: string; maxChars?: number; issue: string; onText(t: string): void };
+
 export function InlineText({ path, value, label, placeholder, id, maxChars }: TextSlot) {
   const store = useStore();
   const domId = id ?? path.replace(/\./g, "-");
-  if (INLINE.test(path)) return <InlineSpan path={path} value={value} label={label} placeholder={placeholder} id={domId} onText={(t) => store.setAt(path, t)} />;
-  return <BlockText path={path} value={value} label={label} placeholder={placeholder} id={domId} maxChars={maxChars} onText={(t) => store.setAt(path, t)} />;
+  const issue = useFieldIssue(path);
+  const props: Props = { path, value, label, placeholder, id: domId, maxChars, issue, onText: (t) => store.setAt(path, t) };
+  // Always in the same wrapper, so an issue that comes and goes never puts a new field under the cursor.
+  return INLINE.test(path) ? (
+    <span className="xe-field-inline">
+      <InlineSpan {...props} />
+      <IssueNote id={issueId(domId)} text={issue} />
+    </span>
+  ) : (
+    <span className="xe-field">
+      <BlockText {...props} />
+      <IssueNote id={issueId(domId)} text={issue} />
+    </span>
+  );
 }
 
-function BlockText({ path, value, label, placeholder, id, maxChars, onText }: { path: string; value: string; label: string; placeholder: string; id: string; maxChars?: number; onText(t: string): void }) {
+function BlockText({ path, value, label, placeholder, id, maxChars, issue, onText }: Props) {
   const forced = useContext(GrowContext);
   const supported = useFieldSizing();
   const mirror = forced === "mirror" || !supported;
@@ -54,6 +69,8 @@ function BlockText({ path, value, label, placeholder, id, maxChars, onText }: { 
       id={id}
       rows={1}
       aria-label={label}
+      aria-invalid={issue ? true : undefined}
+      aria-describedby={issue ? issueId(id) : undefined}
       data-path={path}
       data-field="text"
       data-empty={value.trim() ? undefined : ""}
@@ -82,7 +99,7 @@ function BlockText({ path, value, label, placeholder, id, maxChars, onText }: { 
   );
 }
 
-function InlineSpan({ path, value, label, placeholder, id, onText }: { path: string; value: string; label: string; placeholder: string; id: string; onText(t: string): void }) {
+function InlineSpan({ path, value, label, placeholder, id, issue, onText }: Props) {
   const ref = useRef<HTMLSpanElement>(null);
   // The words are the DOM's own while the person types; they are written in only when they differ (a change from outside).
   useLayoutEffect(() => {
@@ -95,6 +112,8 @@ function InlineSpan({ path, value, label, placeholder, id, onText }: { path: str
       id={id}
       role="textbox"
       aria-label={label}
+      aria-invalid={issue ? true : undefined}
+      aria-describedby={issue ? issueId(id) : undefined}
       aria-placeholder={placeholder}
       data-placeholder={placeholder}
       data-path={path}

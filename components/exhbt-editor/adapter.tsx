@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useContext, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
-import type { EditAdapter, ExtraSlot, ListSlot, RichSlot } from "@/components/portfolio/page-ctx";
+import type { EditAdapter, ExtraSlot, ListSlot, RichSlot, ShellTools } from "@/components/portfolio/page-ctx";
 import { formatLimits, LIMITS } from "@/lib/exhbt/blocks";
 import { FORMAT_COPY, formatOf } from "@/lib/exhbt/formats";
 import { useRuntime } from "./context";
+import { DraftToolsContext, MoreActions } from "./draft-tools";
 import { InlineText } from "./fields/InlineText";
 import { RichField } from "./fields/RichField";
 import { GraphExtras } from "./figures/GraphExtras";
@@ -51,9 +52,24 @@ export function useAdapter(): EditAdapter {
       },
       skills: () => <SkillsEdit />,
       work: () => <WorkButton />,
-      tools: () => null,
+      tools: (o) => <ShellToolbar {...o} />,
     }),
     [],
+  );
+}
+
+/**
+ * A shell part's corner toolbar (the title with its facts, the context line, the skills), over the
+ * part's corner and out of the flow: "More actions" (rewrite, back to the AI version), with the test ids
+ * tools-header, tools-gap and tools-skills, where the AI drafted the exhbt. Nothing otherwise.
+ */
+function ShellToolbar({ block }: ShellTools) {
+  const rt = useContext(DraftToolsContext);
+  if (!rt?.init) return null;
+  return (
+    <div className="xe-shell-tools" data-edit-only data-block={block}>
+      <MoreActions block={block} />
+    </div>
   );
 }
 

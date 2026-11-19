@@ -3,7 +3,10 @@
 import "./css/core.css";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { IMAGE_ACCEPT } from "@/components/editor/media";
-import { writeBackup } from "@/components/editor/useAutosave";
+import { clearBackup, readBackup, writeBackup, type Backup } from "@/components/editor/useAutosave";
+import { Button } from "@/components/ui/Button";
+import { normaliseDoc } from "@/lib/exhbt/blocks";
+import { keptItems } from "@/lib/exhbt/layouts";
 import type { PageCtx } from "@/components/portfolio/page-ctx";
 import { ProjectView, type Owner } from "@/components/portfolio/ProjectView";
 import { lookAttrs, themeStyle } from "@/components/portfolio/themeFonts";
@@ -14,6 +17,8 @@ import { createRuntime, RuntimeContext, useEnv, useRuntime, useUiState, type Pag
 import { createDraftTools, DraftToolsContext } from "./draft-tools";
 import { DragBoard } from "./drag";
 import { GrowContext } from "./fields/InlineText";
+import { closeEditorQueue, openEditorQueue } from "./fields/idle";
+import { labelOf } from "./labels";
 import { createFiles, FilesContext, useFiles, useFilesController, useImageUrls, type FilesController } from "./files";
 import { ChartSheet } from "./figures/ChartSheet";
 import { DraftedGraph } from "./figures/DraftedGraph";
@@ -27,7 +32,7 @@ import { ReorderSheet } from "./phone/ReorderSheet";
 import { CardSheet } from "./sheets/CardSheet";
 import { PublishSheet } from "./sheets/PublishSheet";
 import { WorkPanel } from "./sheets/WorkPanel";
-import { StoreContext, useRenderCount, useShell, useStoreInternal } from "./store";
+import { StoreContext, useDoc, useRenderCount, useShell, useStoreInternal } from "./store";
 import { createStore, type Store } from "./store-core";
 import { TopBar } from "./topbar/TopBar";
 import { Tray } from "./Tray";
@@ -66,8 +71,8 @@ function startVisit(props: PageEditorProps): Visit {
       notePending(doc);
     },
   });
-  const runtime = createRuntime(props, jumpTo);
-  const files = createFiles({ store, exhbtId: props.id, maxFileMb: props.maxFileMb, imageUrls: props.imageUrls, liveFileIds: props.liveFileIds });
+  const runtime = createRuntime(props, (path, ui) => jumpTo(path, ui, store.get()));
+  const files = createFiles({ store, exhbtId: props.id, maxFileMb: props.maxFileMb, imageUrls: props.imageUrls, liveFileIds: props.liveFileIds, initialDoc: props.initialDoc });
   const draft = createDraftTools(store, props.id, props.draftTools);
   return { store, runtime, files, draft };
 }
@@ -78,11 +83,23 @@ export function PageEditor(props: PageEditorProps) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     setReady(true);
+    // The formatted fields' editors start, one at a time, in idle moments from now.
+    openEditorQueue();
     // Development only: the browser tests read the editor's doc and its undo list (e2e/page-editor.ts).
     if (process.env.NODE_ENV !== "production") {
       window.__exhbtEditor = visit.store;
       window.__exhbtUi = visit.runtime.uiApi;
     }
+    // The rule that deletes files runs when the page goes for good, and when the editor unmounts; never when it is only hidden.
+    const gone = (e: PageTransitionEvent) => {
+      if (!e.persisted) visit.files.settle({ keepalive: true });
+    };
+    window.addEventListener("pagehide", gone);
+    return () => {
+      window.removeEventListener("pagehide", gone);
+      closeEditorQueue();
+      visit.files.settle({ keepalive: true });
+    };
   }, [visit]);
   const grow = devParam("grow") === "mirror" ? "mirror" : null;
 
@@ -103,6 +120,7 @@ export function PageEditor(props: PageEditorProps) {
                 }}
               >
                 <TopBar />
+                <BackupOffer />
                 <Body />
                 <PublishSheet />
                 <CardSheet />
@@ -140,6 +158,7 @@ function Body() {
         <DragBoard>
           <div className={CANVAS}>
             <Canvas />
+            <KeptList />
           </div>
           <DraftedGraph />
           <Tray />
@@ -233,9 +252,93 @@ function UndoKeys(): ReactNode {
       uiApi.say(`Undone: ${label}.`);
     };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    // After an Undo (from here or from the top bar), the focus goes to the first field of the section it brought
+    // back or moved; with no such section it stays where it is (on Undo) while Undo can still be pressed, and
+    // otherwise goes to the top bar's heading (decision 0026).
+    const off = store.onUndone((subject) => {
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          const frame = subject ? document.querySelector(`[data-editor="page"] [data-section-id="${CSS.escape(subject)}"]`) : null;
+          const target = frame?.querySelector<HTMLElement>(FIELDS) ?? frame?.querySelector<HTMLElement>("[data-grip]");
+          if (target) target.focus();
+          else if (!store.undoLabel()) document.querySelector<HTMLElement>('[data-editor="page"] h1')?.focus();
+        }),
+      );
+    });
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      off();
+    };
   }, [store, uiApi]);
   return null;
+}
+
+const FIELDS = 'textarea, input:not([type=file]), [contenteditable]:not([contenteditable="false"]), [role=textbox]';
+
+/** Sections the layout keeps but does not draw (decision 0027): a list at the foot of the page, each with Remove. Not on the visitor's page. */
+function KeptList() {
+  const store = useStoreInternal();
+  const key = useDoc((d) => keptItems(d).map((it) => `${it.id}\u0000${labelOf(d, it.id)}`).join("\u0001"));
+  if (!key) return null;
+  const kept = key.split("\u0001").map((row) => row.split("\u0000") as [string, string]);
+  return (
+    <section aria-labelledby="xe-kept-h" className="xe-kept" data-edit-only>
+      <h2 id="xe-kept-h" className="xe-kept-heading">
+        Kept, not shown in this layout
+      </h2>
+      <ul>
+        {kept.map(([id, label]) => (
+          <li key={id}>
+            <span>{label}</span>
+            <button type="button" className="xe-chip" aria-label={`Remove ${label}`} onClick={() => store.remove(id)}>
+              Remove
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** A copy kept in this browser that is newer than the server's, offered back, as the classic editor does. Over the page, under the top bar. */
+function BackupOffer() {
+  const env = useEnv();
+  const store = useStoreInternal();
+  const [offer, setOffer] = useState<Backup | null>(() => {
+    const b = readBackup(env.id);
+    if (!b) return null;
+    if (b.at > Date.parse(env.updatedAt) && JSON.stringify(b.doc) !== JSON.stringify(env.initialDoc)) return b;
+    clearBackup(env.id);
+    return null;
+  });
+  if (!offer) return null;
+  return (
+    <div role="status" className="xe-offer">
+      <p className="font-semibold">We kept changes from {new Date(offer.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} that never reached the server.</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => {
+            // Kept in this browser, maybe in an older shape: read into the current one.
+            store.replace(normaliseDoc(offer.doc));
+            setOffer(null);
+          }}
+        >
+          Restore them
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => {
+            clearBackup(env.id);
+            setOffer(null);
+          }}
+        >
+          Discard them
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 /** Development only (`?crash=change`): throws on the render after the first change, for the crash fallback's test. */

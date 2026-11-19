@@ -137,6 +137,72 @@
     color: inherit;
   }
 
+  /* A formatted field's buttons, while it has the cursor: above the line's right end, or below it on a section's first line. */
+  .xe-format {
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    z-index: 25;
+    display: flex;
+    gap: 0.25rem;
+    padding-bottom: 0.25rem;
+    visibility: hidden;
+  }
+  .xe-format-below {
+    top: 100%;
+    bottom: auto;
+    padding-top: 0.25rem;
+    padding-bottom: 0;
+  }
+  .xe-rich:focus-within > .xe-format {
+    visibility: visible;
+  }
+
+  /* A plain field's own box for its issue's message: the field's box exactly (block, or inline among words). */
+  .xe-field {
+    position: relative;
+    display: block;
+  }
+  .xe-field-inline {
+    position: relative;
+  }
+  /* A field with an issue: an outline in the look's error colour, which takes no room. */
+  .xe-text[aria-invalid="true"],
+  .xe-inline[aria-invalid="true"],
+  .xe-rich[data-invalid] {
+    outline: 2px solid var(--xp-error);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  /* Its message: read out always (aria-describedby), shown under the field only while it has the focus, over the page. */
+  .xe-issue {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    z-index: 26;
+    width: max-content;
+    max-width: min(22rem, 80vw);
+    padding: 0.375rem 0.625rem;
+    border: 1px solid var(--xp-error);
+    border-radius: 8px;
+    background: var(--xp-card);
+    color: var(--xp-error);
+    font: 500 0.8125rem/1.35 var(--xp-font, var(--font-sans));
+    letter-spacing: normal;
+    text-transform: none;
+    text-align: left;
+    white-space: normal;
+    clip-path: inset(50%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .xe-field:focus-within > .xe-issue,
+  .xe-field-inline:focus-within > .xe-issue,
+  .xe-rich:focus-within > .xe-issue {
+    clip-path: none;
+    opacity: 1;
+  }
+
   /* The field's own address prompt, under it, out of the flow. App chrome. */
   .xe-link-ask {
     position: absolute;
@@ -251,6 +317,36 @@
   }
   .xe-more {
     display: inline-flex;
+  }
+  /* "More actions" sits inside parts drawn in the page's type (the title is large): it keeps the app's own. */
+  .xe-more,
+  .xe-shell-tools {
+    font: 400 1rem/1.5 var(--font-sans);
+    letter-spacing: normal;
+    text-wrap: wrap;
+    text-transform: none;
+    color: var(--color-ink);
+  }
+  /* A shell part's corner toolbar: over the part's top right corner, out of the flow. */
+  .xe-shell-tools {
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    z-index: 20;
+    padding-bottom: 0.25rem;
+    opacity: 0;
+    pointer-events: none;
+  }
+  :hover > .xe-shell-tools,
+  :focus-within > .xe-shell-tools {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  @media (pointer: coarse) {
+    .xe-shell-tools {
+      opacity: 1;
+      pointer-events: auto;
+    }
   }
   /* BlockTools keeps its own margins in the classic editor's cards; over the page it sits in the row. */
   .xe-more > div {
@@ -486,6 +582,44 @@
   .xe-skill-new::placeholder {
     color: var(--xp-muted);
     opacity: 1;
+  }
+
+  /* ---------- Kept, not shown in this layout: under the page, in the page's colours ---------- */
+  .xe-kept {
+    margin-top: 2.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px dashed var(--xp-rule);
+    color: var(--xp-ink);
+  }
+  .xe-kept-heading {
+    font: 600 0.9375rem/1.4 var(--xp-font, var(--font-sans));
+  }
+  .xe-kept ul {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+  .xe-kept li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  /* ---------- The backup offer: over the page, under the top bar. App chrome ---------- */
+  .xe-offer {
+    position: fixed;
+    top: calc(var(--xe-topbar-h) + 0.75rem);
+    left: 50%;
+    z-index: 32;
+    width: min(36rem, calc(100vw - 2rem));
+    transform: translateX(-50%);
+    padding: 1rem;
+    border: 1px solid var(--color-ink);
+    border-radius: 16px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-pack);
   }
 
   /* ---------- The status line, fixed at the foot of the window, out of the flow ---------- */
