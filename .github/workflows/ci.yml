@@ -22,15 +22,15 @@ jobs:
       - run: npm run lint
       - run: npm run build
 
-  # The end-to-end suite, split across three runners (by spec file), each with its own dev server.
-  # One runner took close to the old 25-minute limit and then went past it as the suite grew.
+  # The end-to-end suite, split across six runners (by spec file), each with its own dev server.
+  # Three were not enough once the edit-on-page editor's specs came in (release 3); the main session watches the shard times.
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,7 +39,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/3
+      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/6
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

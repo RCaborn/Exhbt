@@ -137,7 +137,7 @@ Where Phase 2 lives:
 | Blocks, limits, word count | `lib/exhbt/blocks.ts` (decisions 0007 and 0009) |
 | How an exhbt looks | `components/portfolio/ProjectView.tsx` |
 | An exhbt's layout (case study, gallery, research) | `lib/exhbt/formats.ts`, `lib/exhbt/layouts.ts` (the order and rows), `components/portfolio/LayoutMain.tsx` with `layout-rows.ts` (the renderer), `components/editor/LayoutPicker.tsx` (decision 0024) |
-| The editor | `app/(app)/exhbts/[id]/edit/`, `components/editor/` |
+| The editor | `app/(app)/exhbts/[id]/edit/`, `components/exhbt-editor/` (the page itself, decision 0026; `css/` holds each owner's styles), `components/editor/` (the classic editor, for one release) |
 | Uploads and AI drafts | `app/(app)/exhbts/new/`, `lib/uploads.ts`, `lib/files.ts`, `lib/ai/exhbt-draft.ts`, `lib/exhbt/verify.ts` |
 | The portfolio builder (profile, look, projects, address) | `app/(app)/portfolio/` (decision 0016) |
 | Portfolio pages | `app/(portfolio)/` (hosts: decision 0001; the subdomain routing is being built separately) |
@@ -174,6 +174,7 @@ Where Phase 2 lives:
 - `preview.spec.ts`: private-preview noindex, robots and banner.
 
 - Phase 2: `phase2-account.spec.ts` (usernames, profile), `phase2-portfolio.spec.ts` (blocks, plan rules, portfolio pages), `phase2-draft.spec.ts` (uploads, AI draft), `auto-figure.spec.ts` (the figure picked from an uploaded PDF: the work's own graph taking the place of the drafted one, scans, and the line the editor says after a draft), `phase2-editor.spec.ts` (editor, publish), `phase2-billing.spec.ts` (Stripe), `phase2-hardening.spec.ts` (account export, privacy and terms).
+- The edit-on-page editor (decision 0026): `editor-inplace.spec.ts` (every field typed in place and stored at its path, the jump to each kind of issue path, Undo, files, publishing in order, the editing page against the visitor's box for box in every look, axe), `editor-smooth.spec.ts` (the smoothness checks that gate CI: one render per key, nothing moving on focus), `editor-classic.spec.ts` (the switch, the escape and the crash fallback). Their page object is `e2e/page-editor.ts`, which holds `EDIT_ONLY_IN_FLOW`, the one list of what is in the flow in the editor only. `/dev/editor-timing` draws the editor on a sample with no sign-in, for the box tests and the timing script.
 
 Tests run against the dev server with no services connected. They use the build folder `.next-e2e`, so they can run while `npm run dev` is up.
 
