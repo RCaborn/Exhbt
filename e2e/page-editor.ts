@@ -148,7 +148,10 @@ export function boxes(page: Page): Promise<Box[]> {
     if (title) add("title", title);
     const context = article.querySelector(".xp-context");
     if (context) add("context line", context);
-    article.querySelectorAll(".xp-pill:not(#skill-new)").forEach((el) => add(`pill ${el.textContent?.trim()}`, el));
+    article.querySelectorAll('.xp-pill:not(#skill-new):not([data-edit-only="add-skill"])').forEach((el) => add(`pill ${el.textContent?.trim()}`, el));
+    // The "Add a skill" box (the stand-in's inert copy, or the editor's field): on EDIT_ONLY_IN_FLOW.
+    const addSkill = article.querySelector('[data-edit-only="add-skill"]');
+    if (addSkill) add("the Add a skill box", addSkill);
     article.querySelectorAll(".xp-flow-box").forEach((el, i) => add(`flowchart box ${i + 1}`, el));
     article.querySelectorAll("[data-part] li.xp-finding").forEach((el) => add(nth("finding"), el));
     return out;

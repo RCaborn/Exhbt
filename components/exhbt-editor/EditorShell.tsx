@@ -10,7 +10,7 @@ import { lookAttrs, themeStyle } from "@/components/portfolio/themeFonts";
 import { formatOf } from "@/lib/exhbt/formats";
 import { useAdapter } from "./adapter";
 import { Autosave } from "./Autosave";
-import { createRuntime, RuntimeContext, useEnv, useRuntime, useUiState, type PageEditorProps, type Runtime } from "./context";
+import { createRuntime, RuntimeContext, useEnv, useRuntime, useUiState, type PageEditorProps, type Runtime, type UiApi } from "./context";
 import { createDraftTools, DraftToolsContext } from "./draft-tools";
 import { DragBoard } from "./drag";
 import { GrowContext } from "./fields/InlineText";
@@ -49,6 +49,8 @@ declare global {
   interface Window {
     /** Development only: the editor's store, for e2e/page-editor.ts. */
     __exhbtEditor?: Store;
+    /** Development only: the view's actions (open a sheet, see as a visitor, jump), for e2e/page-editor.ts. */
+    __exhbtUi?: UiApi;
   }
 }
 
@@ -77,7 +79,10 @@ export function PageEditor(props: PageEditorProps) {
   useEffect(() => {
     setReady(true);
     // Development only: the browser tests read the editor's doc and its undo list (e2e/page-editor.ts).
-    if (process.env.NODE_ENV !== "production") window.__exhbtEditor = visit.store;
+    if (process.env.NODE_ENV !== "production") {
+      window.__exhbtEditor = visit.store;
+      window.__exhbtUi = visit.runtime.uiApi;
+    }
   }, [visit]);
   const grow = devParam("grow") === "mirror" ? "mirror" : null;
 
