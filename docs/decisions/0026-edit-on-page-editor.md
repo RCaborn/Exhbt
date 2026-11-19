@@ -296,6 +296,7 @@ Frame times during a scripted drag and keystroke-to-paint on the longest sample,
 - Two tabs on one exhbt merging their changes. The newest save wins, as now.
 - A formatted title.
 - A tray on a phone or a tablet.
+- The first-visit checklist the classic editor shows on a blank exhbt. The placeholders on the page and "Things to fix" do its job.
 - Sweeping up files left by a killed tab.
 - Dragging a section from one exhbt to another.
 
