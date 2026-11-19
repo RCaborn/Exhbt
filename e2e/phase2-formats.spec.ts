@@ -93,13 +93,14 @@ test.describe("model: the layout field", () => {
   });
 
   test("a layout this code doesn't know reads as a case study and nothing else is lost", () => {
-    const d = normaliseDoc({ ...research(), format: "build" });
+    // "build" was the example until release 2 made it a layout (decision 0028); any id no release knows will do.
+    const d = normaliseDoc({ ...research(), format: "timeline" });
     expect("format" in d).toBe(false);
     expect(d.sections).toHaveLength(research().sections.length);
     expect(d.title).toBe(research().title);
     const parsed = ExhbtDocSchema.parse({ ...gallery(), format: 42 });
     expect(formatOf(parsed)).toBe("case-study");
-    expect(() => normaliseDoc({ format: "build" })).not.toThrow();
+    expect(() => normaliseDoc({ format: "timeline" })).not.toThrow();
     expect(() => normaliseDoc(null)).not.toThrow();
   });
 
