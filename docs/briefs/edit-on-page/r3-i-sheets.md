@@ -46,7 +46,7 @@ export type EditorStore = {
 
   /** Structural changes: each adopts the doc first and is one undo entry. `at` and `place` count page items (pageItems in lib/exhbt/layouts.ts). */
   move(id: string, place: number): void;
-  /** Returns the new section's id, or null when the layout has no room (blockOptions says why). */
+  /** Returns the new section's id ("flow" for the flowchart, put back at `at`), or null when the layout has no room (blockOptions says why) or the flowchart is on the page already. */
   insert(kind: Exclude<BlockKind, "image">, at: number): string | null;
   insertImage(image: { fileId: string; w?: number; h?: number }, at: number): string | null;
   /** Never prunes the numbers to check: Undo may bring the section back. */
@@ -149,8 +149,8 @@ G (the editor's core) makes each of these files in its first milestone with the 
 | `sheets/CardSheet.tsx` | `CardSheet(): ReactNode` | I | nothing |
 | `sheets/WorkPanel.tsx` | `WorkPanel(): ReactNode` | I | nothing |
 | `sheets/WorkButton.tsx` | `WorkButton(): ReactNode` (what `edit.work()` returns) | I | the button, drawn as "See the work" is, opening the work sheet |
-| `figures/ImageExtras.tsx` | `ImageExtras(props: ExtraSlot): ReactNode` | J | below: the description field (`image-N-alt`) in a strip over the foot of the picture; above: nothing |
-| `figures/LinkExtras.tsx` | `LinkExtras(props: ExtraSlot): ReactNode` | J | a "Web address" button over the link's corner, opening a popover that holds the field |
+| `figures/ImageExtras.tsx` | `ImageExtras(props: ExtraSlot): ReactNode` | J | below: the description field (`image-N-alt`), in the flow under the picture and its caption; above: nothing |
+| `figures/LinkExtras.tsx` | `LinkExtras(props: ExtraSlot): ReactNode` | J | over: a "Web address" button over the link's corner, always shown, opening a popover that holds the field |
 | `figures/GraphExtras.tsx` | `GraphExtras(props: ExtraSlot): ReactNode` | J | an "Edit figures" button that opens the chart sheet |
 | `figures/ChartSheet.tsx` | `ChartSheet(): ReactNode` | J | the existing `ChartEditor` (`bare`) for `ui.sheet.sectionId` |
 | `figures/FigureSheet.tsx` | `FigureSheet(): ReactNode` | J | nothing |
@@ -173,7 +173,7 @@ export type Board = {
   moveBy(id: string, by: -1 | 1): void;
   /** Take a section off the page, with the motion, the words read out and the focus moved to what took its place. */
   remove(id: string): void;
-  /** Add a block at a place, with the motion and the focus put in it. Returns its id, or null when there is no room. A graph then opens its figures sheet (`ui.open("chart", id)`); an image opens the picture picker instead and is placed when the pictures are chosen. */
+  /** Add a block at a place, with the motion and the focus put in it. Returns its id, or null when there is no room. A graph then opens its figures sheet (`ui.open("chart", id)`); a link opens its "Web address" popover with the cursor in it (`ui.jumpTo` on its `href` path); an image opens the picture picker instead and is placed when the pictures are chosen; the flowchart, offered only when it is off the page, goes back at `at`. */
   add(kind: BlockKind, at: number): string | null;
   /** The section the focus was last in, for "add after the section you were last in". */
   lastFocus(): string | null;

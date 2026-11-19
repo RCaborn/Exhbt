@@ -74,20 +74,25 @@ export function rowsFor(items: PageItem[], f: Format): Row[];
 export function structureKey(doc: ExhbtDoc): string;
 
 export type BlockKind = PageKind;
-/** `full` is why it cannot be added ("Up to 2 graphs in a case study"); undefined when there is room. */
+/** `name` is the kind's noun in the layout's own words, as the "+" and the tray show it ("Graph", "What happened", "Reference", "Flowchart"). `full` is why it cannot be added ("Up to 2 graphs in a case study"); undefined when there is room. */
 export type BlockOption = { kind: BlockKind; name: string; full?: string };
 /** What the "+" menu and the tray offer: the layout's kinds in its own order and words, then the flowchart when it is off the page. */
 export function blockOptions(doc: ExhbtDoc): BlockOption[];
 
 /** Structural changes. Each adopts the doc first. `at` and `place` count page items (pageItems), not doc.sections. */
+/** `kind` "flow" puts a removed flowchart back at `at` (restoreFlow(doc, at)) and returns the id "flow"; null when the flowchart is on the page already. */
 export function insertBlock(doc: ExhbtDoc, kind: Exclude<BlockKind, "image">, at: number): { doc: ExhbtDoc; id: string } | null;
 export function insertImage(doc: ExhbtDoc, image: { fileId: string; w?: number; h?: number }, at: number): { doc: ExhbtDoc; id: string } | null;
 /** `place`: the item's index among the page items with the item itself taken out (0 is first). */
 export function moveItem(doc: ExhbtDoc, id: string, place: number): ExhbtDoc;
 /** Takes a section out. For the flowchart: removes the marker and sets flowOff; the boxes stay in doc.flow. */
 export function removeItem(doc: ExhbtDoc, id: string): ExhbtDoc;
-/** Puts a removed flowchart back: the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's (at the end if none), every other item keeps its place, and flowOff is deleted. The doc stays arranged. The same object when the flowchart is shown. */
-export function restoreFlow(doc: ExhbtDoc): ExhbtDoc;
+/**
+ * Puts a removed flowchart back and deletes flowOff. Every other item keeps its place, and the doc stays arranged. The same object when the flowchart is shown.
+ * With `at` (a page-item place, as insertBlock's), the marker goes in there: the new editor's "+" and tray always pass it.
+ * Without it (the classic editor's "Put the flowchart back", which has no place to give), the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's, or at the end if none.
+ */
+export function restoreFlow(doc: ExhbtDoc, at?: number): ExhbtDoc;
 ```
 
 From `components/portfolio/layout-rows.ts`: `rowClass(row, f, first)` and `stackClass(name, f)` give the classes the page's own wrappers carry. Lay out your hidden measuring copy with them and with nothing else, so pairs, grids and gaps are the page's real CSS.
@@ -112,7 +117,7 @@ export type EditorStore = {
 
   /** Structural changes: each adopts the doc first and is one undo entry. `at` and `place` count page items (pageItems in lib/exhbt/layouts.ts). */
   move(id: string, place: number): void;
-  /** Returns the new section's id, or null when the layout has no room (blockOptions says why). */
+  /** Returns the new section's id ("flow" for the flowchart, put back at `at`), or null when the layout has no room (blockOptions says why) or the flowchart is on the page already. */
   insert(kind: Exclude<BlockKind, "image">, at: number): string | null;
   insertImage(image: { fileId: string; w?: number; h?: number }, at: number): string | null;
   /** Never prunes the numbers to check: Undo may bring the section back. */
@@ -217,8 +222,8 @@ G (the editor's core) makes each of these files in its first milestone with the 
 | `sheets/CardSheet.tsx` | `CardSheet(): ReactNode` | I | nothing |
 | `sheets/WorkPanel.tsx` | `WorkPanel(): ReactNode` | I | nothing |
 | `sheets/WorkButton.tsx` | `WorkButton(): ReactNode` (what `edit.work()` returns) | I | the button, drawn as "See the work" is, opening the work sheet |
-| `figures/ImageExtras.tsx` | `ImageExtras(props: ExtraSlot): ReactNode` | J | below: the description field (`image-N-alt`) in a strip over the foot of the picture; above: nothing |
-| `figures/LinkExtras.tsx` | `LinkExtras(props: ExtraSlot): ReactNode` | J | a "Web address" button over the link's corner, opening a popover that holds the field |
+| `figures/ImageExtras.tsx` | `ImageExtras(props: ExtraSlot): ReactNode` | J | below: the description field (`image-N-alt`), in the flow under the picture and its caption; above: nothing |
+| `figures/LinkExtras.tsx` | `LinkExtras(props: ExtraSlot): ReactNode` | J | over: a "Web address" button over the link's corner, always shown, opening a popover that holds the field |
 | `figures/GraphExtras.tsx` | `GraphExtras(props: ExtraSlot): ReactNode` | J | an "Edit figures" button that opens the chart sheet |
 | `figures/ChartSheet.tsx` | `ChartSheet(): ReactNode` | J | the existing `ChartEditor` (`bare`) for `ui.sheet.sectionId` |
 | `figures/FigureSheet.tsx` | `FigureSheet(): ReactNode` | J | nothing |
@@ -241,7 +246,7 @@ export type Board = {
   moveBy(id: string, by: -1 | 1): void;
   /** Take a section off the page, with the motion, the words read out and the focus moved to what took its place. */
   remove(id: string): void;
-  /** Add a block at a place, with the motion and the focus put in it. Returns its id, or null when there is no room. A graph then opens its figures sheet (`ui.open("chart", id)`); an image opens the picture picker instead and is placed when the pictures are chosen. */
+  /** Add a block at a place, with the motion and the focus put in it. Returns its id, or null when there is no room. A graph then opens its figures sheet (`ui.open("chart", id)`); a link opens its "Web address" popover with the cursor in it (`ui.jumpTo` on its `href` path); an image opens the picture picker instead and is placed when the pictures are chosen; the flowchart, offered only when it is off the page, goes back at `at`. */
   add(kind: BlockKind, at: number): string | null;
   /** The section the focus was last in, for "add after the section you were last in". */
   lastFocus(): string | null;
@@ -267,9 +272,9 @@ Commit and push after each.
 2. **`drag/measure.ts`**: lays out `rowsFor(items with the lifted one at a place)` as empty boxes in a hidden copy of the column, pairs, stacks and groups included, using `rowClass` and `stackClass`, and reads where each lands. A box keeps the height it had; one whose width changes takes the height it would roughly have (a picture keeps its shape, words keep their area).
 3. **`drag/Board.tsx`**: `DragBoard` and `useBoard`. Freeze at pick-up; follow the pointer yourself (dnd-kit for the sensors and the press delay only: mouse after 6px, touch after a 150ms press with 8px of tolerance); slide by transform or draw the line; the lifted copy on a card with the pack shadow and an outline in the look's link colour, never scaled, drawn with `ItemView` and no adapter; the drop as a move from where it was let go, 180ms, transforms only; nothing animated under reduced motion. Find sections by `data-section-id` each time: a section that changes row is a new node. Clip the canvas so a carried copy cannot lengthen the page. Every step is said through `ui.say`.
 4. **Keyboard**: Space or Enter on the grip, arrows a place at a time, Space or Enter to drop, Escape to cancel, Tab drops. `moveBy` does the same motion for the move buttons and keeps the focus on the button pressed, or the other one at an end.
-5. **`remove` and `add`**: the motion, the words, and the focus (to what took a removed section's place; into a new text section's field). For a graph, `add` calls `ui.open("chart", id)` once it is placed, so its figures sheet opens (J fills the sheet; G's stub already holds `ChartEditor`). For an image, `add` opens the file picker and puts the pictures there through `useFiles().addImages(files, at)`; G's status line says "Uploading 1 of 3" from the moment they are chosen and shows a failed upload's reason, so do not draw your own.
-6. **`Insert.tsx`**: the "+" in the gap above each row and at the end. The end one has the id `add-section`, the name "Add a section" and `data-path="sections"` (the anchor for "Things to fix" issues about how many of a kind; when G's jump lands on it, it gets an `xe-jump` event and opens its menu); each other one is named "Add a section before <label>" (`sectionLabel` of the item after it). It opens the list from `blockOptions(doc)`: each kind with its icon and the layout's word for it; a full kind dimmed and not choosable, with its reason under it and tied to it; the words left (`data-testid="words-left"`) at the top; and when every kind is full, one line above them: "This <layout> is full. Remove a section to add another, or try another layout." When `canTakeFigure(doc, useEnv().reportFiles)` (from `components/exhbt-editor/figures/take.ts`, J's) is true, the list ends with "Take a figure from my report", which calls `ui.open("figure")`; when the image kind is full, that entry is dimmed with the image's reason instead. On a phone the "+" sits at the left of the gap. It must take no room: nothing on the page moves when it is there.
-7. **`Tray.tsx`**: the rail, drawn only from a 77rem window with `pointer: fine`, fixed in the right margin beside the page's frame, clear of the top and bottom fifths of the window, inside the look's wrapper so it takes the look's colours. A block dragged from it has no place until it is over the page, then is placed by the same plan; the page scrolls itself when it is held near an edge (the board does this for a tray block, since dnd-kit will not). Enter on a block adds it after `board.lastFocus()`, or at the end, and says so. A full kind cannot be dragged or added and gives its reason. At the top of the rail: the words left, and the same "full" line as the "+" when every kind is full.
+5. **`remove` and `add`**: the motion, the words, and the focus (to what took a removed section's place; into a new text section's field). For a graph, `add` calls `ui.open("chart", id)` once it is placed, so its figures sheet opens (J fills the sheet; G's stub already holds `ChartEditor`). For a link, `add` calls `ui.jumpTo` on the new link's `sections.N.href`, so its "Web address" popover opens with the cursor in it (G's jump opens the popover first, from its milestone 2; J draws it). The flowchart, offered only when it is off the page, goes back at the place given: `store.insert("flow", at)` is `restoreFlow(doc, at)`, never the flowchart's usual place. For an image, `add` opens the file picker and puts the pictures there through `useFiles().addImages(files, at)`; G's status line says "Uploading 1 of 3" from the moment they are chosen and shows a failed upload's reason, so do not draw your own.
+6. **`Insert.tsx`**: the "+" in the gap above each row and at the end. The end one has the id `add-section`, the name "Add a section" and `data-path="sections"` (the anchor for "Things to fix" issues about how many of a kind; when G's jump lands on it, it gets an `xe-jump` event and opens its menu); each other one is named "Add a section before <label>" (`sectionLabel` of the item after it). It opens the list from `blockOptions(doc)`: each kind with its icon and the layout's word for it; a full kind dimmed and not choosable, with its reason under it and tied to it; the words left (`data-testid="words-left"`) at the top; and when every kind is full, one line above them: "This <layout> is full. Remove a section to add another, or try another layout." Whatever is chosen goes where this "+" is, the flowchart included. When `canTakeFigure(doc, useEnv().reportFiles)` (from `components/exhbt-editor/figures/take.ts`, J's) is true, the list ends with "Take a figure from my report", which calls `ui.open("figure")`; when the image kind is full, that entry is dimmed with the image's reason instead. On a phone the "+" sits at the left of the gap. It must take no room: nothing on the page moves when it is there.
+7. **`Tray.tsx`**: the rail, drawn only from a 77rem window with `pointer: fine`, fixed in the right margin beside the page's frame, clear of the top and bottom fifths of the window, inside the look's wrapper so it takes the look's colours. A block dragged from it has no place until it is over the page, then is placed by the same plan, and lands where it is dropped, the flowchart's block included; the page scrolls itself when it is held near an edge (the board does this for a tray block, since dnd-kit will not). Enter on a block adds it after `board.lastFocus()`, or at the end, and says so. A full kind cannot be dragged or added and gives its reason. At the top of the rail: the words left, and the same "full" line as the "+" when every kind is full.
 8. **`scripts/editor-timing.mjs`**: the prototype's `scripts/lab-timing.mjs` pointed at G's sign-in-free harness, `/dev/editor-timing?sample=gallery`, on a production build made with `EXHBT_LAB=1` (the only way the harness is served in production; never set it anywhere else, and add no sign-in route), with the processor slowed four times: the longest and median frame during a scripted drag of the gallery sample's lead image to the foot of the page and at the drop, and keystroke-to-paint for 40 characters in a finding. It prints a table. It is not a test.
 
 ## What the prototype did not prove
@@ -288,8 +293,8 @@ It drew every sample with the case study's pairing and an even grid. The gallery
 - the page scrolls itself with the pointer still near the bottom edge and near the top edge, and stops at its end; and the same for a block carried from the tray near the bottom edge (dnd-kit does not do this for something fixed to the window);
 - with reduced motion `document.getAnimations()` is empty during and after a drag;
 - the frame, the line and the lifted copy take the look's colours in Exhbt and Night, and pass contrast in all eight looks;
-- the "+": every kind the layout holds, the real caps and reasons, on each layout; a new block lands where the "+" was; nothing moves when the menu opens; each "+" has its own name; on a full case study the "full" line shows; a new graph opens its figures sheet;
-- the tray: there at 77rem and gone at 76rem; beside the page and never over it; a block dragged into a gap, beside the findings and into the grid; the keyboard way; a full kind refused;
+- the "+": every kind the layout holds, the real caps and reasons, on each layout; a new block lands where the "+" was; on a gallery with the flowchart off, Flowchart chosen from the "+" before the last section lands there (the stored marker is there, not at the flowchart's usual place); nothing moves when the menu opens; each "+" has its own name; on a full case study the "full" line shows; a new graph opens its figures sheet; a new link opens its "Web address" popover with the cursor in it (once J and G's milestone 2 are merged);
+- the tray: there at 77rem and gone at 76rem; beside the page and never over it; a block dragged into a gap, beside the findings and into the grid; with the flowchart off, its block dropped into a gap lands there; the keyboard way; a full kind refused;
 - on the `touch` project: a swipe on a section's words and on a picture scrolls and moves nothing; a quick swipe from a grip picks nothing up; a 260ms press picks up; no tray;
 - axe with a section lifted.
 

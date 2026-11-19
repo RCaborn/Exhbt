@@ -56,13 +56,15 @@ The preview site cannot run the signed-in editor today because its database is b
 
 **10. A warning colour in every look.**
 Marks like "Needs a description" and words over the limit have to be readable in all eight looks, dark ones included. The looks have no warning colour today, and the app's own red is not checked against them.
-- Built in: each look gets one warning colour of its own (a red or a deep orange that reads on its background), checked for contrast like every other colour in it. Nobody sees it until the new editor.
-- Cost to change: small. The other choice is one red for every look, which will be hard to read on some of them.
+- Built in: the app's own red in every look where it is readable on that look's background, its cards and its panels. Only a look where it is not readable gets a red or a deep orange of its own, checked for contrast like every other colour in it. You will be shown those, one per look, before the new editor reaches anyone. Nobody sees any of it until the new editor.
+- Cost to change: small. The other choices are the app's red in every look, even where it is hard to read, or a colour of its own for every look.
 
 **11. A picture's description while editing.**
-So the editing page stays exactly the size of the real page, the box for a picture's description sits over the bottom of the picture, and the "From your report" note sits over its top.
-- Built in: over the picture, as described.
-- Cost to change: small. The other choice is a box under each picture, which is easier to see but makes the editing page one line longer per picture than what visitors see.
+Every picture needs a description for people who cannot see it, and while you edit, the box for it has to sit somewhere.
+- Built in: a box under each picture, as the editor was first designed. It is easy to see and covers nothing, but the editing page is one line longer per picture than what visitors see.
+- The other choice: a strip over the bottom of the picture. The editing page stays exactly the size of the real one, but the strip covers part of your picture while you edit.
+- Either way, a figure taken from your report has a small "From your report" note over its top, which holds the "I may share this" tick until it is ticked.
+- Cost to change: small.
 
 ## Carried over, still open
 

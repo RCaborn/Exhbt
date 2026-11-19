@@ -46,7 +46,7 @@ export type EditorStore = {
 
   /** Structural changes: each adopts the doc first and is one undo entry. `at` and `place` count page items (pageItems in lib/exhbt/layouts.ts). */
   move(id: string, place: number): void;
-  /** Returns the new section's id, or null when the layout has no room (blockOptions says why). */
+  /** Returns the new section's id ("flow" for the flowchart, put back at `at`), or null when the layout has no room (blockOptions says why) or the flowchart is on the page already. */
   insert(kind: Exclude<BlockKind, "image">, at: number): string | null;
   insertImage(image: { fileId: string; w?: number; h?: number }, at: number): string | null;
   /** Never prunes the numbers to check: Undo may bring the section back. */
@@ -149,8 +149,8 @@ G (the editor's core) makes each of these files in its first milestone with the 
 | `sheets/CardSheet.tsx` | `CardSheet(): ReactNode` | I | nothing |
 | `sheets/WorkPanel.tsx` | `WorkPanel(): ReactNode` | I | nothing |
 | `sheets/WorkButton.tsx` | `WorkButton(): ReactNode` (what `edit.work()` returns) | I | the button, drawn as "See the work" is, opening the work sheet |
-| `figures/ImageExtras.tsx` | `ImageExtras(props: ExtraSlot): ReactNode` | J | below: the description field (`image-N-alt`) in a strip over the foot of the picture; above: nothing |
-| `figures/LinkExtras.tsx` | `LinkExtras(props: ExtraSlot): ReactNode` | J | a "Web address" button over the link's corner, opening a popover that holds the field |
+| `figures/ImageExtras.tsx` | `ImageExtras(props: ExtraSlot): ReactNode` | J | below: the description field (`image-N-alt`), in the flow under the picture and its caption; above: nothing |
+| `figures/LinkExtras.tsx` | `LinkExtras(props: ExtraSlot): ReactNode` | J | over: a "Web address" button over the link's corner, always shown, opening a popover that holds the field |
 | `figures/GraphExtras.tsx` | `GraphExtras(props: ExtraSlot): ReactNode` | J | an "Edit figures" button that opens the chart sheet |
 | `figures/ChartSheet.tsx` | `ChartSheet(): ReactNode` | J | the existing `ChartEditor` (`bare`) for `ui.sheet.sectionId` |
 | `figures/FigureSheet.tsx` | `FigureSheet(): ReactNode` | J | nothing |
@@ -173,7 +173,7 @@ export type Board = {
   moveBy(id: string, by: -1 | 1): void;
   /** Take a section off the page, with the motion, the words read out and the focus moved to what took its place. */
   remove(id: string): void;
-  /** Add a block at a place, with the motion and the focus put in it. Returns its id, or null when there is no room. A graph then opens its figures sheet (`ui.open("chart", id)`); an image opens the picture picker instead and is placed when the pictures are chosen. */
+  /** Add a block at a place, with the motion and the focus put in it. Returns its id, or null when there is no room. A graph then opens its figures sheet (`ui.open("chart", id)`); a link opens its "Web address" popover with the cursor in it (`ui.jumpTo` on its `href` path); an image opens the picture picker instead and is placed when the pictures are chosen; the flowchart, offered only when it is off the page, goes back at `at`. */
   add(kind: BlockKind, at: number): string | null;
   /** The section the focus was last in, for "add after the section you were last in". */
   lastFocus(): string | null;
@@ -191,7 +191,7 @@ Each owner's CSS goes in its own file in `components/exhbt-editor/css/` (`core.c
 Commit and push after each.
 
 1. **Quieter sections.** On a phone each section shows only its grip, 44px, at its top corner, always visible (there is no hover). Hide the other toolbar buttons with CSS in `phone.css` (`[data-tool]`). They move to the bar.
-2. **`PhoneBar`.** Fixed to the foot of the screen, above the home indicator (`env(safe-area-inset-bottom)`), only on a phone. It follows the section the focus is in, or was last in (`useBoard().lastFocus()`), and names it ("Graph 1"). It holds, each at least 44px: Move up, Move down, the layout's own action where there is one (Make lead image, Make key figure, Before, After), More actions where the AI drafted the part, Remove (not for the flowchart in a case study or research, which always have one), and "Reorder". They call the same things the desktop toolbar does (`board.moveBy`, `board.remove`, `store.patch`). After a Remove, a Move or a drop, the bar shows "Undo <what>" (`store.undoLabel()`, `store.undo()`) until the next action, so a wrong thumb is put right where it happened; Undo in the top bar's menu stays too. When the focus is in the title, the context line or the skills (the parts with no frame), the bar names that part and offers its "More actions" (the same `BlockTools` as G's corner toolbar). With no section in focus it holds "Reorder" and "Add" (which opens the "+" at the end of the page).
+2. **`PhoneBar`.** Fixed to the foot of the screen, above the home indicator (`env(safe-area-inset-bottom)`), only on a phone. It follows the section the focus is in, or was last in (`useBoard().lastFocus()`), and names it ("Graph 1"). It holds, each at least 44px: Move up, Move down, the layout's own action where there is one (Make lead image, Make key figure, Before, After), More actions where the AI drafted the part, Remove (not for the flowchart in a case study or research, which always have one), and "Reorder". They call the same things the desktop toolbar does (`board.moveBy`, `board.remove`, `store.patch`). After a Remove, a Move or a drop, the bar shows "Undo <what>" (`store.undoLabel()`, `store.undo()`) until the next action, so a wrong thumb is put right where it happened; Undo in the top bar's menu stays too. When the focus is in the title, the context line or the skills (the parts with no frame), the bar names that part and offers its "More actions" (the same `BlockTools` as G's corner toolbar). With no section in focus it holds "Reorder" and "Add" (which opens the "+" at the end of the page). G's upload status line (`.xe-status`, "Uploading 2 of 5") is fixed at the foot of the window too: on a phone, lift it in `phone.css` to sit just above the bar, so the two never overlap.
 3. **Formatting on the bar.** While a formatted field has the cursor (`useActiveRich()` is not null), the bar shows Highlight (the context line) or Bold, Italic and Link, with their pressed state, in place of the section actions, and a "Done" that puts the section actions back. Pressing one must not take the cursor out of the field. Link calls `toggleLink()`, which opens the field's own address prompt with its error (G's): never make a link with no address.
 4. **The on-screen keyboard.** The bar must sit on top of the keyboard, not under it and not over the line being typed: follow `window.visualViewport` and keep the field with the cursor in view. Leave room at the foot of the page so the last section can scroll clear of the bar.
 5. **`ReorderSheet`** (`ui.sheet.name === "reorder"`), titled "Reorder sections", full screen. A list of short rows, one per page item in order (the flowchart included), each with its name (`sectionLabel`), a grip, and Move up and Move down. Rows are one height, so dnd-kit's sortable list is right here: a 150ms press on the grip picks a row up, the others slide, the keyboard works from the grip, each step is read out. Every drop is `store.move(id, place)`, one undo entry each. "Done" closes it and scrolls the page to the section last moved.
@@ -206,7 +206,8 @@ Commit and push after each.
 - "Reorder" opens the sheet; a row dragged after a short press, and a row moved with its buttons, change the page's order; "Done" returns to the page at that section;
 - a swipe on a section's words scrolls the page and moves nothing (with F merged: a 260ms press on a grip picks the section up, and the flowchart is carried with a line);
 - nothing scrolls sideways at 390px on any offered layout's sample (`offered()`, `SAMPLES`); every control is at least 44px;
-- the page while editing matches "See as a visitor" box for box on a Pixel 7, on a full page (reuse G's `boxes(page)` and `full(doc)`; your bar and grips must add no box to the page);
+- the page while editing matches "See as a visitor" box for box on a Pixel 7, on a full page, allowing only what G's full-page test allows (reuse G's `boxes(page)`, `full(doc)` and `EDIT_ONLY_IN_FLOW`; your bar and grips must add no box to the page);
+- three pictures added at once: the status line sits just above the bar and the two do not overlap;
 - axe on the page, with the bar showing formatting, and with the reorder sheet open;
 - "Remove" on the bar, then "Undo graph 1" on the bar puts it back; pressing Link with words selected opens the address prompt, and a link is made only with an https address.
 

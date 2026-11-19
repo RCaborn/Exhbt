@@ -27,7 +27,7 @@ Build the frame of the edit-on-page editor: the store, the adapter that puts fie
 
 ## You must not touch
 
-`components/editor/` (frozen: you import from it), `lib/exhbt/`, `lib/site.ts` (the switch is done), `app/globals.css`, `components/exhbt/MethodFlow.tsx` (K's), the server actions in `app/(app)/exhbts/[id]/actions.ts` (unchanged on purpose), `e2e/editor.ts` and the existing specs (N's).
+`components/editor/` (frozen: you import from it), `lib/exhbt/`, `lib/editor-kind.ts` (the switch is done), `lib/site.ts`, `app/globals.css`, `components/exhbt/MethodFlow.tsx` (K's), the server actions in `app/(app)/exhbts/[id]/actions.ts` (unchanged on purpose), `e2e/editor.ts` and the existing specs (N's).
 
 ## What you build against
 
@@ -87,8 +87,9 @@ export type ItemSlot = {
 export type InsertSlot = { at: number; end?: boolean };
 
 /**
- * Edit-only controls that belong to a part but are not on the published page: an image's description and picked-figure strip, a link's address, a graph's "Edit figures", the aim or hypothesis switch.
- * Each is drawn over the part and takes no room (decision 0026, "Edit-only controls take no room"): "above" over its top edge, "below" over its foot, "over" over a corner.
+ * Edit-only things that belong to a part but are not on the published page: an image's description and picked-figure label, a link's "Web address", a graph's "Edit figures", the aim or hypothesis switch.
+ * "above" is drawn over the part's top edge and "over" over a corner: they take no room (decision 0026, "Edit-only controls take no room").
+ * "below" is an image's description field, in the flow under the picture and its caption: one of the two edit-only fields 0026 allows in the flow (`EDIT_ONLY_IN_FLOW`).
  */
 export type ExtraSlot = { sectionId: string; kind: SectionKind; where: "above" | "below" | "over" };
 
@@ -118,11 +119,11 @@ export type EditAdapter = {
   extra(o: ExtraSlot): ReactNode;
   list(o: ListSlot): ReactNode;
   flow: FlowEdit;
-  /** The skill pills, with a way to add and remove one. Takes the place of the read-only list. */
+  /** The skill pills, each with remove, then the "Add a skill" box (id `skill-new`) at their end, in the flow: one of the two edit-only fields 0026 allows there. Takes the place of the read-only list, and is drawn even when there are no skills, when the box alone is the block's placeholder. */
   skills(): ReactNode;
   /** The sidebar's control for the work. Takes the place of "See the work". */
   work(): ReactNode;
-  /** A shell part's corner toolbar, out of the flow: "More actions" (rewrite, back to the AI version) where the AI drafted it, and for the skills "Add a skill". */
+  /** A shell part's corner toolbar, out of the flow: "More actions" (rewrite, back to the AI version) where the AI drafted it. */
   tools(o: ShellTools): ReactNode;
 };
 
@@ -197,20 +198,25 @@ export function rowsFor(items: PageItem[], f: Format): Row[];
 export function structureKey(doc: ExhbtDoc): string;
 
 export type BlockKind = PageKind;
-/** `full` is why it cannot be added ("Up to 2 graphs in a case study"); undefined when there is room. */
+/** `name` is the kind's noun in the layout's own words, as the "+" and the tray show it ("Graph", "What happened", "Reference", "Flowchart"). `full` is why it cannot be added ("Up to 2 graphs in a case study"); undefined when there is room. */
 export type BlockOption = { kind: BlockKind; name: string; full?: string };
 /** What the "+" menu and the tray offer: the layout's kinds in its own order and words, then the flowchart when it is off the page. */
 export function blockOptions(doc: ExhbtDoc): BlockOption[];
 
 /** Structural changes. Each adopts the doc first. `at` and `place` count page items (pageItems), not doc.sections. */
+/** `kind` "flow" puts a removed flowchart back at `at` (restoreFlow(doc, at)) and returns the id "flow"; null when the flowchart is on the page already. */
 export function insertBlock(doc: ExhbtDoc, kind: Exclude<BlockKind, "image">, at: number): { doc: ExhbtDoc; id: string } | null;
 export function insertImage(doc: ExhbtDoc, image: { fileId: string; w?: number; h?: number }, at: number): { doc: ExhbtDoc; id: string } | null;
 /** `place`: the item's index among the page items with the item itself taken out (0 is first). */
 export function moveItem(doc: ExhbtDoc, id: string, place: number): ExhbtDoc;
 /** Takes a section out. For the flowchart: removes the marker and sets flowOff; the boxes stay in doc.flow. */
 export function removeItem(doc: ExhbtDoc, id: string): ExhbtDoc;
-/** Puts a removed flowchart back: the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's (at the end if none), every other item keeps its place, and flowOff is deleted. The doc stays arranged. The same object when the flowchart is shown. */
-export function restoreFlow(doc: ExhbtDoc): ExhbtDoc;
+/**
+ * Puts a removed flowchart back and deletes flowOff. Every other item keeps its place, and the doc stays arranged. The same object when the flowchart is shown.
+ * With `at` (a page-item place, as insertBlock's), the marker goes in there: the new editor's "+" and tray always pass it.
+ * Without it (the classic editor's "Put the flowchart back", which has no place to give), the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's, or at the end if none.
+ */
+export function restoreFlow(doc: ExhbtDoc, at?: number): ExhbtDoc;
 ```
 
 What you define. The other agents build against these word for word.
@@ -235,7 +241,7 @@ export type EditorStore = {
 
   /** Structural changes: each adopts the doc first and is one undo entry. `at` and `place` count page items (pageItems in lib/exhbt/layouts.ts). */
   move(id: string, place: number): void;
-  /** Returns the new section's id, or null when the layout has no room (blockOptions says why). */
+  /** Returns the new section's id ("flow" for the flowchart, put back at `at`), or null when the layout has no room (blockOptions says why) or the flowchart is on the page already. */
   insert(kind: Exclude<BlockKind, "image">, at: number): string | null;
   insertImage(image: { fileId: string; w?: number; h?: number }, at: number): string | null;
   /** Never prunes the numbers to check: Undo may bring the section back. */
@@ -338,8 +344,8 @@ G (the editor's core) makes each of these files in its first milestone with the 
 | `sheets/CardSheet.tsx` | `CardSheet(): ReactNode` | I | nothing |
 | `sheets/WorkPanel.tsx` | `WorkPanel(): ReactNode` | I | nothing |
 | `sheets/WorkButton.tsx` | `WorkButton(): ReactNode` (what `edit.work()` returns) | I | the button, drawn as "See the work" is, opening the work sheet |
-| `figures/ImageExtras.tsx` | `ImageExtras(props: ExtraSlot): ReactNode` | J | below: the description field (`image-N-alt`) in a strip over the foot of the picture; above: nothing |
-| `figures/LinkExtras.tsx` | `LinkExtras(props: ExtraSlot): ReactNode` | J | a "Web address" button over the link's corner, opening a popover that holds the field |
+| `figures/ImageExtras.tsx` | `ImageExtras(props: ExtraSlot): ReactNode` | J | below: the description field (`image-N-alt`), in the flow under the picture and its caption; above: nothing |
+| `figures/LinkExtras.tsx` | `LinkExtras(props: ExtraSlot): ReactNode` | J | over: a "Web address" button over the link's corner, always shown, opening a popover that holds the field |
 | `figures/GraphExtras.tsx` | `GraphExtras(props: ExtraSlot): ReactNode` | J | an "Edit figures" button that opens the chart sheet |
 | `figures/ChartSheet.tsx` | `ChartSheet(): ReactNode` | J | the existing `ChartEditor` (`bare`) for `ui.sheet.sectionId` |
 | `figures/FigureSheet.tsx` | `FigureSheet(): ReactNode` | J | nothing |
@@ -362,7 +368,7 @@ export type Board = {
   moveBy(id: string, by: -1 | 1): void;
   /** Take a section off the page, with the motion, the words read out and the focus moved to what took its place. */
   remove(id: string): void;
-  /** Add a block at a place, with the motion and the focus put in it. Returns its id, or null when there is no room. A graph then opens its figures sheet (`ui.open("chart", id)`); an image opens the picture picker instead and is placed when the pictures are chosen. */
+  /** Add a block at a place, with the motion and the focus put in it. Returns its id, or null when there is no room. A graph then opens its figures sheet (`ui.open("chart", id)`); a link opens its "Web address" popover with the cursor in it (`ui.jumpTo` on its `href` path); an image opens the picture picker instead and is placed when the pictures are chosen; the flowchart, offered only when it is off the page, goes back at `at`. */
   add(kind: BlockKind, at: number): string | null;
   /** The section the focus was last in, for "add after the section you were last in". */
   lastFocus(): string | null;
@@ -377,8 +383,8 @@ Each owner's CSS goes in its own file in `components/exhbt-editor/css/` (`core.c
 
 Push after each step. Milestone 1 is every hook and plug in the blocks above, **working**, because six agents write code and tests against them: the store with undo, the adapter and the frame, the fields, the files, the jump, the sheets. It is deliberately the plainest working version: Tiptap's idle start-up, the formatting buttons, the shell toolbars, the issue popovers and the file rule come in milestone 2. When milestone 1 is pushed and its tests pass, say so in a report at once ("milestone 1 ready at <commit>") and carry on: the main session merges it and starts the others.
 
-1. **`EditorShell.tsx`** (A's stub, now yours) exports `PageEditor(props: PageEditorProps)`. The root is `<div data-editor="page" data-ready>` (`data-ready="true"` once the editor is up, as the classic editor sets it). Inside: the providers; `TopBar` (it holds the screen's heading, "Edit exhbt", at level 1); the canvas, wrapped in the person's look (`lookAttrs(theme)`, `themeStyle(theme)`) at the public frame's width; `ProjectView` with `headingLevel="h2"` and `edit` set; `DraftedGraph`; `Tray`; `PhoneBar`; the sheets; one polite live region; and a status line fixed at the foot of the window, out of the flow, that shows `useFiles().status` (`role="status"`) and, under it, `useFiles().error` (`role="alert"`). "See as a visitor" draws `ProjectView` with no `edit` inside `<section aria-label="Preview">`.
-2. **The store** (`store.ts`), as above. One doc outside React. `setAt` writes by path. The structural actions call B's `insertBlock`, `insertImage`, `moveItem`, `removeItem`, `applyTemplate`, `restoreFlow` ("+" then Flowchart when it is off); all of them adopt. The store keeps a `shell` object that changes identity only when a shell field changes (title, gap, context, whereWhen, myRole, skills, evidence, format) or `structureKey(doc)` changes; the canvas subscribes to that and to nothing else. `useSection(id)` gives the frame its one section.
+1. **`EditorShell.tsx`** (A's stub, now yours) exports `PageEditor(props: PageEditorProps)`. The root is `<div data-editor="page" data-ready>` (`data-ready="true"` once the editor is up, as the classic editor sets it). Inside: the providers; `TopBar` (it holds the screen's heading, "Edit exhbt", at level 1); the canvas, wrapped in the person's look (`lookAttrs(theme)`, `themeStyle(theme)`) at the public frame's width; `ProjectView` with `headingLevel="h2"` and `edit` set; `DraftedGraph`; `Tray`; `PhoneBar`; the sheets; one polite live region; and a status line fixed at the foot of the window, out of the flow, that shows `useFiles().status` (`role="status"`) and, under it, `useFiles().error` (`role="alert"`). Give it the class `xe-status`: on a phone L's bar is fixed at the foot of the screen too, and L's `phone.css` lifts the status line to sit just above the bar, so the two never overlap. "See as a visitor" draws `ProjectView` with no `edit` inside `<section aria-label="Preview">`.
+2. **The store** (`store.ts`), as above. One doc outside React. `setAt` writes by path. The structural actions call B's `insertBlock`, `insertImage`, `moveItem`, `removeItem` and `applyTemplate`; all of them adopt. `insert("flow", at)`, from the "+" or the tray when the flowchart is off, goes through `insertBlock(doc, "flow", at)`, which is `restoreFlow(doc, at)`: the flowchart goes back where it was put, never to its usual place. `restoreFlow` with no place is the classic editor's alone. The store keeps a `shell` object that changes identity only when a shell field changes (title, gap, context, whereWhen, myRole, skills, evidence, format) or `structureKey(doc)` changes; the canvas subscribes to that and to nothing else. `useSection(id)` gives the frame its one section.
    - **The browser copy and the newest doc go round React** (0026, "Saving"). In every change (`setAt`, `patch`, `patchDoc`, each structural action), the store calls `writeBackup(id, doc)` from `components/editor/useAutosave.ts` and records the doc as the newest, before it tells any subscriber. `pending.ts` (A's stub, now yours) exports `flushPending(): Promise<void>`: when the newest doc differs from the last one the server has, it sends it with `saveDraft`; it resolves when that lands or after three seconds, whichever is first. The crash boundary awaits it.
    - In development only, `?crash=change` makes `PageEditor` throw on the render after the first change.
 3. **Undo** (`undo.ts`), exactly as 0026 says under "Undo", "What an entry holds":
@@ -389,19 +395,19 @@ Push after each step. Milestone 1 is every hook and plug in the blocks above, **
    - up to 30; flowchart boxes get keys that last for the visit; Ctrl or Cmd and Z only when the cursor is not in a field; after an Undo the focus goes as 0026 says.
 4. **The adapter** (`adapter.tsx`): `useAdapter(): EditAdapter`, one stable object.
    - `item` returns `<Frame {...slot} />`. `Frame` is memoised, reads its section with `useSection(id)` and its index in `doc.sections` with `useDoc` (a number, so it re-renders when a kept section before it is removed and its fields' paths would otherwise go stale), draws `<div data-section-id data-kind data-as data-path="sections.N" class="xe-frame …rowClass">` (no `data-path` on the flowchart's frame: K's list carries `flow`), positioned, with the toolbar and `ItemView` inside, and counts its renders. The frame must add no box: the part inside sits exactly where the read-only page puts it.
-   - `text` returns `InlineText`; `rich` returns `RichField`; `insert` returns `Insert`; `extra` returns the right plug by kind (the aim's switch is yours, over the aim's top edge); `list` returns a finding's controls (move up, move down, remove), and at `index === n` "Add a finding" with `data-path="sections.N.items"`, all drawn over the list, names as the classic editor's; `flow` is `useFlowEdit()`; `skills` is yours (pills with remove, the block carrying `data-path="skills"`); `work` returns `WorkButton`; `tools` returns null until milestone 2.
-   - Every element the adapter adds that the visitor's page lacks carries `data-edit-only`, and none but the placeholders of 0026's list takes room.
+   - `text` returns `InlineText`; `rich` returns `RichField`; `insert` returns `Insert`; `extra` returns the right plug by kind (the aim's switch is yours, over the aim's top edge); `list` returns a finding's controls (move up, move down, remove), and at `index === n` "Add a finding" with `data-path="sections.N.items"`, all drawn over the list, names as the classic editor's. "Add a finding" shows whenever the pointer or the focus is in the findings section, and always under `(pointer: coarse)`; it sits in the gap below the last finding, as the "+" sits in its gap, clear of the "+" below the row, and covers no words; `flow` is `useFlowEdit()`; `skills` is yours: the pills with remove, then, after the last pill, the "Add a skill" box (id `skill-new`, the size of a pill, in the flow, always drawn: on an exhbt with no skills it is the skills block's placeholder; Enter makes what is typed a pill), the block carrying `data-path="skills"`; `work` returns `WorkButton`; `tools` returns null until milestone 2.
+   - Every element the adapter adds that the visitor's page lacks carries `data-edit-only`, and none takes room but what is on 0026's list of what is in the flow in the editor only: the placeholders, each image's description field (J's) and the "Add a skill" box.
 5. **`fields/InlineText.tsx` and `fields/RichField.tsx`**, as 0026 says under "Typing in the page's own type". Each carries `data-path`, its name, and an id (`o.id`, or the path with dots as hyphens). An empty field shows its placeholder in `--xp-muted`. In milestone 1, `RichField` draws the page's own markup and makes its Tiptap editor (`injectCSS: false`, loaded in its own chunk) when the field is clicked or focused; nothing moves in the swap. Keep the limits out of the fields: a field never stops typing at a word cap.
-6. **The toolbar** on each frame: the grip (`<button data-grip {...board.grip(id)}>`, named "Drag <label> to move it"), "Move <label> up", "Move <label> down" (`board.moveBy`), the layout's action where there is one ("Make lead image", "Make key figure", and "Before" and "After" on an image in a Before and after exhbt), "More actions" where the AI drafted the part (the existing `BlockTools`, with its `tools-*` and `rewrites-left` test ids), and "Remove <label>" (`board.remove`). The flowchart has no Remove where the layout always has one (`FORMAT_RULES[f].flowRemovable` is false: a case study and research). Labels come from `sectionLabel`. It is out of the flow. With a mouse it shows on hover and on focus within; under `(pointer: coarse)`, whatever the width, it is always shown and its buttons are 44px (36px otherwise). Each button has a tooltip.
+6. **The toolbar** on each frame: the grip (`<button data-grip {...board.grip(id)}>`, named "Drag <label> to move it"), "Move <label> up", "Move <label> down" (`board.moveBy`), the layout's action where there is one ("Make lead image", "Make key figure", and "Before" and "After" on an image in a Before and after exhbt), "More actions" where the AI drafted the part (the existing `BlockTools`, with its `tools-*` and `rewrites-left` test ids), and "Remove <label>" (`board.remove`). The flowchart has no Remove where the layout always has one (`FORMAT_RULES[f].flowRemovable` is false: a case study and research). Labels come from `sectionLabel`. It is out of the flow. With a mouse it shows on hover and on focus within; on a touch screen (`pointer: coarse`) wider than 48rem it is always shown and its buttons are 44px (36px otherwise). On a phone (narrower than 48rem, with touch) L's `phone.css` shows only the grip and L's bar holds the rest. Each button has a tooltip.
 7. **Autosave.** A component that renders nothing subscribes to the whole doc and runs `useAutosave` with a `save` that wraps `saveDraft`. Focus leaving the editor flushes. The status words are exactly "Saved", "Saving…", "Not saved. Retry". A save that throws for a reason other than the network (a `TypeError` from `fetch`, or `navigator.onLine` false) means the page's server actions are gone (a deploy or a rollback since the page was opened): `useSave().status` then carries `error: "The editor was updated. Reload to carry on; your changes are kept in this browser."`, and H shows it with a Reload button. In development only, `?save=stale` makes the save throw a plain `Error`, for the test.
 8. **Files.** `files.ts`: port `addImages` from `Editor.tsx` with its ordering (the pictures land in the order picked, whichever upload finishes first), `pick`, `replaceImage`, `attachWork`, `removeWork` (one undo entry), `markPublished`. `status` reads "Uploading 1 of 3" from the moment the pictures are chosen; a file too large or of a kind that cannot be read sets `error.image` with the reason, at once. **In this milestone no stored file is ever deleted**: that is always safe, and the rule that deletes them is milestone 2's.
 9. **The jump** (`jump.ts`): `ui.jumpTo(path)` finds `[data-path]` exactly, then by shorter and shorter prefixes; when what it finds is not a field, it puts the cursor in the first field inside it, or focuses it. Milestone 2 adds opening a sheet or a popover first.
 10. **Every plug in the table**, with its stub, `drag/options.ts` with its three constants included. **`css/core.css`**, which defines `--xe-topbar-h`, the top bar's one fixed height: A's loading view leaves that much room and H's bar is exactly that tall, so nothing moves when the bar arrives. **`ui/Sheet.tsx`**: a native `<dialog>` opened by `ui.open`, at the side on a desktop and full screen under 48rem, titled, closing on Escape and giving the focus back.
 11. **`e2e/page-editor.ts`**:
-    - `openNew(page, username, plan?)` (development sign-in, "Start from scratch", wait for `[data-editor="page"][data-ready=true]`, return the id), `openSeeded(page, username, withParam, slug)`, `openDoc(page, username, doc)` (seeds a doc with `POST /dev/parity` and opens its editor), `field(page, path)`, `frame(page, id)`, `grip(page, id)`, `waitSaved(page)`, `pageOrder(page)` (frame ids in page order), `boxes(page)` (the place and size of every `[data-part]`, the title, the context line, each pill, each flowchart box, each finding and each figure), `renders(page)`, `readStored(page, id)` (`GET /dev/parity`);
+    - `openNew(page, username, plan?)` (development sign-in, "Start from scratch", wait for `[data-editor="page"][data-ready=true]`, return the id), `openSeeded(page, username, withParam, slug)`, `openDoc(page, username, doc)` (seeds a doc with `POST /dev/parity`, then signs in with `/auth/dev?email=<username>@example.com&next=…` and opens its editor: never `signInAs` or `/dev/portfolio` after seeding, which clear that user's exhbts), `field(page, path)`, `frame(page, id)`, `grip(page, id)`, `waitSaved(page)`, `pageOrder(page)` (frame ids in page order), `boxes(page)` (the place and size of every `[data-part]`, the title, the context line, each pill, each flowchart box, each finding and each figure), `renders(page)`, `readStored(page, id)` (`GET /dev/parity`);
     - `SAMPLES`: for each of the seven layouts, the seed of its sample (`with` and slug; the four new ones are D's, from release 2), and `offered()`, the layouts in `OFFERED_FORMATS`. Every editor spec that runs "on each layout" loops over `offered()`, so in release 4 it covers seven with no change;
     - `full(doc)`: the doc with every empty optional part given words (a context line, What it is, Where and when, My role, a work link, every box's detail, every caption, a quote's role, every link's description);
-    - `EDIT_ONLY_IN_FLOW`: 0026's list of placeholders, as data (a name and a selector each). Every box-for-box test reads it; nobody writes the list anywhere else.
+    - `EDIT_ONLY_IN_FLOW`: 0026's list of what is in the flow in the editor only, as data: a name, a selector, and whether it is always there (each image's description field, the "Add a skill" box) or only while its part is empty (the placeholders). Every box-for-box test reads it and allows its entries as 0026 says under "How a box-for-box test allows them"; nobody writes the list anywhere else.
 12. **First tests** in `e2e/editor-inplace.spec.ts`: a new exhbt opens in the new editor; typing the title, a box, a finding and the context line saves and is there after a reload; the stored doc has no marker after typing alone; "Move down" on a section writes the marker, and Undo puts the order back and takes the marker out; a picture can be added and is stored. In `e2e/editor-classic.spec.ts` (A's, now yours): `?crash=change` ends in the classic editor with the words typed before the crash, both in the stored doc and in the classic editor's fields.
 
 ## Milestone 2: the rest
@@ -409,7 +415,7 @@ Push after each step. Milestone 1 is every hook and plug in the blocks above, **
 13. **`RichField`, all of it**: editors made one at a time in idle moments after the page is up, and at once for a field that is clicked; the formatting buttons out of the flow while it has the cursor, below the line on a section's first line, where the toolbar sits; `useActiveRich()`; `toggleLink()` opening the field's own address prompt (as the classic `RichTextField` does, with its error).
 14. **Issues on the page**: a field with an issue at its path gets an outline in `--xp-error`, `aria-invalid`, and `aria-describedby` pointing at its message, which is visually hidden until the field has the focus and then shows in a small popover under it. Never in the flow.
 15. **The jump, all of it**: a path whose field lives in a sheet opens that sheet first (`summary`, `headline`, `evidence`; `sections.N.chart` and `sections.N.chart.*` open the chart sheet); a field inside a closed native popover opens it first (`showPopover()` on the closest `[popover]`). The anchors 0026 lists for paths with no field: `""` is H's word bar, `sections` F's end "+", `flow` K's list, `skills` and `sections.N.items` yours, `sections.N` the frame. On whatever it lands, the jump dispatches an `xe-jump` event (F's end "+" opens its menu on it).
-16. **The shell toolbars** (`edit.tools`): for the title (`header`), the context line (`gap`) and the skills, a small toolbar over the part's corner, out of the flow, holding "More actions" (`BlockTools` with `tools-header`, `tools-gap`, `tools-skills`) where the AI drafted the part, and for the skills "Add a skill", a popover holding the box `skill-new`. Same show and size rules as the section toolbar.
+16. **The shell toolbars** (`edit.tools`): for the title (`header`), the context line (`gap`) and the skills, a small toolbar over the part's corner, out of the flow, holding "More actions" (`BlockTools` with `tools-header`, `tools-gap`, `tools-skills`) where the AI drafted the part. "Add a skill" is not here: it is the box at the end of the pills (step 4). Same show and size rules as the section toolbar.
 17. **The file rule.** The four-part rule in 0026 decides when a file is deleted. Run it after each save lands, when an undo entry falls off the list, on `pagehide` only when `event.persisted` is false, and on unmount (use `keepalive`). Never on `visibilitychange`, and never on a `pagehide` that keeps the page in the back-forward cache. Pictures dropped onto the canvas are added after the section they were dropped on.
 18. **The kept list** ("Kept, not shown in this layout", each with Remove), **the backup offer** (port the classic editor's "We kept changes from…"), a new text section's focus going into its field, and the focus after an Undo (0026).
 19. **The timing harness.** `app/dev/editor-timing/page.tsx`: draws `PageEditor` on a sample (`?sample=`) with no sign-in and a save that does nothing. It is not found unless `NODE_ENV` is not `production`, or the build has `EXHBT_LAB=1` (as the lab's page was gated; never set on the live Worker). F's `scripts/editor-timing.mjs` opens it on a production build.
@@ -428,9 +434,9 @@ Push after each step. Milestone 1 is every hook and plug in the blocks above, **
 - **undo of the first move**: on the order fixture "a figure before the findings" (untouched), move a section, then Undo: the stored doc has no marker and its first order, and `boxes(page)` equals what it was before the move;
 - **publishing keeps the order**: on an arranged doc (the flowchart moved below the findings, a figure before the findings), publish, open the live address: its `[data-part]` order is the editor's;
 - **a hidden page keeps Undo working**: remove a picture, wait for "Saved", fire `visibilitychange` to hidden and back, press Undo: the picture is back and its address loads;
-- **box for box, on full pages**: for each layout's sample made `full`, `boxes(page)` while editing equals `boxes(page)` in "See as a visitor", to half a pixel, at 1440 wide and on a Pixel 7, in the Exhbt, Classic and Night looks and one colourway of each other look. The only difference allowed is the highlight's wrap, by name;
-- **box for box, on a sparse page**: on a new exhbt, every difference from "See as a visitor" is a part named in `EDIT_ONLY_IN_FLOW`, and nothing else moves but what sits below it;
-- **the loading stand-in matches**: on a new exhbt, `boxes(page)` just before `data-ready="true"` (hold the editor's chunk back with `page.route`) equals `boxes(page)` after;
+- **box for box, on full pages**: for each layout's sample made `full`, `boxes(page)` while editing equals `boxes(page)` in "See as a visitor", to half a pixel, at 1440 wide and on a Pixel 7, in the Exhbt, Classic and Night looks and one colourway of each other look. The only differences allowed, by name, are the highlight's wrap and the entries of `EDIT_ONLY_IN_FLOW` that are always there (each image's description field, the "Add a skill" box), as 0026 says under "How a box-for-box test allows them";
+- **box for box, on a sparse page**: on a new exhbt, every difference from "See as a visitor" is a part named in `EDIT_ONLY_IN_FLOW`, and nothing else moves but what sits below it (0026, "How a box-for-box test allows them");
+- **the loading stand-in matches**: on a new exhbt, and on the gallery's sample (described pictures and skills), `boxes(page)` just before `data-ready="true"` (hold the editor's chunk back with `page.route`) equals `boxes(page)` after;
 - **the status line**: three pictures picked at once show "Uploading 1 of 3", then land in the order picked; a picture over the size limit shows its reason in the alert and adds nothing;
 - **a stale editor**: with `?save=stale`, a change ends in "The editor was updated. Reload to carry on; your changes are kept in this browser.";
 - axe: at rest, while typing, with a sheet open; and at rest on a new exhbt and on a full one in all eight looks.
