@@ -1,5 +1,6 @@
-import { FLOW_ID, isContent, type ContentSection, type ExhbtDoc, type FlowMarker, type FlowStep, type Section, type SectionKind, type SectionOf } from "./blocks";
-import { flowShown, FORMAT_RULES, formatOf, hasMarker, isArranged, isShown, withFormat, type Format, type PageKind } from "./formats";
+import { FLOW_ID, formatLimits, isContent, type ContentSection, type ExhbtDoc, type FlowMarker, type FlowStep, type Section, type SectionKind, type SectionOf } from "./blocks";
+import { flowShown, FORMAT_COPY, FORMAT_RULES, formatOf, hasMarker, isArranged, isShown, withFormat, type Format, type PageKind } from "./formats";
+import { newImageSection, newSection, roomFor, sectionName } from "./sections";
 
 /**
  * The layout engine (decision 0027): what the main column of an exhbt draws, in what order, and
@@ -303,6 +304,18 @@ function storedPlace(sections: Section[], items: PageItem[], at: number): number
 }
 
 /**
+ * An arranged doc whose flowchart is drawn with no marker (flowOff in a case study or research,
+ * which always draw it, first) with the marker written in, first, so every page item has its
+ * place in doc.sections. The page is the same. Any other doc as it is.
+ */
+function pinned(doc: ExhbtDoc): ExhbtDoc {
+  if (hasMarker(doc) || !flowShown(doc)) return doc;
+  const next = { ...doc, sections: [marker(), ...doc.sections] };
+  delete next.flowOff;
+  return next;
+}
+
+/**
  * Puts a removed flowchart back and deletes flowOff. Every other item keeps its place, and the doc stays arranged. The same object when the flowchart is shown.
  * With `at` (a page-item place, as insertBlock's), the marker goes in there: the new editor's "+" and tray always pass it.
  * Without it (the classic editor's "Put the flowchart back", which has no place to give), the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's, or at the end if none.
@@ -325,6 +338,120 @@ export function restoreFlow(doc: ExhbtDoc, at?: number): ExhbtDoc {
   const next = { ...doc, sections: [...doc.sections.slice(0, index), marker(), ...doc.sections.slice(index)] };
   delete next.flowOff;
   return next;
+}
+
+export type BlockKind = PageKind;
+/** `name` is the kind's noun in the layout's own words, as the "+" and the tray show it ("Graph", "What happened", "Reference", "Flowchart"). `full` is why it cannot be added ("Up to 2 graphs in a case study"); undefined when there is room. */
+export type BlockOption = { kind: BlockKind; name: string; full?: string };
+
+/** The order of the classic editor's "Add a section" menu (menuFor in components/editor/Sections.tsx): research's own, and everyone else's, with the pull quote after the findings. */
+const MENU_ORDER: readonly SectionKind[] = ["findings", "pullquote", "graph", "image", "quote", "reflection", "link", "aim", "conclusion"];
+const RESEARCH_MENU_ORDER: readonly SectionKind[] = ["aim", "findings", "graph", "image", "conclusion", "quote", "reflection", "link"];
+
+/** What one of a kind is called in a reason ("One quote in a gallery"), and more than one ("Up to 2 graphs in a case study"). */
+function nouns(kind: SectionKind, f: Format): [one: string, many: string] {
+  switch (kind) {
+    case "findings":
+      return f === "research" ? ["results section", "results sections"] : ["findings section", "findings sections"];
+    case "reflection":
+      return f === "research" ? ["limitations section", "limitations sections"] : ["section on what's next", "sections on what's next"];
+    case "link": {
+      const word = FORMAT_COPY[f].link.toLowerCase();
+      return [word, `${word}s`];
+    }
+    case "aim":
+      return ["aim or hypothesis", "aims or hypotheses"];
+    case "pullquote":
+      return ["pull quote", "pull quotes"];
+    default:
+      return [kind, `${kind}s`];
+  }
+}
+
+/** Why a kind can't be added: every one the layout allows is used, or (research) the graphs and images together are at their cap. Undefined when there is room. Every number is formatLimits'. */
+function fullReason(kind: SectionKind, f: Format, sections: Section[]): string | undefined {
+  if (roomFor(sections, kind, f) > 0) return undefined;
+  const L = formatLimits(f);
+  const where = FORMAT_COPY[f].inLayout;
+  const ofKind = sections.filter((s) => s.kind === kind).length;
+  const figures = sections.filter((s) => s.kind === "graph" || s.kind === "image").length;
+  if (L.maxFigures !== null && (kind === "graph" || kind === "image") && figures >= L.maxFigures && ofKind < L.sections[kind]) {
+    return `Up to ${L.maxFigures} graphs and images together ${where}`;
+  }
+  const max = L.sections[kind];
+  const [one, many] = nouns(kind, f);
+  return max === 1 ? `One ${one} ${where}` : `Up to ${max} ${many} ${where}`;
+}
+
+/** What the "+" menu and the tray offer: the layout's kinds in its own order and words, then the flowchart when it is off the page. */
+export function blockOptions(doc: ExhbtDoc): BlockOption[] {
+  const f = formatOf(doc);
+  const kinds = FORMAT_RULES[f].kinds;
+  const options = (f === "research" ? RESEARCH_MENU_ORDER : MENU_ORDER)
+    .filter((kind) => kinds.includes(kind))
+    .map((kind): BlockOption => {
+      const full = fullReason(kind, f, doc.sections);
+      return full ? { kind, name: sectionName(kind, f), full } : { kind, name: sectionName(kind, f) };
+    });
+  return flowShown(doc) ? options : [...options, { kind: "flow", name: "Flowchart" }];
+}
+
+/** The doc (adopted) with `s` at page place `at`. */
+function insertAt(a: ExhbtDoc, s: ContentSection, at: number): ExhbtDoc {
+  const index = storedPlace(a.sections, pageItems(a), at);
+  return { ...a, sections: [...a.sections.slice(0, index), s, ...a.sections.slice(index)] };
+}
+
+/**
+ * Structural changes. Each adopts the doc first. `at` and `place` count page items (pageItems), not doc.sections.
+ * A new section is empty (newSection). Null when the layout has no room for the kind, or doesn't draw it (blockOptions says why).
+ * `kind` "flow" puts a removed flowchart back at `at` (restoreFlow(doc, at)) and returns the id "flow"; null when the flowchart is on the page already.
+ */
+export function insertBlock(doc: ExhbtDoc, kind: Exclude<BlockKind, "image">, at: number): { doc: ExhbtDoc; id: string } | null {
+  if (kind === "flow") return flowShown(doc) ? null : { doc: restoreFlow(doc, at), id: FLOW_ID };
+  const f = formatOf(doc);
+  if (!drawsKind(f, kind) || roomFor(doc.sections, kind, f) === 0) return null;
+  const a = pinned(adopt(doc));
+  const s = newSection(kind, a.sections);
+  return { doc: insertAt(a, s, at), id: s.id };
+}
+
+/** An image of an uploaded file at page place `at`, with its size when known. Null when the layout has no room for another. */
+export function insertImage(doc: ExhbtDoc, image: { fileId: string; w?: number; h?: number }, at: number): { doc: ExhbtDoc; id: string } | null {
+  const f = formatOf(doc);
+  if (!drawsKind(f, "image") || roomFor(doc.sections, "image", f) === 0) return null;
+  const a = pinned(adopt(doc));
+  const s = newImageSection(image.fileId, a.sections, image.w && image.h ? { w: image.w, h: image.h } : undefined);
+  return { doc: insertAt(a, s, at), id: s.id };
+}
+
+/** `place`: the item's index among the page items with the item itself taken out (0 is first). An id that is not a page item: the doc as it was. */
+export function moveItem(doc: ExhbtDoc, id: string, place: number): ExhbtDoc {
+  const a = pinned(adopt(doc));
+  const items = pageItems(a);
+  const from = items.findIndex((it) => it.id === id);
+  if (from < 0) return doc;
+  const stored = items[from]!.index;
+  const moving = a.sections[stored]!;
+  const sections = a.sections.filter((_, i) => i !== stored);
+  const rest = items.filter((_, k) => k !== from).map((it): PageItem => ({ ...it, index: it.index > stored ? it.index - 1 : it.index }));
+  const index = storedPlace(sections, rest, place);
+  return { ...a, sections: [...sections.slice(0, index), moving, ...sections.slice(index)] };
+}
+
+/**
+ * Takes a section out (one the layout draws or one it keeps). For the flowchart: removes the marker and sets flowOff; the boxes stay in doc.flow.
+ * Nothing where the layout always draws a flowchart, or for an id the doc does not have: the doc as it was.
+ */
+export function removeItem(doc: ExhbtDoc, id: string): ExhbtDoc {
+  if (id === FLOW_ID) {
+    if (!FORMAT_RULES[formatOf(doc)].flowRemovable || !flowShown(doc)) return doc;
+    const a = adopt(doc);
+    return { ...a, sections: a.sections.filter(isContent), flowOff: true };
+  }
+  if (!doc.sections.some((s) => s.id === id)) return doc;
+  const a = pinned(adopt(doc));
+  return { ...a, sections: a.sections.filter((s) => s.id !== id) };
 }
 
 /** Changes exactly when the layout of the page could: the layout, flowOff, and each item's id, kind and image stage, in order. */

@@ -1,4 +1,5 @@
-import { emptyDoc, findingsOf, plain, type ExhbtDoc, type FlowStep, type RichText } from "./blocks";
+import { z } from "zod/v4";
+import { ChartSchema, emptyDoc, findingsOf, plain, type Chart, type ExhbtDoc, type FlowStep, type RichText } from "./blocks";
 import { normaliseNumber, numbersIn, numbersInDoc, unverifiedNumbers } from "./verify";
 
 /**
@@ -35,9 +36,27 @@ export type BlockValue<K extends DraftBlock = DraftBlock> = BlockValues[K];
 export type AiVersion = {
   blocks: { [K in DraftBlock]?: BlockValues[K] };
   unverified: { [K in DraftBlock]?: string[] };
+  /** The graphs the draft drew that a figure from the work took the place of (decision 0025), kept so the editor can offer them back (decision 0026). */
+  graphs?: Chart[];
 };
 
 export const emptyAiVersion = (): AiVersion => ({ blocks: {}, unverified: {} });
+
+/**
+ * An AI version as stored (JSON, lib/draft-tools.ts), read back: its blocks and flags, and its
+ * graphs when they read as a list of charts (each by ChartSchema); otherwise no `graphs` key.
+ * Nothing stored, or nothing readable, is the empty version.
+ */
+export function readAiVersion(raw: string | null): AiVersion {
+  if (!raw) return emptyAiVersion();
+  try {
+    const v = JSON.parse(raw) as Partial<AiVersion> & { graphs?: unknown };
+    const graphs = z.array(ChartSchema).safeParse(v.graphs);
+    return { blocks: v.blocks ?? {}, unverified: v.unverified ?? {}, ...(graphs.success ? { graphs: graphs.data } : {}) };
+  } catch {
+    return emptyAiVersion();
+  }
+}
 
 export function blockValue<K extends DraftBlock>(doc: ExhbtDoc, key: K): BlockValues[K];
 export function blockValue(doc: ExhbtDoc, key: DraftBlock): BlockValue {

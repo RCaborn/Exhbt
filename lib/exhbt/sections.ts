@@ -1,5 +1,6 @@
 import {
   formatLimits,
+  needMet,
   SECTION_KINDS,
   sectionsOf,
   sectionTexts,
@@ -14,7 +15,7 @@ import {
   type SectionOf,
 } from "./blocks";
 import { newChart } from "./charts";
-import { FORMAT_COPY, FORMAT_RULES, formatOf, hiddenSections, type Format, type FromWork } from "./formats";
+import { FORMAT_COPY, FORMAT_RULES, formatOf, hiddenSections, type Format, type FromWork, type Need } from "./formats";
 import { normaliseNumber, numbersInDoc } from "./verify";
 
 /**
@@ -285,18 +286,30 @@ export function layoutNotes(doc: ExhbtDoc): { hidden: string[]; over: string[]; 
   if (L.maxFigures !== null && figures > L.maxFigures) {
     over.push(`This layout shows up to ${L.maxFigures} figures, graphs and images together; you have ${figures}. Remove some before you publish, or switch back.`);
   }
-  const missing: { text: string; add?: SectionKind }[] = [];
-  const count = (k: SectionKind) => sectionsOf(doc, k).length;
+  // What the layout needs (its `needs`, in order), then empty findings. A case study lists nothing: the publish check says what it lacks.
+  const missing = FORMAT_RULES[f].needs.flatMap((n) => (needMet(doc, n) ? [] : missingOf(n, f)));
   const emptyFindings = sectionsOf(doc, "findings").some((s) => s.items.some((it) => !words(it.map((r) => r.t).join(""))));
-  if (f === "gallery") {
-    if (count("image") < L.minImages) missing.push({ text: `Add at least ${L.minImages} images`, add: "image" });
-    if (emptyFindings) missing.push({ text: "Fill in or remove the empty findings" });
-  } else if (f === "research") {
-    if (!count("aim")) missing.push({ text: "Add your aim or hypothesis", add: "aim" });
-    if (!count("conclusion")) missing.push({ text: "Add your conclusion", add: "conclusion" });
-    if (!count("graph") && !count("image")) missing.push({ text: "Add a graph or an image", add: "graph" });
-    if (!count("findings")) missing.push({ text: "Add your results", add: "findings" });
-    if (emptyFindings) missing.push({ text: "Fill in or remove the empty findings" });
-  }
+  if (f !== "case-study" && emptyFindings) missing.push({ text: "Fill in or remove the empty findings" });
   return { hidden, over, missing };
+}
+
+const withArticle = (kind: SectionKind) => (kind === "image" ? "an image" : `a ${SECTION_NAMES[kind].toLowerCase()}`);
+const plural = (kind: SectionKind) => (kind === "image" ? "images" : `${SECTION_NAMES[kind].toLowerCase()}s`);
+
+/** One need, as the line the editor lists under "To finish this layout", with the kind to add where one button fixes it. */
+function missingOf(n: Need, f: Format): { text: string; add?: SectionKind }[] {
+  const plainly = (message: string) => message.replace(/\.$/, "");
+  switch (n.need) {
+    case "count": {
+      const add = n.kinds[0];
+      if (n.kinds.length > 1) return [{ text: `Add ${n.kinds.map(withArticle).join(" or ")}`, add }];
+      if (n.min > 1) return [{ text: `Add at least ${n.min} ${plural(add!)}`, add }];
+      return [{ text: plainly(n.message), add }];
+    }
+    case "results":
+      return f === "case-study" ? [] : [{ text: plainly(n.message) }];
+    case "stages":
+    case "myRole":
+      return [{ text: plainly(n.message) }];
+  }
 }
