@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { devices, expect, test, type Page } from "@playwright/test";
 import { uniqueEmail } from "./helpers";
+import { draftAndOpen } from "./editor";
 
 // Phase 2 polish, second pass: the phone header menu, one catalogue number, the per-card
 // "More actions" menu, the flowchart as a row on wide screens and a column on phones, the exhbt
@@ -12,13 +13,6 @@ const unique = (tag: string) => `${tag}-${Date.now().toString(36)}${Math.floor(M
 // Pixel 7 in the desktop project (a describe can't change the browser type, so leave that out).
 const PIXEL_7 = (({ viewport, userAgent, deviceScaleFactor, isMobile, hasTouch }) => ({ viewport, userAgent, deviceScaleFactor, isMobile, hasTouch }))(devices["Pixel 7"]);
 
-const PROJECT = [
-  "Final-year project on GP appointment reminders.",
-  "The question was whether sending the reminder 3 hours before an appointment cut missed appointments compared with 24 hours before.",
-  "I cleaned 14,200 appointment records from two practices in Python with pandas and fitted a logistic regression.",
-  "Missed appointments fell from 7.9% to 6.5% across all patients, and from 11.2% to 8.4% for patients under 30.",
-].join("\n");
-
 async function seed(page: Page, username: string, plan: string) {
   const res = await page.request.get(`/dev/portfolio?username=${username}&plan=${plan}`, { maxRedirects: 0 });
   expect(res.status(), await res.text()).toBe(307);
@@ -27,19 +21,6 @@ async function seed(page: Page, username: string, plan: string) {
 const signInAs = (page: Page, email: string, next: string) => page.goto(`/auth/dev?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}`);
 const noSideScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 const direction = (page: Page, selector: string) => page.locator(selector).first().evaluate((el) => getComputedStyle(el).flexDirection);
-
-/** Drafts through the API (the placeholder AI) and opens the editor. */
-async function draftAndOpen(page: Page, tag: string): Promise<string> {
-  await signInAs(page, uniqueEmail(tag), "/exhbts/new");
-  await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
-  const res = await page.request.post("/api/exhbts/draft", { data: { text: PROJECT } });
-  expect(res.status()).toBe(200);
-  const { id } = (await res.json()) as { id: string };
-  await page.goto(`/exhbts/${id}/edit`);
-  await expect(page.getByRole("heading", { level: 1, name: "Edit exhbt" })).toBeVisible();
-  await expect(page.locator("[data-ready=true]").first()).toBeAttached();
-  return id;
-}
 
 test.describe("Phone header", () => {
   test.use(PIXEL_7);
@@ -136,7 +117,7 @@ test.describe("Project page on a phone", () => {
 
 test.describe("Editor", () => {
   test("each card has one More actions menu: rewrite, back to the AI version, and the count", async ({ page }) => {
-    await draftAndOpen(page, "menu");
+    await draftAndOpen(page, "menu", { waitForForm: false });
     const more = page.getByRole("button", { name: "More actions for Findings" });
     const tools = page.getByTestId("tools-findings");
     // No old two-button bar.
@@ -165,7 +146,7 @@ test.describe("Editor", () => {
   });
 
   test("the preview is wide enough for the flowchart to be a row at 1440, and the process card is a wrapping row", async ({ page }) => {
-    await draftAndOpen(page, "row");
+    await draftAndOpen(page, "row", { waitForForm: false });
     expect(await direction(page, 'section[aria-label="Preview"] ol[aria-label="Methodology"]')).toBe("row");
     expect(await direction(page, 'ol[aria-label="Process flowchart"]')).toBe("row");
     expect(await page.locator('ol[aria-label="Process flowchart"]').first().evaluate((el) => getComputedStyle(el).flexWrap)).toBe("wrap");
@@ -175,7 +156,7 @@ test.describe("Editor", () => {
   });
 
   test("no accessibility violations with a More actions menu open", async ({ page }) => {
-    await draftAndOpen(page, "axe");
+    await draftAndOpen(page, "axe", { waitForForm: false });
     await page.getByRole("button", { name: "More actions for Process" }).click();
     await expect(page.getByTestId("tools-flow").getByRole("button", { name: "Rewrite this block" })).toBeVisible();
     const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
@@ -186,7 +167,7 @@ test.describe("Editor", () => {
 test.describe("Editor on a phone", () => {
   test.use(PIXEL_7);
   test("the process card and the preview stay vertical", async ({ page }) => {
-    await draftAndOpen(page, "phone");
+    await draftAndOpen(page, "phone", { waitForForm: false });
     expect(await direction(page, 'ol[aria-label="Process flowchart"]')).toBe("column");
     expect(await noSideScroll(page)).toBe(true);
     await page.getByRole("button", { name: "Preview" }).first().click();
@@ -258,7 +239,7 @@ test.describe("Profile photo on Free", () => {
 
 test.describe("Editor preview: the flowchart's words", () => {
   test("a six-box flowchart at 1440 breaks no word in the preview", async ({ page }) => {
-    await draftAndOpen(page, "six");
+    await draftAndOpen(page, "six", { waitForForm: false });
     const steps = ["Define bank and fintech strategies", "Set payoff matrix with openness parameter", "Derive replicator equations and rest points", "Classify stability of each equilibrium", "Select outcome via risk dominance", "Compare with the mandate's aims"];
     const add = page.getByRole("button", { name: "Add a box at the end" });
     while ((await page.getByLabel(/^Box \d$/).count()) < steps.length) await add.click();

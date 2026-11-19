@@ -1,7 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "@playwright/test";
 import Stripe from "stripe";
 import { BILLING_PERIOD, ENTITLEMENTS, PLAN_NAMES, PRICES } from "../lib/entitlements";
+import { signInAs, startFromScratch } from "./editor";
 
 // Billing polish: Stripe events out of order, the upgrade offer where a limit stops something,
 // the pricing page selling for real with Phase 2 on, and files removed with their exhbt.
@@ -37,21 +38,6 @@ async function postSigned(request: APIRequestContext, payload: string) {
   return request.post("/api/stripe/webhook", { data: payload, headers: { "stripe-signature": header, "content-type": "application/json" } });
 }
 
-/** A dev user with a username on a plan and no exhbts, signed in on /exhbts. */
-async function signInAs(page: Page, username: string, plan: "free" | "premium") {
-  await page.goto(`/dev/portfolio?username=${username}&plan=${plan}&count=0`);
-  await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
-  await expect(page.getByRole("heading", { level: 1, name: "Your exhbts" })).toBeVisible();
-}
-
-/** Starts an empty exhbt from the list and returns its id, leaving the page in the editor. */
-async function startFromScratch(page: Page): Promise<string> {
-  await page.getByRole("button", { name: "Start from scratch" }).click();
-  await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
-  await expect(page.locator("[data-ready=true]")).toBeAttached();
-  return page.url().match(/\/exhbts\/([0-9a-f-]{36})\/edit$/)![1]!;
-}
-
 test.describe("Stripe events out of order", () => {
   test("an older event arriving after a newer one doesn't change the status", async ({ page, request }) => {
     const name = `order${stamp()}`;
@@ -78,7 +64,7 @@ test.describe("Stripe events out of order", () => {
 test.describe("Upgrade at the point of need", () => {
   test("publishing on Free shows why, with the billing button", async ({ page }) => {
     await signInAs(page, `pubfree${stamp()}`.slice(0, 28), "free");
-    await startFromScratch(page);
+    await startFromScratch(page, { waitForContext: false });
     const prompt = page.getByTestId("upgrade-prompt");
     await expect(prompt).toContainText(`Publishing to your own link comes with ${PLAN_NAMES.premium}.`);
     const upgrade = prompt.getByRole("link", { name: `Upgrade to ${PLAN_NAMES.premium} (${PRICES.premium} a ${BILLING_PERIOD})` });
@@ -91,7 +77,7 @@ test.describe("Upgrade at the point of need", () => {
   test("with Premium full, a new exhbt is refused with the upgrade button", async ({ page }) => {
     await signInAs(page, `fullprem${stamp()}`.slice(0, 28), "premium");
     for (let i = 0; i < ENTITLEMENTS.premium.exhbts; i++) {
-      await startFromScratch(page);
+      await startFromScratch(page, { waitForContext: false });
       await page.goto("/exhbts");
     }
     await expect(page.getByRole("button", { name: "Start from scratch" })).toHaveCount(0);
@@ -149,7 +135,7 @@ test.describe("Pricing with Phase 2 on", () => {
 test.describe("Clean-up", () => {
   test("deleting an exhbt deletes its uploaded image", async ({ page }) => {
     await signInAs(page, `clean${stamp()}`.slice(0, 28), "premium");
-    const exhbtId = await startFromScratch(page);
+    const exhbtId = await startFromScratch(page, { waitForContext: false });
 
     // A tiny PNG, uploaded for this exhbt through the Storage stand-in.
     const png = Buffer.from("89504e470d0a1a0a0000000d4948445200000001000000010806000000", "hex");
