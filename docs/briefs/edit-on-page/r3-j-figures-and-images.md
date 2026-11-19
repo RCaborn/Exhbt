@@ -42,9 +42,9 @@ export type EditorStore = {
 
   /** Typing: sets the value at a field path. Never an undo entry. */
   setAt(path: FieldPath, value: string | RichText): void;
-  /** A change inside one section that is not typing (a graph's numbers, a tick, before or after). With `undo`, it is one undo entry with that name. */
+  /** A change inside one section that is not typing (a graph's numbers, a tick, before or after). With `undo`, it is one undo entry with that name, holding the before and after of the fields `fn` changed and nothing else. */
   patch(id: string, fn: (s: ContentSection) => ContentSection, undo?: string): void;
-  /** A change outside the sections (the work, the card's summary, a skill, a confirmed number, an AI rewrite). */
+  /** A change outside the sections (the work, the card's summary, a skill, a confirmed number, an AI rewrite). With `undo`, one entry holding the before and after of the sections' fields and the top-level keys `fn` changed, and nothing else. */
   patchDoc(fn: (d: ExhbtDoc) => ExhbtDoc, undo?: string): void;
 
   /** Structural changes: each adopts the doc first and is one undo entry. `at` and `place` count page items (pageItems in lib/exhbt/layouts.ts). */
@@ -52,6 +52,7 @@ export type EditorStore = {
   /** Returns the new section's id, or null when the layout has no room (blockOptions says why). */
   insert(kind: Exclude<BlockKind, "image">, at: number): string | null;
   insertImage(image: { fileId: string; w?: number; h?: number }, at: number): string | null;
+  /** Never prunes the numbers to check: Undo may bring the section back. */
   remove(id: string): void;
   setLayout(f: Format): void;
 
@@ -61,6 +62,7 @@ export type EditorStore = {
   flowRemove(key: string): void;
   flowMove(key: string, to: number): void;
 
+  /** Writes back only what the last entry changed, so typing done since in other fields is kept. The numbers to check come back as the list now joined with the list before, limited to numbers on the page after the undo. */
   undo(): void;
   /** "remove graph 1", or null when there is nothing to undo. */
   undoLabel(): string | null;
@@ -108,6 +110,7 @@ export type Ui = {
 };
 
 /** The formatted field that has the cursor, if one does: what its buttons do and which are on. For the phone's bar. */
+/** `toggleLink()` with no link on opens the field's own address prompt (as the classic editor's formatted field does, with its error for an address that is not https); with one on, it removes it. */
 export type ActiveRich = { highlight: boolean; bold: boolean; italic: boolean; link: boolean; toggleBold(): void; toggleItalic(): void; toggleLink(): void };
 export function useActiveRich(): ActiveRich | null;
 
@@ -140,7 +143,7 @@ export type Files = {
 export function useFiles(): Files;
 ```
 
-G makes each of these files in its first milestone with the signature shown and a body that works in the plainest way. From the moment that milestone is merged the file belongs to the owner named, who replaces the body. The signature does not change. All are `"use client"` and take what they need from the hooks (`useStore`, `useDoc`, `useUi`, `useEnv`, `useIssues`, `useSave`, `useFiles`), never from props G would have to thread.
+G (the editor's core) makes each of these files in its first milestone with the signature shown and a body that works in the plainest way. From the moment that milestone is merged the file belongs to the owner named, who replaces the body. The signature does not change. All are `"use client"` and take what they need from the hooks (`useStore`, `useDoc`, `useUi`, `useEnv`, `useIssues`, `useSave`, `useFiles`), never from props G would have to thread.
 
 | File in `components/exhbt-editor/` | Export | Owner | G's stub does |
 |---|---|---|---|
@@ -149,8 +152,8 @@ G makes each of these files in its first milestone with the signature shown and 
 | `sheets/CardSheet.tsx` | `CardSheet(): ReactNode` | I | nothing |
 | `sheets/WorkPanel.tsx` | `WorkPanel(): ReactNode` | I | nothing |
 | `sheets/WorkButton.tsx` | `WorkButton(): ReactNode` (what `edit.work()` returns) | I | the button, drawn as "See the work" is, opening the work sheet |
-| `figures/ImageExtras.tsx` | `ImageExtras(props: ExtraSlot): ReactNode` | J | below: the description field (`image-N-alt`); above: nothing |
-| `figures/LinkExtras.tsx` | `LinkExtras(props: ExtraSlot): ReactNode` | J | the "Web address" field |
+| `figures/ImageExtras.tsx` | `ImageExtras(props: ExtraSlot): ReactNode` | J | below: the description field (`image-N-alt`) in a strip over the foot of the picture; above: nothing |
+| `figures/LinkExtras.tsx` | `LinkExtras(props: ExtraSlot): ReactNode` | J | a "Web address" button over the link's corner, opening a popover that holds the field |
 | `figures/GraphExtras.tsx` | `GraphExtras(props: ExtraSlot): ReactNode` | J | an "Edit figures" button that opens the chart sheet |
 | `figures/ChartSheet.tsx` | `ChartSheet(): ReactNode` | J | the existing `ChartEditor` (`bare`) for `ui.sheet.sectionId` |
 | `figures/FigureSheet.tsx` | `FigureSheet(): ReactNode` | J | nothing |
@@ -173,7 +176,7 @@ export type Board = {
   moveBy(id: string, by: -1 | 1): void;
   /** Take a section off the page, with the motion, the words read out and the focus moved to what took its place. */
   remove(id: string): void;
-  /** Add a block at a place, with the motion and the focus put in it. Returns its id, or null when there is no room. */
+  /** Add a block at a place, with the motion and the focus put in it. Returns its id, or null when there is no room. A graph then opens its figures sheet (`ui.open("chart", id)`); an image opens the picture picker instead and is placed when the pictures are chosen. */
   add(kind: BlockKind, at: number): string | null;
   /** The section the focus was last in, for "add after the section you were last in". */
   lastFocus(): string | null;

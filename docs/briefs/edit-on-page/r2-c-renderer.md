@@ -93,6 +93,8 @@ export function insertImage(doc: ExhbtDoc, image: { fileId: string; w?: number; 
 export function moveItem(doc: ExhbtDoc, id: string, place: number): ExhbtDoc;
 /** Takes a section out. For the flowchart: removes the marker and sets flowOff; the boxes stay in doc.flow. */
 export function removeItem(doc: ExhbtDoc, id: string): ExhbtDoc;
+/** Puts a removed flowchart back: the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's (at the end if none), every other item keeps its place, and flowOff is deleted. The doc stays arranged. The same object when the flowchart is shown. */
+export function restoreFlow(doc: ExhbtDoc): ExhbtDoc;
 ```
 
 `ROW_RULES` and `FORMAT_RULES` in `lib/exhbt/layouts.ts` and `formats.ts` say which rows each layout makes. `FORMAT_COPY` has each layout's words.
@@ -152,10 +154,13 @@ export type ItemSlot = {
 /** The "+" before the page item at `at`. `end` is the one after the last item. */
 export type InsertSlot = { at: number; end?: boolean };
 
-/** Edit-only controls that belong to a part but are not on the published page: an image's description and picked-figure strip, a link's address, a graph's "Edit figures", the aim or hypothesis switch. */
+/**
+ * Edit-only controls that belong to a part but are not on the published page: an image's description and picked-figure strip, a link's address, a graph's "Edit figures", the aim or hypothesis switch.
+ * Each is drawn over the part and takes no room (decision 0026, "Edit-only controls take no room"): "above" over its top edge, "below" over its foot, "over" over a corner.
+ */
 export type ExtraSlot = { sectionId: string; kind: SectionKind; where: "above" | "below" | "over" };
 
-/** Controls for point `index` of a list (move up, move down, remove). `index === n` is the control that adds a point. */
+/** Controls for point `index` of a list (move up, move down, remove). `index === n` is the control that adds a point. All of them are drawn over the list and take no room. */
 export type ListSlot = { path: FieldPath; index: number; n: number };
 
 /** The flowchart's own slots, so MethodFlow keeps its markup and classes. */
@@ -170,6 +175,9 @@ export type FlowEdit = {
   add(o: { after: number; count: number }): ReactNode;
 };
 
+/** A part of the page with no frame of its own: the title with the facts, the context line, the skills. */
+export type ShellTools = { block: "header" | "gap" | "skills" };
+
 export type EditAdapter = {
   text(o: TextSlot): ReactNode;
   rich(o: RichSlot): ReactNode;
@@ -182,6 +190,8 @@ export type EditAdapter = {
   skills(): ReactNode;
   /** The sidebar's control for the work. Takes the place of "See the work". */
   work(): ReactNode;
+  /** A shell part's corner toolbar, out of the flow: "More actions" (rewrite, back to the AI version) where the AI drafted it, and for the skills "Add a skill". */
+  tools(o: ShellTools): ReactNode;
 };
 
 /** What every page part is given. `edit` is absent on every public page. */

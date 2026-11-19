@@ -163,6 +163,8 @@ export function insertImage(doc: ExhbtDoc, image: { fileId: string; w?: number; 
 export function moveItem(doc: ExhbtDoc, id: string, place: number): ExhbtDoc;
 /** Takes a section out. For the flowchart: removes the marker and sets flowOff; the boxes stay in doc.flow. */
 export function removeItem(doc: ExhbtDoc, id: string): ExhbtDoc;
+/** Puts a removed flowchart back: the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's (at the end if none), every other item keeps its place, and flowOff is deleted. The doc stays arranged. The same object when the flowchart is shown. */
+export function restoreFlow(doc: ExhbtDoc): ExhbtDoc;
 ```
 
 ```ts
@@ -172,7 +174,7 @@ type Side =
   | { kinds: readonly PageKind[]; as?: ItemAs; first?: boolean }
   | { stack: StackName; kinds: readonly PageKind[] };
 export type RowRule =
-  /** `a` straight before `b` (reversed: false), or `b` straight before `a` (reversed: true). */
+  /** `a` straight before `b` (reversed: false), or `b` straight before `a` (reversed: true). Forward wins: a reversed match is not taken when its `a` item is straight followed by an item that makes a forward pair with it. */
   | { rule: "pair"; ratio: PairRatio; a: Side; b: Side }
   /** A run of one or more of these kinds, each kind once, on a row of its own. Its items are drawn "stacked". */
   | { rule: "stack"; stack: StackName; kinds: readonly PageKind[] }

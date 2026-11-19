@@ -60,7 +60,7 @@ type Side =
   | { kinds: readonly PageKind[]; as?: ItemAs; first?: boolean }
   | { stack: StackName; kinds: readonly PageKind[] };
 export type RowRule =
-  /** `a` straight before `b` (reversed: false), or `b` straight before `a` (reversed: true). */
+  /** `a` straight before `b` (reversed: false), or `b` straight before `a` (reversed: true). Forward wins: a reversed match is not taken when its `a` item is straight followed by an item that makes a forward pair with it. */
   | { rule: "pair"; ratio: PairRatio; a: Side; b: Side }
   /** A run of one or more of these kinds, each kind once, on a row of its own. Its items are drawn "stacked". */
   | { rule: "stack"; stack: StackName; kinds: readonly PageKind[] }
