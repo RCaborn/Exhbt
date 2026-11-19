@@ -307,13 +307,22 @@
     box-shadow: var(--shadow-pack);
   }
 
-  /* On a touch screen there is no hover: the toolbars and the "+" buttons are always there. */
+  /* On a touch screen there is no hover: the toolbars and the "+" buttons are always there. The
+     "+" sits at the left of its gap there, because four 44px buttons at the right reach the middle
+     of a phone's width; its menu opens from the left edge. */
   @media (hover: none), (pointer: coarse) {
     .lab-tools,
     .lab-insert,
     .lab-insert[data-end],
     .lab-flow-tool {
       opacity: 1;
+    }
+    .lab-insert {
+      justify-content: flex-start;
+    }
+    .lab-menu {
+      left: 0;
+      translate: none;
     }
   }
 
@@ -373,7 +382,8 @@
   /* Version B: the line that shows where the lifted section will land. */
   .lab-line {
     position: absolute;
-    z-index: 25;
+    /* Above the lifted copy: the copy hangs from the pointer, right where the line is, and the line is the thing to see. */
+    z-index: 35;
     pointer-events: none;
     background: var(--xp-link);
     border-radius: 999px;
