@@ -857,7 +857,8 @@ test.describe("Desktop", () => {
 
     // A graph: a small sample chart, with its values printed.
     await section(page, "graph-1").locator("[data-remove]").click();
-    await page.getByRole("button", { name: "Add a block before image 1" }).click();
+    // (The findings and the image now share a row, so the "+" above them is the row's; this one is above the remaining graph.)
+    await page.getByRole("button", { name: "Add a block before graph 1" }).click();
     await menu.locator('[data-insert-kind="graph"]').click();
     await expect(section(page, "graph-1")).toContainText("A sample graph (%)");
     await expect(section(page, "graph-1")).toContainText("48%");

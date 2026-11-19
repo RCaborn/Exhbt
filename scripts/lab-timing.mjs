@@ -160,7 +160,7 @@ async function typing() {
 }
 
 const out = { base, cpuSlowdown: rate, sample: SAMPLE, browser: browser.version(), drags: [], typing: null };
-for (const v of ["a", "b"]) out.drags.push(await drag(v));
+for (const v of ["mix", "a", "b"]) out.drags.push(await drag(v));
 out.typing = await typing();
 await browser.close();
 
