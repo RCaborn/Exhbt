@@ -1,9 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { ExhbtDoc } from "../lib/exhbt/blocks";
-import { FORMAT_COPY, formatOf } from "../lib/exhbt/formats";
+import { FORMAT_COPY, FORMAT_RULES, formatOf } from "../lib/exhbt/formats";
 import { flowShown, pageItems, rowsFor, type Cell, type Row } from "../lib/exhbt/layouts";
 import { fullDoc, GALLERY_IMAGES, galleryDoc, researchDoc } from "../lib/exhbt/sample";
 import { beforeAfterFixture, buildFixture, essayFixture, eventFixture } from "../app/dev/edit-slots/layouts";
+import { arrangedCase, arrangedGallery, arrangedResearch, galleryFlowOff, galleryOverCap, researchNoAim } from "../app/dev/edit-slots/orders";
 
 /*
  * The page's editing slots (decision 0026, "One page, one renderer"), through the slot harness
@@ -18,7 +19,8 @@ import { beforeAfterFixture, buildFixture, essayFixture, eventFixture } from "..
  *    list of what is in the flow in the editor only, named, and nothing else.
  *
  * All seven layouts: the case study, the gallery and research by their samples, the four of decision
- * 0028 by the harness's own fixtures (app/dev/edit-slots/layouts.ts).
+ * 0028 by the harness's own fixtures (app/dev/edit-slots/layouts.ts); and pages out of their usual
+ * order, as the new editor will write them (app/dev/edit-slots/orders.ts).
  */
 
 const SAMPLES: Record<string, ExhbtDoc> = {
@@ -30,6 +32,13 @@ const SAMPLES: Record<string, ExhbtDoc> = {
   essay: essayFixture,
   "before-after": beforeAfterFixture,
   event: eventFixture,
+  // Pages out of their usual order, as the new editor will write them, and a gallery over its cap.
+  "arranged-case": arrangedCase,
+  "arranged-gallery": arrangedGallery,
+  "gallery-flow-off": galleryFlowOff,
+  "gallery-over-cap": galleryOverCap,
+  "arranged-research": arrangedResearch,
+  "research-no-aim": researchNoAim,
 };
 
 type Field = { path: string; label: string; id?: string };
@@ -147,7 +156,7 @@ const HIDE_FIELDS = Object.keys(FIELDS).map((k) => `[data-edit-only="${k}"]`).jo
  * The parts on 0026's list of what is in the flow in the editor only (placeholders), from an empty
  * field's path: its name, and the element the part uses on the page once it has words.
  */
-const PLACEHOLDERS: { name: string; path: RegExp; part: string }[] = [
+const PLACEHOLDERS: { name: string; path: RegExp; part: string; kinds?: string[] }[] = [
   { name: "the context line", path: /^gap$/, part: "[data-slot-box]" },
   { name: "What it is", path: /^context$/, part: ".xp-fact" },
   { name: "Where and when", path: /^whereWhen$/, part: ".xp-fact" },
@@ -157,7 +166,7 @@ const PLACEHOLDERS: { name: string; path: RegExp; part: string }[] = [
   // The role is a part of the quote's line, not an element of its own: the field goes.
   { name: "a quote's role", path: /^sections\.\d+\.role$/, part: "[data-slot]" },
   { name: "a link's description", path: /^sections\.\d+\.description$/, part: "p, span.block" },
-  { name: "an aim or a conclusion with no words", path: /^sections\.\d+\.text$/, part: "[data-slot=item]" },
+  { name: "an aim or a conclusion with no words", path: /^sections\.\d+\.text$/, part: "[data-slot=item]", kinds: ["aim", "conclusion"] },
 ];
 
 for (const [name, doc] of Object.entries(SAMPLES)) {
@@ -165,7 +174,7 @@ for (const [name, doc] of Object.entries(SAMPLES)) {
   const items = pageItems(doc);
   const rows = rowsFor(items, f);
 
-  test.describe(`${FORMAT_COPY[f].inLayout.replace(/^in (an? )?/, "")}: the slots`, () => {
+  test.describe(`${name} (${FORMAT_RULES[f].name}): the slots`, () => {
     test("every field path in 0026's table is there once, with its name", async ({ page }) => {
       await page.goto(`/dev/edit-slots?sample=${name}`);
       await settle(page);
@@ -282,7 +291,8 @@ for (const [name, doc] of Object.entries(SAMPLES)) {
             const path = el.getAttribute("data-path") ?? "";
             const entry = list.find((x) => new RegExp(x.path).test(path));
             const part = entry && (entry.part === "[data-slot]" ? el : el.closest(entry.part));
-            if (!entry || !part) unknown.push(path);
+            // A text of another kind (a quote's, a pull quote's) is not on the list.
+            if (!entry || !part || (entry.kinds && !entry.kinds.includes(part.getAttribute("data-kind") ?? ""))) unknown.push(path);
             else {
               part.setAttribute("data-hide", "");
               named.push(`${entry.name} (${path})`);
@@ -293,7 +303,8 @@ for (const [name, doc] of Object.entries(SAMPLES)) {
         expect(empty.unknown, "empty parts the read-only page draws, or that 0026 does not list").toEqual([]);
         test.info().annotations.push({ type: "in the flow in the editor only", description: [...empty.named, ...Object.values(FIELDS)].join("; ") });
 
-        await page.addStyleTag({ content: `[data-hide], ${HIDE_FIELDS} { display: none !important; }` });
+        // Taken out of the page, not only hidden: a hidden part still counts for a stack's "follows another" rule.
+        await page.evaluate((fields) => document.querySelectorAll(`[data-hide], ${fields}`).forEach((el) => el.remove()), HIDE_FIELDS);
         await settle(page);
         expect(differences(visitor, await measure(page)), `${name} at ${w}, with these taken out: ${[...empty.named, ...Object.values(FIELDS)].join("; ")}`).toEqual([]);
       });

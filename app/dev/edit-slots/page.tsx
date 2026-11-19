@@ -17,7 +17,9 @@ export const dynamic = "force-dynamic";
  * is reachable and that the editing page sits where the visitor's page does.
  *
  *   ?sample=   case-study (the default), open-banking, library, gallery, research, build, essay,
- *              before-after, event, new
+ *              before-after, event, new; and pages out of their usual order (./orders.ts):
+ *              arranged-case, arranged-gallery, gallery-flow-off, gallery-over-cap,
+ *              arranged-research, research-no-aim, case-missing-image
  *   ?read=1    the same sample with no adapter: the visitor's page
  *   ?full=1    every empty optional part given words first (in this harness's own code)
  *   ?look=     a portfolio look's id (the Exhbt look by default)
