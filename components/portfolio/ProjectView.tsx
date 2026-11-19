@@ -4,8 +4,6 @@ import { CHECKS_GUIDE } from "@/components/brand/Seal";
 import { RichText } from "@/components/exhbt/RichText";
 import { Avatar } from "@/components/portfolio/Avatar";
 import { FlowPart, firstSentence, SectionBlock, type ImageUrls, type Sub } from "@/components/portfolio/exhbt-parts";
-import { GalleryMain } from "@/components/portfolio/formats/GalleryMain";
-import { ResearchMain } from "@/components/portfolio/formats/ResearchMain";
 import { LayoutMain } from "@/components/portfolio/LayoutMain";
 import type { EditAdapter, PageCtx } from "@/components/portfolio/page-ctx";
 import { PrintButton } from "@/components/portfolio/PrintButton";
@@ -229,11 +227,7 @@ export function ProjectView({
             </p>
           )}
 
-          {format === "gallery" ? (
-            <GalleryMain doc={doc} imageUrls={imageUrls} Sub={Sub} />
-          ) : format === "research" ? (
-            <ResearchMain doc={doc} imageUrls={imageUrls} Sub={Sub} />
-          ) : format === "case-study" && sectionsSlot ? (
+          {format === "case-study" && sectionsSlot ? (
             // The classic editor's "Arrange sections": the flowchart, then its own list of the sections.
             <>
               <FlowPart steps={doc.flow} as="plain" rowClass="mt-8 print:mt-3" ctx={ctx} />
