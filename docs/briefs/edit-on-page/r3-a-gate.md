@@ -14,7 +14,7 @@ Make `/exhbts/<id>/edit` serve the new editor by default and keep the classic ed
 
 ## Read first
 
-`docs/decisions/0026-edit-on-page-editor.md`: "One page, one renderer" (the placeholders list), "The classic editor: the switch, the fallback, the escape", "Saving". `docs/briefs/edit-on-page/README.md`: "The kill switch, and how it is tested". On your base: `lib/site.ts` (`editorKind()`, E's), `app/dev/editor/route.ts` (E's: sets the development cookie), `app/(app)/exhbts/[id]/edit/page.tsx`, `components/editor/Editor.tsx` (its props), `components/portfolio/ProjectView.tsx`, `components/portfolio/page-ctx.ts`, `app/dev/edit-slots/` (C's stand-in adapter: yours is close to it), `components/portfolio/themeFonts.ts` (`lookAttrs`, `themeStyle`), `themeFor` in `lib/portfolio-themes.ts`, `app/(portfolio)/p/[username]/[slug]/layout.tsx` (how a public page gets its look), `playwright.config.ts`.
+`docs/decisions/0026-edit-on-page-editor.md`: "One page, one renderer" (the list of what is in the flow in the editor only), "The classic editor: the switch, the fallback, the escape", "Saving". `docs/briefs/edit-on-page/README.md`: "The kill switch, and how it is tested". On your base: `lib/editor-kind.ts` (`editorKind()`, E's), `app/dev/editor/route.ts` (E's: sets the development cookie), `app/(app)/exhbts/[id]/edit/page.tsx`, `components/editor/Editor.tsx` (its props), `components/portfolio/ProjectView.tsx`, `components/portfolio/page-ctx.ts`, `app/dev/edit-slots/` (C's stand-in adapter: yours is close to it), `components/portfolio/themeFonts.ts` (`lookAttrs`, `themeStyle`), `themeFor` in `lib/portfolio-themes.ts`, `app/(portfolio)/p/[username]/[slug]/layout.tsx` (how a public page gets its look), `playwright.config.ts`.
 
 ## You own
 
@@ -26,14 +26,14 @@ Until you are merged; then G owns all of them:
 
 ## You must not touch
 
-`lib/site.ts` and `app/dev/editor/` (E's, done), `components/editor/`, `lib/exhbt/`, `components/portfolio/`, `app/globals.css`, `wrangler.jsonc`, `next.config.ts`, the existing specs.
+`lib/editor-kind.ts` and `app/dev/editor/` (E's, done), `lib/site.ts`, `components/editor/`, `lib/exhbt/`, `components/portfolio/`, `app/globals.css`, `wrangler.jsonc`, `next.config.ts`, the existing specs.
 
 ## What you build against
 
 From E, on your base:
 
 ```ts
-// lib/site.ts
+// lib/editor-kind.ts  (new, server only: its first line is import "server-only")
 export type EditorKind = "page" | "classic";
 /** Which editor /exhbts/<id>/edit serves. "classic" only when the runtime variable EXHBT_EDITOR is "classic". Read on each request. */
 export async function editorKind(): Promise<EditorKind>;
@@ -65,7 +65,7 @@ export function PageEditor(props: PageEditorProps): React.ReactNode;
 export function flushPending(): Promise<void>;
 
 // components/exhbt-editor/StandIn.tsx  (no hooks, no state: it is in the gate's own chunk)
-/** The adapter the loading view draws with: every placeholder in the flow, inert; every control left out. */
+/** The adapter the loading view draws with: everything 0026 puts in the flow in the editor only (EDIT_ONLY_IN_FLOW), inert; every other control left out. */
 export function standInAdapter(): EditAdapter;
 ```
 
@@ -75,7 +75,7 @@ Commit and push after each.
 
 1. **`context.ts`** with the props type above and nothing else. **`pending.ts`**: `flushPending` resolves at once.
 2. **The edit page.** The classic editor when `searchParams.editor === "classic"` or `(await editorKind()) === "classic"`, wrapped in `<div data-editor="classic">`, with one line above it when it was asked for by the query: "You're in the classic editor." and a link, "Back to the new editor". Otherwise `EditorGate`, with two more props than the classic editor takes: `theme` (the look the person's public pages use: as `app/(portfolio)/p/[username]/[slug]/layout.tsx` gets it, and `themeFor(profile, plan)` for someone with no username yet) and `reportFiles` (the person's stored PDF files attached to this exhbt, kind `source`, leaving out the draft's helper files, each with a signed link; an exhbt started from scratch has none). In development only, `?crash=server` makes the page throw on the server, for the error page's test.
-3. **`StandIn.tsx`**: `standInAdapter()`, close to C's harness adapter but drawing what the live editor will draw in the flow: `text` and `rich` draw the value as the page draws it, or, when empty, the field's placeholder in the part's own element with `--xp-muted`, inert; `item` draws `ItemView` inside a `<div>` carrying `rowClass`, as G's frame will; `skills` draws the read-only pill list; `work` draws the work button, or "Add the work" when there is none; the flowchart's `box` returns the `<li>` it is given; `insert`, `extra`, `list`, `tools` and the flowchart's `tools` and `add` return null (controls take no room, so leaving them out moves nothing). 0026's list of placeholders is exactly what it adds to the visitor's page.
+3. **`StandIn.tsx`**: `standInAdapter()`, close to C's harness adapter but drawing what the live editor will draw in the flow: `text` and `rich` draw the value as the page draws it, or, when empty, the field's placeholder in the part's own element with `--xp-muted`, inert; `item` draws `ItemView` inside a `<div>` carrying `rowClass`, as G's frame will; `skills` draws the read-only pill list with the "Add a skill" box after the last pill, inert, the size of a pill, holding its words in `--xp-muted` (the box alone when there are no skills: it is the skills block's placeholder); `extra` with `where: "below"` on an image draws the description field inert, as J will draw it, in the caption's type: the stored description when there is one, wrapping as the field will, and otherwise one line holding "Describe it for people who can't see it" in `--xp-muted`; `work` draws the work button, or "Add the work" when there is none; the flowchart's `box` returns the `<li>` it is given; `insert`, `list`, `tools`, the other `extra` slots and the flowchart's `tools` and `add` return null (controls take no room, so leaving them out moves nothing). 0026's list of what is in the flow in the editor only (`EDIT_ONLY_IN_FLOW`: the placeholders and the two edit-only fields) is exactly what it adds to the visitor's page, so nothing moves when the editor arrives.
 4. **`EditorShell.tsx`, the stub**: `PageEditor` draws `<div data-editor="page" data-ready="true">`, an empty bar where the top bar will be (`height: var(--xe-topbar-h, 3.5rem)`; G defines the variable in `css/core.css` and H's bar is that tall), and the canvas: the person's look (`lookAttrs(theme)`, `themeStyle(theme)`) at the public frame's width, holding `ProjectView` with `headingLevel="h2"` and `edit={standInAdapter()}`. In development only, `?crash=render` makes it throw on its first render. G replaces it.
 5. **`EditorGate.tsx`: the new editor is never rendered on the server.** A small client component holding an error boundary and `PageEditor`, loaded with `next/dynamic` and `ssr: false`. An error boundary cannot catch a throw during the server's render, so the editor must not be drawn there. While the chunk loads, the gate draws exactly what the stub draws (the bar and the canvas with the stand-in), so the fields come alive in place and nothing moves. The boundary catches a throw while the editor draws and a chunk that fails to load: it logs the error, shows "Something went wrong with the new editor. Your work is saved.", awaits `flushPending()` (three seconds at most), and calls `location.replace` with `?editor=classic` added to the address.
 6. **`error.tsx`** for what the boundary cannot see (the page failing on the server): the same words, and a link to the classic editor (`?editor=classic`), or "Reload" when the classic editor was the one asked for.
@@ -87,7 +87,7 @@ Commit and push after each.
    { name: "tablet", use: { browserName: "chromium", viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 }, testMatch: /editor-tablet\.spec\.ts/ },
    ```
    Keep everything else in the file as it is. `editor-drag` and `editor-flow` run on desktop and touch; `editor-phone` on touch only; `editor-tablet` on tablet only.
-8. **`e2e/editor-classic.spec.ts`**: after `/dev/editor?kind=classic` the edit page serves `[data-editor="classic"]`, and after `?kind=page` the new one (`[data-editor="page"]`); a fresh browser context is not affected by another's cookie; `?editor=classic` serves classic for that request, with the line and the way back, which works; `?crash=render` shows the notice and ends in `[data-editor="classic"]`; `?crash=server` shows the route's error page with its link to the classic editor; `/api/health` reports the kind. G adds the `?crash=change` test when it takes the file over.
+8. **`e2e/editor-classic.spec.ts`**: after `/dev/editor?kind=classic` the edit page serves `[data-editor="classic"]`, and after `?kind=page` the new one (`[data-editor="page"]`); a fresh browser context is not affected by another's cookie; `?editor=classic` serves classic for that request, with the line and the way back, which works; `?crash=render` shows the notice and ends in `[data-editor="classic"]`; `?crash=server` shows the route's error page with its link to the classic editor; `/api/health` reports the kind (read `editor` from its JSON body and ignore the status: in the e2e environment it answers 503, having no database; E's `e2e/editor-switch.spec.ts` does the same). G adds the `?crash=change` test when it takes the file over.
 
 ## Done looks like
 

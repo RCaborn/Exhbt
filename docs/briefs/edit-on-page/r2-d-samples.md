@@ -41,6 +41,8 @@ export type Slot = { kinds: readonly PageKind[]; first?: true };
 /** What a layout needs before it can be published, beyond each part's own checks. Every issue has the path "sections", or "myRole". */
 export type Need =
   | { need: "count"; kinds: readonly SectionKind[]; min: number; message: string }
+  /** A findings section, a graph, or an image picked from the work as a graph or a table (decision 0025): what a case study needs today. */
+  | { need: "results"; message: string }
   | { need: "stages"; message: string }
   | { need: "myRole"; message: string };
 
@@ -120,14 +122,14 @@ Commit and push after each sample.
    - `eventDoc(fileIds)`: a society event or a production, with a poster as the lead, My role, how it went, and a review.
    Fictional people and places, UK universities, plain British English, no hype words, numbers that agree with each other. Each must return no issues from `validateForPublish`, sit in its usual order with no marker (as an AI draft would), and be at or under the word cap.
 2. **Make each as full as a real one would be.** Start with every part the layout offers. If that is over the cap, take out the least important optional part, and write down what you took out and the count before and after. Do not shorten sentences into fragments to squeeze under.
-3. **Seeds.** In `app/dev/portfolio/route.ts`: `with=build`, `with=essay`, `with=before-after`, `with=event`, and `with=layouts` for all four, each published at a slug you name in the route's comment, with flat placeholder pictures stored as the user's own files, as the gallery's are.
+3. **Seeds.** In `app/dev/portfolio/route.ts`: `with=build`, `with=essay`, `with=before-after`, `with=event`, and `with=layouts` for all four, each published at a slug you name in the route's comment, with flat placeholder pictures stored as the user's own files, as the gallery's are. Your tests seed with `plan=max` (and `count=0` if the default seeds get in the way), as `e2e/phase2-formats.spec.ts` does: on the route's default plan, the portfolio shows fewer exhbts than `with=layouts` and the default seeds make together, and some of your pages would not be found.
 4. **Measure.** For each sample, in each of the eight looks: the printed page count, and whether anything is cut off or overlaps at 390px and at 1440px.
 
 ## Tests
 
 Write `e2e/layouts-new.spec.ts`:
 - each sample passes `validateForPublish` and is at or under the cap (a pure test; print the count in the test's title);
-- each seed's page draws with `article[data-format="<id>"]` and its parts in the usual order (`[data-part]`);
+- each seed's page (seeded with `plan=max`) draws with `article[data-format="<id>"]` and its parts in the usual order (`[data-part]`);
 - each prints on one A4 page, in each look;
 - axe finds nothing on each, in each look, and nothing scrolls sideways at 390px.
 

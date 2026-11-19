@@ -41,8 +41,8 @@ At most two heavy (Opus) agents run at once. Rory, 19 Nov 2026: "Move to opus". 
 | | Brief | Model | Branch | Port | Starts when |
 |---|---|---|---|---|---|
 | B | `r2-b-model-engine.md` | Opus | `phase-2-r2-b-model` | 3301 | `phase-2-r2` exists (made with 1b and this design merged in; 1b need not be live) |
-| C | `r2-c-renderer.md` | Opus | `phase-2-r2-c-renderer` | 3302 | B's milestone 1 (schema and engine) is merged; B's milestone 2 runs beside it |
-| E | `r2-e-classic-editor.md` | Sonnet | `phase-2-r2-e-classic` | 3304 | C's part 1 is merged (its tests look at the page the new renderer draws) |
+| C | `r2-c-renderer.md` | Opus | `phase-2-r2-c-renderer` | 3302 | B's milestone 1 is merged (the parity harness, the schema, `FORMAT_COPY` and `FORMAT_LIMITS`, the engine's reading half: B's steps 1 to 5, 2b and 6a); B's milestone 2 runs beside it, and C needs nothing from it |
+| E | `r2-e-classic-editor.md` | Sonnet | `phase-2-r2-e-classic` | 3304 | C's part 1 and B's `restoreFlow` (B's step 6b) are merged (its tests look at the page the new renderer draws, and it calls `restoreFlow`) |
 | D | `r2-d-samples.md` | Sonnet | `phase-2-r2-d-samples` | 3303 | C's part 2 is merged |
 | A | `r3-a-gate.md` | Opus | `phase-2-r3-a-gate` | 3305 | E is merged into `phase-2-r2`. Merged into `phase-2-r3` before anyone else's branch |
 | N, list 1, milestone 0 | `r3-n-test-migration.md` | Sonnet | `phase-2-r3-n-tests-1` | 3314 | A is merged into `phase-2-r3`. Short: points the old specs at `?editor=classic` |
@@ -62,7 +62,7 @@ Heavy agents in order: B, then C (beside B's milestone 2), then A, then G, then 
 
 Nobody waits on an interface that is not written down: every type and signature an agent builds against is in its brief, word for word the same as in the brief of the agent that builds the other side. (Checked by a script that compares every copy of each block.)
 
-When something an agent waits for lands after it has started (F for L's touch-drag and tablet checks, G's milestone 2 for the file rule and the jump into popovers, B's milestone 2 for C), the main session tells it, and it merges the release branch into its own.
+When something an agent waits for lands after it has started (F for L's touch-drag and tablet checks, G's milestone 2 for the file rule and the jump into popovers), the main session tells it, and it merges the release branch into its own.
 
 ## Who owns which files
 
@@ -72,9 +72,9 @@ No two agents edit the same file in the same release, with these stated hand-ove
 
 | Agent | Owns |
 |---|---|
-| B | `lib/exhbt/blocks.ts`, `lib/exhbt/formats.ts`, `lib/exhbt/layouts.ts` (new), `lib/exhbt/sections.ts`, `lib/exhbt/verify.ts`, `lib/exhbt/headline.ts`, `lib/exhbt/draft-blocks.ts` (one field), `lib/draft-tools.ts` (`loadAiVersion`), `app/api/exhbts/[id]/figure/route.ts` (keeping the graphs a figure replaces), `app/api/files/[id]/route.ts` (the `DELETE` guard), `app/dev/parity/` (new), `e2e/layout-parity.spec.ts` (new), `e2e/golden/` (new), `e2e/fixtures/order-docs.ts` (new), `e2e/fixtures/reader-before-r2.ts` (new), `e2e/layout-model.spec.ts` (new), `e2e/data-safety.spec.ts` (new), and the exhbt lines of `AGENTS.md` and `docs/MAP.md`. One-off, smallest-possible fixes, because B runs alone at first (measured with `tsc` and a search for `FORMATS`): `components/editor/Sections.tsx`, `components/editor/LayoutPicker.tsx`, `lib/ai/exhbt-draft.ts`, `lib/exhbt/drafted.ts`, `e2e/phase2-sections.spec.ts`, `e2e/phase2-formats.spec.ts` |
+| B | `lib/exhbt/blocks.ts`, `lib/exhbt/formats.ts`, `lib/exhbt/layouts.ts` (new), `lib/exhbt/sections.ts`, `lib/exhbt/verify.ts`, `lib/exhbt/headline.ts`, `lib/exhbt/draft-blocks.ts` (one field and `readAiVersion`), `lib/draft-tools.ts` (`loadAiVersion`), `app/api/exhbts/[id]/figure/route.ts` (keeping the graphs a figure replaces), `app/api/files/[id]/route.ts` (the `DELETE` guard), `app/dev/parity/` (new), `e2e/layout-parity.spec.ts` (new), `e2e/golden/` (new), `e2e/fixtures/order-docs.ts` (new), `e2e/fixtures/reader-before-r2.ts` (new), `e2e/layout-model.spec.ts` (new), `e2e/data-safety.spec.ts` (new), and the exhbt lines of `AGENTS.md` and `docs/MAP.md`. One-off, smallest-possible fixes, because B runs alone at first (measured with `tsc` and a search for `FORMATS`): `components/editor/Sections.tsx`, `components/editor/LayoutPicker.tsx`, `lib/ai/exhbt-draft.ts`, `lib/exhbt/drafted.ts`, `e2e/phase2-sections.spec.ts`, `e2e/phase2-formats.spec.ts`, `e2e/auto-figure.spec.ts` |
 | C | `components/portfolio/ProjectView.tsx`, `components/portfolio/exhbt-parts.tsx`, `components/portfolio/LayoutMain.tsx` (new), `components/portfolio/layout-rows.ts` (new), `components/portfolio/page-ctx.ts` (new), `components/portfolio/formats/` (deleted), `components/portfolio/ImageZoom.tsx`, `components/portfolio/themeFonts.ts` and `lib/portfolio-themes.ts` (the error colour), `components/exhbt/MethodFlow.tsx`, `app/globals.css`, `app/dev/edit-slots/` (new), `e2e/edit-slots.spec.ts` (new), and the exhbt page paragraphs of `DESIGN.md` |
-| E | `components/editor/` (all of it, after B's fixes are merged), `lib/portfolio-home.ts`, `lib/site.ts`, `app/api/health/route.ts`, `app/dev/editor/` (new), `e2e/editor-classic-keeps.spec.ts` (new), `e2e/editor-switch.spec.ts` (new) |
+| E | `components/editor/` (all of it, after B's fixes are merged), `lib/portfolio-home.ts`, `lib/editor-kind.ts` (new, server only), `app/api/health/route.ts`, `app/dev/editor/` (new), `e2e/editor-classic-keeps.spec.ts` (new), `e2e/editor-switch.spec.ts` (new) |
 | D | `lib/exhbt/sample.ts`, `app/dev/portfolio/route.ts`, `e2e/layouts-new.spec.ts` (new) |
 
 D may not edit `app/globals.css`. If a sample will not fit, D reports the numbers and C or Rory acts on them. The main session owns `.github/workflows/ci.yml` in release 2: after B and C are merged it looks at the shards' times and raises the shard count if one passes 22 minutes.
@@ -94,7 +94,7 @@ D may not edit `app/globals.css`. If a sample will not fit, D reports the number
 | N, list 1 | `e2e/editor.ts`, `e2e/editor-classic-helpers.ts` (new), and the specs in its brief's first list; in milestone 0 only, the `/edit` address lines of list 2's specs |
 | N, list 2 | the specs in the brief's second list. It does not edit `e2e/editor.ts` |
 
-Frozen in release 3 (nobody edits them): `components/editor/` (the classic editor and the parts the new one reuses) apart from J's added exports, `lib/exhbt/`, `lib/site.ts`, `app/globals.css`. The new editor's CSS lives in `components/exhbt-editor/css/`, one file per owner, each imported by its owner's own component.
+Frozen in release 3 (nobody edits them): `components/editor/` (the classic editor and the parts the new one reuses) apart from J's added exports, `lib/exhbt/`, `lib/editor-kind.ts`, `app/globals.css`. The new editor's CSS lives in `components/exhbt-editor/css/`, one file per owner, each imported by its owner's own component.
 
 A slot the page parts lack is G's to add. Another agent that needs one says so in its report; the main session passes it to G.
 
@@ -104,7 +104,7 @@ A slot the page parts lack is G's to add. Another agent that needs one says so i
 |---|---|
 | M | `lib/ai/exhbt-draft.ts`, `lib/exhbt/drafted.ts`, `lib/exhbt/references.ts`, `lib/exhbt/formats.ts` (`OFFERED_FORMATS` and wording), `app/api/exhbts/draft/route.ts`, `evals/exhbt-draft/`, `scripts/eval-drafts.ts`, `components/exhbt-editor/topbar/LayoutMenu.tsx`, `e2e/layouts-new.spec.ts`, the layout lines of `AGENTS.md` and `docs/MAP.md` |
 | Q | `e2e/editor-smooth.spec.ts`, `e2e/editor-drag.spec.ts`, `e2e/editor-inplace.spec.ts`, `e2e/editor-flow.spec.ts` (adding cases only) |
-| P | `components/editor/` (what it deletes), `lib/site.ts`, `app/(app)/exhbts/[id]/edit/page.tsx` and `error.tsx`, `app/dev/editor/`, `app/api/health/route.ts`, `components/exhbt-editor/EditorGate.tsx` (the fallback), `components/exhbt-editor/context.ts` (taking in `EditorProps`), the menu item in `components/exhbt-editor/topbar/`, `e2e/editor-classic.spec.ts`, `e2e/editor-classic-helpers.ts`, `e2e/editor-classic-keeps.spec.ts`, `e2e/editor-switch.spec.ts`, and the docs that mention the classic editor |
+| P | `components/editor/` (what it deletes), `lib/editor-kind.ts` (deleted), `app/(app)/exhbts/[id]/edit/page.tsx` and `error.tsx`, `app/dev/editor/`, `app/api/health/route.ts`, `components/exhbt-editor/EditorGate.tsx` (the fallback), `components/exhbt-editor/context.ts` (taking in `EditorProps`), the menu item in `components/exhbt-editor/topbar/`, `e2e/editor-classic.spec.ts`, `e2e/editor-classic-helpers.ts`, `e2e/editor-classic-keeps.spec.ts`, `e2e/editor-switch.spec.ts`, and the docs that mention the classic editor |
 
 ## Rules for every agent
 
@@ -122,18 +122,18 @@ A slot the page parts lack is G's to add. Another agent that needs one says so i
 ## How each release is verified
 
 **Release 2.**
-- `e2e/layout-model.spec.ts`: the model, `adopt` as a fixed point of today's pairing, `rowsFor` (forward wins), a removed flowchart, `restoreFlow`, the published copy keeping the order, the AI version keeping its graphs, the old reader.
-- `e2e/layout-parity.spec.ts`: the parity gate, markup and boxes, against golden copies taken at B's first commit, before any product code changed, with fixed file ids and a fixed date. C runs it and may not edit it. The main session runs it once more on a later day before C starts.
-- `e2e/edit-slots.spec.ts`: with a stand-in adapter, every field path in 0026's table is reachable on every layout, and a full page matches the read-only one box for box.
+- `e2e/layout-model.spec.ts`: the model, `adopt` as a fixed point of today's pairing, `rowsFor` (forward wins), a removed flowchart, `restoreFlow` with and without a place, the published copy keeping the order, the AI version keeping its graphs (`readAiVersion`), the old reader.
+- `e2e/layout-parity.spec.ts`: the parity gate, markup and boxes, against golden copies taken at B's first commits, before any product code changed, with fixed file ids and a fixed date. C runs it and may not edit it. The golden boxes are compared only in the environment that wrote them, the agents' sandbox Chromium; the main session runs it once more on a later day before C starts, in that same sandbox. CI compares the markup only.
+- `e2e/edit-slots.spec.ts`: with a stand-in adapter, every field path in 0026's table is reachable on every layout, and a full page matches the read-only one box for box, but for the two edit-only fields 0026 keeps in the flow, allowed by name.
 - `e2e/editor-classic-keeps.spec.ts`: the classic editor opens, edits and saves a doc with a marker, a removed flowchart and the new fields, loses none of them, and puts a flowchart back without losing the order.
-- `e2e/data-safety.spec.ts`: the server will not delete a file a published copy uses.
+- `e2e/data-safety.spec.ts`: the server will not delete a file a published copy uses; the AI version's graphs survive a real save and load.
 - `e2e/editor-switch.spec.ts`: the switch and its development cookie.
 - `e2e/layouts-new.spec.ts`: each new sample draws, with its word count and page count reported.
 - The existing suite, unchanged, green in CI.
 - The main session: the live-page comparison (0027, step 4), with the "before" drawn on `main`'s live commit, run on the day; and the switch on the preview site (below).
 
 **Release 3.**
-- `e2e/editor-inplace.spec.ts`: typing on the page, every kind of issue path landing on its target, undo (keeping typing and flags, and taking the marker out again), publishing an arranged doc in its order, the editing page against the visitor's page box for box (full pages: nothing differs; a new exhbt: only 0026's placeholders), the loading stand-in, axe in all eight looks.
+- `e2e/editor-inplace.spec.ts`: typing on the page, every kind of issue path landing on its target, undo (keeping typing and flags, and taking the marker out again), publishing an arranged doc in its order, the editing page against the visitor's page box for box (full pages: only the highlight's wrap, each image's description field and the "Add a skill" box; a new exhbt: only what is on `EDIT_ONLY_IN_FLOW`), the loading stand-in, axe in all eight looks.
 - `e2e/editor-smooth.spec.ts` and `e2e/editor-drag.spec.ts`: the exact checks that gate CI (0026, "Smoothness"), on every offered layout.
 - `e2e/editor-flow.spec.ts`, `editor-topbar`, `editor-sheets`, `editor-figures`, `editor-phone`, `editor-tablet`: each agent's own.
 - `e2e/editor-classic.spec.ts`: the kill switch, the menu's escape and the crash fallback.
@@ -153,7 +153,7 @@ A slot the page parts lack is G's to add. Another agent that needs one says so i
 
 Three ways back to the old editor during releases 3 and 4 (0026 has the detail):
 
-1. **For everyone, with no deploy:** set the variable `EXHBT_EDITOR` to `classic` on the live Worker in the Cloudflare dashboard. `editorKind()` in `lib/site.ts` reads it on each request. Delete the variable to go back.
+1. **For everyone, with no deploy:** set the variable `EXHBT_EDITOR` to `classic` on the live Worker in the Cloudflare dashboard. `editorKind()` in `lib/editor-kind.ts` (server only) reads it on each request. Delete the variable to go back.
 2. **For one visit:** "Use the classic editor" in the editor's menu opens `/exhbts/<id>/edit?editor=classic`.
 3. **By itself:** if the new editor throws, it sends what it can and reloads into the classic editor for that visit. The new editor is only ever drawn in the browser, inside the boundary that does this, because a boundary cannot catch a throw on the server.
 
@@ -161,7 +161,7 @@ Three ways back to the old editor during releases 3 and 4 (0026 has the detail):
 
 Tests:
 - **In the suite** (E's `e2e/editor-switch.spec.ts` in release 2, A's `e2e/editor-classic.spec.ts` in release 3): a development-only page, `/dev/editor?kind=classic`, sets a cookie that `editorKind()` reads in development only, for that browser context alone, so a failed test cannot leave the switch set for the next; the edit page then serves the classic editor (`[data-editor="classic"]`), and `?kind=page` puts it back. `?editor=classic` serves classic for that request only. Development only: `?crash=render` makes the new editor throw the first time it draws, `?crash=change` after the first change, and `?crash=server` makes the page itself fail on the server. Each test sees the notice (or the route's error page), then the classic editor, and after `?crash=change` the words typed before the crash are still there.
-- **On the preview site, in release 2.** The switch and the health line ship in release 2, so this is done before the editor exists. The signed-in editor cannot run on the preview site (its database has no Phase 2 tables), so the proof goes through `/api/health`, which reports `editor: "page"` or `"classic"`. The main session: sets `EXHBT_EDITOR=classic` on the `exhbt-preview` Worker in the dashboard; fetches `/api/health` until it says `classic`, and notes how long that took; dispatches `deploy-preview.yml` and checks it still says `classic` afterwards (this proves `keep_vars` keeps a dashboard variable across a deploy); deletes the variable and checks for `page`. If a deploy does wipe the variable, the fallback is to flip it and hold deploys, and that goes to Rory before release 3.
+- **On the preview site, in release 2.** The switch and the health line ship in release 2, so this is done before the editor exists. The signed-in editor cannot run on the preview site (its database has no Phase 2 tables), so the proof goes through `/api/health`, which reports `editor: "page"` or `"classic"`. The main session: sets `EXHBT_EDITOR=classic` on the `exhbt-preview` Worker in the dashboard; fetches `/api/health` until it says `classic` (reading `editor` from the JSON body, whatever the status), and notes how long that took; dispatches `deploy-preview.yml` and checks it still says `classic` afterwards (this proves `keep_vars` keeps a dashboard variable across a deploy); deletes the variable and checks for `page`. If a deploy does wipe the variable, the fallback is to flip it and hold deploys, and that goes to Rory before release 3.
 - **On the live site, at release 3:** `/api/health` says `page`. The switch is not flipped on live unless it is needed.
 
 ## Undoing a release
@@ -224,3 +224,49 @@ Three critics (data and rollback; the editing experience; buildability) read the
 **Nothing rejected outright.** Two points were taken in part (experience-6, experience-11), with the reasons above. No critic asked to reverse one of Rory's decisions, so nothing went to `open-questions.md` on that ground; the new questions there (the error colour, the overlays on pictures) are choices this revision made.
 
 **Found while revising:** a frame memoised on its page place would keep a stale stored index (and so stale field paths) when a kept section before it is removed; G's frame now reads its stored index from the store.
+
+### Vision check and cold read (19 Nov 2026)
+
+Two more reads, the same day. The first checked that the revision above kept the original design (commit 39a7d95): Rory asked that the designer's vision not be lost, and the revision had moved several things on the page behind overlays and popovers. The second read the release 2 briefs cold, as an agent starting on them would. Where a line here differs from one above (experience-1, experience-5, experience-7, build-11), this one is current.
+
+**Vision check**
+- vision-1 (must-fix): done. `restoreFlow(doc, at?)`: with a place the marker goes there, without one to the usual place. The "+" and the tray always pass their place (`insertBlock(doc, "flow", at)` is `restoreFlow(doc, at)`); only the classic editor's button calls it without one. 0027, every copy of the layouts block, B step 6b, G step 2, F step 5 and F's test (Flowchart from the "+" before the last section lands there).
+- vision-2 (must-fix): done. The skills end with an "Add a skill" box (`skill-new`), always drawn in the flow, so on an empty exhbt it is the skills block's placeholder. It is on `EDIT_ONLY_IN_FLOW`; A's stand-in draws it inert; the box-for-box tests allow it by name; C draws the skills block in edit mode even with no skills. It left the shell toolbar, which keeps More actions, so 0026's field table and its chrome now agree.
+- vision-3 (must-fix): done. An image's description is again a field under the picture and its caption, in the editor only, marked "Needs a description" until filled. It is on `EDIT_ONLY_IN_FLOW`, drawn inert by A's stand-in, and allowed by name in the full and sparse box-for-box tests (0026 now says once, in "How a box-for-box test allows them", what a test allows). Question 11 is reworded neutrally, with the strip over the picture as the other choice.
+- vision-4: done. "Reorder sections" is in the top bar's menu only under `(pointer: coarse)`, and H tests that it is absent on the desktop project. L's tablet test is unchanged.
+- vision-5: done. A new link opens its "Web address" popover with the cursor in it (through `board.add` and the jump); the button is always shown and marked while the address is missing. 0026, J, F, and the `Board` comment in every copy.
+- vision-6: done. While the share tick is unticked, the picked-figure label holds it ("From your report, page 3 · [ ] I may share this"); Crop and Choose another page stay in the popover. 0026, J, N's field list.
+- vision-7: done. "Add a finding" shows whenever the pointer or the focus is in the findings section, and always under `(pointer: coarse)`, in the gap below the last finding, covering no words. 0026, G step 4, C step 5.
+- vision-8: done, as a contradiction. 0026's always-shown toolbar is for touch screens wider than 48rem; on a phone the grip-only rule and the bar apply, as L says. G step 6 says the same.
+- vision-9: done, as a contradiction with `AGENTS.md` ("don't invent new colours"). C uses the app's error colour (#C92324) in every look where it passes 4.5:1, proposes a value only where it fails, and reports each one; 0026 and question 10 say so.
+- vision-10: no change; the stand-in stays. Rory should be told that the loading view shows a new exhbt's grey placeholders, and now the description fields and the skill box.
+- vision-11: no change. Issue messages stay in popovers.
+- vision-12: no change beyond vision-2.
+- vision-13: not taken. No document contradicts another (H already checks the row at 390px), so a test with "2 numbers to check" showing would be new scope.
+- vision-14: done, as a contradiction: the status line and the phone bar would overlap. G gives the status line the class `xe-status`, L lifts it above the bar on a phone and tests it, and 0026 says so.
+- vision-15: not taken. 0028's "one line on what it suits" is what `MENU_LINES` are, so nothing contradicts. The seven menu lines are new words, not yet in question 7.
+- vision-16: done. 0026's wording for `DESIGN.md`: the flowchart section is carried with a line; a box inside it is carried with a line by default, which Rory has not yet confirmed (`FLOW_BOX_STYLE`, question 1).
+- vision-17: not taken here, as no document contradicts another. Before release 3, Rory could try the new editor's drag beside `/lab/editor`, which stays on the preview site until release 5.
+
+**Cold read of the release 2 briefs**
+- cold-1 (must-fix): done. `editorKind()` lives in a new `lib/editor-kind.ts` whose first line is `import "server-only"`, and `lib/site.ts` is left alone. Changed in E (step 9, with a check in `next dev`, since `tsc` misses this), A, G, P, 0026, 0027, the kill switch section and the ownership tables.
+- cold-2 (must-fix): done, with the shape provisional. B's step 2b writes `FORMAT_COPY`'s new fields (`quote`, `skills`, `refs`, `inLayout`), today's literals for the three layouts, and `FORMAT_LIMITS` for all seven. The block is word for word in B and C, and B reports the final type with milestone 1. 0028 says so.
+- cold-3: done. `POST /dev/parity` takes `{ username, slug, doc, working?, publishedAt?, plan?, extraFiles? }`, with plan `max` by default and `publishedAt` set through `memorySnapshot()`, and returns `files`. B, E and the data-safety test use it.
+- cold-4: done. B, E and G's `openDoc` sign in with `/auth/dev?email=…` after seeding, and never call `signInAs` or `/dev/portfolio`, which clear the seeded exhbt.
+- cold-5: done. A pure `readAiVersion(raw)` in `lib/exhbt/draft-blocks.ts`, which `loadAiVersion` calls and the model test checks. The real round trip goes through `/dev/parity`'s `aiVersion` in `e2e/data-safety.spec.ts`.
+- cold-6: done. `e2e/auto-figure.spec.ts` (line 143: iterate `OFFERED_FORMATS`) is in B's named fixes and the README's B row.
+- cold-7: done. `Need` gains `{ need: "results"; message: string }` in every copy (B, D, E, M). Research's figure cap stays a check of its own, in today's order of messages.
+- cold-8: done. B's milestone 1 is steps 1 to 5, 2b and 6a, with step 1 pushed in four parts and the golden files pushed before any product code. Milestone 2 starts with `restoreFlow`, which E waits for. The agents table, C and E say so.
+- cold-9: done. `BlockOption.name` is the noun in the layout's own words; the reasons name the layout with `FORMAT_COPY[f].inLayout`; `insertBlock(doc, "flow", at)` is `restoreFlow(doc, at)`, or null when the flowchart is on the page.
+- cold-10: done. E's switch spec reads `editor` from the JSON body whatever the status, and may add `?only=editor`. The preview check above reads the body too.
+- cold-11: done. B writes the expected runs by hand from `runsOf`, and rebuilds the five and six box docs from `app/dev/portfolio/route.ts`. 0027's fixture list says where they come from.
+- cold-12: done. E starts after C's part 1 and B's `restoreFlow`, in its brief and in the agents table; "B's milestone 2 for C" is gone from the line on late arrivals.
+- cold-13: done. B's step 2 notes `Widen` and booleans, the pull quote in `oneOf`, and narrowing with `isContent`.
+- cold-14: done. B copies the old per-kind schemas from the base commit and builds the old union from the copies, beside `normaliseDoc` and `FORMATS`.
+- cold-15: done. C step 3: a lone flowchart is drawn as `ctx.format`'s page draws it today, checked by the "gallery with no findings" and "research with no figure" fixtures.
+- cold-16: done. D seeds with `plan=max`.
+- cold-17: done. The golden boxes are compared only in the environment that wrote them, the agents' sandbox Chromium, and the main session's later re-run uses that sandbox. In CI the spec compares markup only. 0027, B, C and this README.
+
+**Found while revising**
+- C's slot harness drew `skills` as an empty element, while its box test compared each pill. It now draws the pills and the "Add a skill" box.
+- The link's "Web address" slot is now `where: "over"`, so `"below"` means only an image's description, in the flow. C, J, the plug table and the `ExtraSlot` comment agree.

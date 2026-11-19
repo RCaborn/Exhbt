@@ -202,7 +202,7 @@ The sample agent reports the real numbers, with and without each optional part, 
 
 - `keyFigureOf` (`lib/portfolio-home.ts`) picks a card's figure by layout: the lead image for Build and Event or performance, the first image for Before and after, the first graph or image for an essay, then its usual fallbacks.
 - The layout menu grows to seven. Each keeps a small sketch and one line on what it suits, so it stays quick to scan.
-- `FORMAT_COPY` gains the words that differ per layout and were fixed before: the quote's heading and what the skill pills are called.
+- `FORMAT_COPY` gains the words that differ per layout and were fixed before: the quote's heading, what the skill pills are called, and the heading over a list of sources (research's "References", an essay's "Sources"). The model's agent writes them in release 2, with every layout's entry in `FORMAT_COPY` and `FORMAT_LIMITS`, so the renderer reads each layout's words from one place.
 - Rewrite works on the same five drafted parts in every layout. The pull quote, the sources and My role are not rewritten.
 
 ## To confirm with Rory
