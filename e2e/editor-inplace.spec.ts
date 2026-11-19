@@ -547,7 +547,8 @@ test.describe("axe", () => {
     await openDoc(page, freshName("axe"), sampleDoc("case-study"));
     await waitLive(page);
     expect(await scan(page), "at rest").toEqual([]);
-    await typeIn(page, "sections.1.items.0", " and more", { append: true });
+    const findings = (await docNow(page)).sections.findIndex((s) => s.kind === "findings");
+    await typeIn(page, `sections.${findings}.items.0`, " and more", { append: true });
     expect(await scan(page), "while typing").toEqual([]);
     await page.getByRole("button", { name: "Review and publish" }).click();
     await expect(page.getByRole("dialog", { name: "Review and publish" })).toBeVisible();
