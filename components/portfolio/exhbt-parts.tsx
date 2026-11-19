@@ -288,6 +288,52 @@ export function FlowPart({ steps, as, rowClass = "", ctx }: { steps: FlowStep[];
   return !stacked && rowClass ? <div className={rowClass}>{did}</div> : did;
 }
 
+/**
+ * A Build page's link as a button (decision 0028): the look's outline button, "Try the demo", with its
+ * line under it. A row of them is the row's (the "buttons" group). In edit mode it is not a link.
+ */
+export function ButtonLink({ s, ctx, at }: { s: SectionOf<"link">; ctx: PageCtx; at?: number }) {
+  const edit = ctx.edit;
+  const copy = FORMAT_COPY[ctx.format];
+  const href = safeHref(s.href);
+  const label = s.label.trim() || copy.link;
+  const button = "xp-outline-button inline-flex min-h-11 items-center gap-1.5 px-5 py-2 text-[0.9375rem] leading-tight font-semibold";
+  const line = "xp-muted mt-1.5 px-1 text-sm";
+  return (
+    <div data-part="link" className={cx("min-w-0 break-inside-avoid", rel(ctx))}>
+      {edit ? (
+        <span className={button}>
+          {edit.text({ path: p(at, "label"), value: s.label, label: "What the link is", placeholder: "Try the demo" })}
+          <ArrowUpRight aria-hidden size={16} strokeWidth={2.25} />
+        </span>
+      ) : href ? (
+        <a href={href} rel="nofollow ugc noopener" target="_blank" className={button}>
+          {label}
+          <ArrowUpRight aria-hidden size={16} strokeWidth={2.25} />
+        </a>
+      ) : (
+        <span className={button}>{label}</span>
+      )}
+      {edit ? (
+        <p className={line}>{edit.text({ path: p(at, "description"), value: s.description, label: "One line about it (optional)", placeholder: "One line about it (optional)" })}</p>
+      ) : (
+        s.description.trim() && <p className={line}>{s.description.trim()}</p>
+      )}
+      {edit?.extra({ sectionId: s.id, kind: "link", where: "over" })}
+    </div>
+  );
+}
+
+/** A picture marked Before or After (decision 0028), in a Before and after pair: a small label over its card. */
+export function StagedImage({ s, stage, imageUrls, ctx, at }: { s: SectionOf<"image">; stage: "before" | "after"; imageUrls: ImageUrls; ctx: PageCtx; at?: number }) {
+  return (
+    <div data-stage={stage} className="min-w-0">
+      <p className="xp-label mb-1.5">{stage === "before" ? "Before" : "After"}</p>
+      <Figure s={s} imageUrls={imageUrls} zoom ctx={ctx} at={at} />
+    </div>
+  );
+}
+
 /** Research's aim or hypothesis, in the method stack: a ruled block over the method. */
 export function AimStacked({ s, rowClass = "", ctx, at }: { s: SectionOf<"aim">; rowClass?: string; ctx: PageCtx; at?: number }) {
   const { Sub, edit } = ctx;
@@ -529,8 +575,14 @@ export function PlainSection({
         </section>
       );
     }
-    case "pullquote":
-      // Drawn by the essay layout (LayoutMain); no other layout shows it.
-      return null;
+    case "pullquote": {
+      // An essay's own sentence, large in the look's display face with the quote's rule (decision 0028).
+      const big = "xp-quote xp-display border-l-[3px] pl-5 text-[1.75rem] leading-[1.2] text-balance print:text-[1.2rem]";
+      return (
+        <section aria-label="Pull quote" data-part="pullquote" className={cx(rowClass, "break-inside-avoid")}>
+          <blockquote className={big}>“{edit ? edit.text({ path: p(at, "text"), value: s.text, label: "Pull quote", placeholder: "One sentence of your own" }) : s.text.trim()}”</blockquote>
+        </section>
+      );
+    }
   }
 }

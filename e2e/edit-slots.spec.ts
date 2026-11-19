@@ -3,6 +3,7 @@ import type { ExhbtDoc } from "../lib/exhbt/blocks";
 import { FORMAT_COPY, formatOf } from "../lib/exhbt/formats";
 import { flowShown, pageItems, rowsFor, type Cell, type Row } from "../lib/exhbt/layouts";
 import { fullDoc, GALLERY_IMAGES, galleryDoc, researchDoc } from "../lib/exhbt/sample";
+import { beforeAfterFixture, buildFixture, essayFixture, eventFixture } from "../app/dev/edit-slots/layouts";
 
 /*
  * The page's editing slots (decision 0026, "One page, one renderer"), through the slot harness
@@ -16,13 +17,19 @@ import { fullDoc, GALLERY_IMAGES, galleryDoc, researchDoc } from "../lib/exhbt/s
  *    says and adds only its own height; on the sample as it is, every difference is a part on 0026's
  *    list of what is in the flow in the editor only, named, and nothing else.
  *
- * The four new layouts join this list with the renderer's second part.
+ * All seven layouts: the case study, the gallery and research by their samples, the four of decision
+ * 0028 by the harness's own fixtures (app/dev/edit-slots/layouts.ts).
  */
 
 const SAMPLES: Record<string, ExhbtDoc> = {
   "case-study": fullDoc,
   gallery: galleryDoc(GALLERY_IMAGES.map((_, i) => `gallery-${i + 1}`)),
   research: researchDoc("research-1"),
+  // The four layouts of decision 0028: the harness's own fixtures until their samples exist.
+  build: buildFixture,
+  essay: essayFixture,
+  "before-after": beforeAfterFixture,
+  event: eventFixture,
 };
 
 type Field = { path: string; label: string; id?: string };

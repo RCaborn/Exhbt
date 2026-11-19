@@ -9,7 +9,7 @@ import type { EditAdapter, PageCtx } from "@/components/portfolio/page-ctx";
 import { PrintButton } from "@/components/portfolio/PrintButton";
 import { Button } from "@/components/ui/Button";
 import { formatLimits, type ExhbtDoc } from "@/lib/exhbt/blocks";
-import { FORMAT_COPY, formatOf } from "@/lib/exhbt/formats";
+import { FORMAT_COPY, FORMAT_RULES, formatOf } from "@/lib/exhbt/formats";
 
 /** The editor's arrange preview imports this from here. */
 export { SectionBlock };
@@ -91,6 +91,8 @@ export function ProjectView({
   const copy = FORMAT_COPY[format];
   const L = formatLimits(format);
   const Sub: Sub = headingLevel === "h1" ? "h2" : "h3";
+  // A layout that leads with a picture (the gallery, Build, Event) sets the title and the context line a little closer on a narrow page.
+  const leads = FORMAT_RULES[format].first?.as === "lead";
   const ctx: PageCtx = { Sub, imageUrls, format, edit };
   const first = owner.name.trim().split(/\s+/)[0] || owner.name;
   const hasWork = Boolean(doc.evidence && evidenceUrl);
@@ -212,17 +214,17 @@ export function ProjectView({
           )}
           {team}
 
-          <H className={`xp-title xp-display ${format === "gallery" ? "mt-3 @2xl/main:mt-5" : "mt-5"} text-[clamp(2rem,7cqi,3.4rem)] leading-[1.02] text-balance print:mt-2 print:text-[2rem]${edit ? " relative" : ""}`}>
+          <H className={`xp-title xp-display ${leads ? "mt-3 @2xl/main:mt-5" : "mt-5"} text-[clamp(2rem,7cqi,3.4rem)] leading-[1.02] text-balance print:mt-2 print:text-[2rem]${edit ? " relative" : ""}`}>
             {edit ? edit.text({ path: "title", value: doc.title, label: copy.title, placeholder: copy.emptyTitle, id: "title", maxChars: L.titleChars }) : doc.title}
             {edit?.tools({ block: "header" })}
           </H>
           {edit ? (
             <div className="relative">
-              {edit.rich({ path: "gap", value: doc.gap, label: copy.gap, placeholder: firstSentence(copy.gapHint), className: contextClass(format), highlight: true })}
+              {edit.rich({ path: "gap", value: doc.gap, label: copy.gap, placeholder: firstSentence(copy.gapHint), className: contextClass(leads), highlight: true })}
               {edit.tools({ block: "gap" })}
             </div>
           ) : doc.gap.length > 0 && (
-            <p className={contextClass(format)}>
+            <p className={contextClass(leads)}>
               <RichText value={doc.gap} highlight />
             </p>
           )}
@@ -251,6 +253,6 @@ function Fact({ term, children, wide = false }: { term: string; children: React.
   );
 }
 
-/** The context line's classes: a gallery's sits a little closer under the title on a narrow page. */
-const contextClass = (format: string) =>
-  `xp-context ${format === "gallery" ? "mt-3 @2xl/main:mt-5" : "mt-5"} max-w-[42rem] text-[1.0625rem] leading-[1.6] @2xl/main:text-[1.1875rem] print:mt-2 print:text-[1rem]`;
+/** The context line's classes: in a layout that leads with a picture it sits a little closer under the title on a narrow page. */
+const contextClass = (leads: boolean) =>
+  `xp-context ${leads ? "mt-3 @2xl/main:mt-5" : "mt-5"} max-w-[42rem] text-[1.0625rem] leading-[1.6] @2xl/main:text-[1.1875rem] print:mt-2 print:text-[1rem]`;
