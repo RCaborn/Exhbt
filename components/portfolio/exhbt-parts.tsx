@@ -6,6 +6,7 @@ import { ImageZoom } from "@/components/portfolio/ImageZoom";
 import { safeHref, type Section, type SectionOf } from "@/lib/exhbt/blocks";
 import { FORMAT_COPY, type Format } from "@/lib/exhbt/formats";
 import { imageRatio } from "@/lib/exhbt/sections";
+import type { ImageUrls, Sub } from "./page-ctx";
 
 /**
  * The parts of an exhbt page that more than one layout draws (decision 0024): the findings, a
@@ -14,8 +15,8 @@ import { imageRatio } from "@/lib/exhbt/sections";
  * defaults are the case study's, so its output is as it was.
  */
 
-export type Sub = "h2" | "h3";
-export type ImageUrls = Record<string, string | null>;
+/** Defined in page-ctx.ts; re-exported here, where they were first, so older imports keep working. */
+export type { ImageUrls, Sub };
 
 /** A heading over a rule, then the findings as a ruled list. "What I found", "What happened" or "Results". */
 export function Findings({ s, Sub, heading = "What I found", part = "findings", kicker = false }: { s: SectionOf<"findings">; Sub: Sub; heading?: string; part?: string; /** The small label heading (research's row of Results, Conclusion and Limitations all use it) instead of the large ruled one. */ kicker?: boolean }) {
