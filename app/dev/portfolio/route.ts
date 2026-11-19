@@ -69,6 +69,8 @@ export async function GET(req: NextRequest) {
     photoFileId: q.get("photo") === "1" ? await placeholderPhoto(userId) : null,
   });
   for (const e of await store.listExhbts(userId)) await store.deleteExhbt(e.id, userId);
+  // And no job links left from an earlier visit (a test that failed part-way, then retried, would trip over them).
+  for (const l of await store.listJobLinks(userId)) await store.deleteJobLink(l.id, userId);
   // A fresh arrangement too: the default layout, nothing hidden or featured.
   const layout = normaliseLayout(
     rich

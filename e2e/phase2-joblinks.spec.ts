@@ -136,6 +136,7 @@ const picks = (page: Page) => page.getByRole("list", { name: "Picks, in order" }
 
 test.describe("job link pages", () => {
   test("Max: paste a description, check the picks, reorder, edit the intro, switch the address, turn off and on, delete", async ({ page }) => {
+    test.slow(); // one long scenario; each page compiles on first visit in the dev server
     await signInAs(page, "jlmax", "max");
     let { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
     expect(violations.map((v) => `list ${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
