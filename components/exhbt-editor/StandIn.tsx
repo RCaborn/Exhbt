@@ -8,6 +8,7 @@ import type { ExhbtDoc, RichText as RichTextValue } from "@/lib/exhbt/blocks";
 import { FORMAT_COPY, formatOf } from "@/lib/exhbt/formats";
 import { pageItems, rowsFor, type Cell, type ItemAs } from "@/lib/exhbt/layouts";
 import type { PageEditorProps } from "./context";
+import { CANVAS, DESCRIPTION_PLACEHOLDER, descriptionClass, LOOK_GROUND, MUTED, PILL, SKILLS_LIST, TOPBAR_H, workWords } from "./geometry";
 
 /*
  * The loading stand-in (decision 0026, "The crash fallback"). The new editor is drawn only in the
@@ -26,8 +27,7 @@ import type { PageEditorProps } from "./context";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 const hasWords = (rt: RichTextValue) => rt.some((r) => r.t.trim());
-const muted = { color: "var(--xp-muted)" } as const;
-const PILL = "xp-pill px-2 py-[0.2rem] text-[0.78rem] font-medium";
+const muted = MUTED;
 
 /** An empty field's placeholder, in the part's own element and type, its words in --xp-muted. */
 const placeholder = (words: string) => (
@@ -35,16 +35,6 @@ const placeholder = (words: string) => (
     {words}
   </span>
 );
-
-/**
- * An image's description field is one line in its caption's type, under the caption (exhbt-parts.tsx:
- * a tile's caption is smaller, the lead image's is inset). It wraps as a textarea does.
- */
-const DESCRIPTION_TYPE: Partial<Record<ItemAs, string>> = {
-  tile: "text-[0.8125rem] leading-snug",
-  lead: "px-1 text-sm leading-snug",
-};
-const descriptionClass = (as: ItemAs | undefined) => cx("mt-1 block whitespace-pre-wrap [overflow-wrap:break-word]", (as && DESCRIPTION_TYPE[as]) ?? "text-sm leading-snug");
 
 /** How each item on the page is drawn (its `as`), by id, from the layout engine's own rows. */
 function drawnAs(doc: ExhbtDoc): Map<string, ItemAs> {
@@ -97,7 +87,7 @@ export function standInAdapter(doc: ExhbtDoc, base: Omit<PageCtx, "edit">): Edit
       const alt = s && s.kind === "image" ? s.alt.trim() : "";
       return (
         <span data-edit-only="image-description" inert className={descriptionClass(as.get(o.sectionId))} style={alt ? undefined : muted}>
-          {alt || "Describe it for people who can't see it"}
+          {alt || DESCRIPTION_PLACEHOLDER}
         </span>
       );
     },
@@ -114,7 +104,7 @@ export function standInAdapter(doc: ExhbtDoc, base: Omit<PageCtx, "edit">): Edit
     },
     // The read-only pills, then the "Add a skill" box the size of a pill: on an exhbt with no skills it is the block's placeholder.
     skills: () => (
-      <ul aria-label={copy.skills} className="flex flex-wrap gap-1 @2xl/main:justify-end">
+      <ul aria-label={copy.skills} className={SKILLS_LIST}>
         {doc.skills.map((s) => (
           <li key={s} className={PILL}>
             {s}
@@ -127,7 +117,7 @@ export function standInAdapter(doc: ExhbtDoc, base: Omit<PageCtx, "edit">): Edit
     ),
     // The sidebar's button as the page draws it, or "Add the work"; never left out, as on a phone the sidebar sits above the page.
     work: () => {
-      const words = doc.evidence ? `See the work: ${doc.evidence.label}` : "Add the work";
+      const words = workWords(doc.evidence?.label);
       return (
         <div inert data-edit-only={doc.evidence ? undefined : "placeholder"}>
           <Button href="#" variant="primary" size="md" className="xp-work-button w-full" label={words}>
@@ -155,9 +145,9 @@ export function StandInPage(props: PageEditorProps) {
   const evidenceUrl = doc.evidence?.kind === "link" ? doc.evidence.href : props.fileEvidenceUrl;
   return (
     <>
-      <div aria-hidden className="border-b border-line bg-surface" style={{ height: "var(--xe-topbar-h, 3.5rem)" }} />
-      <div {...lookAttrs(theme)} style={themeStyle(theme)} className="min-h-svh bg-[var(--pf-ground)] text-[color:var(--pf-ink)]">
-        <div inert className="mx-auto max-w-[64rem] px-4 pt-8 pb-10 sm:px-8 sm:pt-12">
+      <div aria-hidden className="border-b border-line bg-surface" style={{ height: TOPBAR_H }} />
+      <div {...lookAttrs(theme)} style={themeStyle(theme)} className={LOOK_GROUND}>
+        <div inert className={CANVAS}>
           <ProjectView
             doc={doc}
             // As the visitor's page has it: the look's photo shape and "All of <name>'s work", which the editing page draws but does not open.
