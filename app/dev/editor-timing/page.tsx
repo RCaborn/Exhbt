@@ -4,6 +4,7 @@ import type { PageEditorProps } from "@/components/exhbt-editor/context";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
 import { BEFORE_AFTER_IMAGES, beforeAfterDoc, BUILD_IMAGES, buildDoc, essayDoc, EVENT_IMAGES, eventDoc, fullDoc, GALLERY_IMAGES, galleryDoc, researchDoc } from "@/lib/exhbt/sample";
 import { DEFAULT_THEME, themeById } from "@/lib/portfolio-themes";
+import { full } from "../edit-slots/stand-in";
 import { TimingEditor } from "./TimingEditor";
 
 export const metadata: Metadata = { title: "Editor timing", robots: { index: false, follow: false } };
@@ -18,6 +19,7 @@ export const dynamic = "force-dynamic";
  *
  *   ?sample=   gallery (the default: the longest), case-study, research, build, essay, before-after, event
  *   ?look=     a portfolio look's id (the Exhbt look by default)
+ *   ?full=1    every empty optional part given words first (the slot harness's full(), app/dev/edit-slots), for the box-for-box tests
  *
  * Not found unless NODE_ENV is not production, or the build has EXHBT_LAB=1 (as the lab's page was
  * gated; it is never set on the live Worker).
@@ -46,7 +48,8 @@ export default async function EditorTiming({ searchParams }: { searchParams: Pro
   if (!enabled()) notFound();
   const q = await searchParams;
   const name = typeof q.sample === "string" && q.sample in SAMPLES ? q.sample : "gallery";
-  const doc = SAMPLES[name]!();
+  const sample = SAMPLES[name]!();
+  const doc = q.full === "1" ? full(sample) : sample;
   const theme = (typeof q.look === "string" && themeById(q.look)) || DEFAULT_THEME;
   const imageUrls = Object.fromEntries(doc.sections.flatMap((s) => (s.kind === "image" && s.fileId ? [[s.fileId, picture(s.w, s.h)]] : [])));
   const props: PageEditorProps = {
