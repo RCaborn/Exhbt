@@ -1,7 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { LIMITS } from "../lib/exhbt/blocks";
 import { buildRoadmap, unlockProjects, uniqueEmail, waitForResult } from "./helpers";
+import { fillValid, previewRegion, signInAs, startFromScratch, waitForSaved } from "./editor";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -10,34 +11,6 @@ const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 const PDF_TEXT = "%PDF-1.4\n% a tiny stand-in report\n";
-
-async function signInAs(page: Page, username: string, plan: "free" | "premium") {
-  await page.goto(`/dev/portfolio?username=${username}&plan=${plan}&count=0`);
-  await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
-  await expect(page.getByRole("heading", { level: 1, name: "Your exhbts" })).toBeVisible();
-}
-
-async function startFromScratch(page: Page) {
-  await page.getByRole("button", { name: "Start from scratch" }).click();
-  await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
-  await expect(page.locator("[data-ready=true]")).toBeAttached();
-  await expect(page.getByRole("textbox", { name: "Context", exact: true })).toBeVisible();
-}
-
-async function waitForSaved(page: Page) {
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
-}
-
-/** Fills everything a publish needs, apart from images and the work. */
-async function fillValid(page: Page, title: string) {
-  await page.locator("#title").fill(title);
-  await page.getByRole("textbox", { name: "Context", exact: true }).fill("Queues ran long at lunch. Would a second till help?");
-  await page.getByLabel("Box 1", { exact: true }).fill("Timed the queue");
-  await page.getByLabel("Box 2", { exact: true }).fill("Added a second till");
-  await page.getByLabel("Box 3", { exact: true }).fill("Waits fell");
-  await page.getByRole("textbox", { name: "Finding 1" }).fill("Waits fell from 11 to 4 minutes.");
-  await page.getByRole("textbox", { name: "Finding 2" }).fill("Sales held steady.");
-}
 
 test.describe("images and the work as a file", () => {
   test("add an image, publishing waits for its description, removing deletes the file", async ({ page }) => {
@@ -49,7 +22,7 @@ test.describe("images and the work as a file", () => {
     await expect(page.getByLabel(/Image 1: describe it/)).toBeVisible();
     // A growing textarea, so a long description is never cut off.
     expect(await page.getByLabel(/Image 1: describe it/).evaluate((el) => el.tagName)).toBe("TEXTAREA");
-    await expect(page.getByRole("region", { name: "Preview" }).locator("img[alt='']").first()).toBeVisible();
+    await expect(previewRegion(page).locator("img[alt='']").first()).toBeVisible();
 
     await page.getByLabel("This is my work, and the numbers are true").check();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
@@ -67,7 +40,7 @@ test.describe("images and the work as a file", () => {
     // After a reload the preview image comes from the stored file.
     await page.reload();
     await expect(page.locator("[data-ready=true]")).toBeAttached();
-    const src = await page.getByRole("region", { name: "Preview" }).locator("img[alt='A queue at the cafe till']").getAttribute("src");
+    const src = await previewRegion(page).locator("img[alt='A queue at the cafe till']").getAttribute("src");
     expect(src).toMatch(/^\/dev\/files\//);
     expect((await page.request.get(src!)).status()).toBe(200);
 
@@ -89,7 +62,7 @@ test.describe("images and the work as a file", () => {
     await waitForSaved(page);
     await page.reload();
     await expect(page.locator("[data-ready=true]")).toBeAttached();
-    const src = await page.getByRole("region", { name: "Preview" }).locator("img").last().getAttribute("src");
+    const src = await previewRegion(page).locator("img").last().getAttribute("src");
     expect(src).toMatch(/^\/dev\/files\//);
     await page.getByRole("button", { name: "Remove image 1" }).click();
     await waitForSaved(page);
@@ -115,7 +88,7 @@ test.describe("images and the work as a file", () => {
     await waitForSaved(page);
     await page.reload();
     await expect(page.locator("[data-ready=true]")).toBeAttached();
-    const first = await page.getByRole("region", { name: "Preview" }).getByRole("link", { name: /See the work/ }).getAttribute("href");
+    const first = await previewRegion(page).getByRole("link", { name: /See the work/ }).getAttribute("href");
     expect(first).toMatch(/^\/dev\/files\//);
 
     // Replace it with a different file: the old one is deleted after the save.
@@ -229,7 +202,7 @@ test.describe("guidance", () => {
   test("the preview stays in view on a wide screen, and the badge waits for the confirmation", async ({ page }) => {
     await signInAs(page, "pru", "premium");
     await startFromScratch(page);
-    const preview = page.getByRole("region", { name: "Preview" });
+    const preview = previewRegion(page);
     await expect(preview).toHaveCSS("position", "sticky");
     await expect(preview.getByText(/^Confirmed by /)).toHaveCount(0);
     await expect(preview.getByText("Not confirmed yet")).toBeVisible();

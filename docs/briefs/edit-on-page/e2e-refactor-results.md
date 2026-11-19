@@ -6,8 +6,8 @@ Run on the desktop Playwright project, one worker, port 3214, no trace. Base is 
 | --- | --- | --- | --- |
 | `file-ownership.spec.ts` | 1 | 1 passed | 1 passed |
 | `phase2-billing-polish.spec.ts` | 7 | 7 passed | 7 passed |
-| `phase2-editor-media.spec.ts` | 15 | 15 passed | |
-| `phase2-editor.spec.ts` | 10 | 10 passed | |
+| `phase2-editor-media.spec.ts` | 15 | 15 passed | 15 passed |
+| `phase2-editor.spec.ts` | 10 | 10 passed | 10 passed |
 | `phase2-graphs.spec.ts` | 16 | 16 passed | |
 | `phase2-sections.spec.ts` | 15 | 15 passed | |
 | `phase2-draft-tools.spec.ts` | 11 | 11 passed | |
