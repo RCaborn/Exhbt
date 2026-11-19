@@ -20,9 +20,10 @@ import {
 } from "../lib/exhbt/blocks";
 import { FORMAT_RULES, FORMATS, fromWorkOf, hiddenSections, OFFERED_FORMATS, shownSections, withFormat, type Format } from "../lib/exhbt/formats";
 import { tileFromDoc } from "../lib/exhbt/headline";
-import { adopt, applyTemplate, flowShown, hasMarker, isArranged, keptItems, pageItems, rowsFor, structureKey, type Cell, type ItemCell, type Row } from "../lib/exhbt/layouts";
-import { newSection, roomFor, sectionLabel, sectionName, withKeyFigure, withWorkVisual } from "../lib/exhbt/sections";
+import { adopt, applyTemplate, blockOptions, flowShown, hasMarker, insertBlock, insertImage, isArranged, keptItems, moveItem, pageItems, removeItem, restoreFlow, rowsFor, structureKey, type Cell, type ItemCell, type Row } from "../lib/exhbt/layouts";
+import { layoutNotes, newSection, roomFor, sectionLabel, sectionName, withKeyFigure, withWorkVisual } from "../lib/exhbt/sections";
 import { pathOfNumber } from "../lib/exhbt/verify";
+import { readAiVersion } from "../lib/exhbt/draft-blocks";
 import { ORDER_FIXTURES, SAMPLE_FIXTURES, todayCaseRows, todayGalleryRows, todayResearchRows, type OrderFixture } from "./fixtures/order-docs";
 import { OLD_FORMATS, OLD_SECTION_KINDS, OldExhbtDocSchema } from "./fixtures/reader-before-r2";
 
@@ -123,6 +124,26 @@ test.describe("The model: the marker and the new fields", () => {
       // Nothing it can't hold is kept: no marker, no flowOff, no My role, no stage.
       expect(JSON.stringify(old)).not.toMatch(/"flowOff"|"myRole"|"stage"|"kind":"flow"|"kind":"pullquote"/);
     }
+  });
+});
+
+/* ---------------- The AI version (step 9) ---------------- */
+
+test.describe("The model: the AI version keeps the graphs a figure replaced", () => {
+  test("a rewrite's read, change and write keeps the graphs; graphs that aren't charts read as none", () => {
+    // What the rewrite action does: load (readAiVersion), change one block, save (JSON, as saveAiVersion writes it), load again.
+    const stored = JSON.stringify({ blocks: { gap: text("The old context.") }, unverified: { gap: [] }, graphs: [bar] });
+    const ai = readAiVersion(stored);
+    expect(ai.graphs).toEqual([bar]);
+    (ai.blocks as Record<string, unknown>).gap = text("The new context.");
+    ai.unverified.gap = ["18%"];
+    const again = readAiVersion(JSON.stringify(ai));
+    expect(again.graphs).toEqual([bar]);
+    expect(again.blocks.gap).toEqual(text("The new context."));
+    expect(again.unverified.gap).toEqual(["18%"]);
+    for (const graphs of [[{ kind: "nothing" }], "a graph", [bar, 42], undefined]) expect("graphs" in readAiVersion(JSON.stringify({ blocks: {}, unverified: {}, graphs }))).toBe(false);
+    expect(readAiVersion(null)).toEqual({ blocks: {}, unverified: {} });
+    expect(readAiVersion("not json")).toEqual({ blocks: {}, unverified: {} });
   });
 });
 
@@ -250,6 +271,19 @@ test.describe("The model: a removed flowchart and the published copy", () => {
     expect(messages(core([image(1, "before"), image(2, "after"), findings()], "before-after"))).toEqual([]);
     expect(messages(core([], "event"))).toEqual(["sections: Add at least one picture, such as the poster.", "myRole: Say what your role was."]);
     expect(messages(core([image(1)], "event", { myRole: "Stage manager" }))).toEqual([]);
+  });
+
+  test("layoutNotes lists what each of the seven layouts still needs (step 7)", () => {
+    const miss = (d: ExhbtDoc) => layoutNotes(d).missing.map((m) => (m.add ? `${m.text} [${m.add}]` : m.text));
+    expect(miss(core([]))).toEqual([]);
+    expect(miss(core([], "gallery"))).toEqual(["Add at least 2 images [image]"]);
+    expect(miss(core([], "research"))).toEqual(["Add your aim or hypothesis [aim]", "Add your conclusion [conclusion]", "Add a graph or an image [graph]", "Add your results [findings]"]);
+    expect(miss(core([], "build"))).toEqual(["Add an image or a link [image]"]);
+    expect(miss(core([], "essay"))).toEqual(["Add your key points [findings]"]);
+    expect(miss(core([image(1)], "before-after"))).toEqual(["Add at least 2 images [image]", "Mark one image Before and one After", "Add what changed and why [findings]"]);
+    expect(miss(core([], "event"))).toEqual(["Add at least one picture, such as the poster [image]", "Say what your role was"]);
+    expect(miss(core([image(1)], "event", { myRole: "Stage manager" }))).toEqual([]);
+    expect(miss(core([{ ...findings(), items: [[], text("Sales held.")] } as ContentSection], "essay"))).toEqual(["Fill in or remove the empty findings"]);
   });
 
   test("pathOfNumber finds the first field on the page that holds a number", () => {
@@ -459,6 +493,144 @@ test.describe("The engine: applyTemplate and structureKey", () => {
     expect(structureKey({ ...d, sections: [...d.sections, quote()] })).not.toBe(key);
     expect(structureKey({ ...d, sections: d.sections.map((s) => (s.kind === "image" ? { ...s, stage: "before" as const } : s)) })).not.toBe(key);
     expect(structureKey(withFormat(d, "gallery"))).not.toBe(key);
+  });
+});
+
+test.describe("The engine: structural changes (step 6b)", () => {
+  test("restoreFlow puts a removed flowchart back, at its usual place or where it is asked for", () => {
+    // A gallery with the flowchart off and its sections moved by hand.
+    const off: ExhbtDoc = { ...core([findings(), image(1), quote(), image(2)], "gallery"), flowOff: true };
+    expect(itemIds(off)).toEqual(["findings", "image-1", "quote-1", "image-2"]);
+    // Its usual place: before the first item that comes after the flowchart in the layout's usual order.
+    const back = restoreFlow(off);
+    expect(ids(back)).toEqual(["flow", "findings", "image-1", "quote-1", "image-2"]);
+    expect("flowOff" in back).toBe(false);
+    expect(isArranged(back)).toBe(true);
+    expect(back.flow).toEqual(off.flow);
+    // With a place: before the last page item. Every other item keeps its order.
+    const there = restoreFlow(off, 3);
+    expect(itemIds(there)).toEqual(["findings", "image-1", "quote-1", "flow", "image-2"]);
+    expect("flowOff" in there).toBe(false);
+    expect(isArranged(there)).toBe(true);
+    expect(itemIds(restoreFlow(off, 0))).toEqual(["flow", "findings", "image-1", "quote-1", "image-2"]);
+    expect(itemIds(restoreFlow(off, 99))).toEqual(["findings", "image-1", "quote-1", "image-2", "flow"]);
+    // A section the layout keeps but doesn't draw keeps its place in the stored order.
+    const kept: ExhbtDoc = { ...off, sections: [findings(), aim(), image(1)] };
+    expect(ids(restoreFlow(kept, 1))).toEqual(["findings", "aim-1", "flow", "image-1"]);
+    // Nothing is after the flowchart's usual place: at the end.
+    expect(ids(restoreFlow({ ...off, sections: [image(1)] }))).toEqual(["image-1", "flow"]);
+    // Shown already: the same object.
+    for (const d of [back, adopt(core([findings()], "gallery")), core([findings()], "gallery"), { ...core([findings()]), flowOff: true }]) expect(restoreFlow(d, 0)).toBe(d);
+  });
+
+  test("insertBlock with the flowchart is restoreFlow at that place, and null once it is on the page", () => {
+    const off: ExhbtDoc = { ...core([findings(), image(1), quote(), image(2)], "gallery"), flowOff: true };
+    const r = insertBlock(off, "flow", 3);
+    expect(r).toEqual({ doc: restoreFlow(off, 3), id: "flow" });
+    expect(insertBlock(r!.doc, "flow", 0)).toBeNull();
+    expect(insertBlock(core([findings()]), "flow", 0)).toBeNull();
+  });
+
+  test("blockOptions: the layout's kinds in its order and words, each with its reason when full", () => {
+    const opt = (d: ExhbtDoc) => blockOptions(d).map((o) => (o.full ? `${o.name}: ${o.full}` : o.name));
+    expect(opt(core([findings(), graph(1), graph(2)]))).toEqual(["Findings: One findings section in a case study", "Graph: Up to 2 graphs in a case study", "Image", "Quote", "What I'd do next", "Link"]);
+    expect(opt(core([quote(), image(1), image(2)], "gallery"))).toEqual(["What happened", "Graph", "Image", "Quote: One quote in a gallery", "What I'd do next", "Link"]);
+    expect(opt(core([graph(1), image(1), image(2), aim()], "research"))).toEqual([
+      "Aim or hypothesis: One aim or hypothesis in research",
+      "Results",
+      "Graph: Up to 3 graphs and images together in research",
+      "Image: Up to 2 images in research",
+      "Conclusion",
+      "Quote",
+      "Limitations and next steps",
+      "Reference",
+    ]);
+    expect(opt(core([pull(), link(1), link(2), link(3), link(4)], "essay"))).toEqual(["Key points", "Pull quote: One pull quote in an essay", "Graph", "Image", "Quote", "What I'd look at next", "Source: Up to 4 sources in an essay"]);
+    expect(opt(core([link(1), link(2)], "build"))).toEqual(["What it does", "Graph", "Image", "Quote", "What's next", "Link: Up to 2 links in a build"]);
+    // The flowchart is offered only when it is off the page.
+    expect(blockOptions({ ...core([image(1)], "gallery"), flowOff: true }).at(-1)).toEqual({ kind: "flow", name: "Flowchart" });
+    for (const f of FORMATS) expect(blockOptions(core([], f)).some((o) => o.kind === "flow")).toBe(false);
+    expect(blockOptions(core([])).every((o) => !("full" in o))).toBe(true);
+  });
+
+  test("insertBlock and insertImage: places count page items, a full kind is refused, the doc is left arranged", () => {
+    const d = core([graph(), findings()]);
+    const q = insertBlock(d, "quote", 1)!;
+    expect(q.id).toBe("quote-1");
+    expect(itemIds(q.doc)).toEqual(["flow", "quote-1", "findings", "graph-1"]);
+    expect(isArranged(q.doc)).toBe(true);
+    // Empty, not filled with sample words.
+    expect(sectionsOf(q.doc, "quote")[0]).toEqual({ id: "quote-1", kind: "quote", text: "", name: "", role: "" });
+    expect(itemIds(insertBlock(d, "link", 99)!.doc)).toEqual(["flow", "findings", "graph-1", "link-1"]);
+    expect(insertBlock(core([findings(), graph(1), graph(2)]), "graph", 0)).toBeNull();
+    // A kind the layout doesn't draw is not added.
+    expect(insertBlock(core([findings()]), "aim", 0)).toBeNull();
+    expect(insertBlock(core([findings()]), "pullquote", 0)).toBeNull();
+    expect(insertBlock(core([findings()], "essay"), "pullquote", 1)!.doc.sections.map((s) => s.kind)).toEqual(["flow", "pullquote", "findings"]);
+    const im = insertImage(d, { fileId: "f9", w: 800, h: 600 }, 0)!;
+    expect(itemIds(im.doc)).toEqual(["image-1", "flow", "findings", "graph-1"]);
+    expect(imagesOf(im.doc)[0]).toEqual({ id: "image-1", kind: "image", fileId: "f9", alt: "", caption: [], w: 800, h: 600 });
+    expect(imagesOf(insertImage(d, { fileId: "f9" }, 0)!.doc)[0]).toEqual({ id: "image-1", kind: "image", fileId: "f9", alt: "", caption: [] });
+    expect(insertImage(core([image(1), image(2)]), { fileId: "f9" }, 0)).toBeNull();
+    // A case study with flowOff draws its flowchart first: a change writes the marker there.
+    const pinned = insertBlock({ ...core([findings()]), flowOff: true }, "quote", 0)!.doc;
+    expect(ids(pinned)).toEqual(["quote-1", "flow", "findings"]);
+    expect("flowOff" in pinned).toBe(false);
+  });
+
+  test("moveItem: the place counts page items with the item taken out; a kept section stays put", () => {
+    const d = core([graph(), aim(), findings()]);
+    expect(ids(adopt(d))).toEqual(["flow", "findings", "graph-1", "aim-1"]);
+    const m = moveItem(d, "graph-1", 0);
+    expect(itemIds(m)).toEqual(["graph-1", "flow", "findings"]);
+    expect(isArranged(m)).toBe(true);
+    expect(ids(moveItem(d, "flow", 2))).toEqual(["findings", "graph-1", "flow", "aim-1"]);
+    expect(ids(moveItem(d, "flow", 1))).toEqual(["findings", "flow", "graph-1", "aim-1"]);
+    expect(itemIds(moveItem(d, "findings", 0))).toEqual(["findings", "flow", "graph-1"]);
+    // Not a page item (unknown, or kept and not drawn): the doc as it was.
+    expect(moveItem(d, "nothing", 0)).toBe(d);
+    expect(moveItem(d, "aim-1", 0)).toBe(d);
+  });
+
+  test("removeItem: a section, or the flowchart where the layout lets it go", () => {
+    const g = core([image(1), findings(), image(2)], "gallery");
+    const off = removeItem(g, "flow");
+    expect(off.flowOff).toBe(true);
+    expect(hasMarker(off)).toBe(false);
+    expect(off.flow).toEqual(g.flow);
+    expect(itemIds(off)).toEqual(["image-1", "findings", "image-2"]);
+    expect(removeItem(off, "flow")).toBe(off);
+    // A case study and research always draw it.
+    for (const d of [core([findings()]), core([findings()], "research")]) expect(removeItem(d, "flow")).toBe(d);
+    const c = core([findings(), aim()]);
+    const r = removeItem(c, "findings");
+    expect(ids(r)).toEqual(["flow", "aim-1"]);
+    expect(isArranged(r)).toBe(true);
+    // A kept section can go too; an id the doc doesn't have changes nothing.
+    expect(ids(removeItem(c, "aim-1"))).toEqual(["flow", "findings"]);
+    expect(removeItem(c, "nothing")).toBe(c);
+  });
+
+  test("the published copy keeps the order of a doc arranged with moveItem, and structureKey follows each change", () => {
+    for (const f of FIXTURES) {
+      const d = docOf(f);
+      const items = pageItems(d);
+      for (const [id, place] of [
+        [items[0]!.id, items.length - 1],
+        [items[items.length - 1]!.id, 0],
+      ] as const) {
+        const moved = moveItem(d, id, place);
+        expect(itemIds(publicDoc(moved)), f.name).toEqual(itemIds(moved));
+        expect(hasMarker(publicDoc(moved)), f.name).toBe(true);
+        expect(structureKey(moved), f.name).not.toBe(structureKey(d));
+      }
+    }
+    const g = core([image(1), findings(), image(2)], "gallery");
+    expect(structureKey(insertBlock(g, "quote", 0)!.doc)).not.toBe(structureKey(g));
+    expect(structureKey(removeItem(g, "flow"))).not.toBe(structureKey(g));
+    const pub = publicDoc(removeItem(g, "flow"));
+    expect(pub.flowOff).toBe(true);
+    expect(pub.flow).toEqual([]);
   });
 });
 
