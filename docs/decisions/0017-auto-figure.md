@@ -1,7 +1,7 @@
 Status: accepted
 Date: 16 Nov 2026
 Amends: 0022 (the key figure beside What I found is now filled in when the exhbt is drafted)
-Amended by: 0024 (where a picked figure lands depends on the layout: after What I found, the lead image, or the key figure)
+Amended by: 0024 (where a picked figure lands depends on the layout: after What I found, the lead image, or the key figure), 0026 (the picked figure is managed on the page; a figure can be taken by hand when none was picked)
 
 # The figure from the report, picked when the exhbt is drafted
 
