@@ -6,9 +6,9 @@
 | Model | Sonnet |
 | Branches | `phase-2-r3-n-tests-1` and `phase-2-r3-n-tests-2`, each made from `phase-2-r3` |
 | Ports | 3314 (list 1), 3315 (list 2) |
-| Starts when | `phase-2-e2e-page-object` is merged (it brings `e2e/editor.ts` and `docs/briefs/edit-on-page/test-contract.md`), and F, G, H, I, J, K and L are merged into `phase-2-r3` |
+| Starts when | List 1's milestone 0: as soon as A is merged into `phase-2-r3`. The rest of list 1, and list 2: when F, G, H, I, J, K and L are merged into `phase-2-r3` |
 
-This brief is run by two agents. You are told which list is yours. **List 1 goes first and owns the page object. List 2 starts when list 1's first milestone is merged.**
+This brief is run by two agents. You are told which list is yours. **List 1 goes first and owns the page object. Its milestone 0 runs the moment A is merged, alone and short; its milestone 1 runs once the release 3 agents are merged. List 2 starts when list 1's milestone 1 is merged.**
 
 ## Goal
 
@@ -25,7 +25,7 @@ About 85 browser tests drive today's editor through its form cards. Make them dr
 
 ## You must not touch
 
-Any file that is not a test. `e2e/page-editor.ts` (G's), the new `e2e/editor-*.spec.ts` files (their owners'), `e2e/layout-*.spec.ts`, `e2e/golden/`, `playwright.config.ts`. If a test fails because the new editor is wrong, do not bend the test: report the failure with the test's name and what it expected.
+Any file that is not a test. `e2e/page-editor.ts` (G's), the new `e2e/editor-*.spec.ts` files (their owners'; `e2e/editor-classic-keeps.spec.ts` already opens `?editor=classic` and needs nothing), `e2e/layout-*.spec.ts`, `e2e/golden/`, `playwright.config.ts`. If a test fails because the new editor is wrong, do not bend the test: report the failure with the test's name and what it expected.
 
 ## What you build against
 
@@ -34,7 +34,7 @@ The new editor's selectors, which its builders were told to keep exact:
 | What | How to find it |
 |---|---|
 | The editor, ready | `[data-editor="page"][data-ready=true]` (classic: `[data-editor="classic"]`) |
-| A field | `[data-path="<path>"]`, or by its name: `#title`, `#context`, `#whereWhen`, the textbox named "Context" (or "The brief", "Background"), "Box n", "Box n detail", "Finding n", "The quote, word for word", "Who said it", "Web address", `#image-N-alt`, `#skill-new`, `#summary` (in the card sheet) |
+| A field | `[data-path="<path>"]`, or by its name: `#title`, `#context`, `#whereWhen`, the textbox named "Context" (or "The brief", "Background"), "Box n", "Box n detail", "Finding n", "The quote, word for word", "Who said it", `#image-N-alt` (in the strip over the picture), `#summary` (in the card sheet). In a popover, open it first: "Web address" (the button "Web address: <label>" over the link), `#skill-new` ("Add a skill" on the skills' toolbar), the picked figure's tick (the label over the picture) |
 | A section | `[data-section-id="<id>"]`, with `data-kind`; its buttons "Drag <label> to move it", "Move <label> up", "Move <label> down", "Remove <label>" |
 | The "+" at the end | `#add-section`; the words left: `data-testid="words-left"` |
 | The page being edited | `article[data-exhbt-page]`, `article[data-format]`, `[data-part]` |
@@ -42,15 +42,21 @@ The new editor's selectors, which its builders were told to keep exact:
 | The layout | the radiogroup "Layout", radios named by layout |
 | The word bar | `[data-word-bar]`, `data-over` |
 | The save status | "Saving…", "Saved", "Not saved. Retry" |
-| Things to fix | the region "Things to fix before publishing" |
+| Things to fix | the button "N things to fix" or "N number(s) to check", then the region "Things to fix before publishing"; the numbers in the list "Numbers to check" ("Check this number: 18%", "That's right: 18%", "Show me") |
 | Publishing | "Review and publish", then the tick "This is my work, and the numbers are true", "Publish" or "Publish changes", "It's live." or "Your changes are live." |
-| Rewrite tools | `data-testid="tools-<block>"`, `data-testid="rewrites-left"`, "Rewrite this block", "Back to the AI version" |
+| Rewrite tools | `data-testid="tools-<block>"`, `data-testid="rewrites-left"`, "Rewrite this block", "Back to the AI version": `tools-findings` and `tools-flow` in a section's toolbar, `tools-header`, `tools-gap` and `tools-skills` in the corner toolbar of the title, the context line and the skills |
 | A graph's figures | "Edit figures", then the group "Graph N" in the sheet |
 | The picture picker | the file input named "Choose an image" |
 
 ## Steps
 
 Commit and push after each spec file.
+
+**List 1, milestone 0: keep the old suite green on the classic editor while release 3 is built.** From A's merge, `/exhbts/<id>/edit` serves the new editor, and every spec that drives the classic form cards through a bare `/edit` address fails. For the whole of release 3's build those specs would protect nothing. So, at once:
+
+0. In `e2e/editor.ts`, make every helper that opens the editor open `/exhbts/<id>/edit?editor=classic` and wait for `[data-editor="classic"]`. In every spec on either list, change each inline visit of a bare `/exhbts/<id>/edit` address the same way, and nothing else in those specs (the only edit you may make to list 2's specs). Run `e2e/phase2-editor.spec.ts`, `e2e/auto-figure.spec.ts` and `e2e/phase2-draft.spec.ts`, and report "milestone 0 ready at <commit>" at once. The main session merges it; from then on every release 3 agent's run of an old spec drives the classic editor, and a regression in publishing, files or the rewrite tools shows up the day it is made. Then stop until the release 3 agents are merged.
+
+When you migrate a spec below, the first thing you do is take `?editor=classic` out of it.
 
 **List 1, milestone 1 (report it at once when pushed, so list 2 can start):**
 

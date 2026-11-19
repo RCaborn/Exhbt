@@ -18,7 +18,7 @@ Make the new editor good on a phone: one column, a bar at the foot of the screen
 
 ## You own
 
-`components/exhbt-editor/phone/` (every file in it), `components/exhbt-editor/css/phone.css`, `e2e/editor-phone.spec.ts` (new).
+`components/exhbt-editor/phone/` (every file in it), `components/exhbt-editor/css/phone.css`, `e2e/editor-phone.spec.ts` (new), `e2e/editor-tablet.spec.ts` (new).
 
 ## You must not touch
 
@@ -191,8 +191,8 @@ Each owner's CSS goes in its own file in `components/exhbt-editor/css/` (`core.c
 Commit and push after each.
 
 1. **Quieter sections.** On a phone each section shows only its grip, 44px, at its top corner, always visible (there is no hover). Hide the other toolbar buttons with CSS in `phone.css` (`[data-tool]`). They move to the bar.
-2. **`PhoneBar`.** Fixed to the foot of the screen, above the home indicator (`env(safe-area-inset-bottom)`), only on a phone. It follows the section the focus is in, or was last in (`useBoard().lastFocus()`), and names it ("Graph 1"). It holds, each at least 44px: Move up, Move down, the layout's own action where there is one (Make lead image, Make key figure, Before, After), More actions where the AI drafted the part, Remove (not for the flowchart in a case study or research, which always have one), and "Reorder". They call the same things the desktop toolbar does (`board.moveBy`, `board.remove`, `store.patch`). With no section in focus it holds "Reorder" and "Add" (which opens the "+" at the end of the page).
-3. **Formatting on the bar.** While a formatted field has the cursor (`useActiveRich()` is not null), the bar shows Highlight (the context line) or Bold, Italic and Link, with their pressed state, in place of the section actions, and a "Done" that puts the section actions back. Pressing one must not take the cursor out of the field.
+2. **`PhoneBar`.** Fixed to the foot of the screen, above the home indicator (`env(safe-area-inset-bottom)`), only on a phone. It follows the section the focus is in, or was last in (`useBoard().lastFocus()`), and names it ("Graph 1"). It holds, each at least 44px: Move up, Move down, the layout's own action where there is one (Make lead image, Make key figure, Before, After), More actions where the AI drafted the part, Remove (not for the flowchart in a case study or research, which always have one), and "Reorder". They call the same things the desktop toolbar does (`board.moveBy`, `board.remove`, `store.patch`). After a Remove, a Move or a drop, the bar shows "Undo <what>" (`store.undoLabel()`, `store.undo()`) until the next action, so a wrong thumb is put right where it happened; Undo in the top bar's menu stays too. When the focus is in the title, the context line or the skills (the parts with no frame), the bar names that part and offers its "More actions" (the same `BlockTools` as G's corner toolbar). With no section in focus it holds "Reorder" and "Add" (which opens the "+" at the end of the page).
+3. **Formatting on the bar.** While a formatted field has the cursor (`useActiveRich()` is not null), the bar shows Highlight (the context line) or Bold, Italic and Link, with their pressed state, in place of the section actions, and a "Done" that puts the section actions back. Pressing one must not take the cursor out of the field. Link calls `toggleLink()`, which opens the field's own address prompt with its error (G's): never make a link with no address.
 4. **The on-screen keyboard.** The bar must sit on top of the keyboard, not under it and not over the line being typed: follow `window.visualViewport` and keep the field with the cursor in view. Leave room at the foot of the page so the last section can scroll clear of the bar.
 5. **`ReorderSheet`** (`ui.sheet.name === "reorder"`), titled "Reorder sections", full screen. A list of short rows, one per page item in order (the flowchart included), each with its name (`sectionLabel`), a grip, and Move up and Move down. Rows are one height, so dnd-kit's sortable list is right here: a 150ms press on the grip picks a row up, the others slide, the keyboard works from the grip, each step is read out. Every drop is `store.move(id, place)`, one undo entry each. "Done" closes it and scrolls the page to the section last moved.
 6. **Sheets and menus.** Check each sheet (publish, card, work, chart, figure) and the "+" menu at 390px: full screen or within the screen, nothing cut off, the close button reachable with a thumb. Fix what is yours in `phone.css`; report what is not.
@@ -205,11 +205,14 @@ Commit and push after each.
 - with the cursor in the context line the bar shows Highlight; pressing it highlights the selected words and the cursor stays in the field;
 - "Reorder" opens the sheet; a row dragged after a short press, and a row moved with its buttons, change the page's order; "Done" returns to the page at that section;
 - a swipe on a section's words scrolls the page and moves nothing (with F merged: a 260ms press on a grip picks the section up, and the flowchart is carried with a line);
-- nothing scrolls sideways at 390px on any of the three layouts' samples; every control is at least 44px;
-- the page while editing matches "See as a visitor" box for box on a Pixel 7 (reuse G's `boxes(page)`; your bar and grips must add no box to the page);
-- axe on the page, with the bar showing formatting, and with the reorder sheet open.
+- nothing scrolls sideways at 390px on any offered layout's sample (`offered()`, `SAMPLES`); every control is at least 44px;
+- the page while editing matches "See as a visitor" box for box on a Pixel 7, on a full page (reuse G's `boxes(page)` and `full(doc)`; your bar and grips must add no box to the page);
+- axe on the page, with the bar showing formatting, and with the reorder sheet open;
+- "Remove" on the bar, then "Undo graph 1" on the bar puts it back; pressing Link with words selected opens the address prompt, and a link is made only with an https address.
 
-Run: `e2e/editor-phone.spec.ts` on the `touch` project; `e2e/editor-inplace.spec.ts` and `e2e/editor-smooth.spec.ts` on the desktop project (your CSS must change nothing there).
+`e2e/editor-tablet.spec.ts`, on the `tablet` project (820 by 1180 with touch: wider than 48rem, so your phone bar is not there): each section's toolbar is visible without hovering and every button in it is at least 44px (G's rule for `pointer: coarse`); a 260ms press on a grip and a drag moves a section (with F merged); "Reorder sections" is reachable from the top bar's menu (H's) and works. If G's or H's part is missing, report it and test the rest.
+
+Run: `e2e/editor-phone.spec.ts` on the `touch` project; `e2e/editor-tablet.spec.ts` on the `tablet` project; `e2e/editor-inplace.spec.ts` and `e2e/editor-smooth.spec.ts` on the desktop project (your CSS must change nothing there).
 
 ## Done looks like
 
