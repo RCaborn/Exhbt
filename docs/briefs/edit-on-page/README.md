@@ -64,8 +64,8 @@ No two agents edit the same file in the same release, with one stated hand-over 
 
 | Agent | Owns |
 |---|---|
-| B | `lib/exhbt/blocks.ts`, `lib/exhbt/formats.ts`, `lib/exhbt/layouts.ts` (new), `lib/exhbt/sections.ts`, `lib/exhbt/verify.ts`, `scripts/golden-dom.mjs` (new), `app/dev/parity/` (new), `e2e/golden/` (new), `e2e/fixtures/order-docs.ts` (new), `e2e/fixtures/reader-before-r2.ts` (new), `e2e/layout-model.spec.ts` (new), and the exhbt lines of `AGENTS.md` and `docs/MAP.md`. One-off, smallest-possible compile fixes, because B runs alone: `components/editor/Sections.tsx`, `components/editor/LayoutPicker.tsx`, `lib/ai/exhbt-draft.ts`, `e2e/phase2-sections.spec.ts` |
-| C | `components/portfolio/ProjectView.tsx`, `components/portfolio/exhbt-parts.tsx`, `components/portfolio/LayoutMain.tsx` (new), `components/portfolio/layout-rows.ts` (new), `components/portfolio/page-ctx.ts` (new), `components/portfolio/formats/` (deleted), `components/portfolio/ImageZoom.tsx`, `components/exhbt/MethodFlow.tsx`, `app/globals.css`, `app/dev/edit-slots/` (new), `e2e/layout-parity.spec.ts` (new), `e2e/edit-slots.spec.ts` (new), and the exhbt page paragraphs of `DESIGN.md` |
+| B | `lib/exhbt/blocks.ts`, `lib/exhbt/formats.ts`, `lib/exhbt/layouts.ts` (new), `lib/exhbt/sections.ts`, `lib/exhbt/verify.ts`, `app/dev/parity/` (new), `e2e/layout-parity.spec.ts` (new), `e2e/golden/` (new), `e2e/fixtures/order-docs.ts` (new), `e2e/fixtures/reader-before-r2.ts` (new), `e2e/layout-model.spec.ts` (new), and the exhbt lines of `AGENTS.md` and `docs/MAP.md`. One-off, smallest-possible compile fixes, because B runs alone: `components/editor/Sections.tsx`, `components/editor/LayoutPicker.tsx`, `lib/ai/exhbt-draft.ts`, `e2e/phase2-sections.spec.ts` |
+| C | `components/portfolio/ProjectView.tsx`, `components/portfolio/exhbt-parts.tsx`, `components/portfolio/LayoutMain.tsx` (new), `components/portfolio/layout-rows.ts` (new), `components/portfolio/page-ctx.ts` (new), `components/portfolio/formats/` (deleted), `components/portfolio/ImageZoom.tsx`, `components/exhbt/MethodFlow.tsx`, `app/globals.css`, `app/dev/edit-slots/` (new), `e2e/edit-slots.spec.ts` (new), and the exhbt page paragraphs of `DESIGN.md` |
 | E | `components/editor/` (all of it, after B's two fixes are merged), `lib/portfolio-home.ts`, `e2e/editor-classic-keeps.spec.ts` (new) |
 | D | `lib/exhbt/sample.ts`, `app/dev/portfolio/route.ts`, `e2e/layouts-new.spec.ts` (new) |
 
@@ -111,7 +111,7 @@ A slot the page parts lack is G's to add. Another agent that needs one says so i
 
 **Release 2.**
 - `e2e/layout-model.spec.ts`: the model, `adopt`, `rowsFor`, a removed flowchart, the old reader.
-- `e2e/layout-parity.spec.ts`: the parity gate, against golden copies taken from the base commit.
+- `e2e/layout-parity.spec.ts`: the parity gate, against golden copies taken at B's first commit, before any product code changed. C runs it and may not edit it.
 - `e2e/edit-slots.spec.ts`: with a stand-in adapter, every field path in 0026's table is reachable on every layout.
 - `e2e/editor-classic-keeps.spec.ts`: the classic editor opens, edits and saves a doc with a marker, a removed flowchart and the new fields, and loses none of them.
 - `e2e/layouts-new.spec.ts`: each new sample draws, with its word count and page count reported.
