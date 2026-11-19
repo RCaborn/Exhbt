@@ -140,15 +140,17 @@ What was hard, and what was found:
 
 | | Longest frame during the drag | Longest frame at the drop |
 |---|---|---|
-| Mix | 67, 67, 67ms | 67, 83, 67ms |
-| A, slide | 67, 83, 67ms | 67, 83, 83ms |
-| B, line | 67, 67, 100ms | 83, 133, 117ms |
+| Mix | 83, 67, 83ms | 83, 83, 100ms |
+| A, slide | 100, 67, 67ms | 83, 67, 83ms |
+| B, line | 100, 67, 67ms | 100, 117, 83ms |
 
-In every drag the median frame was 16.7ms, the 95th centile 16.7 to 16.8ms, and one frame was over 50ms: the pick-up, when the page is measured and the lifted copy drawn. The drop is one React commit, a layout, and the start of the slide into place; the line's drop is a little longer because every section starts moving at the drop, where sliding has already moved them.
+In every drag the median frame was 16.7ms, the 95th centile 16.7 to 16.8ms, and exactly one frame was over 50ms: the pick-up, when the page is measured and the lifted copy drawn. The drop is one React commit, a layout, and the start of the move into place.
 
-Typing 40 characters into a finding: keystroke to paint median 10.7, 11.7 and 11.6ms; 95th centile 18.1 to 18.3ms; longest 26.8, 19.1 and 20.4ms. No other section rendered.
+Typing 40 characters into a finding: keystroke to paint median 12.1, 12.0 and 12.2ms; 95th centile 17.5, 16.7 and 18.3ms; longest 20.6, 18.2 and 20.4ms. No other section rendered.
 
-There is no measurable difference between the styles while dragging. Without the slowdown these frames are about a quarter as long.
+The same script with no slowdown, one run: no frame longer than 16.8ms in any version, during the drag or at the drop; typing median 3.2ms, 95th centile 7.5ms, longest 8.7ms.
+
+There is no consistent difference between the styles, dragging or dropping. The differences in the table are one frame either way and move between runs.
 
 ### The gate
 
