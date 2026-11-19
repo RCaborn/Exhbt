@@ -128,7 +128,7 @@ All of it is optional and lives in the jsonb doc. There is no migration.
 
 Build needs nothing new. Its screenshots are images, its demo and code are links, and its stack is the skill pills under another name.
 
-`myRole` is offered on every layout and needed only by Event or performance. It counts towards the word cap, as every fact in the sidebar does. It is not drafted unless the material says it.
+`myRole` is offered on every layout by the new editor (release 3 on) and needed only by Event or performance. It counts towards the word cap, as every fact in the sidebar does. It is not drafted unless the material says it. In release 2 the classic editor shows its field only on a doc that already has one or whose layout is Event or performance: release 2 offers nobody anything new, and a value typed then would be dropped without a word if release 2 were rolled back.
 
 A stage is set by the person in the editor (Before, After, or neither), on any image in a Before and after exhbt. Outside that layout the mark is kept and not shown.
 
