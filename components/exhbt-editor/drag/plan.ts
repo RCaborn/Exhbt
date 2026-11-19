@@ -46,8 +46,8 @@ export type Plan = {
   cellBox: Box[][];
   /** The column's width. */
   width: number;
-  /** For each place, what the pointer is measured against: segments, and at home the carried item's own box. */
-  anchors: { segs: Seg[]; box?: Box }[];
+  /** For each place, what the pointer is measured against: segments, and boxes (at home the carried item's own; in a group, the half of each neighbour nearer the gap). */
+  anchors: { segs: Seg[]; boxes: Box[] }[];
 };
 
 /** How much nearer (px) another place must be before the drag moves to it. */
@@ -102,7 +102,7 @@ const horizontal = (y: number, x1: number, x2: number): Seg => ({ x1, y1: y, x2,
  * boxes and the page's rows as they stood. `rows` are the rows with the carried item where it was
  * (for a new block, the page's own rows).
  */
-export function makePlan(id: string, order: string[], boxes: Record<string, Box>, rows: RowInfo[], width: number): Plan {
+export function makePlan(id: string, order: string[], boxes: Record<string, Box>, rows: RowInfo[], width: number, grip?: Box): Plan {
   const rest = order.filter((x) => x !== id);
   const home = order.indexOf(id);
   const rowOf: Record<string, number> = {};
@@ -118,7 +118,9 @@ export function makePlan(id: string, order: string[], boxes: Record<string, Box>
     cellBox.push(r.cells.map((c) => (known(c).length ? union(known(c)) : rb)));
   });
   const plan: Plan = { id, order, rest, home, boxes, rows, rowOf, cellOf, rowBox, cellBox, width, anchors: [] };
-  for (let p = 0; p <= rest.length; p++) plan.anchors.push(anchorFor(plan, p));
+  // At home, the grip's toolbar counts as the item's own: a pointer still on the grip is where it was.
+  const own = boxes[id] && grip ? union([boxes[id]!, grip]) : boxes[id];
+  for (let p = 0; p <= rest.length; p++) plan.anchors.push(anchorFor(plan, p, own));
   return plan;
 }
 
@@ -128,15 +130,19 @@ const rowIsWide = (plan: Plan, x: string) => {
   return Boolean(r && r.ids.length > 1 && sideBySide(r.ids.map((i) => plan.boxes[i]!).filter(Boolean)));
 };
 
-function anchorFor(plan: Plan, place: number): Plan["anchors"][number] {
+function anchorFor(plan: Plan, place: number, own: Box | undefined): Plan["anchors"][number] {
   const { rest, boxes, rowOf, cellOf, rowBox, cellBox, width } = plan;
-  // At home the carried item's own box counts too: the gap it sits in belongs to the place it is in.
-  const box = place === plan.home ? boxes[plan.id] : undefined;
   const a = rest[place - 1];
   const b = rest[place];
   const A = a ? boxes[a] : undefined;
   const B = b ? boxes[b] : undefined;
   const segs: Seg[] = [];
+  // At home the carried item's own box counts too: the gap it sits in belongs to the place it is in.
+  const box: Box[] = place === plan.home && own ? [own] : [];
+  // In a group (a grid of tiles, graphs side by side), each item's half nearer a gap is that gap's: a pointer over a tile goes before it or after it.
+  const group = (x: string) => plan.rows[rowOf[x]!]?.kind === "group" && plan.rows[rowOf[x]!]!.ids.length > 1;
+  if (a && A && group(a)) box.push(rowIsWide(plan, a) ? { x: A.x + A.w / 2, y: A.y, w: A.w / 2, h: A.h } : { x: A.x, y: A.y + A.h / 2, w: A.w, h: A.h / 2 });
+  if (b && B && group(b)) box.push(rowIsWide(plan, b) ? { x: B.x, y: B.y, w: B.w / 2, h: B.h } : { x: B.x, y: B.y, w: B.w, h: B.h / 2 });
   if (a && b && A && B && rowOf[a] === rowOf[b]) {
     const r = rowOf[a]!;
     const row = plan.rows[r]!;
@@ -160,7 +166,7 @@ function anchorFor(plan: Plan, place: number): Plan["anchors"][number] {
       segs.push(vertical(right(A) + EDGE, A.y, bottom(A)));
       segs.push(vertical(B.x - EDGE, B.y, bottom(B)));
     }
-    return { segs, box };
+    return { segs, boxes: box };
   }
   // Between two rows, or before the first, or after the last: a line across the column.
   const rA = a ? rowBox[rowOf[a]!] : undefined;
@@ -172,7 +178,7 @@ function anchorFor(plan: Plan, place: number): Plan["anchors"][number] {
   // The end of a row that holds things side by side, and the start of one, are this place too.
   if (a && A && rowIsWide(plan, a)) segs.push(vertical(right(A) + EDGE, A.y, bottom(A)));
   if (b && B && rowIsWide(plan, b)) segs.push(vertical(B.x - EDGE, B.y, bottom(B)));
-  return { segs, box };
+  return { segs, boxes: box };
 }
 
 function distToSeg(px: number, py: number, s: Seg): number {
@@ -185,10 +191,10 @@ function distToSeg(px: number, py: number, s: Seg): number {
 export function distToPlace(plan: Plan, place: number, px: number, py: number): number {
   const a = plan.anchors[place]!;
   let d = Infinity;
-  if (a.box) {
-    const cx = Math.max(a.box.x, Math.min(px, right(a.box)));
-    const cy = Math.max(a.box.y, Math.min(py, bottom(a.box)));
-    d = Math.hypot(px - cx, py - cy);
+  for (const b of a.boxes) {
+    const cx = Math.max(b.x, Math.min(px, right(b)));
+    const cy = Math.max(b.y, Math.min(py, bottom(b)));
+    d = Math.min(d, Math.hypot(px - cx, py - cy));
   }
   for (const s of a.segs) d = Math.min(d, distToSeg(px, py, s));
   return d;
@@ -214,11 +220,9 @@ export function placeAt(plan: Plan, px: number, py: number, current: number): nu
   return best;
 }
 
-/** A point that is nearest to `place` and to no other: the middle of its first segment, or of its box at home. */
+/** A point that is nearest to `place`: the middle of its first segment. */
 export function pointFor(plan: Plan, place: number): { x: number; y: number } {
-  const a = plan.anchors[place]!;
-  if (a.box) return { x: a.box.x + a.box.w / 2, y: a.box.y + a.box.h / 2 };
-  const s = a.segs[0]!;
+  const s = plan.anchors[place]!.segs[0]!;
   return { x: (s.x1 + s.x2) / 2, y: (s.y1 + s.y2) / 2 };
 }
 
