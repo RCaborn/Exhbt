@@ -549,3 +549,30 @@ test.describe("Sections in the editor", () => {
     expect(pdf.match(/\/Type\s*\/Page[^s]/g)).toHaveLength(1);
   });
 });
+
+test.describe("Sections in the editor: blank boxes in the preview", () => {
+  test("a blank last box is left out of the preview, so the last filled step keeps the result box", async ({ page }) => {
+    await signInAs(page, "blanky");
+    await startWithCore(page, "Blank boxes stay out of the preview");
+    const list = preview(page).getByRole("list", { name: "Methodology" });
+    await expect(list.getByRole("listitem")).toHaveCount(3);
+    await page.getByRole("button", { name: "Add a box at the end" }).click();
+    await expect(page.getByLabel(/^Box \d$/)).toHaveCount(4);
+    await expect(list.getByRole("listitem")).toHaveCount(3);
+    await expect(list.getByRole("listitem").last()).toContainText("Timed it again");
+    await expect(list.locator("[data-last]")).toHaveCount(1);
+    await expect(list.getByRole("listitem").last().locator("[data-last]")).toBeVisible();
+    // Typing in it brings it in as the last step.
+    await page.getByLabel("Box 4", { exact: true }).fill("Wrote it up");
+    await expect(list.getByRole("listitem")).toHaveCount(4);
+    await expect(list.getByRole("listitem").last()).toContainText("Wrote it up");
+  });
+
+  test("with every box blank (a new exhbt) the preview still lists them", async ({ page }) => {
+    await signInAs(page, "blankall");
+    await page.getByRole("button", { name: "Start from scratch" }).click();
+    await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
+    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await expect(preview(page).getByRole("list", { name: "Methodology" }).getByRole("listitem")).toHaveCount(3);
+  });
+});
