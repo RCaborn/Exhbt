@@ -130,7 +130,8 @@ function distToPlace(plan: Plan, place: number, px: number, py: number): number 
  */
 export function placeAt(plan: Plan, px: number, py: number, current: number): number {
   let best = current;
-  let bestD = distToPlace(plan, current, px, py) - HYSTERESIS;
+  // No place yet (a new block coming onto the page): the nearest one, with nothing to hold on to.
+  let bestD = current >= 0 ? distToPlace(plan, current, px, py) - HYSTERESIS : Infinity;
   for (let p = 0; p < plan.anchors.length; p++) {
     if (p === current) continue;
     const d = distToPlace(plan, p, px, py);
@@ -153,7 +154,8 @@ export type Measured = Record<string, Box>;
  * their area, which is close enough to slide things by until the drop lays the page out for real.
  */
 export function measurePlace(host: HTMLElement, plan: Plan, sections: Record<string, Section>, place: number): Measured {
-  const order = orderWith(plan.order, plan.id, place);
+  // A place below 0 is the page without the lifted thing: what a new block is measured against before it lands.
+  const order = place < 0 ? plan.order.filter((x) => x !== plan.id) : orderWith(plan.order, plan.id, place);
   host.textContent = "";
   const els: Record<string, HTMLElement> = {};
   for (const row of rowsOf(order, sections)) {

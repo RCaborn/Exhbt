@@ -2,31 +2,35 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { DndContext, MouseSensor, TouchSensor, useDraggable, useSensor, useSensors, type DragMoveEvent, type DragStartEvent } from "@dnd-kit/core";
+import { DndContext, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragStartEvent } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
-import { ArrowDown, ArrowUp, GripVertical, Plus } from "lucide-react";
+import { ArrowDown, ArrowUp, GripVertical, Plus, X } from "lucide-react";
 import { useReducedMotion } from "@/components/ui/useReducedMotion";
 import type { Section } from "@/lib/exhbt/blocks";
 import { sectionLabel } from "@/lib/exhbt/sections";
+import { blockIcon, blockName, blockOptions, draftBlock, whyFull, type BlockKind, type Draft } from "./blocks";
 import { lineFor, makePlan, measurePlace, placeAt, type Box, type Measured, type Plan } from "./drag-plan";
 import { EASE, MOVE_MS } from "./LabFlow";
 import { rowClass, rowsOf } from "./layout";
 import { sectionStyle, type DragStyle, type Version } from "./options";
-import { FLOW_ID } from "./samples";
+import { FLOW_ID, type LabDoc } from "./samples";
 import { SectionContent, StaticSection } from "./sections";
-import { kindOf, useLab, useLabStore, useRenderCount, type InsertKind, type ItemKind } from "./store";
+import { kindOf, useLab, useLabStore, useRenderCount, type ItemKind } from "./store";
+import { Tray, TRAY_ID } from "./Tray";
 
 const DRAG_INSTRUCTIONS =
   "To move this section, press Space or Enter, use the arrow keys, then press Space or Enter again to drop it, or Escape to cancel. The move up and move down buttons do the same.";
-
-const INSERT_NAMES: Record<InsertKind, string> = { findings: "Findings", quote: "Quote", image: "Image" };
 
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 /** dnd-kit's own announcements are for droppable targets, which the lab doesn't use; the board reads out its own. */
 const SILENT = { onDragStart: () => undefined, onDragOver: () => undefined, onDragEnd: () => undefined, onDragCancel: () => undefined };
 
-type Lift = { id: string; mode: "pointer" | "keys"; box: Box; tile: boolean };
+/** What is being carried: a section already on the page, or a new block from the tray (`draft`). */
+type Lift = { id: string; mode: "pointer" | "keys"; box: Box; tile: boolean; draft?: Draft; name?: string };
+
+/** No place: a new block that hasn't been carried onto the page yet. */
+const NOWHERE = -1;
 
 /** A drag in progress. Kept outside React state: a drag renders the page twice, when it starts and when it ends. */
 type Live = {
@@ -38,19 +42,24 @@ type Live = {
   els: Record<string, HTMLElement>;
   /** What the page would look like at each place tried so far. */
   seen: Map<number, Measured>;
-  /** Where the pointer was in the board when the section was picked up. */
+  /** Where the pointer was in the board when the section was picked up, and where it is on the screen now. */
   grab: { x: number; y: number };
+  pointer: { x: number; y: number };
   sections: Record<string, Section>;
+  /** A new block from the tray, not on the page yet. */
+  draft?: Draft;
+  /** Stops following the pointer. */
+  stop?: () => void;
 };
 
 /**
  * The exhbt's sections, edited and arranged on the page: the main column below the context line.
  *
- * Each section has a frame and a corner toolbar (a grip, move up, move down). The grip is the only
- * thing that drags, so words can be selected, links followed and the page scrolled by touch. A
- * section is picked up with the mouse (6px of movement), a short press of a finger, or Space on
- * the grip, and from then on the page's layout doesn't change until it is dropped: every section
- * keeps its box, and what moves, moves by a transform.
+ * Each section has a frame and a corner toolbar (a grip, move up, move down, remove). The grip is
+ * the only thing that drags, so words can be selected, links followed and the page scrolled by
+ * touch. A section is picked up with the mouse (6px of movement), a short press of a finger, or
+ * Space on the grip, and from then on the page's layout doesn't change until it is dropped: every
+ * section keeps its box, and what moves, moves by a transform.
  *
  *  - Slide (version A): the other sections slide to where they would sit, and a dashed box shows
  *    the room made for the lifted one.
@@ -60,6 +69,10 @@ type Live = {
  * In both, the pointer carries a lifted copy; dropped, the section moves from where it was let go
  * to its place and any neighbours that pair up again move with it (180ms, transforms only, none
  * for people who ask for less motion). How places are worked out is components/lab/drag-plan.ts.
+ *
+ * New blocks come in three ways, all through the same rules (components/lab/blocks.ts): the "+"
+ * between sections, the tray beside the page on a desktop (components/lab/Tray.tsx), dragged in
+ * with the same feel as moving a section, and Enter on a block in the tray.
  */
 export function Board({ version }: { version: Version }) {
   const store = useLabStore();
@@ -69,16 +82,31 @@ export function Board({ version }: { version: Version }) {
   const reduced = useReducedMotion();
   const [lift, setLift] = useState<Lift | null>(null);
 
-  const wrap = useRef<HTMLDivElement>(null);
+  const wrap = useRef<HTMLDivElement | null>(null);
   const host = useRef<HTMLDivElement>(null);
+  const sizer = useRef<HTMLDivElement>(null);
   const line = useRef<HTMLDivElement>(null);
   const landing = useRef<HTMLDivElement>(null);
   const copy = useRef<HTMLDivElement>(null);
   const status = useRef<HTMLParagraphElement>(null);
   const live = useRef<Live | null>(null);
+  /** The section the focus was last in, for "add after the section you were last in". */
+  const lastFocus = useRef<string | null>(null);
+  const lastDrop = useRef(0);
   // The latest values, for the handlers below, which are made once.
   const now = useRef({ version, reduced });
   now.current = { version, reduced };
+
+  // The page is one droppable, so dnd-kit scrolls the page for a block carried in from the tray too
+  // (the tray is fixed to the screen, and a fixed thing has nothing to scroll of its own).
+  const { setNodeRef: setDropRef } = useDroppable({ id: "lab-page" });
+  const setWrap = useCallback(
+    (el: HTMLDivElement | null) => {
+      wrap.current = el;
+      setDropRef(el);
+    },
+    [setDropRef],
+  );
 
   // A section's kind never changes, so the layout depends on the order alone.
   const sections = store.get().sections;
@@ -104,26 +132,44 @@ export function Board({ version }: { version: Version }) {
     }
     return m;
   };
+  /** What the lifted thing is called, and how many places there will be once it is down. */
+  const nameOf = (l: Live) => (l.draft ? blockName(store.get(), l.draft.kind) : (labels[l.plan.id] ?? "Section"));
+  const placesOf = (l: Live) => l.plan.rest.length + 1;
 
-  /** Draws the place the drag is at: version A's slides and landing box, or version B's line. */
+  /** Draws the place the drag is at: the slides and landing box, or the line. */
   const show = useCallback(() => {
     const l = live.current;
     const el = wrap.current;
     if (!l || !el) return;
     const { plan, place } = l;
     el.dataset.labPlace = String(place);
+    if (place === NOWHERE) {
+      for (const id of plan.rest) l.els[id]!.style.transform = "";
+      if (landing.current) landing.current.hidden = true;
+      if (line.current) line.current.hidden = true;
+      return;
+    }
     const at = measured(l, place);
     if (l.style === "slide") {
-      const base = measured(l, plan.home);
+      // Where everything sits with the lifted thing where it came from: its own place, or off the page for a new block.
+      const base = measured(l, l.draft ? NOWHERE : plan.home);
       for (const id of plan.rest) {
         const dx = Math.round(at[id]!.x - base[id]!.x);
         const dy = Math.round(at[id]!.y - base[id]!.y);
         l.els[id]!.style.transform = dx || dy ? `translate(${dx}px, ${dy}px)` : "";
       }
-      const home = plan.boxes[plan.id]!;
-      const land = { x: home.x + Math.round(at[plan.id]!.x - base[plan.id]!.x), y: home.y + Math.round(at[plan.id]!.y - base[plan.id]!.y), w: at[plan.id]!.w, h: at[plan.id]!.h };
-      if (l.mode === "keys") l.els[plan.id]!.style.transform = `translate(${land.x - home.x}px, ${land.y - home.y}px)`;
-      else if (landing.current) {
+      const mine = at[plan.id]!;
+      let land: Box;
+      if (l.draft) {
+        // The measured copy and the page share an origin; any difference between them is taken from the first section.
+        const ref = plan.rest[0];
+        land = { x: mine.x + (ref ? plan.boxes[ref]!.x - base[ref]!.x : 0), y: mine.y + (ref ? plan.boxes[ref]!.y - base[ref]!.y : 0), w: mine.w, h: mine.h };
+      } else {
+        const home = plan.boxes[plan.id]!;
+        land = { x: home.x + Math.round(mine.x - base[plan.id]!.x), y: home.y + Math.round(mine.y - base[plan.id]!.y), w: mine.w, h: mine.h };
+        if (l.mode === "keys") l.els[plan.id]!.style.transform = `translate(${land.x - home.x}px, ${land.y - home.y}px)`;
+      }
+      if (l.mode === "pointer" && landing.current) {
         const s = landing.current.style;
         s.left = `${land.x}px`;
         s.top = `${land.y}px`;
@@ -144,10 +190,35 @@ export function Board({ version }: { version: Version }) {
     }
   }, []);
 
-  /** Freezes the page as it stands and starts a drag of `id`. */
-  const pickUp = useCallback((id: string, mode: "pointer" | "keys", pointer?: { x: number; y: number }) => {
+  /** Moves the drag to a place and reads it out. */
+  const goTo = useCallback((place: number) => {
+    const l = live.current;
+    if (!l || place === l.place) return;
+    l.place = place;
+    show();
+    const name = nameOf(l);
+    if (place === NOWHERE) say(`${name} isn't over the page.`);
+    else say(place === l.plan.home ? `${name} is back where it was, place ${place + 1} of ${placesOf(l)}.` : `${name} would go to place ${place + 1} of ${placesOf(l)}.`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nameOf reads the latest labels when called.
+  }, [show, labels]);
+
+  /** Puts the lifted copy under the pointer and works out the place from where the pointer is on the page. */
+  const follow = useCallback(() => {
+    const l = live.current;
     const el = wrap.current;
-    if (!el || live.current) return;
+    if (!l || !el || l.mode !== "pointer") return;
+    const o = el.getBoundingClientRect();
+    const px = l.pointer.x - o.left;
+    const py = l.pointer.y - o.top;
+    if (copy.current) copy.current.style.transform = `translate(${px - l.grab.x}px, ${py - l.grab.y}px)`;
+    // A new block has no place until it is carried off the tray and onto the page.
+    if (l.draft && px > l.plan.width + 8) goTo(NOWHERE);
+    else goTo(placeAt(l.plan, px, py, l.place));
+  }, [goTo]);
+
+  /** The page as it stands: every section's element, box and kind. */
+  const freeze = () => {
+    const el = wrap.current!;
     const doc = store.get();
     const origin = el.getBoundingClientRect();
     const els: Record<string, HTMLElement> = {};
@@ -160,16 +231,67 @@ export function Board({ version }: { version: Version }) {
       boxes[sid] = { x: r.left - origin.left, y: r.top - origin.top, w: r.width, h: r.height };
       kinds[sid] = kindOf(doc, sid);
     }
+    return { doc, origin, els, boxes, kinds };
+  };
+
+  /** From here until the drop, the pointer (and the page scrolling under it) is followed directly. */
+  const watchPointer = (l: Live) => {
+    const move = (e: MouseEvent | TouchEvent) => {
+      const p = "touches" in e ? e.touches[0] : e;
+      if (!p) return;
+      l.pointer = { x: p.clientX, y: p.clientY };
+      follow();
+    };
+    window.addEventListener("mousemove", move, true);
+    window.addEventListener("touchmove", move, { capture: true, passive: true });
+    window.addEventListener("scroll", follow, { capture: true, passive: true });
+    l.stop = () => {
+      window.removeEventListener("mousemove", move, true);
+      window.removeEventListener("touchmove", move, true);
+      window.removeEventListener("scroll", follow, true);
+    };
+  };
+
+  /** Freezes the page as it stands and starts a drag of `id`. */
+  const pickUp = useCallback((id: string, mode: "pointer" | "keys", pointer?: { x: number; y: number }) => {
+    if (!wrap.current || live.current) return;
+    const { doc, origin, els, boxes, kinds } = freeze();
     if (!boxes[id]) return;
     const plan = makePlan(id, doc.order, boxes, kinds, doc.sections, origin.width);
-    const grab = pointer ? { x: pointer.x - origin.left, y: pointer.y - origin.top } : { x: boxes[id]!.x, y: boxes[id]!.y };
+    const at = pointer ?? { x: origin.left + boxes[id]!.x, y: origin.top + boxes[id]!.y };
     const style = sectionStyle(now.current.version, id === FLOW_ID);
-    live.current = { plan, mode, style, place: plan.home, els, seen: new Map(), grab, sections: doc.sections };
+    const l: Live = { plan, mode, style, place: plan.home, els, seen: new Map(), grab: { x: at.x - origin.left, y: at.y - origin.top }, pointer: at, sections: doc.sections };
+    live.current = l;
+    if (mode === "pointer") watchPointer(l);
     const tile = rowsOf(doc.order, doc.sections).some((r) => r.type === "grid" && r.ids.includes(id));
     setLift({ id, mode, box: boxes[id]!, tile });
-    const name = labels[id] ?? "Section";
-    say(`Picked up ${lowerFirst(name)}, place ${plan.home + 1} of ${doc.order.length}.`);
-  }, [store, labels]);
+    say(`Picked up ${lowerFirst(labels[id] ?? "Section")}, place ${plan.home + 1} of ${doc.order.length}.`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- freeze and watchPointer read the page when called.
+  }, [store, labels, follow]);
+
+  /** Starts carrying a new block from the tray: the page is frozen as for any drag, and the block has no place until it is over the page. */
+  const pickUpNew = useCallback((kind: BlockKind, pointer: { x: number; y: number }, from: DOMRect) => {
+    if (!wrap.current || live.current) return;
+    const { doc, origin, els, boxes, kinds } = freeze();
+    const draft = draftBlock(doc, kind);
+    if (!draft) {
+      say(`${whyFull(doc, kind) ?? "There is no room for it"}.`);
+      return;
+    }
+    kinds[draft.id] = kind;
+    const withDraft = draft.section ? { ...doc.sections, [draft.id]: draft.section } : doc.sections;
+    const plan = makePlan(draft.id, doc.order, boxes, kinds, withDraft, origin.width);
+    // Its size on the page isn't known until it has been drawn once; the hidden copy below is measured as the lift begins.
+    boxes[draft.id] = { x: 0, y: 0, w: origin.width, h: 120 };
+    const style = sectionStyle(now.current.version, kind === "flow");
+    const l: Live = { plan, mode: "pointer", style, place: NOWHERE, els, seen: new Map(), grab: { x: pointer.x - origin.left, y: pointer.y - origin.top }, pointer, sections: withDraft, draft };
+    live.current = l;
+    watchPointer(l);
+    const name = blockName(doc, kind);
+    setLift({ id: draft.id, mode: "pointer", box: { x: from.left - origin.left, y: from.top - origin.top, w: from.width, h: from.height }, tile: false, draft, name });
+    say(`Picked up a new block: ${lowerFirst(name)}. Carry it onto the page.`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- freeze and watchPointer read the page when called.
+  }, [store, follow]);
 
   // Once the lifted copy is on the page (the same render), the section it came from steps back.
   useLayoutEffect(() => {
@@ -179,24 +301,21 @@ export function Board({ version }: { version: Version }) {
     const still = now.current.reduced;
     el.dataset.labLifting = l.mode;
     el.dataset.labStyle = l.style;
-    const mine = l.els[l.plan.id]!;
-    if (l.mode === "pointer") mine.style.opacity = l.style === "slide" ? "0" : "0.35";
-    else mine.dataset.lifted = "";
+    if (l.draft) {
+      // The new block as the page would draw it, measured once, so the room made for it is the right size.
+      const drawn = sizer.current?.firstElementChild?.getBoundingClientRect();
+      if (drawn) l.plan.boxes[l.plan.id] = { x: 0, y: 0, w: drawn.width, h: drawn.height };
+    } else {
+      const mine = l.els[l.plan.id]!;
+      if (l.mode === "pointer") mine.style.opacity = l.style === "slide" ? "0" : "0.35";
+      else mine.dataset.lifted = "";
+    }
     if (l.style === "slide" && !still) {
       for (const id of l.plan.order) if (id !== l.plan.id || l.mode === "keys") l.els[id]!.style.transition = `transform ${MOVE_MS}ms ${EASE}`;
     }
     show();
-  }, [lift, show]);
-
-  /** Moves the drag to a place and reads it out. */
-  const goTo = useCallback((place: number) => {
-    const l = live.current;
-    if (!l || place === l.place) return;
-    l.place = place;
-    show();
-    const name = labels[l.plan.id] ?? "Section";
-    say(place === l.plan.home ? `${name} is back where it was, place ${place + 1} of ${l.plan.order.length}.` : `${name} would go to place ${place + 1} of ${l.plan.order.length}.`);
-  }, [show, labels]);
+    follow();
+  }, [lift, show, follow]);
 
   /** Slides every section from where it was to where it is now (FLIP): 180ms, transforms only. */
   const settle = useCallback((first: Map<string, DOMRect>, lifted?: string) => {
@@ -225,12 +344,13 @@ export function Board({ version }: { version: Version }) {
     return first;
   };
 
-  /** Ends the drag: drops the section at its place, or puts everything back. */
+  /** Ends the drag: drops the section at its place (or adds the new block there), or puts everything back. */
   const finish = useCallback((drop: boolean) => {
     const l = live.current;
     const el = wrap.current;
     if (!l || !el) return;
-    const { plan, place, mode } = l;
+    const { plan, place, mode, draft } = l;
+    l.stop?.();
     const first = snapshot();
     if (mode === "pointer" && copy.current) first.set(plan.id, copy.current.getBoundingClientRect());
     for (const s of Object.values(l.els)) {
@@ -244,18 +364,23 @@ export function Board({ version }: { version: Version }) {
     if (line.current) line.current.hidden = true;
     if (landing.current) landing.current.hidden = true;
     if (host.current) host.current.textContent = "";
+    const name = nameOf(l);
+    const places = placesOf(l);
     live.current = null;
-    const moved = drop && place !== plan.home;
+    lastDrop.current = Date.now();
+    const moved = drop && place !== plan.home && place !== NOWHERE;
     flushSync(() => {
       setLift(null);
-      if (moved) store.move(plan.id, place);
+      if (!moved) return;
+      if (draft) store.insertDraft(place, draft);
+      else store.move(plan.id, place);
     });
     settle(first, plan.id);
-    const name = labels[plan.id] ?? "Section";
-    if (!drop) say(`Moving ${lowerFirst(name)} cancelled. It's back where it was.`);
-    else say(moved ? `${name} dropped in place ${place + 1} of ${plan.order.length}.` : `${name} dropped where it was.`);
+    if (draft) say(moved ? `${name} added in place ${place + 1} of ${places}.` : `${name} was not added.`);
+    else if (!drop) say(`Moving ${lowerFirst(name)} cancelled. It's back where it was.`);
+    else say(moved ? `${name} dropped in place ${place + 1} of ${places}.` : `${name} dropped where it was.`);
     if (mode === "keys") el.querySelector<HTMLElement>(`[data-lab-section="${plan.id}"] [data-grip]`)?.focus({ preventScroll: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot and shells read the page when called.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot, shells and nameOf read the page when called.
   }, [store, settle, labels]);
 
   /* ---------- Pointer and touch (dnd-kit's sensors; the places are the board's own) ---------- */
@@ -268,17 +393,13 @@ export function Board({ version }: { version: Version }) {
   );
 
   const onDragStart = useCallback((e: DragStartEvent) => {
-    const at = e.activatorEvent ? getEventCoordinates(e.activatorEvent) : null;
-    pickUp(String(e.active.id), "pointer", at ?? undefined);
-  }, [pickUp]);
-
-  const onDragMove = useCallback((e: DragMoveEvent) => {
-    const l = live.current;
-    if (!l || l.mode !== "pointer") return;
-    // delta already includes how far the page has scrolled, so this is the pointer's place on the page.
-    if (copy.current) copy.current.style.transform = `translate(${e.delta.x}px, ${e.delta.y}px)`;
-    goTo(placeAt(l.plan, l.grab.x + e.delta.x, l.grab.y + e.delta.y, l.place));
-  }, [goTo]);
+    const at = (e.activatorEvent ? getEventCoordinates(e.activatorEvent) : null) ?? undefined;
+    const id = String(e.active.id);
+    if (!id.startsWith(TRAY_ID)) return pickUp(id, "pointer", at);
+    const kind = id.slice(TRAY_ID.length) as BlockKind;
+    const tile = document.querySelector(`[data-tray-kind="${kind}"]`)?.getBoundingClientRect();
+    if (at && tile) pickUpNew(kind, at, tile);
+  }, [pickUp, pickUpNew]);
 
   /* ---------- Keyboard: Space picks up, the arrows move a place at a time, Space drops ---------- */
 
@@ -319,7 +440,7 @@ export function Board({ version }: { version: Version }) {
     if (l && l.mode === "keys" && l.plan.id === id) finish(false);
   }, [finish]);
 
-  /* ---------- Move up and down, and adding a section ---------- */
+  /* ---------- Move up and down, adding a block, taking a section off ---------- */
 
   const moveBy = useCallback((id: string, by: -1 | 1) => {
     const el = wrap.current;
@@ -339,39 +460,92 @@ export function Board({ version }: { version: Version }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot reads the page when called.
   }, [store, settle, labels]);
 
-  const insert = useCallback((at: number, kind: InsertKind) => {
-    const el = wrap.current;
-    if (!el) return;
+  /** Puts a new block of a kind on the page at `at`, if the layout has room for it. Returns its id. */
+  const add = (at: number, kind: BlockKind, where: string): string | null => {
+    const doc = store.get();
+    const draft = draftBlock(doc, kind);
+    if (!draft) {
+      say(`${whyFull(doc, kind) ?? "There is no room for it"}.`);
+      return null;
+    }
     const first = snapshot();
-    let id = "";
-    flushSync(() => {
-      id = store.insert(at, kind);
-    });
+    flushSync(() => store.insertDraft(at, draft));
     settle(first);
-    say(`${INSERT_NAMES[kind]} added in place ${at + 1} of ${store.get().order.length}.`);
-    const shell = el.querySelector<HTMLElement>(`[data-lab-section="${id}"]`);
+    say(`${blockName(doc, kind)} added ${where}, place ${at + 1} of ${doc.order.length + 1}.`);
+    return draft.id;
+  };
+
+  /** From a "+" between sections: the new block goes there, and the focus goes into it. */
+  const insert = useCallback((at: number, kind: BlockKind) => {
+    const id = add(at, kind, "here");
+    if (!id) return;
+    const shell = wrap.current?.querySelector<HTMLElement>(`[data-lab-section="${id}"]`);
     (shell?.querySelector<HTMLElement>("textarea") ?? shell?.querySelector<HTMLElement>("[data-grip]"))?.focus({ preventScroll: true });
     shell?.scrollIntoView({ block: "nearest" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot reads the page when called.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- add reads the page when called.
   }, [store, settle]);
 
-  // A drag left behind (the sample or the version changed under it) is let go of.
-  useEffect(() => () => void (live.current = null), []);
+  /** From the tray, by Enter or a click: after the section the focus was last in, or at the end. The focus stays on the tray. */
+  const addFromTray = useCallback((kind: BlockKind) => {
+    // A click that only ends a drag isn't a press of the button.
+    if (Date.now() - lastDrop.current < 300) return;
+    const doc = store.get();
+    const last = lastFocus.current && doc.order.includes(lastFocus.current) ? lastFocus.current : null;
+    const at = last ? doc.order.indexOf(last) + 1 : doc.order.length;
+    const id = add(at, kind, last ? `after ${lowerFirst(labels[last] ?? "that section")}` : "at the end");
+    if (id) wrap.current?.querySelector<HTMLElement>(`[data-lab-section="${id}"]`)?.scrollIntoView({ block: "nearest", behavior: now.current.reduced ? "auto" : "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- add reads the page when called.
+  }, [store, settle, labels]);
+
+  const remove = useCallback((id: string) => {
+    const el = wrap.current;
+    const before = store.get().order;
+    const i = before.indexOf(id);
+    if (!el || i < 0) return;
+    const first = snapshot();
+    flushSync(() => store.remove(id));
+    settle(first);
+    say(`${labels[id] ?? "Section"} removed.`);
+    if (lastFocus.current === id) lastFocus.current = null;
+    // The focus goes to what took its place, or to the "+" at the end.
+    const next = store.get().order[i] ?? store.get().order[i - 1];
+    const target = next ? el.querySelector<HTMLElement>(`[data-lab-section="${next}"] [data-grip]`) : el.querySelector<HTMLElement>("[data-insert-end]");
+    target?.focus({ preventScroll: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot reads the page when called.
+  }, [store, settle, labels]);
+
+  // A drag left behind (the page went away under it) is let go of.
+  useEffect(
+    () => () => {
+      live.current?.stop?.();
+      live.current = null;
+    },
+    [],
+  );
 
   const indexOf = (id: string) => order.indexOf(id);
+  const draftDoc = (d: Draft): LabDoc => {
+    const doc = store.get();
+    return { ...doc, sections: d.section ? { ...doc.sections, [d.id]: d.section } : doc.sections, imageUrls: d.picture ? { ...doc.imageUrls, [d.picture.fileId]: d.picture.url } : doc.imageUrls };
+  };
 
   return (
-    <div ref={wrap} data-lab-board data-version={version} className="relative">
+    <div ref={setWrap} data-lab-board data-version={version} className="relative">
       <DndContext
         id="lab-sections"
         sensors={sensors}
         onDragStart={onDragStart}
-        onDragMove={onDragMove}
         onDragEnd={() => finish(true)}
         onDragCancel={() => finish(false)}
         accessibility={{ announcements: SILENT, screenReaderInstructions: { draggable: DRAG_INSTRUCTIONS } }}
       >
-        <div data-lab-rows>
+        <div
+          data-lab-rows
+          onFocusCapture={(e) => {
+            const id = (e.target as HTMLElement).closest<HTMLElement>("[data-lab-section]")?.dataset.labSection;
+            if (id) lastFocus.current = id;
+          }}
+        >
           {rows.map((row) => (
             <div
               key={row.ids[0]}
@@ -379,38 +553,60 @@ export function Board({ version }: { version: Version }) {
               role={row.type === "two" || row.type === "grid" ? "group" : undefined}
               aria-label={row.type === "grid" || (row.type === "two" && row.of === "image") ? "Images" : row.type === "two" ? "Graphs" : undefined}
             >
-              <InsertPoint at={indexOf(row.ids[0]!)} label={`Add a section before ${lowerFirst(labels[row.ids[0]!] ?? "this section")}`} onInsert={insert} />
+              <InsertPoint at={indexOf(row.ids[0]!)} label={`Add a block before ${lowerFirst(labels[row.ids[0]!] ?? "this section")}`} onInsert={insert} />
               {row.ids.map((id) => (
-                <Shell key={id} id={id} kind={kindOf(store.get(), id)} label={lowerFirst(labels[id] ?? "section")} first={indexOf(id) === 0} last={indexOf(id) === order.length - 1} onKey={onGripKey} onBlur={onGripBlur} onMove={moveBy} />
+                <Shell key={id} id={id} kind={kindOf(store.get(), id)} label={lowerFirst(labels[id] ?? "section")} first={indexOf(id) === 0} last={indexOf(id) === order.length - 1} onKey={onGripKey} onBlur={onGripBlur} onMove={moveBy} onRemove={remove} />
               ))}
             </div>
           ))}
         </div>
-        <InsertPoint at={order.length} end label="Add a section at the end" onInsert={insert} />
+        <InsertPoint at={order.length} end label="Add a block at the end" onInsert={insert} />
+        <Tray onAdd={addFromTray} />
       </DndContext>
 
       {/* The hidden copy the drag measures (drag-plan.ts): no height, clipped, never read out. */}
       <div ref={host} aria-hidden inert data-lab-measure className="pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden" />
       <div ref={line} hidden aria-hidden data-lab-line className="lab-line" />
       <div ref={landing} hidden aria-hidden data-lab-landing className="lab-landing" />
-      {lift?.mode === "pointer" && (
-        <div
-          ref={copy}
-          aria-hidden
-          inert
-          data-lab-copy
-          className={`lab-lift grid grid-cols-[minmax(0,1fr)] [&_.xp-section]:mt-0 ${lift.tile ? "[&_img]:aspect-[4/3] [&_img]:object-contain" : ""}`}
-          style={{ left: lift.box.x, top: lift.box.y, width: lift.box.w, height: lift.box.h }}
-        >
-          <div className="lab-card" />
-          <div className="relative grid grid-cols-[minmax(0,1fr)]">
-            <StaticSection doc={store.get()} id={lift.id} prefix="lifted-" />
+      {lift?.draft && (
+        // A new block drawn once, unseen, at the column's width: how big it will be on the page.
+        <div ref={sizer} aria-hidden inert className="pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden [&_.xp-section]:mt-0">
+          <div className="grid grid-cols-[minmax(0,1fr)]">
+            <StaticSection doc={draftDoc(lift.draft)} id={lift.id} prefix="sizing-" />
           </div>
         </div>
       )}
+      {lift?.mode === "pointer" &&
+        (lift.draft ? (
+          <div ref={copy} aria-hidden inert data-lab-copy data-lab-chip className="lab-lift" style={{ left: lift.box.x, top: lift.box.y, width: lift.box.w, height: lift.box.h }}>
+            <span className="lab-tray-tile lab-tray-lifted">
+              <ChipIcon kind={lift.draft.kind} />
+              <span>{lift.name}</span>
+            </span>
+          </div>
+        ) : (
+          <div
+            ref={copy}
+            aria-hidden
+            inert
+            data-lab-copy
+            className={`lab-lift grid grid-cols-[minmax(0,1fr)] [&_.xp-section]:mt-0 ${lift.tile ? "[&_img]:aspect-[4/3] [&_img]:object-contain" : ""}`}
+            style={{ left: lift.box.x, top: lift.box.y, width: lift.box.w, height: lift.box.h }}
+          >
+            <div className="lab-card" />
+            <div className="relative grid grid-cols-[minmax(0,1fr)]">
+              <StaticSection doc={store.get()} id={lift.id} prefix="lifted-" />
+            </div>
+          </div>
+        ))}
       <p ref={status} role="status" aria-live="assertive" data-lab-status className="sr-only" />
     </div>
   );
+}
+
+function ChipIcon({ kind }: { kind: BlockKind }) {
+  const Icon = blockIcon(kind);
+  return <Icon aria-hidden size={18} strokeWidth={2} />;
 }
 
 /**
@@ -426,6 +622,7 @@ const Shell = memo(function Shell({
   onKey,
   onBlur,
   onMove,
+  onRemove,
 }: {
   id: string;
   kind: ItemKind;
@@ -436,6 +633,7 @@ const Shell = memo(function Shell({
   onKey: (id: string, e: React.KeyboardEvent) => void;
   onBlur: (id: string) => void;
   onMove: (id: string, by: -1 | 1) => void;
+  onRemove: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef } = useDraggable({ id, attributes: { roleDescription: "draggable section" } });
   return (
@@ -461,48 +659,69 @@ const Shell = memo(function Shell({
         <button type="button" data-move="down" disabled={last} onClick={() => onMove(id, 1)} aria-label={`Move ${label} down`} title="Move down" className="xp-outline-button lab-tool">
           <ArrowDown aria-hidden size={16} strokeWidth={2.25} />
         </button>
+        <button type="button" data-remove onClick={() => onRemove(id)} aria-label={`Remove ${label}`} title="Remove" className="xp-outline-button lab-tool">
+          <X aria-hidden size={16} strokeWidth={2.25} />
+        </button>
       </div>
       <SectionContent id={id} />
     </div>
   );
 });
 
-/** "+" in the gap above a row (or after the last): opens three placeholder sections to add there. */
-const InsertPoint = memo(function InsertPoint({ at, end = false, label, onInsert }: { at: number; end?: boolean; label: string; onInsert: (at: number, kind: InsertKind) => void }) {
+/**
+ * "+" in the gap above a row (or after the last): opens the blocks the layout can hold, to add one
+ * there. A kind with no room left is listed but can't be chosen, with the reason beside it.
+ */
+const InsertPoint = memo(function InsertPoint({ at, end = false, label, onInsert }: { at: number; end?: boolean; label: string; onInsert: (at: number, kind: BlockKind) => void }) {
+  const store = useLabStore();
   const [open, setOpen] = useState(false);
+  const options = open ? blockOptions(store.get()) : [];
   return (
     <div
       className="lab-insert"
       data-end={end || undefined}
       data-open={open || undefined}
       onKeyDown={(e) => {
-        if (e.key === "Escape") setOpen(false);
+        if (e.key !== "Escape" || !open) return;
+        setOpen(false);
+        e.currentTarget.querySelector<HTMLElement>("[data-insert]")?.focus();
       }}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
       }}
     >
       <span className="relative inline-flex">
-        <button type="button" data-insert={at} aria-expanded={open} aria-label={label} title="Add a section here" onClick={() => setOpen((o) => !o)} className="xp-outline-button lab-tool">
+        <button type="button" data-insert={at} data-insert-end={end || undefined} aria-expanded={open} aria-label={label} title="Add a block here" onClick={() => setOpen((o) => !o)} className="xp-outline-button lab-tool">
           <Plus aria-hidden size={16} strokeWidth={2.25} />
         </button>
         {open && (
-          <span role="group" aria-label="Add a section" className="lab-menu">
-            {(Object.keys(INSERT_NAMES) as InsertKind[]).map((k) => (
-              <button
-                key={k}
-                type="button"
-                data-insert-kind={k}
-                onClick={() => {
-                  setOpen(false);
-                  onInsert(at, k);
-                }}
-                className="xp-outline-button inline-flex h-9 items-center px-3 text-[0.8125rem] font-semibold whitespace-nowrap"
-              >
-                {INSERT_NAMES[k]}
-              </button>
+          <ul role="group" aria-label="Add a block" className="lab-menu">
+            {options.map(({ kind, name, icon: Icon, full }) => (
+              <li key={kind}>
+                <button
+                  type="button"
+                  data-insert-kind={kind}
+                  disabled={Boolean(full)}
+                  aria-describedby={full ? `lab-full-${at}-${kind}` : undefined}
+                  onClick={() => {
+                    setOpen(false);
+                    onInsert(at, kind);
+                  }}
+                  className="lab-menu-item"
+                >
+                  <Icon aria-hidden size={16} strokeWidth={2.25} className="mt-0.5 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block font-semibold">{name}</span>
+                    {full && (
+                      <span id={`lab-full-${at}-${kind}`} className="lab-menu-why block">
+                        {full}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              </li>
             ))}
-          </span>
+          </ul>
         )}
       </span>
     </div>

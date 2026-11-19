@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useEffect, useSyncExternalStore } from "react";
 import { text, type Section, type SectionOf } from "@/lib/exhbt/blocks";
-import { nextSectionId } from "@/lib/exhbt/sections";
-import { FLOW_ID, placeholderPicture, sampleDoc, type LabDoc, type LabStep, type SampleId } from "./samples";
+import type { Draft } from "./blocks";
+import { FLOW_ID, sampleDoc, type LabDoc, type LabStep, type SampleId } from "./samples";
 
 /**
  * The lab's doc, held in memory outside React (nothing is saved). Each part of the page reads its
@@ -11,8 +11,6 @@ import { FLOW_ID, placeholderPicture, sampleDoc, type LabDoc, type LabStep, type
  * slice of every other section is the same object as before. The order is its own slice, so the
  * page is laid out again only when a section moves, is added, or the sample changes.
  */
-
-export type InsertKind = "findings" | "quote" | "image";
 
 export class LabStore {
   private doc: LabDoc;
@@ -103,24 +101,26 @@ export class LabStore {
     this.set({ ...this.doc, order: [...rest.slice(0, to), id, ...rest.slice(to)] });
   }
 
-  /** Adds a placeholder section before the item at `at` in the order. Returns its id. */
-  insert(at: number, kind: InsertKind): string {
-    const all = Object.values(this.doc.sections);
-    const id = nextSectionId(kind, all);
-    let section: Section;
-    let imageUrls = this.doc.imageUrls;
-    if (kind === "findings") section = { id, kind, items: [[], []] };
-    else if (kind === "quote") section = { id, kind, text: "What they said about the work goes here", name: "Their name", role: "their role" };
-    else {
-      const fileId = `lab-${id}`;
-      const n = all.filter((s) => s.kind === "image").length;
-      section = { id, kind, fileId, alt: "A placeholder picture.", caption: [], w: 1600, h: 1200 };
-      imageUrls = { ...imageUrls, [fileId]: placeholderPicture(1600, 1200, "Placeholder", n) };
-    }
+  /** Puts a block (components/lab/blocks.ts) on the page before the item at `at` in the order. */
+  insertDraft(at: number, draft: Draft) {
     const order = this.doc.order;
+    if (order.includes(draft.id)) return;
     const i = Math.max(0, Math.min(order.length, at));
-    this.set({ ...this.doc, imageUrls, sections: { ...this.doc.sections, [id]: section }, order: [...order.slice(0, i), id, ...order.slice(i)] });
-    return id;
+    this.set({
+      ...this.doc,
+      imageUrls: draft.picture ? { ...this.doc.imageUrls, [draft.picture.fileId]: draft.picture.url } : this.doc.imageUrls,
+      sections: draft.section ? { ...this.doc.sections, [draft.id]: draft.section } : this.doc.sections,
+      order: [...order.slice(0, i), draft.id, ...order.slice(i)],
+    });
+  }
+
+  /** Takes a section off the page. The flowchart's boxes are kept, so it comes back as it was. */
+  remove(id: string) {
+    const order = this.doc.order;
+    if (!order.includes(id)) return;
+    const sections = { ...this.doc.sections };
+    delete sections[id];
+    this.set({ ...this.doc, sections, order: order.filter((x) => x !== id) });
   }
 }
 

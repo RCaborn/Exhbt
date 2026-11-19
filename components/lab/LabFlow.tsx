@@ -80,6 +80,8 @@ export function LabFlow() {
   );
   const at = (id: UniqueIdentifier | null | undefined) => steps.findIndex((s) => s.id === id);
   const leftStart = useRef(false);
+  /** The place the last box was dropped in (from 1), or null when it went back where it was. Noted before the boxes move. */
+  const dropped = useRef<number | null>(null);
   const announcements: Announcements = {
     onDragStart: ({ active }) => {
       leftStart.current = false;
@@ -90,12 +92,13 @@ export function LabFlow() {
       leftStart.current = true;
       return over ? `The box would go to place ${at(over.id) + 1} of ${steps.length}.` : "The box isn't over a place.";
     },
-    onDragEnd: ({ active, over }) => (over && over.id !== active.id ? `Box dropped in place ${at(over.id) + 1} of ${steps.length}.` : "Box dropped where it was."),
+    onDragEnd: () => (dropped.current ? `Box dropped in place ${dropped.current} of ${steps.length}.` : "Box dropped where it was."),
     onDragCancel: () => "Moving the box cancelled. It's back where it was.",
   };
 
   function onDragEnd({ active, over }: DragEndEvent) {
     setDrag(null);
+    dropped.current = over && active.id !== over.id ? at(over.id) + 1 : null;
     if (!over || active.id === over.id) return;
     if (!line || reduced) {
       store.moveStep(at(active.id), at(over.id));
