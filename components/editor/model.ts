@@ -1,5 +1,5 @@
 import { plain, words, type ExhbtDoc, type Issue } from "@/lib/exhbt/blocks";
-import { FORMAT_COPY, formatOf, isShown } from "@/lib/exhbt/formats";
+import { flowShown, FORMAT_COPY, formatOf, isShown } from "@/lib/exhbt/formats";
 import { sectionLabel, sectionWords } from "@/lib/exhbt/sections";
 
 /**
@@ -25,7 +25,7 @@ export type CardKey = "header" | "gap" | "flow" | "evidence" | "sections" | "ove
 /** Which card an issue path ("flow.2.step", "sections.1.chart.title", "title") points at. */
 export function cardOf(path: string): CardKey {
   const [head = "", idx] = path.split(".");
-  if (["title", "context", "whereWhen", "summary", "skills", "headline"].includes(head)) return "header";
+  if (["title", "context", "whereWhen", "myRole", "summary", "skills", "headline"].includes(head)) return "header";
   if (head === "sections") return idx !== undefined && /^\d+$/.test(idx) ? `section-${Number(idx)}` : "sections";
   if (["gap", "flow", "evidence"].includes(head)) return head as CardKey;
   return "overall";
@@ -70,9 +70,10 @@ export const issuesIn = (issues: Issue[], card: CardKey) => issues.filter((i) =>
 export function cardWords(doc: ExhbtDoc): Partial<Record<CardKey, number>> {
   const sum = (xs: string[]) => xs.reduce((n, s) => n + words(s), 0);
   return {
-    header: sum([doc.title, doc.context, doc.whereWhen ?? "", doc.summary ?? "", ...doc.skills, doc.headline?.value ?? "", doc.headline?.label ?? ""]),
+    header: sum([doc.title, doc.context, doc.whereWhen ?? "", doc.myRole ?? "", doc.summary ?? "", ...doc.skills, doc.headline?.value ?? "", doc.headline?.label ?? ""]),
     gap: words(plain(doc.gap)),
-    flow: sum(doc.flow.flatMap((s) => [s.step, s.detail ?? ""])),
+    // A flowchart taken off the page counts nothing, as in wordCount.
+    flow: flowShown(doc) ? sum(doc.flow.flatMap((s) => [s.step, s.detail ?? ""])) : 0,
     // A section the layout doesn't draw counts nothing (decision 0024), as in wordCount.
     ...Object.fromEntries(doc.sections.map((s, i) => [`section-${i}`, isShown(doc, s) ? sectionWords(s) : 0])),
     evidence: words(doc.evidence?.label ?? ""),
@@ -83,6 +84,7 @@ const LABELS: Record<string, string> = {
   title: "Your question (the title)",
   context: "What it is",
   whereWhen: "Where and when",
+  myRole: "My role",
   summary: "One-sentence summary",
   skills: "Skills",
   headline: "Headline number",

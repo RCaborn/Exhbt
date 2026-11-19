@@ -58,27 +58,29 @@ export function ExhbtTile({
       )}
 
       {/* Methodology strip: step names only; details live in the full exhbt. Without a number it sits higher and reads larger. */}
-      <ol className={`flex flex-wrap items-center gap-1 ${e.headline ? "mt-4" : "mt-5"}`} aria-label="Methodology">
-        {e.methodology.map((m, i) => {
-          const last = i === e.methodology.length - 1;
-          return (
-            <li key={`${i}-${m.step}`} className="flex items-center gap-1">
-              <span
-                className={`rounded-[6px] px-2 py-0.5 font-mono ${e.headline ? "text-[0.7rem]" : "text-[0.8125rem]"} ${
-                  last ? "bg-ink text-white" : "border border-line bg-mist text-ink"
-                }`}
-              >
-                {m.step}
-              </span>
-              {!last && (
-                <span aria-hidden className="font-mono text-[0.7rem] text-field">
-                  →
+      {e.methodology.length > 0 && (
+        <ol className={`flex flex-wrap items-center gap-1 ${e.headline ? "mt-4" : "mt-5"}`} aria-label="Methodology">
+          {e.methodology.map((m, i) => {
+            const last = i === e.methodology.length - 1;
+            return (
+              <li key={`${i}-${m.step}`} className="flex items-center gap-1">
+                <span
+                  className={`rounded-[6px] px-2 py-0.5 font-mono ${e.headline ? "text-[0.7rem]" : "text-[0.8125rem]"} ${
+                    last ? "bg-ink text-white" : "border border-line bg-mist text-ink"
+                  }`}
+                >
+                  {m.step}
                 </span>
-              )}
-            </li>
-          );
-        })}
-      </ol>
+                {!last && (
+                  <span aria-hidden className="font-mono text-[0.7rem] text-field">
+                    →
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
 
       {team}
 
