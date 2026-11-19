@@ -234,7 +234,7 @@ export function withWorkVisual(doc: ExhbtDoc, visual: WorkVisual, opts: { wants?
   const { kind, ...figure } = visual;
   let next = withKeyFigure({ ...doc, sections }, { ...figure, ...(figure.picked ? { picked: { ...figure.picked, kind } } : {}) }, gap);
   // Research reads figure first, and its key figure is the results: a drafted graph stays first and
-  // a picked diagram or photo follows it (Rory, 19 Nov 2026). With no graph left, the picked visual leads.
+  // a picked diagram or photo follows it (decided in the build, 19 Nov 2026; open for Rory to confirm). With no graph left, the picked visual leads.
   if (f === "research" && !replacesDraftedGraph(kind)) {
     const image = next.sections.findIndex((s) => s.kind === "image" && s.fileId === visual.fileId);
     const graph = next.sections.findIndex((s) => s.kind === "graph");

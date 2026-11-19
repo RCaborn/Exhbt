@@ -25,7 +25,7 @@ When the figure is placed:
 
 - **A graph or a table** removes every graph section the draft made, then goes where the layout wants its key figure. The exhbt has the real graph and no drawn one.
 - **Another visual** goes in the same place, and the drafted graphs stay while the layout has room for both. When it hasn't, the picked visual comes first: graphs go, last first, until it fits.
-- **In research, a drafted graph that stays is still the key figure**, and a picked diagram or photo goes straight after it (Rory, 19 Nov 2026). Research is read figure first, and its key figure should be the results. With no graph on the exhbt, the picked visual is the key figure. A case study and a gallery are as above.
+- **In research, a drafted graph that stays is still the key figure**, and a picked diagram or photo goes straight after it (decided in the build, 19 Nov 2026; open for Rory to confirm). Research is read figure first, and its key figure should be the results. With no graph on the exhbt, the picked visual is the key figure. A case study and a gallery are as above.
 - **Nothing picked**: the drafted graph stays. It is the fallback, so `lib/ai/exhbt-draft.ts` still drafts it every time.
 - A person's own pictures are never taken off to make room. A layout whose images are full is left as it was, graphs included.
 - A case study needs findings or a graph before it can be published. The work's own graph or table, picked in place of the drafted graph, now counts as that graph (`validateForPublish`), so a draft with a graph and no findings can still be published after the swap. A picked photo or diagram doesn't count, and nor does a figure once the person has chosen another page, since its kind goes with it.
@@ -122,6 +122,7 @@ It runs in the existing workflow, `.github/workflows/eval-drafts.yml`, with the 
 
 ## To confirm with Rory
 
+- **Research ordering.** In a research layout, a drafted graph stays first as the key figure and a picked diagram or photo follows it. This was decided in the build on 19 Nov 2026 and Rory has not confirmed it.
 - **Putting the drafted graph back.** When someone removes a picked graph they can't share, should the graph the draft drew come back? It would need the removed graph to be kept with the exhbt and its numbers checked again. It isn't built, because the brief asked for no new editor controls and a graph parked out of sight would escape the number check.
 - **A results table from the work.** It is treated like a graph: the picture of the table goes on and the drafted graph comes off. If the table is long, the drafted graph may read better at a glance than a picture of twelve rows. The kind is recorded, so this can be changed for tables alone.
 - **"A figure can only be taken from a PDF for now."** Said when the upload has no PDF. It goes when Word, PowerPoint and pictures can be picked from.
