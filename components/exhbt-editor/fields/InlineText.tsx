@@ -56,6 +56,7 @@ function BlockText({ path, value, label, placeholder, id, maxChars, onText }: { 
       aria-label={label}
       data-path={path}
       data-field="text"
+      data-empty={value.trim() ? undefined : ""}
       data-grow={mirror ? "mirror" : "css"}
       value={value}
       placeholder={placeholder}
@@ -98,6 +99,7 @@ function InlineSpan({ path, value, label, placeholder, id, onText }: { path: str
       data-placeholder={placeholder}
       data-path={path}
       data-field="text"
+      data-empty={value.trim() ? undefined : ""}
       contentEditable="plaintext-only"
       suppressContentEditableWarning
       spellCheck

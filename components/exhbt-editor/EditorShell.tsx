@@ -45,7 +45,14 @@ import { Tray } from "./Tray";
  * first change (e2e/editor-classic.spec.ts); `?grow=mirror` makes the plain fields grow by their mirror.
  */
 
-const devParam = (key: string) => (process.env.NODE_ENV !== "production" && typeof window !== "undefined" ? new URLSearchParams(window.location.search).get(key) : null);
+declare global {
+  interface Window {
+    /** Development only: the editor's store, for e2e/page-editor.ts. */
+    __exhbtEditor?: Store;
+  }
+}
+
+const devParam =(key: string) => (process.env.NODE_ENV !== "production" && typeof window !== "undefined" ? new URLSearchParams(window.location.search).get(key) : null);
 
 type Visit = { store: Store; runtime: Runtime; files: FilesController; draft: ReturnType<typeof createDraftTools> };
 
@@ -67,7 +74,11 @@ export function PageEditor(props: PageEditorProps) {
   if (devParam("crash") === "render") throw new Error("The new editor was told to fail (?crash=render, development only).");
   const [visit] = useState(() => startVisit(props));
   const [ready, setReady] = useState(false);
-  useEffect(() => setReady(true), []);
+  useEffect(() => {
+    setReady(true);
+    // Development only: the browser tests read the editor's doc and its undo list (e2e/page-editor.ts).
+    if (process.env.NODE_ENV !== "production") window.__exhbtEditor = visit.store;
+  }, [visit]);
   const grow = devParam("grow") === "mirror" ? "mirror" : null;
 
   return (

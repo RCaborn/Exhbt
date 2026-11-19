@@ -100,7 +100,8 @@ function AimSwitch({ sectionId }: { sectionId: string }) {
 function ListControls({ path, index, n }: ListSlot) {
   const frame = useFrame();
   const store = useStoreInternal();
-  const L = useDoc((d) => formatLimits(formatOf(d)).findings);
+  const max = useDoc((d) => formatLimits(formatOf(d)).findings.max);
+  const min = useDoc((d) => formatLimits(formatOf(d)).findings.min);
   const id = frame?.id ?? "";
   if (index === n) {
     return (
@@ -108,7 +109,7 @@ function ListControls({ path, index, n }: ListSlot) {
         <button
           type="button"
           className="xe-chip"
-          disabled={n >= L.max}
+          disabled={n >= max}
           onClick={() => {
             store.listAdd(id, n);
             requestAnimationFrame(() => jumpTo(`${path}.${n}`));
@@ -128,7 +129,7 @@ function ListControls({ path, index, n }: ListSlot) {
       <button type="button" className="xe-tool xe-tool-sm" data-tip={`Move finding ${k} down`} aria-label={`Move finding ${k} down`} disabled={index === n - 1} onClick={() => store.listMove(id, index, index + 1)}>
         <ArrowDown aria-hidden size={14} strokeWidth={2.25} />
       </button>
-      <button type="button" className="xe-tool xe-tool-sm" data-tip={`Remove finding ${k}`} aria-label={`Remove finding ${k}`} disabled={n <= L.min} onClick={() => store.listRemove(id, index)}>
+      <button type="button" className="xe-tool xe-tool-sm" data-tip={`Remove finding ${k}`} aria-label={`Remove finding ${k}`} disabled={n <= min} onClick={() => store.listRemove(id, index)}>
         <X aria-hidden size={14} strokeWidth={2.25} />
       </button>
     </span>

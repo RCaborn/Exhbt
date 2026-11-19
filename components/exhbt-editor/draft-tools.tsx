@@ -62,7 +62,8 @@ export function createDraftTools(store: Store, id: string, init: DraftToolsInit)
 export const DraftToolsContext = createContext<DraftToolsRuntime | null>(null);
 
 /** What a block's value depends on, as one string for the header (whose value is a new object each time) or the slice itself. */
-const sliceOf = (d: ExhbtDoc, block: DraftBlock): unknown => (block === "header" ? JSON.stringify(blockValue(d, "header")) : blockValue(d, block));
+const sliceOf = (d: ExhbtDoc, block: DraftBlock): unknown =>
+  block === "header" ? JSON.stringify(blockValue(d, "header")) : block === "findings" ? d.sections.find((s) => s.kind === "findings") : blockValue(d, block);
 
 /** "More actions" for one block the AI drafted, or nothing when the exhbt has no AI version. A leaf: it reads its own block's slice. */
 export function MoreActions({ block }: { block: DraftBlock }) {
