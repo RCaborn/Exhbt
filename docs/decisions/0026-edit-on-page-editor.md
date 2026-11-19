@@ -1,6 +1,6 @@
 Status: accepted
 Date: 19 Nov 2026
-Amends: 0007 (the editor is the page itself, not cards beside a preview), 0015 (sections are edited, added, removed and dragged on the page; a removed image can be put back), 0022 ("Arrange sections" goes; the editing page is the page), 0017 and 0025 (where a picked figure is managed; taking a figure by hand; the drafted chart can come back)
+Amends: 0007 (the editor is the page itself, not cards beside a preview), 0015 (sections are edited, added, removed and dragged on the page; a removed image can be put back), 0022 ("Arrange sections" goes; the editing page is the page), 0017 and 0025 (where a picked figure is managed; taking a figure by hand; the drafted chart can come back), and `DESIGN.md` (the Dragging rule, the exhbt page paragraph, the editor paragraph: the new wording is under "What DESIGN.md says from release 3")
 
 # The exhbt editor is the page itself
 
@@ -118,10 +118,23 @@ export type PageCtx = { Sub: Sub; imageUrls: ImageUrls; format: Format; edit?: E
 ```
 
 Rules for the page parts when `edit` is there:
-- **Nothing is left out for being empty.** Where the read-only page hides an empty part (the context line, a caption, "Where and when"), the editing page draws the part with its field, and the field's placeholder is what shows.
+- **Nothing is left out for being empty.** Where the read-only page hides an empty part (the context line, a caption, "Where and when"), the editing page draws the part with its field, and the field's placeholder is what shows. These placeholders are the only edit-only things in the flow, and each one takes exactly the room the part takes once it has words.
+- **Edit-only controls take no room.** Everything else the editor adds is drawn over the page, absolutely positioned inside the part it belongs to, or in a native popover: the section toolbar, the "+", the flowchart's grips and "+", a finding's controls and "Add a finding", an image's description strip, the picked-figure strip, a link's "Web address", a graph's "Edit figures", the aim or hypothesis switch, the shell parts' toolbars, "Add a skill", the formatting buttons and every issue message. So a page whose optional parts all have words is the visitor's page box for box, with nothing allowed for. Each edit-only element carries `data-edit-only`.
 - **Nothing navigates.** "All of Amara's work", a link section and the work button are drawn the same but do not open. A picture does not open larger.
 - **A part never knows which editor it is in.** It calls the slot and draws what comes back.
 - **The read-only page is byte for byte what it was.** The slots add nothing to it (the parity gate, 0027).
+
+The placeholders in the flow, the whole list. Each is there only while its part is empty, drawn in the part's own element and type with its words in `--xp-muted`:
+- the context line;
+- the sidebar's facts: What it is, Where and when, My role;
+- "Add the work", in place of "See the work";
+- a flowchart box's detail;
+- an image's caption;
+- a quote's role;
+- a link's description;
+- an aim or a conclusion with no words.
+
+The list lives once in the code, as `EDIT_ONLY_IN_FLOW` in `e2e/page-editor.ts`, and every box-for-box test reads it. Box for box is run twice. On samples with every optional part filled (My role included), the editing page and the visitor's page differ in nothing but the highlight's wrap (below). On a sparse fixture (a new exhbt), the editing page equals the loading stand-in exactly (below, "The crash fallback"), and differs from the visitor's page only by the parts on the list.
 
 ## What re-renders
 
@@ -159,33 +172,38 @@ Every field carries `data-path`, and the path is exactly the one `validateForPub
 
 | What | Where |
 |---|---|
-| An image's description (`sections.N.alt`) | A field under the picture, in the editor only: "Image n: describe it for people who can't see it" (id `image-N-alt`). Marked "Needs a description" until filled |
-| A link's address (`sections.N.href`) | "Web address", under the link, in the editor only |
-| A graph's figures (`sections.N.chart.*`) | Click the graph, or "Edit figures": a sheet at the side holds the existing `ChartEditor`, and the graph on the page redraws behind it |
-| A picked figure's tick, crop and other pages (`sections.N.picked.shareOk`) | A strip above the picture (the existing `PickedFigure`) |
+| An image's description (`sections.N.alt`) | A strip over the foot of the picture, in the editor only, taking no room: "Image n: describe it for people who can't see it" (id `image-N-alt`). Marked "Needs a description" until filled |
+| A link's address (`sections.N.href`) | A "Web address" button over the link's corner opens a popover holding the field |
+| A graph's figures (`sections.N.chart`, `sections.N.chart.*`) | Click the graph, or "Edit figures" over its corner: a sheet at the side holds the existing `ChartEditor`, and the graph on the page redraws behind it. A graph with no numbers yet shows "Add your numbers" over it, not an empty axis. A graph just added opens its sheet |
+| A picked figure's tick, crop and other pages (`sections.N.picked.shareOk`) | A small label over the top of the picture ("From your report, page 3") opens a popover holding the existing `PickedFigure` strip |
+| The aim or hypothesis switch | Over the aim's top edge |
 | The work (`evidence`) | The sidebar's button opens a small panel: a link or a file, and the name on the button |
 | The card's summary and headline number (`summary`, `headline`) | "Card and link details" in the top bar: a sheet with the portfolio tile drawn live beside the fields |
-| Numbers to check | In "Things to fix", each with "That's right" and a jump to the field that holds it |
+| Numbers to check | In "Things to fix", in a list named "Numbers to check", each with "That's right" and "Show me". The top bar's button shows whenever there is an issue or a number to check ("1 number to check" when that is all). The same rows are in the publish sheet |
 | The publish tick, Publish, the live link | "Review and publish": a sheet |
-| Unpublish, Delete, Use the classic editor | The menu at the end of the top bar |
-| Rewrite, Back to the AI version | "More actions" on the part it rewrites, as now |
+| Unpublish, Delete, Reorder sections, Use the classic editor | The menu at the end of the top bar |
+| Rewrite, Back to the AI version | "More actions": on a section, in its toolbar; on the title, the context line and the skills, in their own corner toolbar (`edit.tools`), out of the flow, with the test ids `tools-header`, `tools-gap` and `tools-skills` as now |
 | Sections the layout keeps but does not draw | A list at the foot of the page: "Kept, not shown in this layout", each with Remove |
-| How many of a kind (`sections`), the word total (path `""`) | The "+" at the end of the page; the word bar |
+| How many of a kind (path `sections`), the flowchart's count (`flow`), the skills (`skills`), the findings' count (`sections.N.items`), the word total (path `""`) | Each has an anchor that "Things to fix" jumps to: the "+" at the end of the page carries `data-path="sections"` and opens its menu; the flowchart's list `flow`; the skills block `skills`; a findings list's "Add a finding" `sections.N.items`; the word bar `""`. Every frame also carries `data-path="sections.N"`, so a path with no field of its own still lands on its section |
 | Teammates | Above the editor, as now (`TeamStrip`, `MatchPrompt`) |
+
+**Issues.** A field with an issue gets an outline in the look's error colour (`--xp-error`, below) and `aria-invalid`, and is tied to its message (`aria-describedby`). The message is visually hidden until the field has the focus, when it shows in a small popover under the field. It is never put in the flow: `visibleIssues` shows an over-limit issue while the person types, and a message in the flow would push the page down mid-word. Every message is also in "Things to fix".
 
 ## The chrome
 
-**The top bar**, one row that stays at the top: back to Your exhbts; the Layout menu; Undo, named for what it undoes ("Undo: remove graph 1"); the word bar; "3 things to fix"; See as a visitor; the save status; Card and link details; the menu; Review and publish. On a phone it keeps back, the word count, the things to fix, the save status and Publish; the rest is in the menu.
+**The top bar**, one row that stays at the top: back to Your exhbts; the Layout menu; Undo, named for what it undoes ("Undo: remove graph 1"); the word bar; "3 things to fix"; See as a visitor; the save status; Card and link details; the menu; Review and publish. On a phone it keeps back, the word count, the things to fix, the save status and "Review and publish" (one label for one action, everywhere); the rest is in the menu.
 
 **See as a visitor** draws the same doc with no adapter, in a region named "Preview". It is the truth about what a visitor gets, and it is what the editing page is tested against.
 
-**On each section**, a small toolbar at its top corner, outside the flow so it takes no room: the grip, move up, move down, the layout's own action where there is one (Make lead image, Make key figure, Before or After), More actions where the AI drafted the part, and Remove (the flowchart has no Remove in a case study or research, which always have one). It shows when the pointer is over the section or the focus is in it. The frame is an outline, not a border. Rory: "Grip thing good." The grip is the only thing that drags, so words can be selected and the page scrolled by touch.
+**On each section**, a small toolbar at its top corner, outside the flow so it takes no room: the grip, move up, move down, the layout's own action where there is one (Make lead image, Make key figure, Before or After), More actions where the AI drafted the part, and Remove (the flowchart has no Remove in a case study or research, which always have one). With a mouse it shows when the pointer is over the section or the focus is in it. On any touch screen (`pointer: coarse`), a tablet or a phone turned sideways included, it is always shown and its buttons are 44px; elsewhere they are 36px. Each button has a tooltip. The frame is an outline, not a border. Rory: "Grip thing good." The grip is the only thing that drags, so words can be selected and the page scrolled by touch.
 
-**The "+"** sits in the gap above each row and after the last. It lists every kind the layout can hold, in the layout's own words, with the flowchart when it is off the page. A kind with no room is listed, dimmed, with the reason under it ("Up to 2 graphs in a case study"). The list and the reasons come from one function (`blockOptions`), which reads the product's own caps. A new text section opens with the cursor in it. Image opens the file picker: several pictures at once, placed there in the order they were picked.
+**On the title, the context line and the skills**, which have no frame, the same kind of toolbar sits at the part's corner, out of the flow: "More actions" (rewrite, back to the AI version) where the AI drafted the part, and on the skills "Add a skill", which opens a popover holding the box (id `skill-new`).
 
-**The tray**, on a desktop only: a rail of the same blocks beside the page, to drag onto it. It is drawn from a window 77rem wide with a mouse or trackpad, fixed in the right margin, clear of the top and bottom fifths of the window where carrying something scrolls the page. Each block is also a button: Enter adds it after the section the focus was last in. Rory: "maybe tray only there on desktop". Between 64rem and 77rem there is no room for it, and the "+" is the way.
+**The "+"** sits in the gap above each row and after the last. It lists every kind the layout can hold, in the layout's own words, with the flowchart when it is off the page. A kind with no room is listed, dimmed, with the reason under it ("Up to 2 graphs in a case study"). The list and the reasons come from one function (`blockOptions`), which reads the product's own caps. When every kind is full, one line at the top says so: "This case study is full. Remove a section to add another, or try another layout." The words left are at the top too. The end one is named "Add a section"; the one in each gap "Add a section before <label>". A new text section opens with the cursor in it; a new graph opens its figures sheet. Image opens the file picker: several pictures at once, placed there in the order they were picked, with "Uploading 2 of 5" said and shown at once in a small status line at the foot of the window (out of the flow), and a failed upload's reason under it (`role="alert"`).
 
-**On a phone:** one column. Each section shows its grip; the other actions for the section in focus are in a bar at the foot of the screen, with the formatting buttons when a formatted field has the cursor. "Reorder sections" opens a sheet of short rows to drag or move with buttons. Sheets fill the screen. Targets are 44px. There is no tray.
+**The tray**, on a desktop only: a rail of the same blocks beside the page, to drag onto it. It is drawn from a window 77rem wide with a mouse or trackpad, fixed in the right margin, clear of the top and bottom fifths of the window where carrying something scrolls the page. Each block is also a button: Enter adds it after the section the focus was last in. It shows the words left and, when every kind is full, the same one line as the "+". Rory: "maybe tray only there on desktop". Between 64rem and 77rem there is no room for it, and the "+" is the way.
+
+**On a phone:** one column. Each section shows its grip; the other actions for the section in focus are in a bar at the foot of the screen, with the formatting buttons when a formatted field has the cursor. After a remove, a move or a drop the bar shows "Undo <what>" until the next action, so a wrong thumb is put right where it happened. "Reorder sections" opens a sheet of short rows to drag or move with buttons; it is also in the top bar's menu on every screen. Sheets fill the screen. Targets are 44px. There is no tray.
 
 ## Dragging
 
@@ -222,10 +240,10 @@ Formatted fields are Tiptap, one small editor per field. What the prototype foun
 - **Tiptap's wrapper is a `div`,** which cannot go in a `p`. So a formatted slot renders its own `div` with the paragraph's classes in place of the `p`.
 - **Tiptap starts after the first paint.** Until its editor exists, a field is drawn as the page draws it and swapped when ready; nothing moves in the swap. Editors are made one at a time in idle moments after the page is up, and at once for a field the person clicks. A full gallery has about a dozen.
 - **The highlight** is stored as bold and drawn as the page's `mark`, so the line being typed is the line that will be published.
-- **The formatting buttons** (Highlight on the context line; bold, italic and link elsewhere) float above the line's right end while it has the cursor, out of the flow.
+- **The formatting buttons** (Highlight on the context line; bold, italic and link elsewhere) float above the line's right end while it has the cursor, out of the flow; on a section's first line, where the toolbar sits, they go below the line instead, so the two never overlap.
 - **The title stays plain text.** `text-wrap: balance` works in a textarea, so it wraps as the published title does; the cost is that lines re-balance as you type.
 
-Known differences from the visitor's page, all small and all listed in the box-for-box test: a highlight that wraps is about 5px longer in the field; an image with no caption is one line taller while editing, because the empty caption field is there.
+The one known difference from the visitor's page on a full page, written into the box-for-box test by name: a highlight that wraps is about 5px longer in the field. Empty parts are the placeholders listed under "One page, one renderer".
 
 ## Undo
 
@@ -234,12 +252,19 @@ Undo reverses the last structural action. It never throws away typing, so it is 
 - On the list, up to 30: add, remove or move a section; a layout switch; add, remove or move a flowchart box or a finding; an AI rewrite; a confirmed number; removing the work.
 - Not on it: typing. Within a field the browser's own undo works.
 - Each entry is keyed by section id (a flowchart box by a key that lasts for the visit), so typing done since does not break it.
+- **What an entry holds.** A structural action (add, remove, move, a layout switch, the flowchart off or on) holds the whole structure before it: the sections' ids in stored order, the content of any section it took out, whether the marker was there, `flowOff` and the layout. Undo restores exactly that, the marker absent if it was absent (0027, "Layouts are starting templates"); sections still on the page keep their words. Any other entry (a rewrite, a confirmed number, the work removed, a patch with a name) holds the before and after of exactly what it changed: for each section it touched, the fields that changed; for the doc, the top-level keys other than `sections` that changed. Undo writes back only those, so typing done since in any other field is kept. A whole-doc snapshot is never used: it would throw typing away.
+- **The numbers to check.** Taking out a section never prunes the flags; a rewrite does, as now (`replaceBlock`). Undo brings the list back as the list now joined with the list before the action, limited to numbers on the page after the undo. So undoing a rewrite brings back the old "18%" still flagged: the server publishes only when the list the page sends is empty, so a number nobody checked must not lose its flag.
+- **Files.** Each entry says which stored files it could bring back, for the file rule below.
 - Ctrl or Cmd and Z runs it only when the cursor is not in a text field.
-- The list lasts for the visit.
+- The list lasts for the visit. After an Undo the focus goes to the first field of the section it brought back or moved; when there is no such section it stays on Undo while Undo can still be pressed, and otherwise goes to the top bar's heading.
 
 ## Saving, and what may delete a file
 
 Saving is `useAutosave`, unchanged: about a second and a half after the last change, at once when the tab is hidden or focus leaves the editor, one save at a time, three tries, a copy kept in the browser until the server has it. The status is quiet text: "Saved", "Saving…", or "Not saved. Retry". Nothing spins and nothing blocks typing. The server actions (`saveDraft`, `publishExhbt`) are unchanged.
+
+Two things go round React, because React can lose them:
+- **The browser copy is written by the store,** in the same change that sets the words (`writeBackup`, under the key `useAutosave` uses), before anyone is told of the change. If the editor throws while drawing that change, React drops the render, so a backup written in an effect would never be made. The store also keeps the newest doc for `flushPending()`, which the crash fallback awaits.
+- **A save that fails for a reason other than the network** (after a deploy or a rollback the page's server actions no longer exist on the server) does not retry three times and then say "Not saved". It says "The editor was updated. Reload to carry on; your changes are kept in this browser." with a Reload button.
 
 Typing never writes the flow marker; the first structural change does (0027).
 
@@ -250,7 +275,9 @@ A stored file (a picture, or the work) is deleted only when all four are true:
 3. the doc in the editor now does not point at it;
 4. no undo entry could put it back.
 
-The check runs after each save lands, when an undo entry falls off the end of the list, and when the editor goes away (the page is hidden, or the person leaves or switches to the classic editor). So a removed picture can be put back with Undo for as long as the visit lasts, which the classic editor could not do. If the tab is killed outright, a removed picture's file is left behind; it is harmless and counts against storage, as an orphan does today.
+The check runs after each save lands, when an undo entry falls off the end of the list, on `pagehide` when the page is not being kept (`event.persisted` is false), and when the editor unmounts (the person leaves or switches to the classic editor). It never runs when the page is merely hidden (`visibilitychange`), nor on a `pagehide` that keeps the page in the back-forward cache: in both the visit, and its undo list, comes back. So a removed picture can be put back with Undo for as long as the visit lasts, which the classic editor could not do. If the tab is killed outright, a removed picture's file is left behind; it is harmless and counts against storage, as an orphan does today.
+
+**The server has the last word.** Each editor decides from what it saw, and two can be open on one exhbt (two tabs, or the new one and the classic one after the switch or the escape). So `DELETE /api/files/[id]` deletes nothing, and answers as if it had, while any of the person's exhbts points at the file in its working copy or its published copy. This ships in release 2, where it changes nothing: today's editor never deletes a file either copy still uses.
 
 A picture replaced by a new crop or another page is not an undo entry: the old file goes when the save without it lands, as now.
 
@@ -258,28 +285,30 @@ A picture replaced by a new crop or another page is not an undo entry: the old f
 
 - **Pictures by hand** are as now: several at once, shrunk in the browser, placed in the order picked, with the cursor then put in the first empty description. They can also be dropped onto the page.
 - **A picked figure** keeps its strip: where it came from, the share tick, Crop, Choose another page.
-- **When nothing was picked** and the layout takes a figure from the work, an image "+" also offers "Take a figure from my report": the page chooser that `PickedFigure` already has, with no AI call. It needs the stored PDF, so it is offered only when there is one.
-- **Removing a picked graph or table** offers the chart the draft drew: "Put back the chart drafted from your numbers". When the figure was placed, the graphs it replaced are kept with the exhbt's AI version (`ai-version.json`, beside the blocks kept for "Back to the AI version"), not in the doc. Putting one back goes through the server, which checks its numbers against the source again, so a parked graph cannot escape the number check. The graphs are kept from release 2 on; an exhbt drafted before that has none, and gets no offer.
+- **When nothing was picked** and the layout takes a figure from the work, the "+" also offers "Take a figure from my report": the page chooser that `PickedFigure` already has, with no AI call. It needs the stored PDF, so it is listed only when there is one. When the layout has no room for another image it is still listed, dimmed, with the image's reason ("Up to 2 images in a case study"), so the person learns it is there.
+- **Removing a picked graph or table** offers the chart the draft drew: "Put back the chart drafted from your numbers". The offer shows only once no image on the page has a picked graph or table: while the report's own figure is on the page the drafted chart stays away, as 0025 rules. When the figure was placed, the graphs it replaced are kept with the exhbt's AI version (`ai-version.json`, beside the blocks kept for "Back to the AI version"), not in the doc. Reading and rewriting the AI version keeps them (`loadAiVersion` returns `graphs`, so a rewrite of another part does not wipe them). Putting one back goes through the server, which checks its numbers against the source again, so a parked graph cannot escape the number check. The graphs are kept from release 2 on; an exhbt drafted before that has none, and gets no offer.
 
 ## The person's own look
 
 The editing page sits in the person's look: the wrapper carries `lookAttrs(theme)` and `themeStyle(theme)` (`components/portfolio/themeFonts.ts`), as the public frame does. The frames, grips, the line and the lifted copy take the look's own variables, so they hold on a dark look. The top bar and the sheets stay in the app's own style.
 
+Two marks on the page need colours each look must pass: the placeholders, which use `--xp-muted` (already checked in every look as "secondary text on the ground", on cards and on the well); and issues ("Needs a description", an invalid field's outline, words over the cap, a kind that is full), which use a new `--xp-error`, from a new `error` colour in every look's palette (`--pf-error`), added to `contrastPairs` on the ground, the cards and the well. It is the one colour this decision adds; the app's own red never goes on a look's ground. It ships in release 2, unused, so the looks' contrast test covers it before the editor exists. It is one of Rory's questions.
+
 ## The classic editor: the switch, the fallback, the escape
 
 The old editor stays for one release as "classic". It is the safety net for going straight to everyone.
 
-- **The switch.** `editorKind()` in `lib/site.ts` returns `"page"` unless the runtime variable `EXHBT_EDITOR` is `classic`. It is read on each request, so setting it in the Cloudflare dashboard flips everyone back with no deploy.
+- **The switch.** `editorKind()` in `lib/site.ts` returns `"page"` unless the runtime variable `EXHBT_EDITOR` is `classic`. It is read on each request, so setting it in the Cloudflare dashboard flips everyone back with no deploy. In development only, a cookie (`exhbt-editor-kind`, set by `/dev/editor?kind=`) overrides it, so each browser test has its own and a failed test cannot leave the switch set for the next. It ships, unused, in release 2, so the switch is proven on the preview site before there is an editor to switch to.
 - **The escape.** "Use the classic editor" opens the same exhbt with `?editor=classic`, for that visit. The classic editor shows a line with the way back.
-- **The crash fallback.** An error boundary sits round the new editor. If it throws, the boundary shows "Something went wrong with the new editor. Your work is saved.", lets the waiting save finish, and reloads the page with `?editor=classic`. It reloads, and does not swap editors in place, because the page's props are from when it was opened: an editor mounted on them could save over newer work.
-  - An error boundary cannot catch a throw while the server draws the page. So the new editor is never drawn on the server: it loads in the browser, inside the boundary. Until it has loaded, the person sees their exhbt as a visitor would, and the fields then come alive in place.
+- **The crash fallback.** An error boundary sits round the new editor. If it throws, the boundary shows "Something went wrong with the new editor. Your work is saved.", waits for `flushPending()` (the store's newest doc sent to the server, three seconds at most; the browser copy was already written), and reloads the page with `?editor=classic`. It reloads, and does not swap editors in place, because the page's props are from when it was opened: an editor mounted on them could save over newer work.
+  - An error boundary cannot catch a throw while the server draws the page. So the new editor is never drawn on the server: it loads in the browser, inside the boundary. Until it has loaded, the person sees the editing page drawn by a static stand-in adapter: the same slots, with every placeholder in the flow drawn as inert text and every control left out (they take no room). The visitor's page would not do, because it leaves out empty parts, and every placeholder would pop in when the editor arrived. With the stand-in the fields come alive in place and nothing moves, which a test checks on a blank new exhbt.
   - If the page itself fails on the server, the route's own error page says the same and links to the classic editor.
 
 Both editors use the same doc, autosave and actions, and the classic editor keeps what it does not edit (0027), so moving between them mid-exhbt loses nothing. How the switch is proven is in `docs/briefs/edit-on-page/README.md`.
 
 ## Smoothness
 
-Rory asked for "super smooth". These exact checks gate CI. They count things; they do not time them, so they do not flake.
+Rory asked for "super smooth". These exact checks gate CI. They count things; they do not time them, so they do not flake. They run on the sample of every layout the editor offers (`OFFERED_FORMATS`), so when release 4 offers seven, they cover seven with no change to the specs, and release 4 adds flicker cases for its new rows (a Before and after pair forming, Build's row of buttons, Essay's key points beside the pull quote).
 
 1. **Typing re-renders only what was typed in.** A counter on each unit (the shell, the flowchart, each section). A key typed in a finding, a caption or a quote adds one to that section and none to anything else. A key in a flowchart box adds one to the flowchart only. A key in the title or the context line adds one to the shell and none to any section.
 2. **Nothing moves when a field takes focus.** Every frame, pill, flowchart box, finding and figure is in the same place before and after, on every layout.
@@ -296,8 +325,17 @@ Frame times during a scripted drag and keystroke-to-paint on the longest sample,
 - Sheets are native `<dialog>`s: focus is trapped, Escape closes, and focus goes back to what opened them.
 - An issue is tied to its field (`aria-describedby`) and marks it invalid.
 - The toolbar shows on focus as well as on hover, and is always shown on touch.
-- axe runs on every layout at rest, with a section lifted, in a dark look, while typing, on a phone and with each sheet open.
+- Every "+" has its own name: "Add a section" at the end, "Add a section before <label>" in each gap.
+- axe runs on every layout at rest, with a section lifted, in a dark look, while typing, on a phone and with each sheet open; and at rest on a blank and on a full exhbt in all eight looks, because on a blank exhbt the placeholders are all there is to read.
 - The editing page keeps the page's heading order: the screen's own heading is "Edit exhbt", and the exhbt's title is drawn one level down.
+
+## What DESIGN.md says from release 3
+
+This decision departs from three passages of `DESIGN.md`. The editor's agent pastes this wording in at release 3, so a reviewer judging the look against `DESIGN.md` judges it against this.
+
+- **Dragging** (replaces the sentences after the builder's): "On the exhbt editing page, sections slide to make room and the flowchart, and a box inside it, is carried over a still page with a line showing where it lands (decision 0026). The lifted copy keeps its card, takes `shadow-pack` and an outline in the look's link colour (jade in the Exhbt look), and is never scaled; the others move only by transform, 180ms, and nothing moves under `prefers-reduced-motion`. Toolbar buttons are small round icon buttons, 36px, 44px on any touch screen, each with an `aria-label` and a tooltip. Status is quiet text ("Saved"); the exhbt editor's Undo keeps up to 30 steps, named for what each undoes."
+- **The exhbt page** (replaces "The core's order never changes."): "The flowchart is a section like the others: it can be moved, and removed in the layouts that let it go (decision 0027). Every layout is drawn in the doc's order by one engine."
+- **The editor** (replaces the paragraph that starts "In the editor each section is a card"): "The exhbt editor is the page itself, in the person's own look (decision 0026). Each section has a toolbar at its top corner, out of the flow: a grip (the only thing that drags), move up and down, the layout's own action, More actions, and Remove. Edit-only controls take no room; only an empty part's placeholder is in the flow. The top bar and the sheets are app chrome, in the app's own style."
 
 ## Not done, on purpose
 
@@ -319,5 +357,7 @@ Frame times during a scripted drag and keystroke-to-paint on the longest sample,
 - **A screen reader has not been heard.** The announcements are checked as text.
 - **`keep_vars`** should keep a dashboard variable across deploys. The plan put that at about three in four; the preview test settles it before release.
 - **The shell re-renders on every key in the title.** It is light, but it is the largest unit.
+- **Overlays over the picture.** The description strip covers the foot of each picture while editing, and the picked-figure label its top. That is the price of the page keeping its size. Rory may prefer a field under the picture; it would make the editing page longer than the visitor's by one line per picture.
+- **Popovers** (the link's address, the picked figure's strip, "Add a skill") use the native popover element. Safari and Firefox support it in their current versions; older ones need a person to check.
 
 Code: `components/portfolio/page-ctx.ts`, `components/portfolio/ProjectView.tsx`, `components/portfolio/LayoutMain.tsx`, `components/exhbt-editor/`, `lib/site.ts`, `app/(app)/exhbts/[id]/edit/page.tsx`, `app/(app)/exhbts/[id]/figure-actions.ts`. Kept and reused: `components/editor/useAutosave.ts`, `media.ts`, `model.ts`, `ChartEditor.tsx`, `PickedFigure.tsx`, `BlockTools.tsx`, `ConfirmAction.tsx`. Tests: `e2e/editor-inplace.spec.ts`, `editor-smooth`, `editor-drag`, `editor-flow`, `editor-classic`. Briefs: `docs/briefs/edit-on-page/`.
