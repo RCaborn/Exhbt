@@ -198,7 +198,7 @@ Three critics (data and rollback; the editing experience; buildability) read the
 - experience-8 (major): accepted, with build-13. "Put it back" shows only when no image has a picked graph or table (0026, J), tested both ways.
 - experience-9 (major): accepted. `board.add("graph", at)` calls `ui.open("chart", id)`, written into the `Board` type in every brief; an empty chart shows "Add your numbers" over it (J).
 - experience-10 (major): accepted. Every smoothness, drag, flowchart and box-for-box spec loops over `OFFERED_FORMATS` (`offered()` and `SAMPLES` in G's page object); a new Sonnet brief, Q, runs them on seven in release 4 and adds flicker cases for the new rows.
-- experience-11 (major): accepted in part. The critic was wrong that `--xp-muted` is unchecked: it is the palette's `soft`, checked at 4.5 on the ground, cards and the well, so placeholders use it. The error colour was truly missing: C adds `error` to every look's palette, `--pf-error` and `--xp-error`, and three contrast pairs, in release 2. axe runs at rest on a blank and a full exhbt in all eight looks. A per-look error colour is put to Rory (question 12).
+- experience-11 (major): accepted in part. The critic was wrong that `--xp-muted` is unchecked: it is the palette's `soft`, checked at 4.5 on the ground, cards and the well, so placeholders use it. The error colour was truly missing: C adds `error` to every look's palette, `--pf-error` and `--xp-error`, and three contrast pairs, in release 2. axe runs at rest on a blank and a full exhbt in all eight looks. A per-look error colour is put to Rory (question 10; question 11 is the overlays on pictures).
 - experience-12 (major): accepted (as data-2).
 
 **Build**

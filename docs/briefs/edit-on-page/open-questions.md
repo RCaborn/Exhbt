@@ -32,7 +32,7 @@ An essay's flowchart shows how the argument runs. It also costs about 15 of the 
 - Cost to change: one line.
 
 **6. "My role" on every layout, or only on Event or performance?**
-- Built in: offered on every layout, needed only for an event.
+- Built in: offered on every layout in the new editor, needed only for an event. (Until the new editor arrives, the old editor shows the box only on an exhbt that already has one, so nobody sees a new box before then.)
 - Cost to change: one line.
 
 **7. The names and headings.**
@@ -52,12 +52,24 @@ The preview site cannot run the signed-in editor today because its database is b
 - Built in: not done. Only the switch itself is proven on the preview site.
 - Cost to change: an hour or two, and I would ask before touching that database.
 
+## About the editing page
+
+**10. A warning colour in every look.**
+Marks like "Needs a description" and words over the limit have to be readable in all eight looks, dark ones included. The looks have no warning colour today, and the app's own red is not checked against them.
+- Built in: each look gets one warning colour of its own (a red or a deep orange that reads on its background), checked for contrast like every other colour in it. Nobody sees it until the new editor.
+- Cost to change: small. The other choice is one red for every look, which will be hard to read on some of them.
+
+**11. A picture's description while editing.**
+So the editing page stays exactly the size of the real page, the box for a picture's description sits over the bottom of the picture, and the "From your report" note sits over its top.
+- Built in: over the picture, as described.
+- Cost to change: small. The other choice is a box under each picture, which is easier to see but makes the editing page one line longer per picture than what visitors see.
+
 ## Carried over, still open
 
-**10. A long results table from the work replaces the AI's chart** (from decision 0025). A picture of a twelve-row table may read worse than the chart the AI drew.
-- Built in: the table wins, as a graph does. If the person removes it, the editor now offers the drafted chart back.
+**12. A long results table from the work replaces the AI's chart** (from decision 0025). A picture of a twelve-row table may read worse than the chart the AI drew.
+- Built in: the table wins, as a graph does. If the person removes it, the editor then offers the drafted chart back (never while the table is still on the page).
 - Cost to change: small.
 
-**11. Two things I need from you, not decisions.**
+**13. Two things I need from you, not decisions.**
 - The GitHub secret `ANTHROPIC_API_KEY`, so the real-AI tests can run (release 1b and release 4 both wait on it).
 - A try of the finished editor in Safari on an iPhone if you have one. Everything here was tested in Chrome only.
