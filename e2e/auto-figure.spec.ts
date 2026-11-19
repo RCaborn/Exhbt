@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { emptyDoc, ExhbtDocSchema, formatLimits, publicDoc, text, validateForPublish, type ExhbtDoc, type Section } from "../lib/exhbt/blocks";
 import { checkedReason, figureSentence, layoutSentence } from "../lib/exhbt/drafted";
-import { FORMAT_RULES, FORMATS, fromWorkOf } from "../lib/exhbt/formats";
+import { FORMAT_RULES, fromWorkOf, OFFERED_FORMATS } from "../lib/exhbt/formats";
 import { roomFor, sectionLabel, withKeyFigure, withWorkVisual } from "../lib/exhbt/sections";
 import { imageSize } from "../lib/figures/image-size";
 import { FIGURE, boxFromPixels, clampBox, fitCaption, mayHoldFigure, pixelsFromBox, withMargin } from "../lib/figures/rules";
@@ -140,7 +140,7 @@ test.describe("Picked figure rules", () => {
 
 test.describe("The work's own graph wins (decision 0025)", () => {
   test("every layout says what it takes from the work, and today each takes a visual", () => {
-    expect(FORMATS.map((f) => [f, FORMAT_RULES[f].fromWork])).toEqual([
+    expect(OFFERED_FORMATS.map((f) => [f, FORMAT_RULES[f].fromWork])).toEqual([
       ["case-study", "figure"],
       ["gallery", "pictures"],
       ["research", "figure"],

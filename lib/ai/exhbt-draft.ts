@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
 import { formatLimits, LIMITS, SCHEMA_VERSION, text, withHighlight, words, type ExhbtDoc, type Section } from "@/lib/exhbt/blocks";
-import { FORMATS, isFormat } from "@/lib/exhbt/formats";
+import { DRAFT_FORMATS, isFormat } from "@/lib/exhbt/formats";
 import { checkedReason, LAYOUT_REASONS, type LayoutReason } from "@/lib/exhbt/drafted";
 import { CHART_KINDS, hasData, type Chart } from "@/lib/exhbt/charts";
 import { referencesFrom, squash } from "@/lib/exhbt/references";
@@ -97,7 +97,7 @@ const DraftChartSchema = z.object({
 export type DraftChart = z.infer<typeof DraftChartSchema>;
 
 const DraftSchema = z.object({
-  format: z.enum(FORMATS),
+  format: z.enum(DRAFT_FORMATS),
   /** Why that layout: a fixed signal, never the model's own words (lib/exhbt/drafted.ts, decision 0025). */
   formatReason: z.enum(LAYOUT_REASONS),
   title: z.string(),

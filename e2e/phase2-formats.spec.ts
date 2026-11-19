@@ -16,7 +16,7 @@ import {
   type Section,
 } from "../lib/exhbt/blocks";
 import { applyBlock } from "../lib/exhbt/draft-blocks";
-import { formatOf, FORMATS, hiddenSections, shownSections, withFormat } from "../lib/exhbt/formats";
+import { formatOf, hiddenSections, OFFERED_FORMATS, shownSections, withFormat } from "../lib/exhbt/formats";
 import { fitCaption } from "../lib/figures/rules";
 import { keyFigureOf } from "../lib/portfolio-home";
 import { referencesFrom } from "../lib/exhbt/references";
@@ -93,13 +93,14 @@ test.describe("model: the layout field", () => {
   });
 
   test("a layout this code doesn't know reads as a case study and nothing else is lost", () => {
-    const d = normaliseDoc({ ...research(), format: "build" });
+    // "build" was the example until release 2 made it a layout (decision 0028); any id no release knows will do.
+    const d = normaliseDoc({ ...research(), format: "timeline" });
     expect("format" in d).toBe(false);
     expect(d.sections).toHaveLength(research().sections.length);
     expect(d.title).toBe(research().title);
     const parsed = ExhbtDocSchema.parse({ ...gallery(), format: 42 });
     expect(formatOf(parsed)).toBe("case-study");
-    expect(() => normaliseDoc({ format: "build" })).not.toThrow();
+    expect(() => normaliseDoc({ format: "timeline" })).not.toThrow();
     expect(() => normaliseDoc(null)).not.toThrow();
   });
 
@@ -125,7 +126,7 @@ test.describe("model: the layout field", () => {
       expect(withFormat(there, "case-study")).toEqual(withFormat(doc, "case-study"));
     }
     for (const doc of sampleDocs) expect(withFormat(withFormat(withFormat(doc, "case-study"), "gallery"), "case-study")).toEqual(doc);
-    expect(FORMATS).toEqual(["case-study", "gallery", "research"]);
+    expect(OFFERED_FORMATS).toEqual(["case-study", "gallery", "research"]);
   });
 });
 

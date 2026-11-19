@@ -5,6 +5,7 @@ import {
   sectionTexts,
   text,
   words,
+  type ContentSection,
   type ExhbtDoc,
   type FigureKind,
   type Picked,
@@ -32,6 +33,7 @@ export const SECTION_NAMES: Record<SectionKind, string> = {
   link: "Link",
   aim: "Aim or hypothesis",
   conclusion: "Conclusion",
+  pullquote: "Pull quote",
 };
 
 /** What a layout calls a kind: findings, what I'd do next and the link read the layout's own words. */
@@ -56,6 +58,7 @@ export function sectionName(kind: SectionKind, f: Format = "case-study"): string
 export function sectionLabel(sections: Section[], i: number, f: Format = "case-study"): string {
   const s = sections[i];
   if (!s) return "";
+  if (s.kind === "flow") return "Flowchart";
   if (f === "gallery" && s.kind === "image" && sections.findIndex((x) => x.kind === "image") === i) return "Lead image";
   if (f === "research" && (s.kind === "graph" || s.kind === "image") && firstOfKinds(sections, ["graph", "image"]) === i) return "Key figure";
   if (formatLimits(f).sections[s.kind] <= 1) return sectionName(s.kind, f);
@@ -64,9 +67,9 @@ export function sectionLabel(sections: Section[], i: number, f: Format = "case-s
 }
 
 /** The index of the first section whose kind is one of `kinds`, or -1. "Make lead image" and "Make key figure" move a section here. */
-export const firstOfKinds = (sections: Section[], kinds: SectionKind[]): number => sections.findIndex((s) => kinds.includes(s.kind));
+export const firstOfKinds = (sections: Section[], kinds: SectionKind[]): number => sections.findIndex((s) => s.kind !== "flow" && kinds.includes(s.kind));
 
-/** How many more of a kind there's room for. In research a graph or image also respects the cap on figures together. */
+/** How many more of a kind there's room for. In research a graph or image also respects the cap on figures together. The flowchart's marker is never counted. */
 export function roomFor(sections: Section[], kind: SectionKind, f: Format = "case-study"): number {
   const L = formatLimits(f);
   let room = Math.max(0, L.sections[kind] - sections.filter((s) => s.kind === kind).length);
@@ -83,7 +86,7 @@ export function nextSectionId(kind: SectionKind, sections: Section[]): string {
 }
 
 /** A new, empty section of a kind (an image needs its uploaded file, so it's made with newImageSection). */
-export function newSection(kind: Exclude<SectionKind, "image">, sections: Section[]): Section {
+export function newSection(kind: Exclude<SectionKind, "image">, sections: Section[]): ContentSection {
   const id = nextSectionId(kind, sections);
   switch (kind) {
     case "findings":
@@ -100,6 +103,8 @@ export function newSection(kind: Exclude<SectionKind, "image">, sections: Sectio
       return { id, kind, text: [] };
     case "conclusion":
       return { id, kind, text: [] };
+    case "pullquote":
+      return { id, kind, text: "" };
   }
 }
 
@@ -166,7 +171,11 @@ export function withKeyFigure(
   if (f === "gallery" || f === "research") {
     const first = firstOfKinds(ss, f === "gallery" ? ["image"] : ["graph", "image"]);
     at = first < 0 ? Math.min(Math.max(0, instead ?? ss.length), ss.length) : first;
-  } else at = ss.findIndex((s) => s.kind === "findings") + 1;
+  } else {
+    // Straight after the findings; with none, first, or straight after the flowchart on a doc that has its marker (decision 0027).
+    const findings = ss.findIndex((s) => s.kind === "findings");
+    at = findings >= 0 ? findings + 1 : ss.findIndex((s) => s.kind === "flow") + 1;
+  }
   return { ...doc, sections: [...ss.slice(0, at), section, ...ss.slice(at)] };
 }
 

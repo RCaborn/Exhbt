@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-import { FORMAT_COPY, FORMAT_LIMITS, FORMAT_RULES, FORMATS, formatOf, isFormat, isShown, shownSections, type Format } from "./formats";
+import { flowShown, FORMAT_COPY, FORMAT_LIMITS, FORMAT_RULES, FORMATS, formatOf, isFormat, isShown, shownSections, type Format, type Need } from "./formats";
 import { asChart, CHART_LIMITS, ChartSchema, chartIssues, chartTexts, publicChart, type Chart } from "./charts";
 
 /**
@@ -9,9 +9,11 @@ import { asChart, CHART_LIMITS, ChartSchema, chartIssues, chartTexts, publicChar
  *   header:   photo + name (from the profile, not stored here) · skill boxes · the title, phrased as
  *             the question · the context line (gap), its bold run drawn as a highlight
  *   sidebar:  what it is (context) · where and when · the checks · the work · Save as PDF
- *   core:     the context line → the process flowchart (3 to 6 boxes). Always there, in this order.
- *   sections: below the flowchart, in the person's order: findings, graphs (0-2), images (0-2),
- *             a quote, what I'd do next, a link. Each can be added, removed and moved.
+ *   core:     the context line → the process flowchart (3 to 6 boxes). Its boxes are `flow`; its
+ *             place among the sections is a marker, `{ id: "flow", kind: "flow" }` (decision 0027),
+ *             and a doc with no marker is drawn as it always was (adopt, lib/exhbt/layouts.ts).
+ *   sections: in the person's order: findings, graphs (0-2), images (0-2), a quote, what I'd do
+ *             next, a link. Each can be added, removed and moved.
  *   footer:   the work (evidence) · trust badge (system)
  *
  * Drafts may break the limits (saving is never blocked); publishing may not (validateForPublish,
@@ -21,8 +23,12 @@ import { asChart, CHART_LIMITS, ChartSchema, chartIssues, chartTexts, publicChar
 
 export const SCHEMA_VERSION = 2;
 
-/** `aim` and `conclusion` are drawn only by the research layout (decision 0024). Last, so the order of issues for the older kinds is unchanged. */
-export const SECTION_KINDS = ["findings", "graph", "image", "quote", "reflection", "link", "aim", "conclusion"] as const;
+/**
+ * `aim` and `conclusion` are drawn only by the research layout (decision 0024), the pull quote only
+ * by the essay (decision 0028). Last, so the order of issues for the older kinds is unchanged. Never
+ * "flow": the flowchart's marker is a section but not a kind, so every table keyed by kind is unchanged.
+ */
+export const SECTION_KINDS = ["findings", "graph", "image", "quote", "reflection", "link", "aim", "conclusion", "pullquote"] as const;
 export type SectionKind = (typeof SECTION_KINDS)[number];
 
 /** Hard limits, checked on publish. The editor shows them as it goes. */
@@ -33,6 +39,8 @@ export const LIMITS = {
   contextChars: 90,
   /** "Where and when", e.g. "University of St Andrews, August 2026". */
   whereWhenChars: 60,
+  /** "My role", in the sidebar (decision 0028), e.g. "Stage manager". */
+  myRoleChars: 60,
   /** One sentence on what you found, for portfolio cards (exhbtSummary). */
   summaryWords: 25,
   skills: { max: 6, wordsEach: 3, charsEach: 32 },
@@ -46,20 +54,22 @@ export const LIMITS = {
   quote: { words: 30, nameChars: 60, roleChars: 60 },
   /** What I'd do next: one or two lines. */
   reflection: { words: 35 },
-  /** A repository, demo or document: https only. */
-  link: { labelWords: 8, descriptionWords: 15 },
+  /** A repository, demo or document: https only. `hrefOptional`: a layout may allow a link with no address (an essay's sources, decision 0028). */
+  link: { labelWords: 8, descriptionWords: 15, hrefOptional: false },
   /** Research only (decision 0024). */
   aim: { words: 20 },
   conclusion: { words: 25 },
+  /** Essay only: the person's own words, drawn large (decision 0028). */
+  pullquote: { words: 30 },
   /** How many of each section an exhbt can have (decision 0015). */
-  sections: { findings: 1, graph: CHART_LIMITS.max, image: 2, quote: 1, reflection: 1, link: 1, aim: 1, conclusion: 1 } satisfies Record<SectionKind, number>,
+  sections: { findings: 1, graph: CHART_LIMITS.max, image: 2, quote: 1, reflection: 1, link: 1, aim: 1, conclusion: 1, pullquote: 1 } satisfies Record<SectionKind, number>,
   evidenceCaptionWords: 15,
   /** Every word on the page (see wordCount). 150 is what the editor aims for; 200 is the limit. */
   totalWords: 200,
   targetWords: 150,
 } as const;
 
-type Widen<T> = { -readonly [K in keyof T]: T[K] extends number ? number : T[K] extends object ? Widen<T[K]> : T[K] };
+type Widen<T> = { -readonly [K in keyof T]: T[K] extends number ? number : T[K] extends boolean ? boolean : T[K] extends object ? Widen<T[K]> : T[K] };
 export type Limits = Omit<Widen<typeof LIMITS>, "sections"> & {
   sections: Record<SectionKind, number>;
   /** Fewest images a layout needs (a gallery: two). */
@@ -127,6 +137,8 @@ export const ImageSchema = z.object({
   /** The picture's size in pixels after the browser's resize, so a page knows its shape before it loads. Older images have none. */
   w: z.number().int().min(1).max(20000).optional(),
   h: z.number().int().min(1).max(20000).optional(),
+  /** Marked by the person as how it was or how it is now (decision 0028). Only Before and after draws it; elsewhere it is kept. A value this code doesn't know reads as none. */
+  stage: z.enum(["before", "after"]).optional().catch(undefined),
 });
 
 export const EvidenceSchema = z.union([
@@ -191,6 +203,13 @@ export const LinkSectionSchema = z.object({ id: SectionId, kind: z.literal("link
 /** Research only: the aim or hypothesis, and the conclusion (decision 0024). Short formatted text, like "What I'd do next". */
 export const AimSectionSchema = z.object({ id: SectionId, kind: z.literal("aim"), text: RichTextSchema, heading: z.enum(["aim", "hypothesis"]).optional() });
 export const ConclusionSectionSchema = z.object({ id: SectionId, kind: z.literal("conclusion"), text: RichTextSchema });
+/** Your own words, drawn large (the essay layout). Plain text. */
+export const PullquoteSectionSchema = z.object({ id: SectionId, kind: z.literal("pullquote"), text: z.string() });
+
+export const FLOW_ID = "flow";
+/** Where the flowchart sits among the sections. Its boxes stay in doc.flow. At most one. */
+export const FlowMarkerSchema = z.object({ id: z.literal(FLOW_ID), kind: z.literal("flow") });
+export type FlowMarker = z.infer<typeof FlowMarkerSchema>;
 
 export const SectionSchema = z.discriminatedUnion("kind", [
   FindingsSectionSchema,
@@ -201,8 +220,14 @@ export const SectionSchema = z.discriminatedUnion("kind", [
   LinkSectionSchema,
   AimSectionSchema,
   ConclusionSectionSchema,
+  PullquoteSectionSchema,
+  FlowMarkerSchema,
 ]);
+/** A section as stored, the flowchart's marker included. */
 export type Section = z.output<typeof SectionSchema>;
+/** Every section but the flowchart's marker. */
+export type ContentSection = Exclude<Section, FlowMarker>;
+export const isContent = (s: Section): s is ContentSection => s.kind !== "flow";
 export type SectionOf<K extends SectionKind> = Extract<Section, { kind: K }>;
 
 const DocSchema = z.object({
@@ -217,6 +242,8 @@ const DocSchema = z.object({
   context: z.string(),
   /** "Where and when", in the sidebar, e.g. "University of St Andrews, August 2026". Optional: older docs have none. */
   whereWhen: z.string().optional(),
+  /** "My role", in the sidebar (decision 0028). Optional. */
+  myRole: z.string().optional(),
   /** One sentence on what you found, for portfolio cards. Optional; exhbtSummary falls back to the first finding. */
   summary: z.string().optional(),
   /** The one number that sums it up, on job-link tiles and link previews (not on the page since decision 0022). Optional. */
@@ -227,9 +254,11 @@ const DocSchema = z.object({
    * highlighted phrase, the gap (decision 0022). Called "The question" before the title became one.
    */
   gap: RichTextSchema,
-  /** The process flowchart: always there, 3 to 6 boxes. */
+  /** The process flowchart's boxes, 3 to 6. Where it sits is the marker in `sections`. */
   flow: z.array(FlowStepSchema),
-  /** Everything below the flowchart, in page order. */
+  /** The flowchart has been taken off the page (decision 0027). Never there with a marker: normaliseDoc deletes it. */
+  flowOff: z.boolean().optional(),
+  /** The sections in page order, with the flowchart's marker among them once the doc is arranged (decision 0027). */
   sections: z.array(SectionSchema),
   /** The work, in the footer beside the trust badge (not a section: the badge's "source attached" reads it). */
   evidence: EvidenceSchema.optional(),
@@ -254,12 +283,16 @@ export type ExhbtDocV1 = Omit<ExhbtDoc, "schemaVersion" | "sections"> & {
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
-/** Every section with an id, and no id twice (a repeat or a missing one gets the next free `${kind}-n`). */
+/**
+ * Every section with an id, and no id twice (a repeat or a missing one gets the next free `${kind}-n`).
+ * The flowchart's marker always has the id `flow`, and no other section ever does.
+ */
 function withIds(sections: unknown[]): unknown[] {
-  const seen = new Set<string>();
+  const seen = new Set<string>([FLOW_ID]);
   const ids = new Set(sections.map((s) => (isObject(s) && typeof s.id === "string" ? s.id : "")));
   return sections.map((s) => {
     if (!isObject(s)) return s;
+    if (s.kind === "flow") return { id: FLOW_ID, kind: "flow" };
     let id = typeof s.id === "string" && s.id && !seen.has(s.id) ? s.id : "";
     if (!id) {
       const kind = typeof s.kind === "string" ? s.kind : "section";
@@ -284,8 +317,16 @@ export function normaliseDoc(raw: unknown): ExhbtDoc {
   if (Array.isArray(raw.sections)) {
     // A layout this code doesn't know (written by a later release) reads as a case study, and a
     // section kind it doesn't know is left out of what is read, so no reader or schema ever meets one.
+    // At most one flowchart marker (decision 0027): a second is dropped, and with one there, flowOff
+    // goes, so the two can never disagree in a saved doc.
     const { format, ...rest } = raw;
-    const known = raw.sections.filter((s) => !isObject(s) || (SECTION_KINDS as readonly string[]).includes(s.kind as string));
+    let markers = 0;
+    const known = raw.sections.filter((s) => {
+      if (!isObject(s)) return true;
+      if (s.kind === "flow") return ++markers === 1;
+      return (SECTION_KINDS as readonly string[]).includes(s.kind as string);
+    });
+    if (markers > 0) delete rest.flowOff;
     return { ...(isFormat(format) ? { ...rest, format } : rest), sections: withIds(known) } as ExhbtDoc;
   }
   const { findings, charts, images, ...rest } = raw;
@@ -300,6 +341,8 @@ export function normaliseDoc(raw: unknown): ExhbtDoc {
 export const ExhbtDocSchema = z.preprocess(normaliseDoc, DocSchema);
 
 /* ---------------- Reading sections ---------------- */
+
+/* Every helper here returns content sections only: only doc.sections and pageItems (lib/exhbt/layouts.ts) show the flowchart's marker. */
 
 export const sectionsOf = <K extends SectionKind>(d: Pick<ExhbtDoc, "sections">, kind: K): SectionOf<K>[] =>
   d.sections.filter((s): s is SectionOf<K> => s.kind === kind);
@@ -336,9 +379,13 @@ export function exhbtSummary(d: Pick<ExhbtDoc, "summary" | "sections">): string 
   return first ? plain(first).trim() : "";
 }
 
-/** Every text a section puts on the page, for the word cap. Image alt text and link addresses don't show, so they're left out. */
+/** Every text a section puts on the page, for the word cap. Image alt text and link addresses don't show, so they're left out. The flowchart's marker has none: its boxes are doc.flow. */
 export function sectionTexts(s: Section): string[] {
   switch (s.kind) {
+    case "flow":
+      return [];
+    case "pullquote":
+      return [s.text];
     case "findings":
       return s.items.map(plain);
     case "graph":
@@ -360,22 +407,24 @@ export function sectionTexts(s: Section): string[] {
 /**
  * Every word on the page, for the 200-word cap (Rory, 12 and 13 Nov 2026: "200 should cap
  * everything", "even if you add, it is within limit"): header, skills, headline, what it is, where
- * and when, the summary (it shows on portfolio cards), the context line, the
+ * and when, my role, the summary (it shows on portfolio cards), the context line, the
  * flowchart, every section (findings, every word on the graphs, image captions, the quote with its
- * name and role, what I'd do next, the link's label and description) and the evidence label. Only
- * image alt text and link addresses are left out: they aren't shown on the page.
+ * name and role, what I'd do next, the link's label and description, the pull quote) and the
+ * evidence label. Only image alt text and link addresses are left out: they aren't shown on the
+ * page. A flowchart taken off the page (decision 0027) isn't counted.
  */
 export function wordCount(d: ExhbtDoc): number {
   return [
     d.title,
     d.context,
     d.whereWhen ?? "",
+    d.myRole ?? "",
     d.summary ?? "",
     ...d.skills,
     d.headline?.value ?? "",
     d.headline?.label ?? "",
     plain(d.gap),
-    ...d.flow.flatMap((s) => [s.step, s.detail ?? ""]),
+    ...(flowShown(d) ? d.flow.flatMap((s) => [s.step, s.detail ?? ""]) : []),
     // A kind the layout doesn't draw is kept but not counted (decision 0024).
     ...shownSections(d).flatMap(({ s }) => sectionTexts(s)),
     d.evidence?.label ?? "",
@@ -414,6 +463,8 @@ function oneOf(kind: SectionKind, L: Limits): string {
       return "Only one aim or hypothesis.";
     case "conclusion":
       return "Only one conclusion.";
+    case "pullquote":
+      return "Only one pull quote.";
   }
 }
 
@@ -439,6 +490,7 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
   need(doc.title.length <= L.titleChars, "title", `Keep the title to ${L.titleChars} characters.`);
   need(doc.context.length <= L.contextChars, "context", `Keep "What it is" to ${L.contextChars} characters.`);
   need((doc.whereWhen ?? "").length <= L.whereWhenChars, "whereWhen", `Keep "Where and when" to ${L.whereWhenChars} characters.`);
+  need((doc.myRole ?? "").length <= L.myRoleChars, "myRole", `Keep "My role" to ${L.myRoleChars} characters.`);
   need(words(doc.summary ?? "") <= L.summaryWords, "summary", `Keep the summary to one sentence of ${L.summaryWords} words or fewer.`);
 
   need(doc.skills.length <= L.skills.max, "skills", `Up to ${L.skills.max} skills.`);
@@ -451,34 +503,47 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
   need(words(plain(doc.gap)) <= L.gapWords, "gap", `Keep the context to ${L.gapWords} words.`);
   httpsOnly(doc.gap, "gap");
 
-  need(doc.flow.length >= L.flow.min, "flow", `The flowchart needs at least ${L.flow.min} boxes.`);
-  need(doc.flow.length <= L.flow.max, "flow", `Up to ${L.flow.max} boxes in the flowchart.`);
-  doc.flow.forEach((s, i) => {
-    need(s.step.trim().length > 0, `flow.${i}.step`, "Type in this box or remove it.");
-    need(words(s.step) <= L.flow.stepWords, `flow.${i}.step`, `Keep each box to ${L.flow.stepWords} words.`);
-    need(words(s.detail ?? "") <= L.flow.detailWords, `flow.${i}.detail`, `Keep the detail to ${L.flow.detailWords} words.`);
-  });
+  // A flowchart taken off the page (decision 0027) is kept, not checked.
+  if (flowShown(doc)) {
+    need(doc.flow.length >= L.flow.min, "flow", `The flowchart needs at least ${L.flow.min} boxes.`);
+    need(doc.flow.length <= L.flow.max, "flow", `Up to ${L.flow.max} boxes in the flowchart.`);
+    doc.flow.forEach((s, i) => {
+      need(s.step.trim().length > 0, `flow.${i}.step`, "Type in this box or remove it.");
+      need(words(s.step) <= L.flow.stepWords, `flow.${i}.step`, `Keep each box to ${L.flow.stepWords} words.`);
+      need(words(s.detail ?? "") <= L.flow.detailWords, `flow.${i}.detail`, `Keep the detail to ${L.flow.detailWords} words.`);
+    });
+  }
 
   // Sections: how many of each (more than the layout allows is an error; nothing is hidden), and what the layout needs.
   for (const kind of SECTION_KINDS) if (kinds.has(kind)) need(sectionsOf(doc, kind).length <= L.sections[kind], "sections", oneOf(kind, L));
-  const nImages = sectionsOf(doc, "image").length;
-  const nFigures = nImages + sectionsOf(doc, "graph").length;
-  if (F === "case-study") {
-    // The work's own graph or results table, picked in place of a drafted graph (decision 0025), shows what came of the work as a graph does.
-    const showsResults = (s: Section) => s.kind === "findings" || s.kind === "graph" || (s.kind === "image" && (s.picked?.kind === "graph" || s.picked?.kind === "table"));
-    need(doc.sections.some(showsResults), "sections", "Add findings or a graph, so the exhbt shows what came of the work.");
-  } else if (F === "gallery") {
-    need(nImages >= L.minImages, "sections", `A gallery needs at least ${L.minImages} images.`);
-  } else {
-    need(sectionsOf(doc, "aim").length > 0, "sections", "Add your aim or hypothesis.");
-    need(sectionsOf(doc, "conclusion").length > 0, "sections", "Add your conclusion.");
-    need(nFigures > 0, "sections", "Add a graph or an image: the key figure.");
-    need(L.maxFigures === null || nFigures <= L.maxFigures, "sections", `Up to ${L.maxFigures} figures, graphs and images together.`);
-    need(sectionsOf(doc, "findings").length > 0, "sections", "Add your results.");
+  const nFigures = sectionsOf(doc, "image").length + sectionsOf(doc, "graph").length;
+  // Research's cap on graphs and images together is checked straight after its need for a figure, or after every need when there is none.
+  const figuresCap = () => need(L.maxFigures === null || nFigures <= L.maxFigures, "sections", `Up to ${L.maxFigures} figures, graphs and images together.`);
+  const isFigureNeed = (n: Need) => n.need === "count" && n.kinds.includes("graph") && n.kinds.includes("image");
+  for (const n of FORMAT_RULES[F].needs) {
+    switch (n.need) {
+      case "count":
+        need(n.kinds.reduce((sum, k) => sum + sectionsOf(doc, k).length, 0) >= n.min, "sections", n.message);
+        break;
+      case "results":
+        // The work's own graph or results table, picked in place of a drafted graph (decision 0025), shows what came of the work as a graph does.
+        need(doc.sections.some((s) => s.kind === "findings" || s.kind === "graph" || (s.kind === "image" && (s.picked?.kind === "graph" || s.picked?.kind === "table"))), "sections", n.message);
+        break;
+      case "stages": {
+        const images = sectionsOf(doc, "image");
+        need(images.some((s) => s.stage === "before") && images.some((s) => s.stage === "after"), "sections", n.message);
+        break;
+      }
+      case "myRole":
+        need(words(doc.myRole ?? "") > 0, "myRole", n.message);
+        break;
+    }
+    if (isFigureNeed(n)) figuresCap();
   }
+  if (!FORMAT_RULES[F].needs.some(isFigureNeed)) figuresCap();
 
   doc.sections.forEach((s, n) => {
-    if (!kinds.has(s.kind)) return;
+    if (s.kind === "flow" || !kinds.has(s.kind)) return;
     const p = `sections.${n}`;
     switch (s.kind) {
       case "findings":
@@ -513,7 +578,8 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
         httpsOnly(s.text, `${p}.text`);
         break;
       case "link":
-        need(safeHref(s.href) !== null, `${p}.href`, "Use a full https:// link.");
+        // A layout may allow a link with no address (an essay's sources); one it has must still be https.
+        need(safeHref(s.href) !== null || (L.link.hrefOptional && s.href.trim() === ""), `${p}.href`, "Use a full https:// link.");
         need(s.label.trim().length > 0, `${p}.label`, "Say what the link is.");
         need(words(s.label) <= L.link.labelWords, `${p}.label`, `Keep the label to ${L.link.labelWords} words.`);
         need(words(s.description) <= L.link.descriptionWords, `${p}.description`, `Keep the description to ${L.link.descriptionWords} words.`);
@@ -527,6 +593,10 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
         need(words(plain(s.text)) > 0, `${p}.text`, "Write your conclusion, or remove this.");
         need(words(plain(s.text)) <= L.conclusion.words, `${p}.text`, `Keep the conclusion to ${L.conclusion.words} words.`);
         httpsOnly(s.text, `${p}.text`);
+        break;
+      case "pullquote":
+        need(words(s.text) > 0, `${p}.text`, "Type in the pull quote or remove it.");
+        need(words(s.text) <= L.pullquote.words, `${p}.text`, `Keep the pull quote to ${L.pullquote.words} words.`);
         break;
     }
   });
@@ -543,13 +613,18 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
  * typed in (decision 0011), wherever its section sits, and a picked figure's note of where it came
  * from stays in the working copy (decision 0017). A section the layout doesn't draw (an aim outside
  * research) stays in the working copy too (decision 0024).
+ *
+ * The published copy keeps the order (decision 0027): the flowchart's marker stays where it is and
+ * flowOff is kept, so an arranged doc goes live as arranged. A flowchart taken off the page goes live
+ * with no boxes (`flow: []`); its boxes stay in the working copy.
  */
 export function publicDoc(raw: ExhbtDoc): ExhbtDoc {
   const d = normaliseDoc(raw);
   return {
     ...d,
+    ...(flowShown(d) ? {} : { flow: [] }),
     // A kind the layout doesn't draw stays in the working copy, not in what employers see.
-    sections: d.sections.filter((s) => isShown(d, s)).map((s) => {
+    sections: d.sections.filter((s) => s.kind === "flow" || isShown(d, s)).map((s) => {
       if (s.kind === "graph") return { ...s, chart: publicChart(s.chart) };
       if (s.kind === "image" && s.picked) {
         const rest = { ...s };
