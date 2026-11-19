@@ -186,6 +186,8 @@ Each owner's CSS goes in its own file in `components/exhbt-editor/css/` (`core.c
 
 `ui/Sheet.tsx` gives you the sheet itself (a native dialog, at the side on a desktop and full screen on a phone, with a title, Escape to close and the focus given back). Each of your components renders its sheet only while `useUi().sheet?.name` is its own.
 
+For the numbers to check: `unverifiedOf(doc)` and `confirmNumber(doc, n)` from `components/editor/model.ts`, and `pathOfNumber(doc, n): string | null` from `lib/exhbt/verify.ts` (the path of the first field holding that number).
+
 ## Steps
 
 Commit and push after each. Keep every label and message below exactly: the migrated tests look for them.
