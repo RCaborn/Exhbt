@@ -136,7 +136,7 @@ Where Phase 2 lives:
 |---|---|
 | Blocks, limits, word count | `lib/exhbt/blocks.ts` (decisions 0007 and 0009) |
 | How an exhbt looks | `components/portfolio/ProjectView.tsx` |
-| An exhbt's layout (case study, gallery, research) | `lib/exhbt/formats.ts`, `components/portfolio/formats/`, `components/editor/LayoutPicker.tsx` (decision 0024) |
+| An exhbt's layout (case study, gallery, research) | `lib/exhbt/formats.ts`, `lib/exhbt/layouts.ts` (the order and rows), `components/portfolio/LayoutMain.tsx` with `layout-rows.ts` (the renderer), `components/editor/LayoutPicker.tsx` (decision 0024) |
 | The editor | `app/(app)/exhbts/[id]/edit/`, `components/editor/` |
 | Uploads and AI drafts | `app/(app)/exhbts/new/`, `lib/uploads.ts`, `lib/files.ts`, `lib/ai/exhbt-draft.ts`, `lib/exhbt/verify.ts` |
 | The portfolio builder (profile, look, projects, address) | `app/(app)/portfolio/` (decision 0016) |

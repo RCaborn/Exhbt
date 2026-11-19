@@ -279,7 +279,6 @@ export function researchDoc(imageFileId: string): ExhbtDoc {
 export const BUILD_IMAGES = [
   { w: 1440, h: 900, alt: "The Shift Swap rota for one week: a grid of shifts, with two open shifts marked in green.", caption: "The weekly rota, with open shifts marked" },
   { w: 900, h: 1600, alt: "A phone screen showing one swap request with Approve and Decline buttons.", caption: "A swap waiting for a manager's approval" },
-  { w: 1440, h: 900, alt: "The manager's page listing every swap this month, with its status beside it.", caption: "The manager's list of this month's swaps" },
 ];
 
 export function buildDoc(fileIds: string[]): ExhbtDoc {
@@ -311,7 +310,6 @@ export function buildDoc(fileIds: string[]): ExhbtDoc {
         chart: { kind: "beforeAfter", title: "Shifts left uncovered each month", beforeLabel: "Group chat", afterLabel: "Shift Swap", lowerIsBetter: true, rows: [{ label: "Uncovered shifts", before: 9, after: 2 }] },
       },
       { id: "image-2", kind: "image", fileId: fileIds[1] ?? "missing-2", alt: BUILD_IMAGES[1]!.alt, caption: text(BUILD_IMAGES[1]!.caption), w: BUILD_IMAGES[1]!.w, h: BUILD_IMAGES[1]!.h },
-      { id: "image-3", kind: "image", fileId: fileIds[2] ?? "missing-3", alt: BUILD_IMAGES[2]!.alt, caption: text(BUILD_IMAGES[2]!.caption), w: BUILD_IMAGES[2]!.w, h: BUILD_IMAGES[2]!.h },
       { id: "quote-1", kind: "quote", text: "It saves me a Sunday of messages.", name: "Priya Nair", role: "Bar manager" },
       { id: "reflection-1", kind: "reflection", text: text("Add a calendar feed so shifts appear on staff phones, and test it with a bigger team before term starts.") },
       { id: "link-1", kind: "link", href: "https://example.com/shift-swap-demo", label: "Try the demo", description: "A test login for the live app" },
@@ -425,7 +423,6 @@ export const EVENT_IMAGES = [
   { w: 1200, h: 1700, alt: "A tall poster: the title The Crucible in white on deep red, with the dates and the studio theatre.", caption: "The poster, printed for the union and halls" },
   { w: 1600, h: 1000, alt: "The finished set: a bare wooden courtroom with a long bench and tall windows.", caption: "The set on the first night of tech week" },
   { w: 1600, h: 1000, alt: "The cast mid-scene on stage under warm side lighting.", caption: "Dress rehearsal, Act Three" },
-  { w: 1200, h: 1600, alt: "A prompt copy of the script, its margins full of cue numbers in pencil.", caption: "My prompt copy, with every cue marked" },
 ];
 
 export function eventDoc(fileIds: string[]): ExhbtDoc {

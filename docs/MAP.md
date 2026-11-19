@@ -75,7 +75,7 @@ Phase 2 is the paid product: build exhbts, publish them to a portfolio, pay for 
 | The exhbt's blocks, limits or word cap | `lib/exhbt/blocks.ts`, and decisions 0007, 0009 and 0015 |
 | Which sections an exhbt can have below the flowchart, and how they're added, moved and drawn | `lib/exhbt/blocks.ts` (`SectionSchema`, `normaliseDoc`), `lib/exhbt/sections.ts`, `components/editor/Sections.tsx`, `components/portfolio/ProjectView.tsx`, decision 0015 |
 | A kind of graph, its caps, how it's drawn, or protected numbers | `lib/exhbt/charts.ts`, `components/charts/`, the graph card `components/editor/ChartEditor.tsx`, decision 0011 |
-| An exhbt's layout (case study, gallery, research) | `lib/exhbt/formats.ts`, `components/portfolio/formats/`, `components/editor/LayoutPicker.tsx`, decision 0024 |
+| An exhbt's layout (case study, gallery, research) | `lib/exhbt/formats.ts`, `lib/exhbt/layouts.ts` (the order and rows), `components/portfolio/LayoutMain.tsx` with `layout-rows.ts` (the renderer), `components/editor/LayoutPicker.tsx`, decision 0024 |
 | How an exhbt looks on a portfolio: the sidebar, the title as the question, findings beside the chart, print | `components/portfolio/ProjectView.tsx`, decision 0022 |
 | How a portfolio look restyles the exhbt page | the look's `--pf-*` set (decision 0018), read as the `--xp-*` names in `app/globals.css` (`[data-look]`, listed in decision 0022); the frame `app/(portfolio)/p/[username]/[slug]/layout.tsx` |
 | The editor | `app/(app)/exhbts/[id]/edit/`, `components/editor/` |
