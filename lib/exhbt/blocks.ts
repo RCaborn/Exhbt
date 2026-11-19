@@ -464,7 +464,9 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
   const nImages = sectionsOf(doc, "image").length;
   const nFigures = nImages + sectionsOf(doc, "graph").length;
   if (F === "case-study") {
-    need(doc.sections.some((s) => s.kind === "findings" || s.kind === "graph"), "sections", "Add findings or a graph, so the exhbt shows what came of the work.");
+    // The work's own graph or results table, picked in place of a drafted graph (decision 0025), shows what came of the work as a graph does.
+    const showsResults = (s: Section) => s.kind === "findings" || s.kind === "graph" || (s.kind === "image" && (s.picked?.kind === "graph" || s.picked?.kind === "table"));
+    need(doc.sections.some(showsResults), "sections", "Add findings or a graph, so the exhbt shows what came of the work.");
   } else if (F === "gallery") {
     need(nImages >= L.minImages, "sections", `A gallery needs at least ${L.minImages} images.`);
   } else {

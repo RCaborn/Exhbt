@@ -25,8 +25,10 @@ When the figure is placed:
 
 - **A graph or a table** removes every graph section the draft made, then goes where the layout wants its key figure. The exhbt has the real graph and no drawn one.
 - **Another visual** goes in the same place, and the drafted graphs stay while the layout has room for both. When it hasn't, the picked visual comes first: graphs go, last first, until it fits.
+- **In research, a drafted graph that stays is still the key figure**, and a picked diagram or photo goes straight after it (Rory, 19 Nov 2026). Research is read figure first, and its key figure should be the results. With no graph on the exhbt, the picked visual is the key figure. A case study and a gallery are as above.
 - **Nothing picked**: the drafted graph stays. It is the fallback, so `lib/ai/exhbt-draft.ts` still drafts it every time.
 - A person's own pictures are never taken off to make room. A layout whose images are full is left as it was, graphs included.
+- A case study needs findings or a graph before it can be published. The work's own graph or table, picked in place of the drafted graph, now counts as that graph (`validateForPublish`), so a draft with a graph and no findings can still be published after the swap. A picked photo or diagram doesn't count, and nor does a figure once the person has chosen another page, since its kind goes with it.
 
 The rule is `withWorkVisual` in `lib/exhbt/sections.ts`. It runs in `/api/exhbts/[id]/figure`, where the figure is placed, because the draft and the pick run side by side and neither knows the other's answer until then. It runs once, straight after the draft and before the editor opens, so every graph on the exhbt at that moment is one the draft made. A number flagged "check this" that was only on a graph it removed leaves the list, since it is no longer on the page.
 
@@ -42,7 +44,7 @@ Each layout says what it takes from the person's own files, beside its other rul
 |---|---|---|
 | Case study | `figure`: its one key figure | straight after What I found |
 | Gallery | `pictures`: the work's pictures | the lead image |
-| Research | `figure` | the key figure, where the drafted graph was |
+| Research | `figure` | a graph or table: the key figure, where the drafted graph was. Another visual: straight after the drafted graph, which stays the key figure |
 
 The third value is `none`: nothing is looked for and nothing is placed. No layout uses it yet. The essay layout that is coming will. A layout that says `none` gets no placement (the route refuses it and the page deletes the picture it uploaded) and nothing is said about a figure.
 
@@ -70,7 +72,9 @@ Only pages that paint a shape or a picture are sent (0017). Two things change.
 
 **A clipping path is not a shape.** Word, browsers and LaTeX put clipping paths round ordinary text. They paint nothing, but they were counted, so most pages of a real text-only PDF counted as holding a figure and were sent. That cost little, but the privacy policy says only pages with charts, diagrams or pictures are sent. A path that ends without a fill or a stroke is now left out (`marksOf` in `lib/figures/pdf.ts`). The eval's reports, printed by Chromium, showed it: every text page had four "shapes", exactly the threshold. They now have two (the page's background), and are not sent.
 
-**Scans, after consent.** A scan asks before it is sent to be read as text. The same question now covers the figure: "We can send it to our AI reader to turn it into text and to look for a figure, such as a graph, for your exhbt. Only the text and where the figure is come back, and the file stays private to you." If the person agrees, the scan's pages are drawn on the device and go with the draft like any other PDF's. Every page of a scan is a picture, so every page (of the first 30) is a candidate; the caps on images and bytes are unchanged. If they choose "Keep it without reading", nothing is drawn and nothing is sent. A scan's pages are left out of the count of "pages with pictures" that the draft uses to choose a layout, since a picture of a page of text says nothing about how visual the work is. The privacy policy says a scanned PDF's page images are sent only if the person chooses to send the scan (`app/(marketing)/legal/[doc]/page.tsx`; the date in `lib/legal.ts`).
+**Scans, after consent.** A PDF the browser can't read any text from, which is what most scans are, asks before it is sent to be read as text. The same question now covers the figure: "We can send it to our AI reader to turn it into text and to look for a figure, such as a graph, for your exhbt. Only the text and where the figure is come back, and the file stays private to you." If the person agrees, the scan's pages are drawn on the device and go with the draft like any other PDF's. Every page of a scan is a picture, so every page (of the first 30) is a candidate; the caps on images and bytes are unchanged. If they choose "Keep it without reading", nothing is drawn and nothing is sent. A scan's pages are left out of the count of "pages with pictures" that the draft uses to choose a layout, since a picture of a page of text says nothing about how visual the work is.
+
+A scan that already has text in it (a scanner app or a copier that adds it) is read on the device like any other PDF, so it is never asked about, and its pages, being pictures, are sent when the person drafts. That was so before this decision and is unchanged. The privacy policy says both things: page images of a PDF with no readable text are sent only if the person chooses to send it, and a scan that already has text in it is treated like any other PDF (`app/(marketing)/legal/[doc]/page.tsx`; the date in `lib/legal.ts`).
 
 ## A seam for Word, PowerPoint and pictures
 
@@ -82,11 +86,12 @@ When the editor opens after a draft it says one quiet line under the layout choi
 
 > Laid out as Research because your work has an aim and results. Change layout. The figure is from page 3 of report.pdf. Tick that you may share it before you publish.
 
-**The layout and why.** The draft returns, with the layout, one of a fixed set of signals (`LAYOUT_REASONS`): the notes name the layout; an aim and results; a hypothesis and results; a study with a method and results; work that is shown by its pictures; an upload that is mostly pictures; a question and what was found; or no reason. Each has fixed wording. The model never writes the reason. A signal is only said when the draft bears it out (`checkedReason`): "an aim and results" needs an aim and findings in the draft itself, "your notes name this layout" needs the layout's name in the notes, "mostly pictures" needs the upload counts to say so. Anything else gives no reason: "Laid out as Case study." It now shows for a case study too. "Change layout" puts the cursor on the choices just above.
+**The layout and why.** The draft returns, with the layout, one of a fixed set of signals (`LAYOUT_REASONS`): the notes name the layout; an aim and results; a hypothesis and results; a study with a method and results; work that is shown by its pictures; an upload that is mostly pictures; a question and what was found; or no reason. Each has fixed wording. The model never writes the reason. A signal is only said when the draft bears it out (`checkedReason`): "an aim and results" needs an aim and findings in the draft itself, "your notes name this layout" needs the layout's name in the notes, "mostly pictures" needs pictures to be more than half of the upload (picture files and PDF pages with pictures on them, out of picture files and all PDF pages), so one photo beside a long report doesn't count. Anything else gives no reason: "Laid out as Case study." It now shows for a case study too. "Change layout" puts the cursor on the choices just above.
 
-**The figure.** Where it came from is read from the exhbt itself, so the address can't claim a figure that isn't there. When none went on, the draft page passes on which of three things happened, each with fixed wording:
+**The figure.** Where it came from is read from the exhbt itself, so the address can't claim a figure that isn't there. When none went on, the draft page passes on which of four things happened, each with fixed wording:
 
-- none found: "No figure was found in your files, so the graph uses numbers from your files and notes."
+- none found: "No figure was found in your files, so the graph uses numbers from your files and notes." The second half is only said when none of the draft's numbers is flagged as not found in the material; otherwise it is just "No figure was found in your files."
+- none found, but not every page was looked at (a PDF longer than 30 pages, pages past the caps on one pick, or a PDF that couldn't be drawn): "No figure was found in the pages we looked at. We look at up to 30 pages of your files." Nothing is claimed about pages nobody saw.
 - it couldn't look (the request failed, ran past the 20-second wait, or the figure couldn't be put on): "We couldn't look for a figure in your files this time. You can add an image yourself."
 - there was no PDF to look in: "A figure can only be taken from a PDF for now."
 
@@ -119,7 +124,6 @@ It runs in the existing workflow, `.github/workflows/eval-drafts.yml`, with the 
 
 - **Putting the drafted graph back.** When someone removes a picked graph they can't share, should the graph the draft drew come back? It would need the removed graph to be kept with the exhbt and its numbers checked again. It isn't built, because the brief asked for no new editor controls and a graph parked out of sight would escape the number check.
 - **A results table from the work.** It is treated like a graph: the picture of the table goes on and the drafted graph comes off. If the table is long, the drafted graph may read better at a glance than a picture of twelve rows. The kind is recorded, so this can be changed for tables alone.
-- **A diagram as research's key figure.** When the work has no graph, a picked diagram or photo leads and the drafted graph sits after it. The person can move the graph first in the editor.
 - **"A figure can only be taken from a PDF for now."** Said when the upload has no PDF. It goes when Word, PowerPoint and pictures can be picked from.
 
 ## Not done yet

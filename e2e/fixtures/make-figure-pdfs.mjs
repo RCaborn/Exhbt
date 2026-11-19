@@ -6,6 +6,7 @@
 //                            The stand-in reads "diagram" in the name as a visual that isn't a graph.
 //   scan-report.pdf          two A4 pages that are pictures with no text behind them, like a scan:
 //                            a page of grey lines, and a page with a bar chart
+//   report-long-text.pdf     31 A4 pages of text: one more than the pages looked at for a figure
 //
 // Run `node e2e/fixtures/make-figure-pdfs.mjs` to rebuild them. The PDFs are committed so the
 // tests read the same bytes every time; this script is how they were made. No dependencies:
@@ -221,4 +222,8 @@ writeFileSync(join(here, "report-with-chart.pdf"), pdf(pages.withChart));
 writeFileSync(join(here, "report-text-only.pdf"), pdf(pages.textOnly));
 writeFileSync(join(here, "report-with-diagram.pdf"), pdf(pages.withDiagram));
 writeFileSync(join(here, "scan-report.pdf"), scanPdf([scannedText(), scannedChart()]));
-console.log("Wrote report-with-chart.pdf, report-text-only.pdf, report-with-diagram.pdf and scan-report.pdf");
+// Longer than the 30 pages looked at for a figure (FIGURE.maxPages in lib/figures/rules.ts).
+const chapters = [INTRO, METHOD, RESULTS];
+const longText = Array.from({ length: 31 }, (_, i) => [heading(`Section ${i + 1}`, 790), textBlock(chapters[i % chapters.length], 760)].join("\n"));
+writeFileSync(join(here, "report-long-text.pdf"), pdf(longText));
+console.log("Wrote report-with-chart.pdf, report-text-only.pdf, report-with-diagram.pdf, scan-report.pdf and report-long-text.pdf");

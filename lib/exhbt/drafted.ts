@@ -1,4 +1,5 @@
 import { findingsOf, imagesOf, plain, sectionsOf, type ExhbtDoc } from "./blocks";
+import { FIGURE } from "@/lib/figures/rules";
 import { FORMAT_RULES, formatOf, type Format } from "./formats";
 
 /**
@@ -52,7 +53,8 @@ export type UploadSignals = { imageFiles: number; pdfPages: number; pdfPicturePa
  *  - "notes": the notes hold the layout's name.
  *  - research: an aim (or a hypothesis, whichever the draft holds) with results; or results alone
  *    ("study").
- *  - "mostly-pictures": the upload had picture files, or at least half its PDF pages hold pictures.
+ *  - "mostly-pictures": pictures are more than half of the upload (picture files and PDF pages with
+ *    pictures on them, out of picture files and all PDF pages).
  *  - "question-findings": the title is a question and there are findings.
  */
 export function checkedReason(doc: ExhbtDoc, claimed: unknown, facts: { notes?: string; signals?: UploadSignals } = {}): LayoutReason {
@@ -71,8 +73,12 @@ export function checkedReason(doc: ExhbtDoc, claimed: unknown, facts: { notes?: 
       return aim.heading === "hypothesis" ? "hypothesis-results" : "aim-results";
     }
     case "mostly-pictures": {
+      // "Most" is counted over the whole upload: picture files and PDF pages with pictures on them,
+      // out of picture files and all PDF pages. One photo beside a long report isn't most of it.
       const s = facts.signals;
-      return s && (s.imageFiles > 0 || (s.pdfPages > 0 && s.pdfPicturePages * 2 >= s.pdfPages)) ? "mostly-pictures" : "visual-work";
+      const pictures = s ? s.imageFiles + s.pdfPicturePages : 0;
+      const everything = s ? s.imageFiles + s.pdfPages : 0;
+      return pictures * 2 > everything ? "mostly-pictures" : "visual-work";
     }
     case "question-findings":
       return doc.title.trim().endsWith("?") && hasFindings ? "question-findings" : "default";
@@ -92,12 +98,14 @@ export function layoutSentence(f: Format, reason: LayoutReason | undefined): str
 
 /**
  * What came of looking for a figure, when none went on the exhbt. The draft page passes one on:
- *  - "none": pages were looked at and no figure was found (or no page drew anything but text);
+ *  - "none": every page was looked at and no figure was found (or no page drew anything but text);
+ *  - "partial": the same, but some pages were left out: a PDF longer than FIGURE.maxPages, pages
+ *    past the caps on what one pick may send, or a PDF whose pages couldn't be drawn;
  *  - "failed": it couldn't look, the pick ran late, or the figure couldn't be put on;
  *  - "unread": files were uploaded but none was a PDF whose pages could be looked at.
  * A figure that did go on is read from the doc, not from this.
  */
-export const FIGURE_NEWS = ["none", "failed", "unread"] as const;
+export const FIGURE_NEWS = ["none", "partial", "failed", "unread"] as const;
 export type FigureNews = (typeof FIGURE_NEWS)[number];
 export const isFigureNews = (v: unknown): v is FigureNews => typeof v === "string" && (FIGURE_NEWS as readonly string[]).includes(v);
 
@@ -113,7 +121,13 @@ export function figureSentence(doc: ExhbtDoc, news: FigureNews | undefined): str
   }
   switch (news) {
     case "none":
-      return sectionsOf(doc, "graph").length > 0 ? "No figure was found in your files, so the graph uses numbers from your files and notes." : "No figure was found in your files.";
+      // Where the graph's numbers came from is only said when none of the draft's numbers is flagged as not found in the material.
+      return sectionsOf(doc, "graph").length > 0 && (doc.unverified ?? []).length === 0
+        ? "No figure was found in your files, so the graph uses numbers from your files and notes."
+        : "No figure was found in your files.";
+    case "partial":
+      // Not every page was looked at, so nothing is claimed about the whole of the files.
+      return `No figure was found in the pages we looked at. We look at up to ${FIGURE.maxImages} pages of your files.`;
     case "failed":
       return "We couldn't look for a figure in your files this time. You can add an image yourself.";
     case "unread":

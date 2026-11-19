@@ -198,7 +198,8 @@ export const replacesDraftedGraph = (kind: FigureKind): boolean => kind === "gra
  *    layout wants its key figure (withKeyFigure). The exhbt has the real graph and no drawn one.
  *  - Another visual (a photo, a diagram): it is put there too, and the graphs stay while the layout
  *    has room for both. When it hasn't, the picked visual comes first: graphs go, last first,
- *    until it fits.
+ *    until it fits. In research a drafted graph that stays is still the key figure, and the picked
+ *    visual goes straight after it.
  *  - A person's own pictures are never taken off to make room. A layout whose images are full
  *    leaves the doc, graphs included, as it was.
  *
@@ -231,7 +232,14 @@ export function withWorkVisual(doc: ExhbtDoc, visual: WorkVisual, opts: { wants?
   if (roomFor(sections, "image", f) === 0) return unchanged("no-room");
 
   const { kind, ...figure } = visual;
-  const next = withKeyFigure({ ...doc, sections }, { ...figure, ...(figure.picked ? { picked: { ...figure.picked, kind } } : {}) }, gap);
+  let next = withKeyFigure({ ...doc, sections }, { ...figure, ...(figure.picked ? { picked: { ...figure.picked, kind } } : {}) }, gap);
+  // Research reads figure first, and its key figure is the results: a drafted graph stays first and
+  // a picked diagram or photo follows it (Rory, 19 Nov 2026). With no graph left, the picked visual leads.
+  if (f === "research" && !replacesDraftedGraph(kind)) {
+    const image = next.sections.findIndex((s) => s.kind === "image" && s.fileId === visual.fileId);
+    const graph = next.sections.findIndex((s) => s.kind === "graph");
+    if (image >= 0 && graph > image) next = { ...next, sections: moveSection(next.sections, image, graph) };
+  }
   if (!removed.length || !next.unverified) return { doc: next, placed: true, removed };
   // A number can't be normalised only if something else wrote the list; leave what can't be judged.
   const onPage = new Set(numbersInDoc(next).map(normaliseNumber));

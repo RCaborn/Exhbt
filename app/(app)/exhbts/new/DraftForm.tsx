@@ -13,7 +13,7 @@ import { FORMAT_RULES, isFormat } from "@/lib/exhbt/formats";
 import { isLayoutReason, type FigureNews } from "@/lib/exhbt/drafted";
 import type { PdfPages } from "@/lib/figures/pdf";
 import { Tick } from "@/components/ui/Tick";
-import { candidatesOf, drawPages, placeFigure, prepareFigure, type FigureOutcome, type FigureSource } from "./figure";
+import { drawPages, pdfCandidates, placeFigure, prepareFigure, withinCaps, type FigureOutcome, type FigureSource } from "./figure";
 
 /**
  * The upload step: files are read on the device as they're added (scans and photos ask before
@@ -236,6 +236,9 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
     const stop = new AbortController();
     const drawn = material.filter((it) => pages.current.has(it.key));
     setFigure(drawn.length ? "working" : "none");
+    // Whether some pages went unlooked-at, so "no figure" is never said of pages nobody saw: a PDF
+    // longer than the pages drawn, pages past the caps on one pick, or a PDF that couldn't be drawn.
+    let leftOut = false;
     const figureJob: Promise<FigureOutcome> | null = drawn.length
       ? (async (): Promise<FigureOutcome> => {
           const sources: FigureSource[] = [];
@@ -245,7 +248,10 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
           }
           // A PDF whose pages couldn't be drawn wasn't looked at: that isn't "no figure".
           if (!sources.length) return { status: "failed" };
-          return prepareFigure(candidatesOf(sources), stop.signal);
+          const all = sources.flatMap(pdfCandidates);
+          const candidates = withinCaps(all);
+          leftOut = sources.length < drawn.length || candidates.length < all.length || sources.some((s) => s.pages.pageCount > s.pages.pages.length);
+          return prepareFigure(candidates, stop.signal);
         })().catch((): FigureOutcome => ({ status: "failed" }))
       : null;
     // Counts from the upload for the AI's choice of layout (decision 0024): picture files, PDF pages, and
@@ -299,7 +305,7 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
         if (fig.status === "ready") {
           placed = await placeFigure(data.id, fig.figure);
           if (!placed) news = "failed";
-        } else news = fig.status;
+        } else news = fig.status === "none" && leftOut ? "partial" : fig.status;
       }
       dropUnplaced();
       setFigure((f) => (f === "none" ? f : "done"));

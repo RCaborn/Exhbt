@@ -19,6 +19,7 @@ const TEXT_PDF = "e2e/fixtures/report-text-only.pdf";
 const DIAGRAM_PDF = "e2e/fixtures/report-with-diagram.pdf";
 const SCAN_PDF = "e2e/fixtures/scan-report.pdf";
 const PRINTED_ESSAY_PDF = "evals/figure-pick/fixtures/08-text-only.pdf";
+const LONG_TEXT_PDF = "e2e/fixtures/report-long-text.pdf";
 const WARNING = "Picked from your report. Check you're allowed to share it.";
 const TICK = "I may share this figure on my portfolio";
 const NEEDS_TICK = "Tick that you may share this figure, or remove it.";
@@ -168,6 +169,27 @@ test.describe("The work's own graph wins (decision 0025)", () => {
     expect(r.doc.sections[1]).toMatchObject({ picked: { kind: "table" } });
   });
 
+  test("a case study drafted with a graph and no findings can still be published when the work's graph takes its place", () => {
+    const NEEDS = "Add findings or a graph, so the exhbt shows what came of the work.";
+    const messages = (d: ExhbtDoc) => validateForPublish(d).map((i) => i.message);
+    const draft: ExhbtDoc = { ...caseDraft(), sections: [bar("graph-1", [7.9, 6.5])], unverified: [] };
+    expect(messages(draft)).not.toContain(NEEDS);
+    for (const kind of ["graph", "table"] as const) {
+      const r = withWorkVisual(draft, visual(kind));
+      expect(kindsOf(r.doc)).toEqual(["image"]);
+      // The work's own graph or table shows what came of the work, as the drafted graph did.
+      expect(messages(r.doc)).not.toContain(NEEDS);
+    }
+    // A picture that isn't the work's results doesn't count: a photo alone, or a figure whose kind
+    // went when the person chose another page.
+    const placed = withWorkVisual(draft, visual("graph")).doc;
+    const rekind = (kind?: "other") =>
+      ({ ...placed, sections: placed.sections.map((s) => (s.kind === "image" ? { ...s, picked: { ...picked, ...(kind ? { kind } : {}) } } : s)) }) as ExhbtDoc;
+    expect(messages(rekind("other"))).toContain(NEEDS);
+    expect(messages(rekind())).toContain(NEEDS);
+    expect(messages({ ...placed, sections: [] })).toContain(NEEDS);
+  });
+
   test("a case study: another visual keeps the drafted graphs", () => {
     const r = withWorkVisual(caseDraft(), visual("other"));
     expect(kindsOf(r.doc)).toEqual(["findings", "image", "graph", "graph", "reflection"]);
@@ -185,15 +207,18 @@ test.describe("The work's own graph wins (decision 0025)", () => {
     expect(validateForPublish(r.doc).map((i) => i.message)).not.toContain("Add a graph or an image: the key figure.");
   });
 
-  test("research: another visual leads and the drafted graphs stay, up to the cap on figures", () => {
+  test("research: the drafted graph stays the key figure and another visual follows it, up to the cap on figures", () => {
     const r = withWorkVisual(researchDraft(), visual("other"));
-    expect(kindsOf(r.doc)).toEqual(["aim", "findings", "image", "graph", "graph", "conclusion", "link"]);
+    expect(kindsOf(r.doc)).toEqual(["aim", "findings", "graph", "image", "graph", "conclusion", "link"]);
+    expect(sectionLabel(r.doc.sections, 2, "research")).toBe("Key figure");
+    expect(r.doc.sections[2]).toMatchObject({ kind: "graph", id: "graph-1" });
+    expect(r.doc.sections[3]).toMatchObject({ kind: "image", fileId: "f1", picked: { kind: "other" } });
     expect(r.removed).toEqual([]);
     expect(roomFor(r.doc.sections, "image", "research")).toBe(0);
     expect(validateForPublish(r.doc).some((i) => /figures, graphs and images together/.test(i.message))).toBe(false);
   });
 
-  test("research: when room is short the picked visual comes first, and the last graph goes", () => {
+  test("research: when room is short the picked visual is kept and the last graph goes", () => {
     const draft = researchDraft();
     const full: ExhbtDoc = { ...draft, sections: [...draft.sections, image("image-1", "mine")] };
     expect(formatLimits("research").maxFigures).toBe(3);
@@ -201,10 +226,17 @@ test.describe("The work's own graph wins (decision 0025)", () => {
     const r = withWorkVisual(full, visual("other"));
     expect(r.placed).toBe(true);
     expect(r.removed.map((s) => s.id)).toEqual(["graph-2"]);
-    expect(kindsOf(r.doc)).toEqual(["aim", "findings", "image", "graph", "conclusion", "link", "image"]);
+    // The graph that stays is still the key figure, and the picked visual follows it.
+    expect(kindsOf(r.doc)).toEqual(["aim", "findings", "graph", "image", "conclusion", "link", "image"]);
+    expect(r.doc.sections[3]).toMatchObject({ kind: "image", fileId: "f1" });
     // The person's own picture is still there, and the number that was only on the graph that went is off the list.
     expect(r.doc.sections.at(-1)).toMatchObject({ kind: "image", fileId: "mine" });
     expect(r.doc.unverified).toEqual(["6.5%"]);
+    // With no graph on the exhbt, the picked visual is the key figure.
+    const bare: ExhbtDoc = { ...draft, sections: draft.sections.filter((s) => s.kind !== "graph") };
+    const alone = withWorkVisual(bare, visual("other")).doc;
+    const at = alone.sections.findIndex((s) => s.kind === "image");
+    expect(sectionLabel(alone.sections, at, "research")).toBe("Key figure");
   });
 
   test("a layout whose images are full is left as it was, graphs and all", () => {
@@ -284,6 +316,11 @@ test.describe("What the editor says after a draft (decision 0025)", () => {
     expect(checkedReason(gallery, "mostly-pictures", { signals: { imageFiles: 4, pdfPages: 0, pdfPicturePages: 0 } })).toBe("mostly-pictures");
     expect(checkedReason(gallery, "mostly-pictures", { signals: { imageFiles: 0, pdfPages: 10, pdfPicturePages: 6 } })).toBe("mostly-pictures");
     expect(checkedReason(gallery, "mostly-pictures", { signals: { imageFiles: 0, pdfPages: 10, pdfPicturePages: 1 } })).toBe("visual-work");
+    // One photo beside a 40-page report isn't most of the upload, and exactly half isn't most either.
+    expect(checkedReason(gallery, "mostly-pictures", { signals: { imageFiles: 1, pdfPages: 40, pdfPicturePages: 2 } })).toBe("visual-work");
+    expect(checkedReason(gallery, "mostly-pictures", { signals: { imageFiles: 0, pdfPages: 10, pdfPicturePages: 5 } })).toBe("visual-work");
+    expect(checkedReason(gallery, "mostly-pictures", { signals: { imageFiles: 12, pdfPages: 10, pdfPicturePages: 0 } })).toBe("mostly-pictures");
+    expect(checkedReason(gallery, "mostly-pictures", { signals: { imageFiles: 0, pdfPages: 0, pdfPicturePages: 0 } })).toBe("visual-work");
     expect(checkedReason(gallery, "mostly-pictures")).toBe("visual-work");
   });
 
@@ -304,8 +341,15 @@ test.describe("What the editor says after a draft (decision 0025)", () => {
     expect(figureSentence(placed, "none")).toBe("The figure is from page 3 of report.pdf. Tick that you may share it before you publish.");
     const ticked: ExhbtDoc = { ...placed, sections: placed.sections.map((s) => (s.kind === "image" && s.picked ? { ...s, picked: { ...s.picked, shareOk: true } } : s)) };
     expect(figureSentence(ticked, undefined)).toBe("The figure is from page 3 of report.pdf.");
-    expect(figureSentence(caseDraft(), "none")).toBe("No figure was found in your files, so the graph uses numbers from your files and notes.");
-    expect(figureSentence({ ...caseDraft(), sections: [] }, "none")).toBe("No figure was found in your files.");
+    const clean: ExhbtDoc = { ...caseDraft(), unverified: [] };
+    expect(figureSentence(clean, "none")).toBe("No figure was found in your files, so the graph uses numbers from your files and notes.");
+    // A number in the draft is flagged as not found in the material: nothing is said about where the graph's numbers came from.
+    expect(figureSentence(caseDraft(), "none")).toBe("No figure was found in your files.");
+    expect(figureSentence({ ...clean, sections: [] }, "none")).toBe("No figure was found in your files.");
+    // Not every page was looked at: nothing is claimed about the whole of the files.
+    expect(figureSentence(clean, "partial")).toBe("No figure was found in the pages we looked at. We look at up to 30 pages of your files.");
+    expect(FIGURE.maxPages).toBe(30);
+    expect(FIGURE.maxImages).toBe(30);
     expect(figureSentence(caseDraft(), "failed")).toBe("We couldn't look for a figure in your files this time. You can add an image yourself.");
     expect(figureSentence(caseDraft(), "unread")).toBe("A figure can only be taken from a PDF for now.");
     expect(figureSentence(caseDraft(), undefined)).toBeNull();
@@ -498,7 +542,56 @@ test.describe("Draft from a PDF with a chart", () => {
   });
 });
 
+test.describe("Draft a research exhbt from a PDF with a diagram", () => {
+  test("the drafted graph stays the key figure and the picked diagram follows it", async ({ page }) => {
+    await signInFree(page, "figresearch");
+    await addFile(page, DIAGRAM_PDF);
+    await page.locator("#notes").fill("stand-in: layout research");
+    const pickedResponse = page.waitForResponse((r) => r.url().includes("/api/exhbts/figure-pick"));
+    await draft(page);
+    expect(((await (await pickedResponse).json()) as { pick: { kind: string } }).pick.kind).toBe("other");
+    await expect(page.getByRole("radio", { name: /^Research/ })).toBeChecked();
+    const kinds = await sectionKinds(page);
+    expect(kinds).toContain("graph");
+    expect(kinds).toContain("image");
+    // Research's key figure is its first graph or image: the results graph, with the diagram straight after it.
+    expect(kinds.indexOf("image")).toBe(kinds.indexOf("graph") + 1);
+    const keyFigure = page.getByRole("region", { name: "Key figure", exact: true });
+    await expect(keyFigure).toBeVisible();
+    await expect(keyFigure.locator("[data-picked]")).toHaveCount(0);
+    await expect(page.locator("[data-picked]").getByText("From report-with-diagram.pdf, page 2.", { exact: false })).toBeVisible();
+    const line = draftedLine(page);
+    await expect(line).toContainText("Laid out as Research because your notes name this layout.");
+    await expect(line).toContainText("The figure is from page 2 of report-with-diagram.pdf.");
+  });
+});
+
 test.describe("Drafts with no figure", () => {
+  test("a PDF longer than the pages looked at: the line doesn't speak for the pages nobody saw", async ({ page }) => {
+    await signInFree(page, "figlong");
+    const seen = countPicks(page);
+    await addFile(page, LONG_TEXT_PDF);
+    await draft(page);
+    // Thirty of its 31 pages were drawn, none draws anything but text, so nothing was sent.
+    expect(seen.picks).toBe(0);
+    const line = draftedLine(page);
+    await expect(line).toContainText("No figure was found in the pages we looked at. We look at up to 30 pages of your files.");
+    await expect(line).not.toContainText("No figure was found in your files");
+  });
+
+  test("a draft with a number flagged to check: the line doesn't say where the graph's numbers came from", async ({ page }) => {
+    await signInFree(page, "figflag");
+    await addFile(page, TEXT_PDF);
+    // The stand-in then adds a total it worked out to its graph, which isn't in the report.
+    await page.locator("#notes").fill("stand-in: add a figure to check");
+    await draft(page);
+    expect(await sectionKinds(page)).toContain("graph");
+    await expect(page.getByRole("list", { name: "Numbers to check" })).toBeVisible();
+    const line = draftedLine(page);
+    await expect(line).toContainText("No figure was found in your files.");
+    await expect(line).not.toContainText("so the graph uses numbers");
+  });
+
   test("a PDF of plain text: no pick, the drafted graph stays, and the line says none was found", async ({ page }) => {
     await signInFree(page, "nofig");
     const seen = countPicks(page);
