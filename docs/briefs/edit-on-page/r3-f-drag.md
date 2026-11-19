@@ -117,7 +117,7 @@ export type EditorStore = {
 
   /** Structural changes: each adopts the doc first and is one undo entry. `at` and `place` count page items (pageItems in lib/exhbt/layouts.ts). */
   move(id: string, place: number): void;
-  /** Returns the new section's id, or null when the layout has no room (blockOptions says why). */
+  /** Returns the new section's id ("flow" for the flowchart, put back at `at`), or null when the layout has no room (blockOptions says why) or the flowchart is on the page already. */
   insert(kind: Exclude<BlockKind, "image">, at: number): string | null;
   insertImage(image: { fileId: string; w?: number; h?: number }, at: number): string | null;
   /** Never prunes the numbers to check: Undo may bring the section back. */

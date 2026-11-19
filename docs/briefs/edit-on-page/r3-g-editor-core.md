@@ -241,7 +241,7 @@ export type EditorStore = {
 
   /** Structural changes: each adopts the doc first and is one undo entry. `at` and `place` count page items (pageItems in lib/exhbt/layouts.ts). */
   move(id: string, place: number): void;
-  /** Returns the new section's id, or null when the layout has no room (blockOptions says why). */
+  /** Returns the new section's id ("flow" for the flowchart, put back at `at`), or null when the layout has no room (blockOptions says why) or the flowchart is on the page already. */
   insert(kind: Exclude<BlockKind, "image">, at: number): string | null;
   insertImage(image: { fileId: string; w?: number; h?: number }, at: number): string | null;
   /** Never prunes the numbers to check: Undo may bring the section back. */
@@ -436,7 +436,7 @@ Push after each step. Milestone 1 is every hook and plug in the blocks above, **
 - **a hidden page keeps Undo working**: remove a picture, wait for "Saved", fire `visibilitychange` to hidden and back, press Undo: the picture is back and its address loads;
 - **box for box, on full pages**: for each layout's sample made `full`, `boxes(page)` while editing equals `boxes(page)` in "See as a visitor", to half a pixel, at 1440 wide and on a Pixel 7, in the Exhbt, Classic and Night looks and one colourway of each other look. The only differences allowed, by name, are the highlight's wrap and the entries of `EDIT_ONLY_IN_FLOW` that are always there (each image's description field, the "Add a skill" box), as 0026 says under "How a box-for-box test allows them";
 - **box for box, on a sparse page**: on a new exhbt, every difference from "See as a visitor" is a part named in `EDIT_ONLY_IN_FLOW`, and nothing else moves but what sits below it (0026, "How a box-for-box test allows them");
-- **the loading stand-in matches**: on a new exhbt, `boxes(page)` just before `data-ready="true"` (hold the editor's chunk back with `page.route`) equals `boxes(page)` after;
+- **the loading stand-in matches**: on a new exhbt, and on the gallery's sample (described pictures and skills), `boxes(page)` just before `data-ready="true"` (hold the editor's chunk back with `page.route`) equals `boxes(page)` after;
 - **the status line**: three pictures picked at once show "Uploading 1 of 3", then land in the order picked; a picture over the size limit shows its reason in the alert and adds nothing;
 - **a stale editor**: with `?save=stale`, a change ends in "The editor was updated. Reload to carry on; your changes are kept in this browser.";
 - axe: at rest, while typing, with a sheet open; and at rest on a new exhbt and on a full one in all eight looks.
