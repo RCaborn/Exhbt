@@ -20,7 +20,16 @@ This record is the page's side of the edit-on-page editor (decision 0026). It sh
 
 Nothing is ever reordered to make a row. Two things pair only when they are neighbours in the doc.
 
-The rules are data (`ROW_RULES` in `lib/exhbt/layouts.ts`), tried in order at each place in the doc. For the three layouts that exist:
+The rules are data (`ROW_RULES` in `lib/exhbt/layouts.ts`), tried in order at each place in the doc. A pair rule matches forward (its `a` straight before its `b`) or reversed (`b` straight before `a`). **Forward wins:** a reversed match is not taken when its `a` item is straight followed by an item that makes a forward pair with it. So a figure on each side of the findings pairs with the one after, and the one before stands alone. This is what keeps an adopted page the same as today's (below):
+
+| Stored order (case study, no marker) | Today's page | `adopt` gives | Rows of the adopted order |
+|---|---|---|---|
+| image, graph, findings | the image alone; the findings beside the graph | flowchart, image, findings, graph | flowchart; images [image]; `found` pair (findings, graph) |
+| graph, image, findings | the graph alone; the findings beside the image | flowchart, graph, findings, image | flowchart; graphs [graph]; `found` pair (findings, image) |
+
+Without the tie-break the first row would read the image straight before the findings as a reversed pair and leave the graph on its own. The adopted order is a fixed point: for every fixture, the rows of `adopt(doc)` are the runs today's `runsOf` draws, and adopting again changes nothing (`e2e/layout-model.spec.ts` checks both).
+
+For the three layouts that exist:
 
 - **Case study.** Findings and a graph or image that is their neighbour share a row. Graphs next to each other share a row; so do images. Everything else stands alone. This is what `runsOf` does today.
 - **Gallery.** The first image is the lead, across the column. The flowchart ("What I did", drawn as a column) and its neighbours the findings and the graph ("What happened") share a row. The other images that sit together form the justified grid. Links that sit together go two to a row.
@@ -90,6 +99,8 @@ export function insertImage(doc: ExhbtDoc, image: { fileId: string; w?: number; 
 export function moveItem(doc: ExhbtDoc, id: string, place: number): ExhbtDoc;
 /** Takes a section out. For the flowchart: removes the marker and sets flowOff; the boxes stay in doc.flow. */
 export function removeItem(doc: ExhbtDoc, id: string): ExhbtDoc;
+/** Puts a removed flowchart back: the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's (at the end if none), every other item keeps its place, and flowOff is deleted. The doc stays arranged. The same object when the flowchart is shown. */
+export function restoreFlow(doc: ExhbtDoc): ExhbtDoc;
 ```
 
 Each layout's own facts sit beside its name in `FORMAT_RULES` (`lib/exhbt/formats.ts`): the kinds it draws, its usual order, whether the flowchart can go, what it needs to publish, and what it takes from the work (decision 0025). `validateForPublish` reads `needs` from there, so the `F === "gallery"` branches go.
@@ -140,12 +151,22 @@ How it is read, by `flowShown(doc)`:
 
 While it is off the page its words are not counted, its boxes are not checked for publishing, and the number check still reads them, as it reads every kept section.
 
+"Put the flowchart back", in either editor, is `restoreFlow(doc)`: it writes the marker at the flowchart's usual place among the items as they now are and deletes `flowOff`. It never just deletes `flowOff`: a doc with neither would count as untouched and be redrawn in the template order, losing the person's own order.
+
+## The published copy keeps the order
+
+`publicDoc` (what publishing writes to `published_blocks`) keeps the marker where it is. It filters with `s.kind === "flow" || isShown(d, s)`, keeps `flowOff`, and empties `doc.flow` only when `flowShown` is false.
+
+This matters because `isShown` reads the layout's kinds, which never hold `"flow"`, and `normaliseDoc` has already deleted `flowOff` when a marker is there. Filtered by `isShown` alone, an arranged doc would go live with neither, read as untouched, and be drawn through `adopt`: in a case study the flowchart would jump back to the top and a figure put before the findings would swap sides; a gallery or research page would go back to its template order. "See as a visitor" draws the working copy, so nothing in the editor would show it.
+
+Checked twice: a model test that, for every order fixture made arranged, `pageItems(publicDoc(d))` lists the same ids in the same order as `pageItems(d)`; and a browser test that publishes an arranged doc and finds the live page's parts in the editor's order (brief G).
+
 What code one release older does with it:
 
 | Live code | Meets a removed flowchart | What the person sees |
 |---|---|---|
 | Release 3 and later | understands it | no flowchart |
-| Release 2, the reader release (the rollback target for release 3) | understands it: `flowShown` ships in release 2 | no flowchart, the same page. The classic editor keeps `flowOff` and offers "Put the flowchart back" |
+| Release 2, the reader release (the rollback target for release 3) | understands it: `flowShown` ships in release 2 | no flowchart, the same page. The classic editor keeps `flowOff` and offers "Put the flowchart back" (`restoreFlow`) |
 | Before release 2 (two steps back, not a planned rollback) | drops `flowOff` when it saves; never sees a marker | Working copy: the flowchart is back in its fixed place with its boxes. Published copy: an empty list where the flowchart was, which draws nothing. Both are valid pages |
 
 Everything that reads `doc.flow` was checked for an empty list: `MethodFlow` draws an empty `<ol>`; `keyFigureOf` (`lib/portfolio-home.ts`) falls back to a flow figure with no steps only when there is no graph and no image, and release 2 changes it to skip a flowchart that is not shown; `tileFromDoc` (`lib/exhbt/headline.ts`) builds a tile from the published copy, and with no boxes its methodology strip is empty, so the tile shows the title, the headline number if there is one, and the skills; `lib/ai/exhbt-rewrite.ts` and `lib/exhbt/draft-blocks.ts` read the working copy, where the boxes are kept.
@@ -166,7 +187,7 @@ The marker is written to the stored doc only when the person makes their first s
 
 ## Layouts are starting templates
 
-In the new editor, picking a layout does three things as one step: adopts the doc, sets the layout, and sorts the sections into that layout's usual order (`applyTemplate`). The editor says "Laid out as a gallery. Undo restores your order." One Undo puts back the layout, the order and the flowchart as they were.
+In the new editor, picking a layout does three things as one step: adopts the doc, sets the layout, and sorts the sections into that layout's usual order (`applyTemplate`). The editor says "Laid out as a gallery. Undo restores your order." One Undo puts back the layout, the order and the flowchart as they were, the marker included: undoing the first structural change on an untouched doc takes the marker out again and restores the order as it was stored, so the doc is untouched again and drawn exactly as before. Restoring the stored order but leaving the marker would draw a different page (an untouched case study stored as graph, findings is drawn with the findings on the left; arranged, the graph would be).
 
 This amends 0024, which said a switch changes `format` and nothing else, so that switching back gave the exhbt exactly as it was. That promise now belongs to Undo. Picking the old layout again gives that layout's usual order, not the hand-made one.
 
@@ -189,8 +210,11 @@ Release 2 changes nothing a person can see or do. It makes the live site able to
 - the model: the marker, `flowOff`, the pull quote kind, an image's stage, `myRole`, the seven layout ids (the four new ones are not offered: `OFFERED_FORMATS`), and `adopt`;
 - the engine and `LayoutMain`, drawing all seven layouts;
 - the editing slots on the page parts (decision 0026), unused;
-- the classic editor keeping what it does not edit: the marker (shown as a row called Flowchart that can be moved), `flowOff`, and the new fields;
-- the graphs a figure from the work replaces, kept with the exhbt's AI version from now on, so release 3 can offer them back (decision 0026);
+- the classic editor keeping what it does not edit: the marker (shown as a row called Flowchart that can be moved), `flowOff`, and the new fields. It offers a field for My role only on a doc that already has one or whose layout is Event or performance, so nobody is offered a new field in this release;
+- the published copy keeping the marker (above);
+- the graphs a figure from the work replaces, kept with the exhbt's AI version from now on, and read back with it (`loadAiVersion` keeps `graphs`), so release 3 can offer them back (decision 0026);
+- a server check before a stored file is deleted: `DELETE /api/files/[id]` deletes nothing while any of the person's exhbts points at the file in its working copy or its published copy (decision 0026, "Saving, and what may delete a file");
+- the editor switch, unused: `editorKind()` in `lib/site.ts` and an `editor` line in `/api/health`, so the switch can be proven on the preview site before there is an editor to switch to;
 - samples and seeds for the four new layouts, on development pages only.
 
 Why this order makes each later step safe to undo:
@@ -209,10 +233,12 @@ The four new layouts' model and drawing ride in release 2 so there is one pass t
 
 Release 2 may not change any existing page. "The same" is defined so a script can check it.
 
-1. **The comparison.** For each fixture, the `outerHTML` of `article[data-exhbt-page]` at 1440 by 900, normalised in three ways and no others: file addresses in `src` and `href` become the file's id; ids React makes (`useId`) become their position in the page; the words in each `class` attribute are sorted. Two pages are the same when the strings are equal.
-2. **The fixtures.** Every sample and seed (`lib/exhbt/sample.ts`: the old-shape GP exhbt, the library, open banking, the full one, five and six boxes, the gallery, the research poster) and order fixtures made for this: a figure before the findings, two graphs before the findings, an image then a graph then the findings, a graph then an image with no address then the findings, a gallery with no findings, a gallery whose sections are out of the usual order, research with no figure.
-3. **Golden copies first.** `e2e/layout-parity.spec.ts`, run with `GOLDEN=write`, writes each fixture's string to `e2e/golden/`. That is done on the model agent's first commit, which adds the test and a development-only page and changes no product code. Run without `GOLDEN`, the test compares. The renderer's agent runs it and may not edit it.
-4. **Every live page.** Before release, the main session exports each published exhbt from the live site to a file outside the repo, draws it on that first commit and on the candidate through the same test (`PARITY_DOCS`), and compares. Today that is one exhbt, a case study. The count is run again on the day.
+1. **The comparison.** For each fixture, two things are compared.
+   - The `outerHTML` of `article[data-exhbt-page]` at 1440 by 900, normalised in five ways and no others: file addresses in `src` and `href` become the file's id; file ids then become their order of first appearance in the page (`file-1`, `file-2`); ids React makes (`useId`) become their position in the page; the words in each `class` attribute are sorted; the date in the sidebar's "Checked by exhbt" line becomes `DATE`. Two pages are the same when the strings are equal.
+   - The boxes: the place and size of every element in the article, rounded to the half pixel, at 1440 by 900 and at 412 by 915. They are the same within half a pixel. A new CSS rule can restyle a page without changing a byte of its markup; this catches it.
+2. **The fixtures.** Every sample and seed (`lib/exhbt/sample.ts`: the old-shape GP exhbt, the library, open banking, the full one, five and six boxes, the gallery, the research poster) and order fixtures made for this: a figure before the findings, two graphs before the findings, an image then a graph then the findings, a graph then an image then the findings, a graph then an image with no address then the findings, a gallery with no findings, a gallery whose sections are out of the usual order, research with no figure. Every fixture, the samples included, is seeded through the parity page (`POST /dev/parity`) with file ids made from the slug and the section id and a fixed publish date, so a run on another day, or a second run, draws the same page. An image stored before decision 0024 has no `w` or `h`: its placeholder picture is a fixed 1200 by 800, and the doc's `w` and `h` stay absent, so the page is drawn exactly as stored.
+3. **Golden copies first.** `e2e/layout-parity.spec.ts`, run with `GOLDEN=write`, writes each fixture's string and boxes to `e2e/golden/`. That is done on the model agent's first commit, which adds the test and a development-only page and changes no product code. Run without `GOLDEN`, the test compares. The renderer's agent runs it and may not edit it. Before the renderer's agent starts, the main session runs the comparison again on a later day, to prove it does not depend on the date or on a run.
+4. **Every live page.** Before release, the main session exports each published exhbt from the live site to a file outside the repo and compares the page each draws on the code the live site runs now (the "before") with the release candidate (the "after"), through the same test (`PARITY_DOCS`). The "before" is drawn on `main`'s live commit with the parity page, spec and fixtures copied onto it in a scratch worktree (they change no product code), not on the model agent's first commit: the release branch already carries release 1b, so a change 1b makes to a published page would be on both sides and never seen. Today that is one exhbt, a case study. The count is run again on the day, and the comparison is run again before release 3, whose page-part changes (the slots, the flowchart's edit hooks) also touch every live page.
 5. **Adopting changes nothing.** For every fixture, the page of `adopt(doc)` equals the page of `doc`.
 6. **Print.** The samples that print on one A4 page today still do (the checks in `e2e/exhbt-page.spec.ts` and `e2e/phase2-formats.spec.ts` stay as they are and stay green).
 7. **An old reader.** A frozen copy of today's `normaliseDoc` and schema, kept in the test fixtures, reads docs as later releases will write them and gets a doc today's page can draw.
@@ -222,14 +248,14 @@ If the engine cannot give an identical page for a fixture, the agent stops and r
 ## Consequences
 
 - `AGENTS.md`'s "Exhbt layout" line and `docs/MAP.md` describe a fixed core. Both change with release 2.
-- `withKeyFigure` and `withWorkVisual` (decisions 0017 and 0025) place a figure by kind, not by index from the top, so they work on an arranged doc. They run before the editor opens, on a doc with no marker, and need no change beyond skipping the marker.
+- `withKeyFigure` and `withWorkVisual` (decisions 0017 and 0025) place a figure by kind, not by index from the top. They run when a draft is made, on a doc with no marker, and in the new editor ("Take a figure from my report", decision 0026), on a doc that may be arranged. So beyond skipping the marker, `withKeyFigure` needs one change: in a case study with no findings it places the figure straight after the marker when there is one, not at the very top (today's rule, findings index plus one, gives 0, which on an arranged doc is above the flowchart).
 - The AI draft still writes docs with no marker. They are drawn in the usual order and adopted on the first structural change.
 - A switch in the classic editor on an arranged doc keeps the hand-made order under the new layout. That is a valid page, and the classic editor lasts one release.
 
 ## Not sure, and risky
 
 - **An identical page from a general engine.** Gallery and research have their own wrappers today. The row renderers must reproduce them exactly. This is the part of release 2 most likely to need a second round.
-- **The figure-before-findings swap.** It is the only place `adopt` changes a case study's order. If a fixture shows today's page pairing in a way the swap does not cover, `adopt` needs that case too.
+- **The figure-before-findings swap.** It is the only place `adopt` changes a case study's order. If a fixture shows today's page pairing in a way the swap does not cover, `adopt` needs that case too. The "forward wins" tie-break was found by reading `runsOf` against the two fixtures in the table above; a fixture nobody has thought of may need another.
 - **`flow: []` in the published copy** means a two-step rollback shows no flowchart, not the removed one. The other choice was to keep the boxes there, which would show a part the person took off.
 - **Reading the layout from the usual order for every non-case-study doc with no marker** is right for the three old layouts. For a new layout it is a choice: the AI's own order is discarded in favour of the template.
 - The rule tables for the four new layouts have not been drawn yet. Decision 0028 says what is expected of them.
