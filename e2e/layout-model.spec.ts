@@ -23,6 +23,7 @@ import { tileFromDoc } from "../lib/exhbt/headline";
 import { adopt, applyTemplate, blockOptions, flowShown, hasMarker, insertBlock, insertImage, isArranged, keptItems, moveItem, pageItems, removeItem, restoreFlow, rowsFor, structureKey, type Cell, type ItemCell, type Row } from "../lib/exhbt/layouts";
 import { layoutNotes, newSection, roomFor, sectionLabel, sectionName, withKeyFigure, withWorkVisual } from "../lib/exhbt/sections";
 import { pathOfNumber } from "../lib/exhbt/verify";
+import { readAiVersion } from "../lib/exhbt/draft-blocks";
 import { ORDER_FIXTURES, SAMPLE_FIXTURES, todayCaseRows, todayGalleryRows, todayResearchRows, type OrderFixture } from "./fixtures/order-docs";
 import { OLD_FORMATS, OLD_SECTION_KINDS, OldExhbtDocSchema } from "./fixtures/reader-before-r2";
 
@@ -123,6 +124,26 @@ test.describe("The model: the marker and the new fields", () => {
       // Nothing it can't hold is kept: no marker, no flowOff, no My role, no stage.
       expect(JSON.stringify(old)).not.toMatch(/"flowOff"|"myRole"|"stage"|"kind":"flow"|"kind":"pullquote"/);
     }
+  });
+});
+
+/* ---------------- The AI version (step 9) ---------------- */
+
+test.describe("The model: the AI version keeps the graphs a figure replaced", () => {
+  test("a rewrite's read, change and write keeps the graphs; graphs that aren't charts read as none", () => {
+    // What the rewrite action does: load (readAiVersion), change one block, save (JSON, as saveAiVersion writes it), load again.
+    const stored = JSON.stringify({ blocks: { gap: text("The old context.") }, unverified: { gap: [] }, graphs: [bar] });
+    const ai = readAiVersion(stored);
+    expect(ai.graphs).toEqual([bar]);
+    (ai.blocks as Record<string, unknown>).gap = text("The new context.");
+    ai.unverified.gap = ["18%"];
+    const again = readAiVersion(JSON.stringify(ai));
+    expect(again.graphs).toEqual([bar]);
+    expect(again.blocks.gap).toEqual(text("The new context."));
+    expect(again.unverified.gap).toEqual(["18%"]);
+    for (const graphs of [[{ kind: "nothing" }], "a graph", [bar, 42], undefined]) expect("graphs" in readAiVersion(JSON.stringify({ blocks: {}, unverified: {}, graphs }))).toBe(false);
+    expect(readAiVersion(null)).toEqual({ blocks: {}, unverified: {} });
+    expect(readAiVersion("not json")).toEqual({ blocks: {}, unverified: {} });
   });
 });
 

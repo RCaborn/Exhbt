@@ -1,6 +1,6 @@
 import "server-only";
 import { devBlobs, devStorageEnabled } from "./files";
-import { emptyAiVersion, type AiVersion } from "./exhbt/draft-blocks";
+import { readAiVersion, type AiVersion } from "./exhbt/draft-blocks";
 import { deleteFile } from "./uploads";
 import { getStore, isSupabaseConfigured, supabaseAdmin, type StoredFile } from "./store";
 
@@ -86,14 +86,8 @@ export async function saveAiVersion(userId: string, exhbtId: string, v: AiVersio
   await write(userId, exhbtId, AI_NAME, "application/json", JSON.stringify(v));
 }
 
+/** The exhbt's AI version, as readAiVersion reads it: its graphs come back with it, so a load, change and save keeps them. */
 export async function loadAiVersion(userId: string, exhbtId: string): Promise<AiVersion> {
   const f = await find(userId, exhbtId, AI_NAME);
-  const raw = f ? await getObject(f) : null;
-  if (!raw) return emptyAiVersion();
-  try {
-    const v = JSON.parse(raw) as Partial<AiVersion>;
-    return { blocks: v.blocks ?? {}, unverified: v.unverified ?? {} };
-  } catch {
-    return emptyAiVersion();
-  }
+  return readAiVersion(f ? await getObject(f) : null);
 }

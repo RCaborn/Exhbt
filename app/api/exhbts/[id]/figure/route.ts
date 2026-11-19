@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { getCurrentUser } from "@/lib/auth";
-import { loadDraftSource } from "@/lib/draft-tools";
+import { loadAiVersion, loadDraftSource, saveAiVersion } from "@/lib/draft-tools";
 import { FIGURE_KINDS, FigureBoxSchema, formatLimits, normaliseDoc } from "@/lib/exhbt/blocks";
 import { formatOf } from "@/lib/exhbt/formats";
 import { withWorkVisual } from "@/lib/exhbt/sections";
@@ -98,6 +98,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     unverified.push(n);
   }
   if (!(await store.saveExhbtDraft(id, user.id, { ...next, unverified }))) return fail("Exhbt not found.", 404);
+  // The graphs the figure took the place of are kept with the AI version, beside what is there, so the
+  // editor can offer them back (decision 0026). Nothing reads them yet. A failure here loses nothing on the page.
+  if (result.removed.length) {
+    try {
+      const ai = await loadAiVersion(user.id, id);
+      await saveAiVersion(user.id, id, { ...ai, graphs: [...(ai.graphs ?? []), ...result.removed.map((s) => s.chart)] });
+    } catch (e) {
+      console.error("ai version graphs save failed", (e as Error).message);
+    }
+  }
   await store.attachFiles(user.id, id, [fileId]);
   await store.logEvent("figure_added", user.id, { exhbtId: id, from: picked.page ? "pdf" : "office", kind, graphsRemoved: result.removed.length });
   return new NextResponse(null, { status: 204 });

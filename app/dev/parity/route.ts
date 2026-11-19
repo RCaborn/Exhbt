@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { loadAiVersion, saveAiVersion } from "@/lib/draft-tools";
 import type { Plan } from "@/lib/entitlements";
 import { emptyDoc } from "@/lib/exhbt/blocks";
+import type { AiVersion } from "@/lib/exhbt/draft-blocks";
 import { devBlobs } from "@/lib/files";
 import { usernameProblem } from "@/lib/hosts";
 import { getStore, isSupabaseConfigured, memorySnapshot, setPlanForDevelopment, setStoredCopiesForDevelopment } from "@/lib/store";
@@ -11,7 +13,7 @@ import { getStore, isSupabaseConfigured, memorySnapshot, setPlanForDevelopment, 
  * compared (e2e/layout-parity.spec.ts); the editor tests seed docs with it too. It changes no
  * product code and must run unchanged on main's live commit: the live pages' "before" is drawn there.
  *
- * POST { username, slug, doc, working?, publishedAt?, plan?, extraFiles? } stores a published exhbt
+ * POST { username, slug, doc, working?, publishedAt?, plan?, extraFiles?, aiVersion? } stores a published exhbt
  * for the development user of that username (the dev sign-in user for `<username>@example.com`),
  * raw, not read into the current shape: `doc` is its published copy and `working` its working copy
  * (`doc` when absent). Any exhbt of theirs with that slug is replaced, and the new one goes first on
@@ -28,7 +30,11 @@ import { getStore, isSupabaseConfigured, memorySnapshot, setPlanForDevelopment, 
  * copy points at, its id made from the slug and the name. `files` maps each image section's id and
  * each extra name to its file id.
  *
- * GET ?id=<id> answers that exhbt's stored copies, untouched: { working, published }.
+ * `aiVersion`, when given, is saved as the exhbt's AI version (saveAiVersion, as a draft saves it),
+ * so a test can seed one with graphs.
+ *
+ * GET ?id=<id> answers that exhbt's stored copies, untouched, and its AI version as loadAiVersion
+ * reads it: { working, published, aiVersion }.
  *
  * Disabled with Supabase or in production, as app/dev/portfolio is.
  */
@@ -59,6 +65,7 @@ export async function POST(req: NextRequest) {
   if (body.working !== undefined && !isObject(body.working)) return new NextResponse("working must be an object", { status: 400 });
   if (!PLANS.includes(plan)) return new NextResponse("Unknown plan", { status: 400 });
   if (!Array.isArray(extra) || !extra.every((n) => typeof n === "string" && n)) return new NextResponse("extraFiles must be a list of names", { status: 400 });
+  if (body.aiVersion !== undefined && !isObject(body.aiVersion)) return new NextResponse("aiVersion must be an object", { status: 400 });
 
   const store = getStore();
   const userId = `dev-${username}@example.com`;
@@ -94,6 +101,7 @@ export async function POST(req: NextRequest) {
   if (record) Object.assign(record, { publishedAt, confirmedAt: publishedAt });
   const ids = (await store.listExhbts(userId)).map((e) => e.id);
   await store.reorderExhbts(userId, [id, ...ids.filter((x) => x !== id)]);
+  if (body.aiVersion !== undefined) await saveAiVersion(userId, id, body.aiVersion as AiVersion);
   return NextResponse.json({ id, url: `/p/${username}/${slug}`, files: pictures.ids });
 }
 
@@ -102,7 +110,7 @@ export async function GET(req: NextRequest) {
   const id = new URL(req.url).searchParams.get("id") ?? "";
   const e = memorySnapshot()?.exhbts.get(id);
   if (!e) return new NextResponse("Not found", { status: 404 });
-  return NextResponse.json({ working: e.doc, published: e.published });
+  return NextResponse.json({ working: e.doc, published: e.published, aiVersion: await loadAiVersion(e.userId, id) });
 }
 
 /** The doc with each image pointed at its placeholder picture; `pictures` collects the pictures to store and their ids. */
