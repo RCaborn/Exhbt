@@ -6,6 +6,7 @@ import { headlineFor } from "../lib/exhbt/headline";
 import { legacyGpDoc, sampleDocs } from "../lib/exhbt/sample";
 import { slugify } from "../lib/exhbt/slug";
 import { unverifiedNumbers } from "../lib/exhbt/verify";
+import { addGraph, addGraphSection, graph, pickGraphKind, previewRegion, publish, signInAs, startWithBasics } from "./editor";
 
 // Graphs (decision 0011): a fixed set of kinds, every value typed in and printed, a hidden table
 // for each, the word cap counting every graph word, the number check covering every graph
@@ -161,57 +162,9 @@ test.describe("Graph kinds", () => {
 
 /* ---------------- In the browser ---------------- */
 
-/** Makes a dev user with a username on Premium, signs in, and opens /exhbts. */
-async function signInAs(page: Page, username: string) {
-  await page.goto(`/dev/portfolio?username=${username}&plan=premium&count=0`);
-  await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
-  await expect(page.getByRole("heading", { level: 1, name: "Your exhbts" })).toBeVisible();
-}
-
-async function startWithBasics(page: Page, title: string) {
-  await page.getByRole("button", { name: "Start from scratch" }).click();
-  await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
-  await expect(page.locator("[data-ready=true]")).toBeAttached();
-  await expect(page.getByRole("textbox", { name: "Context", exact: true })).toBeVisible();
-  await page.locator("#title").fill(title);
-  await page.getByRole("textbox", { name: "Context", exact: true }).fill("Lunch queues ran long. Would a second till help?");
-  for (const [i, box] of ["Timed the queue", "Opened a second till", "Timed it again"].entries()) await page.getByLabel(`Box ${i + 1}`, { exact: true }).fill(box);
-  await page.getByRole("textbox", { name: "Finding 1" }).fill("Waits fell.");
-  await page.getByRole("textbox", { name: "Finding 2" }).fill("Sales held steady.");
-}
-
-const graph = (page: Page, n: number) => page.getByRole("group", { name: `Graph ${n}`, exact: true });
-
-/** Picks a kind in the type picker by clicking its tile, then checks the radio took it. */
-async function pick(g: Locator, kind: string) {
-  const radio = g.getByRole("radio", { name: kind, exact: true });
-  await g.locator("label", { has: g.page().getByRole("radio", { name: kind, exact: true }) }).click();
-  await expect(radio).toBeChecked();
-}
-
-/** Opens "Add a section" and adds a graph (decision 0015). */
-async function addGraphSection(page: Page) {
-  await page.getByRole("button", { name: "Add a section" }).click();
-  await page.getByRole("button", { name: "Add a graph" }).click();
-}
-
-async function addGraph(page: Page, n: number, kind: string, title: string): Promise<Locator> {
-  await addGraphSection(page);
-  const g = graph(page, n);
-  await pick(g, kind);
-  await g.getByLabel("Title", { exact: true }).fill(title);
-  return g;
-}
-
 /** Fills inputs by their labels, in order. */
 async function fill(scope: Locator | Page, values: [string, string][]) {
   for (const [label, value] of values) await scope.getByLabel(label, { exact: true }).fill(value);
-}
-
-async function publish(page: Page) {
-  await page.getByLabel("This is my work, and the numbers are true").check();
-  await page.getByRole("button", { name: /^Publish( changes)?$/ }).click();
-  await expect(page.getByText(/^(It's live\.|Your changes are live\.)$/)).toBeVisible();
 }
 
 /** A graph on the project page, by its title. */
@@ -257,7 +210,7 @@ test.describe("Graphs in the editor and on the page", () => {
     await g2.getByRole("button", { name: "Add a group to graph 2" }).click();
     await fill(g2, [["Graph 2, group 2 label", "Arts"], ["Graph 2, group 2 Spring", "55"], ["Graph 2, group 2 Autumn", "64"]]);
     // The live preview redraws as you type, with every value.
-    const preview = page.getByRole("region", { name: "Preview" });
+    const preview = previewRegion(page);
     await expect(preview.locator("figure[data-chart]").filter({ hasText: "Marks by term" }).getByText("64", { exact: true }).first()).toBeVisible();
     // Both graphs are used: the menu says so and won't add a third.
     await page.getByRole("button", { name: "Add a section" }).click();
@@ -266,7 +219,7 @@ test.describe("Graphs in the editor and on the page", () => {
     await page.keyboard.press("Escape");
     await axe(page, "editor");
 
-    await publish(page);
+    await publish(page, { changes: true });
     await page.goto(`/p/gwen/${slugify(title)}`);
     await shows(page, "Average wait", ["11 min", "4 min", "7 min"], /^Bar graph of 3 bars\. Highest: Till A, 11 min\. Lowest: Till B, 4 min\.$/);
     await shows(page, "Marks by term", ["62", "71", "55", "64"], /^Grouped bar graph: 2 groups of Spring and Autumn\.$/);
@@ -287,7 +240,7 @@ test.describe("Graphs in the editor and on the page", () => {
     await fill(g2, [["Graph 2, point 3 label", "Third"], ["Graph 2, point 3 Visits", "160"]]);
     await axe(page, "editor");
 
-    await publish(page);
+    await publish(page, { changes: true });
     await page.goto(`/p/gary/${slugify(title)}`);
     await shows(page, "Hours by task", ["30", "12", "42"], /^Stacked bar graph: 1 bar, each split into Sorting and Driving\.$/);
     await shows(page, "Weekly visits", ["120", "135", "160"], /^Line graph of 3 points, from First to Third\. Visits goes from 120 to 160\.$/);
@@ -316,7 +269,7 @@ test.describe("Graphs in the editor and on the page", () => {
     await fill(g2, [["Graph 2, number 2 label", "records cleaned"], ["Graph 2, number 2 value", "14,200"]]);
     await axe(page, "editor");
 
-    await publish(page);
+    await publish(page, { changes: true });
     await page.goto(`/p/gina/${slugify(title)}`);
     await shows(page, "Revision and marks", ["Ana", "Ben"], /^Scatter graph of 3 points: Exam mark against Hours revised\.$/);
     await expect(figure(page, "Revision and marks").getByText("(9, 74)", { exact: true })).toBeVisible();
@@ -341,14 +294,14 @@ test.describe("Graphs in the editor and on the page", () => {
     const g2 = graph(page, 2);
     await expect(g2.getByRole("radio", { name: "Before and after", exact: true })).toBeChecked();
     await fill(g2, [["Title", "Missed appointments"], ["Before is called", "Day before"], ["After is called", "Same day"], ["Unit (optional)", "%"], ["Graph 2, row 1 group", "All patients"], ["Graph 2, row 1 Day before", "7.9"], ["Graph 2, row 1 Same day", "6.5"]]);
-    await pick(g2, "Grouped bars");
+    await pickGraphKind(g2, "Grouped bars");
     await expect(g2.getByLabel("Graph 2, series 1 name")).toHaveValue("Day before");
     await expect(g2.getByLabel("Graph 2, group 1 Same day")).toHaveValue("6.5");
-    await pick(g2, "Before and after");
+    await pickGraphKind(g2, "Before and after");
     await expect(g2.getByLabel("Graph 2, row 1 Same day")).toHaveValue("6.5");
     await expect(g2.getByLabel("Before is called")).toHaveValue("Day before");
 
-    await publish(page);
+    await publish(page, { changes: true });
     await page.goto(`/p/gus/${slugify(title)}`);
     const table = page.getByRole("table", { name: "Model comparison" });
     await expect(table).toBeVisible();
@@ -369,7 +322,7 @@ test.describe("Graphs in the editor and on the page", () => {
     const g = graph(page, 1);
     await expect(g.getByRole("radio", { name: "Before and after", exact: true })).toBeChecked();
     await expect(g.getByLabel("Graph 1, row 2 group")).toHaveValue("Under 30");
-    await expect(page.getByRole("region", { name: "Preview" }).getByText("11.2%", { exact: true }).first()).toBeVisible();
+    await expect(previewRegion(page).getByText("11.2%", { exact: true }).first()).toBeVisible();
   });
 
   test("graph labels can push an exhbt over 200 words, and then it can't be published", async ({ page }) => {
@@ -433,7 +386,7 @@ test.describe("Graphs in the editor and on the page", () => {
     await expect(card.getByText("£61,230", { exact: true })).toHaveCount(0);
     await expect(card).toContainText("The real figures aren't shared.");
 
-    await publish(page);
+    await publish(page, { changes: true });
     const url = `/p/gabe/${slugify(title)}`;
     await page.goto(url);
     await shows(page, "Weekly revenue", ["+9.5%", "+26.7%"], /Shown as the change from each line's first point, in %\. The real figures aren't shared\.$/);
