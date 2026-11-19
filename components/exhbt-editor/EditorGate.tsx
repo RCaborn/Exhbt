@@ -37,10 +37,15 @@ const PageEditor = dynamic(() => import("./EditorShell").then((m) => m.PageEdito
 /** The longest the fallback waits for the newest doc to reach the server before it reloads. */
 const FLUSH_MS = 3000;
 
-/** This address with ?editor=classic added. The development crash switch is taken off, so the classic editor opens cleanly. */
+/**
+ * This address with ?editor=classic added. The development crash switch comes off. So does what the draft page
+ * passed on (drafted, why, fig): the classic editor takes those off the address by replacing it with the bare
+ * path (components/editor/Editor.tsx), which would drop editor=classic too, and a reload would then be the new
+ * editor again. The visit stays in the classic editor; the line about the draft is not said.
+ */
 function classicAddress(href: string): string {
   const url = new URL(href);
-  url.searchParams.delete("crash");
+  for (const key of ["crash", "drafted", "why", "fig"]) url.searchParams.delete(key);
   url.searchParams.set("editor", "classic");
   return url.toString();
 }

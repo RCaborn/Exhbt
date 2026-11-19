@@ -24,7 +24,7 @@ const doc = (): ExhbtDoc => ({
   skills: ["Excel"],
   gap: text("Would a second till help?"),
   flow: [{ step: "Timed it" }, { step: "Added a till" }, { step: "Timed it again" }],
-  sections: [{ id: "findings", kind: "findings", items: [text("Waits fell from 11 to 4 minutes.")] }],
+  sections: [{ id: "findings", kind: "findings", items: [text("Waits fell from 11 to 4 minutes."), text("Sales held steady.")] }],
 });
 
 async function signIn(page: Page, username: string) {
@@ -150,6 +150,18 @@ test.describe("the crash fallback", () => {
     expect(url.searchParams.has("crash")).toBe(false);
     await expect(page.getByText(LINE)).toBeVisible();
     expect(logged.some((l) => l.includes("The new editor failed"))).toBe(true);
+  });
+
+  test("a crash straight after a draft opens the classic editor for the rest of the visit", async ({ page }) => {
+    const { edit } = await seed(page, "drafted");
+    await page.goto(`${edit}?drafted=case-study&why=default&crash=render`);
+    await expect(page.locator(CLASSIC_READY)).toBeAttached();
+    // The classic editor takes what the draft page passed on off the address, and with it anything else in the
+    // query; so the fallback leaves those out, and ?editor=classic stays. A reload is still the classic editor.
+    expect(new URL(page.url()).search).toBe("?editor=classic");
+    await page.reload();
+    await expect(page.locator(CLASSIC_READY)).toBeAttached();
+    await expect(page.locator('[data-editor="page"]')).toHaveCount(0);
   });
 
   test("an editor chunk that fails to load opens the classic editor too", async ({ page }) => {
