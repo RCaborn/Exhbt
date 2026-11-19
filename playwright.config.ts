@@ -21,9 +21,13 @@ export default defineConfig({
     // In environments with a preinstalled Chromium (e.g. Claude Code cloud), point at it.
     launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
   },
+  // The edit-on-page editor's drag and flowchart specs run with a mouse and by touch; its phone and
+  // tablet specs only on their own devices (docs/briefs/edit-on-page/README.md).
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
+    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } }, testIgnore: /editor-(phone|tablet)\.spec\.ts/ },
     { name: "mobile", use: { ...devices["Pixel 7"] }, testMatch: /responsive\.spec\.ts/ },
+    { name: "touch", use: { ...devices["Pixel 7"] }, testMatch: /editor-(drag|flow|phone)\.spec\.ts/ },
+    { name: "tablet", use: { browserName: "chromium", viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 }, testMatch: /editor-tablet\.spec\.ts/ },
   ],
   webServer: {
     command: `npx next dev -p ${PORT}`,
