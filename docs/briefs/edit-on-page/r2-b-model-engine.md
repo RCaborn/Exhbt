@@ -20,7 +20,7 @@ Teach the stored exhbt everything later releases will write (the flowchart's mar
 
 ## You own
 
-- `lib/exhbt/blocks.ts`, `lib/exhbt/formats.ts`, `lib/exhbt/layouts.ts` (new), `lib/exhbt/sections.ts`, `lib/exhbt/verify.ts`
+- `lib/exhbt/blocks.ts`, `lib/exhbt/formats.ts`, `lib/exhbt/layouts.ts` (new), `lib/exhbt/sections.ts`, `lib/exhbt/verify.ts`, `lib/exhbt/headline.ts`
 - `app/dev/parity/route.ts` (new), `e2e/layout-parity.spec.ts` (new), `e2e/golden/` (new)
 - `e2e/fixtures/order-docs.ts` (new), `e2e/fixtures/reader-before-r2.ts` (new), `e2e/layout-model.spec.ts` (new)
 - the exhbt lines of `AGENTS.md` ("Exhbt layout") and `docs/MAP.md` ("The exhbt and its editor")
@@ -256,7 +256,7 @@ Commit and push after each.
    - Run it with `GOLDEN=write`, commit the golden files, then run it without and see it pass.
 2. **The schema** (`blocks.ts`, `formats.ts`), as the types above. `normaliseDoc`: keeps one marker and gives it the id `flow`; drops a second; deletes `flowOff` when a marker is there; still drops a kind or layout it does not know. `OFFERED_FORMATS` is the three. Export `DRAFT_FORMATS` (the same three, as a tuple) and use it for the enum in `lib/ai/exhbt-draft.ts`, so the AI's choice does not widen.
 3. **Every helper that returns sections returns content sections only** (`shownSections`, `hiddenSections`, `sectionsOf`, `imagesOf`, `findingsOf`, `chartsOf`). Only `doc.sections` and `pageItems` ever show the marker. `sectionTexts` of a pull quote is its text. `sectionLabel` of the marker is "Flowchart". `sectionName` of a pull quote is "Pull quote". `newSection("pullquote")` is `{ text: "" }`. `roomFor`, `withKeyFigure` and `withWorkVisual` ignore the marker.
-4. **Reading a removed flowchart.** `wordCount` leaves the flowchart's words out when `flowShown` is false and adds `myRole`. `validateForPublish` skips the flowchart's checks when it is not shown; reads `needs`; allows an empty link address where `formatLimits(f).link.hrefOptional`; checks a pull quote (not empty, within its words) at `sections.N.text`; checks `myRole`'s length at `myRole`. `publicDoc` writes `flow: []` when the flowchart is not shown. The number check (`verify.ts`) still reads everything kept, and gains `myRole`.
+4. **Reading a removed flowchart.** `wordCount` leaves the flowchart's words out when `flowShown` is false and adds `myRole`. `validateForPublish` skips the flowchart's checks when it is not shown; reads `needs`; allows an empty link address where `formatLimits(f).link.hrefOptional`; checks a pull quote (not empty, within its words) at `sections.N.text`; checks `myRole`'s length at `myRole`. `publicDoc` writes `flow: []` when the flowchart is not shown. `tileFromDoc` (`lib/exhbt/headline.ts`) gives a tile no methodology steps when the flowchart is not shown; look at what `components/exhbt/ExhbtTile.tsx` then draws (read only) and say in your report whether an empty strip is left behind. The number check (`verify.ts`) still reads everything kept, and gains `myRole`.
 5. **`pathOfNumber(doc, n): string | null`** in `verify.ts`: the path of the first field whose text holds that number (by value, as `normaliseNumber`), for "Things to fix".
 6. **The engine** (`layouts.ts`):
    - `adopt`: for a case study, port `runsOf` as it is today and emit its runs flattened with the marker first, a findings-and-figure run as the findings then the figure. For every other layout, a stable sort into `template`, the marker at the flowchart's slot. Sections the layout keeps but does not draw stay after the shown section they followed.
