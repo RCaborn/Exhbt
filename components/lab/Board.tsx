@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { DndContext, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragStartEvent } from "@dnd-kit/core";
+import { DndContext, MouseSensor, TouchSensor, useDraggable, useSensor, useSensors, type DragStartEvent } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { ArrowDown, ArrowUp, GripVertical, Plus, X } from "lucide-react";
 import { useReducedMotion } from "@/components/ui/useReducedMotion";
@@ -82,7 +82,7 @@ export function Board({ version }: { version: Version }) {
   const reduced = useReducedMotion();
   const [lift, setLift] = useState<Lift | null>(null);
 
-  const wrap = useRef<HTMLDivElement | null>(null);
+  const wrap = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null);
   const sizer = useRef<HTMLDivElement>(null);
   const line = useRef<HTMLDivElement>(null);
@@ -96,17 +96,6 @@ export function Board({ version }: { version: Version }) {
   // The latest values, for the handlers below, which are made once.
   const now = useRef({ version, reduced });
   now.current = { version, reduced };
-
-  // The page is one droppable, so dnd-kit scrolls the page for a block carried in from the tray too
-  // (the tray is fixed to the screen, and a fixed thing has nothing to scroll of its own).
-  const { setNodeRef: setDropRef } = useDroppable({ id: "lab-page" });
-  const setWrap = useCallback(
-    (el: HTMLDivElement | null) => {
-      wrap.current = el;
-      setDropRef(el);
-    },
-    [setDropRef],
-  );
 
   // A section's kind never changes, so the layout depends on the order alone.
   const sections = store.get().sections;
@@ -545,7 +534,7 @@ export function Board({ version }: { version: Version }) {
   };
 
   return (
-    <div ref={setWrap} data-lab-board data-version={version} className="relative">
+    <div ref={wrap} data-lab-board data-version={version} className="relative">
       <DndContext
         id="lab-sections"
         sensors={sensors}

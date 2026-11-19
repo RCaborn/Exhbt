@@ -128,6 +128,10 @@
   .lab-insert > * {
     pointer-events: auto;
   }
+  /* Open, its menu lies over the sections below, their toolbars and their own "+" included. */
+  .lab-insert[data-open] {
+    z-index: 40;
+  }
   /* After the last section: under the board, in the page's own bottom padding. */
   .lab-insert[data-end] {
     top: 100%;

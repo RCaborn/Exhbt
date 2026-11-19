@@ -144,7 +144,7 @@ What was hard, and what was found:
 | A, slide | 100, 67, 67ms | 83, 67, 83ms |
 | B, line | 100, 67, 67ms | 100, 117, 83ms |
 
-In every drag the median frame was 16.7ms, the 95th centile 16.7 to 16.8ms, and exactly one frame was over 50ms: the pick-up, when the page is measured and the lifted copy drawn. The drop is one React commit, a layout, and the start of the move into place.
+In every drag the median frame was 16.7ms, the 95th centile 16.7 to 16.8ms, and one frame was over 50ms. The script does not say which frame that was; the pick-up, when the page is measured and the lifted copy drawn, is the likely one. The drop is one React commit, a layout, and the start of the move into place.
 
 Typing 40 characters into a finding: keystroke to paint median 12.1, 12.0 and 12.2ms; 95th centile 17.5, 16.7 and 18.3ms; longest 20.6, 18.2 and 20.4ms. No other section rendered.
 
@@ -184,6 +184,7 @@ They were read as stills and as contact sheets of frames a quarter of a second a
 - **Safari and Firefox.** Only Chromium is installed here. Two things to look at first: `field-sizing` (the mirror fallback is tested, but only in Chromium), and whether a container query's element becomes the containing block for fixed things there, which would misplace the flow box's lifted copy and the tray. Both are drawn in the look's wrapper to avoid it.
 - **A screen reader.** The announcements are checked as text in a live region, not heard.
 - **The deployed preview Worker.** The gate was checked with `next start`, not on Cloudflare.
+- **The page scrolling itself near the top edge.** Only the bottom edge is in the checks.
 - **Print, and the five other looks.**
 
 ## What the real editor will need
@@ -191,4 +192,4 @@ They were read as stills and as contact sheets of frames a quarter of a second a
 - **Slots in the page parts.** `ProjectView` has no place to put a field or a draggable flowchart, so the lab composes the page frame itself with the same classes and uses the real parts (`Findings`, `Figure`, `SectionBlock`, `MethodFlow`, `runsOf`, the look wrapper) wherever nothing is typed. Findings, an image's caption and the flowchart are copies with a field in them. The rewrite of those files should give each a slot for its words.
 - **A place for the flowchart in the order.** A stored exhbt keeps it fixed above the sections. The lab makes it an item in the order so it can be dragged and removed.
 - **Find a section by its id, never by a kept reference.** A section that changes row is a new DOM node, because React cannot move a keyed child from one parent to another. Focus, the slide into place and the render counters all go by id.
-- **Follow the pointer directly.** dnd-kit's sensors, press delay and page scrolling are used as they are, but the lab reads the pointer itself: dnd-kit's own figure includes scrolling for a section and leaves it out for something fixed to the window, such as a block from the tray.
+- **Follow the pointer directly.** dnd-kit's sensors, press delay and page scrolling are used as they are, but the lab reads the pointer itself: dnd-kit's own figure includes scrolling for a section and leaves it out for something fixed to the window, such as a block from the tray. For the same reason dnd-kit does not scroll the page for a drag that starts on something fixed, so for a block from the tray the board scrolls the page itself.
