@@ -4,9 +4,9 @@
 |---|---|
 | Release | 2, the reader release |
 | Model | Sonnet |
-| Branch | `phase-2-r2-e-classic`, made from `phase-2-r2` after C's part 1 is merged |
+| Branch | `phase-2-r2-e-classic`, made from `phase-2-r2` after C's part 1 and B's `restoreFlow` are merged |
 | Port | 3304 |
-| Starts when | B and C's part 1 are merged: your tests look at the preview, which only draws a moved or removed flowchart once the new renderer is in. C's part 2 may run beside you, on other files |
+| Starts when | C's part 1 and B's `restoreFlow` (B's step 6b) are merged into `phase-2-r2`: your tests look at the preview, which only draws a moved or removed flowchart once the new renderer is in, and your step 3 calls `restoreFlow`. C's part 2 and the rest of B's milestone 2 may run beside you, on other files |
 
 ## Goal
 
@@ -18,11 +18,11 @@ Today's editor stays for two more releases as the fallback. Make it open, edit a
 
 ## You own
 
-`components/editor/` (every file), `lib/portfolio-home.ts`, `lib/site.ts`, `app/api/health/route.ts`, `app/dev/editor/` (new), `e2e/editor-classic-keeps.spec.ts` (new), `e2e/editor-switch.spec.ts` (new).
+`components/editor/` (every file), `lib/portfolio-home.ts`, `lib/editor-kind.ts` (new), `app/api/health/route.ts`, `app/dev/editor/` (new), `e2e/editor-classic-keeps.spec.ts` (new), `e2e/editor-switch.spec.ts` (new).
 
 ## You must not touch
 
-`lib/exhbt/` (B's, merged; report what you need), `components/portfolio/` and `components/exhbt/` (C's), `app/globals.css`, `app/(app)/exhbts/[id]/` (the edit page does not read the switch until release 3), `wrangler.jsonc`, `next.config.ts`, the existing specs.
+`lib/exhbt/` (B's, merged; report what you need), `components/portfolio/` and `components/exhbt/` (C's), `lib/site.ts` (client code imports it, so the switch has a file of its own), `app/globals.css`, `app/(app)/exhbts/[id]/` (the edit page does not read the switch until release 3), `wrangler.jsonc`, `next.config.ts`, the existing specs.
 
 ## What you build against
 
@@ -102,7 +102,7 @@ export function restoreFlow(doc: ExhbtDoc, at?: number): ExhbtDoc;
 
  From `lib/exhbt/formats.ts`: `OFFERED_FORMATS`, `FORMAT_RULES[f].flowRemovable`. Every helper that returns sections (`shownSections`, `sectionsOf`, `imagesOf` and the rest) returns content sections only; `doc.sections` itself can hold the marker.
 
-B's development page helps your tests: `POST /dev/parity` with `{ username, slug, doc }` stores a doc as it is and returns `{ id, url }`; `GET /dev/parity?id=<id>` returns the stored working copy and published copy as JSON.
+B's development page helps your tests: `POST /dev/parity` with `{ username, slug, doc, working?, publishedAt?, plan?, extraFiles? }` stores an exhbt as given (`doc` is the published copy, `working` the working copy, `doc` when absent; `plan` defaults to `max`) and returns `{ id, url, files }`; `GET /dev/parity?id=<id>` returns the stored working copy and published copy as JSON. Give each test its own username.
 
 ## Steps
 
@@ -121,18 +121,18 @@ Commit and push after each. Nothing here may change what a person sees on an exh
 6. **The "Add a section" menu** offers the layout's kinds from `FORMAT_RULES[f].kinds`; add the entry "Add a pull quote". Keep today's wording for everything that exists (the tests read it).
 7. **`keyFigureOf`** (`lib/portfolio-home.ts`): Build and Event or performance take the first image, then a graph; Before and after takes the first image, then a graph; an essay takes the first graph or image. The flowchart is the fallback only when `flowShown(doc)`. Check what a card draws for a flowchart with no steps (`components/portfolio/PortfolioHome.tsx`, read only) and say in your report whether it is acceptable.
 8. **One word for the new editor.** In `components/editor/useAutosave.ts`, add `export` to `writeBackup` and change nothing else. In release 3 the new editor's store writes the browser copy itself, under the same key, so the classic editor's "We kept changes from…" offer still finds it after a crash.
-9. **The switch, unused.** In `lib/site.ts`:
+9. **The switch, unused.** In a new file, `lib/editor-kind.ts`, whose first line is `import "server-only"`:
    ```ts
    // lib/editor-kind.ts  (new, server only: its first line is import "server-only")
    export type EditorKind = "page" | "classic";
    /** Which editor /exhbts/<id>/edit serves. "classic" only when the runtime variable EXHBT_EDITOR is "classic". Read on each request. */
    export async function editorKind(): Promise<EditorKind>;
    ```
-   In production it reads `process.env.EXHBT_EDITOR` when called and nothing else. In development only (`process.env.NODE_ENV !== "production"`), a cookie `exhbt-editor-kind` (`page` or `classic`, read with `cookies()` from `next/headers`) overrides it, so each browser test has its own and nothing leaks between tests. `app/dev/editor/route.ts` (development only, guarded as `app/dev/portfolio/route.ts` is): `GET ?kind=classic|page` sets the cookie, `?kind=` with nothing clears it; it answers with the kind now in force. `app/api/health/route.ts` adds `editor: await editorKind()` to what it reports. Do not add `EXHBT_EDITOR` to `wrangler.jsonc` (`vars` there are reset on every deploy) or to `next.config.ts` (fixed at build). Nothing reads `editorKind()` yet but the health route: the edit page starts using it in release 3.
+   In production it reads `process.env.EXHBT_EDITOR` when called and nothing else. In development only (`process.env.NODE_ENV !== "production"`), a cookie `exhbt-editor-kind` (`page` or `classic`, read with `cookies()` from `next/headers`) overrides it, so each browser test has its own and nothing leaks between tests. `app/dev/editor/route.ts` (development only, guarded as `app/dev/portfolio/route.ts` is): `GET ?kind=classic|page` sets the cookie, `?kind=` with nothing clears it; it answers with the kind now in force. `app/api/health/route.ts` adds `editor: await editorKind()` to what it reports. Do not add `EXHBT_EDITOR` to `wrangler.jsonc` (`vars` there are reset on every deploy) or to `next.config.ts` (fixed at build). Nothing reads `editorKind()` yet but the health route: the edit page starts using it in release 3. It must not go in `lib/site.ts`: `lib/entitlements.ts` imports that file, client components import `lib/entitlements.ts` (`components/editor/Editor.tsx`, `components/roadmap/SaveIdea.tsx`), and a `next/headers` import reachable from a client component breaks the build. `tsc` does not catch this, so after the change start `next dev` and load `/exhbts` and an editor page, and check they draw.
 
 ## Tests
 
-Write `e2e/editor-classic-keeps.spec.ts`. Seed each doc with `POST /dev/parity`, sign in as that development user, open `/exhbts/<id>/edit?editor=classic` (today's page ignores the query; from release 3 it is what keeps this spec on the classic editor, so nobody has to edit it then):
+Write `e2e/editor-classic-keeps.spec.ts`. Seed each doc with `POST /dev/parity`, then sign in as that development user with `page.goto('/auth/dev?email=<username>@example.com&next=/exhbts')`. Do not use `signInAs` from `e2e/editor.ts` and never call `/dev/portfolio` after seeding: both clear that user's exhbts (`count=0`), and the seeded one would be gone. Open `/exhbts/<id>/edit?editor=classic` (today's page ignores the query; from release 3 it is what keeps this spec on the classic editor, so nobody has to edit it then):
 - A case study with the marker third in `sections`: the preview draws the flowchart third; the list has a "Flowchart" row there; type in the title, wait for "Saved", read the doc back with `GET /dev/parity`: the marker is still third and nothing else changed but the title. Move the row up: the preview and the stored doc follow.
 - A gallery with `flowOff: true` and its sections in an order of the person's own (not the template's): no flowchart in the preview; "Put the flowchart back" brings it back at the flowchart's usual place; the stored doc has the marker and no `flowOff`; every other section's page order is what it was before the press.
 - A case study with no `myRole`: no My role field. An event with `myRole`: the field is there.
@@ -140,7 +140,7 @@ Write `e2e/editor-classic-keeps.spec.ts`. Seed each doc with `POST /dev/parity`,
 - "Arrange sections" is not offered on an arranged doc and still is on an untouched case study.
 - axe on the editor with the marker row and the note showing.
 
-Write `e2e/editor-switch.spec.ts`: `/api/health` reports `editor: "page"`; after `/dev/editor?kind=classic` in a browser context, `/api/health` from that context reports `"classic"`, and from a fresh context still `"page"`; `?kind=` puts it back.
+Write `e2e/editor-switch.spec.ts`. In the e2e environment `/api/health` answers 503 (there is no database there) with a JSON body, so read `editor` from the body and ignore the status. You may add `?only=editor` to the health route, answering `{ editor }` at once without the other checks (the e2e config's dummy Stripe key makes the full route call Stripe each time), and use it in the spec. The checks: `/api/health` reports `editor: "page"`; after `/dev/editor?kind=classic` in a browser context, `/api/health` from that context reports `"classic"`, and from a fresh context still `"page"`; `?kind=` puts it back.
 
 Run: `e2e/editor-classic-keeps.spec.ts`, `e2e/editor-switch.spec.ts`, `e2e/phase2-editor.spec.ts`, `e2e/phase2-sections.spec.ts`, `e2e/phase2-formats.spec.ts`, `e2e/phase2-polish-2.spec.ts`, `e2e/phase2-portfolio.spec.ts`.
 
