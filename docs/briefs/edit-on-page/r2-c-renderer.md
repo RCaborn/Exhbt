@@ -6,7 +6,7 @@
 | Model | Opus |
 | Branch | `phase-2-r2-c-renderer`, made from `phase-2-r2` after B's milestone 1 is merged |
 | Port | 3302 |
-| Starts when | B's milestone 1 (the schema and the engine) is merged into `phase-2-r2`. B carries on with its milestone 2 beside you, on other files; merge the release branch into yours when the main session says it has landed. E starts when your part 1 is merged |
+| Starts when | B's milestone 1 is merged into `phase-2-r2`: the parity harness and its golden copies, the schema, `FORMAT_COPY` and `FORMAT_LIMITS` for all seven layouts, and the half of the engine that reads a doc (B's steps 1 to 5 and 6a). B carries on with its milestone 2 beside you, on other files. You need nothing from it, but merge the release branch into yours when the main session says it has landed, to stay current. E starts when your part 1 and B's `restoreFlow` are both merged |
 
 ## Goal
 
@@ -34,7 +34,7 @@ If your part 2 is not merged when release 2 ships, you keep `app/globals.css` an
 
 ## What you build against
 
-From B, already on your base:
+From B. Everything in this block is on your base except the structural changes (`blockOptions`, `insertBlock`, `insertImage`, `moveItem`, `removeItem`, `restoreFlow`): they are B's milestone 2, they land while you work, and you call none of them.
 
 ```ts
 // lib/exhbt/layouts.ts  (pure and server-safe: no React, no DOM)
@@ -84,23 +84,45 @@ export function rowsFor(items: PageItem[], f: Format): Row[];
 export function structureKey(doc: ExhbtDoc): string;
 
 export type BlockKind = PageKind;
-/** `full` is why it cannot be added ("Up to 2 graphs in a case study"); undefined when there is room. */
+/** `name` is the kind's noun in the layout's own words, as the "+" and the tray show it ("Graph", "What happened", "Reference", "Flowchart"). `full` is why it cannot be added ("Up to 2 graphs in a case study"); undefined when there is room. */
 export type BlockOption = { kind: BlockKind; name: string; full?: string };
 /** What the "+" menu and the tray offer: the layout's kinds in its own order and words, then the flowchart when it is off the page. */
 export function blockOptions(doc: ExhbtDoc): BlockOption[];
 
 /** Structural changes. Each adopts the doc first. `at` and `place` count page items (pageItems), not doc.sections. */
+/** `kind` "flow" puts a removed flowchart back at `at` (restoreFlow(doc, at)) and returns the id "flow"; null when the flowchart is on the page already. */
 export function insertBlock(doc: ExhbtDoc, kind: Exclude<BlockKind, "image">, at: number): { doc: ExhbtDoc; id: string } | null;
 export function insertImage(doc: ExhbtDoc, image: { fileId: string; w?: number; h?: number }, at: number): { doc: ExhbtDoc; id: string } | null;
 /** `place`: the item's index among the page items with the item itself taken out (0 is first). */
 export function moveItem(doc: ExhbtDoc, id: string, place: number): ExhbtDoc;
 /** Takes a section out. For the flowchart: removes the marker and sets flowOff; the boxes stay in doc.flow. */
 export function removeItem(doc: ExhbtDoc, id: string): ExhbtDoc;
-/** Puts a removed flowchart back: the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's (at the end if none), every other item keeps its place, and flowOff is deleted. The doc stays arranged. The same object when the flowchart is shown. */
-export function restoreFlow(doc: ExhbtDoc): ExhbtDoc;
+/**
+ * Puts a removed flowchart back and deletes flowOff. Every other item keeps its place, and the doc stays arranged. The same object when the flowchart is shown.
+ * With `at` (a page-item place, as insertBlock's), the marker goes in there: the new editor's "+" and tray always pass it.
+ * Without it (the classic editor's "Put the flowchart back", which has no place to give), the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's, or at the end if none.
+ */
+export function restoreFlow(doc: ExhbtDoc, at?: number): ExhbtDoc;
 ```
 
-`ROW_RULES` and `FORMAT_RULES` in `lib/exhbt/layouts.ts` and `formats.ts` say which rows each layout makes. `FORMAT_COPY` has each layout's words.
+`ROW_RULES` and `FORMAT_RULES` in `lib/exhbt/layouts.ts` and `formats.ts` say which rows each layout makes. `FORMAT_COPY` has each layout's words, the page's headings among them, for all seven layouts. B adds the fields below in its milestone 1. This is the shape intended; B reports the final type, and the main session puts it in this brief and B's word for word before you start. Read it on your base and use what is there.
+
+```ts
+// lib/exhbt/formats.ts: FORMAT_COPY keeps every field it has today (title, titleHint, header, emptyTitle, gap, gapHint, gapMissing,
+// flow, findings, reflection, reflectionLabel, reflectionPlaceholder, rewriteName, link, linkHint) and gains the four below.
+// It has an entry for each of the seven layouts. The three that exist keep every word, and take today's literals for the new fields.
+export const FORMAT_COPY: Record<Format, {
+  /* today's fields, unchanged */
+  /** The quote's heading on the page: "Feedback", or "Review" in an event. Today a literal in exhbt-parts.tsx. */
+  quote: string;
+  /** What the skill pills are called, the list's accessible name: "Skills used", or "Built with" in a build. Today a literal in ProjectView.tsx. */
+  skills: string;
+  /** The heading over links drawn as a list (the "refs" group): "References" in research (today a literal in ResearchMain.tsx), "Sources" in an essay. Absent where the layout draws no such list. */
+  refs?: string;
+  /** The layout as blockOptions' reasons name it: "in a case study", "in a gallery", "in research", and the same way for the four new ones ("in an essay"). */
+  inLayout: string;
+}>;
+```
 
 What you define, and the editor's agents build against word for word:
 
@@ -158,8 +180,9 @@ export type ItemSlot = {
 export type InsertSlot = { at: number; end?: boolean };
 
 /**
- * Edit-only controls that belong to a part but are not on the published page: an image's description and picked-figure strip, a link's address, a graph's "Edit figures", the aim or hypothesis switch.
- * Each is drawn over the part and takes no room (decision 0026, "Edit-only controls take no room"): "above" over its top edge, "below" over its foot, "over" over a corner.
+ * Edit-only things that belong to a part but are not on the published page: an image's description and picked-figure label, a link's "Web address", a graph's "Edit figures", the aim or hypothesis switch.
+ * "above" is drawn over the part's top edge and "over" over a corner: they take no room (decision 0026, "Edit-only controls take no room").
+ * "below" is an image's description field, in the flow under the picture and its caption: one of the two edit-only fields 0026 allows in the flow (`EDIT_ONLY_IN_FLOW`).
  */
 export type ExtraSlot = { sectionId: string; kind: SectionKind; where: "above" | "below" | "over" };
 
@@ -189,11 +212,11 @@ export type EditAdapter = {
   extra(o: ExtraSlot): ReactNode;
   list(o: ListSlot): ReactNode;
   flow: FlowEdit;
-  /** The skill pills, with a way to add and remove one. Takes the place of the read-only list. */
+  /** The skill pills, each with remove, then the "Add a skill" box (id `skill-new`) at their end, in the flow: one of the two edit-only fields 0026 allows there. Takes the place of the read-only list, and is drawn even when there are no skills, when the box alone is the block's placeholder. */
   skills(): ReactNode;
   /** The sidebar's control for the work. Takes the place of "See the work". */
   work(): ReactNode;
-  /** A shell part's corner toolbar, out of the flow: "More actions" (rewrite, back to the AI version) where the AI drafted it, and for the skills "Add a skill". */
+  /** A shell part's corner toolbar, out of the flow: "More actions" (rewrite, back to the AI version) where the AI drafted it. */
   tools(o: ShellTools): ReactNode;
 };
 
@@ -225,38 +248,39 @@ export function stackClass(name: StackName, f: Format): string;
 Commit and push after each step. Run the parity spec after each.
 
 1. **`page-ctx.ts`**, exactly as above. Re-export `Sub` and `ImageUrls` from `exhbt-parts.tsx` so existing imports keep working.
-1b. **The error colour** (decision 0026, "The person's own look"). Add `error` to `Palette` in `lib/portfolio-themes.ts`, a value for every look and colourway that reads as an error on that look's ground (a red or a deep orange, never the app's own red copied blindly), and three rows to `contrastPairs`: error text on the ground, on cards and on the well, each at 4.5. `themeStyle` in `components/portfolio/themeFonts.ts` writes it as `--pf-error`. In `app/globals.css`, add `--xp-error` beside `--xp-muted` in both blocks of `xp-*` variables: `var(--pf-error)` inside a look, and the app's own error token outside one. Nothing uses it yet; `e2e/phase2-looks.spec.ts` checks it in every look. If the new field breaks a type elsewhere (a palette built by hand outside `lib/portfolio-themes.ts`), make the smallest fix there and list the file in your report. The article's markup does not change (the variables sit on the wrapper outside it), so the parity gate does not move.
+1b. **The error colour** (decision 0026, "The person's own look"). Add `error` to `Palette` in `lib/portfolio-themes.ts`, a value for every look and colourway, and three rows to `contrastPairs`: error text on the ground, on cards and on the well, each at 4.5. `AGENTS.md` says not to invent colours, so the value is the app's own error colour (`#C92324`, `ERROR` in `themes/exhbt/exhbtTheme.ts`) in every look and colourway where it passes all three. Only where it fails, choose the nearest red or deep orange that passes, and list each of those looks in your report with its value and its three ratios: they go to Rory (open question 10). `themeStyle` in `components/portfolio/themeFonts.ts` writes it as `--pf-error`. In `app/globals.css`, add `--xp-error` beside `--xp-muted` in both blocks of `xp-*` variables: `var(--pf-error)` inside a look, and the app's own error token outside one. Nothing uses it yet; `e2e/phase2-looks.spec.ts` checks it in every look. If the new field breaks a type elsewhere (a palette built by hand outside `lib/portfolio-themes.ts`), make the smallest fix there and list the file in your report. The article's markup does not change (the variables sit on the wrapper outside it), so the parity gate does not move.
 2. **`layout-rows.ts`.** `rowClass` and `stackClass` return the classes today's wrappers carry, copied from `SectionsView`, `GalleryMain` and `ResearchMain`, as whole class names (Tailwind reads the source). A reversed pair mirrors its column widths. The editor's drag engine lays out empty boxes with these same strings to measure where things would land, so they must be the only source of a row's classes: `LayoutMain` reads them from here too.
 3. **`LayoutMain` and `ItemView`.**
    - Read-only: take `pageItems(doc, skip)`, where `skip` leaves out an image with no address in `ctx.imageUrls` and an aim or conclusion with no words (it must be passed in, not filtered afterwards: today's page drops these before it pairs anything); `rowsFor`; draw. A row of one item is that item's own root element with the row's classes on it (as today, where a lone section carries `xp-section` itself). A pair or a group is a wrapper with the row's classes and the items inside it.
    - Each `ItemAs` is one of today's drawings: "plain" is `SectionBlock`'s; "lead" is the gallery's lead image; "tile" a grid tile; "key" research's key figure; "kicker" research's Results; "stacked" a part inside a stack (the flowchart as a column under its heading, the aim with its rule, the conclusion and limitations as small blocks); "listed" a reference in the list. Keep every `data-part`, `aria-label`, heading id and class as it is now.
+   - A flowchart on a row of its own is drawn as `ctx.format`'s page draws it today, not as one "plain" drawing for all: in a case study it is the bare `<section data-part="process">` with no heading; in a gallery or research with nothing beside it, it keeps its heading ("What I did", "Method") inside the wrapper today's page puts round it (the gallery's is `div.xp-section.grid`). The parity fixtures "a gallery with no findings" and "research with no figure" check this.
    - Editing (`ctx.edit` is there): pass no `skip`; leave nothing out. Before each row, and once after the last with `end: true`, render `ctx.edit.insert({ at })`, where `at` is the index of the row's first item among the page items. For each item render `ctx.edit.item({ id, kind, as, rowClass, index, count })` and nothing else: the editor's frame calls `ItemView` itself with a fresh copy of the item. `rowClass` is the row's classes for a row of one item and `""` inside a pair, a stack or a group. Wrappers for pairs, groups and stacks are yours in both modes.
    - In edit mode the rows may depend only on what `structureKey` reads: the layout, `flowOff`, and each item's id, kind and image stage.
-4. **`ProjectView`.** Builds `ctx` once and passes it down. New prop `edit?: EditAdapter`. With it: the title is `ctx.edit.text` inside the same heading element; the context line is `ctx.edit.rich` with the paragraph's classes and `highlight: true`, in place of the `<p>`; "What it is", "Where and when" and "My role" are always drawn, each a `ctx.edit.text`; the skill list is `ctx.edit.skills()`; the work button is `ctx.edit.work()`, always drawn; "All of …'s work" is drawn but `inert`. Call `ctx.edit.tools({ block: "header" })` inside the title's heading block, `ctx.edit.tools({ block: "gap" })` inside the context line's block, and `ctx.edit.tools({ block: "skills" })` inside the skills block, each as that block's last child; in edit mode only, give each of those three blocks `position: relative` (a class added only when `ctx.edit` is there), so the toolbar the adapter returns can sit over its corner and take no room. Add the "My role" fact (shown read-only when `doc.myRole` has words). The quote's heading and the skill list's name come from `FORMAT_COPY`. `sectionsSlot` keeps working as now (the classic editor's "Arrange sections" uses it). Keep exporting `SectionBlock`, `Owner` and `ProjectView`; search for other importers before removing `runsOf` and `SectionsView`.
-5. **The parts** (`exhbt-parts.tsx`). `Findings`, `Figure` and `SectionBlock` keep the props they have (the classic editor calls `SectionBlock` with them) and take an optional `ctx`. With `ctx.edit`, every text in the fields table of 0026 is a slot at its path, with the name and id that table gives. **Every `extra` and `list` slot is called as the last child of a box that is `position: relative` in edit mode only** (a class added when `ctx.edit` is there, never a new wrapper element), because what the adapter returns is drawn over that box and takes no room (0026, "Edit-only controls take no room"):
-   - a finding: `ctx.edit.rich` inside the same `<li>` (`className: ""`), then `ctx.edit.list({ path, index, n })` inside that `<li>`; after the last `<li>`, inside the list, `ctx.edit.list` with `index === n` ("Add a finding");
-   - an image: the picture with no zoom, then, inside the box that holds the picture, `ctx.edit.extra({ …, where: "above" })` and `ctx.edit.extra({ …, where: "below" })`; the caption as `ctx.edit.rich` inside an always-drawn `<figcaption>`;
+4. **`ProjectView`.** Builds `ctx` once and passes it down. New prop `edit?: EditAdapter`. With it: the title is `ctx.edit.text` inside the same heading element; the context line is `ctx.edit.rich` with the paragraph's classes and `highlight: true`, in place of the `<p>`; "What it is", "Where and when" and "My role" are always drawn, each a `ctx.edit.text`; the skill list is `ctx.edit.skills()`, called even when `doc.skills` is empty (the read-only page leaves the list out then: keep that, but in edit mode draw the skills block always, so on a new exhbt the adapter's "Add a skill" box is the block's placeholder); the work button is `ctx.edit.work()`, always drawn; "All of …'s work" is drawn but `inert`. Call `ctx.edit.tools({ block: "header" })` inside the title's heading block, `ctx.edit.tools({ block: "gap" })` inside the context line's block, and `ctx.edit.tools({ block: "skills" })` inside the skills block, each as that block's last child; in edit mode only, give each of those three blocks `position: relative` (a class added only when `ctx.edit` is there), so the toolbar the adapter returns can sit over its corner and take no room. Add the "My role" fact (shown read-only when `doc.myRole` has words). The quote's heading and the skill list's name come from `FORMAT_COPY` (`quote` and `skills`). `sectionsSlot` keeps working as now (the classic editor's "Arrange sections" uses it). Keep exporting `SectionBlock`, `Owner` and `ProjectView`; search for other importers before removing `runsOf` and `SectionsView`.
+5. **The parts** (`exhbt-parts.tsx`). `Findings`, `Figure` and `SectionBlock` keep the props they have (the classic editor calls `SectionBlock` with them) and take an optional `ctx`. With `ctx.edit`, every text in the fields table of 0026 is a slot at its path, with the name and id that table gives. **Every `list` slot, and every `extra` slot but an image's `"below"`, is called as the last child of a box that is `position: relative` in edit mode only** (a class added when `ctx.edit` is there, never a new wrapper element), because what the adapter returns is drawn over that box and takes no room (0026, "Edit-only controls take no room"):
+   - a finding: `ctx.edit.rich` inside the same `<li>` (`className: ""`), then `ctx.edit.list({ path, index, n })` inside that `<li>`; after the last `<li>`, inside the list, `ctx.edit.list` with `index === n` ("Add a finding", which the editor draws in the gap below the last finding, covering no words);
+   - an image: the picture with no zoom, then, inside the box that holds the picture, `ctx.edit.extra({ …, where: "above" })` (the picked-figure label, over the picture's top edge); the caption as `ctx.edit.rich` inside an always-drawn `<figcaption>`; then, after the `<figcaption>` and inside the figure's own root, `ctx.edit.extra({ …, where: "below" })`. That one is the description field, **in the flow**, under the picture and its caption, as the original design had it (0026): call it where a line under the caption would go, in no positioned box;
    - a graph: the chart, then, inside the box that holds it, `ctx.edit.extra({ …, where: "over" })`;
    - a quote: the words, the name and the role as three `ctx.edit.text`, the quotation marks drawn round the field, not typed into it;
    - what I'd do next, the aim, the conclusion: `ctx.edit.rich` with the paragraph's classes; the aim also `ctx.edit.extra({ …, where: "above" })` inside the aim's own block, for its aim-or-hypothesis choice;
-   - a link: label and description as `ctx.edit.text`, drawn as now but not as a link, then, inside the link's box, `ctx.edit.extra({ …, where: "below" })`;
+   - a link: label and description as `ctx.edit.text`, drawn as now but not as a link, then, inside the link's box, `ctx.edit.extra({ …, where: "over" })` (its "Web address" button, over the link's corner);
    - a pull quote: `ctx.edit.text`.
-   In edit mode the only things drawn that the read-only page leaves out are the placeholders of 0026's list (an empty context line, the three facts, "Add the work", a box's detail, a caption, a quote's role, a link's description, an aim or a conclusion with no words), each in the element the part uses once it has words.
+   In edit mode the only things drawn that the read-only page leaves out are those on 0026's list of what is in the flow in the editor only: the placeholders (an empty context line, the three facts, "Add the work", a box's detail, a caption, a quote's role, a link's description, an aim or a conclusion with no words), each in the element the part uses once it has words; and the two edit-only fields, drawn by the adapter where you call its slot: each image's description (its `"below"` extra) and the "Add a skill" box at the end of the pills (inside `skills()`).
 6. **`MethodFlow`, page variant.** Takes `ctx`. With `ctx.edit`: the `<ol>` goes through `ctx.edit.flow.list`; each box's `<li>` is rendered by `ctx.edit.flow.box` with the classes you would have put on it; in each box `ctx.edit.flow.tools`, the step as `ctx.edit.text` (path `flow.N.step`, name "Box n", id `flow-box-N`) and the detail, always drawn, as `ctx.edit.text` ("Box n detail"); in each arrow, and once after the last box, `ctx.edit.flow.add`. Without `ctx.edit` its output is exactly today's, keys included.
-7. **The slot harness.** `app/dev/edit-slots/page.tsx`: development only (not found in production or with a database configured). It draws `ProjectView` for a sample (`?sample=`) with a stand-in adapter that marks each slot and adds no box: `text` and `rich` render the words in a `<span data-slot data-path data-label>` with `display: contents`; `item` renders `<div data-slot="item" data-id data-as>` with the row classes round `ItemView`; `insert`, `extra`, `list`, `tools`, `skills`, `work` and the flow slots render marked, empty, zero-size elements (the flow's `box` renders the `<li>` it is given). `?read=1` draws the same sample with no adapter. `?full=1` first fills every empty optional part of the sample with words (a context line, the three facts with My role, a work link, every box's detail, every caption, a quote's role, every link's description), in the harness's own code, so the sample in `lib/exhbt/sample.ts` is not touched.
+7. **The slot harness.** `app/dev/edit-slots/page.tsx`: development only (not found in production or with a database configured). It draws `ProjectView` for a sample (`?sample=`) with a stand-in adapter that marks each slot and adds no box: `text` and `rich` render the words in a `<span data-slot data-path data-label>` with `display: contents`; `item` renders `<div data-slot="item" data-id data-as>` with the row classes round `ItemView`; `insert`, `list`, `tools`, `work`, the flow slots, and `extra` with `"above"` or `"over"` render marked, empty, zero-size elements (the flow's `box` renders the `<li>` it is given). The two edit-only fields 0026 keeps in the flow are drawn, marked and inert, as the editor will draw them, so your box test sees them: `skills` draws the read-only pill list with an "Add a skill" box as its last `<li>` (the size of a pill, its words in `--xp-muted`; the box alone when there are no skills), and `extra` with `"below"` on an image draws one line in the caption's type holding "Describe it for people who can't see it" in `--xp-muted`. `?read=1` draws the same sample with no adapter. `?full=1` first fills every empty optional part of the sample with words (a context line, the three facts with My role, a work link, every box's detail, every caption, a quote's role, every link's description), in the harness's own code, so the sample in `lib/exhbt/sample.ts` is not touched.
 
 ## Part 2: the four new layouts
 
 Start when part 1 is merged or at least pushed and green. Release 2 can ship without this part; say clearly in your report where you stopped.
 
-8. Draw the rest of `ItemAs` and `GroupOf`: "button" and the `buttons` group (Build's links as a row of buttons, drawn with the look's button variables; in edit mode not links); "before" and "after" and the `before-after` group (two images side by side, each with a small "Before" or "After" label over it); the pull quote (large, in the look's display face, with a rule; beside the key points in a `found` pair); `refs` for an essay's "Sources", where an item with no address is plain text; the lead image for Build and Event; each layout's flowchart heading from `FORMAT_COPY`.
+8. Draw the rest of `ItemAs` and `GroupOf`: "button" and the `buttons` group (Build's links as a row of buttons, drawn with the look's button variables; in edit mode not links); "before" and "after" and the `before-after` group (two images side by side, each with a small "Before" or "After" label over it); the pull quote (large, in the look's display face, with a rule; beside the key points in a `found` pair); `refs` for an essay's "Sources" (the heading from `FORMAT_COPY[f].refs`), where an item with no address is plain text; the lead image for Build and Event; each layout's flowchart heading from `FORMAT_COPY`.
 9. Print rules for them in the print block, in the manner of the gallery's and research's: the aim is one A4 page.
 10. Put a fixture doc for each new layout in `app/dev/edit-slots/` so the harness can draw them. The real samples are D's.
 
 ## Tests
 
-- `e2e/layout-parity.spec.ts` (B's) is your gate for part 1. Never run it with `GOLDEN=write`.
-- Write `e2e/edit-slots.spec.ts`: for each layout's sample in the harness, every path in 0026's fields table that applies is there exactly once with its name; every page item has one item slot; there is one insert slot per row and one at the end; the three `tools` slots are there once each. **Box for box, two ways**, at 1440 wide and at 412 wide: with `?full=1`, every `[data-part]`, the title, the context line, each pill and each flowchart box is in the same place and size with the stand-in adapter as with `?read=1&full=1`, to half a pixel, with nothing allowed for; and on the sample as it is, any difference is one of 0026's placeholders (say which, by name) and nothing else.
+- `e2e/layout-parity.spec.ts` (B's) is your gate for part 1. Never run it with `GOLDEN=write`. Run it in your own sandbox's Chromium, where B wrote the golden copies: the boxes are compared only there (in CI the spec compares the markup only), so a box difference you see is real.
+- Write `e2e/edit-slots.spec.ts`: for each layout's sample in the harness, every path in 0026's fields table that applies is there exactly once with its name; every page item has one item slot; there is one insert slot per row and one at the end; the three `tools` slots are there once each. **Box for box, two ways**, at 1440 wide and at 412 wide, allowing differences only as 0026 says under "How a box-for-box test allows them": with `?full=1`, every `[data-part]`, the title, the context line, each pill and each flowchart box is in the same place and size with the stand-in adapter as with `?read=1&full=1`, to half a pixel, with only the two edit-only fields allowed for, by name (each image's description, the "Add a skill" box); and on the sample as it is, any difference is one on 0026's list of what is in the flow in the editor only (say which, by name) and nothing else.
 - Run: `e2e/layout-parity.spec.ts`, `e2e/edit-slots.spec.ts`, `e2e/exhbt-page.spec.ts`, `e2e/phase2-formats.spec.ts`, `e2e/phase2-sections.spec.ts`, `e2e/phase2-looks.spec.ts`, `e2e/responsive.spec.ts`.
 
 ## Done looks like
@@ -267,7 +291,7 @@ Start when part 1 is merged or at least pushed and green. Release 2 can ship wit
 
 ## Report back
 
-The branch head for each part; any fixture you could not make identical, with the difference; any slot the fields table needs that you could not place; any change you needed in `lib/exhbt/`; the print page count for each new layout's fixture; the specs you ran and their results.
+The branch head for each part; each look or colourway where the app's error colour failed, with the value you chose and its three ratios; any fixture you could not make identical, with the difference; any slot the fields table needs that you could not place; any change you needed in `lib/exhbt/`; the print page count for each new layout's fixture; the specs you ran and their results.
 
 ## Rules for every agent
 

@@ -87,20 +87,25 @@ export function rowsFor(items: PageItem[], f: Format): Row[];
 export function structureKey(doc: ExhbtDoc): string;
 
 export type BlockKind = PageKind;
-/** `full` is why it cannot be added ("Up to 2 graphs in a case study"); undefined when there is room. */
+/** `name` is the kind's noun in the layout's own words, as the "+" and the tray show it ("Graph", "What happened", "Reference", "Flowchart"). `full` is why it cannot be added ("Up to 2 graphs in a case study"); undefined when there is room. */
 export type BlockOption = { kind: BlockKind; name: string; full?: string };
 /** What the "+" menu and the tray offer: the layout's kinds in its own order and words, then the flowchart when it is off the page. */
 export function blockOptions(doc: ExhbtDoc): BlockOption[];
 
 /** Structural changes. Each adopts the doc first. `at` and `place` count page items (pageItems), not doc.sections. */
+/** `kind` "flow" puts a removed flowchart back at `at` (restoreFlow(doc, at)) and returns the id "flow"; null when the flowchart is on the page already. */
 export function insertBlock(doc: ExhbtDoc, kind: Exclude<BlockKind, "image">, at: number): { doc: ExhbtDoc; id: string } | null;
 export function insertImage(doc: ExhbtDoc, image: { fileId: string; w?: number; h?: number }, at: number): { doc: ExhbtDoc; id: string } | null;
 /** `place`: the item's index among the page items with the item itself taken out (0 is first). */
 export function moveItem(doc: ExhbtDoc, id: string, place: number): ExhbtDoc;
 /** Takes a section out. For the flowchart: removes the marker and sets flowOff; the boxes stay in doc.flow. */
 export function removeItem(doc: ExhbtDoc, id: string): ExhbtDoc;
-/** Puts a removed flowchart back: the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's (at the end if none), every other item keeps its place, and flowOff is deleted. The doc stays arranged. The same object when the flowchart is shown. */
-export function restoreFlow(doc: ExhbtDoc): ExhbtDoc;
+/**
+ * Puts a removed flowchart back and deletes flowOff. Every other item keeps its place, and the doc stays arranged. The same object when the flowchart is shown.
+ * With `at` (a page-item place, as insertBlock's), the marker goes in there: the new editor's "+" and tray always pass it.
+ * Without it (the classic editor's "Put the flowchart back", which has no place to give), the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's, or at the end if none.
+ */
+export function restoreFlow(doc: ExhbtDoc, at?: number): ExhbtDoc;
 ```
 
 Each layout's own facts sit beside its name in `FORMAT_RULES` (`lib/exhbt/formats.ts`): the kinds it draws, its usual order, whether the flowchart can go, what it needs to publish, and what it takes from the work (decision 0025). `validateForPublish` reads `needs` from there, so the `F === "gallery"` branches go.
@@ -136,7 +141,7 @@ The flowchart can be removed in Gallery, Build, Essay, Before and after, and Eve
 
 ## A removed flowchart, exactly
 
-Removing the flowchart takes the marker out and sets `flowOff: true` on the doc. The boxes stay in `doc.flow` in the working copy, so "+" then Flowchart puts it back as it was.
+Removing the flowchart takes the marker out and sets `flowOff: true` on the doc. The boxes stay in `doc.flow` in the working copy, so "+" then Flowchart puts it back with its boxes as they were, at the place of that "+".
 
 | | Working copy (`exhbts.blocks`) | Published copy (`published_blocks`) |
 |---|---|---|
@@ -151,7 +156,7 @@ How it is read, by `flowShown(doc)`:
 
 While it is off the page its words are not counted, its boxes are not checked for publishing, and the number check still reads them, as it reads every kept section.
 
-"Put the flowchart back", in either editor, is `restoreFlow(doc)`: it writes the marker at the flowchart's usual place among the items as they now are and deletes `flowOff`. It never just deletes `flowOff`: a doc with neither would count as untouched and be redrawn in the template order, losing the person's own order.
+Putting the flowchart back, in either editor, is `restoreFlow`: it writes the marker and deletes `flowOff`. The new editor always knows the place: the "+" the person chose Flowchart from, or the gap the tray's block was dropped in, so it calls `restoreFlow(doc, at)` and the marker goes exactly there. The classic editor's "Put the flowchart back" button has no place to give, so it calls `restoreFlow(doc)`, which puts the marker at the flowchart's usual place among the items as they now are. It never just deletes `flowOff`: a doc with neither would count as untouched and be redrawn in the template order, losing the person's own order.
 
 ## The published copy keeps the order
 
@@ -214,7 +219,7 @@ Release 2 changes nothing a person can see or do. It makes the live site able to
 - the published copy keeping the marker (above);
 - the graphs a figure from the work replaces, kept with the exhbt's AI version from now on, and read back with it (`loadAiVersion` keeps `graphs`), so release 3 can offer them back (decision 0026);
 - a server check before a stored file is deleted: `DELETE /api/files/[id]` deletes nothing while any of the person's exhbts points at the file in its working copy or its published copy (decision 0026, "Saving, and what may delete a file");
-- the editor switch, unused: `editorKind()` in `lib/site.ts` and an `editor` line in `/api/health`, so the switch can be proven on the preview site before there is an editor to switch to;
+- the editor switch, unused: `editorKind()` in `lib/editor-kind.ts` (a new file, server only) and an `editor` line in `/api/health`, so the switch can be proven on the preview site before there is an editor to switch to;
 - samples and seeds for the four new layouts, on development pages only.
 
 Why this order makes each later step safe to undo:
@@ -236,8 +241,8 @@ Release 2 may not change any existing page. "The same" is defined so a script ca
 1. **The comparison.** For each fixture, two things are compared.
    - The `outerHTML` of `article[data-exhbt-page]` at 1440 by 900, normalised in five ways and no others: file addresses in `src` and `href` become the file's id; file ids then become their order of first appearance in the page (`file-1`, `file-2`); ids React makes (`useId`) become their position in the page; the words in each `class` attribute are sorted; the date in the sidebar's "Checked by exhbt" line becomes `DATE`. Two pages are the same when the strings are equal.
    - The boxes: the place and size of every element in the article, rounded to the half pixel, at 1440 by 900 and at 412 by 915. They are the same within half a pixel. A new CSS rule can restyle a page without changing a byte of its markup; this catches it.
-2. **The fixtures.** Every sample and seed (`lib/exhbt/sample.ts`: the old-shape GP exhbt, the library, open banking, the full one, five and six boxes, the gallery, the research poster) and order fixtures made for this: a figure before the findings, two graphs before the findings, an image then a graph then the findings, a graph then an image then the findings, a graph then an image with no address then the findings, a gallery with no findings, a gallery whose sections are out of the usual order, research with no figure. Every fixture, the samples included, is seeded through the parity page (`POST /dev/parity`) with file ids made from the slug and the section id and a fixed publish date, so a run on another day, or a second run, draws the same page. The `/demo` pages are compared as well, drawn as they are: they store no pictures, and the date token covers their checked-on line. An image stored before decision 0024 has no `w` or `h`: its placeholder picture is a fixed 1200 by 800, and the doc's `w` and `h` stay absent, so the page is drawn exactly as stored.
-3. **Golden copies first.** `e2e/layout-parity.spec.ts`, run with `GOLDEN=write`, writes each fixture's string and boxes to `e2e/golden/`. That is done on the model agent's first commit, which adds the test and a development-only page and changes no product code. Run without `GOLDEN`, the test compares. The renderer's agent runs it and may not edit it. Before the renderer's agent starts, the main session runs the comparison again on a later day, to prove it does not depend on the date or on a run.
+2. **The fixtures.** Every sample and seed (the docs in `lib/exhbt/sample.ts`, and those `app/dev/portfolio/route.ts` builds in its own code: the old-shape GP exhbt, the library, open banking, the full one, five and six boxes, the gallery, the research poster) and order fixtures made for this: a figure before the findings, two graphs before the findings, an image then a graph then the findings, a graph then an image then the findings, a graph then an image with no address then the findings, a gallery with no findings, a gallery whose sections are out of the usual order, research with no figure. Every fixture, the samples included, is seeded through the parity page (`POST /dev/parity`) with file ids made from the slug and the section id and a fixed publish date, so a run on another day, or a second run, draws the same page. The `/demo` pages are compared as well, drawn as they are: they store no pictures, and the date token covers their checked-on line. An image stored before decision 0024 has no `w` or `h`: its placeholder picture is a fixed 1200 by 800, and the doc's `w` and `h` stay absent, so the page is drawn exactly as stored.
+3. **Golden copies first.** `e2e/layout-parity.spec.ts`, run with `GOLDEN=write`, writes each fixture's string and boxes to `e2e/golden/`. That is done on the model agent's first commit, which adds the test and a development-only page and changes no product code. Run without `GOLDEN`, the test compares. The renderer's agent runs it and may not edit it. Before the renderer's agent starts, the main session runs the comparison again on a later day, to prove it does not depend on the date or on a run. Boxes depend on the browser and the system that draws them, so the golden boxes are compared only where they were written: the agents' sandbox Chromium. The main session's later run uses that same sandbox. In CI the spec compares the markup only (it skips the boxes when `CI` is set), so a half-pixel difference between machines cannot stall the renderer's agent.
 4. **Every live page.** Before release, the main session exports each published exhbt from the live site to a file outside the repo and compares the page each draws on the code the live site runs now (the "before") with the release candidate (the "after"), through the same test (`PARITY_DOCS`). The "before" is drawn on `main`'s live commit with the parity page, spec and fixtures copied onto it in a scratch worktree (they change no product code), not on the model agent's first commit: the release branch already carries release 1b, so a change 1b makes to a published page would be on both sides and never seen. Today that is one exhbt, a case study. The count is run again on the day, and the comparison is run again before release 3, whose page-part changes (the slots, the flowchart's edit hooks) also touch every live page.
 5. **Adopting changes nothing.** For every fixture, the page of `adopt(doc)` equals the page of `doc`.
 6. **Print.** The samples that print on one A4 page today still do (the checks in `e2e/exhbt-page.spec.ts` and `e2e/phase2-formats.spec.ts` stay as they are and stay green).

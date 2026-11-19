@@ -41,6 +41,8 @@ export type Slot = { kinds: readonly PageKind[]; first?: true };
 /** What a layout needs before it can be published, beyond each part's own checks. Every issue has the path "sections", or "myRole". */
 export type Need =
   | { need: "count"; kinds: readonly SectionKind[]; min: number; message: string }
+  /** A findings section, a graph, or an image picked from the work as a graph or a table (decision 0025): what a case study needs today. */
+  | { need: "results"; message: string }
   | { need: "stages"; message: string }
   | { need: "myRole"; message: string };
 

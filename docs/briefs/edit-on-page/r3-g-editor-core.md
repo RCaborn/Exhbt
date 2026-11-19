@@ -87,8 +87,9 @@ export type ItemSlot = {
 export type InsertSlot = { at: number; end?: boolean };
 
 /**
- * Edit-only controls that belong to a part but are not on the published page: an image's description and picked-figure strip, a link's address, a graph's "Edit figures", the aim or hypothesis switch.
- * Each is drawn over the part and takes no room (decision 0026, "Edit-only controls take no room"): "above" over its top edge, "below" over its foot, "over" over a corner.
+ * Edit-only things that belong to a part but are not on the published page: an image's description and picked-figure label, a link's "Web address", a graph's "Edit figures", the aim or hypothesis switch.
+ * "above" is drawn over the part's top edge and "over" over a corner: they take no room (decision 0026, "Edit-only controls take no room").
+ * "below" is an image's description field, in the flow under the picture and its caption: one of the two edit-only fields 0026 allows in the flow (`EDIT_ONLY_IN_FLOW`).
  */
 export type ExtraSlot = { sectionId: string; kind: SectionKind; where: "above" | "below" | "over" };
 
@@ -118,11 +119,11 @@ export type EditAdapter = {
   extra(o: ExtraSlot): ReactNode;
   list(o: ListSlot): ReactNode;
   flow: FlowEdit;
-  /** The skill pills, with a way to add and remove one. Takes the place of the read-only list. */
+  /** The skill pills, each with remove, then the "Add a skill" box (id `skill-new`) at their end, in the flow: one of the two edit-only fields 0026 allows there. Takes the place of the read-only list, and is drawn even when there are no skills, when the box alone is the block's placeholder. */
   skills(): ReactNode;
   /** The sidebar's control for the work. Takes the place of "See the work". */
   work(): ReactNode;
-  /** A shell part's corner toolbar, out of the flow: "More actions" (rewrite, back to the AI version) where the AI drafted it, and for the skills "Add a skill". */
+  /** A shell part's corner toolbar, out of the flow: "More actions" (rewrite, back to the AI version) where the AI drafted it. */
   tools(o: ShellTools): ReactNode;
 };
 
@@ -197,20 +198,25 @@ export function rowsFor(items: PageItem[], f: Format): Row[];
 export function structureKey(doc: ExhbtDoc): string;
 
 export type BlockKind = PageKind;
-/** `full` is why it cannot be added ("Up to 2 graphs in a case study"); undefined when there is room. */
+/** `name` is the kind's noun in the layout's own words, as the "+" and the tray show it ("Graph", "What happened", "Reference", "Flowchart"). `full` is why it cannot be added ("Up to 2 graphs in a case study"); undefined when there is room. */
 export type BlockOption = { kind: BlockKind; name: string; full?: string };
 /** What the "+" menu and the tray offer: the layout's kinds in its own order and words, then the flowchart when it is off the page. */
 export function blockOptions(doc: ExhbtDoc): BlockOption[];
 
 /** Structural changes. Each adopts the doc first. `at` and `place` count page items (pageItems), not doc.sections. */
+/** `kind` "flow" puts a removed flowchart back at `at` (restoreFlow(doc, at)) and returns the id "flow"; null when the flowchart is on the page already. */
 export function insertBlock(doc: ExhbtDoc, kind: Exclude<BlockKind, "image">, at: number): { doc: ExhbtDoc; id: string } | null;
 export function insertImage(doc: ExhbtDoc, image: { fileId: string; w?: number; h?: number }, at: number): { doc: ExhbtDoc; id: string } | null;
 /** `place`: the item's index among the page items with the item itself taken out (0 is first). */
 export function moveItem(doc: ExhbtDoc, id: string, place: number): ExhbtDoc;
 /** Takes a section out. For the flowchart: removes the marker and sets flowOff; the boxes stay in doc.flow. */
 export function removeItem(doc: ExhbtDoc, id: string): ExhbtDoc;
-/** Puts a removed flowchart back: the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's (at the end if none), every other item keeps its place, and flowOff is deleted. The doc stays arranged. The same object when the flowchart is shown. */
-export function restoreFlow(doc: ExhbtDoc): ExhbtDoc;
+/**
+ * Puts a removed flowchart back and deletes flowOff. Every other item keeps its place, and the doc stays arranged. The same object when the flowchart is shown.
+ * With `at` (a page-item place, as insertBlock's), the marker goes in there: the new editor's "+" and tray always pass it.
+ * Without it (the classic editor's "Put the flowchart back", which has no place to give), the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's, or at the end if none.
+ */
+export function restoreFlow(doc: ExhbtDoc, at?: number): ExhbtDoc;
 ```
 
 What you define. The other agents build against these word for word.
@@ -338,8 +344,8 @@ G (the editor's core) makes each of these files in its first milestone with the 
 | `sheets/CardSheet.tsx` | `CardSheet(): ReactNode` | I | nothing |
 | `sheets/WorkPanel.tsx` | `WorkPanel(): ReactNode` | I | nothing |
 | `sheets/WorkButton.tsx` | `WorkButton(): ReactNode` (what `edit.work()` returns) | I | the button, drawn as "See the work" is, opening the work sheet |
-| `figures/ImageExtras.tsx` | `ImageExtras(props: ExtraSlot): ReactNode` | J | below: the description field (`image-N-alt`) in a strip over the foot of the picture; above: nothing |
-| `figures/LinkExtras.tsx` | `LinkExtras(props: ExtraSlot): ReactNode` | J | a "Web address" button over the link's corner, opening a popover that holds the field |
+| `figures/ImageExtras.tsx` | `ImageExtras(props: ExtraSlot): ReactNode` | J | below: the description field (`image-N-alt`), in the flow under the picture and its caption; above: nothing |
+| `figures/LinkExtras.tsx` | `LinkExtras(props: ExtraSlot): ReactNode` | J | over: a "Web address" button over the link's corner, always shown, opening a popover that holds the field |
 | `figures/GraphExtras.tsx` | `GraphExtras(props: ExtraSlot): ReactNode` | J | an "Edit figures" button that opens the chart sheet |
 | `figures/ChartSheet.tsx` | `ChartSheet(): ReactNode` | J | the existing `ChartEditor` (`bare`) for `ui.sheet.sectionId` |
 | `figures/FigureSheet.tsx` | `FigureSheet(): ReactNode` | J | nothing |
@@ -362,7 +368,7 @@ export type Board = {
   moveBy(id: string, by: -1 | 1): void;
   /** Take a section off the page, with the motion, the words read out and the focus moved to what took its place. */
   remove(id: string): void;
-  /** Add a block at a place, with the motion and the focus put in it. Returns its id, or null when there is no room. A graph then opens its figures sheet (`ui.open("chart", id)`); an image opens the picture picker instead and is placed when the pictures are chosen. */
+  /** Add a block at a place, with the motion and the focus put in it. Returns its id, or null when there is no room. A graph then opens its figures sheet (`ui.open("chart", id)`); a link opens its "Web address" popover with the cursor in it (`ui.jumpTo` on its `href` path); an image opens the picture picker instead and is placed when the pictures are chosen; the flowchart, offered only when it is off the page, goes back at `at`. */
   add(kind: BlockKind, at: number): string | null;
   /** The section the focus was last in, for "add after the section you were last in". */
   lastFocus(): string | null;

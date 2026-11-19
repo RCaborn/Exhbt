@@ -58,6 +58,8 @@ export type Slot = { kinds: readonly PageKind[]; first?: true };
 /** What a layout needs before it can be published, beyond each part's own checks. Every issue has the path "sections", or "myRole". */
 export type Need =
   | { need: "count"; kinds: readonly SectionKind[]; min: number; message: string }
+  /** A findings section, a graph, or an image picked from the work as a graph or a table (decision 0025): what a case study needs today. */
+  | { need: "results"; message: string }
   | { need: "stages"; message: string }
   | { need: "myRole"; message: string };
 
@@ -79,6 +81,25 @@ export type FormatRule = {
   needs: readonly Need[];
 };
 export const FORMAT_RULES: Record<Format, FormatRule>;
+```
+
+`FORMAT_COPY` gains four fields (step 2b). C builds against this shape word for word. It is the shape intended: if you need a different one, build it, say so in your milestone 1 report with the final type, and the main session puts it in this brief and C's before C starts.
+
+```ts
+// lib/exhbt/formats.ts: FORMAT_COPY keeps every field it has today (title, titleHint, header, emptyTitle, gap, gapHint, gapMissing,
+// flow, findings, reflection, reflectionLabel, reflectionPlaceholder, rewriteName, link, linkHint) and gains the four below.
+// It has an entry for each of the seven layouts. The three that exist keep every word, and take today's literals for the new fields.
+export const FORMAT_COPY: Record<Format, {
+  /* today's fields, unchanged */
+  /** The quote's heading on the page: "Feedback", or "Review" in an event. Today a literal in exhbt-parts.tsx. */
+  quote: string;
+  /** What the skill pills are called, the list's accessible name: "Skills used", or "Built with" in a build. Today a literal in ProjectView.tsx. */
+  skills: string;
+  /** The heading over links drawn as a list (the "refs" group): "References" in research (today a literal in ResearchMain.tsx), "Sources" in an essay. Absent where the layout draws no such list. */
+  refs?: string;
+  /** The layout as blockOptions' reasons name it: "in a case study", "in a gallery", "in research", and the same way for the four new ones ("in an essay"). */
+  inLayout: string;
+}>;
 ```
 
 ```ts
@@ -152,20 +173,25 @@ export function rowsFor(items: PageItem[], f: Format): Row[];
 export function structureKey(doc: ExhbtDoc): string;
 
 export type BlockKind = PageKind;
-/** `full` is why it cannot be added ("Up to 2 graphs in a case study"); undefined when there is room. */
+/** `name` is the kind's noun in the layout's own words, as the "+" and the tray show it ("Graph", "What happened", "Reference", "Flowchart"). `full` is why it cannot be added ("Up to 2 graphs in a case study"); undefined when there is room. */
 export type BlockOption = { kind: BlockKind; name: string; full?: string };
 /** What the "+" menu and the tray offer: the layout's kinds in its own order and words, then the flowchart when it is off the page. */
 export function blockOptions(doc: ExhbtDoc): BlockOption[];
 
 /** Structural changes. Each adopts the doc first. `at` and `place` count page items (pageItems), not doc.sections. */
+/** `kind` "flow" puts a removed flowchart back at `at` (restoreFlow(doc, at)) and returns the id "flow"; null when the flowchart is on the page already. */
 export function insertBlock(doc: ExhbtDoc, kind: Exclude<BlockKind, "image">, at: number): { doc: ExhbtDoc; id: string } | null;
 export function insertImage(doc: ExhbtDoc, image: { fileId: string; w?: number; h?: number }, at: number): { doc: ExhbtDoc; id: string } | null;
 /** `place`: the item's index among the page items with the item itself taken out (0 is first). */
 export function moveItem(doc: ExhbtDoc, id: string, place: number): ExhbtDoc;
 /** Takes a section out. For the flowchart: removes the marker and sets flowOff; the boxes stay in doc.flow. */
 export function removeItem(doc: ExhbtDoc, id: string): ExhbtDoc;
-/** Puts a removed flowchart back: the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's (at the end if none), every other item keeps its place, and flowOff is deleted. The doc stays arranged. The same object when the flowchart is shown. */
-export function restoreFlow(doc: ExhbtDoc): ExhbtDoc;
+/**
+ * Puts a removed flowchart back and deletes flowOff. Every other item keeps its place, and the doc stays arranged. The same object when the flowchart is shown.
+ * With `at` (a page-item place, as insertBlock's), the marker goes in there: the new editor's "+" and tray always pass it.
+ * Without it (the classic editor's "Put the flowchart back", which has no place to give), the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's, or at the end if none.
+ */
+export function restoreFlow(doc: ExhbtDoc, at?: number): ExhbtDoc;
 ```
 
 ```ts

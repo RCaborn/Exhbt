@@ -41,6 +41,8 @@ export type Slot = { kinds: readonly PageKind[]; first?: true };
 /** What a layout needs before it can be published, beyond each part's own checks. Every issue has the path "sections", or "myRole". */
 export type Need =
   | { need: "count"; kinds: readonly SectionKind[]; min: number; message: string }
+  /** A findings section, a graph, or an image picked from the work as a graph or a table (decision 0025): what a case study needs today. */
+  | { need: "results"; message: string }
   | { need: "stages"; message: string }
   | { need: "myRole"; message: string };
 
@@ -90,8 +92,12 @@ export const isContent = (s: Section): s is ContentSection => s.kind !== "flow";
 From `lib/exhbt/layouts.ts`: `hasMarker(doc)`, `isArranged(doc)`, `flowShown(doc)`, and
 
 ```ts
-/** Puts a removed flowchart back: the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's (at the end if none), every other item keeps its place, and flowOff is deleted. The doc stays arranged. The same object when the flowchart is shown. */
-export function restoreFlow(doc: ExhbtDoc): ExhbtDoc;
+/**
+ * Puts a removed flowchart back and deletes flowOff. Every other item keeps its place, and the doc stays arranged. The same object when the flowchart is shown.
+ * With `at` (a page-item place, as insertBlock's), the marker goes in there: the new editor's "+" and tray always pass it.
+ * Without it (the classic editor's "Put the flowchart back", which has no place to give), the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's, or at the end if none.
+ */
+export function restoreFlow(doc: ExhbtDoc, at?: number): ExhbtDoc;
 ```
 
  From `lib/exhbt/formats.ts`: `OFFERED_FORMATS`, `FORMAT_RULES[f].flowRemovable`. Every helper that returns sections (`shownSections`, `sectionsOf`, `imagesOf` and the rest) returns content sections only; `doc.sections` itself can hold the marker.
@@ -117,6 +123,7 @@ Commit and push after each. Nothing here may change what a person sees on an exh
 8. **One word for the new editor.** In `components/editor/useAutosave.ts`, add `export` to `writeBackup` and change nothing else. In release 3 the new editor's store writes the browser copy itself, under the same key, so the classic editor's "We kept changes from…" offer still finds it after a crash.
 9. **The switch, unused.** In `lib/site.ts`:
    ```ts
+   // lib/editor-kind.ts  (new, server only: its first line is import "server-only")
    export type EditorKind = "page" | "classic";
    /** Which editor /exhbts/<id>/edit serves. "classic" only when the runtime variable EXHBT_EDITOR is "classic". Read on each request. */
    export async function editorKind(): Promise<EditorKind>;

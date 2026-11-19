@@ -33,7 +33,7 @@ Until you are merged; then G owns all of them:
 From E, on your base:
 
 ```ts
-// lib/site.ts
+// lib/editor-kind.ts  (new, server only: its first line is import "server-only")
 export type EditorKind = "page" | "classic";
 /** Which editor /exhbts/<id>/edit serves. "classic" only when the runtime variable EXHBT_EDITOR is "classic". Read on each request. */
 export async function editorKind(): Promise<EditorKind>;
