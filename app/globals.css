@@ -973,13 +973,6 @@
   [data-format="event"] [data-part="graph"] .space-y-2\.5 > :not(:last-child) {
     margin-bottom: 0.3rem;
   }
-  /* A bar's lane is a little lower on paper (the bar inside is 16px, so it fits), so a graph with
-     the labels above its bars takes less height. */
-  [data-format="build"] [data-part="graph"] [role="img"] .relative.h-5,
-  [data-format="before-after"] [data-part="graph"] [role="img"] .relative.h-5,
-  [data-format="event"] [data-part="graph"] [role="img"] .relative.h-5 {
-    height: 1.4rem;
-  }
   /* A lead picture (Build's screenshot, Event's poster) is whole and in its own shape; its box and
      caption sit closer to it, and Event's poster, the tallest picture, is a little taller than the
      gallery's 46mm so it stays readable. */
