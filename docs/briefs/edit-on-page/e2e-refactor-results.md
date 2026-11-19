@@ -4,8 +4,8 @@ Run on the desktop Playwright project, one worker, port 3214, no trace. Base is 
 
 | Spec | Tests | Before (base) | After (this branch) |
 | --- | --- | --- | --- |
-| `file-ownership.spec.ts` | 1 | 1 passed | |
-| `phase2-billing-polish.spec.ts` | 7 | 7 passed | |
+| `file-ownership.spec.ts` | 1 | 1 passed | 1 passed |
+| `phase2-billing-polish.spec.ts` | 7 | 7 passed | 7 passed |
 | `phase2-editor-media.spec.ts` | 15 | 15 passed | |
 | `phase2-editor.spec.ts` | 10 | 10 passed | |
 | `phase2-graphs.spec.ts` | 16 | 16 passed | |
