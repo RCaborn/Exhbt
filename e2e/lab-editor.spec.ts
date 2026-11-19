@@ -816,29 +816,270 @@ test.describe("Desktop", () => {
     await expect(page.getByRole("button", { name: /Add a box after/ })).toHaveCount(0);
   });
 
-  test("+ between sections adds a placeholder there", async ({ page }) => {
+  /** What a "+" menu or the tray offers: each kind, and whether it can be added. */
+  const offered = (page: Page, within: string, attr: string) =>
+    page.locator(`${within} [${attr}]`).evaluateAll((els, name) => els.map((b) => `${b.getAttribute(name)}${(b as HTMLButtonElement).disabled || b.getAttribute("aria-disabled") === "true" ? " (full)" : ""}`), attr);
+
+  test("+ between sections offers every kind the layout can hold, with the real caps, and adds a filled block there; Remove takes one off", async ({ page }) => {
     await open(page);
-    const add = page.getByRole("button", { name: "Add a section before graph 2" });
+    const add = page.getByRole("button", { name: "Add a block before graph 2" });
     await add.click();
-    await expect(page.getByRole("group", { name: "Add a section" })).toBeVisible();
+    const menu = page.getByRole("group", { name: "Add a block" });
+    await expect(menu).toBeVisible();
+    // A case study: six kinds. The sample already has its one set of findings, both graphs, its quote, its note and its link.
+    expect(await offered(page, ".lab-menu", "data-insert-kind")).toEqual(["findings (full)", "graph (full)", "image", "quote (full)", "reflection (full)", "link (full)"]);
+    await expect(menu.locator('[data-insert-kind="graph"]')).toHaveAccessibleDescription("Up to 2 graphs in a case study");
+    await expect(menu.locator('[data-insert-kind="quote"]')).toHaveAccessibleDescription("One quote in a case study");
+    await expect(menu.locator('[data-insert-kind="findings"]')).toHaveAccessibleDescription("One set of findings in a case study");
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("group", { name: "Add a section" })).toHaveCount(0);
+    await expect(menu).toHaveCount(0);
+    await expect(add).toBeFocused();
+
+    // An image: a placeholder picture with a caption, there, with the cursor in the caption.
     await add.click();
-    await page.getByRole("button", { name: "Quote", exact: true }).click();
-    expect(await order(page)).toEqual(["flow", "findings", "graph-1", "quote-2", "graph-2", "quote-1", "reflection-1", "link-1"]);
-    await expect(status(page)).toHaveText("Quote added in place 4 of 8.");
-    await page.getByRole("button", { name: "Add a section at the end" }).click();
-    await page.getByRole("button", { name: "Findings", exact: true }).click();
-    expect((await order(page)).at(-1)).toBe("findings-1");
-    await expect(section(page, "findings-1").getByLabel("Finding 1")).toBeFocused();
-    await page.keyboard.type("A new finding");
-    // An image placeholder next to the new findings pairs with them.
-    await page.getByRole("button", { name: "Add a section at the end" }).click();
-    await page.getByRole("button", { name: "Image", exact: true }).click();
+    await menu.locator('[data-insert-kind="image"]').click();
+    expect(await order(page)).toEqual(["flow", "findings", "graph-1", "image-1", "graph-2", "quote-1", "reflection-1", "link-1"]);
+    await expect(status(page)).toHaveText("Image added here, place 4 of 8.");
+    await expect(section(page, "image-1").locator("img")).toBeVisible();
+    await expect(section(page, "image-1").locator("textarea")).toHaveValue("What the picture shows");
+    await expect(section(page, "image-1").locator("textarea")).toBeFocused();
+
+    // Remove: the quote goes, the focus moves to what took its place, and a quote can be added again.
+    await section(page, "quote-1").locator("[data-remove]").click();
+    await expect(status(page)).toHaveText("Quote removed.");
+    expect(await order(page)).toEqual(["flow", "findings", "graph-1", "image-1", "graph-2", "reflection-1", "link-1"]);
+    await expect(section(page, "reflection-1").locator("[data-grip]")).toBeFocused();
+    await page.getByRole("button", { name: "Add a block at the end" }).click();
+    expect(await offered(page, ".lab-menu", "data-insert-kind")).toEqual(["findings (full)", "graph (full)", "image", "quote", "reflection (full)", "link (full)"]);
+    await menu.locator('[data-insert-kind="quote"]').click();
+    expect((await order(page)).at(-1)).toBe("quote-1");
+    await expect(section(page, "quote-1")).toContainText("What they said about the work, in their own words.");
+
+    // A graph: a small sample chart, with its values printed.
+    await section(page, "graph-1").locator("[data-remove]").click();
+    await page.getByRole("button", { name: "Add a block before image 1" }).click();
+    await menu.locator('[data-insert-kind="graph"]').click();
+    await expect(section(page, "graph-1")).toContainText("A sample graph (%)");
+    await expect(section(page, "graph-1")).toContainText("48%");
+
+    // The flowchart can come off, and is then offered.
+    await section(page, "flow").locator("> .lab-tools [data-remove]").click();
+    await expect(status(page)).toHaveText("Flowchart removed.");
+    expect(await order(page)).not.toContain("flow");
+    await page.getByRole("button", { name: "Add a block before findings" }).click();
+    expect((await offered(page, ".lab-menu", "data-insert-kind")).at(-1)).toBe("flow");
+    await menu.locator('[data-insert-kind="flow"]').click();
+    expect((await order(page))[0]).toBe("flow");
+    await expect(page.locator("[data-flow-step]")).toHaveCount(5);
     await settled(page);
-    const now = await drawn(page);
-    expect(now["image-1"]!.y).toBeLessThan(now["findings-1"]!.y + now["findings-1"]!.h);
-    expect(now["image-1"]!.x).toBeGreaterThan(now["findings-1"]!.x + 100);
+
+    // Research adds the aim and the conclusion, and caps graphs and images together.
+    await open(page, "?sample=research");
+    await page.getByRole("button", { name: "Add a block at the end" }).click();
+    expect(await offered(page, ".lab-menu", "data-insert-kind")).toEqual(["aim (full)", "findings (full)", "graph", "image", "conclusion (full)", "quote", "reflection (full)", "link"]);
+    await expect(menu.locator('[data-insert-kind="aim"]')).toHaveAccessibleDescription("One aim or hypothesis in research");
+    await menu.locator('[data-insert-kind="image"]').click();
+    await page.getByRole("button", { name: "Add a block at the end" }).click();
+    await expect(menu.locator('[data-insert-kind="graph"]')).toBeDisabled();
+    await expect(menu.locator('[data-insert-kind="graph"]')).toHaveAccessibleDescription("Up to 3 graphs and images together in research");
+    await expect(menu.locator('[data-insert-kind="image"]')).toHaveAccessibleDescription("Up to 2 images in research");
+  });
+
+  test("the tray sits beside the page on a desktop, never over it, clear of where the page scrolls itself, and is gone on a narrower window", async ({ page }) => {
+    const tray = page.locator("[data-lab-tray]");
+    for (const sample of SAMPLES) {
+      await open(page, `?sample=${sample}`);
+      await expect(tray).toBeVisible();
+      const view = page.viewportSize()!;
+      const t = (await tray.boundingBox())!;
+      const column = (await board(page).boundingBox())!;
+      expect(t.x, sample).toBeGreaterThanOrEqual(column.x + column.width);
+      expect(t.x + t.width, sample).toBeLessThanOrEqual(view.width);
+      // Clear of the top and bottom fifths, where carrying something scrolls the page.
+      expect(t.y, sample).toBeGreaterThanOrEqual(view.height * 0.2);
+      expect(t.y + t.height, sample).toBeLessThanOrEqual(view.height * 0.8);
+      // Fixed to the window: it is in the same place however far the page is scrolled.
+      await page.evaluate(() => window.scrollTo(0, 900));
+      expect(await tray.boundingBox()).toEqual(t);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    }
+    // The same kinds as the "+" menu, with the same ones full.
+    await open(page, "?sample=research");
+    const inTray = await offered(page, "[data-lab-tray]", "data-tray-kind");
+    await page.getByRole("button", { name: "Add a block at the end" }).click();
+    expect(await offered(page, ".lab-menu", "data-insert-kind")).toEqual(inTray);
+    // 77rem is the narrowest window with room for it beside the page.
+    await page.setViewportSize({ width: 1232, height: 800 });
+    await expect(tray).toBeVisible();
+    const narrow = (await tray.boundingBox())!;
+    const col = (await board(page).boundingBox())!;
+    expect(narrow.x).toBeGreaterThanOrEqual(col.x + col.width);
+    expect(narrow.x + narrow.width).toBeLessThanOrEqual(1232);
+    await page.setViewportSize({ width: 1216, height: 800 });
+    await expect(tray).toBeHidden();
+    await page.setViewportSize({ width: 1024, height: 800 });
+    await expect(tray).toBeHidden();
+  });
+
+  test("a block dragged from the tray lands in a gap, beside the findings and in the image grid, by the same rules as moving a section", async ({ page }) => {
+    await page.setViewportSize(TALL);
+    await open(page);
+    /** Presses the mouse on a block in the tray and moves past the 6px threshold. */
+    const lift = async (kind: string) => {
+      const g = (await page.locator(`[data-tray-kind="${kind}"]`).boundingBox())!;
+      await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(g.x + g.width / 2 - 5, g.y + g.height / 2 + 6, { steps: 4 });
+      await expect(board(page)).toHaveAttribute("data-lab-lifting", "pointer");
+      return g;
+    };
+    const client = async (id: string) => (await section(page, id).boundingBox())!;
+
+    // Lifted: nothing on the page moves, and it has no place while it is still over the tray.
+    const before = await drawn(page);
+    const boxes = await layout(page);
+    const tile = await lift("image");
+    expect(await drawn(page)).toEqual(before);
+    await expect(board(page)).toHaveAttribute("data-lab-place", "-1");
+    await expect(board(page)).toHaveAttribute("data-lab-style", "slide");
+    await expect(page.locator("[data-lab-landing]")).toBeHidden();
+    await expect(status(page)).toHaveText("Picked up a new block: image. Carry it onto the page.");
+    // What is carried is the block's own tile, the same size, not scaled.
+    const chip = (await page.locator("[data-lab-chip]").boundingBox())!;
+    expect([Math.round(chip.width), Math.round(chip.height)]).toEqual([Math.round(tile.width), Math.round(tile.height)]);
+
+    // Into the gap between the quote and what I'd do next: the page makes room, by transform only.
+    const q = await client("quote-1");
+    const r = await client("reflection-1");
+    await page.mouse.move(q.x + q.width / 2, (q.y + q.height + r.y) / 2, { steps: 25 });
+    await page.waitForTimeout(250);
+    await expect(status(page)).toHaveText("Image would go to place 6 of 8.");
+    expect(await layout(page)).toEqual(boxes);
+    await expect(page.locator("[data-lab-landing]")).toBeVisible();
+    const mid = await drawn(page);
+    expect(mid["reflection-1"]!.y).toBeGreaterThan(before["reflection-1"]!.y + 100);
+    expect(mid["quote-1"]).toEqual(before["quote-1"]);
+    await page.mouse.up();
+    expect(await order(page)).toEqual(["flow", "findings", "graph-1", "graph-2", "quote-1", "image-1", "reflection-1", "link-1"]);
+    await expect(status(page)).toHaveText("Image added in place 6 of 8.");
+    const motion = await page.evaluate((sel) => document.getAnimations().filter((a) => (a.effect as KeyframeEffect).target?.matches(sel)).map((a) => (a.effect as KeyframeEffect).getTiming().duration), SECTIONS);
+    expect(motion.length).toBeGreaterThan(0);
+    expect(new Set(motion)).toEqual(new Set([180]));
+    await settled(page);
+    await expect(section(page, "image-1").locator("img")).toBeVisible();
+
+    // Let go off the page: nothing is added.
+    await section(page, "image-1").locator("[data-remove]").click();
+    await lift("image");
+    await page.mouse.move(1400, 500, { steps: 5 });
+    await expect(board(page)).toHaveAttribute("data-lab-place", "-1");
+    await page.mouse.up();
+    await expect(status(page)).toHaveText("Image was not added.");
+    expect(await order(page)).toEqual(["flow", "findings", "graph-1", "graph-2", "quote-1", "reflection-1", "link-1"]);
+
+    // Between the findings and the graph beside them: the image takes the findings' side, and the two graphs pair up.
+    await lift("image");
+    const f = await client("findings");
+    const g1 = await client("graph-1");
+    await page.mouse.move((f.x + f.width + g1.x) / 2, f.y + f.height / 2, { steps: 25 });
+    await expect(status(page)).toHaveText("Image would go to place 3 of 8.");
+    await page.mouse.up();
+    expect(await order(page)).toEqual(["flow", "findings", "image-1", "graph-1", "graph-2", "quote-1", "reflection-1", "link-1"]);
+    await settled(page);
+    const paired = await drawn(page);
+    expect(paired["image-1"]!.x).toBeGreaterThan(paired.findings!.x + 100);
+    expect(paired["image-1"]!.y).toBeLessThan(paired.findings!.y + paired.findings!.h);
+    expect(paired["graph-1"]!.y).toBeCloseTo(paired["graph-2"]!.y, 0);
+
+    // The image grid: a new picture between two tiles of the second row. The tiles after it shuffle along.
+    await open(page, "?sample=gallery");
+    const grid = await drawn(page);
+    await lift("image");
+    const a = await client("image-5");
+    const b = await client("image-6");
+    await page.mouse.move((a.x + a.width + b.x) / 2, a.y + a.height / 2, { steps: 25 });
+    await page.waitForTimeout(250);
+    await expect(status(page)).toHaveText("Image would go to place 9 of 12.");
+    const shuffled = await drawn(page);
+    expect(shuffled["image-5"]).toEqual(grid["image-5"]);
+    expect(shuffled["image-6"]!.x).toBeCloseTo(grid["image-7"]!.x, 0);
+    await page.mouse.up();
+    expect(await order(page)).toEqual(["image-1", "flow", "findings", "link-1", "image-2", "image-3", "image-4", "image-5", "image-8", "image-6", "image-7", "link-2"]);
+    await settled(page);
+    const tiles = await drawn(page);
+    expect(tiles["image-8"]!.y).toBeCloseTo(tiles["image-5"]!.y, 0);
+    expect(tiles["image-8"]!.w).toBeCloseTo(tiles["image-5"]!.w, 0);
+    // A gallery holds eight images: the block is now full, with the reason.
+    await expect(page.locator('[data-tray-kind="image"]')).toHaveAttribute("aria-disabled", "true");
+    await expect(page.locator('[data-tray-kind="image"]')).toHaveAccessibleDescription("Up to 8 images in a gallery");
+
+    // Version B: the same block is carried over a still page, with a line.
+    await open(page, "?v=b");
+    const still = await drawn(page);
+    await lift("image");
+    const q2 = await client("quote-1");
+    await page.mouse.move(q2.x + q2.width / 2, q2.y - 20, { steps: 20 });
+    await expect(page.locator("[data-lab-line]")).toBeVisible();
+    await expect(page.locator("[data-lab-landing]")).toBeHidden();
+    expect(await drawn(page)).toEqual(still);
+    await page.mouse.up();
+    expect(await order(page)).toEqual(["flow", "findings", "graph-1", "graph-2", "image-1", "quote-1", "reflection-1", "link-1"]);
+  });
+
+  test("carrying a block from the tray near the bottom edge scrolls the page, and stops at its end", async ({ page }) => {
+    await open(page, "?sample=gallery");
+    const g = (await page.locator('[data-tray-kind="quote"]').boundingBox())!;
+    await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(g.x - 300, g.y + 30, { steps: 8 });
+    const view = page.viewportSize()!;
+    const height = await page.evaluate(() => document.documentElement.scrollHeight);
+    await page.mouse.move(view.width / 2, view.height - 10, { steps: 10 });
+    const p0 = await board(page).getAttribute("data-lab-place");
+    await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 8000 }).toBeGreaterThan(300);
+    expect(await board(page).getAttribute("data-lab-place")).not.toBe(p0);
+    // To the end, and no further: the page is no longer than it was.
+    await expect.poll(() => page.evaluate(() => Math.ceil(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight), { timeout: 15000 }).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(height);
+    await page.mouse.up();
+    expect((await order(page)).at(-1)).toBe("quote-1");
+  });
+
+  test("the tray from the keyboard: Enter adds a block after the section last in focus, or at the end; a full kind is refused with the reason", async ({ page }) => {
+    await open(page);
+    const image = page.getByRole("button", { name: "Image", exact: true });
+    // Nothing on the page has had the focus yet: it goes at the end. The focus stays on the tray.
+    await image.focus();
+    await expect(image).toHaveAccessibleDescription(/Press Enter to add it after the section you were last in, or at the end of the page/);
+    await page.keyboard.press("Enter");
+    await expect(status(page)).toHaveText("Image added at the end, place 8 of 8.");
+    expect((await order(page)).at(-1)).toBe("image-1");
+    await expect(image).toBeFocused();
+    // With the focus last in the findings: straight after them.
+    await page.getByLabel("Finding 2").focus();
+    await image.focus();
+    await page.keyboard.press("Enter");
+    await expect(status(page)).toHaveText("Image added after findings, place 3 of 9.");
+    expect(await order(page)).toEqual(["flow", "findings", "image-2", "graph-1", "graph-2", "quote-1", "reflection-1", "link-1", "image-1"]);
+    // That was the second image, which is all a case study holds: the block is refused from now on, and says why.
+    await expect(image).toHaveAttribute("aria-disabled", "true");
+    await expect(image).toHaveAccessibleDescription("Up to 2 images in a case study");
+    await page.keyboard.press("Enter");
+    await expect(status(page)).toHaveText("Up to 2 images in a case study.");
+    expect((await order(page)).length).toBe(9);
+    // Nor can it be dragged.
+    const g = (await image.boundingBox())!;
+    await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(g.x - 300, g.y + 40, { steps: 10 });
+    await expect(board(page)).not.toHaveAttribute("data-lab-lifting");
+    await page.mouse.up();
+    expect((await order(page)).length).toBe(9);
+    // The reason shows beside the block when it is pointed at.
+    await image.hover({ force: true });
+    await expect(page.locator("#lab-tray-why-image")).toHaveCSS("opacity", "1");
+    // Every block in the tray is a button in the tab order.
+    expect(await page.locator("[data-lab-tray] button").evaluateAll((els) => els.every((b) => (b as HTMLButtonElement).tabIndex === 0))).toBe(true);
   });
 
   for (const v of VERSIONS) {
@@ -989,6 +1230,32 @@ test.describe("Touch (Pixel 7)", () => {
     await page.waitForTimeout(250);
     await touch.up();
     expect(await boxes()).toEqual(["step-2", "step-3", "step-1", "step-4", "step-5"]);
+  });
+
+  test("there is no tray on a phone; the + menu offers the same kinds and adds one", async ({ page }) => {
+    await open(page, "?sample=research");
+    await expect(page.locator("[data-lab-tray]")).toBeHidden();
+    await expect(page.getByRole("button", { name: "Image", exact: true })).toHaveCount(0);
+    // What the tray would offer (it is in the page, not drawn) is what the menu offers.
+    const kinds = (within: string, attr: string) =>
+      page.locator(`${within} [${attr}]`).evaluateAll((els, name) => els.map((b) => `${b.getAttribute(name)}${(b as HTMLButtonElement).disabled || b.getAttribute("aria-disabled") === "true" ? " (full)" : ""}`), attr);
+    const plus = page.getByRole("button", { name: "Add a block before conclusion" });
+    await plus.scrollIntoViewIfNeeded();
+    await plus.tap();
+    const menu = page.getByRole("group", { name: "Add a block" });
+    await expect(menu).toBeVisible();
+    expect(await kinds(".lab-menu", "data-insert-kind")).toEqual(["aim (full)", "findings (full)", "graph", "image", "conclusion (full)", "quote", "reflection (full)", "link"]);
+    expect(await kinds(".lab-menu", "data-insert-kind")).toEqual(await kinds("[data-lab-tray]", "data-tray-kind"));
+    // The menu fits the screen, and each row is big enough for a finger.
+    const box = (await menu.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+    for (const b of await menu.getByRole("button").all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await menu.locator('[data-insert-kind="quote"]').tap();
+    expect(await order(page)).toEqual(["aim-1", "flow", "graph-1", "findings", "quote-1", "conclusion-1", "image-1", "reflection-1", "link-1"]);
+    // Remove takes it off again.
+    await section(page, "quote-1").locator("[data-remove]").tap();
+    expect(await order(page)).not.toContain("quote-1");
   });
 
   test("axe finds nothing on a phone, and the page matches the published one", async ({ page }) => {

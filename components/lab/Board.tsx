@@ -245,7 +245,22 @@ export function Board({ version }: { version: Version }) {
     window.addEventListener("mousemove", move, true);
     window.addEventListener("touchmove", move, { capture: true, passive: true });
     window.addEventListener("scroll", follow, { capture: true, passive: true });
+    // A block from the tray: the tray is fixed to the window, so dnd-kit has nothing of its to scroll
+    // and leaves the page alone. The board scrolls the page itself, the same way: once the block is
+    // over the page, the nearer the pointer is to the top or bottom edge (the outer fifths), the faster.
+    let frame = 0;
+    if (l.draft) {
+      const edge = () => {
+        const zone = window.innerHeight * 0.2;
+        const y = l.pointer.y;
+        const pull = y < zone ? (y - zone) / zone : y > window.innerHeight - zone ? (y - (window.innerHeight - zone)) / zone : 0;
+        if (pull && l.place !== NOWHERE) window.scrollBy(0, Math.round(pull * 16));
+        frame = requestAnimationFrame(edge);
+      };
+      frame = requestAnimationFrame(edge);
+    }
     l.stop = () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener("mousemove", move, true);
       window.removeEventListener("touchmove", move, true);
       window.removeEventListener("scroll", follow, true);
