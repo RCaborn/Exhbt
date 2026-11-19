@@ -4,6 +4,7 @@ import { createContext, useContext, useMemo } from "react";
 import { fileIdsOf, checkFile, prepareImage, readSize, UploadError, uploadForExhbt } from "@/components/editor/media";
 import type { ExhbtDoc, Picked } from "@/lib/exhbt/blocks";
 import { formatOf } from "@/lib/exhbt/formats";
+import { pageItems } from "@/lib/exhbt/layouts";
 import { roomFor } from "@/lib/exhbt/sections";
 import { atom, useAtom, type Atom } from "./atom";
 import type { Store } from "./store-core";
@@ -56,7 +57,7 @@ export type FilesController = Methods & {
   setInput(el: HTMLInputElement | null): void;
   /** The files the live copy uses, for the rule that deletes files. */
   live(): ReadonlySet<string>;
-  /** Where the last pick() asked for the pictures to go. */
+  /** Where the pictures being chosen go (what pick() was given, or -1 for the end of the page), read once: the next read is -1 again. */
   pickAt(): number;
   /** A save landed: the server holds this doc. Runs the rule. */
   noteSaved(doc: ExhbtDoc): void;
@@ -73,7 +74,8 @@ export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: nu
   const { store, exhbtId, maxFileMb } = opts;
   const state = atom<State>({ imageUrls: { ...opts.imageUrls }, busy: { image: false, work: false }, error: {}, status: "" });
   let input: HTMLInputElement | null = null;
-  let pickAt = 0;
+  // Where the next pictures chosen go: set by pick(at), and the end of the page when the picker was opened some other way.
+  let pickAt = -1;
   let live = new Set(opts.liveFileIds);
   let serverDoc = opts.initialDoc;
   // Every stored file this visit has seen: the rule decides about these and nothing else.
@@ -101,7 +103,8 @@ export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: nu
    * settles, the settled run from the front is placed. A failure says which file and why; the rest
    * still go up.
    */
-  async function addImages(files: File[], at: number) {
+  async function addImages(files: File[], from: number) {
+    const at = from < 0 ? pageItems(store.get()).length : from;
     if (!files.length) return;
     set((s) => ({ error: { ...s.error, image: undefined }, status: "" }));
     const doc = store.get();
@@ -237,7 +240,11 @@ export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: nu
       input = el;
     },
     live: () => live,
-    pickAt: () => pickAt,
+    pickAt: () => {
+      const at = pickAt;
+      pickAt = -1;
+      return at;
+    },
     noteSaved(doc) {
       serverDoc = doc;
       settle();

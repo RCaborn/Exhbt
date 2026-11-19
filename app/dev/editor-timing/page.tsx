@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { PageEditorProps } from "@/components/exhbt-editor/context";
-import type { ExhbtDoc } from "@/lib/exhbt/blocks";
+import { emptyDoc, type ExhbtDoc } from "@/lib/exhbt/blocks";
 import { BEFORE_AFTER_IMAGES, beforeAfterDoc, BUILD_IMAGES, buildDoc, essayDoc, EVENT_IMAGES, eventDoc, fullDoc, GALLERY_IMAGES, galleryDoc, researchDoc } from "@/lib/exhbt/sample";
 import { DEFAULT_THEME, themeById } from "@/lib/portfolio-themes";
 import { full } from "../edit-slots/stand-in";
@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
  * sign-in, nothing stored and a save that does nothing. Pictures are flat grey drawings of each image's
  * size, as data addresses.
  *
- *   ?sample=   gallery (the default: the longest), case-study, research, build, essay, before-after, event
+ *   ?sample=   gallery (the default: the longest), case-study, research, build, essay, before-after, event, new (an empty exhbt)
  *   ?look=     a portfolio look's id (the Exhbt look by default)
  *   ?full=1    every empty optional part given words first (the slot harness's full(), app/dev/edit-slots), for the box-for-box tests
  *
@@ -36,6 +36,7 @@ const SAMPLES: Record<string, () => ExhbtDoc> = {
   essay: () => essayDoc("essay-1"),
   "before-after": () => beforeAfterDoc(ids(BEFORE_AFTER_IMAGES.length, "before-after")),
   event: () => eventDoc(ids(EVENT_IMAGES.length, "event")),
+  new: () => emptyDoc(),
 };
 
 /** A flat grey picture of the image's own size, as a data address, so nothing is stored. */

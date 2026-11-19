@@ -255,7 +255,7 @@ export function sampleDoc(f: Format): ExhbtDoc {
  * layout's sample: `full` gives every empty optional part words, `look` is a portfolio look's id,
  * `grow` "mirror" makes the plain fields grow by their mirror.
  */
-export async function openTiming(page: Page, f: Format, opts: { full?: boolean; look?: string; grow?: "mirror" } = {}) {
+export async function openTiming(page: Page, f: Format | "new", opts: { full?: boolean; look?: string; grow?: "mirror" } = {}) {
   const q = new URLSearchParams({ sample: f, ...(opts.full ? { full: "1" } : {}), ...(opts.look ? { look: opts.look } : {}), ...(opts.grow ? { grow: opts.grow } : {}) });
   await page.goto(`/dev/editor-timing?${q}`);
   await waitReady(page);

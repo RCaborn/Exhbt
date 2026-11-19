@@ -50,7 +50,8 @@ export function targetOf(path: FieldPath, root: ParentNode = document.querySelec
 /** Puts the cursor in the field at (or inside) `el`, opening the popover it sits in first. */
 function land(el: HTMLElement, path: FieldPath) {
   const field = isField(el) ? el : el.querySelector<HTMLElement>(FIELD);
-  const target = field ?? el;
+  // An anchor with no field (the "+" at the end, "Add a finding") is its button.
+  const target = field ?? (el.matches("button, a[href]") ? el : el.querySelector<HTMLElement>("button:not([disabled]), a[href]")) ?? el;
   const pop = target.closest<HTMLElement>("[popover]");
   if (pop && !pop.matches(":popover-open")) pop.showPopover();
   if (!field && !target.hasAttribute("tabindex") && !target.matches("a[href], button, input, select, textarea")) target.tabIndex = -1;
