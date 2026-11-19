@@ -67,3 +67,31 @@ test("the AI version keeps its graphs through the real save and load", async ({ 
   expect(read.aiVersion.blocks).toEqual(aiVersion.blocks);
   expect(read.working.title).toBe(core.title);
 });
+
+test("a graph from the work that replaces the drafted one leaves the drafted graph in the AI version", async ({ page }) => {
+  const username = unique("figgraph");
+  const chart = { kind: "bar", title: "Queue time (min)", unit: "min", rows: [{ label: "Before", value: 11 }, { label: "After", value: 4 }] };
+  const blocks = { gap: [{ t: "Queues ran long at lunch." }] };
+  const seeded = await page.request.post("/dev/parity", {
+    data: {
+      username,
+      slug: "queue",
+      doc: { ...core, sections: [findings] },
+      working: { ...core, sections: [findings, { id: "graph-1", kind: "graph", chart }] },
+      extraFiles: ["report-graph"],
+      aiVersion: { blocks, unverified: {} },
+    },
+  });
+  expect(seeded.status(), await seeded.text()).toBe(200);
+  const { id, files } = (await seeded.json()) as { id: string; files: Record<string, string> };
+  await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
+  const placed = await page.request.post(`/api/exhbts/${id}/figure`, {
+    data: { fileId: files["report-graph"], alt: "The report's queue graph", caption: "", kind: "graph", picked: { from: "report.pdf", page: 2 } },
+  });
+  expect(placed.status(), await placed.text()).toBe(204);
+  const read = (await (await page.request.get(`/dev/parity?id=${id}`)).json()) as { working: { sections: { kind: string }[] }; aiVersion: { blocks: unknown; graphs?: unknown[] } };
+  // The work's graph took the drafted one's place on the page, and the drafted one is kept beside the AI version's blocks.
+  expect(read.working.sections.map((s) => s.kind)).toEqual(["findings", "image"]);
+  expect(read.aiVersion.graphs).toEqual([chart]);
+  expect(read.aiVersion.blocks).toEqual(blocks);
+});
