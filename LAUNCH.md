@@ -114,7 +114,7 @@ Payments stay off until Phase 2 is switched on. Do all of this in Stripe's **tes
 4. **Developers > API keys**: copy the **Secret key** (starts `sk_test_` in test mode).
 5. **Developers > Webhooks > Add endpoint**:
    - URL: `https://app.exhbt.co.uk/api/stripe/webhook`
-   - Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+   - Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`
    - After saving, reveal the **Signing secret** (starts `whsec_`).
 6. Add both as Worker secrets, either in Cloudflare (Worker > **Settings > Variables and Secrets**, type **Secret**) or from a terminal:
    ```

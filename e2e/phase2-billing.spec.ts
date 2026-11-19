@@ -34,6 +34,31 @@ function subscriptionEvent(type: string, userId: string, status: string) {
   });
 }
 
+/** A signed invoice event with the subscription expanded, so the webhook needs no call to Stripe. */
+function invoiceEvent(type: "invoice.paid" | "invoice.payment_failed", userId: string, status: string, created: number) {
+  const sub = {
+    id: "sub_test_invoice",
+    object: "subscription",
+    customer: "cus_test_invoice",
+    status,
+    metadata: { user_id: userId, plan: "premium" },
+    items: { object: "list", data: [{ id: "si_invoice", price: { id: PRICE_PREMIUM }, current_period_end: created + 365 * 86_400 }] },
+  };
+  return JSON.stringify({
+    id: `evt_${type}_${created}`,
+    object: "event",
+    type,
+    created,
+    data: {
+      object: {
+        id: `in_${type}_${created}`,
+        object: "invoice",
+        parent: { type: "subscription_details", subscription_details: { subscription: sub, metadata: sub.metadata } },
+      },
+    },
+  });
+}
+
 async function postSigned(request: APIRequestContext, payload: string) {
   const header = Stripe.webhooks.generateTestHeaderString({ payload, secret: SECRET });
   return request.post("/api/stripe/webhook", { data: payload, headers: { "stripe-signature": header, "content-type": "application/json" } });
@@ -55,9 +80,17 @@ test.describe("Billing (Phase 2)", () => {
     expect((await postSigned(request, updated)).status()).toBe(200);
     // Repeats are harmless.
     expect((await postSigned(request, updated)).status()).toBe(200);
-    // Events we don't use are accepted and ignored.
-    const other = JSON.stringify({ id: "evt_other", object: "event", type: "invoice.paid", data: { object: {} } });
+    // Events we don't use are accepted and ignored. An invoice with no subscription is one of those.
+    const other = JSON.stringify({ id: "evt_other", object: "event", type: "customer.created", data: { object: {} } });
     expect((await postSigned(request, other)).status()).toBe(200);
+    const bareInvoice = JSON.stringify({
+      id: "evt_invoice_bare",
+      object: "event",
+      type: "invoice.paid",
+      created: Math.floor(Date.now() / 1000),
+      data: { object: { id: "in_bare", object: "invoice", parent: null } },
+    });
+    expect((await postSigned(request, bareInvoice)).status()).toBe(200);
 
     await signIn(page, "billing@example.com");
     await expect(page.getByTestId("current-plan")).toHaveText("Premium");
@@ -68,6 +101,21 @@ test.describe("Billing (Phase 2)", () => {
     await page.reload();
     await expect(page.getByTestId("current-plan")).toHaveText("Free");
     await expect(page.getByRole("button", { name: "Choose Premium" })).toBeVisible();
+  });
+
+  test("invoice.paid sets the plan, and invoice.payment_failed keeps it while the card fails", async ({ page, request }) => {
+    const userId = "dev-invoice@example.com";
+    const paidAt = Math.floor(Date.now() / 1000);
+    expect((await postSigned(request, invoiceEvent("invoice.paid", userId, "active", paidAt))).status()).toBe(200);
+
+    await signIn(page, "invoice@example.com");
+    await expect(page.getByTestId("current-plan")).toHaveText("Premium");
+    await expect(page.getByText(/^Renews on /)).toBeVisible();
+
+    expect((await postSigned(request, invoiceEvent("invoice.payment_failed", userId, "past_due", paidAt + 1))).status()).toBe(200);
+    await page.reload();
+    await expect(page.getByTestId("current-plan")).toHaveText("Premium");
+    await expect(page.getByText("Your last payment didn't go through.")).toBeVisible();
   });
 
   test("on Free in development: both plans with prices, and the development plan row", async ({ page }) => {
