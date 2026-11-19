@@ -87,24 +87,10 @@ test.describe("Each page in the usual order", () => {
   }
 });
 
-/**
- * Measured on 19 Nov 2026 (brief D): the looks and layouts where the full sample prints on two
- * A4 pages, not one, with the word count of the sample. The cap and the CSS are not this file's to
- * change, so these are fixme, with the numbers, until the owner decides. Event: the reflection and
- * the links spill onto page two. Build and Before and after: a sliver spills, with no text on it.
- */
-const TWO_PAGES: Record<string, number> = {
-  "exhbt event": 2, "classic event": 2, "notebook event": 2, "night event": 2, "studio event": 2, "ledger event": 2, "bloom event": 2,
-  "classic build": 2, "studio build": 2, "ledger build": 2,
-  "studio before-after": 2,
-};
-
 test.describe("Every look: one printed A4 page, axe, and no sideways scroll", () => {
   for (const t of PORTFOLIO_THEMES) {
     for (const s of SAMPLES) {
-      const measured = TWO_PAGES[`${t.id} ${s.format}`];
-      const printTest = measured ? test.fixme : test;
-      printTest(`${t.id} ${s.format}: prints on one A4 page${measured ? ` (FIXME: measured ${measured} pages at ${wordCount(s.doc)} words)` : ""}`, async ({ page }, info) => {
+      test(`${t.id} ${s.format}: prints on one A4 page`, async ({ page }, info) => {
         const u = await seed(page, t.id);
         await page.goto(`/p/${u}/${s.slug}`);
         await expect(page.locator(`article[data-format="${s.format}"]`)).toBeVisible();
