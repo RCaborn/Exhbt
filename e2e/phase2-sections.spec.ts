@@ -14,6 +14,7 @@ import {
   wordCount,
   words,
   type Chart,
+  type ContentSection,
   type ExhbtDoc,
   type ExhbtDocV1,
   type Section,
@@ -39,9 +40,9 @@ const F: Section = { id: "findings", kind: "findings", items: [text("Waits fell.
 const bar: Chart = { kind: "bar", title: "Waits", unit: "min", rows: [{ label: "Before", value: 11 }, { label: "After", value: 4 }] };
 const graph = (n = 1, chart: Chart = bar): Section => ({ id: `graph-${n}`, kind: "graph", chart });
 const image = (n = 1): Section => ({ id: `image-${n}`, kind: "image", fileId: `f${n}`, alt: "A queue at the till", caption: [] });
-const quote = (t = "Lunch is calmer now.", name = "Priya Shah", role = "Cafe manager"): Section => ({ id: "quote-1", kind: "quote", text: t, name, role });
-const next = (t = "Next time I'd time the evening queue too."): Section => ({ id: "reflection-1", kind: "reflection", text: text(t) });
-const link = (href = "https://example.com/code", label = "Model code", description = ""): Section => ({ id: "link-1", kind: "link", href, label, description });
+const quote = (t = "Lunch is calmer now.", name = "Priya Shah", role = "Cafe manager"): ContentSection => ({ id: "quote-1", kind: "quote", text: t, name, role });
+const next = (t = "Next time I'd time the evening queue too."): ContentSection => ({ id: "reflection-1", kind: "reflection", text: text(t) });
+const link = (href = "https://example.com/code", label = "Model code", description = ""): ContentSection => ({ id: "link-1", kind: "link", href, label, description });
 /** A complete core, with these sections below the flowchart. */
 const core = (sections: Section[]): ExhbtDoc => ({
   ...emptyDoc(),

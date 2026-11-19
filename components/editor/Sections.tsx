@@ -378,7 +378,7 @@ function SortableSection({
   children,
 }: {
   id: string;
-  kind: SectionKind;
+  kind: SectionKind | "flow";
   /** "graph 1", for "Drag graph 1". */
   label: string;
   reduced: boolean;
@@ -429,6 +429,9 @@ function hintFor(s: Section, maxFileMb: number, L: Limits, f: Format): string {
     case "aim":
     case "conclusion":
       return "Only what your report states.";
+    case "pullquote":
+    case "flow":
+      return "";
   }
 }
 

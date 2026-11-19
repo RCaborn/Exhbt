@@ -43,7 +43,8 @@ const FITS: Record<LayoutReason, readonly Format[]> = {
 };
 
 /** How a layout's name is written in a person's notes. */
-const NAMED: Record<Format, RegExp> = { "case-study": /case[\s-]?stud(?:y|ies)/i, gallery: /gallery/i, research: /research/i };
+/** Keyed by the layouts the AI may draft (DRAFT_FORMATS). */
+const NAMED: Partial<Record<Format, RegExp>> = { "case-study": /case[\s-]?stud(?:y|ies)/i, gallery: /gallery/i, research: /research/i };
 
 export type UploadSignals = { imageFiles: number; pdfPages: number; pdfPicturePages: number };
 
@@ -63,7 +64,7 @@ export function checkedReason(doc: ExhbtDoc, claimed: unknown, facts: { notes?: 
   const hasFindings = findingsOf(doc).some((it) => plain(it).trim());
   switch (reason) {
     case "notes":
-      return NAMED[f].test(facts.notes ?? "") ? "notes" : "default";
+      return NAMED[f]?.test(facts.notes ?? "") ? "notes" : "default";
     case "aim-results":
     case "hypothesis-results":
     case "study": {

@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
 import { figureSentence, layoutSentence, type FigureNews, type LayoutReason } from "@/lib/exhbt/drafted";
-import { FORMAT_RULES, FORMATS, formatOf, withFormat, type Format } from "@/lib/exhbt/formats";
+import { FORMAT_RULES, formatOf, OFFERED_FORMATS, withFormat, type Format } from "@/lib/exhbt/formats";
 import { layoutNotes } from "@/lib/exhbt/sections";
 
 /**
@@ -18,7 +18,7 @@ import { layoutNotes } from "@/lib/exhbt/sections";
  * whether a figure was taken from the person's files (decision 0025, lib/exhbt/drafted.ts).
  */
 
-const SKETCHES: Record<Format, React.ReactNode> = {
+const SKETCHES: Partial<Record<Format, React.ReactNode>> = {
   // A title bar, a row of three boxes, two columns.
   "case-study": (
     <>
@@ -91,7 +91,7 @@ export function LayoutPicker({ doc, setDoc, drafted }: { doc: ExhbtDoc; setDoc: 
         </legend>
         <p className="hint mt-1">How the page reads. Switching never deletes anything.</p>
         <div ref={group} role="radiogroup" aria-label="Layout" className="mt-4 space-y-2">
-          {FORMATS.map((k) => {
+          {OFFERED_FORMATS.map((k) => {
             const hint = `${name}-${k}`;
             return (
               <label key={k} className="flex cursor-pointer items-center gap-3 rounded-[12px] border border-line p-3 has-[:checked]:border-ink has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink">
