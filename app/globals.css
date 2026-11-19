@@ -209,6 +209,8 @@
     --xp-ground: var(--color-surface);
     --xp-ink: var(--color-ink);
     --xp-muted: var(--color-graphite);
+    /* Issues on the editing page (decision 0026): the app's own error colour outside a look. */
+    --xp-error: var(--color-error);
     --xp-rule: var(--color-line);
     --xp-rule-strong: var(--color-ink);
     --xp-card: var(--color-mist);
@@ -264,6 +266,7 @@
     --xp-ink: var(--pf-ink);
     --xp-heading: var(--pf-heading);
     --xp-muted: var(--pf-soft);
+    --xp-error: var(--pf-error);
     --xp-rule: var(--pf-line);
     --xp-rule-strong: var(--pf-rule);
     --xp-card: var(--pf-well);
