@@ -551,6 +551,21 @@
   .xp-section {
     margin-top: 2.75rem;
   }
+  /* The editing page (decision 0026) draws each part of a stack in a frame of its own, so a part
+     can't carry the classes the page gives it for following another (stackItemClass in
+     components/portfolio/layout-rows.ts). The stack's wrapper takes one of these instead, for the
+     same place: research's method below the aim, the limitations below the conclusion with the
+     hairline above. Only the editing page uses them. */
+  .xp-stack-edit-method > * + * {
+    margin-top: 1.5rem;
+  }
+  .xp-stack-edit-closing > * + * {
+    margin-top: 1.25rem;
+  }
+  .xp-stack-edit-closing > * + * :where([data-part]) {
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--xp-rule);
+  }
 
   /* Gallery and research pages (decision 0024). Only --xp-* variables, so every look applies. */
   /* The gallery's lead image: its frame has the picture's shape (set inline), never taller than 70% of the screen. */
@@ -865,6 +880,16 @@
   /* The exhbt page: tighter gaps between sections so a full exhbt fits one page. */
   .xp-section {
     margin-top: 0.85rem;
+  }
+  /* The editing page's stacks, as print:mt-3 and print:mt-2 print:pt-2 draw them on the page. */
+  .xp-stack-edit-method > * + * {
+    margin-top: 0.75rem;
+  }
+  .xp-stack-edit-closing > * + * {
+    margin-top: 0.5rem;
+  }
+  .xp-stack-edit-closing > * + * :where([data-part]) {
+    padding-top: 0.5rem;
   }
   /* Gallery and research (decision 0024): the lead image and the grid's rows are short, so a full
      gallery (a lead and seven more) still fits one page; the enlarge dialog and its chips never print. */
