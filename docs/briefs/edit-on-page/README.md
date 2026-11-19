@@ -224,3 +224,49 @@ Three critics (data and rollback; the editing experience; buildability) read the
 **Nothing rejected outright.** Two points were taken in part (experience-6, experience-11), with the reasons above. No critic asked to reverse one of Rory's decisions, so nothing went to `open-questions.md` on that ground; the new questions there (the error colour, the overlays on pictures) are choices this revision made.
 
 **Found while revising:** a frame memoised on its page place would keep a stale stored index (and so stale field paths) when a kept section before it is removed; G's frame now reads its stored index from the store.
+
+### Vision check and cold read (19 Nov 2026)
+
+Two more reads, the same day. The first checked that the revision above kept the original design (commit 39a7d95): Rory asked that the designer's vision not be lost, and the revision had moved several things on the page behind overlays and popovers. The second read the release 2 briefs cold, as an agent starting on them would. Where a line here differs from one above (experience-1, experience-5, experience-7, build-11), this one is current.
+
+**Vision check**
+- vision-1 (must-fix): done. `restoreFlow(doc, at?)`: with a place the marker goes there, without one to the usual place. The "+" and the tray always pass their place (`insertBlock(doc, "flow", at)` is `restoreFlow(doc, at)`); only the classic editor's button calls it without one. 0027, every copy of the layouts block, B step 6b, G step 2, F step 5 and F's test (Flowchart from the "+" before the last section lands there).
+- vision-2 (must-fix): done. The skills end with an "Add a skill" box (`skill-new`), always drawn in the flow, so on an empty exhbt it is the skills block's placeholder. It is on `EDIT_ONLY_IN_FLOW`; A's stand-in draws it inert; the box-for-box tests allow it by name; C draws the skills block in edit mode even with no skills. It left the shell toolbar, which keeps More actions, so 0026's field table and its chrome now agree.
+- vision-3 (must-fix): done. An image's description is again a field under the picture and its caption, in the editor only, marked "Needs a description" until filled. It is on `EDIT_ONLY_IN_FLOW`, drawn inert by A's stand-in, and allowed by name in the full and sparse box-for-box tests (0026 now says once, in "How a box-for-box test allows them", what a test allows). Question 11 is reworded neutrally, with the strip over the picture as the other choice.
+- vision-4: done. "Reorder sections" is in the top bar's menu only under `(pointer: coarse)`, and H tests that it is absent on the desktop project. L's tablet test is unchanged.
+- vision-5: done. A new link opens its "Web address" popover with the cursor in it (through `board.add` and the jump); the button is always shown and marked while the address is missing. 0026, J, F, and the `Board` comment in every copy.
+- vision-6: done. While the share tick is unticked, the picked-figure label holds it ("From your report, page 3 · [ ] I may share this"); Crop and Choose another page stay in the popover. 0026, J, N's field list.
+- vision-7: done. "Add a finding" shows whenever the pointer or the focus is in the findings section, and always under `(pointer: coarse)`, in the gap below the last finding, covering no words. 0026, G step 4, C step 5.
+- vision-8: done, as a contradiction. 0026's always-shown toolbar is for touch screens wider than 48rem; on a phone the grip-only rule and the bar apply, as L says. G step 6 says the same.
+- vision-9: done, as a contradiction with `AGENTS.md` ("don't invent new colours"). C uses the app's error colour (#C92324) in every look where it passes 4.5:1, proposes a value only where it fails, and reports each one; 0026 and question 10 say so.
+- vision-10: no change; the stand-in stays. Rory should be told that the loading view shows a new exhbt's grey placeholders, and now the description fields and the skill box.
+- vision-11: no change. Issue messages stay in popovers.
+- vision-12: no change beyond vision-2.
+- vision-13: not taken. No document contradicts another (H already checks the row at 390px), so a test with "2 numbers to check" showing would be new scope.
+- vision-14: done, as a contradiction: the status line and the phone bar would overlap. G gives the status line the class `xe-status`, L lifts it above the bar on a phone and tests it, and 0026 says so.
+- vision-15: not taken. 0028's "one line on what it suits" is what `MENU_LINES` are, so nothing contradicts. The seven menu lines are new words, not yet in question 7.
+- vision-16: done. 0026's wording for `DESIGN.md`: the flowchart section is carried with a line; a box inside it is carried with a line by default, which Rory has not yet confirmed (`FLOW_BOX_STYLE`, question 1).
+- vision-17: not taken here, as no document contradicts another. Before release 3, Rory could try the new editor's drag beside `/lab/editor`, which stays on the preview site until release 5.
+
+**Cold read of the release 2 briefs**
+- cold-1 (must-fix): done. `editorKind()` lives in a new `lib/editor-kind.ts` whose first line is `import "server-only"`, and `lib/site.ts` is left alone. Changed in E (step 9, with a check in `next dev`, since `tsc` misses this), A, G, P, 0026, 0027, the kill switch section and the ownership tables.
+- cold-2 (must-fix): done, with the shape provisional. B's step 2b writes `FORMAT_COPY`'s new fields (`quote`, `skills`, `refs`, `inLayout`), today's literals for the three layouts, and `FORMAT_LIMITS` for all seven. The block is word for word in B and C, and B reports the final type with milestone 1. 0028 says so.
+- cold-3: done. `POST /dev/parity` takes `{ username, slug, doc, working?, publishedAt?, plan?, extraFiles? }`, with plan `max` by default and `publishedAt` set through `memorySnapshot()`, and returns `files`. B, E and the data-safety test use it.
+- cold-4: done. B, E and G's `openDoc` sign in with `/auth/dev?email=…` after seeding, and never call `signInAs` or `/dev/portfolio`, which clear the seeded exhbt.
+- cold-5: done. A pure `readAiVersion(raw)` in `lib/exhbt/draft-blocks.ts`, which `loadAiVersion` calls and the model test checks. The real round trip goes through `/dev/parity`'s `aiVersion` in `e2e/data-safety.spec.ts`.
+- cold-6: done. `e2e/auto-figure.spec.ts` (line 143: iterate `OFFERED_FORMATS`) is in B's named fixes and the README's B row.
+- cold-7: done. `Need` gains `{ need: "results"; message: string }` in every copy (B, D, E, M). Research's figure cap stays a check of its own, in today's order of messages.
+- cold-8: done. B's milestone 1 is steps 1 to 5, 2b and 6a, with step 1 pushed in four parts and the golden files pushed before any product code. Milestone 2 starts with `restoreFlow`, which E waits for. The agents table, C and E say so.
+- cold-9: done. `BlockOption.name` is the noun in the layout's own words; the reasons name the layout with `FORMAT_COPY[f].inLayout`; `insertBlock(doc, "flow", at)` is `restoreFlow(doc, at)`, or null when the flowchart is on the page.
+- cold-10: done. E's switch spec reads `editor` from the JSON body whatever the status, and may add `?only=editor`. The preview check above reads the body too.
+- cold-11: done. B writes the expected runs by hand from `runsOf`, and rebuilds the five and six box docs from `app/dev/portfolio/route.ts`. 0027's fixture list says where they come from.
+- cold-12: done. E starts after C's part 1 and B's `restoreFlow`, in its brief and in the agents table; "B's milestone 2 for C" is gone from the line on late arrivals.
+- cold-13: done. B's step 2 notes `Widen` and booleans, the pull quote in `oneOf`, and narrowing with `isContent`.
+- cold-14: done. B copies the old per-kind schemas from the base commit and builds the old union from the copies, beside `normaliseDoc` and `FORMATS`.
+- cold-15: done. C step 3: a lone flowchart is drawn as `ctx.format`'s page draws it today, checked by the "gallery with no findings" and "research with no figure" fixtures.
+- cold-16: done. D seeds with `plan=max`.
+- cold-17: done. The golden boxes are compared only in the environment that wrote them, the agents' sandbox Chromium, and the main session's later re-run uses that sandbox. In CI the spec compares markup only. 0027, B, C and this README.
+
+**Found while revising**
+- C's slot harness drew `skills` as an empty element, while its box test compared each pill. It now draws the pills and the "Add a skill" box.
+- The link's "Web address" slot is now `where: "over"`, so `"below"` means only an image's description, in the flow. C, J, the plug table and the `ExtraSlot` comment agree.
