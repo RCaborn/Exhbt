@@ -200,7 +200,7 @@ Commit and push after each. Buttons are Astryx Buttons through `components/ui/Bu
 6. **See as a visitor.** A button with `aria-pressed`, calling `ui.setVisitor`.
 7. **The save status.** `role="status"`: "Saved" or "Saving…". On an error: a button, "Not saved. Retry" (`useSave().flush()`), and "Kept in this browser." with the reason. When the error is G's "The editor was updated. Reload to carry on; your changes are kept in this browser.", show those words and a "Reload" button (`location.reload()`) in place of Retry.
 8. **Card and link details**: a button, `ui.open("card")`.
-9. **The menu** at the end: "Reorder sections" (`ui.open("reorder")`, L's sheet: on a tablet or with a keyboard it is the quick way to reorder), "Unpublish" (only when live; the existing `ConfirmAction` with `unpublishExhbt`), "Delete this exhbt" (`ConfirmAction` with `deleteExhbt`), and "Use the classic editor": wait for `useSave().flush()`, then go to the same address with `?editor=classic`.
+9. **The menu** at the end: "Reorder sections" (`ui.open("reorder")`, L's sheet), only under `(pointer: coarse)`, a phone or a tablet, where a long drag is hard (not with a mouse and keyboard, where the grip, Move up and Move down do it and the page stays the one way to arrange sections: 0026), "Unpublish" (only when live; the existing `ConfirmAction` with `unpublishExhbt`), "Delete this exhbt" (`ConfirmAction` with `deleteExhbt`), and "Use the classic editor": wait for `useSave().flush()`, then go to the same address with `?editor=classic`.
 
 ## Tests
 
@@ -214,6 +214,7 @@ Commit and push after each. Buttons are Astryx Buttons through `components/ui/Bu
 - "See as a visitor" shows a region named "Preview" with no fields in it, and pressing again brings the fields back;
 - "Saving…" then "Saved" after a change;
 - "Use the classic editor" lands on `[data-editor="classic"]` with the change made just before it saved;
+- on the desktop project the menu has no "Reorder sections" (L's tablet test checks it is there on a tablet);
 - at 390px wide the row does not scroll sideways and every control is at least 44px;
 - axe with each panel open.
 

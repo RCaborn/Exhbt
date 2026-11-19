@@ -35,7 +35,7 @@ Commit and push after each.
    - beside Essay's key points and pull quote pair, on each side;
    - along Event's image grid.
    And for each: dropped there, the stored order is the place shown.
-3. **Box for box** (`e2e/editor-inplace.spec.ts`): the four new samples, made `full`, in the Exhbt, Classic and Night looks, at 1440 and on a Pixel 7. Nothing may differ but the highlight's wrap.
+3. **Box for box** (`e2e/editor-inplace.spec.ts`): the four new samples, made `full`, in the Exhbt, Classic and Night looks, at 1440 and on a Pixel 7. Nothing may differ but what 0026 allows on a full page: the highlight's wrap and the entries of `EDIT_ONLY_IN_FLOW` that are always there (each image's description field, the "Add a skill" box), by name.
 4. Report how long each spec now takes: they are four times the matrix they were.
 
 ## Done looks like

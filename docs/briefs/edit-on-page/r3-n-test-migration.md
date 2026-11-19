@@ -34,7 +34,7 @@ The new editor's selectors, which its builders were told to keep exact:
 | What | How to find it |
 |---|---|
 | The editor, ready | `[data-editor="page"][data-ready=true]` (classic: `[data-editor="classic"]`) |
-| A field | `[data-path="<path>"]`, or by its name: `#title`, `#context`, `#whereWhen`, the textbox named "Context" (or "The brief", "Background"), "Box n", "Box n detail", "Finding n", "The quote, word for word", "Who said it", `#image-N-alt` (in the strip over the picture), `#summary` (in the card sheet). In a popover, open it first: "Web address" (the button "Web address: <label>" over the link), `#skill-new` ("Add a skill" on the skills' toolbar), the picked figure's tick (the label over the picture) |
+| A field | `[data-path="<path>"]`, or by its name: `#title`, `#context`, `#whereWhen`, the textbox named "Context" (or "The brief", "Background"), "Box n", "Box n detail", "Finding n", "The quote, word for word", "Who said it", `#image-N-alt` (under the picture and its caption, in the flow), `#skill-new` (the "Add a skill" box at the end of the pills, in the flow), the picked figure's tick (on the label over the picture while it is not ticked), `#summary` (in the card sheet). In a popover, open it first: "Web address" (the button "Web address: <label>" over the link, always shown), the picked figure's tick once it is ticked (the label over the picture) |
 | A section | `[data-section-id="<id>"]`, with `data-kind`; its buttons "Drag <label> to move it", "Move <label> up", "Move <label> down", "Remove <label>" |
 | The "+" at the end | `#add-section`; the words left: `data-testid="words-left"` |
 | The page being edited | `article[data-exhbt-page]`, `article[data-format]`, `[data-part]` |
