@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useRef } from "react";
 import { saveDraft } from "@/app/(app)/exhbts/[id]/actions";
 import { useAutosave, type SaveResult } from "@/components/editor/useAutosave";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
@@ -35,11 +35,16 @@ async function send(id: string, doc: ExhbtDoc): Promise<SaveResult> {
   }
 }
 
+/** Development only: a save in place of the server action (the timing harness, app/dev/editor-timing, saves nothing). */
+export const SaveOverride = createContext<((doc: ExhbtDoc) => Promise<SaveResult>) | null>(null);
+
 export function Autosave() {
+  const override = useContext(SaveOverride);
   const { env, save } = useRuntime();
+  const saveDoc = (d: ExhbtDoc) => (override ? override(d) : send(env.id, d));
   const files = useFilesController();
   const doc = useDoc((d) => d);
-  const a = useAutosave({ id: env.id, doc, initial: env.initialDoc, save: (d) => send(env.id, d),
+  const a = useAutosave({ id: env.id, doc, initial: env.initialDoc, save: saveDoc,
     // The server has it: noted for the crash fallback, and the rule that deletes files runs.
     onSavedDoc: (d) => {
       noteSaved(d);
@@ -64,10 +69,10 @@ export function Autosave() {
   useEffect(
     () =>
       registerSender({
-        send: async (d) => (await send(env.id, d)).ok,
+        send: async (d) => (await (override ? override(d) : send(env.id, d))).ok,
         settled: () => latest.current.settled(),
       }),
-    [env.id],
+    [env.id, override],
   );
   return null;
 }
