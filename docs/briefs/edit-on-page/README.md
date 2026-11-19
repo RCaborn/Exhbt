@@ -48,7 +48,7 @@ At most two heavy agents (Fable or Opus) run at once. Sonnet agents may run besi
 | I | `r3-i-sheets.md` | Sonnet | `phase-2-r3-i-sheets` | 3309 | G's first milestone is merged |
 | J | `r3-j-figures-and-images.md` | Opus | `phase-2-r3-j-figures` | 3310 | G's first milestone is merged |
 | L | `r3-l-phone.md` | Opus | `phase-2-r3-l-phone` | 3312 | G's first milestone is merged; its touch-drag checks need F |
-| N | `r3-n-test-migration.md` | Sonnet | `phase-2-r3-n-tests-1`, `-2` | 3314, 3315 | `phase-2-e2e-page-object` is merged, and F to L are merged |
+| N | `r3-n-test-migration.md` | Sonnet | `phase-2-r3-n-tests-1`, `-2` | 3314, 3315 | `phase-2-e2e-page-object` is merged, and F to L are merged. Two agents: list 1 first (it owns the page object), list 2 when list 1's first milestone is merged |
 | M | `r4-m-ai-and-layouts.md` | Opus | `phase-2-r4-m-ai` | 3313 | Release 3 is live; D's numbers are in; the GitHub secret `ANTHROPIC_API_KEY` is set |
 | P | `r5-p-remove-classic.md` | Sonnet | `phase-2-r5-p-remove` | 3316 | Release 4 is live and Rory agrees |
 
@@ -75,16 +75,17 @@ D may not edit `app/globals.css`. If a sample will not fit, D reports the number
 
 | Agent | Owns |
 |---|---|
-| G | `components/exhbt-editor/` as first made, then everything in it that is not handed over below; `lib/site.ts`; `app/(app)/exhbts/[id]/edit/page.tsx`; `app/api/health/route.ts`; `app/dev/editor/` (new); `playwright.config.ts`; `e2e/page-editor.ts` (new); `e2e/editor-inplace.spec.ts`, `e2e/editor-smooth.spec.ts`, `e2e/editor-classic.spec.ts` (new); the page parts for slot fixes only (`components/portfolio/ProjectView.tsx`, `exhbt-parts.tsx`, `LayoutMain.tsx`, `layout-rows.ts`, `page-ctx.ts`); the editor paragraphs of `DESIGN.md`, `docs/MAP.md`, `HANDOFF.md`, `AGENTS.md` |
+| G | `components/exhbt-editor/` as first made, then everything in it that is not handed over below; `lib/site.ts`; `app/(app)/exhbts/[id]/edit/page.tsx`; `app/api/health/route.ts`; `app/dev/editor/` (new); `playwright.config.ts`; `e2e/page-editor.ts` (new); `e2e/editor-inplace.spec.ts`, `e2e/editor-smooth.spec.ts`, `e2e/editor-classic.spec.ts` (new); `DESIGN.md`'s and the other docs' editor paragraphs; the page parts for slot fixes only (`components/portfolio/ProjectView.tsx`, `exhbt-parts.tsx`, `LayoutMain.tsx`, `layout-rows.ts`, `page-ctx.ts`) |
 | F | `components/exhbt-editor/drag/`, `components/exhbt-editor/Insert.tsx`, `components/exhbt-editor/Tray.tsx`, `components/exhbt-editor/css/drag.css`, `e2e/editor-drag.spec.ts` (new), `scripts/editor-timing.mjs` (new) |
 | K | `components/exhbt-editor/flow/`, `components/exhbt-editor/css/flow.css`, `components/exhbt/MethodFlow.tsx`, `e2e/editor-flow.spec.ts` (new) |
 | H | `components/exhbt-editor/topbar/`, `components/exhbt-editor/css/topbar.css`, `e2e/editor-topbar.spec.ts` (new) |
 | I | `components/exhbt-editor/sheets/`, `components/exhbt-editor/css/sheets.css`, `e2e/editor-sheets.spec.ts` (new) |
-| J | `components/exhbt-editor/figures/`, `components/exhbt-editor/css/figures.css`, `app/(app)/exhbts/[id]/figure-actions.ts` (new), `app/api/exhbts/[id]/figure/route.ts`, `lib/exhbt/draft-blocks.ts` (the `graphs` field only), `e2e/editor-figures.spec.ts` (new) |
+| J | `components/exhbt-editor/figures/`, `components/exhbt-editor/css/figures.css`, `app/(app)/exhbts/[id]/figure-actions.ts` (new), `app/api/exhbts/[id]/figure/route.ts`, `lib/exhbt/draft-blocks.ts` (the `graphs` field only), `components/editor/PickedFigure.tsx` and `ChartEditor.tsx` (adding the word `export` only), `e2e/editor-figures.spec.ts` (new) |
 | L | `components/exhbt-editor/phone/`, `components/exhbt-editor/css/phone.css`, `e2e/editor-phone.spec.ts` (new) |
-| N | `e2e/editor.ts`, `e2e/editor-classic-helpers.ts` (new), and the existing specs in its brief's two lists |
+| N, list 1 | `e2e/editor.ts`, `e2e/editor-classic-helpers.ts` (new), and the specs in its brief's first list |
+| N, list 2 | the specs in the brief's second list. It does not edit `e2e/editor.ts` |
 
-Frozen in release 3 (nobody edits them): `components/editor/` (the classic editor and the parts the new one reuses), `lib/exhbt/` apart from J's one field, `app/globals.css`. The new editor's CSS lives in `components/exhbt-editor/css/`, one file per owner, each imported by its owner's own component.
+Frozen in release 3 (nobody edits them): `components/editor/` (the classic editor and the parts the new one reuses) apart from J's added exports, `lib/exhbt/` apart from J's one field, `app/globals.css`. The new editor's CSS lives in `components/exhbt-editor/css/`, one file per owner, each imported by its owner's own component.
 
 A slot the page parts lack is G's to add. Another agent that needs one says so in its report; the main session passes it to G.
 
@@ -93,7 +94,7 @@ A slot the page parts lack is G's to add. Another agent that needs one says so i
 | Agent | Owns |
 |---|---|
 | M | `lib/ai/exhbt-draft.ts`, `lib/exhbt/drafted.ts`, `lib/exhbt/references.ts`, `lib/exhbt/formats.ts` (`OFFERED_FORMATS` and wording), `app/api/exhbts/draft/route.ts`, `evals/exhbt-draft/`, `scripts/eval-drafts.ts`, `components/exhbt-editor/topbar/LayoutMenu.tsx`, `e2e/layouts-new.spec.ts`, the layout lines of `AGENTS.md` and `docs/MAP.md` |
-| P | What it deletes in `components/editor/`, `lib/site.ts`, `app/(app)/exhbts/[id]/edit/page.tsx`, `app/dev/editor/`, `e2e/editor-classic.spec.ts`, `e2e/editor-classic-helpers.ts`, `e2e/editor-classic-keeps.spec.ts`, and the docs that mention the classic editor |
+| P | `components/editor/` (what it deletes), `lib/site.ts`, `app/(app)/exhbts/[id]/edit/page.tsx`, `app/dev/editor/`, `app/api/health/route.ts`, the fallback in `components/exhbt-editor/EditorShell.tsx` and the menu item in `topbar/`, `e2e/editor-classic.spec.ts`, `e2e/editor-classic-helpers.ts`, `e2e/editor-classic-keeps.spec.ts`, and the docs that mention the classic editor |
 
 ## Rules for every agent
 
