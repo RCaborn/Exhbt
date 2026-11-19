@@ -639,7 +639,7 @@ export function Editor(props: EditorProps) {
               <FieldIssues id="gap-issues" issues={issuesAt(issues, "gap")} />
             </Card>
 
-            <Card id="card-flow" title={copy.flow} words={cw.flow} hint="How you did it, as a flowchart. Type in the boxes. Every exhbt has one." flagged={flaggedBy("flow")} heaviest={heaviest === "flow"}>
+            <Card id="card-flow" title={copy.flow} words={cw.flow} hint={flowOff ? "How you did it, as a flowchart. Its boxes are kept while it is off the page." : "How you did it, as a flowchart. Type in the boxes. Every exhbt has one."} flagged={flaggedBy("flow")} heaviest={heaviest === "flow"}>
               <BlockTools dt={dt} block="flow" />
               {flowOff && (
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-[10px] bg-mist px-3 py-2 text-sm text-graphite" data-flow-off>
