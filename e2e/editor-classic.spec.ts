@@ -152,6 +152,23 @@ test.describe("the crash fallback", () => {
     expect(logged.some((l) => l.includes("The new editor failed"))).toBe(true);
   });
 
+  test("a throw after the first change (?crash=change) ends in the classic editor with the words typed before it, stored and in its fields", async ({ page }) => {
+    const { edit } = await seed(page, "change");
+    const shown = await watchNotice(page);
+    await page.goto(`${edit}?crash=change`);
+    await expect(page.locator(NEW_READY)).toBeAttached();
+    // One change: the whole title at once, as a paste would put it.
+    await page.locator(`${NEW_READY} #title`).fill("Shorter queues at lunch");
+    await expect(page.locator(CLASSIC_READY)).toBeAttached();
+    await expect.poll(() => shown).toEqual([NOTICE]);
+    expect(new URL(page.url()).searchParams.get("editor")).toBe("classic");
+    // The newest doc was sent before the reload (flushPending), so the server has the words, and the classic editor shows them.
+    const id = edit.split("/")[2]!;
+    const stored = (await (await page.request.get(`/dev/parity?id=${id}`)).json()) as { working: ExhbtDoc };
+    expect(stored.working.title).toBe("Shorter queues at lunch");
+    await expect(page.locator(`${CLASSIC} #title`)).toHaveValue("Shorter queues at lunch");
+  });
+
   test("a crash straight after a draft opens the classic editor for the rest of the visit", async ({ page }) => {
     const { edit } = await seed(page, "drafted");
     await page.goto(`${edit}?drafted=case-study&why=default&crash=render`);
