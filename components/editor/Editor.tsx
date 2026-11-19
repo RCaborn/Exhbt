@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/Button";
 import { CopyLink } from "@/components/ui/CopyLink";
 import type { Plan } from "@/lib/entitlements";
 import { formatLimits, LIMITS, normaliseDoc, safeHref, validateForPublish, wordCount, type ExhbtDoc, type Picked } from "@/lib/exhbt/blocks";
-import { FORMAT_COPY, formatOf } from "@/lib/exhbt/formats";
+import { flowShown, FORMAT_COPY, formatOf } from "@/lib/exhbt/formats";
+import { isArranged, restoreFlow } from "@/lib/exhbt/layouts";
 import { hasData } from "@/lib/exhbt/charts";
 import { newImageSection, roomFor } from "@/lib/exhbt/sections";
 import { LayoutPicker, type Drafted } from "./LayoutPicker";
@@ -372,7 +373,10 @@ export function Editor(props: EditorProps) {
     sections: doc.sections.filter((s) => s.kind !== "graph" || hasData(s.chart)),
   };
   const liveUrl = liveBase && slug ? `${liveBase}/${slug}` : null;
-  const arrangeable = f === "case-study" && doc.sections.length > 1;
+  const arrangeable = f === "case-study" && doc.sections.length > 1 && !isArranged(doc);
+  const flowOff = !flowShown(doc);
+  // "My role" is shown only where a doc already has one, or in an event: release 2 offers nobody a new field.
+  const showMyRole = doc.myRole !== undefined || f === "event";
   const justLiveUrl = liveBase && justLive ? `${liveBase}/${justLive.slug}` : null;
   const shownLive = canGoLive && status === "published";
 
@@ -557,7 +561,7 @@ export function Editor(props: EditorProps) {
                   multiline
                   placeholder="What you found, in one sentence. Shown on your portfolio's cards."
                 />
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className={`grid gap-4 ${showMyRole ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
                   <TextInput id="context" label="What it is" value={doc.context} max={LIMITS.contextChars} onChange={(context) => update({ context })} issues={issuesAt(issues, "context")} placeholder="e.g. MSc Finance dissertation" />
                   <TextInput
                     id="whereWhen"
@@ -568,6 +572,17 @@ export function Editor(props: EditorProps) {
                     issues={issuesAt(issues, "whereWhen")}
                     placeholder="e.g. University of Leeds, May 2026"
                   />
+                  {showMyRole && (
+                    <TextInput
+                      id="myRole"
+                      label="My role (optional)"
+                      value={doc.myRole ?? ""}
+                      max={LIMITS.myRoleChars}
+                      onChange={(myRole) => update({ myRole })}
+                      issues={issuesAt(issues, "myRole")}
+                      placeholder="e.g. Producer"
+                    />
+                  )}
                 </div>
                 <fieldset>
                   <legend className="label">
@@ -626,6 +641,14 @@ export function Editor(props: EditorProps) {
 
             <Card id="card-flow" title={copy.flow} words={cw.flow} hint="How you did it, as a flowchart. Type in the boxes. Every exhbt has one." flagged={flaggedBy("flow")} heaviest={heaviest === "flow"}>
               <BlockTools dt={dt} block="flow" />
+              {flowOff && (
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-[10px] bg-mist px-3 py-2 text-sm text-graphite" data-flow-off>
+                  <p>The flowchart is off the page.</p>
+                  <Button size="sm" label="Put the flowchart back" onClick={() => setDoc((d) => restoreFlow(d))}>
+                    Put the flowchart back
+                  </Button>
+                </div>
+              )}
               <FlowEditor steps={doc.flow} onChange={(flow) => update({ flow })} issues={issues} />
               <FieldIssues id="flow-issues" issues={issuesAt(issues, "flow")} />
             </Card>

@@ -91,13 +91,13 @@ export function LayoutPicker({ doc, setDoc, drafted }: { doc: ExhbtDoc; setDoc: 
         </legend>
         <p className="hint mt-1">How the page reads. Switching never deletes anything.</p>
         <div ref={group} role="radiogroup" aria-label="Layout" className="mt-4 space-y-2">
-          {OFFERED_FORMATS.map((k) => {
+          {(OFFERED_FORMATS.includes(f) ? OFFERED_FORMATS : [...OFFERED_FORMATS, f]).map((k) => {
             const hint = `${name}-${k}`;
             return (
               <label key={k} className="flex cursor-pointer items-center gap-3 rounded-[12px] border border-line p-3 has-[:checked]:border-ink has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink">
                 <input type="radio" name={name} value={k} checked={f === k} onChange={() => choose(k)} aria-describedby={hint} className="size-4 shrink-0 accent-jade" />
                 <svg aria-hidden width="56" height="40" viewBox="0 0 56 40" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0 text-graphite">
-                  {SKETCHES[k]}
+                  {SKETCHES[k] ?? SKETCHES["case-study"]}
                 </svg>
                 <span className="min-w-0">
                   <span className="block font-semibold">{FORMAT_RULES[k].name}</span>
