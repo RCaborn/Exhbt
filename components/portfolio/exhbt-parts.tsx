@@ -1,25 +1,72 @@
 /* eslint-disable @next/next/no-img-element -- signed Storage URLs; see Avatar.tsx. */
 import { ArrowUpRight } from "lucide-react";
 import { Chart } from "@/components/charts/Chart";
+import { MethodFlow } from "@/components/exhbt/MethodFlow";
 import { RichText } from "@/components/exhbt/RichText";
 import { ImageZoom } from "@/components/portfolio/ImageZoom";
-import { safeHref, type Section, type SectionOf } from "@/lib/exhbt/blocks";
+import { safeHref, type FlowStep, type Section, type SectionOf } from "@/lib/exhbt/blocks";
 import { FORMAT_COPY, type Format } from "@/lib/exhbt/formats";
-import { imageRatio } from "@/lib/exhbt/sections";
-import type { ImageUrls, Sub } from "./page-ctx";
+import type { ItemAs } from "@/lib/exhbt/layouts";
+import { imageRatio, leadRatio } from "@/lib/exhbt/sections";
+import type { ImageUrls, PageCtx, Sub } from "./page-ctx";
 
 /**
- * The parts of an exhbt page that more than one layout draws (decision 0024): the findings, a
- * figure and any one section on its own. The case study's page (ProjectView) and the gallery and
- * research pages (components/portfolio/formats/) share them. Server-safe, no hooks. Their
- * defaults are the case study's, so its output is as it was.
+ * The parts of an exhbt page (decisions 0022, 0024 and 0027): the findings, a figure, any one
+ * section on its own, the flowchart's section, and the drawings particular to a layout (the
+ * gallery's lead image and tiles, research's key figure, its stacked aim and closing blocks, a
+ * reference in its list). LayoutMain (the one renderer) draws every layout with them; the classic
+ * editor's arrange preview draws SectionBlock. Server-safe, no hooks. Their defaults are the case
+ * study's, so a call with no options draws what the case study always drew.
+ *
+ * Each part takes an optional `ctx` (components/portfolio/page-ctx.ts) and `at`, its index in
+ * doc.sections. On a public page `ctx.edit` is absent and the part's markup is exactly what it was.
+ * With `ctx.edit` (the edit-on-page editor, decision 0026) every text is a slot at its issue path,
+ * an empty part is drawn with its field so its placeholder shows, nothing is a link or opens larger,
+ * and the edit-only controls are slots called as the last child of a box that is `relative` in
+ * edit mode only, so what the adapter returns sits over the part and takes no room.
  */
 
 /** Defined in page-ctx.ts; re-exported here, where they were first, so older imports keep working. */
 export type { ImageUrls, Sub };
 
+const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
+/** A box the editor draws its controls over: positioned in edit mode only, so the public page's markup is unchanged. */
+const rel = (ctx?: PageCtx) => (ctx?.edit ? "relative" : "");
+/** The field paths of a section's parts, as validateForPublish reports them. */
+const p = (at: number | undefined, field: string) => `sections.${at ?? -1}.${field}`;
+/** The first sentence of a hint, as a short placeholder on the page. */
+export const firstSentence = (s: string) => s.match(/^[^.?!]*[.?!]/)?.[0] ?? s;
+
 /** A heading over a rule, then the findings as a ruled list. "What I found", "What happened" or "Results". */
-export function Findings({ s, Sub, heading = "What I found", part = "findings", kicker = false }: { s: SectionOf<"findings">; Sub: Sub; heading?: string; part?: string; /** The small label heading (research's row of Results, Conclusion and Limitations all use it) instead of the large ruled one. */ kicker?: boolean }) {
+const FINDING = "xp-finding border-b py-3.5 text-[0.9375rem] leading-relaxed last:border-b-0 print:py-1 print:text-[0.9rem] print:leading-snug";
+/**
+ * In edit mode the list's last child is "Add a finding" (the adapter's list slot), so the last finding is no
+ * longer :last-child; this keeps its bottom rule off, as on the page.
+ */
+const LAST_FINDING_EDIT = "[&:nth-last-child(1_of_.xp-finding)]:border-b-0";
+
+export function Findings({
+  s,
+  Sub,
+  heading = "What I found",
+  part = "findings",
+  kicker = false,
+  ctx,
+  at,
+}: {
+  s: SectionOf<"findings">;
+  Sub: Sub;
+  heading?: string;
+  part?: string;
+  /** The small label heading (research's row of Results, Conclusion and Limitations all use it) instead of the large ruled one. */
+  kicker?: boolean;
+  ctx?: PageCtx;
+  /** Its index in doc.sections, for the field paths in edit mode. */
+  at?: number;
+}) {
+  const edit = ctx?.edit;
+  const n = s.items.length;
+  const path = p(at, "items");
   return (
     <section aria-labelledby={`${s.id}-h`} data-part={part} className="min-w-0 break-inside-avoid">
       {kicker ? (
@@ -31,133 +78,459 @@ export function Findings({ s, Sub, heading = "What I found", part = "findings", 
           {heading}
         </Sub>
       )}
-      <ul className={kicker ? "mt-1" : undefined}>
-        {s.items.map((f, i) => (
-          <li key={i} className="xp-finding border-b py-3.5 text-[0.9375rem] leading-relaxed last:border-b-0 print:py-1 print:text-[0.9rem] print:leading-snug">
-            <RichText value={f} />
-          </li>
-        ))}
+      <ul className={edit ? cx(kicker && "mt-1", "relative") : kicker ? "mt-1" : undefined}>
+        {s.items.map((f, i) =>
+          edit ? (
+            <li key={i} className={cx(FINDING, "relative", LAST_FINDING_EDIT)}>
+              {edit.rich({ path: `${path}.${i}`, value: f, label: `Finding ${i + 1}`, placeholder: "A finding, in one sentence", className: "" })}
+              {edit.list({ path, index: i, n })}
+            </li>
+          ) : (
+            <li key={i} className={FINDING}>
+              <RichText value={f} />
+            </li>
+          ),
+        )}
+        {edit?.list({ path, index: n, n })}
       </ul>
     </section>
   );
 }
+
+/** The figure's rounded picture corners: a step inside the card's own. */
+const PICTURE_RADIUS = "rounded-[max(0px,calc(var(--xp-radius-card)-8px))]";
+
+/**
+ * In edit mode: the picture as the page draws it, but still (it does not open larger), in a box that
+ * is positioned so the adapter's "above" slot (the picked-figure label) sits over it. `box` is the
+ * class of the element the page wraps the picture in (ImageZoom's button, minus what makes it a
+ * button); a picture with no address yet is a quiet box of the picture's shape.
+ */
+function StillPicture({ s, src, box, img, imgStyle, ctx }: { s: SectionOf<"image">; src: string | null | undefined; box: string; img: string; imgStyle?: React.CSSProperties; ctx: PageCtx }) {
+  return (
+    <span className={cx("relative block", box)}>
+      {src ? (
+        <img src={src} alt={s.alt} width={s.w} height={s.h} decoding="async" className={img} style={imgStyle} />
+      ) : (
+        <span aria-hidden className={cx("block w-full", PICTURE_RADIUS)} style={{ aspectRatio: imageRatio(s), background: "var(--xp-card)" }} />
+      )}
+      {ctx.edit!.extra({ sectionId: s.id, kind: "image", where: "above" })}
+    </span>
+  );
+}
+
+/** An image's caption: drawn when it has runs; in edit mode always, as a field. */
+function Caption({ s, className, ctx, at }: { s: SectionOf<"image">; className: string; ctx?: PageCtx; at?: number }) {
+  const edit = ctx?.edit;
+  if (edit) {
+    return (
+      <figcaption className={className}>
+        {edit.rich({ path: p(at, "caption"), value: s.caption, label: "Image caption", placeholder: "Add a caption (optional)", className: "" })}
+      </figcaption>
+    );
+  }
+  return s.caption.length > 0 ? (
+    <figcaption className={className}>
+      <RichText value={s.caption} />
+    </figcaption>
+  ) : null;
+}
+
+/** In edit mode: the image's description field, in the flow under the picture and its caption (decision 0026). */
+const Below = ({ s, ctx }: { s: SectionOf<"image">; ctx?: PageCtx }) => <>{ctx?.edit?.extra({ sectionId: s.id, kind: "image", where: "below" })}</>;
 
 /**
  * A graph or an image in its card: the key chart beside the findings, or on its own. With `zoom`
  * an image opens larger in a dialog (gallery and research). With `big` an image is roomier: the
  * research poster's key figure, never cropped, at most 34rem tall (80mm in print).
  */
-export function Figure({ s, imageUrls, zoom = false, big = false }: { s: SectionOf<"graph"> | SectionOf<"image">; imageUrls: ImageUrls; zoom?: boolean; big?: boolean }) {
+export function Figure({
+  s,
+  imageUrls,
+  zoom = false,
+  big = false,
+  ctx,
+  at,
+}: {
+  s: SectionOf<"graph"> | SectionOf<"image">;
+  imageUrls: ImageUrls;
+  zoom?: boolean;
+  big?: boolean;
+  ctx?: PageCtx;
+  /** Its index in doc.sections, for the field paths in edit mode. */
+  at?: number;
+}) {
+  const edit = ctx?.edit;
   if (s.kind === "graph") {
     return (
-      <div className="xp-figure min-w-0 break-inside-avoid p-5 print:p-3" data-part="graph">
+      <div className={cx("xp-figure min-w-0 break-inside-avoid p-5 print:p-3", rel(ctx))} data-part="graph">
         <Chart data={s.chart} />
+        {edit?.extra({ sectionId: s.id, kind: "graph", where: "over" })}
       </div>
     );
   }
   const src = imageUrls[s.fileId];
-  if (!src) return null;
-  const radius = "rounded-[max(0px,calc(var(--xp-radius-card)-8px))]";
+  if (!src && !edit) return null;
+  // An image stored before sizes were kept has none: reserve a 4:3 box (uncropped), so the page doesn't jump as it loads.
+  const sized = !s.w || !s.h ? { aspectRatio: imageRatio(s), width: "100%" } : undefined;
+  const zoomImg = `mx-auto h-auto max-h-[34rem] w-auto max-w-full object-contain ${PICTURE_RADIUS} ${big ? "print:max-h-[68mm]" : "print:max-h-[34mm]"}`;
+  const plainImg = `w-full ${PICTURE_RADIUS} print:max-h-[62mm] print:w-auto`;
   return (
     <figure className={`xp-figure m-0 min-w-0 break-inside-avoid ${big ? "p-5" : "p-4"} print:p-3`} data-part="image">
-      {zoom ? (
-        <ImageZoom
-          src={src}
-          alt={s.alt}
-          caption={s.caption}
-          w={s.w}
-          h={s.h}
-          className="mx-auto w-full cursor-zoom-in"
-          // An image stored before sizes were kept has none: reserve a 4:3 box (uncropped), so the page doesn't jump as it loads.
-          imgStyle={!s.w || !s.h ? { aspectRatio: imageRatio(s), width: "100%" } : undefined}
-          imgClassName={`mx-auto h-auto max-h-[34rem] w-auto max-w-full object-contain ${radius} ${big ? "print:max-h-[68mm]" : "print:max-h-[34mm]"}`}
-        />
+      {edit ? (
+        zoom ? (
+          <StillPicture s={s} src={src} box="mx-auto w-full" img={zoomImg} imgStyle={sized} ctx={ctx} />
+        ) : (
+          <StillPicture s={s} src={src} box="" img={plainImg} ctx={ctx} />
+        )
+      ) : zoom ? (
+        <ImageZoom src={src!} alt={s.alt} caption={s.caption} w={s.w} h={s.h} className="mx-auto w-full cursor-zoom-in" imgStyle={sized} imgClassName={zoomImg} />
       ) : (
-        <img src={src} alt={s.alt} width={s.w} height={s.h} className={`w-full ${radius} print:max-h-[62mm] print:w-auto`} />
+        <img src={src!} alt={s.alt} width={s.w} height={s.h} className={plainImg} />
       )}
-      {s.caption.length > 0 && (
-        <figcaption className="xp-muted mt-2.5 text-sm leading-snug">
-          <RichText value={s.caption} />
-        </figcaption>
-      )}
+      <Caption s={s} className="xp-muted mt-2.5 text-sm leading-snug" ctx={ctx} at={at} />
+      <Below s={s} ctx={ctx} />
     </figure>
   );
 }
 
-/** One section on its own, in the page's style: what a lone section is drawn as, and the editor's preview while arranging. */
-export function SectionBlock({ s, Sub, imageUrls, format = "case-study" }: { s: Section; Sub: Sub; imageUrls: ImageUrls; format?: Format }) {
-  const copy = FORMAT_COPY[format];
-  switch (s.kind) {
-    case "findings":
-      return (
-        <div className="xp-section">
-          <Findings s={s} Sub={Sub} heading={copy.findings} />
+/** The gallery's lead image, across the column: its frame has the picture's shape, never taller than 70% of the screen. */
+export function LeadImage({ s, imageUrls, rowClass, ctx, at }: { s: SectionOf<"image">; imageUrls: ImageUrls; rowClass: string; ctx?: PageCtx; at?: number }) {
+  const edit = ctx?.edit;
+  const src = imageUrls[s.fileId];
+  if (!src && !edit) return null;
+  return (
+    <section aria-label="Lead image" data-part="lead" className={rowClass || undefined}>
+      <figure className="xp-figure m-0 min-w-0 p-3 break-inside-avoid print:p-2">
+        <div className="xp-lead" style={{ aspectRatio: leadRatio(s) }}>
+          {edit ? (
+            <StillPicture s={s} src={src} box="h-full w-full" img="h-full w-full object-contain" ctx={ctx} />
+          ) : (
+            <ImageZoom src={src!} alt={s.alt} caption={s.caption} w={s.w} h={s.h} priority className="h-full w-full cursor-zoom-in" imgClassName="h-full w-full object-contain" />
+          )}
         </div>
-      );
+        <Caption s={s} className="xp-muted mt-2.5 px-1 text-sm leading-snug" ctx={ctx} at={at} />
+        <Below s={s} ctx={ctx} />
+      </figure>
+    </section>
+  );
+}
+
+/** One picture in the gallery's justified rows. Its cell (`li.xp-tile`, with the picture's shape as --r) is the row's, drawn by LayoutMain. */
+export function TileImage({ s, imageUrls, ctx, at }: { s: SectionOf<"image">; imageUrls: ImageUrls; ctx?: PageCtx; at?: number }) {
+  const edit = ctx?.edit;
+  const src = imageUrls[s.fileId];
+  if (!src && !edit) return null;
+  return (
+    <figure className="m-0">
+      {edit ? (
+        <StillPicture s={s} src={src} box="w-full" img="xp-tile-img" imgStyle={{ aspectRatio: "var(--r)" }} ctx={ctx} />
+      ) : (
+        <ImageZoom src={src!} alt={s.alt} caption={s.caption} w={s.w} h={s.h} className="w-full cursor-zoom-in" imgClassName="xp-tile-img" imgStyle={{ aspectRatio: "var(--r)" }} />
+      )}
+      <Caption s={s} className="xp-muted mt-1.5 text-[0.8125rem] leading-snug [overflow-wrap:anywhere] print:text-[0.75rem]" ctx={ctx} at={at} />
+      <Below s={s} ctx={ctx} />
+    </figure>
+  );
+}
+
+/** Research's key figure: the first graph or image, large, beside the aim and the method. */
+export function KeyFigure({ s, imageUrls, rowClass, ctx, at }: { s: SectionOf<"graph"> | SectionOf<"image">; imageUrls: ImageUrls; rowClass: string; ctx?: PageCtx; at?: number }) {
+  return (
+    <div data-part="key-figure" className={cx("min-w-0", rowClass)}>
+      <Figure s={s} imageUrls={imageUrls} zoom big ctx={ctx} at={at} />
+    </div>
+  );
+}
+
+/**
+ * The flowchart's section, as each layout draws it:
+ *  - a case study: the bare section, no heading (named "Process");
+ *  - research: "Method", a small label over the boxes as a column (it always sits in the method stack);
+ *  - the others: the layout's heading ("What I did") over a rule, the boxes a column when they sit
+ *    beside "What happened" (`as` "stacked") and a row that fits the room when on their own.
+ * `rowClass` is its place: on the section itself, or for a heading-and-boxes section on its own, on
+ * the grid today's gallery puts round it.
+ */
+export function FlowPart({ steps, as, rowClass = "", ctx }: { steps: FlowStep[]; as: ItemAs; rowClass?: string; ctx: PageCtx }) {
+  const { Sub, format } = ctx;
+  const copy = FORMAT_COPY[format];
+  if (format === "case-study") {
+    return (
+      <section aria-label={copy.flow} data-part="process" className={cx(rowClass, "break-inside-avoid")}>
+        <MethodFlow steps={steps} variant="page" ctx={ctx} />
+      </section>
+    );
+  }
+  if (format === "research") {
+    return (
+      <section aria-labelledby="method-h" data-part="process" className={cx("break-inside-avoid", rowClass)}>
+        <Sub id="method-h" className="xp-label">
+          {copy.flow}
+        </Sub>
+        <div className="mt-2">
+          <MethodFlow steps={steps} variant="page" stack ctx={ctx} />
+        </div>
+      </section>
+    );
+  }
+  const stacked = as === "stacked";
+  const did = (
+    <section aria-labelledby="did-h" data-part="did" className={cx("min-w-0 break-inside-avoid", stacked && rowClass)}>
+      <Sub id="did-h" className="xp-found-heading xp-display border-b pb-3 text-[1.5rem] leading-tight print:pb-1.5 print:text-[1.25rem]">
+        {copy.flow}
+      </Sub>
+      <div className="mt-4 print:mt-2">
+        <MethodFlow steps={steps} variant="page" stack={stacked} ctx={ctx} />
+      </div>
+    </section>
+  );
+  return !stacked && rowClass ? <div className={rowClass}>{did}</div> : did;
+}
+
+/** Research's aim or hypothesis, in the method stack: a ruled block over the method. */
+export function AimStacked({ s, rowClass = "", ctx, at }: { s: SectionOf<"aim">; rowClass?: string; ctx: PageCtx; at?: number }) {
+  const { Sub, edit } = ctx;
+  const heading = s.heading === "hypothesis" ? "Hypothesis" : "Aim";
+  const text = "mt-1.5 text-[1.0625rem] leading-relaxed";
+  return (
+    <section aria-labelledby={`${s.id}-h`} data-part="aim" className={cx("xp-quote break-inside-avoid border-l-[3px] pl-4", rowClass, rel(ctx))}>
+      <Sub id={`${s.id}-h`} className="xp-label">
+        {heading}
+      </Sub>
+      {edit ? (
+        edit.rich({ path: p(at, "text"), value: s.text, label: heading, placeholder: "What the study set out to find", className: text })
+      ) : (
+        <p className={text}>
+          <RichText value={s.text} />
+        </p>
+      )}
+      {edit?.extra({ sectionId: s.id, kind: "aim", where: "above" })}
+    </section>
+  );
+}
+
+/** Research's conclusion, or its limitations and next steps: a small heading over text, with a hairline above when it follows another (its `rowClass`). */
+export function ClosingBlock({ s, label, rowClass = "", ctx, at }: { s: SectionOf<"conclusion"> | SectionOf<"reflection">; label: string; rowClass?: string; ctx: PageCtx; at?: number }) {
+  const { Sub, edit } = ctx;
+  const text = "mt-1.5 text-[1.0625rem] leading-relaxed";
+  return (
+    <section aria-labelledby={`${s.id}-h`} data-part={s.kind} className={cx("break-inside-avoid", rowClass)}>
+      <Sub id={`${s.id}-h`} className="xp-label">
+        {label}
+      </Sub>
+      {edit ? (
+        edit.rich({ path: p(at, "text"), value: s.text, label, placeholder: s.kind === "conclusion" ? "What the study found, in a sentence or two" : FORMAT_COPY[ctx.format].reflectionPlaceholder, className: text })
+      ) : (
+        <p className={text}>
+          <RichText value={s.text} />
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
+ * A link drawn as one line of a list (research's references): what it is, linked when it has an
+ * address, and a line about it. Its line (`li`) is the list's, drawn by LayoutMain, so this is what
+ * goes inside it.
+ */
+export function RefLine({ s, ctx, at }: { s: SectionOf<"link">; ctx: PageCtx; at?: number }) {
+  const edit = ctx.edit;
+  const copy = FORMAT_COPY[ctx.format];
+  const href = safeHref(s.href);
+  if (edit) {
+    return (
+      <div className="relative">
+        {href ? (
+          <span className="xp-link inline-flex items-start gap-1.5 font-semibold">
+            <span>{edit.text({ path: p(at, "label"), value: s.label, label: "What the link is", placeholder: copy.link })}</span>
+            <ArrowUpRight aria-hidden size={16} strokeWidth={2.25} className="mt-0.5 shrink-0" />
+          </span>
+        ) : (
+          <span className="font-semibold">{edit.text({ path: p(at, "label"), value: s.label, label: "What the link is", placeholder: copy.link })}</span>
+        )}
+        <span className="xp-muted mt-0.5 block text-sm">{edit.text({ path: p(at, "description"), value: s.description, label: "One line about it (optional)", placeholder: "One line about it (optional)" })}</span>
+        {edit.extra({ sectionId: s.id, kind: "link", where: "over" })}
+      </div>
+    );
+  }
+  const label = s.label.trim() || copy.link;
+  return (
+    <>
+      {href ? (
+        <a href={href} rel="nofollow ugc noopener" target="_blank" className="xp-link inline-flex items-start gap-1.5 font-semibold">
+          <span>{label}</span>
+          <ArrowUpRight aria-hidden size={16} strokeWidth={2.25} className="mt-0.5 shrink-0" />
+        </a>
+      ) : (
+        <span className="font-semibold">{label}</span>
+      )}
+      {s.description.trim() && <span className="xp-muted mt-0.5 block text-sm">{s.description.trim()}</span>}
+    </>
+  );
+}
+
+/** One section on its own, in the page's style: what a lone section is drawn as, and the classic editor's preview while arranging. */
+export function SectionBlock({
+  s,
+  Sub,
+  imageUrls,
+  format = "case-study",
+  ctx,
+  at,
+}: {
+  s: Section;
+  Sub: Sub;
+  imageUrls: ImageUrls;
+  format?: Format;
+  ctx?: PageCtx;
+  /** Its index in doc.sections, for the field paths in edit mode. */
+  at?: number;
+}) {
+  return <PlainSection s={s} Sub={Sub} imageUrls={imageUrls} format={format} rowClass="xp-section" ctx={ctx} at={at} />;
+}
+
+/**
+ * A section on its own, with `rowClass` for its place on its root (`xp-section` between rows; the
+ * editor's frame carries it and the part is drawn with ""). The findings and a figure, which have no
+ * room for it on their own root, are wrapped in an element that carries it.
+ */
+export function PlainSection({
+  s,
+  Sub,
+  imageUrls,
+  format,
+  rowClass,
+  ctx,
+  at,
+}: {
+  s: Section;
+  Sub: Sub;
+  imageUrls: ImageUrls;
+  format: Format;
+  rowClass: string;
+  ctx?: PageCtx;
+  at?: number;
+}) {
+  const edit = ctx?.edit;
+  const copy = FORMAT_COPY[format];
+  const wrap = (node: React.ReactNode) => (rowClass ? <div className={rowClass}>{node}</div> : node);
+  switch (s.kind) {
+    case "flow":
+      return null;
+    case "findings":
+      return wrap(<Findings s={s} Sub={Sub} heading={copy.findings} ctx={ctx} at={at} />);
     case "graph":
     case "image":
-      return s.kind === "image" && !imageUrls[s.fileId] ? null : (
-        <div className="xp-section">
-          <Figure s={s} imageUrls={imageUrls} zoom={format !== "case-study"} />
-        </div>
-      );
-    case "quote":
+      return s.kind === "image" && !imageUrls[s.fileId] && !edit ? null : wrap(<Figure s={s} imageUrls={imageUrls} zoom={format !== "case-study"} ctx={ctx} at={at} />);
+    case "quote": {
+      const name = s.name.trim();
+      const role = s.role.trim();
       return (
-        <section aria-labelledby={`${s.id}-h`} data-part="quote" className="xp-section break-inside-avoid">
+        <section aria-labelledby={`${s.id}-h`} data-part="quote" className={cx(rowClass, "break-inside-avoid")}>
           <Sub id={`${s.id}-h`} className="xp-label">
-            Feedback
+            {copy.quote}
           </Sub>
           <figure className="xp-quote m-0 mt-2 border-l-[3px] pl-4">
-            <blockquote className="text-[1.125rem] leading-relaxed">“{s.text.trim()}”</blockquote>
-            {(s.name.trim() || s.role.trim()) && (
-              <figcaption className="xp-muted mt-1.5 text-sm">{[s.name.trim(), s.role.trim()].filter(Boolean).join(", ")}</figcaption>
+            {edit ? (
+              <>
+                <blockquote className="text-[1.125rem] leading-relaxed">
+                  “{edit.text({ path: p(at, "text"), value: s.text, label: "The quote, word for word", placeholder: "The quote, word for word" })}”
+                </blockquote>
+                <figcaption className="xp-muted mt-1.5 text-sm">
+                  {edit.text({ path: p(at, "name"), value: s.name, label: "Who said it", placeholder: "Who said it" })}
+                  {", "}
+                  {edit.text({ path: p(at, "role"), value: s.role, label: "Their role (optional)", placeholder: "Their role (optional)" })}
+                </figcaption>
+              </>
+            ) : (
+              <>
+                <blockquote className="text-[1.125rem] leading-relaxed">“{s.text.trim()}”</blockquote>
+                {(name || role) && <figcaption className="xp-muted mt-1.5 text-sm">{[name, role].filter(Boolean).join(", ")}</figcaption>}
+              </>
             )}
           </figure>
         </section>
       );
-    case "reflection":
+    }
+    case "reflection": {
+      const text = "mt-2 max-w-[42rem] text-[1.125rem] leading-relaxed";
       return (
-        <section aria-labelledby={`${s.id}-h`} data-part="reflection" className="xp-section xp-next break-inside-avoid border-t pt-6 print:pt-2">
+        <section aria-labelledby={`${s.id}-h`} data-part="reflection" className={cx(rowClass, "xp-next break-inside-avoid border-t pt-6 print:pt-2")}>
           <Sub id={`${s.id}-h`} className="xp-label">
             {copy.reflection}
           </Sub>
-          <p className="mt-2 max-w-[42rem] text-[1.125rem] leading-relaxed">
-            <RichText value={s.text} />
-          </p>
+          {edit ? (
+            edit.rich({ path: p(at, "text"), value: s.text, label: copy.reflection, placeholder: copy.reflectionPlaceholder, className: text })
+          ) : (
+            <p className={text}>
+              <RichText value={s.text} />
+            </p>
+          )}
         </section>
       );
+    }
     case "aim":
-    case "conclusion":
+    case "conclusion": {
       // Only research draws these; elsewhere they are kept but not shown (decision 0024).
       if (format !== "research") return null;
+      const heading = s.kind === "conclusion" ? "Conclusion" : s.heading === "hypothesis" ? "Hypothesis" : "Aim";
+      const text = "mt-2 max-w-[42rem] text-[1.125rem] leading-relaxed";
       return (
-        <section aria-labelledby={`${s.id}-h`} data-part={s.kind} className="xp-section break-inside-avoid">
+        <section aria-labelledby={`${s.id}-h`} data-part={s.kind} className={cx(rowClass, "break-inside-avoid", s.kind === "aim" && rel(ctx))}>
           <Sub id={`${s.id}-h`} className="xp-label">
-            {s.kind === "conclusion" ? "Conclusion" : s.heading === "hypothesis" ? "Hypothesis" : "Aim"}
+            {heading}
           </Sub>
-          <p className="mt-2 max-w-[42rem] text-[1.125rem] leading-relaxed">
-            <RichText value={s.text} />
-          </p>
+          {edit ? (
+            edit.rich({ path: p(at, "text"), value: s.text, label: heading, placeholder: `Your ${heading.toLowerCase()}`, className: text })
+          ) : (
+            <p className={text}>
+              <RichText value={s.text} />
+            </p>
+          )}
+          {s.kind === "aim" && edit?.extra({ sectionId: s.id, kind: "aim", where: "above" })}
         </section>
       );
+    }
     case "link": {
       const href = safeHref(s.href);
       const label = s.label.trim() || "Link";
       return (
-        <section aria-label={copy.link} data-part="link" className="xp-section break-inside-avoid">
-          <div className="xp-card px-5 py-4 print:px-3 print:py-2">
-            {href ? (
-              <a href={href} rel="nofollow ugc noopener" target="_blank" className="xp-link inline-flex items-center gap-1.5 font-semibold">
-                {label}
-                <ArrowUpRight aria-hidden size={16} strokeWidth={2.25} />
-              </a>
+        <section aria-label={copy.link} data-part="link" className={cx(rowClass, "break-inside-avoid")}>
+          <div className={cx("xp-card px-5 py-4 print:px-3 print:py-2", rel(ctx))}>
+            {edit ? (
+              <>
+                {href ? (
+                  <span className="xp-link inline-flex items-center gap-1.5 font-semibold">
+                    {edit.text({ path: p(at, "label"), value: s.label, label: "What the link is", placeholder: "What the link is" })}
+                    <ArrowUpRight aria-hidden size={16} strokeWidth={2.25} />
+                  </span>
+                ) : (
+                  <p className="font-semibold">{edit.text({ path: p(at, "label"), value: s.label, label: "What the link is", placeholder: "What the link is" })}</p>
+                )}
+                <p className="xp-muted mt-0.5 text-sm">{edit.text({ path: p(at, "description"), value: s.description, label: "One line about it (optional)", placeholder: "One line about it (optional)" })}</p>
+                {edit.extra({ sectionId: s.id, kind: "link", where: "over" })}
+              </>
             ) : (
-              <p className="font-semibold">{label}</p>
+              <>
+                {href ? (
+                  <a href={href} rel="nofollow ugc noopener" target="_blank" className="xp-link inline-flex items-center gap-1.5 font-semibold">
+                    {label}
+                    <ArrowUpRight aria-hidden size={16} strokeWidth={2.25} />
+                  </a>
+                ) : (
+                  <p className="font-semibold">{label}</p>
+                )}
+                {s.description.trim() && <p className="xp-muted mt-0.5 text-sm">{s.description.trim()}</p>}
+              </>
             )}
-            {s.description.trim() && <p className="xp-muted mt-0.5 text-sm">{s.description.trim()}</p>}
           </div>
         </section>
       );
     }
+    case "pullquote":
+      // Drawn by the essay layout (LayoutMain); no other layout shows it.
+      return null;
   }
 }
