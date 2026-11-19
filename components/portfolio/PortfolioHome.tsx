@@ -504,7 +504,7 @@ function Featured({ project: p, theme, anchors = true }: { project: HomeProject;
   const ids = anchors ? { id: "best-work", "aria-labelledby": "best-work-h" } : {};
   const band = theme.treatment.band;
   const inner = (
-    <div className={`grid items-center gap-x-12 gap-y-8 @3xl:grid-cols-2 ${band === "inset" ? "p-6 @3xl:p-12" : band === "ruled" ? "py-12 @3xl:py-16" : "py-14 @3xl:py-20"}`}>
+    <div className={`grid items-center gap-x-12 gap-y-8 ${hasFigure(p.figure) ? "@3xl:grid-cols-2" : ""} ${band === "inset" ? "p-6 @3xl:p-12" : band === "ruled" ? "py-12 @3xl:py-16" : "py-14 @3xl:py-20"}`}>
       <div className="min-w-0">
         <p className="text-[0.8125rem] font-semibold text-[color:var(--band-accent)]">My best piece of work</p>
         <h2 id={anchors ? "best-work-h" : undefined} className="pf-display mt-3 text-[clamp(1.85rem,4.4cqw,2.75rem)] leading-[1.08] text-[color:var(--band-text)] [letter-spacing:calc(var(--pf-tracking)*0.75)]">
@@ -519,11 +519,13 @@ function Featured({ project: p, theme, anchors = true }: { project: HomeProject;
           </p>
         </div>
       </div>
-      <div
-        className={`min-w-0 rounded-[var(--pf-radius-lg)] border-[length:var(--pf-edge-width)] border-[color:var(--pf-edge)] bg-[var(--pf-figure)] p-5 text-[color:var(--pf-ink)] @3xl:p-7 ${band === "bleed" ? "shadow-pack" : ""}`}
-      >
-        <Figure project={p} large />
-      </div>
+      {hasFigure(p.figure) && (
+        <div
+          className={`min-w-0 rounded-[var(--pf-radius-lg)] border-[length:var(--pf-edge-width)] border-[color:var(--pf-edge)] bg-[var(--pf-figure)] p-5 text-[color:var(--pf-ink)] @3xl:p-7 ${band === "bleed" ? "shadow-pack" : ""}`}
+        >
+          <Figure project={p} large />
+        </div>
+      )}
     </div>
   );
   if (band === "inset") {
@@ -615,11 +617,13 @@ export function ProjectCard({ project: p }: { project: HomeProject }) {
   const body = (
     <>
       {/* A graph sits on the look's figure ground (graphs never on a grey well, DESIGN.md); a picture or the steps on the well. */}
-      <div
-        className={`flex min-h-48 items-center justify-center border-b border-[color:var(--pf-line)] p-5 ${p.figure.kind === "chart" ? "bg-[var(--pf-figure)]" : "bg-[var(--pf-well)]"}`}
-      >
-        <Figure project={p} />
-      </div>
+      {hasFigure(p.figure) && (
+        <div
+          className={`flex min-h-48 items-center justify-center border-b border-[color:var(--pf-line)] p-5 ${p.figure.kind === "chart" ? "bg-[var(--pf-figure)]" : "bg-[var(--pf-well)]"}`}
+        >
+          <Figure project={p} />
+        </div>
+      )}
       <div className="p-5">
         <h3 className="pf-display text-[1.125rem] leading-snug [letter-spacing:calc(var(--pf-tracking)*0.3)]">{p.title}</h3>
         {p.summary && <p className="mt-1.5 text-[0.9375rem] leading-relaxed text-[color:var(--pf-soft)]">{p.summary}</p>}
@@ -736,6 +740,13 @@ function EmptySection({ sectionKey }: { sectionKey: SectionKey }) {
     </section>
   );
 }
+
+/**
+ * Whether there is a figure to draw. An exhbt with no graph, no picture and its flowchart taken off
+ * the page (decision 0027) has none: keyFigureOf gives a flowchart with no steps, and the card and
+ * the band then leave the figure's well out rather than draw an empty grey box.
+ */
+const hasFigure = (f: KeyFigure) => f.kind !== "flow" || f.steps.length > 0;
 
 /** The key figure: a graph as the exhbt page draws it, an image, or the steps of the process. */
 function Figure({ project: p, large = false }: { project: HomeProject; large?: boolean }) {

@@ -6,6 +6,8 @@ import { emptyDoc, text, type ExhbtDoc, type Section } from "@/lib/exhbt/blocks"
 import { FORMAT_COPY, formatOf } from "@/lib/exhbt/formats";
 import { pageItems } from "@/lib/exhbt/layouts";
 import { fullDoc, GALLERY_IMAGES, galleryDoc, libraryDoc, openBankingDoc, researchDoc } from "@/lib/exhbt/sample";
+import { beforeAfterFixture, buildFixture, essayFixture, eventFixture } from "./layouts";
+import { arrangedCase, arrangedGallery, arrangedResearch, caseMissingImage, galleryFlowOff, galleryOverCap, researchNoAim } from "./orders";
 
 /*
  * The slot harness's own parts (app/dev/edit-slots, development only): the samples it draws, the
@@ -30,13 +32,25 @@ import { fullDoc, GALLERY_IMAGES, galleryDoc, libraryDoc, openBankingDoc, resear
  *    one page and not the other would move every part below it.
  */
 
-/** The samples, one per layout (the four new ones come with the renderer's second part), and a new exhbt. */
+/** The samples, one per layout (the four of decision 0028 are fixtures of this harness's own, ./layouts.ts), and a new exhbt. */
 export const SAMPLES = {
   "case-study": () => fullDoc,
   "open-banking": () => openBankingDoc,
   library: () => libraryDoc,
   gallery: () => galleryDoc(GALLERY_IMAGES.map((_, i) => `gallery-${i + 1}`)),
   research: () => researchDoc("research-1"),
+  build: () => buildFixture,
+  essay: () => essayFixture,
+  "before-after": () => beforeAfterFixture,
+  event: () => eventFixture,
+  // Pages out of their usual order, as the new editor will write them (./orders.ts).
+  "arranged-case": () => arrangedCase,
+  "arranged-gallery": () => arrangedGallery,
+  "gallery-flow-off": () => galleryFlowOff,
+  "gallery-over-cap": () => galleryOverCap,
+  "arranged-research": () => arrangedResearch,
+  "research-no-aim": () => researchNoAim,
+  "case-missing-image": () => caseMissingImage,
   new: () => emptyDoc(),
 } satisfies Record<string, () => ExhbtDoc>;
 export type SampleName = keyof typeof SAMPLES;
@@ -122,7 +136,7 @@ export function standIn(doc: ExhbtDoc, base: Omit<PageCtx, "edit">, evidenceUrl:
     item: (o) => {
       const item = items.get(o.id);
       return (
-        <div data-slot="item" data-id={o.id} data-as={o.as} data-index={o.index} data-count={o.count} className={`${o.rowClass} min-w-0`.trim()}>
+        <div data-slot="item" data-id={o.id} data-kind={o.kind} data-as={o.as} data-index={o.index} data-count={o.count} className={`${o.rowClass} min-w-0`.trim()}>
           {item && <ItemView item={item} as={o.as} ctx={ctx} />}
         </div>
       );

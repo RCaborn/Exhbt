@@ -927,6 +927,27 @@
   [data-format="research"] .xp-section {
     margin-top: 0.4rem;
   }
+  /* The four layouts of decision 0028, in the same manner: a smaller title and context line and
+     tighter gaps between the parts, so each fits one A4 page. */
+  [data-format="build"] .xp-title,
+  [data-format="essay"] .xp-title,
+  [data-format="before-after"] .xp-title,
+  [data-format="event"] .xp-title {
+    font-size: 1.6rem;
+  }
+  [data-format="build"] .xp-context,
+  [data-format="essay"] .xp-context,
+  [data-format="before-after"] .xp-context,
+  [data-format="event"] .xp-context {
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+  [data-format="build"] .xp-section,
+  [data-format="essay"] .xp-section,
+  [data-format="before-after"] .xp-section,
+  [data-format="event"] .xp-section {
+    margin-top: 0.4rem;
+  }
   .xp-zoom-chip,
   .xp-zoom-dialog {
     display: none !important;

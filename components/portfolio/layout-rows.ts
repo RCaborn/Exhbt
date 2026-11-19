@@ -103,14 +103,16 @@ function groupClass(of: GroupOf, n: number, f: Format, first: boolean): string {
     case "images":
     case "figures":
     case "links":
-      return cx(margin(f, first), "grid gap-6", n > 1 && TWO);
+      // Build's screenshots are often a phone's shape beside a wide one: each card keeps its own height.
+      return cx(margin(f, first), "grid gap-6", n > 1 && TWO, of === "images" && f === "build" && "items-start");
     case "grid":
       // The justified rows carry their own gap above (.xp-grid in globals.css).
       return "xp-grid";
     case "refs":
       return cx(margin(f, first), "break-inside-avoid");
     case "buttons":
-      return cx(margin(f, first), "flex flex-wrap gap-3");
+      // Build's demo and code: buttons side by side, each with its line under it.
+      return cx(margin(f, first), "flex flex-wrap items-start gap-x-4 gap-y-3");
     case "before-after":
       return cx(margin(f, first), "grid gap-6", TWO);
   }

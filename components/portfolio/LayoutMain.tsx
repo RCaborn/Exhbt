@@ -3,7 +3,7 @@ import type { ContentSection, ExhbtDoc, RichText } from "@/lib/exhbt/blocks";
 import { FORMAT_COPY } from "@/lib/exhbt/formats";
 import { pageItems, rowsFor, type Cell, type ItemAs, type ItemCell, type PageItem, type Row, type StackCell } from "@/lib/exhbt/layouts";
 import { imageRatio } from "@/lib/exhbt/sections";
-import { AimStacked, ClosingBlock, Figure, Findings, FlowPart, KeyFigure, LeadImage, PlainSection, RefLine, TileImage } from "./exhbt-parts";
+import { AimStacked, ButtonLink, ClosingBlock, Figure, Findings, FlowPart, KeyFigure, LeadImage, PlainSection, RefLine, StagedImage, TileImage } from "./exhbt-parts";
 import { cellClass, cellItemClass, rowClass, stackClass, stackEditClass, stackIsRow, stackItemClass } from "./layout-rows";
 import type { ImageUrls, PageCtx } from "./page-ctx";
 
@@ -140,8 +140,13 @@ export function LayoutMain({ doc, ctx }: { doc: ExhbtDoc; ctx: PageCtx }) {
             );
           }
           case "buttons":
-          case "before-after":
             return <div className={rc}>{row.items.map((c) => item(c, ""))}</div>;
+          case "before-after":
+            return (
+              <div role="group" aria-label="Before and after" className={rc}>
+                {row.items.map((c) => item(c, ""))}
+              </div>
+            );
         }
     }
   }
@@ -181,6 +186,7 @@ export function ItemView({ item, as, ctx, rowClass = "" }: { item: PageItem; as:
       if (as === "key") return <KeyFigure s={s} imageUrls={imageUrls} rowClass={rowClass} ctx={ctx} at={at} />;
       if (as === "lead" && s.kind === "image") return <LeadImage s={s} imageUrls={imageUrls} rowClass={rowClass} ctx={ctx} at={at} />;
       if (as === "tile" && s.kind === "image") return <TileImage s={s} imageUrls={imageUrls} ctx={ctx} at={at} />;
+      if ((as === "before" || as === "after") && s.kind === "image") return <StagedImage s={s} stage={as} imageUrls={imageUrls} ctx={ctx} at={at} />;
       // In a stack ("What happened") or a pair: the figure alone, its own root in the column.
       if (as === "stacked" || !rowClass) return <Figure s={s} imageUrls={imageUrls} zoom={f !== "case-study" && as !== "stacked"} ctx={ctx} at={at} />;
       break;
@@ -195,6 +201,7 @@ export function ItemView({ item, as, ctx, rowClass = "" }: { item: PageItem; as:
       break;
     case "link":
       if (as === "listed") return <RefLine s={s} ctx={ctx} at={at} />;
+      if (as === "button") return <ButtonLink s={s} ctx={ctx} at={at} />;
       break;
   }
   // "plain": the section on its own row, as SectionBlock draws it, with the row's classes.
