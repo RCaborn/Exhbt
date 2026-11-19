@@ -12,4 +12,4 @@ Run on the desktop Playwright project, one worker, port 3214, no trace. Base is 
 | `phase2-sections.spec.ts` | 15 | 15 passed | 15 passed |
 | `phase2-draft-tools.spec.ts` | 11 | 11 passed | 11 passed |
 | `phase2-polish-2.spec.ts` | 13 | 13 passed | 13 passed (first run 12 passed, 1 failed: "Phone header, Max: Job links is in the menu, and a tap outside closes it", which does not use a moved helper; it passed alone and on a full re-run) |
-| `phase2-formats.spec.ts` | 80 | interrupted at test 77 by a container restart (77 passed); to be re-run | |
+| `phase2-formats.spec.ts` | 80 | 80 passed (first baseline run was cut off at test 77 by a container restart; re-run clean) | 80 passed |
