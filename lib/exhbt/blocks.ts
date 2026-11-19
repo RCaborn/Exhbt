@@ -468,9 +468,39 @@ function oneOf(kind: SectionKind, L: Limits): string {
   }
 }
 
+/** Whether the doc has what one of its layout's needs asks for (FORMAT_RULES[f].needs): read by validateForPublish and layoutNotes. */
+export function needMet(doc: ExhbtDoc, n: Need): boolean {
+  switch (n.need) {
+    case "count":
+      return n.kinds.reduce((sum, k) => sum + sectionsOf(doc, k).length, 0) >= n.min;
+    case "results":
+      // The work's own graph or results table, picked in place of a drafted graph (decision 0025), shows what came of the work as a graph does.
+      return doc.sections.some((s) => s.kind === "findings" || s.kind === "graph" || (s.kind === "image" && (s.picked?.kind === "graph" || s.picked?.kind === "table")));
+    case "stages": {
+      const images = sectionsOf(doc, "image");
+      return images.some((s) => s.stage === "before") && images.some((s) => s.stage === "after");
+    }
+    case "myRole":
+      return words(doc.myRole ?? "") > 0;
+  }
+}
+
 /**
  * What stops publishing. Each issue has a path the editor can point at
  * (e.g. "flow.2.step", "sections.0.items.1"). Empty means it can be published.
+ *
+ * Most paths name a field on the page. These name none, and the new editor puts an anchor on the
+ * page for each (decision 0026); a new shape of path added here must be given one there too:
+ *  - ""                  the whole exhbt: the word cap, and a doc that can't be read at all.
+ *  - "sections"          how many of a kind (more than the layout allows), what the layout needs
+ *                        (each need but My role), and research's cap on graphs and images together.
+ *  - "flow"              how many boxes the flowchart has (too few or too many).
+ *  - "skills"            how many skills there are (too many).
+ *  - "sections.N.items"  how many findings that findings section has (too few or too many).
+ *  - "sections.N.chart…" anything inside graph N (its title, rows, series, points, tiles, labels):
+ *                        a graph's figures are edited in its sheet, not on the page.
+ * Some name a field the page doesn't draw, edited in an edit-only control over its part instead:
+ * "sections.N.alt", "sections.N.href", "sections.N.picked.shareOk", and "evidence" (the work, in the sidebar).
  */
 export function validateForPublish(d: ExhbtDoc): Issue[] {
   const out: Issue[] = [];
@@ -521,23 +551,7 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
   const figuresCap = () => need(L.maxFigures === null || nFigures <= L.maxFigures, "sections", `Up to ${L.maxFigures} figures, graphs and images together.`);
   const isFigureNeed = (n: Need) => n.need === "count" && n.kinds.includes("graph") && n.kinds.includes("image");
   for (const n of FORMAT_RULES[F].needs) {
-    switch (n.need) {
-      case "count":
-        need(n.kinds.reduce((sum, k) => sum + sectionsOf(doc, k).length, 0) >= n.min, "sections", n.message);
-        break;
-      case "results":
-        // The work's own graph or results table, picked in place of a drafted graph (decision 0025), shows what came of the work as a graph does.
-        need(doc.sections.some((s) => s.kind === "findings" || s.kind === "graph" || (s.kind === "image" && (s.picked?.kind === "graph" || s.picked?.kind === "table"))), "sections", n.message);
-        break;
-      case "stages": {
-        const images = sectionsOf(doc, "image");
-        need(images.some((s) => s.stage === "before") && images.some((s) => s.stage === "after"), "sections", n.message);
-        break;
-      }
-      case "myRole":
-        need(words(doc.myRole ?? "") > 0, "myRole", n.message);
-        break;
-    }
+    need(needMet(doc, n), n.need === "myRole" ? "myRole" : "sections", n.message);
     if (isFigureNeed(n)) figuresCap();
   }
   if (!FORMAT_RULES[F].needs.some(isFigureNeed)) figuresCap();

@@ -21,7 +21,7 @@ import {
 import { FORMAT_RULES, FORMATS, fromWorkOf, hiddenSections, OFFERED_FORMATS, shownSections, withFormat, type Format } from "../lib/exhbt/formats";
 import { tileFromDoc } from "../lib/exhbt/headline";
 import { adopt, applyTemplate, blockOptions, flowShown, hasMarker, insertBlock, insertImage, isArranged, keptItems, moveItem, pageItems, removeItem, restoreFlow, rowsFor, structureKey, type Cell, type ItemCell, type Row } from "../lib/exhbt/layouts";
-import { newSection, roomFor, sectionLabel, sectionName, withKeyFigure, withWorkVisual } from "../lib/exhbt/sections";
+import { layoutNotes, newSection, roomFor, sectionLabel, sectionName, withKeyFigure, withWorkVisual } from "../lib/exhbt/sections";
 import { pathOfNumber } from "../lib/exhbt/verify";
 import { ORDER_FIXTURES, SAMPLE_FIXTURES, todayCaseRows, todayGalleryRows, todayResearchRows, type OrderFixture } from "./fixtures/order-docs";
 import { OLD_FORMATS, OLD_SECTION_KINDS, OldExhbtDocSchema } from "./fixtures/reader-before-r2";
@@ -250,6 +250,19 @@ test.describe("The model: a removed flowchart and the published copy", () => {
     expect(messages(core([image(1, "before"), image(2, "after"), findings()], "before-after"))).toEqual([]);
     expect(messages(core([], "event"))).toEqual(["sections: Add at least one picture, such as the poster.", "myRole: Say what your role was."]);
     expect(messages(core([image(1)], "event", { myRole: "Stage manager" }))).toEqual([]);
+  });
+
+  test("layoutNotes lists what each of the seven layouts still needs (step 7)", () => {
+    const miss = (d: ExhbtDoc) => layoutNotes(d).missing.map((m) => (m.add ? `${m.text} [${m.add}]` : m.text));
+    expect(miss(core([]))).toEqual([]);
+    expect(miss(core([], "gallery"))).toEqual(["Add at least 2 images [image]"]);
+    expect(miss(core([], "research"))).toEqual(["Add your aim or hypothesis [aim]", "Add your conclusion [conclusion]", "Add a graph or an image [graph]", "Add your results [findings]"]);
+    expect(miss(core([], "build"))).toEqual(["Add an image or a link [image]"]);
+    expect(miss(core([], "essay"))).toEqual(["Add your key points [findings]"]);
+    expect(miss(core([image(1)], "before-after"))).toEqual(["Add at least 2 images [image]", "Mark one image Before and one After", "Add what changed and why [findings]"]);
+    expect(miss(core([], "event"))).toEqual(["Add at least one picture, such as the poster [image]", "Say what your role was"]);
+    expect(miss(core([image(1)], "event", { myRole: "Stage manager" }))).toEqual([]);
+    expect(miss(core([{ ...findings(), items: [[], text("Sales held.")] } as ContentSection], "essay"))).toEqual(["Fill in or remove the empty findings"]);
   });
 
   test("pathOfNumber finds the first field on the page that holds a number", () => {
