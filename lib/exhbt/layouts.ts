@@ -293,6 +293,40 @@ export function rowsFor(items: PageItem[], f: Format): Row[] {
 
 const stageOf = (it: PageItem | undefined): "before" | "after" | undefined => (it?.kind === "image" ? (it.s as SectionOf<"image">).stage : undefined);
 
+/* ---------------- Structural changes ---------------- */
+
+/** Where in `sections` a thing goes to sit at page place `at` (0 is first): before the page item there, or straight after the last. */
+function storedPlace(sections: Section[], items: PageItem[], at: number): number {
+  const p = Math.max(0, Math.min(Math.trunc(at) || 0, items.length));
+  if (p < items.length) return items[p]!.index;
+  return items.length ? items[items.length - 1]!.index + 1 : sections.length;
+}
+
+/**
+ * Puts a removed flowchart back and deletes flowOff. Every other item keeps its place, and the doc stays arranged. The same object when the flowchart is shown.
+ * With `at` (a page-item place, as insertBlock's), the marker goes in there: the new editor's "+" and tray always pass it.
+ * Without it (the classic editor's "Put the flowchart back", which has no place to give), the marker goes in before the first page item whose place in the layout's usual order comes after the flowchart's, or at the end if none.
+ */
+export function restoreFlow(doc: ExhbtDoc, at?: number): ExhbtDoc {
+  if (flowShown(doc)) return doc;
+  const items = pageItems(doc);
+  let index: number;
+  if (at !== undefined) index = storedPlace(doc.sections, items, at);
+  else {
+    const f = formatOf(doc);
+    const flowSlot = FORMAT_RULES[f].template.findIndex((slot) => slot.kinds.includes("flow"));
+    const slots = slotsOf(
+      items.map((it) => it.kind),
+      f,
+    );
+    const after = items.findIndex((_, k) => slots[k]! > flowSlot);
+    index = after < 0 ? doc.sections.length : items[after]!.index;
+  }
+  const next = { ...doc, sections: [...doc.sections.slice(0, index), marker(), ...doc.sections.slice(index)] };
+  delete next.flowOff;
+  return next;
+}
+
 /** Changes exactly when the layout of the page could: the layout, flowOff, and each item's id, kind and image stage, in order. */
 export function structureKey(doc: ExhbtDoc): string {
   const part = (it: PageItem) => [it.id, it.kind, stageOf(it) ?? ""];
