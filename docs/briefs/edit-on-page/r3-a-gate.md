@@ -87,7 +87,7 @@ Commit and push after each.
    { name: "tablet", use: { browserName: "chromium", viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 }, testMatch: /editor-tablet\.spec\.ts/ },
    ```
    Keep everything else in the file as it is. `editor-drag` and `editor-flow` run on desktop and touch; `editor-phone` on touch only; `editor-tablet` on tablet only.
-8. **`e2e/editor-classic.spec.ts`**: after `/dev/editor?kind=classic` the edit page serves `[data-editor="classic"]`, and after `?kind=page` the new one (`[data-editor="page"]`); a fresh browser context is not affected by another's cookie; `?editor=classic` serves classic for that request, with the line and the way back, which works; `?crash=render` shows the notice and ends in `[data-editor="classic"]`; `?crash=server` shows the route's error page with its link to the classic editor; `/api/health` reports the kind. G adds the `?crash=change` test when it takes the file over.
+8. **`e2e/editor-classic.spec.ts`**: after `/dev/editor?kind=classic` the edit page serves `[data-editor="classic"]`, and after `?kind=page` the new one (`[data-editor="page"]`); a fresh browser context is not affected by another's cookie; `?editor=classic` serves classic for that request, with the line and the way back, which works; `?crash=render` shows the notice and ends in `[data-editor="classic"]`; `?crash=server` shows the route's error page with its link to the classic editor; `/api/health` reports the kind (read `editor` from its JSON body and ignore the status: in the e2e environment it answers 503, having no database; E's `e2e/editor-switch.spec.ts` does the same). G adds the `?crash=change` test when it takes the file over.
 
 ## Done looks like
 
