@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowRight } from "lucide-react";
+import type { PageCtx } from "@/components/portfolio/page-ctx";
 
 type Step = { step: string; detail?: string };
 
@@ -15,9 +16,14 @@ type Step = { step: string; detail?: string };
  *
  * `stack` (page variant only, decision 0024) keeps the page's flowchart a column on screen and in
  * print, for a gallery's "What I did" and research's "Method", which sit in a narrow column.
+ *
+ * `ctx` (page variant only) is the exhbt page's (components/portfolio/page-ctx.ts). With `ctx.edit`
+ * the editor's slots draw the list, each box, its words and the "+" between boxes, in the same
+ * markup and classes (decision 0026). With no boxes it draws nothing, unless it is being edited.
  */
-export function MethodFlow({ steps, variant = "card", stack = false }: { steps: Step[]; variant?: "card" | "page"; stack?: boolean }) {
-  if (variant === "page") return <PageFlow steps={steps} stack={stack} />;
+export function MethodFlow({ steps, variant = "card", stack = false, ctx }: { steps: Step[]; variant?: "card" | "page"; stack?: boolean; ctx?: PageCtx }) {
+  if (variant === "page") return <PageFlow steps={steps} stack={stack} ctx={ctx} />;
+  if (steps.length === 0) return null;
   return (
     <ol className="flex flex-col gap-0 @xl:flex-row @xl:items-stretch" aria-label="Methodology">
       {steps.map((s, i) => {
@@ -86,40 +92,92 @@ const PAGE_ROW = {
   },
 } as const;
 
-/** The page's flowchart: a row on wide columns (wider for more boxes) and in print, a column on narrow ones (always a column when `stack`). */
-function PageFlow({ steps, stack = false }: { steps: Step[]; stack?: boolean }) {
-  const row = PAGE_ROW[steps.length >= 6 ? "3xl" : steps.length === 5 ? "2xl" : "xl"];
-  return (
-    <ol className={stack ? "xp-flow flex flex-col" : `xp-flow flex flex-col ${row.ol} print:flex-row print:items-stretch`} aria-label="Methodology">
-      {steps.map((s, i) => {
-        const last = i === steps.length - 1;
-        return (
-          <li
-            key={`${i}-${s.step}`}
-            className={stack ? "flex flex-col items-stretch" : `flex flex-col items-stretch ${row.li} print:min-w-0 print:flex-1 print:flex-row print:items-center`}
-          >
-            <div
-              data-last={last || undefined}
-              className={stack ? "xp-flow-box min-w-0 px-3 py-3 print:px-2.5 print:py-1.5" : `xp-flow-box min-w-0 px-3 py-3 ${row.box} print:h-full print:flex-1 print:px-2.5 print:py-2`}
-            >
-              <span className="block text-[0.8125rem] leading-snug font-semibold break-words print:text-[0.85rem]">{s.step}</span>
-              {s.detail && <span className="xp-flow-detail mt-1 block text-[0.8125rem] leading-snug">{s.detail}</span>}
-            </div>
-            {!last && (
-              <span aria-hidden className={stack ? "xp-flow-arrow flex justify-center py-1 print:py-0" : `xp-flow-arrow flex justify-center py-1.5 ${row.arrow} print:px-1 print:py-0`}>
-                {stack ? (
-                  <ArrowDown size={15} strokeWidth={2} />
-                ) : (
-                  <>
-                    <ArrowDown size={15} strokeWidth={2} className={`${row.down} print:hidden`} />
-                    <ArrowRight size={15} strokeWidth={2} className={`hidden ${row.right} print:block`} />
-                  </>
-                )}
-              </span>
-            )}
-          </li>
-        );
-      })}
-    </ol>
+/**
+ * The page's flowchart: a row on wide columns (wider for more boxes) and in print, a column on narrow ones (always a column when `stack`).
+ * Nothing at all with no boxes, unless it is being edited: then the list is there for the first box to be added to.
+ */
+function PageFlow({ steps, stack = false, ctx }: { steps: Step[]; stack?: boolean; ctx?: PageCtx }) {
+  const edit = ctx?.edit;
+  if (steps.length === 0 && !edit) return null;
+  const n = steps.length;
+  const row = PAGE_ROW[n >= 6 ? "3xl" : n === 5 ? "2xl" : "xl"];
+  const olClass = stack ? "xp-flow flex flex-col" : `xp-flow flex flex-col ${row.ol} print:flex-row print:items-stretch`;
+  const liClass = stack ? "flex flex-col items-stretch" : `flex flex-col items-stretch ${row.li} print:min-w-0 print:flex-1 print:flex-row print:items-center`;
+  const boxClass = stack ? "xp-flow-box min-w-0 px-3 py-3 print:px-2.5 print:py-1.5" : `xp-flow-box min-w-0 px-3 py-3 ${row.box} print:h-full print:flex-1 print:px-2.5 print:py-2`;
+  const arrowClass = stack ? "xp-flow-arrow flex justify-center py-1 print:py-0" : `xp-flow-arrow flex justify-center py-1.5 ${row.arrow} print:px-1 print:py-0`;
+  const arrows = stack ? (
+    <ArrowDown size={15} strokeWidth={2} />
+  ) : (
+    <>
+      <ArrowDown size={15} strokeWidth={2} className={`${row.down} print:hidden`} />
+      <ArrowRight size={15} strokeWidth={2} className={`hidden ${row.right} print:block`} />
+    </>
   );
+  const stepClass = "block text-[0.8125rem] leading-snug font-semibold break-words print:text-[0.85rem]";
+  const detailClass = "xp-flow-detail mt-1 block text-[0.8125rem] leading-snug";
+
+  if (!edit) {
+    return (
+      <ol className={olClass} aria-label="Methodology">
+        {steps.map((s, i) => {
+          const last = i === n - 1;
+          return (
+            <li key={`${i}-${s.step}`} className={liClass}>
+              <div data-last={last || undefined} className={boxClass}>
+                <span className={stepClass}>{s.step}</span>
+                {s.detail && <span className={detailClass}>{s.detail}</span>}
+              </div>
+              {!last && (
+                <span aria-hidden className={arrowClass}>
+                  {arrows}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    );
+  }
+
+  // The editing page (decision 0026): the same list, boxes and arrows, with the editor's slots in them. The arrow keeps
+  // its icons hidden but is no longer hidden itself, because the "+" in it is a control. Boxes and arrows are positioned
+  // so the tools and the "+" the adapter returns sit over them and take no room.
+  const boxes = steps.map((s, i) => {
+    const last = i === n - 1;
+    const label = `Box ${i + 1}`;
+    return edit.flow.box({
+      index: i,
+      last,
+      className: `${liClass} relative`,
+      children: (
+        <>
+          <div data-last={last || undefined} className={`${boxClass} relative`}>
+            <span className={stepClass}>{edit.text({ path: `flow.${i}.step`, value: s.step, label, placeholder: last ? "The result" : "What you did", id: `flow-box-${i}` })}</span>
+            <span className={detailClass}>{edit.text({ path: `flow.${i}.detail`, value: s.detail ?? "", label: `${label} detail`, placeholder: "Detail (optional)" })}</span>
+            {edit.flow.tools({ index: i, count: n })}
+          </div>
+          {last ? (
+            edit.flow.add({ after: i, count: n })
+          ) : (
+            <span className={`${arrowClass} relative`}>
+              {arrows}
+              {edit.flow.add({ after: i, count: n })}
+            </span>
+          )}
+        </>
+      ),
+    });
+  });
+  return edit.flow.list({
+    count: n,
+    stack,
+    children: (
+      <>
+        <ol className={olClass} aria-label="Methodology">
+          {boxes}
+        </ol>
+        {n === 0 && edit.flow.add({ after: -1, count: 0 })}
+      </>
+    ),
+  });
 }

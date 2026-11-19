@@ -1,16 +1,15 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { CHECKS_GUIDE } from "@/components/brand/Seal";
-import { MethodFlow } from "@/components/exhbt/MethodFlow";
 import { RichText } from "@/components/exhbt/RichText";
 import { Avatar } from "@/components/portfolio/Avatar";
-import { Figure, Findings, SectionBlock, type ImageUrls, type Sub } from "@/components/portfolio/exhbt-parts";
-import { GalleryMain } from "@/components/portfolio/formats/GalleryMain";
-import { ResearchMain } from "@/components/portfolio/formats/ResearchMain";
+import { FlowPart, firstSentence, SectionBlock, type ImageUrls, type Sub } from "@/components/portfolio/exhbt-parts";
+import { LayoutMain } from "@/components/portfolio/LayoutMain";
+import type { EditAdapter, PageCtx } from "@/components/portfolio/page-ctx";
 import { PrintButton } from "@/components/portfolio/PrintButton";
 import { Button } from "@/components/ui/Button";
-import type { ExhbtDoc, Section, SectionOf } from "@/lib/exhbt/blocks";
-import { formatOf, shownSections } from "@/lib/exhbt/formats";
+import { formatLimits, type ExhbtDoc } from "@/lib/exhbt/blocks";
+import { FORMAT_COPY, formatOf } from "@/lib/exhbt/formats";
 
 /** The editor's arrange preview imports this from here. */
 export { SectionBlock };
@@ -42,6 +41,11 @@ export type Owner = {
  * radii and the highlight come from the --xp-* variables in globals.css, so a portfolio look can
  * restyle the page without touching this file. Prints as one A4 page (the print: classes and the
  * @media print block in globals.css).
+ *
+ * The main column below the context line is LayoutMain, the one renderer for every layout
+ * (decision 0027). With `edit` (decision 0026, only the edit-on-page editor passes it) the same page
+ * is drawn with the editor's slots: every text is a field, the empty parts are drawn so their
+ * placeholders show, the skills and the work are the editor's, and nothing navigates.
  */
 export function ProjectView({
   doc,
@@ -56,6 +60,7 @@ export function ProjectView({
   saveAsPdf = false,
   sectionsSlot,
   back,
+  edit,
 }: {
   doc: ExhbtDoc;
   owner: Owner;
@@ -78,14 +83,20 @@ export function ProjectView({
   sectionsSlot?: React.ReactNode;
   /** "← Back to Lloyds", when the page was opened from a job page (?for=<slug>). */
   back?: { href: string; label: string };
+  /** The editor's slots (components/portfolio/page-ctx.ts). Only the edit-on-page editor passes it. */
+  edit?: EditAdapter;
 }) {
   const H = headingLevel;
   const format = formatOf(doc);
+  const copy = FORMAT_COPY[format];
+  const L = formatLimits(format);
   const Sub: Sub = headingLevel === "h1" ? "h2" : "h3";
+  const ctx: PageCtx = { Sub, imageUrls, format, edit };
   const first = owner.name.trim().split(/\s+/)[0] || owner.name;
   const hasWork = Boolean(doc.evidence && evidenceUrl);
   const kind = doc.context.trim();
   const whereWhen = doc.whereWhen?.trim() ?? "";
+  const myRole = doc.myRole?.trim() ?? "";
   const checks: { label: React.ReactNode; key: string; done: boolean }[] = [
     { key: "confirmed", label: confirmed ? `Confirmed by ${first}` : "Not confirmed yet", done: confirmed },
     ...(doc.evidence ? [{ key: "source", label: "Source attached", done: true }] : []),
@@ -123,22 +134,33 @@ export function ProjectView({
               <p className="xp-name xp-display text-[1.5rem] leading-tight @3xl/xp:text-[1.625rem] print:text-[1.3rem]">{owner.name}</p>
               {owner.bio?.trim() && <p className="xp-muted mt-1.5 text-[0.875rem] leading-snug">{owner.bio.trim()}</p>}
               {owner.homeHref && (
-                <Link href={owner.homeHref} className="xp-outline-button mt-4 hidden h-11 w-full items-center justify-center px-3 text-center text-[0.875rem] leading-tight font-semibold @3xl/xp:flex print:hidden">
+                <Link href={owner.homeHref} inert={edit ? true : undefined} className="xp-outline-button mt-4 hidden h-11 w-full items-center justify-center px-3 text-center text-[0.875rem] leading-tight font-semibold @3xl/xp:flex print:hidden">
                   All of {first}&apos;s work
                 </Link>
               )}
             </div>
           </div>
           {owner.homeHref && (
-            <Link href={owner.homeHref} className="xp-outline-button mt-3 flex h-11 w-full items-center justify-center px-3 text-center text-[0.875rem] leading-tight font-semibold @3xl/xp:hidden print:hidden">
+            <Link href={owner.homeHref} inert={edit ? true : undefined} className="xp-outline-button mt-3 flex h-11 w-full items-center justify-center px-3 text-center text-[0.875rem] leading-tight font-semibold @3xl/xp:hidden print:hidden">
               All of {first}&apos;s work
             </Link>
           )}
 
           {/* Stacked above the work, the facts sit side by side and the ticks in a row, so the question isn't pushed far down. */}
           <dl className="mt-4 grid grid-cols-1 gap-x-6 px-1 @md/xp:grid-cols-2 @3xl/xp:mt-6 @3xl/xp:block @3xl/xp:px-5 print:row-span-2 print:mt-0 print:grid print:grid-cols-3 print:gap-x-5 print:px-0">
-            {kind && <Fact term="What it is">{kind}</Fact>}
-            {whereWhen && <Fact term="Where and when">{whereWhen}</Fact>}
+            {edit ? (
+              <>
+                <Fact term="What it is">{edit.text({ path: "context", value: doc.context, label: "What it is", placeholder: "e.g. MSc Finance dissertation", id: "context", maxChars: L.contextChars })}</Fact>
+                <Fact term="Where and when">{edit.text({ path: "whereWhen", value: doc.whereWhen ?? "", label: "Where and when", placeholder: "e.g. University of Leeds, May 2026", id: "whereWhen", maxChars: L.whereWhenChars })}</Fact>
+                <Fact term="My role">{edit.text({ path: "myRole", value: doc.myRole ?? "", label: "My role", placeholder: "e.g. Stage manager", id: "myRole", maxChars: L.myRoleChars })}</Fact>
+              </>
+            ) : (
+              <>
+                {kind && <Fact term="What it is">{kind}</Fact>}
+                {whereWhen && <Fact term="Where and when">{whereWhen}</Fact>}
+                {myRole && <Fact term="My role">{myRole}</Fact>}
+              </>
+            )}
             <Fact term="Can you trust it?" wide>
               <ul aria-label="Can you trust it?" className="mt-1 flex flex-wrap gap-x-5 gap-y-1.5 @3xl/xp:block @3xl/xp:space-y-1.5 print:block print:space-y-1" data-checks>
                 {checks.map((c) => (
@@ -157,7 +179,9 @@ export function ProjectView({
             </Fact>
           </dl>
 
-          {hasWork && (
+          {edit ? (
+            <div className="mt-6 print:mt-3">{edit.work()}</div>
+          ) : hasWork && (
             <div className="mt-6 print:mt-3">
               <Button href={evidenceUrl!} variant="primary" size="md" target="_blank" rel="nofollow ugc noopener" className="xp-work-button w-full" label={`See the work: ${doc.evidence!.label}`}>
                 <span className="min-w-0">See the work: {doc.evidence!.label}</span>
@@ -172,8 +196,13 @@ export function ProjectView({
         </aside>
 
         <div className="@container/main min-w-0">
-          {doc.skills.length > 0 && (
-            <ul aria-label="Skills used" className="flex flex-wrap gap-1 @2xl/main:justify-end">
+          {edit ? (
+            <div className="relative">
+              {edit.skills()}
+              {edit.tools({ block: "skills" })}
+            </div>
+          ) : doc.skills.length > 0 && (
+            <ul aria-label={copy.skills} className="flex flex-wrap gap-1 @2xl/main:justify-end">
               {doc.skills.map((s) => (
                 <li key={s} className="xp-pill px-2 py-[0.2rem] text-[0.78rem] font-medium">
                   {s}
@@ -183,27 +212,29 @@ export function ProjectView({
           )}
           {team}
 
-          <H className={`xp-title xp-display ${format === "gallery" ? "mt-3 @2xl/main:mt-5" : "mt-5"} text-[clamp(2rem,7cqi,3.4rem)] leading-[1.02] text-balance print:mt-2 print:text-[2rem]`}>
-            {doc.title}
+          <H className={`xp-title xp-display ${format === "gallery" ? "mt-3 @2xl/main:mt-5" : "mt-5"} text-[clamp(2rem,7cqi,3.4rem)] leading-[1.02] text-balance print:mt-2 print:text-[2rem]${edit ? " relative" : ""}`}>
+            {edit ? edit.text({ path: "title", value: doc.title, label: copy.title, placeholder: copy.emptyTitle, id: "title", maxChars: L.titleChars }) : doc.title}
+            {edit?.tools({ block: "header" })}
           </H>
-          {doc.gap.length > 0 && (
-            <p className={`xp-context ${format === "gallery" ? "mt-3 @2xl/main:mt-5" : "mt-5"} max-w-[42rem] text-[1.0625rem] leading-[1.6] @2xl/main:text-[1.1875rem] print:mt-2 print:text-[1rem]`}>
+          {edit ? (
+            <div className="relative">
+              {edit.rich({ path: "gap", value: doc.gap, label: copy.gap, placeholder: firstSentence(copy.gapHint), className: contextClass(format), highlight: true })}
+              {edit.tools({ block: "gap" })}
+            </div>
+          ) : doc.gap.length > 0 && (
+            <p className={contextClass(format)}>
               <RichText value={doc.gap} highlight />
             </p>
           )}
 
-          {format === "gallery" ? (
-            <GalleryMain doc={doc} imageUrls={imageUrls} Sub={Sub} />
-          ) : format === "research" ? (
-            <ResearchMain doc={doc} imageUrls={imageUrls} Sub={Sub} />
-          ) : (
+          {format === "case-study" && sectionsSlot ? (
+            // The classic editor's "Arrange sections": the flowchart, then its own list of the sections.
             <>
-              <section aria-label="Process" data-part="process" className="mt-8 break-inside-avoid print:mt-3">
-                <MethodFlow steps={doc.flow} variant="page" />
-              </section>
-
-              {sectionsSlot ?? <SectionsView sections={shownSections(doc).map((x) => x.s)} imageUrls={imageUrls} Sub={Sub} />}
+              <FlowPart steps={doc.flow} as="plain" rowClass="mt-8 print:mt-3" ctx={ctx} />
+              {sectionsSlot}
             </>
+          ) : (
+            <LayoutMain doc={doc} ctx={ctx} />
           )}
         </div>
       </div>
@@ -220,76 +251,6 @@ function Fact({ term, children, wide = false }: { term: string; children: React.
   );
 }
 
-/* ---------------- Sections ---------------- */
-
-/**
- * How sections are drawn, in the person's order: "What I found" next to a graph or image that is
- * its neighbour (before or after it) shares a row with it, findings on the left; graphs next to each
- * other share a row, and so do images; everything else stands alone. Nothing is reordered.
- */
-export type Run =
-  | { kind: "found"; findings: SectionOf<"findings">; figure: SectionOf<"graph"> | SectionOf<"image"> }
-  | { kind: "graphs"; items: SectionOf<"graph">[] }
-  | { kind: "images"; items: SectionOf<"image">[] }
-  | { kind: "one"; section: Exclude<Section, { kind: "graph" | "image" }> };
-
-const isFigure = (s: Section | undefined): s is SectionOf<"graph"> | SectionOf<"image"> => s?.kind === "graph" || s?.kind === "image";
-
-export function runsOf(sections: Section[]): Run[] {
-  const out: Run[] = [];
-  for (let i = 0; i < sections.length; i++) {
-    const s = sections[i]!;
-    const next = sections[i + 1];
-    const last = out[out.length - 1];
-    if (s.kind === "findings" && isFigure(next)) {
-      out.push({ kind: "found", findings: s, figure: next });
-      i++;
-    } else if (isFigure(s) && next?.kind === "findings" && !(last?.kind === "graphs" && s.kind === "graph") && !(last?.kind === "images" && s.kind === "image")) {
-      // A figure straight before the findings pairs with them, unless it's already in a row of its kind.
-      out.push({ kind: "found", findings: next, figure: s });
-      i++;
-    } else if (s.kind === "graph") {
-      if (last?.kind === "graphs") last.items.push(s);
-      else out.push({ kind: "graphs", items: [s] });
-    } else if (s.kind === "image") {
-      if (last?.kind === "images") last.items.push(s);
-      else out.push({ kind: "images", items: [s] });
-    } else out.push({ kind: "one", section: s });
-  }
-  return out;
-}
-
-/** Every section below the flowchart, drawn as runsOf lays them out. Images without a URL are left out. */
-export function SectionsView({ sections, imageUrls, Sub }: { sections: Section[]; imageUrls: ImageUrls; Sub: Sub }) {
-  return (
-    <>
-      {runsOf(sections.filter((s) => s.kind !== "image" || imageUrls[s.fileId])).map((run) => {
-        switch (run.kind) {
-          case "found":
-            return (
-              <div key={run.findings.id} data-found className="xp-section xp-found grid items-center gap-8 @2xl/main:grid-cols-[minmax(0,0.92fr)_minmax(0,1fr)] @2xl/main:gap-9 print:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)] print:gap-5">
-                <Findings s={run.findings} Sub={Sub} />
-                <Figure s={run.figure} imageUrls={imageUrls} />
-              </div>
-            );
-          case "graphs":
-          case "images":
-            return (
-              <div
-                key={run.items[0]!.id}
-                aria-label={run.kind === "graphs" ? "Graphs" : "Images"}
-                role="group"
-                className={`xp-section grid gap-6 ${run.items.length > 1 ? "@2xl/main:grid-cols-2 print:grid-cols-2" : ""}`}
-              >
-                {run.items.map((f) => (
-                  <Figure key={f.id} s={f} imageUrls={imageUrls} />
-                ))}
-              </div>
-            );
-          case "one":
-            return <SectionBlock key={run.section.id} s={run.section} Sub={Sub} imageUrls={imageUrls} />;
-        }
-      })}
-    </>
-  );
-}
+/** The context line's classes: a gallery's sits a little closer under the title on a narrow page. */
+const contextClass = (format: string) =>
+  `xp-context ${format === "gallery" ? "mt-3 @2xl/main:mt-5" : "mt-5"} max-w-[42rem] text-[1.0625rem] leading-[1.6] @2xl/main:text-[1.1875rem] print:mt-2 print:text-[1rem]`;
