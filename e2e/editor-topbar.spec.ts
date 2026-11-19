@@ -91,6 +91,16 @@ test.describe("the top bar", () => {
     expect(orderAfterRemove).not.toEqual(orderBefore);
   });
 
+  test("right after an AI draft the layout line is said once and kept out of the address", async ({ page }) => {
+    await openDoc(page, freshName("tbdrafted"), openBankingDoc, { query: "?drafted=case-study" });
+    await expect.poll(() => new URL(page.url()).search).toBe("");
+    await expect(page.locator("[data-said]")).toContainText("Laid out as Case study.");
+    const group = await openLayout(page);
+    await expect(page.locator("[data-drafted]")).toContainText("Laid out as Case study.");
+    await group.getByRole("radio", { name: /^Research/ }).check();
+    await expect(page.locator("[data-drafted]")).toHaveCount(0);
+  });
+
   test("Undo is named for what it undoes, aria-disabled with nothing to undo, and gives the focus a place to go", async ({ page }) => {
     await openDoc(page, freshName("tbundo"), openBankingDoc);
     const undo = bar(page).getByRole("button", { name: /^Undo/ });
