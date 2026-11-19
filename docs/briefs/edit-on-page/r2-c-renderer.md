@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Release | 2, the reader release |
-| Model | Fable |
+| Model | Opus |
 | Branch | `phase-2-r2-c-renderer`, made from `phase-2-r2` after B is merged |
 | Port | 3302 |
 | Starts when | B's branch is merged into `phase-2-r2`. E starts when your part 1 is merged |

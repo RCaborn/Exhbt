@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Release | 3, the editor |
-| Model | Fable |
+| Model | Opus |
 | Branch | `phase-2-r3-f-drag`, made from `phase-2-r3` after G's first milestone is merged |
 | Port | 3306 |
 | Starts when | G's first milestone is merged |

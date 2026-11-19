@@ -33,17 +33,17 @@ Each release goes the usual way: the release branch is merged into `phase-2`, CI
 
 ## Agents, order and what each waits for
 
-At most two heavy agents (Fable or Opus) run at once. Sonnet agents may run beside them.
+At most two heavy (Opus) agents run at once. Rory, 19 Nov 2026: "Move to opus". Fable is no longer used: it kept hitting the account's usage limit. Sonnet agents may run beside them.
 
 | | Brief | Model | Branch | Port | Starts when |
 |---|---|---|---|---|---|
-| B | `r2-b-model-engine.md` | Fable | `phase-2-r2-b-model` | 3301 | `phase-2-r2` exists and has `withWorkVisual` (release 1b) |
-| C | `r2-c-renderer.md` | Fable | `phase-2-r2-c-renderer` | 3302 | B is merged |
+| B | `r2-b-model-engine.md` | Opus | `phase-2-r2-b-model` | 3301 | `phase-2-r2` exists and has `withWorkVisual` (release 1b) |
+| C | `r2-c-renderer.md` | Opus | `phase-2-r2-c-renderer` | 3302 | B is merged |
 | E | `r2-e-classic-editor.md` | Sonnet | `phase-2-r2-e-classic` | 3304 | C's part 1 is merged (its tests look at the page the new renderer draws) |
 | D | `r2-d-samples.md` | Sonnet | `phase-2-r2-d-samples` | 3303 | C's part 2 is merged |
-| G | `r3-g-editor-core.md` | Fable | `phase-2-r3-g-core` | 3307 | Release 2 is live. Its first milestone is every hook and plug the others call, working |
-| F | `r3-f-drag.md` | Fable | `phase-2-r3-f-drag` | 3306 | G's first milestone is merged |
-| K | `r3-k-flowchart.md` | Fable | `phase-2-r3-k-flow` | 3311 | G's first milestone is merged |
+| G | `r3-g-editor-core.md` | Opus | `phase-2-r3-g-core` | 3307 | Release 2 is live. Its first milestone is every hook and plug the others call, working |
+| F | `r3-f-drag.md` | Opus | `phase-2-r3-f-drag` | 3306 | G's first milestone is merged |
+| K | `r3-k-flowchart.md` | Opus | `phase-2-r3-k-flow` | 3311 | G's first milestone is merged |
 | H | `r3-h-top-bar.md` | Sonnet | `phase-2-r3-h-topbar` | 3308 | G's first milestone is merged |
 | I | `r3-i-sheets.md` | Sonnet | `phase-2-r3-i-sheets` | 3309 | G's first milestone is merged |
 | J | `r3-j-figures-and-images.md` | Opus | `phase-2-r3-j-figures` | 3310 | G's first milestone is merged |

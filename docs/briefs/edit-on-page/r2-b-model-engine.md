@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Release | 2, the reader release |
-| Model | Fable |
+| Model | Opus |
 | Branch | `phase-2-r2-b-model`, made from `phase-2-r2` |
 | Port | 3301 |
 | Starts when | `phase-2-r2` exists. You run alone: nobody else is working yet |

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Release | 3, the editor |
-| Model | Fable |
+| Model | Opus |
 | Branch | `phase-2-r3-g-core`, made from `phase-2-r3` |
 | Port | 3307 |
 | Starts when | Release 2 is live and `phase-2-r3` exists. Seven agents wait for your first milestone |
