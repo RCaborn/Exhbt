@@ -49,14 +49,16 @@ export function UndoButton(): ReactNode {
     <Button
       id="xe-undo"
       size="sm"
-      className="xe-tb"
+      className="xe-tb xe-undo-button"
       label={name}
       {...(label ? {} : ({ "aria-disabled": true } as object))}
       onClick={() => undo()}
     >
       <Undo2 aria-hidden size={16} strokeWidth={2.25} className="shrink-0" />
-      <span className="xe-tb-text">Undo</span>
-      {label && <span className="xe-undo-for">: {label}</span>}
+      <span className="xe-undo-text">
+        <span className="xe-tb-text">Undo</span>
+        {label && <span className="xe-undo-for">: {label}</span>}
+      </span>
     </Button>
   );
 }

@@ -1,12 +1,14 @@
 /* The edit-on-page editor's top bar (decision 0026, "The chrome"): H's. App chrome, so only the app's own
    tokens, never the page's --xp-* variables. The row is exactly --xe-topbar-h tall (core.css) and never
-   scrolls sideways: what does not fit is shortened in steps (100rem, 80rem, 64rem), and under 48rem the row
+   scrolls sideways: what does not fit is shortened in steps (100rem, 88rem, 64rem), and under 48rem the row
    keeps the way back, the word count, the things to fix, the save status and "Review and publish", with the
    rest in the menu. */
 @layer components {
   .xe-topbar .xe-topbar-row {
     gap: 0.5rem;
     min-width: 0;
+    /* The whole width of the window, so the steps below (by window width) are the room the row has. */
+    max-width: none;
   }
   .xe-topbar .xe-topbar-row > * {
     flex: none;
@@ -65,6 +67,11 @@
     background: var(--color-wash);
     border-color: var(--color-jade);
     color: var(--color-ink);
+  }
+  .xe-undo-text {
+    display: inline-flex;
+    min-width: 0;
+    white-space: nowrap;
   }
   .xe-undo-for {
     display: none;
@@ -175,8 +182,8 @@
   .xe-menu-items > * {
     justify-content: flex-start;
   }
-  .xe-menu-items .xe-tb-text,
-  .xe-menu-items .xe-undo-for {
+  .xe-topbar .xe-menu-items .xe-tb .xe-tb-text,
+  .xe-topbar .xe-menu-items .xe-tb .xe-undo-for {
     display: inline;
   }
   .xe-menu-items [role="group"] {
@@ -294,6 +301,21 @@
   }
 
   /* The kept steps, from the widest down. */
+  @media (width < 64rem) {
+    .xe-topbar .xe-publish,
+    .xe-topbar .xe-publish * {
+      white-space: normal;
+      line-height: 1.1;
+      text-align: center;
+    }
+    .xe-topbar .xe-publish {
+      padding-inline: 0.625rem;
+      max-width: 6.25rem;
+    }
+    .xe-topbar .xe-undo-button .xe-tb-text {
+      display: none;
+    }
+  }
   .xe-back-text,
   .xe-chip-state {
     display: none;
@@ -308,7 +330,10 @@
       display: inline-flex;
     }
   }
-  @media (width >= 80rem) {
+  @media (width >= 88rem) {
+    .xe-topbar .xe-visitor .xe-tb-text {
+      display: inline;
+    }
     .xe-wordbar-limits {
       display: inline;
     }
@@ -333,7 +358,6 @@
     .xe-wordbar-bar {
       display: block;
     }
-    .xe-topbar .xe-visitor .xe-tb-text,
     .xe-topbar .xe-card-button .xe-tb-text {
       display: inline;
     }
@@ -358,11 +382,16 @@
       display: none;
     }
     .xe-topbar .xe-tb-icon,
-    .xe-fix-button {
+    .xe-topbar .xe-fix-button {
       min-width: 2.75rem;
+      padding-inline: 0.5rem;
     }
     .xe-wordbar {
       font-size: 0.75rem;
+    }
+    .xe-topbar .xe-publish,
+    .xe-topbar .xe-publish * {
+      font-size: 0.8125rem;
     }
     .xe-fix-words {
       display: none;
@@ -383,18 +412,13 @@
     .xe-topbar-row:has(.xe-save-bad) .xe-wordbar {
       display: none;
     }
-    .xe-publish {
-      white-space: normal;
-      line-height: 1.1;
-      padding-inline: 0.625rem;
-      max-width: 5.75rem;
-    }
     .xe-pop {
       position: static;
     }
+    /* Under the bar (the header is the sticky box they hang from), as wide as the screen. */
     .xe-pop-panel {
-      position: fixed;
-      top: calc(var(--xe-topbar-h) + 0.25rem);
+      position: absolute;
+      top: calc(100% + 0.25rem);
       left: 0.5rem;
       right: 0.5rem;
       width: auto;
@@ -409,10 +433,6 @@
     }
     .xe-menu-items .xe-tb {
       min-height: 2.75rem;
-    }
-    .xe-menu-items .xe-visitor .xe-tb-text,
-    .xe-menu-items .xe-card-button .xe-tb-text {
-      display: inline;
     }
     .xe-layout-panel,
     .xe-fix-panel {

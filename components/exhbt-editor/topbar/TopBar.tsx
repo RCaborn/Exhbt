@@ -53,7 +53,7 @@ export function TopBar(): ReactNode {
   return (
     <header className="xe-topbar" data-topbar>
       <div className="xe-topbar-row">
-        <Link href="/exhbts" className="xe-back">
+        <Link href="/exhbts" className="xe-back" aria-label="Your exhbts">
           <ArrowLeft aria-hidden size={16} strokeWidth={2.25} />
           <span className="xe-back-text">Your exhbts</span>
         </Link>

@@ -101,22 +101,24 @@ test.describe("the top bar", () => {
     await expect(undo).not.toHaveAttribute("aria-disabled", "true");
     await expect(undo).toHaveAccessibleName("Undo: remove graph 1");
     await undo.click();
-    // The graph is back; the cursor is in its first field or on its frame, and Undo has nothing left to undo.
+    // The graph is back and the focus is in it (its first field, or the frame when it has none).
     await expect(page.locator(`${READY} [data-section-id="graph-1"]`)).toBeVisible();
     await expect(undo).toHaveAttribute("aria-disabled", "true");
-    await expect(page.getByRole("heading", { level: 1, name: "Edit exhbt" })).toBeFocused();
+    await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-section-id]")?.getAttribute("data-section-id"))).toBe("graph-1");
     expect(await undoLabel(page)).toBeNull();
 
-    // With two entries, the second Undo leaves the focus on Undo itself.
+    // An entry about no one section (a layout switch) leaves the focus on Undo while it can still be pressed ...
     await page.evaluate(() => {
-      window.__exhbtEditor!.remove("graph-1");
-      window.__exhbtEditor!.remove("reflection-1");
+      window.__exhbtEditor!.setLayout("gallery");
+      window.__exhbtEditor!.setLayout("research");
     });
     await undo.click();
-    await expect(page.locator(`${READY} [data-section-id="reflection-1"]`)).toBeVisible();
-    await expect(page.locator(`${READY} [data-section-id="reflection-1"] :focus`)).toHaveCount(1);
+    await expect(undo).not.toHaveAttribute("aria-disabled", "true");
+    await expect(undo).toBeFocused();
+    // ... and sends it to the heading when there is nothing left to undo.
     await undo.click();
     await expect(undo).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByRole("heading", { level: 1, name: "Edit exhbt" })).toBeFocused();
   });
 
   test("the word bar counts as you type and turns over past the cap", async ({ page }) => {
@@ -229,7 +231,7 @@ test.describe("the top bar", () => {
     await page.getByRole("button", { name: "Use the classic editor" }).click();
     await expect(page.locator('[data-editor="classic"]')).toBeVisible();
     expect(page.url()).toContain("editor=classic");
-    await expect(page.getByLabel(/Your question/).first()).toHaveValue("Typed just before the switch");
+    await expect(page.getByRole("textbox", { name: /Your question/ }).first()).toHaveValue("Typed just before the switch");
     expect(id).toBeTruthy();
   });
 
@@ -240,6 +242,20 @@ test.describe("the top bar", () => {
     await expect(page.getByRole("button", { name: "Use the classic editor" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Unpublish" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Reorder sections" })).toHaveCount(0);
+  });
+
+  test("the row fits without scrolling sideways from a phone to a wide desktop", async ({ page }) => {
+    await openDoc(page, freshName("tbwidths"), flaggedDoc());
+    await page.evaluate(() => window.__exhbtEditor!.remove("graph-1"));
+    for (const width of [390, 600, 768, 820, 1024, 1280, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      const row = bar(page).locator(".xe-topbar-row");
+      await expect(row).toBeVisible();
+      if (process.env.TOPBAR_SHOTS) await bar(page).screenshot({ path: `${process.env.TOPBAR_SHOTS}/bar-${width}.png` });
+      const over = await row.evaluate((el) => [...el.children].filter((c) => c.getBoundingClientRect().right > el.getBoundingClientRect().right + 0.5 || c.getBoundingClientRect().left < -0.5).map((c) => c.className));
+      expect(over, `at ${width}px`).toEqual([]);
+      expect(await row.evaluate((el) => el.scrollWidth <= el.clientWidth), `at ${width}px`).toBe(true);
+    }
   });
 
   test("on a phone the row keeps its short list, does not scroll sideways and every control is 44px", async ({ page }) => {
