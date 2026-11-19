@@ -32,10 +32,10 @@ Nothing above has run with real Stripe, real Supabase Storage, or the real Haiku
    - GitHub only lets you run a manual workflow once its file is on `main`, so the eval workflow (`.github/workflows/eval-drafts.yml`) needs to land on `main` first.
    - It's safe to merge that one file on its own, because it doesn't change the site. Say the word and it will be done as a small pull request.
 2. **Stripe, test mode first** (LAUNCH.md has the detail):
-   - Create two products, Premium £9/month and Max £15/month (GBP).
+   - Create two products, Premium and Max, each with one yearly GBP price. The amounts are `PRICES` in `lib/entitlements.ts` (LAUNCH.md). Not monthly.
    - Put both price ids in `wrangler.jsonc` vars, as `STRIPE_PRICE_PREMIUM` and `STRIPE_PRICE_MAX`.
    - Add the secrets `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` to the Worker.
-   - Create a webhook to `https://<app host>/api/stripe/webhook` with `checkout.session.completed`, `customer.subscription.updated` and `customer.subscription.deleted`.
+   - Create a webhook to `https://<app host>/api/stripe/webhook` with `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid` and `invoice.payment_failed`.
    - Turn on the Customer portal.
    - Optional: a promotion code for a new-joiner discount.
 3. **A preview to click through.** Create a second free Supabase project (for example `exhbt-preview`) and say so. The preview Worker is built (see "Preview site" below); it needs its secrets adding and the migrations applied to that project, then Stripe test keys. That's where the real-service run happens.

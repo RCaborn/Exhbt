@@ -56,7 +56,7 @@ Phase 2 builds on all of this rather than starting again.
 
 ## 2. Payments (Stripe)
 - Stripe Checkout for Premium and Max. The Stripe Billing Portal handles upgrade, downgrade and cancel.
-- `app/api/stripe/webhook/route.ts`: verify signatures with `stripe.webhooks.constructEventAsync`, which works on the Workers runtime. It handles `checkout.session.completed`, `customer.subscription.updated` and `customer.subscription.deleted`, writing to `subscriptions` (the table exists).
+- `app/api/stripe/webhook/route.ts`: verify signatures with `stripe.webhooks.constructEventAsync`, which works on the Workers runtime. It handles `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid` and `invoice.payment_failed`, writing to `subscriptions` (the table exists). The invoice events refresh that row from the subscription, so a renewal or a failed card is recorded even when the subscription event is late.
 - Secrets: `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` as Worker secrets. Price IDs go in `wrangler.jsonc` vars (not secret) and are added to `/api/health`.
 - `PRICES` in `lib/entitlements.ts` stays the only place prices live. **Rory sets the prices** (open question). Until then the pricing page keeps the waitlist.
 
