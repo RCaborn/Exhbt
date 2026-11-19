@@ -14,7 +14,7 @@ Make the new editor good on a phone: one column, a bar at the foot of the screen
 
 ## Read first
 
-`docs/decisions/0026-edit-on-page-editor.md` ("The chrome", "Dragging", "Accessibility", "Not sure, and risky"). The prototype's report, `git show origin/phase-2-lab:docs/briefs/edit-on-page/drag-prototype.md` ("Why the flowchart feels worse sliding", "Not verified", and the note that four 44px buttons on every section crowd a phone). `DESIGN.md` (touch targets, motion). On your base: `components/exhbt-editor/phone/` (G's stubs), `Frame.tsx` (read only: the toolbar's markup), `store.ts`, `context.ts`, `drag/index.ts`, `ui/Sheet.tsx`, and the `editor-touch` rules in `app/globals.css` (read only).
+`docs/decisions/0026-edit-on-page-editor.md` ("The chrome", "Dragging", "Accessibility", "Not sure, and risky"). The prototype's report, `docs/briefs/edit-on-page/drag-prototype.md` ("Why the flowchart feels worse sliding", "Not verified", and the note that four 44px buttons on every section crowd a phone). `DESIGN.md` (touch targets, motion). On your base: `components/exhbt-editor/phone/` (G's stubs), `Frame.tsx` (read only: the toolbar's markup), `store.ts`, `context.ts`, `drag/index.ts`, `ui/Sheet.tsx`, and the `editor-touch` rules in `app/globals.css` (read only).
 
 ## You own
 

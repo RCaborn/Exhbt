@@ -14,7 +14,7 @@ Rebuild the prototype's drag on the real editor: sections slide to make room, th
 
 ## Read first
 
-`docs/decisions/0026-edit-on-page-editor.md` ("Dragging", "The chrome", "Smoothness", "Not sure, and risky"). The prototype's report, `git show origin/phase-2-lab:docs/briefs/edit-on-page/drag-prototype.md`, all of it. The prototype's code, which proved the method and which you build again against the real store and rows, not paste in: `git show origin/phase-2-lab:components/lab/Board.tsx`, `drag-plan.ts`, `layout.ts`, `blocks.ts`, `Tray.tsx`, `options.ts`, `lab.css`, and `git show origin/phase-2-lab:e2e/lab-editor.spec.ts` (the checks to carry over). Then, on your base: `components/exhbt-editor/store.ts`, `Frame.tsx`, `drag/index.ts`, `Insert.tsx`, `Tray.tsx` (G's stubs), `lib/exhbt/layouts.ts`, `components/portfolio/layout-rows.ts`, `LayoutMain.tsx`, and DESIGN.md's Dragging rule.
+`docs/decisions/0026-edit-on-page-editor.md` ("Dragging", "The chrome", "Smoothness", "Not sure, and risky"). The prototype's report, `docs/briefs/edit-on-page/drag-prototype.md`, all of it. The prototype's code, which proved the method and which you build again against the real store and rows, not paste in: `git show origin/phase-2-lab:components/lab/Board.tsx`, `drag-plan.ts`, `layout.ts`, `blocks.ts`, `Tray.tsx`, `options.ts`, `lab.css`, and `git show origin/phase-2-lab:e2e/lab-editor.spec.ts` (the checks to carry over). Then, on your base: `components/exhbt-editor/store.ts`, `Frame.tsx`, `drag/index.ts`, `Insert.tsx`, `Tray.tsx` (G's stubs), `lib/exhbt/layouts.ts`, `components/portfolio/layout-rows.ts`, `LayoutMain.tsx`, and DESIGN.md's Dragging rule.
 
 ## You own
 
@@ -22,7 +22,7 @@ Rebuild the prototype's drag on the real editor: sections slide to make room, th
 
 ## You must not touch
 
-The rest of `components/exhbt-editor/` (`Frame.tsx` and `store.ts` are G's), `components/exhbt-editor/flow/` (K drags the boxes inside the flowchart; you drag the flowchart as a section), the page parts, `lib/exhbt/`, `app/globals.css`, `playwright.config.ts` (G's: it has a `touch` project on a Pixel 7 for your spec; report if you need a change).
+The rest of `components/exhbt-editor/` (`Frame.tsx` and `store.ts` are G's), `components/exhbt-editor/flow/` (K drags the boxes inside the flowchart; you drag the flowchart as a section), the page parts, `lib/exhbt/`, `app/globals.css`, `playwright.config.ts` (A made it, G owns it: a `touch` project on a Pixel 7 runs `editor-drag`, `editor-flow` and `editor-phone`; report if you need a change).
 
 ## What you build against
 
@@ -267,10 +267,10 @@ Commit and push after each.
 2. **`drag/measure.ts`**: lays out `rowsFor(items with the lifted one at a place)` as empty boxes in a hidden copy of the column, pairs, stacks and groups included, using `rowClass` and `stackClass`, and reads where each lands. A box keeps the height it had; one whose width changes takes the height it would roughly have (a picture keeps its shape, words keep their area).
 3. **`drag/Board.tsx`**: `DragBoard` and `useBoard`. Freeze at pick-up; follow the pointer yourself (dnd-kit for the sensors and the press delay only: mouse after 6px, touch after a 150ms press with 8px of tolerance); slide by transform or draw the line; the lifted copy on a card with the pack shadow and an outline in the look's link colour, never scaled, drawn with `ItemView` and no adapter; the drop as a move from where it was let go, 180ms, transforms only; nothing animated under reduced motion. Find sections by `data-section-id` each time: a section that changes row is a new node. Clip the canvas so a carried copy cannot lengthen the page. Every step is said through `ui.say`.
 4. **Keyboard**: Space or Enter on the grip, arrows a place at a time, Space or Enter to drop, Escape to cancel, Tab drops. `moveBy` does the same motion for the move buttons and keeps the focus on the button pressed, or the other one at an end.
-5. **`remove` and `add`**: the motion, the words, and the focus (to what took a removed section's place; into a new text section's field; for an image, open the file picker and put the pictures there through `useFiles().addImages(files, at)`).
-6. **`Insert.tsx`**: the "+" in the gap above each row and at the end (the end one has the id `add-section`). It opens the list from `blockOptions(doc)`: each kind with its icon and the layout's word for it; a full kind dimmed and not choosable, with its reason under it and tied to it; the words left (`data-testid="words-left"`) at the top. When `canTakeFigure(doc, useEnv().reportFiles)` (from `components/exhbt-editor/figures/take.ts`, J's) is true, the list ends with "Take a figure from my report", which calls `ui.open("figure")`. On a phone the "+" sits at the left of the gap. It must take no room: nothing on the page moves when it is there.
-7. **`Tray.tsx`**: the rail, drawn only from a 77rem window with `pointer: fine`, fixed in the right margin beside the page's frame, clear of the top and bottom fifths of the window, inside the look's wrapper so it takes the look's colours. A block dragged from it has no place until it is over the page, then is placed by the same plan; the page scrolls itself when it is held near an edge (the board does this for a tray block, since dnd-kit will not). Enter on a block adds it after `board.lastFocus()`, or at the end, and says so. A full kind cannot be dragged or added and gives its reason.
-8. **`scripts/editor-timing.mjs`**: the prototype's `scripts/lab-timing.mjs` pointed at the real editor on a production build with the processor slowed four times: the longest and median frame during a scripted drag of the gallery sample's lead image to the foot of the page and at the drop, and keystroke-to-paint for 40 characters in a finding. It prints a table. It is not a test.
+5. **`remove` and `add`**: the motion, the words, and the focus (to what took a removed section's place; into a new text section's field). For a graph, `add` calls `ui.open("chart", id)` once it is placed, so its figures sheet opens (J fills the sheet; G's stub already holds `ChartEditor`). For an image, `add` opens the file picker and puts the pictures there through `useFiles().addImages(files, at)`; G's status line says "Uploading 1 of 3" from the moment they are chosen and shows a failed upload's reason, so do not draw your own.
+6. **`Insert.tsx`**: the "+" in the gap above each row and at the end. The end one has the id `add-section`, the name "Add a section" and `data-path="sections"` (the anchor for "Things to fix" issues about how many of a kind; when G's jump lands on it, it gets an `xe-jump` event and opens its menu); each other one is named "Add a section before <label>" (`sectionLabel` of the item after it). It opens the list from `blockOptions(doc)`: each kind with its icon and the layout's word for it; a full kind dimmed and not choosable, with its reason under it and tied to it; the words left (`data-testid="words-left"`) at the top; and when every kind is full, one line above them: "This <layout> is full. Remove a section to add another, or try another layout." When `canTakeFigure(doc, useEnv().reportFiles)` (from `components/exhbt-editor/figures/take.ts`, J's) is true, the list ends with "Take a figure from my report", which calls `ui.open("figure")`; when the image kind is full, that entry is dimmed with the image's reason instead. On a phone the "+" sits at the left of the gap. It must take no room: nothing on the page moves when it is there.
+7. **`Tray.tsx`**: the rail, drawn only from a 77rem window with `pointer: fine`, fixed in the right margin beside the page's frame, clear of the top and bottom fifths of the window, inside the look's wrapper so it takes the look's colours. A block dragged from it has no place until it is over the page, then is placed by the same plan; the page scrolls itself when it is held near an edge (the board does this for a tray block, since dnd-kit will not). Enter on a block adds it after `board.lastFocus()`, or at the end, and says so. A full kind cannot be dragged or added and gives its reason. At the top of the rail: the words left, and the same "full" line as the "+" when every kind is full.
+8. **`scripts/editor-timing.mjs`**: the prototype's `scripts/lab-timing.mjs` pointed at G's sign-in-free harness, `/dev/editor-timing?sample=gallery`, on a production build made with `EXHBT_LAB=1` (the only way the harness is served in production; never set it anywhere else, and add no sign-in route), with the processor slowed four times: the longest and median frame during a scripted drag of the gallery sample's lead image to the foot of the page and at the drop, and keystroke-to-paint for 40 characters in a finding. It prints a table. It is not a test.
 
 ## What the prototype did not prove
 
@@ -278,17 +278,17 @@ It drew every sample with the case study's pairing and an even grid. The gallery
 
 ## Tests
 
-`e2e/editor-drag.spec.ts`, carried over from `e2e/lab-editor.spec.ts`, on each of the three layouts' samples, desktop project unless said:
+`e2e/editor-drag.spec.ts`, carried over from `e2e/lab-editor.spec.ts`, on each layout's sample (loop over `offered()` and `SAMPLES` from `e2e/page-editor.ts`, so release 4 adds four layouts with no change here), desktop project unless said:
 - a click on a grip or a nudge under 6px is not a drag; words in a section can still be selected;
 - **nothing moves when a drag starts, and until the drop every section's layout box is unchanged**; a slide changes only transforms; the drop's motion is transforms only and 180ms; (check 3 of 0026's "Smoothness");
 - the flowchart is carried with a line over a still page, by mouse and by keyboard; every other section slides;
 - dropped into a pair, out of a pair, into the image grid and out of it, the stored order is the place shown;
 - **no flicker**: resting on a boundary and trembling 2px either side 40 times never changes the place, beside a pair, down the side of a pair, along a row of the grid, between two rows of it, and beside a stack (check 4);
 - the keyboard moves a section across a pair and into and out of the grid, each step read out;
-- the page scrolls itself with the pointer still near the bottom edge and near the top edge, and stops at its end;
+- the page scrolls itself with the pointer still near the bottom edge and near the top edge, and stops at its end; and the same for a block carried from the tray near the bottom edge (dnd-kit does not do this for something fixed to the window);
 - with reduced motion `document.getAnimations()` is empty during and after a drag;
 - the frame, the line and the lifted copy take the look's colours in Exhbt and Night, and pass contrast in all eight looks;
-- the "+": every kind the layout holds, the real caps and reasons, on each layout; a new block lands where the "+" was; nothing moves when the menu opens;
+- the "+": every kind the layout holds, the real caps and reasons, on each layout; a new block lands where the "+" was; nothing moves when the menu opens; each "+" has its own name; on a full case study the "full" line shows; a new graph opens its figures sheet;
 - the tray: there at 77rem and gone at 76rem; beside the page and never over it; a block dragged into a gap, beside the findings and into the grid; the keyboard way; a full kind refused;
 - on the `touch` project: a swipe on a section's words and on a picture scrolls and moves nothing; a quick swipe from a grip picks nothing up; a 260ms press picks up; no tray;
 - axe with a section lifted.
@@ -297,7 +297,7 @@ Run: `e2e/editor-drag.spec.ts` on both projects, and `e2e/editor-smooth.spec.ts`
 
 ## Done looks like
 
-Every check above passes on all three layouts; the timing script runs and you have its table; `drag/options.ts` has the three constants.
+Every check above passes on every offered layout; the timing script runs and you have its table; `drag/options.ts` has the three constants.
 
 ## Report back
 

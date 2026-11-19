@@ -194,6 +194,7 @@ Commit and push after each. Keep every label and message below exactly: the migr
    - a plan that cannot publish: "This exhbt is a preview only: nobody else can see it." and the existing `UpgradePrompt`;
    - no username: "You need a username to publish." with the link "Choose one";
    - when there are issues: "3 things to fix before this can go live." and a button, "Show me", which closes the sheet and calls `ui.jumpTo` on the first issue's path;
+   - when there are numbers to check (`unverifiedOf(doc)`), the same rows as H's panel, in a list named "Numbers to check": "Check this number: 18%", "That's right: 18%" (`store.patchDoc((d) => confirmNumber(d, n), "confirm 18%")`) and "Show me" (closes the sheet, `ui.jumpTo(pathOfNumber(doc, n))`). If the server's reasons include its "Check the flagged number… at the top, or take them out.", show "Check the flagged numbers below." in its place: there is nothing at the top of this editor;
    - the tick, labelled exactly "This is my work, and the numbers are true", bound to `ui.confirmed` and `ui.setConfirmed`;
    - the button "Publish", or "Publish changes" when it is live. On press: `useIssues().setTried(true)`; `await useSave().settled()`; `publishExhbt(id, store.get(), ui.confirmed)`. On success: `useSave().markSaved(doc)`, `useFiles().markPublished(doc)`, and the live panel: "It's live." or "Your changes are live.", the address, "View it", the existing `CopyLink`, "Back to your exhbts". On failure: the reasons, in a `role="status"` list;
    - when it is live and nothing is in progress: "Live at <address>".
@@ -209,6 +210,7 @@ Commit and push after each. Keep every label and message below exactly: the migr
 `e2e/editor-sheets.spec.ts`, using `e2e/page-editor.ts` (read it, do not edit it):
 - publishing a complete exhbt: tick, "Publish", "It's live.", and the live address opens the page; then a change and "Publish changes" gives "Your changes are live.";
 - publishing an incomplete one: the reasons show, "Show me" lands the cursor in the first field to fix, and the page's "Confirmed by" check is hollow until the tick is made;
+- a complete doc with one flagged number (seeded with `unverified`): the sheet lists it; "That's right" then the tick then "Publish" gives "It's live.";
 - a Free plan sees the preview-only words and no Publish button;
 - the summary typed in the sheet shows on the tile beside it at once, is saved, and an over-long one shows its issue; `ui.jumpTo("summary")` (through "Things to fix", if H has landed, or by calling it in the page) opens the sheet with the cursor in the field;
 - the work: a link and its name appear on the sidebar button; a file can be attached, replaced and removed; removing it and pressing Undo brings it back with its file still there;

@@ -72,12 +72,13 @@ Commit and push after each.
    - `"slide"`: the other boxes slide aside (dnd-kit's sortable does this well for boxes of one size in one line).
    The flowchart is a row or a column by its container's width, so read which it is from the list and sort along that axis. Mouse after 6px, touch after a 150ms press, keyboard from the grip (Space or Enter, arrows, Space or Enter, Escape), each step read out ("The box would go to place 3 of 5"). Nothing animates under reduced motion.
 5. **The last box is the result**, drawn dark, whichever box that is after a move. Check it follows.
-6. **Issues**: a box with an issue at `flow.N.step` or `flow.N.detail` is marked by the field (G's); the count issue at `flow` ("The flowchart needs at least 3 boxes.") shows under the flowchart, tied to the list.
+6. **Issues**: a box with an issue at `flow.N.step` or `flow.N.detail` is marked by the field (G's). The list carries `data-path="flow"` (and `tabIndex={-1}`), the anchor "Things to fix" jumps to for the count issue ("The flowchart needs at least 3 boxes."). That issue is never drawn in the flow: the list gets an outline in `--xp-error` and `aria-describedby` pointing at the message, which is visually hidden until the list or a box in it has the focus, then shows in a small popover. It is in "Things to fix" too.
 
 ## Tests
 
-`e2e/editor-flow.spec.ts`, on a case study (a row), a gallery (a column beside "What happened") and research (a column under "Method"):
+`e2e/editor-flow.spec.ts`, on each layout's sample (loop over `offered()` and `SAMPLES` from `e2e/page-editor.ts`): a case study (a row), a gallery (a column beside "What happened"), research (a column under "Method"), and in release 4 the four new ones with no change here:
 - typing in a box re-renders the flowchart only, once a key (use `renders(page)` from `e2e/page-editor.ts`);
+- with two boxes, "Things to fix" lists the count issue and jumps to the list, and nothing on the page moved when the issue appeared;
 - "+" on an arrow adds a box there with the focus in it; at six boxes there is no "+"; Remove at three boxes is off;
 - a box dragged along the row and down the column lands where shown; with `"line"` every other box stays where it is until the drop and a copy the size of the box is carried; nothing moves when the drag starts;
 - the keyboard moves a box, each step read out;
@@ -91,7 +92,7 @@ Run: `e2e/editor-flow.spec.ts` on both projects, `e2e/layout-parity.spec.ts`, `e
 
 ## Done looks like
 
-The checks above pass on all three layouts; the parity spec still passes; changing `FLOW_BOX_STYLE` to `"slide"` needs no other change (run your spec once each way, without committing the change, and say so).
+The checks above pass on every offered layout; the parity spec still passes; changing `FLOW_BOX_STYLE` to `"slide"` needs no other change (run your spec once each way, without committing the change, and say so).
 
 ## Report back
 
