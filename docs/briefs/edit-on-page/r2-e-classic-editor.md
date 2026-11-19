@@ -4,9 +4,9 @@
 |---|---|
 | Release | 2, the reader release |
 | Model | Sonnet |
-| Branch | `phase-2-r2-e-classic`, made from `phase-2-r2` after B is merged |
+| Branch | `phase-2-r2-e-classic`, made from `phase-2-r2` after C's part 1 is merged |
 | Port | 3304 |
-| Starts when | B's branch is merged. C works beside you on other files |
+| Starts when | B and C's part 1 are merged: your tests look at the preview, which only draws a moved or removed flowchart once the new renderer is in. C's part 2 may run beside you, on other files |
 
 ## Goal
 
@@ -22,7 +22,7 @@ Today's editor stays for two more releases as the fallback. Make it open, edit a
 
 ## You must not touch
 
-`lib/exhbt/` (B's, merged; report what you need), `components/portfolio/` and `components/exhbt/` (C is in them now), `app/globals.css`, `app/(app)/exhbts/[id]/`, the existing specs.
+`lib/exhbt/` (B's, merged; report what you need), `components/portfolio/` and `components/exhbt/` (C's), `app/globals.css`, `app/(app)/exhbts/[id]/`, the existing specs.
 
 ## What you build against
 
@@ -134,7 +134,8 @@ The branch head; anything in `components/editor/` that rebuilt a doc from fixed 
 3. **Your files only.** Change the files this brief says you own. If something you need is in a file you must not touch, stop that part, carry on with the rest, and say exactly what you need in your report. Do not work round it with a copy.
 4. **Commit and push after every working step.** The account's usage limit can stop you without warning, and only what is pushed survives. A step is small: one function with its test, one component that renders. Push each time (`git push -u origin <your branch>`).
 5. **Before every commit, run all four:** `npx tsc --noEmit -p .` ; `npm run lint` ; `npm run check:docs` ; `npm run check:theme`. Then `git checkout -- tsconfig.json` if `next dev` rewrote it.
-6. **Playwright:** run only the spec files this brief names, one worker, on your own port: `E2E_PORT=<your port> npx playwright test <file> --workers=1`. Never run the whole suite. Never skip or delete a test to make it pass.
+6. **Playwright:** run only the spec files this brief names, one worker, on your own port: `E2E_PORT=<your port> npx playwright test <file> --workers=1`. Never run the whole suite. Never skip, weaken or delete a test to make it pass, unless this brief names the case.
 7. **Commit messages:** plain British English, what changed and why, first line under about 70 characters. End with your own attribution lines, then the line `Claude-Session: https://claude.ai/code/session_01SXCVQu8yRBVXtcSEG6wWoZ`.
 8. **House rules that bite here:** colours and corners on the exhbt page come only from the `--xp-*` variables; buttons in app chrome are Astryx Buttons through `components/ui/Button.tsx`; lower-case "exhbt" in running text; plain British English with no hype words; no plan figures in prose; Claude Haiku is the only model the app names (`lib/ai/model.ts`); data access goes through the `Store` interface; never edit an applied migration; never commit a secret.
-9. **If you are resumed after a stop:** run `git status` and `git log --oneline -5` first, commit and push anything on disk that works, then carry on from the step list.
+9. **If something you wait for lands after you started,** the main session will tell you. Then merge the release branch into yours (`git fetch origin && git merge origin/<release branch>`); never rebase a branch you have pushed.
+10. **If you are resumed after a stop:** run `git status` and `git log --oneline -5` first, commit and push anything on disk that works, then carry on from the step list.

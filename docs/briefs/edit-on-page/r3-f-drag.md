@@ -61,8 +61,12 @@ export function flowShown(doc: ExhbtDoc): boolean;
 export function adopt(doc: ExhbtDoc): ExhbtDoc;
 /** A layout switch in the new editor: adopt, set the layout, sort the sections into its usual order (a stable sort). */
 export function applyTemplate(doc: ExhbtDoc, to: Format): ExhbtDoc;
-/** What the main column draws, in order: the items of adopt(doc) that the layout shows, each with its index in `doc` as given. */
-export function pageItems(doc: ExhbtDoc): PageItem[];
+/**
+ * What the main column draws, in order: the items of adopt(doc) that the layout shows, each with its index in `doc` as given.
+ * `skip` leaves sections out before the order is worked out (the read-only page skips an image with no address and an aim
+ * or conclusion with no words, as today's page does before it pairs anything). The editor never passes it.
+ */
+export function pageItems(doc: ExhbtDoc, skip?: (s: ContentSection) => boolean): PageItem[];
 /** Sections the layout keeps but does not draw. */
 export function keptItems(doc: ExhbtDoc): PageItem[];
 export function rowsFor(items: PageItem[], f: Format): Row[];
@@ -217,6 +221,7 @@ G makes each of these files in its first milestone with the signature shown and 
 | `figures/take.ts` | `canTakeFigure(doc: ExhbtDoc, reportFiles: { fileId: string }[]): boolean` | J | returns false |
 | `flow/FlowEdit.tsx` | `useFlowEdit(): FlowEdit` | K | `list` returns its children; `box` returns the `<li>` with a lasting key; `tools` and `add` return null |
 | `drag/index.ts` | `DragBoard(props: { children: ReactNode }): ReactNode`; `useBoard(): Board` | F | `DragBoard` returns its children; `useBoard` moves and removes through the store with no motion |
+| `drag/options.ts` | `SECTION_STYLE`, `FLOW_SECTION_STYLE`, `FLOW_BOX_STYLE`, each `"slide" \| "line"` | F (K reads `FLOW_BOX_STYLE` and never edits the file) | the three constants: `"slide"`, `"line"`, `"line"` |
 | `Insert.tsx` | `Insert(props: InsertSlot): ReactNode` | F | a "+" button listing `blockOptions(doc)` and adding the chosen kind there |
 | `Tray.tsx` | `Tray(): ReactNode` | F | nothing |
 | `phone/PhoneBar.tsx` | `PhoneBar(): ReactNode` | L | nothing |
@@ -246,7 +251,7 @@ Each owner's CSS goes in its own file in `components/exhbt-editor/css/` (`core.c
 
 - A section **slides**: the others move aside by transform and a dashed box shows the room made.
 - The flowchart, moved as a section, is **carried with a line** over a still page.
-- These are constants in `drag/options.ts`, one line each: `SECTION_STYLE: "slide"`, `FLOW_SECTION_STYLE: "line"`. K reads `FLOW_BOX_STYLE: "line"` from the same file for the boxes inside the flowchart; create it.
+- These are constants in `drag/options.ts`, one line each, which G made and you now own: `SECTION_STYLE: "slide"`, `FLOW_SECTION_STYLE: "line"`. `FLOW_BOX_STYLE: "line"` in the same file is for the boxes inside the flowchart; K reads it. Do not rename any of the three.
 - The grip is the only thing that drags.
 
 ## Steps
@@ -300,7 +305,8 @@ The branch head; the timing table; any row where you fell back to the line, or w
 3. **Your files only.** Change the files this brief says you own. If something you need is in a file you must not touch, stop that part, carry on with the rest, and say exactly what you need in your report. Do not work round it with a copy.
 4. **Commit and push after every working step.** The account's usage limit can stop you without warning, and only what is pushed survives. A step is small: one function with its test, one component that renders. Push each time (`git push -u origin <your branch>`).
 5. **Before every commit, run all four:** `npx tsc --noEmit -p .` ; `npm run lint` ; `npm run check:docs` ; `npm run check:theme`. Then `git checkout -- tsconfig.json` if `next dev` rewrote it.
-6. **Playwright:** run only the spec files this brief names, one worker, on your own port: `E2E_PORT=<your port> npx playwright test <file> --workers=1`. Never run the whole suite. Never skip or delete a test to make it pass.
+6. **Playwright:** run only the spec files this brief names, one worker, on your own port: `E2E_PORT=<your port> npx playwright test <file> --workers=1`. Never run the whole suite. Never skip, weaken or delete a test to make it pass, unless this brief names the case.
 7. **Commit messages:** plain British English, what changed and why, first line under about 70 characters. End with your own attribution lines, then the line `Claude-Session: https://claude.ai/code/session_01SXCVQu8yRBVXtcSEG6wWoZ`.
 8. **House rules that bite here:** colours and corners on the exhbt page come only from the `--xp-*` variables; buttons in app chrome are Astryx Buttons through `components/ui/Button.tsx`; lower-case "exhbt" in running text; plain British English with no hype words; no plan figures in prose; Claude Haiku is the only model the app names (`lib/ai/model.ts`); data access goes through the `Store` interface; never edit an applied migration; never commit a secret.
-9. **If you are resumed after a stop:** run `git status` and `git log --oneline -5` first, commit and push anything on disk that works, then carry on from the step list.
+9. **If something you wait for lands after you started,** the main session will tell you. Then merge the release branch into yours (`git fetch origin && git merge origin/<release branch>`); never rebase a branch you have pushed.
+10. **If you are resumed after a stop:** run `git status` and `git log --oneline -5` first, commit and push anything on disk that works, then carry on from the step list.

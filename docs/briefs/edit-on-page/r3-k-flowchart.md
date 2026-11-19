@@ -58,7 +58,7 @@ From the store (`components/exhbt-editor/store.ts`), the part you use:
 
 Each of the three changes is one undo entry. `flowAdd` returns null when the flowchart is full.
 
-`useDoc((d) => d.flow)` gives the boxes. `useUi().say(text)` speaks. The limits are `LIMITS.flow` in `lib/exhbt/blocks.ts` (min, max). `FLOW_BOX_STYLE` in `components/exhbt-editor/drag/options.ts` is `"line"` or `"slide"`; if F has not created it yet, create the file with that one constant and say so in your report.
+`useDoc((d) => d.flow)` gives the boxes. `useUi().say(text)` speaks. The limits are `LIMITS.flow` in `lib/exhbt/blocks.ts` (min, max). `FLOW_BOX_STYLE` in `components/exhbt-editor/drag/options.ts` is `"line"` or `"slide"`. G made that file and F owns it: read the constant and never edit the file. For your own run with the other style, change it locally and do not commit the change.
 
 ## Steps
 
@@ -91,7 +91,7 @@ Run: `e2e/editor-flow.spec.ts` on both projects, `e2e/layout-parity.spec.ts`, `e
 
 ## Done looks like
 
-The checks above pass on all three layouts; the parity spec still passes; changing `FLOW_BOX_STYLE` to `"slide"` and back needs no other change (run your spec once each way and say so).
+The checks above pass on all three layouts; the parity spec still passes; changing `FLOW_BOX_STYLE` to `"slide"` needs no other change (run your spec once each way, without committing the change, and say so).
 
 ## Report back
 
@@ -104,7 +104,8 @@ The branch head; anything you changed in `MethodFlow.tsx` and why; whether both 
 3. **Your files only.** Change the files this brief says you own. If something you need is in a file you must not touch, stop that part, carry on with the rest, and say exactly what you need in your report. Do not work round it with a copy.
 4. **Commit and push after every working step.** The account's usage limit can stop you without warning, and only what is pushed survives. A step is small: one function with its test, one component that renders. Push each time (`git push -u origin <your branch>`).
 5. **Before every commit, run all four:** `npx tsc --noEmit -p .` ; `npm run lint` ; `npm run check:docs` ; `npm run check:theme`. Then `git checkout -- tsconfig.json` if `next dev` rewrote it.
-6. **Playwright:** run only the spec files this brief names, one worker, on your own port: `E2E_PORT=<your port> npx playwright test <file> --workers=1`. Never run the whole suite. Never skip or delete a test to make it pass.
+6. **Playwright:** run only the spec files this brief names, one worker, on your own port: `E2E_PORT=<your port> npx playwright test <file> --workers=1`. Never run the whole suite. Never skip, weaken or delete a test to make it pass, unless this brief names the case.
 7. **Commit messages:** plain British English, what changed and why, first line under about 70 characters. End with your own attribution lines, then the line `Claude-Session: https://claude.ai/code/session_01SXCVQu8yRBVXtcSEG6wWoZ`.
 8. **House rules that bite here:** colours and corners on the exhbt page come only from the `--xp-*` variables; buttons in app chrome are Astryx Buttons through `components/ui/Button.tsx`; lower-case "exhbt" in running text; plain British English with no hype words; no plan figures in prose; Claude Haiku is the only model the app names (`lib/ai/model.ts`); data access goes through the `Store` interface; never edit an applied migration; never commit a secret.
-9. **If you are resumed after a stop:** run `git status` and `git log --oneline -5` first, commit and push anything on disk that works, then carry on from the step list.
+9. **If something you wait for lands after you started,** the main session will tell you. Then merge the release branch into yours (`git fetch origin && git merge origin/<release branch>`); never rebase a branch you have pushed.
+10. **If you are resumed after a stop:** run `git status` and `git log --oneline -5` first, commit and push anything on disk that works, then carry on from the step list.

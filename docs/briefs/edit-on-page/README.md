@@ -39,9 +39,9 @@ At most two heavy agents (Fable or Opus) run at once. Sonnet agents may run besi
 |---|---|---|---|---|---|
 | B | `r2-b-model-engine.md` | Fable | `phase-2-r2-b-model` | 3301 | `phase-2-r2` exists and has `withWorkVisual` (release 1b) |
 | C | `r2-c-renderer.md` | Fable | `phase-2-r2-c-renderer` | 3302 | B is merged |
-| E | `r2-e-classic-editor.md` | Sonnet | `phase-2-r2-e-classic` | 3304 | B is merged (beside C) |
+| E | `r2-e-classic-editor.md` | Sonnet | `phase-2-r2-e-classic` | 3304 | C's part 1 is merged (its tests look at the page the new renderer draws) |
 | D | `r2-d-samples.md` | Sonnet | `phase-2-r2-d-samples` | 3303 | C's part 2 is merged |
-| G | `r3-g-editor-core.md` | Fable | `phase-2-r3-g-core` | 3307 | Release 2 is live |
+| G | `r3-g-editor-core.md` | Fable | `phase-2-r3-g-core` | 3307 | Release 2 is live. Its first milestone is every hook and plug the others call, working |
 | F | `r3-f-drag.md` | Fable | `phase-2-r3-f-drag` | 3306 | G's first milestone is merged |
 | K | `r3-k-flowchart.md` | Fable | `phase-2-r3-k-flow` | 3311 | G's first milestone is merged |
 | H | `r3-h-top-bar.md` | Sonnet | `phase-2-r3-h-topbar` | 3308 | G's first milestone is merged |
@@ -56,17 +56,19 @@ Heavy agents in order: B, then C, then G, then F with K, then J with L, then M. 
 
 Nobody waits on an interface that is not written down: every type and signature an agent builds against is in its brief, word for word the same as in the brief of the agent that builds the other side.
 
+When something an agent waits for lands after it has started (F for L's touch-drag checks, G's second milestone for the file rule), the main session tells it, and it merges the release branch into its own.
+
 ## Who owns which files
 
-No two agents edit the same file in the same release, with one stated hand-over in release 3 (G makes stub files and their owners take them over when G's first milestone is merged).
+No two agents edit the same file in the same release, with two stated hand-overs: in release 2, B makes its listed fixes in two classic-editor files before E takes them over; in release 3, G makes stub files and their owners take them over when G's first milestone is merged.
 
 ### Release 2
 
 | Agent | Owns |
 |---|---|
-| B | `lib/exhbt/blocks.ts`, `lib/exhbt/formats.ts`, `lib/exhbt/layouts.ts` (new), `lib/exhbt/sections.ts`, `lib/exhbt/verify.ts`, `lib/exhbt/headline.ts`, `app/dev/parity/` (new), `e2e/layout-parity.spec.ts` (new), `e2e/golden/` (new), `e2e/fixtures/order-docs.ts` (new), `e2e/fixtures/reader-before-r2.ts` (new), `e2e/layout-model.spec.ts` (new), and the exhbt lines of `AGENTS.md` and `docs/MAP.md`. One-off, smallest-possible compile fixes, because B runs alone: `components/editor/Sections.tsx`, `components/editor/LayoutPicker.tsx`, `lib/ai/exhbt-draft.ts`, `e2e/phase2-sections.spec.ts` |
+| B | `lib/exhbt/blocks.ts`, `lib/exhbt/formats.ts`, `lib/exhbt/layouts.ts` (new), `lib/exhbt/sections.ts`, `lib/exhbt/verify.ts`, `lib/exhbt/headline.ts`, `app/dev/parity/` (new), `e2e/layout-parity.spec.ts` (new), `e2e/golden/` (new), `e2e/fixtures/order-docs.ts` (new), `e2e/fixtures/reader-before-r2.ts` (new), `e2e/layout-model.spec.ts` (new), `lib/exhbt/draft-blocks.ts` (one field) and `app/api/exhbts/[id]/figure/route.ts` (keeping the graphs a figure replaces), and the exhbt lines of `AGENTS.md` and `docs/MAP.md`. One-off, smallest-possible fixes, because B runs alone (measured with `tsc` and a search for `FORMATS`): `components/editor/Sections.tsx`, `components/editor/LayoutPicker.tsx`, `lib/ai/exhbt-draft.ts`, `lib/exhbt/drafted.ts`, `e2e/phase2-sections.spec.ts`, `e2e/phase2-formats.spec.ts` |
 | C | `components/portfolio/ProjectView.tsx`, `components/portfolio/exhbt-parts.tsx`, `components/portfolio/LayoutMain.tsx` (new), `components/portfolio/layout-rows.ts` (new), `components/portfolio/page-ctx.ts` (new), `components/portfolio/formats/` (deleted), `components/portfolio/ImageZoom.tsx`, `components/exhbt/MethodFlow.tsx`, `app/globals.css`, `app/dev/edit-slots/` (new), `e2e/edit-slots.spec.ts` (new), and the exhbt page paragraphs of `DESIGN.md` |
-| E | `components/editor/` (all of it, after B's two fixes are merged), `lib/portfolio-home.ts`, `e2e/editor-classic-keeps.spec.ts` (new) |
+| E | `components/editor/` (all of it, after B's fixes are merged), `lib/portfolio-home.ts`, `e2e/editor-classic-keeps.spec.ts` (new) |
 | D | `lib/exhbt/sample.ts`, `app/dev/portfolio/route.ts`, `e2e/layouts-new.spec.ts` (new) |
 
 D may not edit `app/globals.css`. If a sample will not fit, D reports the numbers and C or Rory acts on them.
@@ -75,17 +77,17 @@ D may not edit `app/globals.css`. If a sample will not fit, D reports the number
 
 | Agent | Owns |
 |---|---|
-| G | `components/exhbt-editor/` as first made, then everything in it that is not handed over below; `lib/site.ts`; `app/(app)/exhbts/[id]/edit/page.tsx`; `app/api/health/route.ts`; `app/dev/editor/` (new); `playwright.config.ts`; `e2e/page-editor.ts` (new); `e2e/editor-inplace.spec.ts`, `e2e/editor-smooth.spec.ts`, `e2e/editor-classic.spec.ts` (new); `DESIGN.md`'s and the other docs' editor paragraphs; the page parts for slot fixes only (`components/portfolio/ProjectView.tsx`, `exhbt-parts.tsx`, `LayoutMain.tsx`, `layout-rows.ts`, `page-ctx.ts`) |
+| G | `components/exhbt-editor/` as first made, then everything in it that is not handed over below; `lib/site.ts`; `app/(app)/exhbts/[id]/edit/page.tsx` and `error.tsx` (new); `app/api/health/route.ts`; `app/dev/editor/` (new); `playwright.config.ts`; `e2e/page-editor.ts` (new); `e2e/editor-inplace.spec.ts`, `e2e/editor-smooth.spec.ts`, `e2e/editor-classic.spec.ts` (new); `DESIGN.md`'s and the other docs' editor paragraphs; the page parts for slot fixes only (`components/portfolio/ProjectView.tsx`, `exhbt-parts.tsx`, `LayoutMain.tsx`, `layout-rows.ts`, `page-ctx.ts`) |
 | F | `components/exhbt-editor/drag/`, `components/exhbt-editor/Insert.tsx`, `components/exhbt-editor/Tray.tsx`, `components/exhbt-editor/css/drag.css`, `e2e/editor-drag.spec.ts` (new), `scripts/editor-timing.mjs` (new) |
 | K | `components/exhbt-editor/flow/`, `components/exhbt-editor/css/flow.css`, `components/exhbt/MethodFlow.tsx`, `e2e/editor-flow.spec.ts` (new) |
 | H | `components/exhbt-editor/topbar/`, `components/exhbt-editor/css/topbar.css`, `e2e/editor-topbar.spec.ts` (new) |
 | I | `components/exhbt-editor/sheets/`, `components/exhbt-editor/css/sheets.css`, `e2e/editor-sheets.spec.ts` (new) |
-| J | `components/exhbt-editor/figures/`, `components/exhbt-editor/css/figures.css`, `app/(app)/exhbts/[id]/figure-actions.ts` (new), `app/api/exhbts/[id]/figure/route.ts`, `lib/exhbt/draft-blocks.ts` (the `graphs` field only), `components/editor/PickedFigure.tsx` and `ChartEditor.tsx` (adding the word `export` only), `e2e/editor-figures.spec.ts` (new) |
+| J | `components/exhbt-editor/figures/`, `components/exhbt-editor/css/figures.css`, `app/(app)/exhbts/[id]/figure-actions.ts` (new), `components/editor/PickedFigure.tsx` and `ChartEditor.tsx` (adding the word `export` only), `e2e/editor-figures.spec.ts` (new) |
 | L | `components/exhbt-editor/phone/`, `components/exhbt-editor/css/phone.css`, `e2e/editor-phone.spec.ts` (new) |
 | N, list 1 | `e2e/editor.ts`, `e2e/editor-classic-helpers.ts` (new), and the specs in its brief's first list |
 | N, list 2 | the specs in the brief's second list. It does not edit `e2e/editor.ts` |
 
-Frozen in release 3 (nobody edits them): `components/editor/` (the classic editor and the parts the new one reuses) apart from J's added exports, `lib/exhbt/` apart from J's one field, `app/globals.css`. The new editor's CSS lives in `components/exhbt-editor/css/`, one file per owner, each imported by its owner's own component.
+Frozen in release 3 (nobody edits them): `components/editor/` (the classic editor and the parts the new one reuses) apart from J's added exports, `lib/exhbt/`, `app/globals.css`. The new editor's CSS lives in `components/exhbt-editor/css/`, one file per owner, each imported by its owner's own component.
 
 A slot the page parts lack is G's to add. Another agent that needs one says so in its report; the main session passes it to G.
 
@@ -103,10 +105,11 @@ A slot the page parts lack is G's to add. Another agent that needs one says so i
 3. **Your files only.** Change the files this brief says you own. If something you need is in a file you must not touch, stop that part, carry on with the rest, and say exactly what you need in your report. Do not work round it with a copy.
 4. **Commit and push after every working step.** The account's usage limit can stop you without warning, and only what is pushed survives. A step is small: one function with its test, one component that renders. Push each time (`git push -u origin <your branch>`).
 5. **Before every commit, run all four:** `npx tsc --noEmit -p .` ; `npm run lint` ; `npm run check:docs` ; `npm run check:theme`. Then `git checkout -- tsconfig.json` if `next dev` rewrote it.
-6. **Playwright:** run only the spec files this brief names, one worker, on your own port: `E2E_PORT=<your port> npx playwright test <file> --workers=1`. Never run the whole suite. Never skip or delete a test to make it pass.
+6. **Playwright:** run only the spec files this brief names, one worker, on your own port: `E2E_PORT=<your port> npx playwright test <file> --workers=1`. Never run the whole suite. Never skip, weaken or delete a test to make it pass, unless this brief names the case.
 7. **Commit messages:** plain British English, what changed and why, first line under about 70 characters. End with your own attribution lines, then the line `Claude-Session: https://claude.ai/code/session_01SXCVQu8yRBVXtcSEG6wWoZ`.
 8. **House rules that bite here:** colours and corners on the exhbt page come only from the `--xp-*` variables; buttons in app chrome are Astryx Buttons through `components/ui/Button.tsx`; lower-case "exhbt" in running text; plain British English with no hype words; no plan figures in prose; Claude Haiku is the only model the app names (`lib/ai/model.ts`); data access goes through the `Store` interface; never edit an applied migration; never commit a secret.
-9. **If you are resumed after a stop:** run `git status` and `git log --oneline -5` first, commit and push anything on disk that works, then carry on from the step list.
+9. **If something you wait for lands after you started,** the main session will tell you. Then merge the release branch into yours (`git fetch origin && git merge origin/<release branch>`); never rebase a branch you have pushed.
+10. **If you are resumed after a stop:** run `git status` and `git log --oneline -5` first, commit and push anything on disk that works, then carry on from the step list.
 
 ## How each release is verified
 
@@ -139,12 +142,12 @@ Three ways back to the old editor during release 3 and 4 (0026 has the detail):
 
 1. **For everyone, with no deploy:** set the variable `EXHBT_EDITOR` to `classic` on the live Worker in the Cloudflare dashboard. `editorKind()` in `lib/site.ts` reads it on each request. Delete the variable to go back.
 2. **For one visit:** "Use the classic editor" in the editor's menu opens `/exhbts/<id>/edit?editor=classic`.
-3. **By itself:** if the new editor throws, it saves what it can and reloads into the classic editor for that visit.
+3. **By itself:** if the new editor throws, it saves what it can and reloads into the classic editor for that visit. The new editor is only ever drawn in the browser, inside the boundary that does this, because a boundary cannot catch a throw on the server.
 
 `EXHBT_EDITOR` must not be listed under `vars` in `wrangler.jsonc` and must not be in `env` in `next.config.ts`. Listed in `wrangler.jsonc`, every deploy would set it back (as the comment there says of `EXHBT_PHASE2`). In `next.config.ts` it would be fixed when the site is built.
 
 Tests:
-- **In the suite** (`e2e/editor-classic.spec.ts`, G): a development-only page, `/dev/editor?kind=classic`, sets what `editorKind()` returns for the test server; the edit page then serves the classic editor (`[data-editor="classic"]`), and `?kind=page` puts it back. `?editor=classic` serves classic for that request only. `?crash=1`, development only, makes the new editor throw: the test sees the notice, then the classic editor, with the words typed before the crash still there.
+- **In the suite** (`e2e/editor-classic.spec.ts`, G): a development-only page, `/dev/editor?kind=classic`, sets what `editorKind()` returns for the test server; the edit page then serves the classic editor (`[data-editor="classic"]`), and `?kind=page` puts it back. `?editor=classic` serves classic for that request only. Development only, `?crash=render` makes the new editor throw the first time it draws and `?crash=change` after the first change: each test sees the notice, then the classic editor, and after `?crash=change` the words typed before the crash are still there.
 - **On the preview site, before release 3.** The signed-in editor cannot run there (its database has no Phase 2 tables), so the proof goes through `/api/health`, which reports `editor: "page"` or `"classic"`. The main session: sets `EXHBT_EDITOR=classic` on the `exhbt-preview` Worker in the dashboard; fetches `/api/health` until it says `classic`, and notes how long that took; dispatches `deploy-preview.yml` and checks it still says `classic` afterwards (this proves `keep_vars` keeps a dashboard variable across a deploy); deletes the variable and checks for `page`.
 - **On the live site, at release 3:** `/api/health` says `page`. The switch is not flipped on live unless it is needed.
 

@@ -65,8 +65,12 @@ export function flowShown(doc: ExhbtDoc): boolean;
 export function adopt(doc: ExhbtDoc): ExhbtDoc;
 /** A layout switch in the new editor: adopt, set the layout, sort the sections into its usual order (a stable sort). */
 export function applyTemplate(doc: ExhbtDoc, to: Format): ExhbtDoc;
-/** What the main column draws, in order: the items of adopt(doc) that the layout shows, each with its index in `doc` as given. */
-export function pageItems(doc: ExhbtDoc): PageItem[];
+/**
+ * What the main column draws, in order: the items of adopt(doc) that the layout shows, each with its index in `doc` as given.
+ * `skip` leaves sections out before the order is worked out (the read-only page skips an image with no address and an aim
+ * or conclusion with no words, as today's page does before it pairs anything). The editor never passes it.
+ */
+export function pageItems(doc: ExhbtDoc, skip?: (s: ContentSection) => boolean): PageItem[];
 /** Sections the layout keeps but does not draw. */
 export function keptItems(doc: ExhbtDoc): PageItem[];
 export function rowsFor(items: PageItem[], f: Format): Row[];
@@ -176,7 +180,7 @@ The classic editor's picker is unchanged: it sets the layout and nothing else.
 
 ## Reading what is drawn
 
-On a read-only page two things are left out before the rows are made, as today: an image with no signed address, and an aim or a conclusion with no words. In the editor nothing is left out for being empty; the field's placeholder shows in its place. The rows may depend only on what `structureKey` covers (the layout, `flowOff`, and each item's id, kind and image stage), because the editor lays the page out again only when that key changes.
+On a read-only page two things are left out, as today: an image with no signed address, and an aim or a conclusion with no words. They are left out before the order is worked out (`pageItems` takes what to skip), because today's page drops them before it pairs anything: a graph, then an image with no address, then the findings is drawn today as the findings beside the graph. In the editor nothing is left out for being empty; the field's placeholder shows in its place. The rows may depend only on what `structureKey` covers (the layout, `flowOff`, and each item's id, kind and image stage), because the editor lays the page out again only when that key changes.
 
 ## What the reader release ships, and why it is the rollback target
 
@@ -186,6 +190,7 @@ Release 2 changes nothing a person can see or do. It makes the live site able to
 - the engine and `LayoutMain`, drawing all seven layouts;
 - the editing slots on the page parts (decision 0026), unused;
 - the classic editor keeping what it does not edit: the marker (shown as a row called Flowchart that can be moved), `flowOff`, and the new fields;
+- the graphs a figure from the work replaces, kept with the exhbt's AI version from now on, so release 3 can offer them back (decision 0026);
 - samples and seeds for the four new layouts, on development pages only.
 
 Why this order makes each later step safe to undo:
@@ -205,7 +210,7 @@ The four new layouts' model and drawing ride in release 2 so there is one pass t
 Release 2 may not change any existing page. "The same" is defined so a script can check it.
 
 1. **The comparison.** For each fixture, the `outerHTML` of `article[data-exhbt-page]` at 1440 by 900, normalised in three ways and no others: file addresses in `src` and `href` become the file's id; ids React makes (`useId`) become their position in the page; the words in each `class` attribute are sorted. Two pages are the same when the strings are equal.
-2. **The fixtures.** Every sample and seed (`lib/exhbt/sample.ts`: the old-shape GP exhbt, the library, open banking, the full one, five and six boxes, the gallery, the research poster) and order fixtures made for this: a figure before the findings, two graphs before the findings, an image then a graph then the findings, a gallery with no findings, a gallery whose sections are out of the usual order, research with no figure.
+2. **The fixtures.** Every sample and seed (`lib/exhbt/sample.ts`: the old-shape GP exhbt, the library, open banking, the full one, five and six boxes, the gallery, the research poster) and order fixtures made for this: a figure before the findings, two graphs before the findings, an image then a graph then the findings, a graph then an image with no address then the findings, a gallery with no findings, a gallery whose sections are out of the usual order, research with no figure.
 3. **Golden copies first.** `e2e/layout-parity.spec.ts`, run with `GOLDEN=write`, writes each fixture's string to `e2e/golden/`. That is done on the model agent's first commit, which adds the test and a development-only page and changes no product code. Run without `GOLDEN`, the test compares. The renderer's agent runs it and may not edit it.
 4. **Every live page.** Before release, the main session exports each published exhbt from the live site to a file outside the repo, draws it on that first commit and on the candidate through the same test (`PARITY_DOCS`), and compares. Today that is one exhbt, a case study. The count is run again on the day.
 5. **Adopting changes nothing.** For every fixture, the page of `adopt(doc)` equals the page of `doc`.

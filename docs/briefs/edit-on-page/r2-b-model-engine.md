@@ -21,11 +21,20 @@ Teach the stored exhbt everything later releases will write (the flowchart's mar
 ## You own
 
 - `lib/exhbt/blocks.ts`, `lib/exhbt/formats.ts`, `lib/exhbt/layouts.ts` (new), `lib/exhbt/sections.ts`, `lib/exhbt/verify.ts`, `lib/exhbt/headline.ts`
+- `lib/exhbt/draft-blocks.ts` (one new field) and `app/api/exhbts/[id]/figure/route.ts` (one addition), for step 8
 - `app/dev/parity/route.ts` (new), `e2e/layout-parity.spec.ts` (new), `e2e/golden/` (new)
 - `e2e/fixtures/order-docs.ts` (new), `e2e/fixtures/reader-before-r2.ts` (new), `e2e/layout-model.spec.ts` (new)
 - the exhbt lines of `AGENTS.md` ("Exhbt layout") and `docs/MAP.md` ("The exhbt and its editor")
 
-Smallest-possible compile fixes only, in files that are not yours, because your type changes break them and nobody else is working yet: `components/editor/Sections.tsx` (two places that switch on a section's kind), `components/editor/LayoutPicker.tsx` (its sketches are keyed by layout), `lib/ai/exhbt-draft.ts` (the layout enum), `e2e/phase2-sections.spec.ts`. If `tsc` fails in any other file, make the smallest type-only fix and list the file in your report.
+Smallest-possible fixes only, in files that are not yours, because your changes break them and nobody else is working yet. This list was measured by making the type changes and running `tsc`, and by searching for every use of `FORMATS`:
+- `components/editor/Sections.tsx`: two places that switch on a section's kind;
+- `components/editor/LayoutPicker.tsx`: it maps over `FORMATS` and keys its sketches by `Format`. Make it list `OFFERED_FORMATS`, and type the sketches so three are enough;
+- `lib/ai/exhbt-draft.ts`: the layout enum (step 2);
+- `lib/exhbt/drafted.ts`: `NAMED` is keyed by `Format`; key it by the three drafted layouts;
+- `e2e/phase2-sections.spec.ts`: three type errors from the wider `Section`;
+- `e2e/phase2-formats.spec.ts`: one assertion that `FORMATS` is the three; point it at `OFFERED_FORMATS`.
+
+If `tsc` or one of your named specs fails anywhere else, make the smallest fix and list the file in your report.
 
 ## You must not touch
 
@@ -129,8 +138,12 @@ export function flowShown(doc: ExhbtDoc): boolean;
 export function adopt(doc: ExhbtDoc): ExhbtDoc;
 /** A layout switch in the new editor: adopt, set the layout, sort the sections into its usual order (a stable sort). */
 export function applyTemplate(doc: ExhbtDoc, to: Format): ExhbtDoc;
-/** What the main column draws, in order: the items of adopt(doc) that the layout shows, each with its index in `doc` as given. */
-export function pageItems(doc: ExhbtDoc): PageItem[];
+/**
+ * What the main column draws, in order: the items of adopt(doc) that the layout shows, each with its index in `doc` as given.
+ * `skip` leaves sections out before the order is worked out (the read-only page skips an image with no address and an aim
+ * or conclusion with no words, as today's page does before it pairs anything). The editor never passes it.
+ */
+export function pageItems(doc: ExhbtDoc, skip?: (s: ContentSection) => boolean): PageItem[];
 /** Sections the layout keeps but does not draw. */
 export function keptItems(doc: ExhbtDoc): PageItem[];
 export function rowsFor(items: PageItem[], f: Format): Row[];
@@ -260,28 +273,29 @@ Commit and push after each.
 5. **`pathOfNumber(doc, n): string | null`** in `verify.ts`: the path of the first field whose text holds that number (by value, as `normaliseNumber`), for "Things to fix".
 6. **The engine** (`layouts.ts`):
    - `adopt`: for a case study, port `runsOf` as it is today and emit its runs flattened with the marker first, a findings-and-figure run as the findings then the figure. For every other layout, a stable sort into `template`, the marker at the flowchart's slot. Sections the layout keeps but does not draw stay after the shown section they followed.
-   - `pageItems`, `keptItems`, `rowsFor` (the rules above), `structureKey`, `applyTemplate`.
+   - `pageItems`, `keptItems`, `rowsFor` (the rules above), `structureKey`, `applyTemplate`. `pageItems`'s `skip` is applied before the order is worked out, so a doc with no marker pairs exactly as today's page does once an image with no address has been left out.
    - `blockOptions`: the layout's kinds in the order and words of today's "Add a section" menu (`menuFor` in `components/editor/Sections.tsx`), each with `full` when there is no room. The reasons read: "Up to 2 graphs in a case study", "One quote in a gallery", "Up to 3 graphs and images together in research". Every number comes from `formatLimits`. The flowchart is offered only when it is off the page.
    - `insertBlock`, `insertImage`, `moveItem`, `removeItem`. A new section is empty (`newSection`), not filled with sample words. `removeItem` on the flowchart does nothing where `flowRemovable` is false.
 7. **`layoutNotes`** reads `needs`, so its "missing" list works for all seven.
-8. **The docs lines** in `AGENTS.md` and `docs/MAP.md`: say the flowchart's place is a marker and that one engine draws every layout. Keep them short and true for release 2.
+8. **Keep the graphs a figure replaces.** `AiVersion` in `lib/exhbt/draft-blocks.ts` gains `graphs?: Chart[]`. In `app/api/exhbts/[id]/figure/route.ts`, when `withWorkVisual` returns `removed` graphs, save their charts in the exhbt's AI version (`saveAiVersion` in `lib/draft-tools.ts`), beside what is there. Nothing else in the route changes and nothing reads the field yet: release 3 offers the chart back (decision 0026). It ships now so every exhbt drafted from release 2 on has it.
+9. **The docs lines** in `AGENTS.md` and `docs/MAP.md`: say the flowchart's place is a marker and that one engine draws every layout. Keep them short and true for release 2.
 
 ## Tests
 
 Write `e2e/layout-model.spec.ts`, pure:
 - `normaliseDoc`: one marker survives, two become one, `flowOff` goes when a marker is there, a pull quote and a stage survive a read and a `ExhbtDocSchema` parse.
-- `adopt`: every sample equals itself adopted when drawn (`pageItems` ids in the same order); adopting twice is the same object; each order fixture gives the order written beside it in the fixture.
+- `adopt`: every sample equals itself adopted when drawn (`pageItems` ids in the same order); adopting twice is the same object; each order fixture gives the order written beside it in the fixture. With `skip` leaving out an image that sits between a graph and the findings, the graph and the findings pair with the findings first, as today.
 - `rowsFor`: for each of the seven layouts in its usual order, the rows expected (for example a case study of flowchart, findings, graph, graph, quote gives: flowchart; a `found` pair of findings and graph 1; a `graphs` group of graph 2; quote). A reversed pair. A gallery with no findings (the flowchart alone, "plain"). Research with no figure (the method stack alone).
 - A removed flowchart: not in `pageItems`, not counted, not checked, `flow: []` in `publicDoc`; drawn first in a case study even with `flowOff`.
 - `insertBlock`, `moveItem`, `removeItem`: places count page items; a full kind returns null; each leaves an arranged doc.
 - `structureKey` changes on a move, an add, a stage and a layout, and not on typing.
 - **An old reader.** `e2e/fixtures/reader-before-r2.ts` is a frozen copy of today's `normaliseDoc`, `DocSchema` and `FORMATS` (copy them from the base commit; do not import them). Docs with a marker, `flowOff`, a pull quote, a stage, `myRole` and each new layout id must parse with it and come out as a doc with only kinds and a layout it knows.
 
-Run: `e2e/layout-model.spec.ts`, `e2e/layout-parity.spec.ts`, `e2e/phase2-sections.spec.ts`, `e2e/phase2-formats.spec.ts`, `e2e/exhbt-page.spec.ts`.
+Run: `e2e/layout-model.spec.ts`, `e2e/layout-parity.spec.ts`, `e2e/phase2-sections.spec.ts`, `e2e/phase2-formats.spec.ts`, `e2e/exhbt-page.spec.ts`, `e2e/auto-figure.spec.ts`, `e2e/phase2-editor.spec.ts`.
 
 ## Done looks like
 
-- The four checks pass. The five named specs pass.
+- The four checks pass. The seven named specs pass.
 - `e2e/layout-parity.spec.ts` passes on your last commit with the renderer untouched: the model change alone moved nothing.
 - No layout but the three is offered or drafted.
 
@@ -296,7 +310,8 @@ The branch head; the files outside your list you had to touch and why; anything 
 3. **Your files only.** Change the files this brief says you own. If something you need is in a file you must not touch, stop that part, carry on with the rest, and say exactly what you need in your report. Do not work round it with a copy.
 4. **Commit and push after every working step.** The account's usage limit can stop you without warning, and only what is pushed survives. A step is small: one function with its test, one component that renders. Push each time (`git push -u origin <your branch>`).
 5. **Before every commit, run all four:** `npx tsc --noEmit -p .` ; `npm run lint` ; `npm run check:docs` ; `npm run check:theme`. Then `git checkout -- tsconfig.json` if `next dev` rewrote it.
-6. **Playwright:** run only the spec files this brief names, one worker, on your own port: `E2E_PORT=<your port> npx playwright test <file> --workers=1`. Never run the whole suite. Never skip or delete a test to make it pass.
+6. **Playwright:** run only the spec files this brief names, one worker, on your own port: `E2E_PORT=<your port> npx playwright test <file> --workers=1`. Never run the whole suite. Never skip, weaken or delete a test to make it pass, unless this brief names the case.
 7. **Commit messages:** plain British English, what changed and why, first line under about 70 characters. End with your own attribution lines, then the line `Claude-Session: https://claude.ai/code/session_01SXCVQu8yRBVXtcSEG6wWoZ`.
 8. **House rules that bite here:** colours and corners on the exhbt page come only from the `--xp-*` variables; buttons in app chrome are Astryx Buttons through `components/ui/Button.tsx`; lower-case "exhbt" in running text; plain British English with no hype words; no plan figures in prose; Claude Haiku is the only model the app names (`lib/ai/model.ts`); data access goes through the `Store` interface; never edit an applied migration; never commit a secret.
-9. **If you are resumed after a stop:** run `git status` and `git log --oneline -5` first, commit and push anything on disk that works, then carry on from the step list.
+9. **If something you wait for lands after you started,** the main session will tell you. Then merge the release branch into yours (`git fetch origin && git merge origin/<release branch>`); never rebase a branch you have pushed.
+10. **If you are resumed after a stop:** run `git status` and `git log --oneline -5` first, commit and push anything on disk that works, then carry on from the step list.

@@ -171,7 +171,7 @@ Every field carries `data-path`, and the path is exactly the one `validateForPub
 
 **See as a visitor** draws the same doc with no adapter, in a region named "Preview". It is the truth about what a visitor gets, and it is what the editing page is tested against.
 
-**On each section**, a small toolbar at its top corner, outside the flow so it takes no room: the grip, move up, move down, the layout's own action where there is one (Make lead image, Make key figure, Before or After), More actions where the AI drafted the part, and Remove. It shows when the pointer is over the section or the focus is in it. The frame is an outline, not a border. Rory: "Grip thing good." The grip is the only thing that drags, so words can be selected and the page scrolled by touch.
+**On each section**, a small toolbar at its top corner, outside the flow so it takes no room: the grip, move up, move down, the layout's own action where there is one (Make lead image, Make key figure, Before or After), More actions where the AI drafted the part, and Remove (the flowchart has no Remove in a case study or research, which always have one). It shows when the pointer is over the section or the focus is in it. The frame is an outline, not a border. Rory: "Grip thing good." The grip is the only thing that drags, so words can be selected and the page scrolled by touch.
 
 **The "+"** sits in the gap above each row and after the last. It lists every kind the layout can hold, in the layout's own words, with the flowchart when it is off the page. A kind with no room is listed, dimmed, with the reason under it ("Up to 2 graphs in a case study"). The list and the reasons come from one function (`blockOptions`), which reads the product's own caps. A new text section opens with the cursor in it. Image opens the file picker: several pictures at once, placed there in the order they were picked.
 
@@ -251,7 +251,7 @@ A picture replaced by a new crop or another page is not an undo entry: the old f
 - **Pictures by hand** are as now: several at once, shrunk in the browser, placed in the order picked, with the cursor then put in the first empty description. They can also be dropped onto the page.
 - **A picked figure** keeps its strip: where it came from, the share tick, Crop, Choose another page.
 - **When nothing was picked** and the layout takes a figure from the work, an image "+" also offers "Take a figure from my report": the page chooser that `PickedFigure` already has, with no AI call. It needs the stored PDF, so it is offered only when there is one.
-- **Removing a picked graph or table** offers the chart the draft drew: "Put back the chart drafted from your numbers". When the figure was placed, the graphs it replaced are kept with the exhbt's AI version (`ai-version.json`, beside the blocks kept for "Back to the AI version"), not in the doc. Putting one back goes through the server, which checks its numbers against the source again, so a parked graph cannot escape the number check.
+- **Removing a picked graph or table** offers the chart the draft drew: "Put back the chart drafted from your numbers". When the figure was placed, the graphs it replaced are kept with the exhbt's AI version (`ai-version.json`, beside the blocks kept for "Back to the AI version"), not in the doc. Putting one back goes through the server, which checks its numbers against the source again, so a parked graph cannot escape the number check. The graphs are kept from release 2 on; an exhbt drafted before that has none, and gets no offer.
 
 ## The person's own look
 
@@ -264,6 +264,8 @@ The old editor stays for one release as "classic". It is the safety net for goin
 - **The switch.** `editorKind()` in `lib/site.ts` returns `"page"` unless the runtime variable `EXHBT_EDITOR` is `classic`. It is read on each request, so setting it in the Cloudflare dashboard flips everyone back with no deploy.
 - **The escape.** "Use the classic editor" opens the same exhbt with `?editor=classic`, for that visit. The classic editor shows a line with the way back.
 - **The crash fallback.** An error boundary sits round the new editor. If it throws, the boundary shows "Something went wrong with the new editor. Your work is saved.", lets the waiting save finish, and reloads the page with `?editor=classic`. It reloads, and does not swap editors in place, because the page's props are from when it was opened: an editor mounted on them could save over newer work.
+  - An error boundary cannot catch a throw while the server draws the page. So the new editor is never drawn on the server: it loads in the browser, inside the boundary. Until it has loaded, the person sees their exhbt as a visitor would, and the fields then come alive in place.
+  - If the page itself fails on the server, the route's own error page says the same and links to the classic editor.
 
 Both editors use the same doc, autosave and actions, and the classic editor keeps what it does not edit (0027), so moving between them mid-exhbt loses nothing. How the switch is proven is in `docs/briefs/edit-on-page/README.md`.
 

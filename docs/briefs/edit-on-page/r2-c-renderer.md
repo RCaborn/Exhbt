@@ -6,7 +6,7 @@
 | Model | Fable |
 | Branch | `phase-2-r2-c-renderer`, made from `phase-2-r2` after B is merged |
 | Port | 3302 |
-| Starts when | B's branch is merged into `phase-2-r2`. E works beside you on other files |
+| Starts when | B's branch is merged into `phase-2-r2`. E starts when your part 1 is merged |
 
 ## Goal
 
@@ -27,7 +27,7 @@ Replace the three fixed page compositions with one component that draws any layo
 
 ## You must not touch
 
-`lib/exhbt/` (B's; report what you need), `components/editor/` (E is in it now), `lib/exhbt/sample.ts`, `e2e/layout-parity.spec.ts` and `e2e/golden/` (the gate you are measured by: if you think a golden copy is wrong, report it), every page that calls `ProjectView` (its props do not change, so they need no edit).
+`lib/exhbt/` (B's; report what you need), `components/editor/` (E's), `lib/exhbt/sample.ts`, `e2e/layout-parity.spec.ts` and `e2e/golden/` (the gate you are measured by: if you think a golden copy is wrong, report it), every page that calls `ProjectView` (its props do not change, so they need no edit).
 
 ## What you build against
 
@@ -68,8 +68,12 @@ export function flowShown(doc: ExhbtDoc): boolean;
 export function adopt(doc: ExhbtDoc): ExhbtDoc;
 /** A layout switch in the new editor: adopt, set the layout, sort the sections into its usual order (a stable sort). */
 export function applyTemplate(doc: ExhbtDoc, to: Format): ExhbtDoc;
-/** What the main column draws, in order: the items of adopt(doc) that the layout shows, each with its index in `doc` as given. */
-export function pageItems(doc: ExhbtDoc): PageItem[];
+/**
+ * What the main column draws, in order: the items of adopt(doc) that the layout shows, each with its index in `doc` as given.
+ * `skip` leaves sections out before the order is worked out (the read-only page skips an image with no address and an aim
+ * or conclusion with no words, as today's page does before it pairs anything). The editor never passes it.
+ */
+export function pageItems(doc: ExhbtDoc, skip?: (s: ContentSection) => boolean): PageItem[];
 /** Sections the layout keeps but does not draw. */
 export function keptItems(doc: ExhbtDoc): PageItem[];
 export function rowsFor(items: PageItem[], f: Format): Row[];
@@ -210,9 +214,9 @@ Commit and push after each step. Run the parity spec after each.
 1. **`page-ctx.ts`**, exactly as above. Re-export `Sub` and `ImageUrls` from `exhbt-parts.tsx` so existing imports keep working.
 2. **`layout-rows.ts`.** `rowClass` and `stackClass` return the classes today's wrappers carry, copied from `SectionsView`, `GalleryMain` and `ResearchMain`, as whole class names (Tailwind reads the source). A reversed pair mirrors its column widths. The editor's drag engine lays out empty boxes with these same strings to measure where things would land, so they must be the only source of a row's classes: `LayoutMain` reads them from here too.
 3. **`LayoutMain` and `ItemView`.**
-   - Read-only: take `pageItems(doc)`; leave out an image with no address in `ctx.imageUrls` and an aim or conclusion with no words; `rowsFor`; draw. A row of one item is that item's own root element with the row's classes on it (as today, where a lone section carries `xp-section` itself). A pair or a group is a wrapper with the row's classes and the items inside it.
+   - Read-only: take `pageItems(doc, skip)`, where `skip` leaves out an image with no address in `ctx.imageUrls` and an aim or conclusion with no words (it must be passed in, not filtered afterwards: today's page drops these before it pairs anything); `rowsFor`; draw. A row of one item is that item's own root element with the row's classes on it (as today, where a lone section carries `xp-section` itself). A pair or a group is a wrapper with the row's classes and the items inside it.
    - Each `ItemAs` is one of today's drawings: "plain" is `SectionBlock`'s; "lead" is the gallery's lead image; "tile" a grid tile; "key" research's key figure; "kicker" research's Results; "stacked" a part inside a stack (the flowchart as a column under its heading, the aim with its rule, the conclusion and limitations as small blocks); "listed" a reference in the list. Keep every `data-part`, `aria-label`, heading id and class as it is now.
-   - Editing (`ctx.edit` is there): leave nothing out. Before each row, and once after the last with `end: true`, render `ctx.edit.insert({ at })`, where `at` is the index of the row's first item among the page items. For each item render `ctx.edit.item({ id, kind, as, rowClass, index, count })` and nothing else: the editor's frame calls `ItemView` itself with a fresh copy of the item. `rowClass` is the row's classes for a row of one item and `""` inside a pair, a stack or a group. Wrappers for pairs, groups and stacks are yours in both modes.
+   - Editing (`ctx.edit` is there): pass no `skip`; leave nothing out. Before each row, and once after the last with `end: true`, render `ctx.edit.insert({ at })`, where `at` is the index of the row's first item among the page items. For each item render `ctx.edit.item({ id, kind, as, rowClass, index, count })` and nothing else: the editor's frame calls `ItemView` itself with a fresh copy of the item. `rowClass` is the row's classes for a row of one item and `""` inside a pair, a stack or a group. Wrappers for pairs, groups and stacks are yours in both modes.
    - In edit mode the rows may depend only on what `structureKey` reads: the layout, `flowOff`, and each item's id, kind and image stage.
 4. **`ProjectView`.** Builds `ctx` once and passes it down. New prop `edit?: EditAdapter`. With it: the title is `ctx.edit.text` inside the same heading element; the context line is `ctx.edit.rich` with the paragraph's classes and `highlight: true`, in place of the `<p>`; "What it is", "Where and when" and "My role" are always drawn, each a `ctx.edit.text`; the skill list is `ctx.edit.skills()`; the work button is `ctx.edit.work()`, always drawn; "All of …'s work" is drawn but `inert`. Add the "My role" fact (shown read-only when `doc.myRole` has words). The quote's heading and the skill list's name come from `FORMAT_COPY`. `sectionsSlot` keeps working as now (the classic editor's "Arrange sections" uses it). Keep exporting `SectionBlock`, `Owner` and `ProjectView`; search for other importers before removing `runsOf` and `SectionsView`.
 5. **The parts** (`exhbt-parts.tsx`). `Findings`, `Figure` and `SectionBlock` keep the props they have (the classic editor calls `SectionBlock` with them) and take an optional `ctx`. With `ctx.edit`, every text in the fields table of 0026 is a slot at its path, with the name and id that table gives:
@@ -257,7 +261,8 @@ The branch head for each part; any fixture you could not make identical, with th
 3. **Your files only.** Change the files this brief says you own. If something you need is in a file you must not touch, stop that part, carry on with the rest, and say exactly what you need in your report. Do not work round it with a copy.
 4. **Commit and push after every working step.** The account's usage limit can stop you without warning, and only what is pushed survives. A step is small: one function with its test, one component that renders. Push each time (`git push -u origin <your branch>`).
 5. **Before every commit, run all four:** `npx tsc --noEmit -p .` ; `npm run lint` ; `npm run check:docs` ; `npm run check:theme`. Then `git checkout -- tsconfig.json` if `next dev` rewrote it.
-6. **Playwright:** run only the spec files this brief names, one worker, on your own port: `E2E_PORT=<your port> npx playwright test <file> --workers=1`. Never run the whole suite. Never skip or delete a test to make it pass.
+6. **Playwright:** run only the spec files this brief names, one worker, on your own port: `E2E_PORT=<your port> npx playwright test <file> --workers=1`. Never run the whole suite. Never skip, weaken or delete a test to make it pass, unless this brief names the case.
 7. **Commit messages:** plain British English, what changed and why, first line under about 70 characters. End with your own attribution lines, then the line `Claude-Session: https://claude.ai/code/session_01SXCVQu8yRBVXtcSEG6wWoZ`.
 8. **House rules that bite here:** colours and corners on the exhbt page come only from the `--xp-*` variables; buttons in app chrome are Astryx Buttons through `components/ui/Button.tsx`; lower-case "exhbt" in running text; plain British English with no hype words; no plan figures in prose; Claude Haiku is the only model the app names (`lib/ai/model.ts`); data access goes through the `Store` interface; never edit an applied migration; never commit a secret.
-9. **If you are resumed after a stop:** run `git status` and `git log --oneline -5` first, commit and push anything on disk that works, then carry on from the step list.
+9. **If something you wait for lands after you started,** the main session will tell you. Then merge the release branch into yours (`git fetch origin && git merge origin/<release branch>`); never rebase a branch you have pushed.
+10. **If you are resumed after a stop:** run `git status` and `git log --oneline -5` first, commit and push anything on disk that works, then carry on from the step list.

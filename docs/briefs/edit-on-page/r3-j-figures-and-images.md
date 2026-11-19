@@ -20,8 +20,6 @@ Build what sits round a graph, a picture and a link while editing: a graph's fig
 
 - `components/exhbt-editor/figures/` (every file in it), `components/exhbt-editor/css/figures.css`
 - `app/(app)/exhbts/[id]/figure-actions.ts` (new)
-- `app/api/exhbts/[id]/figure/route.ts`
-- `lib/exhbt/draft-blocks.ts`: the one new field on `AiVersion`, nothing else
 - `components/editor/PickedFigure.tsx` and `ChartEditor.tsx`: you may add the word `export` to things they already define, and nothing else. Their behaviour must not change (the classic editor uses them)
 - `e2e/editor-figures.spec.ts` (new)
 
@@ -160,6 +158,7 @@ G makes each of these files in its first milestone with the signature shown and 
 | `figures/take.ts` | `canTakeFigure(doc: ExhbtDoc, reportFiles: { fileId: string }[]): boolean` | J | returns false |
 | `flow/FlowEdit.tsx` | `useFlowEdit(): FlowEdit` | K | `list` returns its children; `box` returns the `<li>` with a lasting key; `tools` and `add` return null |
 | `drag/index.ts` | `DragBoard(props: { children: ReactNode }): ReactNode`; `useBoard(): Board` | F | `DragBoard` returns its children; `useBoard` moves and removes through the store with no motion |
+| `drag/options.ts` | `SECTION_STYLE`, `FLOW_SECTION_STYLE`, `FLOW_BOX_STYLE`, each `"slide" \| "line"` | F (K reads `FLOW_BOX_STYLE` and never edits the file) | the three constants: `"slide"`, `"line"`, `"line"` |
 | `Insert.tsx` | `Insert(props: InsertSlot): ReactNode` | F | a "+" button listing `blockOptions(doc)` and adding the chosen kind there |
 | `Tray.tsx` | `Tray(): ReactNode` | F | nothing |
 | `phone/PhoneBar.tsx` | `PhoneBar(): ReactNode` | L | nothing |
@@ -190,7 +189,7 @@ Each owner's CSS goes in its own file in `components/exhbt-editor/css/` (`core.c
 export type ExtraSlot = { sectionId: string; kind: SectionKind; where: "above" | "below" | "over" };
 ```
 
-What you add:
+Already there since release 2 (the figure route saves the graphs a figure replaced):
 
 ```ts
 // lib/exhbt/draft-blocks.ts
@@ -200,7 +199,11 @@ export type AiVersion = {
   /** The graphs the draft drew that a figure from the work took the place of (decision 0025), newest draft only. */
   graphs?: Chart[];
 };
+```
 
+What you add:
+
+```ts
 // app/(app)/exhbts/[id]/figure-actions.ts  ("use server")
 /** The drafted graph at `index`, with the numbers on it that are not in the person's source text. The owner only. */
 export async function draftedGraph(id: string, index: number): Promise<{ ok: true; chart: Chart; flags: string[] } | { ok: false; error: string }>;
@@ -220,7 +223,7 @@ Commit and push after each.
    - `canTakeFigure(doc, reportFiles)`: true when the layout takes something from the work (`FORMAT_RULES[f].fromWork` is not `"none"`), there is at least one stored report, no image on the exhbt has `picked`, and there is room for an image.
    - `FigureSheet` (`ui.sheet.name === "figure"`): choose the report if there are several; its first 30 pages as thumbnails, drawn in the browser from the stored PDF as `PickedFigure`'s "Choose another page" does; a click takes that page whole; then the crop. No AI call. On confirm: upload the picture (`uploadForExhbt`), then one `store.patchDoc` named "take a figure" that places it with `withKeyFigure` and `picked: { from, sourceFileId, page, box, shareOk: false }`. It removes no graph: the person chose it by hand. The cursor then goes to its description.
 6. **The drafted chart back.**
-   - In `app/api/exhbts/[id]/figure/route.ts`: when `withWorkVisual` returns `removed` graphs, save them with the exhbt's AI version (`graphs`), beside what is there. Nothing else in the route changes.
+   - The graphs are already kept: since release 2 the figure route saves what `withWorkVisual` removed in the AI version's `graphs`. An exhbt drafted before release 2 has none, and gets no offer.
    - `draftedGraph(id, index)`: the owner only (follow `draft-tools-actions.ts`); reads the AI version and the kept source text; returns the chart and the numbers on it that are not in the source (`unverifiedNumbers` on a doc holding just that graph). If the source is gone, return the chart with every number flagged.
    - `DraftedGraph`: a quiet line under the page, shown when there is a kept graph, the exhbt has no graph section, and the layout has room for one: "The chart drafted from your numbers is kept." and a button, "Put it back". It calls the action, adds a graph section where the layout wants its figure with that chart, and adds the flags to the doc's numbers to check, as one `store.patchDoc` named "put the drafted chart back". Say what happened ("The drafted chart is back. Check the 2 numbers flagged at the top.").
 
@@ -235,11 +238,11 @@ Commit and push after each.
 - removing a picked graph: "Put it back" returns the drafted chart with its numbers, and a number not in the source is in the numbers to check; the stored doc never held the parked graph meanwhile (read it back);
 - axe with the chart sheet and the figure sheet open.
 
-Run: `e2e/editor-figures.spec.ts`, `e2e/auto-figure.spec.ts` (the route changed), `e2e/editor-inplace.spec.ts`.
+Run: `e2e/editor-figures.spec.ts`, `e2e/auto-figure.spec.ts`, `e2e/editor-inplace.spec.ts`.
 
 ## Done looks like
 
-The checks above pass; `e2e/auto-figure.spec.ts` still passes; the classic editor's graph and picked-figure cards behave as before.
+The checks above pass; `e2e/auto-figure.spec.ts` still passes untouched; the classic editor's graph and picked-figure cards behave as before.
 
 ## Report back
 
@@ -252,7 +255,8 @@ The branch head; each `export` you added in `components/editor/`; whether stored
 3. **Your files only.** Change the files this brief says you own. If something you need is in a file you must not touch, stop that part, carry on with the rest, and say exactly what you need in your report. Do not work round it with a copy.
 4. **Commit and push after every working step.** The account's usage limit can stop you without warning, and only what is pushed survives. A step is small: one function with its test, one component that renders. Push each time (`git push -u origin <your branch>`).
 5. **Before every commit, run all four:** `npx tsc --noEmit -p .` ; `npm run lint` ; `npm run check:docs` ; `npm run check:theme`. Then `git checkout -- tsconfig.json` if `next dev` rewrote it.
-6. **Playwright:** run only the spec files this brief names, one worker, on your own port: `E2E_PORT=<your port> npx playwright test <file> --workers=1`. Never run the whole suite. Never skip or delete a test to make it pass.
+6. **Playwright:** run only the spec files this brief names, one worker, on your own port: `E2E_PORT=<your port> npx playwright test <file> --workers=1`. Never run the whole suite. Never skip, weaken or delete a test to make it pass, unless this brief names the case.
 7. **Commit messages:** plain British English, what changed and why, first line under about 70 characters. End with your own attribution lines, then the line `Claude-Session: https://claude.ai/code/session_01SXCVQu8yRBVXtcSEG6wWoZ`.
 8. **House rules that bite here:** colours and corners on the exhbt page come only from the `--xp-*` variables; buttons in app chrome are Astryx Buttons through `components/ui/Button.tsx`; lower-case "exhbt" in running text; plain British English with no hype words; no plan figures in prose; Claude Haiku is the only model the app names (`lib/ai/model.ts`); data access goes through the `Store` interface; never edit an applied migration; never commit a secret.
-9. **If you are resumed after a stop:** run `git status` and `git log --oneline -5` first, commit and push anything on disk that works, then carry on from the step list.
+9. **If something you wait for lands after you started,** the main session will tell you. Then merge the release branch into yours (`git fetch origin && git merge origin/<release branch>`); never rebase a branch you have pushed.
+10. **If you are resumed after a stop:** run `git status` and `git log --oneline -5` first, commit and push anything on disk that works, then carry on from the step list.
