@@ -20,7 +20,7 @@ import {
 } from "../lib/exhbt/blocks";
 import { FORMAT_RULES, FORMATS, fromWorkOf, hiddenSections, OFFERED_FORMATS, shownSections, withFormat, type Format } from "../lib/exhbt/formats";
 import { tileFromDoc } from "../lib/exhbt/headline";
-import { adopt, applyTemplate, flowShown, hasMarker, isArranged, keptItems, pageItems, rowsFor, structureKey, type Cell, type ItemCell, type Row } from "../lib/exhbt/layouts";
+import { adopt, applyTemplate, flowShown, hasMarker, isArranged, keptItems, pageItems, restoreFlow, rowsFor, structureKey, type Cell, type ItemCell, type Row } from "../lib/exhbt/layouts";
 import { newSection, roomFor, sectionLabel, sectionName, withKeyFigure, withWorkVisual } from "../lib/exhbt/sections";
 import { pathOfNumber } from "../lib/exhbt/verify";
 import { ORDER_FIXTURES, SAMPLE_FIXTURES, todayCaseRows, todayGalleryRows, todayResearchRows, type OrderFixture } from "./fixtures/order-docs";
@@ -459,6 +459,34 @@ test.describe("The engine: applyTemplate and structureKey", () => {
     expect(structureKey({ ...d, sections: [...d.sections, quote()] })).not.toBe(key);
     expect(structureKey({ ...d, sections: d.sections.map((s) => (s.kind === "image" ? { ...s, stage: "before" as const } : s)) })).not.toBe(key);
     expect(structureKey(withFormat(d, "gallery"))).not.toBe(key);
+  });
+});
+
+test.describe("The engine: structural changes (step 6b)", () => {
+  test("restoreFlow puts a removed flowchart back, at its usual place or where it is asked for", () => {
+    // A gallery with the flowchart off and its sections moved by hand.
+    const off: ExhbtDoc = { ...core([findings(), image(1), quote(), image(2)], "gallery"), flowOff: true };
+    expect(itemIds(off)).toEqual(["findings", "image-1", "quote-1", "image-2"]);
+    // Its usual place: before the first item that comes after the flowchart in the layout's usual order.
+    const back = restoreFlow(off);
+    expect(ids(back)).toEqual(["flow", "findings", "image-1", "quote-1", "image-2"]);
+    expect("flowOff" in back).toBe(false);
+    expect(isArranged(back)).toBe(true);
+    expect(back.flow).toEqual(off.flow);
+    // With a place: before the last page item. Every other item keeps its order.
+    const there = restoreFlow(off, 3);
+    expect(itemIds(there)).toEqual(["findings", "image-1", "quote-1", "flow", "image-2"]);
+    expect("flowOff" in there).toBe(false);
+    expect(isArranged(there)).toBe(true);
+    expect(itemIds(restoreFlow(off, 0))).toEqual(["flow", "findings", "image-1", "quote-1", "image-2"]);
+    expect(itemIds(restoreFlow(off, 99))).toEqual(["findings", "image-1", "quote-1", "image-2", "flow"]);
+    // A section the layout keeps but doesn't draw keeps its place in the stored order.
+    const kept: ExhbtDoc = { ...off, sections: [findings(), aim(), image(1)] };
+    expect(ids(restoreFlow(kept, 1))).toEqual(["findings", "aim-1", "flow", "image-1"]);
+    // Nothing is after the flowchart's usual place: at the end.
+    expect(ids(restoreFlow({ ...off, sections: [image(1)] }))).toEqual(["image-1", "flow"]);
+    // Shown already: the same object.
+    for (const d of [back, adopt(core([findings()], "gallery")), core([findings()], "gallery"), { ...core([findings()]), flowOff: true }]) expect(restoreFlow(d, 0)).toBe(d);
   });
 });
 
