@@ -6,7 +6,10 @@ import { headlineFor } from "../lib/exhbt/headline";
 import { legacyGpDoc, sampleDocs } from "../lib/exhbt/sample";
 import { slugify } from "../lib/exhbt/slug";
 import { unverifiedNumbers } from "../lib/exhbt/verify";
-import { addGraph, addGraphSection, graph, pickGraphKind, previewRegion, publish, signInAs, startWithBasics } from "./editor";
+import { addGraph, addGraphSection, graph, pickGraphKind, previewRegion, publish, signInAs, startWithBasics, keepClassic } from "./editor";
+
+// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
+test.beforeEach(({ page }) => keepClassic(page));
 
 // Graphs (decision 0011): a fixed set of kinds, every value typed in and printed, a hidden table
 // for each, the word cap counting every graph word, the number check covering every graph

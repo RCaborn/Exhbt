@@ -3,7 +3,10 @@ import { expect, test } from "@playwright/test";
 import { slugify, uniqueSlug, SLUG_MAX } from "../lib/exhbt/slug";
 import { docToRuns, runsToDoc } from "../lib/exhbt/richtext-tiptap";
 import { LIMITS } from "../lib/exhbt/blocks";
-import { previewRegion, signInAs, startFromScratch, waitForSave } from "./editor";
+import { previewRegion, signInAs, startFromScratch, waitForSave, keepClassic } from "./editor";
+
+// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
+test.beforeEach(({ page }) => keepClassic(page));
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 

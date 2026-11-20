@@ -2,7 +2,10 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { LIMITS } from "../lib/exhbt/blocks";
 import { buildRoadmap, unlockProjects, uniqueEmail, waitForResult } from "./helpers";
-import { fillValid, previewRegion, signInAs, startFromScratch, waitForSaved } from "./editor";
+import { fillValid, previewRegion, signInAs, startFromScratch, waitForSaved, keepClassic } from "./editor";
+
+// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
+test.beforeEach(({ page }) => keepClassic(page));
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 

@@ -1,6 +1,9 @@
 import { expect, test, type Browser } from "@playwright/test";
 import { SCHEMA_VERSION } from "../lib/exhbt/blocks";
-import { fillValid, publish, signInAs, startFromScratch, waitForSaved } from "./editor";
+import { fillValid, publish, signInAs, startFromScratch, waitForSaved, keepClassic } from "./editor";
+
+// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
+test.beforeEach(({ page }) => keepClassic(page));
 
 // A file can only be shown as part of its owner's exhbt. Someone who learns another person's file id
 // can't put it in their own exhbt and get a link to it: the save strips it, and no page signs it.

@@ -24,7 +24,10 @@ import { legacyGpDoc } from "../lib/exhbt/sample";
 import { moveSection, nextSectionId, sectionLabel } from "../lib/exhbt/sections";
 import { slugify } from "../lib/exhbt/slug";
 import { unverifiedNumbers } from "../lib/exhbt/verify";
-import { addSection, card, fillFindings, listOrder, openAddSectionMenu, pageOrder, previewRegion, publish, sectionsArea, signInAs, startWithCore, waitForSave, wordsOnBar } from "./editor";
+import { addSection, card, fillFindings, listOrder, openAddSectionMenu, pageOrder, previewRegion, publish, sectionsArea, signInAs, startWithCore, waitForSave, wordsOnBar, keepClassic } from "./editor";
+
+// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
+test.beforeEach(({ page }) => keepClassic(page));
 
 // Sections (decision 0015): the core (header, the question, the flowchart) is on every exhbt;
 // below it, findings, graphs, images, a quote, what I'd do next and a link can be added, removed
