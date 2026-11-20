@@ -35,11 +35,14 @@ export function Sheet({ name, title, children }: { name: SheetName; title: strin
       // The dialog's `close` arrives a moment after it shuts. By then another sheet may be open: one opened from
       // this one ("Show me", a jump). Only a sheet that is still the open one closes the view, and the focus goes
       // back to what opened it only when no sheet is open now.
-      onClose={() => {
+      onClose={(e) => {
         if (ui.get().sheet?.name === name) uiApi.close();
         const back = opener.current;
         opener.current = null;
-        if (!ui.get().sheet && back?.isConnected) back.focus();
+        // Nor when the person (or a jump) has put the focus somewhere since the dialog shut.
+        const a = document.activeElement;
+        const unmoved = !a || a === document.body || e.currentTarget.contains(a);
+        if (!ui.get().sheet && unmoved && back?.isConnected) back.focus();
       }}
     >
       <div className="xe-sheet-head">
