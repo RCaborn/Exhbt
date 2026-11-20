@@ -130,17 +130,27 @@ const grid = (rows: Row[]) =>
 const nameOf = async (page: Page, id: string) => labelOf(await docNow(page), id);
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
-/** The motion of the frames since the drop: each animation's length and what it animates. */
-const frameMotion = (page: Page) =>
-  page.evaluate((sel) =>
-    document
-      .getAnimations()
-      .filter((a) => (a.effect as KeyframeEffect).target?.matches(sel))
-      .map((a) => {
-        const effect = a.effect as KeyframeEffect;
-        return { ms: effect.getTiming().duration, props: [...new Set(effect.getKeyframes().flatMap((k) => Object.keys(k)))].filter((k) => !["offset", "computedOffset", "easing", "composite"].includes(k)) };
-      }),
-  FRAMES);
+/**
+ * Records every animation a frame is given from now on, as it starts: its length and what it
+ * animates. Read with frameMotion(); recorded rather than read off the page afterwards, because a
+ * 180ms animation can be over before a slow machine gets round to looking.
+ */
+const recordMotion = (page: Page) =>
+  page.evaluate((sel) => {
+    const w = window as unknown as { __motion: { ms: unknown; props: string[] }[]; __animate?: typeof Element.prototype.animate };
+    w.__motion = [];
+    if (!w.__animate) {
+      w.__animate = Element.prototype.animate;
+      Element.prototype.animate = function (this: Element, keyframes, options) {
+        if (this.matches(sel) && Array.isArray(keyframes)) {
+          const props = [...new Set(keyframes.flatMap((k) => Object.keys(k)))].filter((k) => !["offset", "easing", "composite"].includes(k));
+          w.__motion.push({ ms: typeof options === "number" ? options : options?.duration, props });
+        }
+        return w.__animate!.call(this, keyframes, options);
+      };
+    }
+  }, FRAMES);
+const frameMotion = (page: Page) => page.evaluate(() => (window as unknown as { __motion: { ms: unknown; props: string[] }[] }).__motion);
 
 const axe = async (page: Page, where: string) => {
   const { violations } = await new AxeBuilder({ page }).include(READY).withTags(WCAG).analyze();
@@ -273,8 +283,9 @@ test.describe("dragging with a mouse", () => {
       await expect(lifting(page)).toHaveCount(0);
       expect(await pageOrder(page)).toEqual(order);
       expect(await drawn(page)).toEqual(before);
-      // Selecting words by dragging across them selects them, and carries nothing.
-      const words = page.locator(`${READY} .xp-title`);
+      // Selecting a section's words by dragging across them selects them, and carries nothing: here, a flowchart box's.
+      const words = page.locator(`${READY} [data-section-id="flow"] [data-path="flow.0.step"]`);
+      await words.scrollIntoViewIfNeeded();
       const t = (await words.boundingBox())!;
       await page.mouse.move(t.x + 4, t.y + t.height / 2);
       await page.mouse.down();
@@ -311,10 +322,9 @@ test.describe("dragging with a mouse", () => {
       await expect.poll(() => place(page)).toBe(0);
       await expect(page.locator(`${READY} [data-xe-landing]`)).toBeVisible();
       await expect(page.locator(`${READY} [data-xe-line]`)).toBeHidden();
-      await page.waitForTimeout(250);
-      const mid = await drawn(page);
-      expect(mid[order[0]!]!.y, "the first section has slid down").toBeGreaterThan(before[order[0]!]!.y + 20);
+      await expect.poll(async () => (await drawn(page))[order[0]!]!.y, { message: "the first section has slid down" }).toBeGreaterThan(before[order[0]!]!.y + 20);
       expect(await layout(page)).toEqual(boxes);
+      await recordMotion(page);
       await page.mouse.up();
       // Dropped: first, and what slides into place does so by transform alone, in 180ms.
       expect(await pageOrder(page)).toEqual([last, ...order.slice(0, -1)]);
@@ -360,12 +370,14 @@ test.describe("dragging with a mouse", () => {
       await expect(lifting(page)).toHaveAttribute("data-xe-style", "slide");
       const flow = still.flow!;
       await page.mouse.move(flow.x + flow.w / 2, flow.y + flow.h + 30, { steps: 30 });
-      await page.waitForTimeout(250);
       expect(start.y).toBeLessThan(flow.y);
       await expect(page.locator(`${READY} [data-xe-landing]`)).toBeVisible();
       await expect(page.locator(`${READY} [data-xe-line]`)).toBeHidden();
-      const mid = await drawn(page);
-      expect(now.filter((id) => Math.abs(mid[id]!.y - still[id]!.y) > 0.5 || Math.abs(mid[id]!.x - still[id]!.x) > 0.5).length).toBeGreaterThan(0);
+      const slid = async () => {
+        const mid = await drawn(page);
+        return now.filter((id) => Math.abs(mid[id]!.y - still[id]!.y) > 0.5 || Math.abs(mid[id]!.x - still[id]!.x) > 0.5).length;
+      };
+      await expect.poll(slid).toBeGreaterThan(0);
       await page.mouse.up();
       expect((await pageOrder(page)).at(-1)).toBe(other);
       await settled(page);
@@ -609,9 +621,12 @@ test.describe("dragging with a mouse", () => {
     await frame(page, id).hover();
     const up = frame(page, id).locator('[data-tool="up"]');
     await up.focus();
+    await recordMotion(page);
     await page.keyboard.press("Enter");
     expect(await pageOrder(page)).toEqual(orderWith(order, id, order.length - 2));
-    expect((await frameMotion(page)).every((m) => m.ms === 180 && m.props.join() === "transform")).toBe(true);
+    const moved = await frameMotion(page);
+    expect(moved.length).toBeGreaterThan(0);
+    for (const m of moved) expect(m).toEqual({ ms: 180, props: ["transform"] });
     await expect(said(page)).toHaveText(`${await nameOf(page, id)} moved up, to place ${order.length - 1} of ${order.length}.`);
     await expect(frame(page, id).locator('[data-tool="up"]')).toBeFocused();
     for (let i = 2; i < order.length; i++) await page.keyboard.press("Enter");
@@ -956,11 +971,11 @@ test.describe("the tray", () => {
     const prev = union(order.slice(0, -1).map((id) => at[id]!));
     await page.mouse.move(at[last]!.x + at[last]!.w / 2, (prev.y + prev.h + at[last]!.y) / 2, { steps: 25 });
     await expect.poll(() => place(page)).toBe(order.length - 1);
-    await page.waitForTimeout(250);
     await expect(said(page)).toHaveText(`Quote would go to place ${order.length} of ${order.length + 1}.`);
     expect(await layout(page)).toEqual(boxes);
     await expect(page.locator(`${READY} [data-xe-landing]`)).toBeVisible();
-    expect((await drawn(page))[last]!.y).toBeGreaterThan(before[last]!.y + 40);
+    await expect.poll(async () => (await drawn(page))[last]!.y).toBeGreaterThan(before[last]!.y + 40);
+    await recordMotion(page);
     await page.mouse.up();
     let now = await pageOrder(page);
     expect(now[order.length - 1]).toMatch(/^quote-/);
