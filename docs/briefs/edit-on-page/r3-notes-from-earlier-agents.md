@@ -77,3 +77,10 @@ Where G departed from the brief, or followed these notes over it:
 - Right after an AI draft, `LayoutMenu.tsx` says the layout line once and removes `drafted`, `why` and `fig` from the address.
 - The `h1` (`#xe-heading`, `tabIndex={-1}`) is visually hidden until 100rem; Undo sends focus to it when nothing is left to undo, otherwise to the first field of the section brought back, or its frame.
 - The Draft/Live chip and "Unpublish" read `env` props from page load; G is adding a live status that I's publish sheet updates.
+
+## From agent I (the sheets, merged into phase-2-r3)
+
+- `sheets/PublishSheet.tsx` ("Review and publish"), `sheets/CardSheet.tsx` ("Card and link details": summary `#summary` / `data-path="summary"`, the headline pair `data-path="headline"`, and a live `ExhbtTile` with `exhbtSummary(doc)` under it as `data-testid="tile-summary"`), `sheets/WorkPanel.tsx` ("The work"), `sheets/WorkButton.tsx` (`data-path="evidence"`, reads "See the work: <name>" to match the page).
+- `sheets/live.ts`: a small atom for the live status, `setLive(id, status, slug)` and `useLive()`. Publish and Unpublish each call `setLive`. G is to make this the editor's live status (or re-export its own from here) and the top bar's chip read it.
+- `sheets/paths.ts`: `sheetOf(path)` and `useShowMe()` ("Show me" closes the publish sheet, waits 50 ms, opens the right sheet and focuses the field).
+- Known gaps for G: `ui.jumpTo(path)` does not open a sheet for sheet paths (`summary`, `headline`, `evidence`); `ui/Sheet.tsx`'s `onClose` closes whatever sheet is open, so a late close can shut the next sheet.
