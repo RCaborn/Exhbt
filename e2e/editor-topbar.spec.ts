@@ -177,6 +177,15 @@ test.describe("the top bar", () => {
     await expect(page.locator("[data-word-bar]")).toBeFocused();
   });
 
+  test("a blank exhbt shows no Things to fix button; one appears after a failed publish", async ({ page }) => {
+    await openNew(page, freshName("tbnonag"));
+    await expect(bar(page).getByRole("button", { name: /to (fix|check)$/ })).toHaveCount(0);
+    await bar(page).getByRole("button", { name: "Review and publish" }).click();
+    await page.locator('dialog[data-sheet="publish"]').getByRole("button", { name: /^Publish/ }).click();
+    await page.keyboard.press("Escape");
+    await expect(bar(page).getByRole("button", { name: /things? to fix$/ })).toBeVisible();
+  });
+
   test("a complete doc with one flagged number: the button, the list, Show me, That's right", async ({ page }) => {
     const doc = flaggedDoc();
     expect(validateForPublish(doc)).toEqual([]);

@@ -23,9 +23,10 @@ export function ThingsToFix(): ReactNode {
   const issues = useIssues();
   // The slice must be the same object while it has not changed (useDoc), so no new empty list each time.
   const flags = useDoc((d) => d.unverified) ?? NONE;
-  const count = issues.all.length + flags.length;
+  // Real problems now (all of them once publishing has been tried) and the numbers to check: empty parts are not nagged about.
+  const count = issues.shown.length + flags.length;
   if (count === 0) return null;
-  const onlyNumbers = issues.all.length === 0;
+  const onlyNumbers = issues.shown.length === 0;
   const words = onlyNumbers ? (flags.length === 1 ? "1 number to check" : `${flags.length} numbers to check`) : count === 1 ? "1 thing to fix" : `${count} things to fix`;
   return (
     <Popover
@@ -75,7 +76,7 @@ function FixPanel({ close }: { close(restoreFocus?: boolean): void }): ReactNode
                     store.patchDoc((d) => confirmNumber(d, n), `confirm ${n}`);
                     ui.say(`Confirmed ${n}.`);
                     // The last thing to fix: the button goes, so the focus goes to the heading.
-                    if (flags.length === 1 && issues.all.length === 0) requestAnimationFrame(() => document.getElementById(HEADING_ID)?.focus());
+                    if (flags.length === 1 && issues.shown.length === 0) requestAnimationFrame(() => document.getElementById(HEADING_ID)?.focus());
                   }}
                 >
                   That&apos;s right
