@@ -114,3 +114,11 @@ For J: the description must stay the figure's last direct child, with `data-edit
 For L: hide `.xe-format` wherever your bar holds the formatting buttons; a finding's controls stay small under touch, so your bar should carry them on a phone.
 
 Not verified by G: Safari, Firefox, a real phone, a screen reader, the Worker build.
+
+## From agent N, list 1 milestone 0 (merged into phase-2-r3 at 617b9e5)
+
+- `e2e/editor.ts` exports `keepClassic(page)`. It visits `/dev/editor?kind=classic`, which sets the `exhbt-editor-kind` cookie, and checks the answer is `{editor:"classic"}`. `signInAs`, `signInToDraft` and `draftAndOpen` call it.
+- Every spec on both of N's lists also has `test.beforeEach(({ page }) => keepClassic(page));`, because many sign in inline or reach `/edit` by redirect. No assertion changed. Milestone 1 removes these spec by spec as each moves to the new editor.
+- Counts, one worker, every test passing: phase2-editor 10, auto-figure 32, phase2-draft 11, phase2-formats 81, phase2-editor-media 15, phase2-graphs 16, phase2-draft-tools 11, phase2-sections 15, phase2-polish-2 13, phase2-teammates 7, phase2-billing-polish 7, exhbt-page 16, file-ownership 1, phase2-saved-ideas 7 (`docs/briefs/edit-on-page/r3-n-milestone-0-counts.md`).
+- Flaky from sandbox memory or cold compile, not the switch: phase2-sections "stand-in AI drafts a quote" passes alone in about 54 s but once hit the 90 s timeout on a cold compile.
+- The baseline run on `phase-2-r2` was not done (no memory for a second server).
