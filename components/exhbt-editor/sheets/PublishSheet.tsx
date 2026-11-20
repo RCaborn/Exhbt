@@ -1,18 +1,28 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { publishExhbt } from "@/app/(app)/exhbts/[id]/actions";
+import Link from "next/link";
+import { publishExhbt, unpublishExhbt } from "@/app/(app)/exhbts/[id]/actions";
+import { confirmNumber, unverifiedOf } from "@/components/editor/model";
+import { ConfirmAction } from "@/components/editor/ConfirmAction";
+import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
+import { CopyLink } from "@/components/ui/CopyLink";
+import { pathOfNumber } from "@/lib/exhbt/verify";
+import type { FieldPath } from "@/components/portfolio/page-ctx";
 import { useEnv, useIssues, useSave, useUi } from "../context";
-import { useFilesController } from "../files";
+import { useFiles } from "../files";
 import { noteSaved } from "../pending";
-import { useStoreInternal } from "../store";
+import { useDoc, useStore } from "../store";
 import { Sheet } from "../ui/Sheet";
+import { setLive, useLive } from "./live";
+import { useShowMe } from "./paths";
+import "../css/sheets.css";
 
 /*
- * "Review and publish" (decision 0026, "What the page does not draw"). I's: this is G's stub, the tick
- * and the Publish button, calling publishExhbt as the classic editor does: after any save in flight,
- * with the doc as it is now; on success the server has this doc and it is the live copy.
+ * "Review and publish" (decision 0026, "What the page does not draw"): the plan, the username, what
+ * stops publishing, the numbers to check, the tick, and Publish. A port of the classic editor's
+ * publish section.
  */
 export function PublishSheet(): ReactNode {
   return (
@@ -22,16 +32,27 @@ export function PublishSheet(): ReactNode {
   );
 }
 
+type Result = { ok: true; slug: string; changed: boolean } | { ok: false; lines: string[] };
+
+/** The server words one reason with "at the top", which this editor does not have. */
+const FLAGGED = /flagged number/;
+
 function PublishBody() {
   const env = useEnv();
   const ui = useUi();
   const save = useSave();
   const issues = useIssues();
-  const files = useFilesController();
-  const store = useStoreInternal();
+  const files = useFiles();
+  const store = useStore();
+  const doc = useDoc((d) => d);
+  const live = useLive();
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ ok: true; slug: string } | { ok: false; lines: string[] } | null>(null);
-  const published = env.status === "published";
+  const [result, setResult] = useState<Result | null>(null);
+  const published = live.status === "published";
+  const flags = unverifiedOf(doc);
+  const first = issues.all[0];
+
+  const showMe = useShowMe();
 
   async function publish() {
     issues.setTried(true);
@@ -39,13 +60,14 @@ function PublishBody() {
     setResult(null);
     try {
       await save.settled();
-      const doc = store.get();
-      const r = await publishExhbt(env.id, doc, ui.confirmed);
+      const sent = store.get();
+      const r = await publishExhbt(env.id, sent, ui.confirmed);
       if (r.ok) {
-        save.markSaved(doc);
-        noteSaved(doc);
-        files.markPublished(doc);
-        setResult({ ok: true, slug: r.slug });
+        save.markSaved(sent);
+        noteSaved(sent);
+        files.markPublished(sent);
+        setLive(env.id, "published", r.slug);
+        setResult({ ok: true, slug: r.slug, changed: published });
       } else setResult({ ok: false, lines: r.reasons });
     } catch {
       setResult({ ok: false, lines: ["Couldn't reach the server. Try again in a moment."] });
@@ -54,32 +76,117 @@ function PublishBody() {
     }
   }
 
-  const liveUrl = result?.ok && env.liveBase ? `${env.liveBase}/${result.slug}` : null;
+  const base = env.liveBase;
+  const justUrl = result?.ok && base ? `${base}/${result.slug}` : null;
+  const liveUrl = base && live.slug ? `${base}/${live.slug}` : null;
+  const shortOf = (u: string) => u.replace(/^https:\/\//, "");
+  const reasons = result && !result.ok ? [...new Set(result.lines.map((l) => (FLAGGED.test(l) ? "Check the flagged numbers below." : l)))] : [];
+
+  if (!env.canGoLive) {
+    return (
+      <div className="xe-sheet-stack">
+        <p className="text-graphite">This exhbt is a preview only: nobody else can see it.</p>
+        {env.planBlock && <UpgradePrompt reason={env.planBlock.reason} upgradeTo={env.planBlock.upgradeTo} />}
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      {!env.canGoLive && <p className="text-graphite">This exhbt is a preview only: nobody else can see it.</p>}
-      {issues.all.length > 0 && <p className="text-sm text-graphite">{issues.all.length === 1 ? "1 thing" : `${issues.all.length} things`} to fix before this can go live.</p>}
+    <div className="xe-sheet-stack">
+      {result?.ok && justUrl ? (
+        <div role="status" className="xe-live">
+          <p className="text-[1.25rem] font-semibold">{result.changed ? "Your changes are live." : "It's live."}</p>
+          <p className="mt-2 text-graphite">Paste this into an application:</p>
+          <p className="mt-1 font-mono text-sm break-words">
+            <a href={justUrl} className="link font-semibold">
+              {shortOf(justUrl)}
+            </a>
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Button href={justUrl} variant="primary" label="View it">
+              View it
+            </Button>
+            <CopyLink href={justUrl} />
+            <Button href="/exhbts">Back to your exhbts</Button>
+          </div>
+        </div>
+      ) : (
+        liveUrl &&
+        published && (
+          <p className="break-words">
+            Live at{" "}
+            <a href={liveUrl} className="link font-semibold">
+              {shortOf(liveUrl)}
+            </a>
+          </p>
+        )
+      )}
+      {env.planBlock && <UpgradePrompt reason={env.planBlock.reason} upgradeTo={env.planBlock.upgradeTo} primary={false} />}
+      {!env.liveBase && (
+        <p className="text-graphite">
+          You need a username to publish.{" "}
+          <Link href="/account/portfolio" className="link font-semibold text-ink">
+            Choose one
+          </Link>
+        </p>
+      )}
+      {first && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-graphite">{issues.all.length === 1 ? "1 thing" : `${issues.all.length} things`} to fix before this can go live.</p>
+          <Button size="sm" onClick={() => showMe(first.path as FieldPath)}>
+            Show me
+          </Button>
+        </div>
+      )}
+      {flags.length > 0 && (
+        <ul aria-label="Numbers to check" className="xe-sheet-list">
+          {flags.map((n) => {
+            const at = pathOfNumber(doc, n);
+            return (
+              <li key={n} className="xe-flag">
+                <span>
+                  Check this number: <strong className="font-mono">{n}</strong>
+                  <span className="block text-sm text-graphite">We couldn&apos;t find it in your files. Fix it in the text, or confirm it.</span>
+                </span>
+                <span className="flex flex-wrap gap-2">
+                  <Button size="sm" label={`That's right: ${n}`} onClick={() => store.patchDoc((d) => confirmNumber(d, n), `confirm ${n}`)}>
+                    That&apos;s right
+                  </Button>
+                  {at && (
+                    <Button size="sm" label={`Show me: ${n}`} onClick={() => showMe(at as FieldPath)}>
+                      Show me
+                    </Button>
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       <label className="flex items-start gap-3">
         <input type="checkbox" checked={ui.confirmed} onChange={(e) => ui.setConfirmed(e.target.checked)} className="mt-1.5 size-4 accent-jade" />
         <span>This is my work, and the numbers are true</span>
       </label>
-      <Button variant="primary" loading={busy} disabled={busy || !env.canGoLive} onClick={publish} label={published ? "Publish changes" : "Publish"}>
-        {published ? "Publish changes" : "Publish"}
-      </Button>
-      <div role="status">
-        {result?.ok && (
-          <div>
-            <p className="font-semibold">{published ? "Your changes are live." : "It's live."}</p>
-            {liveUrl && (
-              <a href={liveUrl} className="link font-semibold">
-                {liveUrl.replace(/^https:\/\//, "")}
-              </a>
-            )}
-          </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button variant="primary" loading={busy} disabled={busy} onClick={publish} label={published ? "Publish changes" : "Publish"}>
+          {published ? "Publish changes" : "Publish"}
+        </Button>
+        {published && (
+          <ConfirmAction
+            label="Unpublish"
+            question="Take it off your portfolio?"
+            confirmLabel="Yes, unpublish"
+            action={async () => {
+              setLive(env.id, "draft", live.slug);
+              await unpublishExhbt(env.id);
+            }}
+          />
         )}
-        {result && !result.ok && (
+      </div>
+      <div role="status">
+        {reasons.length > 0 && (
           <ul className="space-y-1 text-error">
-            {result.lines.map((l) => (
+            {reasons.map((l) => (
               <li key={l}>{l}</li>
             ))}
           </ul>
