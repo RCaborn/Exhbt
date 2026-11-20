@@ -279,6 +279,8 @@ test.describe("dragging with a mouse", () => {
         await page.keyboard.press("Escape");
         await page.mouse.up();
         await expect(lifting(page)).toHaveCount(0);
+        // The section goes back from where it was let go, raised over its neighbours for those 180ms.
+        await settled(page);
       }
       expect(await pageOrder(page)).toEqual(order);
     });
@@ -807,7 +809,7 @@ test.describe("while carrying", () => {
 
 /** What a menu or the tray offers: each kind, and whether it can be added. */
 const kindsIn = (page: Page, sel: string) =>
-  page.locator(sel).evaluateAll((els) => els.map((b) => `${b.getAttribute("data-kind")}${(b as HTMLButtonElement).disabled || b.getAttribute("aria-disabled") === "true" ? " (full)" : ""}`));
+  page.locator(sel).evaluateAll((els) => els.map((b) => `${b.getAttribute("data-block")}${(b as HTMLButtonElement).disabled || b.getAttribute("aria-disabled") === "true" ? " (full)" : ""}`));
 const expectedKinds = (doc: ExhbtDoc) => blockOptions(doc).map((o) => `${o.kind}${o.full ? " (full)" : ""}`);
 const wordsLeftText = (doc: ExhbtDoc) => `${LIMITS.totalWords - wordCount(doc)} words left of ${LIMITS.totalWords}.`;
 const MENU = `${READY} [data-xe-menu]`;
@@ -836,13 +838,13 @@ test.describe("the + between sections", () => {
       expect(new Set(names).size).toBe(names.length);
       const before = await drawn(page);
       const end = page.locator(`${READY} #add-section`);
-      await expect(end).toHaveAttribute("data-path", "sections");
+      await expect(page.locator(`${READY} .xe-insert[data-end]`)).toHaveAttribute("data-path", "sections");
       await end.click();
       await expect(page.locator(MENU)).toBeVisible();
       expect(await drawn(page)).toEqual(before);
       expect(await kindsIn(page, `${MENU} .xe-plus-item`)).toEqual(expectedKinds(doc));
       for (const o of blockOptions(doc)) {
-        const item = page.locator(`${MENU} [data-kind="${o.kind}"]`);
+        const item = page.locator(`${MENU} [data-block="${o.kind}"]`);
         await expect(item).toContainText(o.name);
         if (o.full) await expect(item).toHaveAccessibleDescription(o.full);
       }
@@ -860,7 +862,7 @@ test.describe("the + between sections", () => {
       const starts = await page.locator(`${READY} .xe-insert:not([data-end])`).evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-at"))));
       const at = starts[Math.floor(starts.length / 2)]!;
       await page.locator(`${READY} .xe-insert[data-at="${at}"] .xe-plus`).click();
-      await page.locator(`${MENU} [data-kind="${kind.kind}"]`).click();
+      await page.locator(`${MENU} [data-block="${kind.kind}"]`).click();
       const now = await pageOrder(page);
       expect(now.length).toBe(order.length + 1);
       const added = now[at]!;
@@ -873,7 +875,7 @@ test.describe("the + between sections", () => {
   test("a new graph opens its figures sheet; on a full case study the + says so, and Things to fix opens it", async ({ page }) => {
     await open(page, "case-study");
     await page.locator(`${READY} #add-section`).click();
-    await page.locator(`${MENU} [data-kind="graph"]`).click();
+    await page.locator(`${MENU} [data-block="graph"]`).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.keyboard.press("Escape");
 
@@ -906,7 +908,7 @@ test.describe("the + between sections", () => {
     const plus = page.locator(`${READY} .xe-insert[data-at="${at}"] .xe-plus`);
     await expect(plus).toHaveAccessibleName(`Add a section before ${await nameOf(page, order[at]!)}`);
     await plus.click();
-    await page.locator(`${MENU} [data-kind="flow"]`).click();
+    await page.locator(`${MENU} [data-block="flow"]`).click();
     expect(await pageOrder(page)).toEqual(orderWith(order, "flow", at));
     // The stored marker is there, not at the flowchart's usual place.
     const doc = await docNow(page);
@@ -921,7 +923,7 @@ test.describe("the + between sections", () => {
  * ---------------------------------------------------------------------------------------------- */
 
 const TRAY = `${READY} [data-xe-tray]`;
-const block = (page: Page, kind: string) => page.locator(`${TRAY} [data-kind="${kind}"]`);
+const block = (page: Page, kind: string) => page.locator(`${TRAY} [data-block="${kind}"]`);
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 
 /** Presses the mouse on a block in the tray and moves past the 6px threshold. */

@@ -44,13 +44,16 @@ export function Insert({ at, end }: InsertSlot) {
   const name = before ? `Add a section before ${before}` : "Add a section";
   const show = () => setOpen(readMenu(store.get(), env.reportFiles));
 
-  // "Things to fix" landing on the end "+" opens its menu.
+  // "Things to fix" landing on the end "+" (its wrapper carries the path; the jump lands on the button in it) opens its menu.
   useEffect(() => {
-    const b = button.current;
-    if (!b || !end) return;
-    const onJump = () => setOpen(readMenu(store.get(), env.reportFiles));
-    b.addEventListener("xe-jump", onJump);
-    return () => b.removeEventListener("xe-jump", onJump);
+    const w = wrap.current;
+    if (!w || !end) return;
+    const onJump = () => {
+      if (document.activeElement !== button.current) button.current?.focus({ preventScroll: true });
+      setOpen(readMenu(store.get(), env.reportFiles));
+    };
+    w.addEventListener("xe-jump", onJump);
+    return () => w.removeEventListener("xe-jump", onJump);
   }, [end, store, env.reportFiles]);
 
   // Open, a press anywhere else closes it.
@@ -75,6 +78,7 @@ export function Insert({ at, end }: InsertSlot) {
       data-edit-only
       data-at={at}
       data-end={end || undefined}
+      data-path={end ? "sections" : undefined}
       onKeyDown={(e) => {
         if (e.key !== "Escape" || !open) return;
         e.stopPropagation();
@@ -89,7 +93,6 @@ export function Insert({ at, end }: InsertSlot) {
         ref={button}
         type="button"
         id={end ? "add-section" : undefined}
-        data-path={end ? "sections" : undefined}
         className="xe-plus"
         aria-label={name}
         data-tip={name}
@@ -108,7 +111,7 @@ export function Insert({ at, end }: InsertSlot) {
           <ul className="xe-plus-list">
             {open.options.map((o) => (
               <li key={o.kind}>
-                <button type="button" className="xe-plus-item" data-kind={o.kind} disabled={Boolean(o.full)} aria-describedby={o.full ? `${menuId}-${o.kind}` : undefined} onClick={() => choose(() => board.add(o.kind, at))}>
+                <button type="button" className="xe-plus-item" data-block={o.kind} disabled={Boolean(o.full)} aria-describedby={o.full ? `${menuId}-${o.kind}` : undefined} onClick={() => choose(() => board.add(o.kind, at))}>
                   <BlockIcon kind={o.kind} />
                   <span className="min-w-0">
                     <span className="xe-plus-name">{o.name}</span>
@@ -123,7 +126,7 @@ export function Insert({ at, end }: InsertSlot) {
             ))}
             {open.figure && (
               <li>
-                <button type="button" className="xe-plus-item" data-kind="figure" disabled={Boolean(open.figure.full)} aria-describedby={open.figure.full ? `${menuId}-figure` : undefined} onClick={() => choose(() => uiApi.open("figure"))}>
+                <button type="button" className="xe-plus-item" data-block="figure" disabled={Boolean(open.figure.full)} aria-describedby={open.figure.full ? `${menuId}-figure` : undefined} onClick={() => choose(() => uiApi.open("figure"))}>
                   <FileText aria-hidden size={16} strokeWidth={2.25} className="xe-block-icon" />
                   <span className="min-w-0">
                     <span className="xe-plus-name">Take a figure from my report</span>

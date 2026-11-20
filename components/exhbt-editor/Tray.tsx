@@ -65,7 +65,7 @@ function TrayBlock({ option }: { option: BlockOption }) {
       <button
         type="button"
         className="xe-tray-block"
-        data-kind={kind}
+        data-block={kind}
         // Kept focusable when there is no room, so the reason can be reached and read.
         aria-disabled={full ? true : undefined}
         aria-describedby={full ? why : TRAY_HOW}
