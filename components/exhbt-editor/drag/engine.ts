@@ -103,6 +103,16 @@ type Live = {
 
 export type Engine = ReturnType<typeof createEngine>;
 
+declare global {
+  interface Window {
+    /** Development only: a drag in progress, for e2e/editor-drag.spec.ts. */
+    __exhbtDrag?: {
+      state(): { id: string; place: number; home: number; style: "slide" | "line"; mode: "pointer" | "keys" } | null;
+      fidelity(): string[];
+    };
+  }
+}
+
 const engines = new WeakMap<Store, Engine>();
 
 /** The one engine for a visit's store. */
@@ -708,6 +718,30 @@ function createEngine(store: Store, ui: UiApi, files: FilesController) {
         if (live && store.get() !== live.doc) finish(false);
       });
       const teardown = TouchSensor.setup?.();
+      // Development only: what e2e/editor-drag.spec.ts reads of a drag in progress.
+      if (process.env.NODE_ENV !== "production") {
+        window.__exhbtDrag = {
+          state: () => (live ? { id: live.plan.id, place: live.place, home: live.plan.home, style: live.style, mode: live.mode } : null),
+          /** How far the hidden copy, laid out with nothing moved, is from the page as it was frozen: each box that differs by more than a pixel. */
+          fidelity: () => {
+            const l = live;
+            if (!l) return ["nothing is being carried"];
+            const at = measured(l, l.draft ? NOWHERE : l.plan.home);
+            const first = l.plan.rest.find((id) => at[id] && l.plan.boxes[id]);
+            if (!first) return [];
+            const dx = l.plan.boxes[first]!.x - at[first]!.x;
+            const dy = l.plan.boxes[first]!.y - at[first]!.y;
+            const off: string[] = [];
+            for (const [id, b] of Object.entries(l.plan.boxes)) {
+              const m = at[id];
+              if (!m) off.push(`${id} is missing`);
+              else if (Math.abs(m.x + dx - b.x) > 1 || Math.abs(m.y + dy - b.y) > 1 || Math.abs(m.w - b.w) > 1 || Math.abs(m.h - b.h) > 1)
+                off.push(`${id} ${[b.x, b.y, b.w, b.h].map((v) => v.toFixed(1)).join(",")} is ${[m.x + dx, m.y + dy, m.w, m.h].map((v) => v.toFixed(1)).join(",")}`);
+            }
+            return off;
+          },
+        };
+      }
       return () => {
         if (live) finish(false);
         view = null;
