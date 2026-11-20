@@ -84,3 +84,33 @@ Where G departed from the brief, or followed these notes over it:
 - `sheets/live.ts`: a small atom for the live status, `setLive(id, status, slug)` and `useLive()`. Publish and Unpublish each call `setLive`. G is to make this the editor's live status (or re-export its own from here) and the top bar's chip read it.
 - `sheets/paths.ts`: `sheetOf(path)` and `useShowMe()` ("Show me" closes the publish sheet, waits 50 ms, opens the right sheet and focuses the field).
 - Known gaps for G: `ui.jumpTo(path)` does not open a sheet for sheet paths (`summary`, `headline`, `evidence`); `ui/Sheet.tsx`'s `onClose` closes whatever sheet is open, so a late close can shut the next sheet.
+
+## From agent G, milestone 2 (merged into phase-2-r3 at db74802)
+
+What it built:
+- Plain fields are textareas wrapped in `.xe-field`; the inline fields (a quote's words, name and role, a pull quote, a link's words) are editable spans in `.xe-field-inline`.
+- Formatted fields start their Tiptap editor in idle moments, or at once on click. In tests reach them with `textbox()` or `typeIn()`. The focus is on the `.ProseMirror` inside the `[data-path]` box, so use `focusedPath(page)` to read the focused field's path.
+- A field with an issue has an outline in the look's error colour and `aria-invalid`; the message shows only while it has the focus.
+- `ui.jumpTo(path)` lands on every kind of issue path. Card, work and chart paths open their sheet first; a link's address opens its popover; a path with no field lands on its anchor's button.
+- One live status lives in `context.ts`: `setLive`, `useLive` and `useStatus()` (which also gives `liveUrl` and `set`). `sheets/live.ts` re-exports it. The publish sheet calls `setLive(id, "published", slug)`, Unpublish calls `setLive(id, "draft", slug)`. I's `useShowMe` can call `ui.jumpTo(path)`.
+- A sheet's late `close` no longer shuts the next sheet, and takes the focus back only if nobody has moved it.
+- The file rule: a stored file is deleted only under 0026's four conditions. When the visit ends (unmount, or a `pagehide` that doesn't keep the page) the undo list stops protecting a file.
+- The crash fallback's pending doc is kept per exhbt.
+- The kept-sections list, the offer to restore a copy kept in the browser, pictures dropped on the page, focus after Undo, and `/dev/editor-timing` (404 unless `EXHBT_LAB=1`; `noindex`).
+- `EDIT_ONLY_IN_FLOW` now also names the title, a flowchart box and a finding (each shows a placeholder the visitor's page doesn't have), and `allowEditOnly()` applies the list.
+- `pickAt()` defaults to the end of the page. `waitSaved` needs a `role=status` that reads exactly "Saved".
+- CI's e2e job runs on 6 shards.
+- DESIGN.md, MAP.md, HANDOFF.md and AGENTS.md describe the editor as it is at release 3.
+
+Tests (one worker): `editor-smooth` 7/7; `editor-classic` 10/10; `editor-inplace` 93 tests, about 14 minutes. A whole-file run of `editor-inplace` on db74802 is still to do; the main session runs it at integration.
+
+Known faults for others:
+- H's `e2e/editor-topbar.spec.ts:203` is a race: it expects `data-path` on the focused element, but a started formatted field puts the focus inside the box. Fix it with `focusedPath(page)`.
+- The "Edit figures" chip covers the end of the graph's title (J).
+- At phone width the grid tiles' section toolbars overlap until `phone.css` shows only the grip, and the formatting buttons below the last finding run into them (L).
+
+For K: box and finding actions and their undo are tested on the store without a page. The last box's placeholder uses `--xp-flow-end-soft`.
+For J: the description must stay the figure's last direct child, with `data-edit-only="image-description"`, and use `descriptionClass(as)` from `geometry.ts`. The shell already handles pictures dropped on the page.
+For L: hide `.xe-format` wherever your bar holds the formatting buttons; a finding's controls stay small under touch, so your bar should carry them on a phone.
+
+Not verified by G: Safari, Firefox, a real phone, a screen reader, the Worker build.
