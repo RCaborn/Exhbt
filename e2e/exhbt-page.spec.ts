@@ -4,6 +4,10 @@ import { exhbtSummary, plain, text, wordCount, LIMITS, validateForPublish, withH
 import { fullDoc, openBankingDoc, sampleDocs } from "../lib/exhbt/sample";
 import { withKeyFigure } from "../lib/exhbt/sections";
 import { applyBlock, blockValue } from "../lib/exhbt/draft-blocks";
+import { keepClassic } from "./editor";
+
+// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
+test.beforeEach(({ page }) => keepClassic(page));
 
 // The exhbt page in the layout Rory drew on 16 Nov 2026 (decision 0022): a sidebar with the person,
 // what it is, where and when, the checks, the work and Save as PDF; the title as the question, the

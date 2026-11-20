@@ -2,6 +2,10 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { ENTITLEMENTS } from "../lib/entitlements";
 import { TEAMMATES_PER_EXHBT } from "../lib/team-rules";
+import { keepClassic } from "./editor";
+
+// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
+test.beforeEach(({ page }) => keepClassic(page));
 
 // Teammates and private file matching (docs/decisions/0013): invites by email and accepting them,
 // teammates on the public page and the tile, removing and leaving, a teammate's own exhbt from the

@@ -78,8 +78,21 @@ export const DRAFT_PROJECT = [
 
 export type Plan = "free" | "premium" | "max";
 
+/**
+ * Release 3, milestone 0: `/exhbts/<id>/edit` now serves the new editor, and the specs still drive the
+ * classic form cards. The development cookie from /dev/editor keeps this browser context on the classic
+ * editor however a spec reaches /edit (a redirect, a link or a typed address). Call it once per browser
+ * context, before the first visit to the editor. It goes when the specs move to the new editor (brief N,
+ * milestone 1).
+ */
+export async function keepClassic(page: Page) {
+  const res = await page.request.get("/dev/editor?kind=classic");
+  expect(await res.json()).toEqual({ editor: "classic" });
+}
+
 /** Makes a dev user with a username on a plan and no exhbts, signs in as them and waits for the "Your exhbts" list. */
 export async function signInAs(page: Page, username: string, plan: Plan = "premium") {
+  await keepClassic(page);
   await page.goto(`/dev/portfolio?username=${username}&plan=${plan}&count=0`);
   await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
   await expect(page.getByRole("heading", SEL.listHeading)).toBeVisible();
@@ -106,6 +119,7 @@ export async function startEditor(page: Page, username: string) {
 
 /** Signs in as a new address and waits for the "Draft an exhbt" page and its form. */
 export async function signInToDraft(page: Page, tag: string) {
+  await keepClassic(page);
   await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(tag))}&next=/exhbts/new`);
   await expect(page.getByRole("heading", SEL.draftHeading)).toBeVisible();
   await expect(page.locator(SEL.draftForm)).toBeAttached();
@@ -119,6 +133,7 @@ export async function signInToDraft(page: Page, tag: string) {
 export async function draftAndOpen(page: Page, tag: string, opts: { waitForForm?: boolean } = {}): Promise<string> {
   if (opts.waitForForm !== false) await signInToDraft(page, tag);
   else {
+    await keepClassic(page);
     await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(tag))}&next=${encodeURIComponent("/exhbts/new")}`);
     await expect(page.getByRole("heading", SEL.draftHeading)).toBeVisible();
   }

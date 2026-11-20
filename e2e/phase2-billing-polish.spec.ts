@@ -2,7 +2,10 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import Stripe from "stripe";
 import { BILLING_PERIOD, ENTITLEMENTS, PLAN_NAMES, PRICES } from "../lib/entitlements";
-import { signInAs, startFromScratch } from "./editor";
+import { signInAs, startFromScratch, keepClassic } from "./editor";
+
+// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
+test.beforeEach(({ page }) => keepClassic(page));
 
 // Billing polish: Stripe events out of order, the upgrade offer where a limit stops something,
 // the pricing page selling for real with Phase 2 on, and files removed with their exhbt.

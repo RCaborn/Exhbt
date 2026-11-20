@@ -1,7 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { devices, expect, test, type Page } from "@playwright/test";
 import { uniqueEmail } from "./helpers";
-import { draftAndOpen } from "./editor";
+import { draftAndOpen, keepClassic } from "./editor";
+
+// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
+test.beforeEach(({ page }) => keepClassic(page));
 
 // Phase 2 polish, second pass: the phone header menu, one catalogue number, the per-card
 // "More actions" menu, the flowchart as a row on wide screens and a column on phones, the exhbt

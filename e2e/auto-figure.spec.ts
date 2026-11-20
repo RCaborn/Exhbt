@@ -6,6 +6,10 @@ import { roomFor, sectionLabel, withKeyFigure, withWorkVisual } from "../lib/exh
 import { imageSize } from "../lib/figures/image-size";
 import { FIGURE, boxFromPixels, clampBox, fitCaption, mayHoldFigure, pixelsFromBox, withMargin } from "../lib/figures/rules";
 import { uniqueEmail } from "./helpers";
+import { keepClassic } from "./editor";
+
+// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
+test.beforeEach(({ page }) => keepClassic(page));
 
 // The figure picked from an upload (decisions 0017 and 0025): the PDF's pages drawn in the browser,
 // the stand-in AI's pick (the first page that draws shapes, with a box that covers the chart in the

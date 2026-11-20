@@ -7,6 +7,10 @@ import { emptyDoc, text } from "../lib/exhbt/blocks";
 import { unverifiedNumbers } from "../lib/exhbt/verify";
 import { makeDocx, makePdf } from "./doc-fixtures";
 import { uniqueEmail } from "./helpers";
+import { keepClassic } from "./editor";
+
+// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
+test.beforeEach(({ page }) => keepClassic(page));
 
 // Upload → AI draft (docs/phase-2.md section 6): the readers, the number check, and /exhbts/new
 // end to end with the placeholder AI (no API key in tests) and the in-memory Storage stand-in.

@@ -23,7 +23,10 @@ import { referencesFrom } from "../lib/exhbt/references";
 import { fullDoc, GALLERY_IMAGES, galleryDoc, libraryDoc, openBankingDoc, researchDoc, sampleDocs, sampleSeeds } from "../lib/exhbt/sample";
 import { firstOfKinds, layoutNotes, leadRatio, imageRatio, sectionLabel, withKeyFigure } from "../lib/exhbt/sections";
 import { unverifiedNumbers } from "../lib/exhbt/verify";
-import { chooseLayout, layoutGroup, pickImages, previewArticle, sectionsArea, signInAs, startEditor, wordsOnBar } from "./editor";
+import { chooseLayout, layoutGroup, pickImages, previewArticle, sectionsArea, signInAs, startEditor, wordsOnBar, keepClassic } from "./editor";
+
+// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
+test.beforeEach(({ page }) => keepClassic(page));
 
 // Exhbt layouts (decision 0024): case study, gallery and research. One optional field, `format`;
 // no migration; a doc without one (or with one this code doesn't know) is a case study.
