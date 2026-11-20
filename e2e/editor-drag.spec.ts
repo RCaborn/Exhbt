@@ -1020,6 +1020,7 @@ test.describe("the tray", () => {
     await open(page, "gallery");
     await frame(page, "flow").hover();
     await frame(page, "flow").locator('[data-tool="remove"]').click();
+    await settled(page);
     const order = await pageOrder(page);
     await expect(block(page, "flow")).toBeVisible();
     const at = await client(page);
@@ -1154,7 +1155,8 @@ test.describe("by touch", () => {
 
     // A quick swipe that starts on a grip picks nothing up.
     const id = tiles[1]!;
-    await frame(page, id).scrollIntoViewIfNeeded();
+    // The grip sits above the section's corner: brought to the middle of the screen, clear of the top bar.
+    await grip(page, id).evaluate((el) => el.scrollIntoView({ block: "center" }));
     await page.waitForTimeout(300);
     let g = (await grip(page, id).boundingBox())!;
     let at = { x: g.x + g.width / 2, y: g.y + g.height / 2 };
