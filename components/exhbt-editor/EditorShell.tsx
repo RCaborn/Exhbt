@@ -6,7 +6,7 @@ import { IMAGE_ACCEPT } from "@/components/editor/media";
 import { clearBackup, readBackup, writeBackup, type Backup } from "@/components/editor/useAutosave";
 import { Button } from "@/components/ui/Button";
 import { normaliseDoc } from "@/lib/exhbt/blocks";
-import { keptItems } from "@/lib/exhbt/layouts";
+import { keptItems, pageItems } from "@/lib/exhbt/layouts";
 import type { PageCtx } from "@/components/portfolio/page-ctx";
 import { ProjectView, type Owner } from "@/components/portfolio/ProjectView";
 import { lookAttrs, themeStyle } from "@/components/portfolio/themeFonts";
@@ -68,7 +68,7 @@ function startVisit(props: PageEditorProps): Visit {
     // The browser copy and the newest doc, in the change itself, before anyone is told (decision 0026, "Saving").
     onChange: (doc) => {
       writeBackup(props.id, doc);
-      notePending(doc);
+      notePending(doc, props.id);
     },
   });
   const runtime = createRuntime(props, (path, ui) => jumpTo(path, ui, store.get()));
@@ -92,13 +92,13 @@ export function PageEditor(props: PageEditorProps) {
     }
     // The rule that deletes files runs when the page goes for good, and when the editor unmounts; never when it is only hidden.
     const gone = (e: PageTransitionEvent) => {
-      if (!e.persisted) visit.files.settle({ keepalive: true });
+      if (!e.persisted) visit.files.settle({ keepalive: true, ending: true });
     };
     window.addEventListener("pagehide", gone);
     return () => {
       window.removeEventListener("pagehide", gone);
       closeEditorQueue();
-      visit.files.settle({ keepalive: true });
+      visit.files.settle({ keepalive: true, ending: true });
     };
   }, [visit]);
   const grow = devParam("grow") === "mirror" ? "mirror" : null;
@@ -148,6 +148,22 @@ export function PageEditor(props: PageEditorProps) {
 function Body() {
   const visitor = useUiState((s) => s.visitor);
   const { theme } = useEnv();
+  const store = useStoreInternal();
+  const files = useFilesController();
+  // Pictures dropped onto the page (decision 0026, "Pictures by hand") go in after the section they were dropped on, in the order given.
+  const pictures = (e: React.DragEvent) => [...(e.dataTransfer?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+  const allowPictures = (e: React.DragEvent) => {
+    if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
+  };
+  const dropPictures = (e: React.DragEvent) => {
+    const list = pictures(e);
+    if (!list.length) return;
+    e.preventDefault();
+    const id = (e.target as Element).closest?.("[data-section-id]")?.getAttribute("data-section-id");
+    const items = pageItems(store.get());
+    const i = items.findIndex((it) => it.id === id);
+    void files.addImages(list, i >= 0 ? i + 1 : items.length);
+  };
   return (
     <div {...lookAttrs(theme)} style={themeStyle(theme)} className={LOOK_GROUND}>
       {visitor ? (
@@ -156,7 +172,7 @@ function Body() {
         </section>
       ) : (
         <DragBoard>
-          <div className={CANVAS}>
+          <div className={CANVAS} onDragOver={allowPictures} onDrop={dropPictures}>
             <Canvas />
             <KeptList />
           </div>

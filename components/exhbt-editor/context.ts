@@ -63,6 +63,9 @@ export type UiState = {
 
 export type UiApi = Pick<Ui, "open" | "close" | "jumpTo" | "say" | "setVisitor" | "setConfirmed"> & { setTried(v: boolean): void };
 
+/** Whether the exhbt is live, and at which slug: what the page was opened with, then what publishing and unpublishing say. */
+export type LiveStatus = { status: "draft" | "published"; slug: string | null };
+
 /** One visit's runtime: made once in EditorShell.tsx. */
 export type Runtime = {
   env: PageEditorProps;
@@ -70,6 +73,7 @@ export type Runtime = {
   uiApi: UiApi;
   save: Atom<SaveApi>;
   activeRich: Atom<ActiveRich | null>;
+  status: Atom<LiveStatus>;
 };
 
 export const RuntimeContext = createContext<Runtime | null>(null);
@@ -96,7 +100,26 @@ export function createRuntime(env: PageEditorProps, jumpTo: (path: FieldPath, ui
     setConfirmed: (on) => ui.set((s) => (s.confirmed === on ? s : { ...s, confirmed: on })),
     setTried: (v) => ui.set((s) => (s.tried === v ? s : { ...s, tried: v })),
   };
-  return { env, ui, uiApi, save: atom(initialSave()), activeRich: atom<ActiveRich | null>(null) };
+  return { env, ui, uiApi, save: atom(initialSave()), activeRich: atom<ActiveRich | null>(null), status: atom<LiveStatus>({ status: env.status, slug: env.slug }) };
+}
+
+/**
+ * Whether the exhbt is live now, its slug, and its live address (`liveBase` + slug, when there is a
+ * username): `useEnv()` holds only what the page was opened with, so the top bar's chip, "Unpublish"
+ * and the publish sheet read this instead. After publishing works, call `set({ status: "published",
+ * slug })` with the slug publishExhbt answered; after unpublishing works, `set({ status: "draft" })`.
+ */
+export function useStatus(): LiveStatus & { liveUrl: string | null; set(next: Partial<LiveStatus>): void } {
+  const { env, status } = useRuntime();
+  const s = useAtom(status);
+  return useMemo(
+    () => ({
+      ...s,
+      liveUrl: s.status === "published" && s.slug && env.liveBase ? `${env.liveBase}/${s.slug}` : null,
+      set: (next: Partial<LiveStatus>) => status.set((cur) => ({ ...cur, ...next })),
+    }),
+    [s, env.liveBase, status],
+  );
 }
 
 /** One slice of the view's state. */

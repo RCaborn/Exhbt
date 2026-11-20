@@ -61,8 +61,8 @@ export type FilesController = Methods & {
   pickAt(): number;
   /** A save landed: the server holds this doc. Runs the rule. */
   noteSaved(doc: ExhbtDoc): void;
-  /** Runs the rule that deletes files (with `keepalive` when the page is going). */
-  settle(opts?: { keepalive?: boolean }): void;
+  /** Runs the rule that deletes files. `ending`: the visit is over (the page goes for good, or the editor unmounts), so its undo list, which goes with it, no longer keeps a file; `keepalive` lets the requests outlive the page. */
+  settle(opts?: { keepalive?: boolean; ending?: boolean }): void;
 };
 
 /** Deletes a stored file. Never throws: a leftover file is harmless, a stuck editor isn't. With `keepalive`, the request outlives the page. */
@@ -85,9 +85,10 @@ export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: nu
   const addUrl = (fileId: string, blob: Blob) => set((s) => ({ imageUrls: { ...s.imageUrls, [fileId]: URL.createObjectURL(blob) } }));
 
   /** The four-part rule (decision 0026). */
-  function settle(o: { keepalive?: boolean } = {}) {
+  function settle(o: { keepalive?: boolean; ending?: boolean } = {}) {
     for (const f of fileIdsOf(store.get())) seen.add(f);
-    const keep = new Set([...fileIdsOf(serverDoc), ...live, ...fileIdsOf(store.get()), ...store.entries().flatMap((e) => e.files)]);
+    const undoable = o.ending ? [] : store.entries().flatMap((e) => e.files);
+    const keep = new Set([...fileIdsOf(serverDoc), ...live, ...fileIdsOf(store.get()), ...undoable]);
     for (const f of [...seen]) {
       if (!f || keep.has(f)) continue;
       seen.delete(f);

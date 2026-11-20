@@ -47,7 +47,7 @@ export function Autosave() {
   const a = useAutosave({ id: env.id, doc, initial: env.initialDoc, save: saveDoc,
     // The server has it: noted for the crash fallback, and the rule that deletes files runs.
     onSavedDoc: (d) => {
-      noteSaved(d);
+      noteSaved(d, env.id);
       files.noteSaved(d);
     },
   });
@@ -69,6 +69,7 @@ export function Autosave() {
   useEffect(
     () =>
       registerSender({
+        id: env.id,
         send: async (d) => (await (override ? override(d) : send(env.id, d))).ok,
         settled: () => latest.current.settled(),
       }),

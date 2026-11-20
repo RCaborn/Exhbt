@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { SCHEMA_VERSION, text, type ExhbtDoc } from "../lib/exhbt/blocks";
+import { flushPending, notePending, registerSender } from "../components/exhbt-editor/pending";
 import { SEL } from "./editor";
 
 // The way back to the classic editor (decision 0026, "The classic editor: the switch, the fallback, the escape";
@@ -130,6 +131,25 @@ test.describe("the edit page's switch", () => {
     // The loading view is the stand-in page: the doc's words, and the "Add a skill" box at the end of the pills.
     expect(html).toContain("Shorter queues");
     expect(html).toContain("Add a skill");
+  });
+});
+
+test.describe("flushPending, in-process", () => {
+  test("sends the newest doc only through the editor of the same exhbt", async () => {
+    const sent: string[] = [];
+    // Visit A changes its doc, and its save never lands; then visit B is opened (by a link, so the module stays).
+    notePending({ ...doc(), title: "A's words" }, "exhbt-a");
+    const off = registerSender({ id: "exhbt-b", send: async (d) => (sent.push(d.title), true), settled: async () => {} });
+    await flushPending();
+    expect(sent, "B's editor never sends A's doc").toEqual([]);
+    // B's own newest doc it does send.
+    notePending({ ...doc(), title: "B's words" }, "exhbt-b");
+    await flushPending();
+    expect(sent).toEqual(["B's words"]);
+    // Once the server has it, nothing more is sent.
+    await flushPending();
+    expect(sent).toEqual(["B's words"]);
+    off();
   });
 });
 

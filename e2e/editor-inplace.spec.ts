@@ -4,6 +4,7 @@ import { emptyDoc, plain, text, type ExhbtDoc, type RichText, type Section } fro
 import { FORMAT_RULES, formatOf } from "../lib/exhbt/formats";
 import { flowShown, hasMarker, pageItems } from "../lib/exhbt/layouts";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
+import { createStore } from "../components/exhbt-editor/store-core";
 import { ORDER_FIXTURES } from "./fixtures/order-docs";
 import {
   allowEditOnly,
@@ -18,6 +19,7 @@ import {
   offered,
   openDoc,
   openNew,
+  openSeeded,
   openTiming,
   pageOrder,
   png,
@@ -66,6 +68,23 @@ function fieldsOf(doc: ExhbtDoc): string[] {
     else if (s.kind === "link") out.push(`${p}.label`, `${p}.description`);
   }
   return out;
+}
+
+/** axe on the editor, WCAG 2.1 A and AA. */
+const scan = async (page: Page) => (await new AxeBuilder({ page }).include('[data-editor="page"]').withTags(WCAG).analyze()).violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(", ")}`);
+
+/** Drafts an exhbt with the placeholder AI (so the parts it drafted have "More actions"), opens its editor, and returns its id. */
+async function openDrafted(page: Page, tag: string): Promise<string> {
+  await page.goto(`/auth/dev?email=${freshName(tag)}@example.com&next=/exhbts/new`);
+  await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
+  const res = await page.request.post("/api/exhbts/draft", {
+    data: { text: "Final-year project on lunch queues. I timed the queue for two weeks, added a second till, and timed it again. Waits fell from 11 to 4 minutes." },
+  });
+  expect(res.status()).toBe(200);
+  const { id } = (await res.json()) as { id: string };
+  await page.goto(`/exhbts/${id}/edit`);
+  await waitReady(page);
+  return id;
 }
 
 const pressUndo = async (page: Page) => {
@@ -233,6 +252,75 @@ test.describe("each kind of issue path lands on its target", () => {
   });
 });
 
+test.describe("the store, in-process: a flowchart box's and a finding's actions, each undone after typing elsewhere", () => {
+  const start = (): ExhbtDoc => ({
+    ...emptyDoc(),
+    title: "Queues",
+    flow: [{ step: "One" }, { step: "Two" }, { step: "Three" }],
+    sections: [{ id: "findings", kind: "findings", items: [text("First."), text("Second."), text("Third.")] }],
+  });
+  const steps = (d: ExhbtDoc) => d.flow.map((s) => s.step);
+  const items = (d: ExhbtDoc) => (d.sections[0] as { items: RichText[] }).items.map(plain);
+
+  test("a flowchart box added, removed and moved: Undo puts the boxes back and keeps the words typed since", () => {
+    const s = createStore(start());
+    const key = s.flowAdd(1)!;
+    expect(steps(s.get())).toEqual(["One", "", "Two", "Three"]);
+    expect(s.flowKeys()[1]).toBe(key);
+    s.setAt("flow.0.step", "One, typed");
+    s.undo();
+    expect(steps(s.get())).toEqual(["One, typed", "Two", "Three"]);
+
+    const two = s.flowKeys()[1]!;
+    s.flowRemove(two);
+    s.setAt("flow.1.step", "Three, typed");
+    s.undo();
+    expect(steps(s.get())).toEqual(["One, typed", "Two", "Three, typed"]);
+    expect(s.flowKeys()[1]).toBe(two);
+
+    const one = s.flowKeys()[0]!;
+    s.flowMove(one, 2);
+    expect(steps(s.get())).toEqual(["Two", "Three, typed", "One, typed"]);
+    s.setAt("flow.0.step", "Two, typed");
+    s.undo();
+    expect(steps(s.get())).toEqual(["One, typed", "Two, typed", "Three, typed"]);
+    expect(s.flowKeys()[0]).toBe(one);
+    expect(s.undoLabel()).toBeNull();
+  });
+
+  test("a finding added, removed and moved: Undo puts them back and keeps the words typed since", () => {
+    const s = createStore(start());
+    s.listAdd("findings", 3);
+    expect(items(s.get())).toEqual(["First.", "Second.", "Third.", ""]);
+    s.setAt("sections.0.items.0", text("First, typed."));
+    s.undo();
+    expect(items(s.get())).toEqual(["First, typed.", "Second.", "Third."]);
+
+    s.listRemove("findings", 1);
+    s.setAt("sections.0.items.1", text("Third, typed."));
+    s.undo();
+    expect(items(s.get())).toEqual(["First, typed.", "Second.", "Third, typed."]);
+
+    s.listMove("findings", 0, 2);
+    s.setAt("sections.0.items.0", text("Second, typed."));
+    s.undo();
+    expect(items(s.get())).toEqual(["First, typed.", "Second, typed.", "Third, typed."]);
+    expect(s.undoLabel()).toBeNull();
+  });
+
+  test("a structural undo writes back only the structure; a named patch only the fields it changed", () => {
+    const s = createStore({ ...start(), sections: [...start().sections, { id: "quote-1", kind: "quote", text: "Calmer.", name: "Sam", role: "" }] });
+    s.remove("quote-1");
+    s.setAt("title", "Queues, typed");
+    s.undo();
+    expect([s.get().title, s.get().sections.some((x) => x.id === "quote-1"), hasMarker(s.get())]).toEqual(["Queues, typed", true, false]);
+    s.patch("quote-1", (q) => (q.kind === "quote" ? { ...q, role: "Manager" } : q), "the role");
+    s.setAt("sections.1.text", "Calmer, typed.");
+    s.undo();
+    expect(s.get().sections[1]).toMatchObject({ text: "Calmer, typed.", role: "" });
+  });
+});
+
 test.describe("undo", () => {
   test("remove and put back a quote: it comes back with its words, in its place", async ({ page }) => {
     const { id } = await openDoc(page, freshName("quote"), sampleDoc("case-study"));
@@ -308,15 +396,7 @@ test.describe("undo", () => {
 
   test("undo keeps typing and the numbers to check: back to the AI version, type in the title, Undo", async ({ page }) => {
     // A drafted exhbt (the placeholder AI), so "More actions" has an AI version to go back to.
-    await page.goto(`/auth/dev?email=${freshName("flags")}@example.com&next=/exhbts/new`);
-    await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
-    const res = await page.request.post("/api/exhbts/draft", {
-      data: { text: "Final-year project on lunch queues. I timed the queue for two weeks, added a second till, and timed it again. Waits fell from 11 to 4 minutes." },
-    });
-    expect(res.status()).toBe(200);
-    const { id } = (await res.json()) as { id: string };
-    await page.goto(`/exhbts/${id}/edit`);
-    await waitReady(page);
+    const id = await openDrafted(page, "flags");
     const findingsId = (await docNow(page)).sections.find((s) => s.kind === "findings")!.id;
     // The findings now hold a number nobody checked: "18%", flagged.
     await page.evaluate((fid) => {
@@ -541,7 +621,6 @@ test("a stale editor: a save that fails for another reason than the network says
 });
 
 test.describe("axe", () => {
-  const scan = async (page: Page) => (await new AxeBuilder({ page }).include('[data-editor="page"]').withTags(WCAG).analyze()).violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(", ")}`);
 
   test("at rest, while typing, and with a sheet open", async ({ page }) => {
     await openDoc(page, freshName("axe"), sampleDoc("case-study"));
@@ -566,4 +645,99 @@ test.describe("axe", () => {
       expect(await scan(page), "a full one").toEqual([]);
     });
   }
+});
+
+test("a drafted exhbt: More actions on each part the AI drafted, the page box for box with the visitor's, and axe", async ({ page }) => {
+  await openDrafted(page, "drafted");
+  await waitLive(page);
+  for (const block of ["header", "gap", "skills", "flow", "findings"]) await expect(page.getByTestId(`tools-${block}`), `tools-${block}`).toHaveCount(1);
+  expect(await scan(page)).toEqual([]);
+  const taken = await allowEditOnly(page, "all");
+  await settle(page);
+  const editing = await boxes(page);
+  await seeAsVisitor(page, true);
+  await settle(page);
+  expect(differences(await boxes(page), editing), `with these taken out: ${taken.join("; ")}`).toEqual([]);
+});
+
+test.describe("a formatted field's buttons, and an issue on the page", () => {
+  const doc = (): ExhbtDoc => ({ ...emptyDoc(), title: "Shorter queues", sections: [{ id: "findings", kind: "findings", items: [text("Waits fell a lot."), text("Sales held steady.")] }] });
+
+  test("Bold is stored; Link asks for an https address, says when it is not one, and stores it", async ({ page }) => {
+    const { id } = await openDoc(page, freshName("buttons"), doc());
+    const f = field(page, "sections.0.items.0");
+    await f.click();
+    await expect(f.locator(".ProseMirror")).toBeFocused();
+    await page.keyboard.press("End");
+    await page.keyboard.press("Shift+Home");
+    await f.getByRole("button", { name: "Bold" }).click();
+    await waitSaved(page, id);
+    expect(((await readStored(page, id)).working.sections[0] as { items: RichText[] }).items[0]).toEqual([{ t: "Waits fell a lot.", b: true }]);
+
+    await page.keyboard.press("End");
+    await page.keyboard.press("Shift+Home");
+    await f.getByRole("button", { name: "Link" }).click();
+    const address = f.getByLabel("Link address (starting https://)");
+    await expect(address).toBeFocused();
+    await address.fill("http://example.com/log");
+    await address.press("Enter");
+    await expect(f.getByRole("alert")).toHaveText("Links must start with https://.");
+    await address.fill("https://example.com/log");
+    await address.press("Enter");
+    await waitSaved(page, id);
+    expect(((await readStored(page, id)).working.sections[0] as { items: RichText[] }).items[0]).toEqual([{ t: "Waits fell a lot.", b: true, href: "https://example.com/log" }]);
+  });
+
+  test("a finding over its cap is outlined and marked invalid, its message shows only while it has the focus, and nothing moves", async ({ page }) => {
+    await openDoc(page, freshName("issue"), doc());
+    const words = Array.from({ length: 24 }, (_, i) => `word${i + 1}`).join(" ");
+    await typeIn(page, "sections.0.items.0", words);
+    const pm = field(page, "sections.0.items.0").locator(".ProseMirror");
+    await expect(pm).toHaveAttribute("aria-invalid", "true");
+    const note = page.locator(`${READY} #${await pm.getAttribute("aria-describedby")}`);
+    await expect(note).not.toHaveText("");
+    const shown = () => note.evaluate((el) => getComputedStyle(el).opacity);
+    expect(await shown()).toBe("1");
+    const focusedBoxes = await boxes(page, { frames: true });
+    await field(page, "title").focus();
+    await expect.poll(shown).toBe("0");
+    // Still read out: the field stays tied to its message.
+    await expect(pm).toHaveAttribute("aria-describedby", /issue$/);
+    expect(differences(focusedBoxes, await boxes(page, { frames: true }))).toEqual([]);
+  });
+});
+
+test("pictures dropped onto the page go in after the section they were dropped on", async ({ page }) => {
+  const { id } = await openDoc(page, freshName("drop"), { ...emptyDoc(), title: "Queues", flow: [{ step: "One" }, { step: "Two" }, { step: "Three" }], sections: [{ id: "findings", kind: "findings", items: [text("A."), text("B.")] }] });
+  expect(await pageOrder(page)).toEqual(["flow", "findings"]);
+  const pictures = [png(30, 10), png(40, 10)].map((b) => b.toString("base64"));
+  await page.evaluate((list) => {
+    const dt = new DataTransfer();
+    list.forEach((b64, i) => dt.items.add(new File([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], `drop-${i + 1}.png`, { type: "image/png" })));
+    const target = document.querySelector('[data-editor="page"] [data-section-id="flow"] .xp-flow-box')!;
+    target.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt }));
+    target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt }));
+  }, pictures);
+  await expect(page.locator(`${READY} [data-kind="image"]`)).toHaveCount(2);
+  expect(await pageOrder(page)).toEqual(["flow", "image-1", "image-2", "findings"]);
+  await waitSaved(page, id);
+  expect((await readStored(page, id)).working.sections.flatMap((s) => (s.kind === "image" ? [s.w] : []))).toEqual([30, 40]);
+});
+
+test("openSeeded opens a sample published by /dev/portfolio", async ({ page }) => {
+  await openSeeded(page, freshName("seeded"), "gallery", "freshers-campaign");
+  await expect(page.locator(`${READY} article[data-format="gallery"]`)).toBeVisible();
+  expect((await pageOrder(page)).length).toBeGreaterThan(5);
+});
+
+test("a picture removed and saved: its file goes when the visit ends, as no Undo can bring it back then", async ({ page }) => {
+  const working: ExhbtDoc = { ...sampleDoc("case-study"), sections: [...sampleDoc("case-study").sections, { id: "image-1", kind: "image", fileId: "x", alt: "The queue", caption: text("Lunch"), w: 1200, h: 800 }] };
+  const { id, files } = await openDoc(page, freshName("leave"), sampleDoc("case-study"), { working });
+  await removeVia(page, "image-1", "Image");
+  await waitSaved(page, id);
+  expect(await fileExists(page, files["image-1"]!)).toBe(true);
+  // Leaving by the app's own link: the editor unmounts and the visit, with its undo list, is over.
+  await page.getByRole("link", { name: "Your exhbts" }).first().click();
+  await page.waitForURL(/\/exhbts$/);
+  await expect.poll(() => fileExists(page, files["image-1"]!)).toBe(false);
 });
