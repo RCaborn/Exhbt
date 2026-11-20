@@ -81,7 +81,7 @@ function Overlay({ lift, engine }: { lift: Lift; engine: Engine }) {
 
   useLayoutEffect(() => {
     if (!root.current || !space.current || !line.current || !landing.current) return;
-    engine.attach({ root: root.current, space: space.current, copy: copy.current, line: line.current, landing: landing.current, sizer: null });
+    engine.attach({ root: root.current, space: space.current, copy: copy.current, line: line.current, landing: landing.current });
   }, [engine, lift]);
 
   const { box } = lift;

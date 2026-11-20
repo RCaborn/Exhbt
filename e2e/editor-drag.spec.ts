@@ -267,6 +267,22 @@ test.describe("dragging with a mouse", () => {
       }
     });
 
+    test(`${f}: picked up by its grip with a mouse, every section stays where it is, at its own place`, async ({ page }) => {
+      await page.setViewportSize(TALL);
+      await open(page, f);
+      const order = await pageOrder(page);
+      const before = await drawn(page);
+      for (const [i, id] of order.entries()) {
+        await pickUp(page, id);
+        expect(await place(page), `${f}, ${id}`).toBe(i);
+        expect(await drawn(page), `${f}, ${id}`).toEqual(before);
+        await page.keyboard.press("Escape");
+        await page.mouse.up();
+        await expect(lifting(page)).toHaveCount(0);
+      }
+      expect(await pageOrder(page)).toEqual(order);
+    });
+
     test(`${f}: a click on a grip, or a nudge under 6px, is not a drag; a section's words can still be selected`, async ({ page }) => {
       await open(page, f);
       const order = await pageOrder(page);

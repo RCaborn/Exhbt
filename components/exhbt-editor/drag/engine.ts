@@ -70,7 +70,7 @@ export type Lift = {
 };
 
 /** The overlay's elements, once DragBoard has drawn them. */
-export type Overlay = { root: HTMLElement; space: HTMLElement; copy: HTMLElement | null; line: HTMLElement; landing: HTMLElement; sizer: HTMLElement | null };
+export type Overlay = { root: HTMLElement; space: HTMLElement; copy: HTMLElement | null; line: HTMLElement; landing: HTMLElement };
 
 type Sensing = { stop(): void } | null;
 
@@ -361,7 +361,7 @@ function createEngine(store: Store, ui: UiApi, files: FilesController) {
     const fz = freeze(main);
     const id = kind === "flow" ? FLOW_ID : `xe-new-${kind}`;
     const item = draftItem(id, kind, doc.flow);
-    // Its size until it is drawn: the size of another of its kind on the page, or a fair guess (DragBoard measures it as the lift begins).
+    // The room made for it until it is drawn: the size of another of its kind on the page, or a fair guess at the column's width.
     const same = fz.list.find((it) => it.kind === kind && fz.frozen[it.id]);
     fz.frozen[id] = same ? { box: { ...fz.frozen[same.id]!.box }, as: "plain" } : { box: { x: 0, y: 0, w: fz.rect.width, h: guessHeight(kind, fz.rect.width) }, as: "plain" };
     const plan = makePlan(
@@ -416,11 +416,6 @@ function createEngine(store: Store, ui: UiApi, files: FilesController) {
     o.root.style.height = `${doc.scrollHeight}px`;
     o.space.style.left = `${l.origin.x}px`;
     o.space.style.top = `${l.origin.y}px`;
-    if (l.draft && o.sizer) {
-      // The new block as the page would draw it, at the column's width, so the room made for it is about the right size.
-      const h = o.sizer.getBoundingClientRect().height;
-      if (h > 0 && l.draft.kind !== "image") l.frozen[l.plan.id] = { box: { x: 0, y: 0, w: l.plan.width, h }, as: "plain" };
-    }
     l.main.dataset.xeDrag = l.mode;
     l.main.dataset.xeStyle = l.style;
     const mine = l.els[l.plan.id];
