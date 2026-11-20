@@ -725,6 +725,47 @@ test("pictures dropped onto the page go in after the section they were dropped o
   expect((await readStored(page, id)).working.sections.flatMap((s) => (s.kind === "image" ? [s.w] : []))).toEqual([30, 40]);
 });
 
+test("the live status: publishing from the sheet turns the chip to Live, and Unpublish from the menu turns it back, with no reload", async ({ page }) => {
+  await openNew(page, freshName("chip"), "max");
+  const chip = page.locator(`${READY} .xe-chip-state`);
+  await expect(chip).toHaveText("Draft");
+  // A draft with every part a case study needs to go live.
+  await page.evaluate((d) => window.__exhbtEditor!.patchDoc(() => d), sampleDoc("case-study"));
+  await page.getByRole("button", { name: "Review and publish" }).click();
+  await page.getByLabel("This is my work, and the numbers are true").check();
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(page.getByText("It's live.")).toBeVisible();
+  await expect(chip).toHaveText("Live");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("button", { name: "Unpublish" }).click();
+  await page.getByRole("button", { name: "Yes, unpublish" }).click();
+  await expect(chip).toHaveText("Draft");
+});
+
+test("a sheet's paths: from the open publish sheet, a jump opens the card or the work sheet with the cursor in its field, and it stays open", async ({ page }) => {
+  await openDoc(page, freshName("sheetjump"), sampleDoc("case-study"));
+  for (const [path, sheet, id] of [
+    ["summary", "Card and link details", "summary"],
+    ["headline.value", "Card and link details", ""],
+    ["evidence", "The work", "evidence-href"],
+  ] as const) {
+    await page.getByRole("button", { name: "Review and publish" }).click();
+    await expect(page.getByRole("dialog", { name: "Review and publish" })).toBeVisible();
+    await jump(page, path);
+    const dialog = page.getByRole("dialog", { name: sheet });
+    await expect(dialog).toBeVisible();
+    if (id) await expect(page.locator(`#${id}`)).toBeFocused();
+    else await expect(dialog.getByRole("textbox", { name: "Headline number" })).toBeFocused();
+    // The publish sheet's late close neither shut this one nor took the focus back.
+    await page.waitForTimeout(300);
+    await expect(dialog).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Review and publish" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  }
+});
+
 test("openSeeded opens a sample published by /dev/portfolio", async ({ page }) => {
   await openSeeded(page, freshName("seeded"), "gallery", "freshers-campaign");
   await expect(page.locator(`${READY} article[data-format="gallery"]`)).toBeVisible();

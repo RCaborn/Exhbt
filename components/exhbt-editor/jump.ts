@@ -3,6 +3,7 @@
 import type { FieldPath } from "@/components/portfolio/page-ctx";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
 import type { SheetName, UiApi } from "./context";
+import { sheetOf } from "./sheets/paths";
 
 /*
  * "Things to fix" jumps to a field by its issue path (decision 0026, "Fields, and the path each one
@@ -25,11 +26,11 @@ const FIELD = 'textarea, input:not([type=file]):not([type=hidden]):not([type=che
 
 const isField = (el: Element) => el.matches(FIELD);
 
-/** The sheet a path's field lives in, if it lives in one. */
-export function sheetOf(path: FieldPath, doc: ExhbtDoc): { name: SheetName; sectionId?: string } | null {
+/** The sheet a path's field lives in, if it lives in one: the card's and the work's by the sheets' own list (sheets/paths.ts), a graph's figures in its chart sheet. */
+export function sheetFor(path: FieldPath, doc: ExhbtDoc): { name: SheetName; sectionId?: string } | null {
+  const page = sheetOf(path);
+  if (page) return { name: page };
   const [head, n, field] = path.split(".");
-  if (head === "summary" || head === "headline") return { name: "card" };
-  if (head === "evidence") return { name: "work" };
   if (head === "sections" && n !== undefined && field === "chart") {
     const s = doc.sections[Number(n)];
     if (s?.kind === "graph") return { name: "chart", sectionId: s.id };
@@ -62,7 +63,7 @@ function land(el: HTMLElement, path: FieldPath) {
 
 /** Scrolls to the field for an issue path and puts the cursor in it, opening its sheet or popover first when it lives in one. */
 export function jumpTo(path: FieldPath, ui?: UiApi, doc?: ExhbtDoc): void {
-  const sheet = doc ? sheetOf(path, doc) : null;
+  const sheet = doc ? sheetFor(path, doc) : null;
   if (!sheet || !ui) {
     const el = targetOf(path);
     if (el) land(el, path);

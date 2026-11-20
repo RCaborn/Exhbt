@@ -5,7 +5,7 @@ import { Ellipsis } from "lucide-react";
 import { deleteExhbt, unpublishExhbt } from "@/app/(app)/exhbts/[id]/actions";
 import { ConfirmAction } from "@/components/editor/ConfirmAction";
 import { Button } from "@/components/ui/Button";
-import { useEnv, useSave, useUi } from "../context";
+import { setLive, useEnv, useLive, useSave, useUi } from "../context";
 import { Popover } from "./Popover";
 
 const COARSE = "(pointer: coarse)";
@@ -34,7 +34,8 @@ export function MenuButton({ before }: { before?: (close: (restoreFocus?: boolea
   const ui = useUi();
   const save = useSave();
   const coarse = useCoarse();
-  const live = env.canGoLive && env.status === "published";
+  const status = useLive();
+  const live = env.canGoLive && status.status === "published";
 
   async function classic() {
     // What was just typed is saved first, so the classic editor opens with it.
@@ -69,7 +70,18 @@ export function MenuButton({ before }: { before?: (close: (restoreFocus?: boolea
               Reorder sections
             </Button>
           )}
-          {live && <ConfirmAction label="Unpublish" question="Take it off your portfolio?" confirmLabel="Yes, unpublish" action={() => unpublishExhbt(env.id)} />}
+          {live && (
+            <ConfirmAction
+              label="Unpublish"
+              question="Take it off your portfolio?"
+              confirmLabel="Yes, unpublish"
+              action={async () => {
+                // Said first: the action ends by sending the page back to itself.
+                setLive(env.id, "draft", status.slug);
+                await unpublishExhbt(env.id);
+              }}
+            />
+          )}
           <ConfirmAction label="Delete this exhbt" variant="danger" question="Delete it for good?" confirmLabel="Yes, delete" action={() => deleteExhbt(env.id)} />
           <Button size="sm" className="xe-tb" onClick={() => void classic()}>
             Use the classic editor

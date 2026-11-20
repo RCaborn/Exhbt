@@ -73,7 +73,6 @@ export type Runtime = {
   uiApi: UiApi;
   save: Atom<SaveApi>;
   activeRich: Atom<ActiveRich | null>;
-  status: Atom<LiveStatus>;
 };
 
 export const RuntimeContext = createContext<Runtime | null>(null);
@@ -100,25 +99,41 @@ export function createRuntime(env: PageEditorProps, jumpTo: (path: FieldPath, ui
     setConfirmed: (on) => ui.set((s) => (s.confirmed === on ? s : { ...s, confirmed: on })),
     setTried: (v) => ui.set((s) => (s.tried === v ? s : { ...s, tried: v })),
   };
-  return { env, ui, uiApi, save: atom(initialSave()), activeRich: atom<ActiveRich | null>(null), status: atom<LiveStatus>({ status: env.status, slug: env.slug }) };
+  return { env, ui, uiApi, save: atom(initialSave()), activeRich: atom<ActiveRich | null>(null) };
 }
 
-/**
- * Whether the exhbt is live now, its slug, and its live address (`liveBase` + slug, when there is a
- * username): `useEnv()` holds only what the page was opened with, so the top bar's chip, "Unpublish"
- * and the publish sheet read this instead. After publishing works, call `set({ status: "published",
- * slug })` with the slug publishExhbt answered; after unpublishing works, `set({ status: "draft" })`.
+/*
+ * The editor's live status: whether the exhbt is live, and at which slug. `useEnv()` holds only what
+ * the page was opened with, so everything that shows the status (the top bar's chip, "Unpublish", the
+ * publish sheet) reads it from here, and publishing and unpublishing tell it with `setLive`. Kept by
+ * exhbt id, so a visit to another exhbt reads its own page's props until it changes. (I built this in
+ * sheets/live.ts, which now re-exports it from here.)
  */
-export function useStatus(): LiveStatus & { liveUrl: string | null; set(next: Partial<LiveStatus>): void } {
-  const { env, status } = useRuntime();
-  const s = useAtom(status);
+const live = atom<({ id: string } & LiveStatus) | null>(null);
+
+/** Publishing worked (`"published"`, with the slug publishExhbt answered) or unpublishing did (`"draft"`): everyone that shows the status changes. */
+export function setLive(id: string, status: LiveStatus["status"], slug: string | null): void {
+  live.set({ id, status, slug });
+}
+
+/** Whether this exhbt is live now, and its slug. */
+export function useLive(): LiveStatus {
+  const env = useEnv();
+  const s = useAtom(live);
+  return useMemo(() => (s && s.id === env.id ? { status: s.status, slug: s.slug } : { status: env.status, slug: env.slug }), [s, env.id, env.status, env.slug]);
+}
+
+/** The live status with the live address (`liveBase` + slug, when there is a username), and `set` for this exhbt. */
+export function useStatus(): LiveStatus & { liveUrl: string | null; set(status: LiveStatus["status"], slug?: string | null): void } {
+  const env = useEnv();
+  const s = useLive();
   return useMemo(
     () => ({
       ...s,
       liveUrl: s.status === "published" && s.slug && env.liveBase ? `${env.liveBase}/${s.slug}` : null,
-      set: (next: Partial<LiveStatus>) => status.set((cur) => ({ ...cur, ...next })),
+      set: (status: LiveStatus["status"], slug: string | null = s.slug) => setLive(env.id, status, slug),
     }),
-    [s, env.liveBase, status],
+    [s, env.id, env.liveBase],
   );
 }
 

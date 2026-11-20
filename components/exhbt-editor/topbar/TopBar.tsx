@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, Eye, IdCard } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { useEnv, useUi } from "../context";
+import { useEnv, useLive, useUi } from "../context";
 import { LayoutMenu, useDraftedLine } from "./LayoutMenu";
 import { MenuButton } from "./MenuButton";
 import { useNarrow } from "./Popover";
@@ -27,7 +27,9 @@ export function TopBar(): ReactNode {
   const env = useEnv();
   const ui = useUi();
   useDraftedLine();
-  const chip = !env.canGoLive ? "Preview only" : env.status === "published" ? "Live" : "Draft";
+  // The live status, not the page's props, so publishing and unpublishing change it without a reload.
+  const live = useLive();
+  const chip = !env.canGoLive ? "Preview only" : live.status === "published" ? "Live" : "Draft";
 
   const visitor = (
     <Button size="sm" className="xe-tb xe-visitor" label="See as a visitor" aria-pressed={ui.visitor} onClick={() => ui.setVisitor(!ui.visitor)}>

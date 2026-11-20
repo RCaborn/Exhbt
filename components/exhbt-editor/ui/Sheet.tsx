@@ -12,7 +12,7 @@ import { useRuntime, useUiState, type SheetName } from "../context";
  */
 export function Sheet({ name, title, children }: { name: SheetName; title: string; children: ReactNode }) {
   const open = useUiState((s) => s.sheet?.name === name);
-  const { uiApi } = useRuntime();
+  const { ui, uiApi } = useRuntime();
   const ref = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const titleId = useId();
@@ -32,11 +32,14 @@ export function Sheet({ name, title, children }: { name: SheetName; title: strin
       className="xe-sheet"
       data-sheet={name}
       aria-labelledby={titleId}
+      // The dialog's `close` arrives a moment after it shuts. By then another sheet may be open: one opened from
+      // this one ("Show me", a jump). Only a sheet that is still the open one closes the view, and the focus goes
+      // back to what opened it only when no sheet is open now.
       onClose={() => {
-        uiApi.close();
+        if (ui.get().sheet?.name === name) uiApi.close();
         const back = opener.current;
         opener.current = null;
-        if (back?.isConnected) back.focus();
+        if (!ui.get().sheet && back?.isConnected) back.focus();
       }}
     >
       <div className="xe-sheet-head">
