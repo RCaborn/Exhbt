@@ -766,6 +766,45 @@ test("a sheet's paths: from the open publish sheet, a jump opens the card or the
   }
 });
 
+test("a copy kept in this browser that never reached the server is offered back; Restore puts it on the page and saves it", async ({ page }) => {
+  // A stale editor: the change is kept in this browser, and the server never gets it.
+  const { id } = await openDoc(page, freshName("backup"), sampleDoc("case-study"), { query: "?save=stale" });
+  await typeIn(page, "title", "Words the server never got");
+  await expect(page.getByText("The editor was updated. Reload to carry on; your changes are kept in this browser.")).toBeVisible();
+  // Leaving asks first while something is unsaved: say yes.
+  page.on("dialog", (d) => void d.accept());
+  await page.goto(`/exhbts/${id}/edit`);
+  await waitReady(page);
+  await expect(page.getByText(/^We kept changes from .+ that never reached the server\.$/)).toBeVisible();
+  expect((await readStored(page, id)).working.title).not.toBe("Words the server never got");
+  await page.getByRole("button", { name: "Restore them" }).click();
+  await expect(field(page, "title")).toHaveValue("Words the server never got");
+  await expect(page.getByText(/^We kept changes from/)).toHaveCount(0);
+  await waitSaved(page, id);
+  expect((await readStored(page, id)).working.title).toBe("Words the server never got");
+});
+
+test("sections a layout keeps but does not draw are listed under the page; Remove takes one out and Undo puts it back", async ({ page }) => {
+  await openDoc(page, freshName("kept"), sampleDoc("research"));
+  await expect(page.getByRole("region", { name: "Kept, not shown in this layout" })).toHaveCount(0);
+  // A case study does not draw research's aim or conclusion: they are kept, not shown.
+  await page.evaluate(() => window.__exhbtEditor!.setLayout("case-study"));
+  const kept = page.getByRole("region", { name: "Kept, not shown in this layout" });
+  await expect(kept.getByRole("listitem")).toHaveCount(2);
+  await expect(kept).toContainText("Aim or hypothesis");
+  await expect(kept).toContainText("Conclusion");
+  // Not on the visitor's page.
+  await seeAsVisitor(page, true);
+  await expect(page.getByRole("region", { name: "Kept, not shown in this layout" })).toHaveCount(0);
+  await seeAsVisitor(page, false);
+  await kept.getByRole("button", { name: "Remove Aim or hypothesis" }).click();
+  await expect(kept.getByRole("listitem")).toHaveCount(1);
+  expect((await docNow(page)).sections.some((s) => s.kind === "aim")).toBe(false);
+  await pressUndo(page);
+  await expect(kept.getByRole("listitem")).toHaveCount(2);
+  expect((await docNow(page)).sections.some((s) => s.kind === "aim")).toBe(true);
+});
+
 test("openSeeded opens a sample published by /dev/portfolio", async ({ page }) => {
   await openSeeded(page, freshName("seeded"), "gallery", "freshers-campaign");
   await expect(page.locator(`${READY} article[data-format="gallery"]`)).toBeVisible();

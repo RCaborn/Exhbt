@@ -81,6 +81,13 @@ export const field = (page: Page, path: string): Locator => page.locator(`${READ
 export const textbox = (page: Page, path: string): Locator =>
   page.locator(`${READY} [data-path="${path}"]:is(textarea, [role=textbox]), ${READY} [data-path="${path}"] .ProseMirror`).first();
 
+/**
+ * The path of the field that has the cursor: the closest `[data-path]` of the focused element. Check this
+ * rather than `data-path` on `:focus` itself: once a formatted field's editor has started (in an idle
+ * moment, or on a click), the focus is on the editor inside the `[data-path]` box, not on the box.
+ */
+export const focusedPath = (page: Page): Promise<string | null> => page.evaluate(() => document.activeElement?.closest("[data-path]")?.getAttribute("data-path") ?? null);
+
 /** The page item's frame. */
 export const frame = (page: Page, id: string): Locator => page.locator(`${READY} [data-section-id="${id}"]`);
 

@@ -194,11 +194,13 @@ export default function RichEditor({ slot, id, at, focusOnReady, issue, onReady,
   );
 }
 
-/** Whether the field starts on its section's first line, where the section's toolbar sits (or under a shell part's corner toolbar). */
+/** Whether the formatting buttons go below the line: on a section's first line, where its toolbar sits, under a shell part's corner toolbar, and in a finding, whose controls sit above it. */
 function onFirstLine(cell: HTMLElement | null): boolean {
   const field = cell?.closest(".xe-rich");
   if (!field) return false;
   if (field.parentElement?.querySelector(":scope > .xe-shell-tools")) return true;
+  // A finding's own controls sit on the rule above it.
+  if (field.closest("li.xp-finding")) return true;
   const frame = field.closest(".xe-frame");
   if (!frame) return false;
   return field.getBoundingClientRect().top - frame.getBoundingClientRect().top < 48;

@@ -151,7 +151,7 @@
   .xe-format-below {
     top: 100%;
     bottom: auto;
-    padding-top: 0.25rem;
+    padding-top: 0;
     padding-bottom: 0;
   }
   .xe-rich:focus-within > .xe-format {
@@ -376,7 +376,8 @@
       opacity: 1;
       pointer-events: auto;
     }
-    .xe-tool {
+    /* A finding's own small controls keep their size: at 44px they would cover its words (L's bar carries them on a phone). */
+    .xe-tool:not(.xe-tool-sm) {
       min-width: 2.75rem;
       height: 2.75rem;
     }
@@ -443,14 +444,15 @@
   }
 
   /* ---------- A finding's controls and "Add a finding" ---------- */
+  /* A finding's controls sit on the rule above it, at its right end: in the padding between two findings, over no words. */
   .xe-list-tools {
     position: absolute;
-    top: 50%;
+    top: 0;
     right: 0;
     z-index: 15;
     display: flex;
     gap: 0.125rem;
-    padding: 0.125rem;
+    padding: 0 0.125rem;
     border-radius: 999px;
     background: var(--xp-ground);
     transform: translateY(-50%);
@@ -477,9 +479,9 @@
     opacity: 1;
     pointer-events: auto;
   }
+  /* "Add a finding" is always shown on a touch screen; a finding's own controls only while it is touched or typed in. */
   @media (pointer: coarse) {
-    .xe-add-finding,
-    .xe-list-tools {
+    .xe-add-finding {
       opacity: 1;
       pointer-events: auto;
     }
