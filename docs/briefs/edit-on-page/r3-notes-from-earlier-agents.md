@@ -37,3 +37,50 @@ From agent A (the gate; branch phase-2-r3-a-gate, head 881ad32):
 - The "Back to the new editor" line shows only when the address asked for classic and editorKind() is page.
 - After A is merged, these specs reach a bare /edit and will get the new editor: auto-figure, exhbt-page, file-ownership, phase2-billing-polish, phase2-draft-tools, phase2-editor-media, phase2-editor, phase2-formats, phase2-graphs, phase2-polish-2, phase2-sections, phase2-teammates, possibly phase2-draft and phase2-saved-ideas. For N's milestone 0: set the /dev/editor?kind=classic cookie in the helpers after sign-in (most reach /edit by redirect, so changing addresses won't keep them on classic).
 - Specs: editor-classic 8 tests 2.0 min; editor-classic-keeps 15 tests 2.5 min; edit-slots 78 tests 4.7 min.
+
+## From agent G's milestone 1 (c1bb09d, merged into phase-2-r3)
+
+The interfaces in the briefs are built word for word: `store.ts` (`EditorStore`, `useStore`, `useDoc`, `useSection`, `useRenderCount`), `context.ts` (`PageEditorProps`, `SheetName`, `Ui`, `ActiveRich`, `useActiveRich`, `useUi`, `useEnv`, `useIssues`, `useSave`), `files.ts` (`Files`, `useFiles`), `drag/index.ts` (`Board`, `DragBoard`, `useBoard`), `drag/options.ts` (`SECTION_STYLE` "slide", `FLOW_SECTION_STYLE` "line", `FLOW_BOX_STYLE` "line"), and every plug with its stub.
+
+Additions you may use:
+- `Frame.tsx` exports `useFrame()`, returning `{ id, kind, as, index (stored), place, count }` or null. J uses this for `ImageExtras` and `LinkExtras` rather than changing `ExtraSlot`.
+- `ui/Sheet.tsx`: `<Sheet name title>` is a native `<dialog>`, opened by `ui.open(name)`; it draws its children only while open and returns focus on close. I's and J's sheets wrap their content in it.
+- `context.ts` also exports `STALE_EDITOR` (the stale-editor words carried by `useSave().status.error`), `useUiState(select)` and `useRuntime()`.
+- `store.ts` exports `useStoreInternal()`: `shell()`, `version()`, `section(id)`, `listAdd`, `listRemove`, `listMove` (each one undo entry for a finding), `entries()`, `onDropped`, `onUndone`, `replace(doc)`. The pure core is in `store-core.ts` and `undo.ts`, with relative imports so specs can test them in-process.
+- `labels.ts`: `labelOf(doc, id)`, `labelAt(doc, place)`.
+- `geometry.ts`: `PILL`, `descriptionClass(as)`, `DESCRIPTION_PLACEHOLDER`, `descriptionLabel(n)`, `workWords`, shared by the stand-in and the editor (J's description field must use them).
+- `jump.ts`: `jumpTo(path)`, `targetOf(path)`; each jump sends a bubbling `xe-jump` event.
+- `files.ts` controller: `useFilesController()`, `useImageUrls()`, `pickAt()`.
+- Development only: `window.__exhbtEditor` (the store) and `window.__exhbtUi` (the view's actions, e.g. `setVisitor(true)`).
+- CSS classes other agents may restyle: `xe-tools`, `xe-tool`, `xe-insert`, `xe-chip`, `xe-over`, `xe-above`, `xe-status`, `xe-sheet`. Toolbar buttons carry `data-grip`, or `data-tool` = `up`, `down`, `action`, `more`, `remove`.
+- Page object `e2e/page-editor.ts`: everything the brief lists, plus `typeIn(page, path, words, {append})` (waits for a formatted field's editor), `docNow`, `undoLabel`, `differences`, `canon`, `settle`, `freshName`, `READY`. `boxes()` measures the "Add a skill" box under the key "the Add a skill box".
+
+Where G departed from the brief, or followed these notes over it:
+1. Fields whose words the page sets inline (a quote's words, name and role; a pull quote; a link's words) are inline `contenteditable="plaintext-only"` spans, because a textarea cannot flow inside quotation marks or along the "name, role" line. Every other plain field is a textarea with `field-sizing` and the mirror fallback.
+2. `rich()` names a caption from its path ("Image 2 caption").
+3. The frame carries `min-w-0`.
+4. `standInAdapter(doc, base)` keeps its two arguments.
+5. A picture's `w` and `h` change the shell, so a grid tile's `--r` redraws.
+6. A placeholder in the last flowchart box uses `--xp-flow-end-soft`. K may change it.
+7. "More actions" reuses the classic `BlockTools` unchanged, with its `DraftTools` built on the store in `draft-tools.tsx`, so a rewrite and "Back to the AI version" are each one undo entry.
+8. The top bar stub's button reads "Review and publish" (0026's one label), so it does not clash with the sheet's own Publish.
+9. `RichField` makes its Tiptap editor only on click or focus (idle start-up comes in G's milestone 2). In tests use `typeIn()`, or wait for `.ProseMirror` to have focus before typing.
+10. No stored file is deleted yet; the deletion rule comes in G's milestone 2.
+
+## From agent H (the top bar, merged into phase-2-r3)
+
+- `components/exhbt-editor/topbar/`: `TopBar.tsx`, `LayoutMenu.tsx` (with `MENU_LINES`), `UndoButton.tsx`, `WordBar.tsx`, `ThingsToFix.tsx`, `SaveStatus.tsx`, `MenuButton.tsx`, `Popover.tsx` (the shared panel button and `useNarrow`).
+- On a phone (under 48rem) the row keeps only the back link, the word count, things to fix (icon plus count), the save status, the menu and "Review and publish". The phone's menu holds the layout menu, Undo, "See as a visitor" and "Card and link details": a test at phone width must open "Menu" first.
+- Under 100rem some buttons are icon-only with full accessible names; the word bar's "aim for N, at most M" shows from 88rem; "Review and publish" wraps under 64rem; the row is full window width.
+- Names: the layout button is "Layout: <name>"; Undo's accessible name is always "Undo: <label>" (visible label from 100rem); issue buttons in the panel carry `data-issue-path`; the layout status line is `[data-layout-status]`; "Show me"; "That's right: <number>".
+- Things to fix: before publishing has been tried, its count and visibility come from `useIssues().shown` plus the numbers to check, so a blank exhbt shows no button.
+- Right after an AI draft, `LayoutMenu.tsx` says the layout line once and removes `drafted`, `why` and `fig` from the address.
+- The `h1` (`#xe-heading`, `tabIndex={-1}`) is visually hidden until 100rem; Undo sends focus to it when nothing is left to undo, otherwise to the first field of the section brought back, or its frame.
+- The Draft/Live chip and "Unpublish" read `env` props from page load; G is adding a live status that I's publish sheet updates.
+
+## From agent I (the sheets, merged into phase-2-r3)
+
+- `sheets/PublishSheet.tsx` ("Review and publish"), `sheets/CardSheet.tsx` ("Card and link details": summary `#summary` / `data-path="summary"`, the headline pair `data-path="headline"`, and a live `ExhbtTile` with `exhbtSummary(doc)` under it as `data-testid="tile-summary"`), `sheets/WorkPanel.tsx` ("The work"), `sheets/WorkButton.tsx` (`data-path="evidence"`, reads "See the work: <name>" to match the page).
+- `sheets/live.ts`: a small atom for the live status, `setLive(id, status, slug)` and `useLive()`. Publish and Unpublish each call `setLive`. G is to make this the editor's live status (or re-export its own from here) and the top bar's chip read it.
+- `sheets/paths.ts`: `sheetOf(path)` and `useShowMe()` ("Show me" closes the publish sheet, waits 50 ms, opens the right sheet and focuses the field).
+- Known gaps for G: `ui.jumpTo(path)` does not open a sheet for sheet paths (`summary`, `headline`, `evidence`); `ui/Sheet.tsx`'s `onClose` closes whatever sheet is open, so a late close can shut the next sheet.
