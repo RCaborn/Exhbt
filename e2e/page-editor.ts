@@ -74,6 +74,13 @@ export async function openDoc(page: Page, username: string, doc: ExhbtDoc, opts:
 /** The element carrying a field path (decision 0026's table): the field itself, or a formatted field's box. */
 export const field = (page: Page, path: string): Locator => page.locator(`${READY} [data-path="${path}"]`);
 
+/**
+ * The field itself, whatever it is now: a plain field's textarea or inline span, a formatted field's
+ * words as the page drew them, or, once its editor has started, its editor (not the buttons beside it).
+ */
+export const textbox = (page: Page, path: string): Locator =>
+  page.locator(`${READY} [data-path="${path}"]:is(textarea, [role=textbox]), ${READY} [data-path="${path}"] .ProseMirror`).first();
+
 /** The page item's frame. */
 export const frame = (page: Page, id: string): Locator => page.locator(`${READY} [data-section-id="${id}"]`);
 

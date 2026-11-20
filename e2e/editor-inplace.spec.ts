@@ -26,6 +26,7 @@ import {
   READY,
   readStored,
   sampleDoc,
+  textbox,
   seeAsVisitor,
   settle,
   typeIn,
@@ -123,8 +124,8 @@ test.describe("a new exhbt in the new editor", () => {
     await waitReady(page);
     await expect(field(page, "title")).toHaveValue("Would a second till cut lunchtime queues?");
     await expect(field(page, "flow.0.step")).toHaveValue("Timed the queue");
-    await expect(field(page, "sections.0.items.0")).toHaveText("Waits fell from 11 to 4 minutes.");
-    await expect(field(page, "gap")).toHaveText("Lunch queues ran past ten minutes.");
+    await expect(textbox(page, "sections.0.items.0")).toHaveText("Waits fell from 11 to 4 minutes.");
+    await expect(textbox(page, "gap")).toHaveText("Lunch queues ran past ten minutes.");
   });
 
   test("Move down writes the marker; Undo puts the order back and takes the marker out", async ({ page }) => {
