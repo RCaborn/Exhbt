@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { validateForPublish, type ExhbtDoc } from "../lib/exhbt/blocks";
 import { FORMAT_RULES } from "../lib/exhbt/formats";
 import { openBankingDoc } from "../lib/exhbt/sample";
-import { canon, docNow, field, freshName, offered, openDoc, openNew, pageOrder, READY, typeIn, undoLabel, waitReady, waitSaved } from "./page-editor";
+import { canon, docNow, field, focusedPath, freshName, offered, openDoc, openNew, pageOrder, READY, typeIn, undoLabel, waitReady, waitSaved } from "./page-editor";
 
 /*
  * The edit-on-page editor's top bar (decision 0026, "The chrome"): the row, the layout menu, Undo, the word
@@ -200,7 +200,7 @@ test.describe("the top bar", () => {
 
     await list.getByRole("button", { name: "Show me" }).click();
     await expect(fixes).toHaveCount(0);
-    await expect(page.locator(`${READY} :focus`)).toHaveAttribute("data-path", /^sections\.0\.items\.0/);
+    await expect.poll(() => focusedPath(page)).toMatch(/^sections\.0\.items\.0/);
 
     await button.click();
     await page.getByRole("button", { name: "That's right: 18%" }).click();
