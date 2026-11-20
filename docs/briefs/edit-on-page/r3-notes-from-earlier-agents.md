@@ -66,3 +66,14 @@ Where G departed from the brief, or followed these notes over it:
 8. The top bar stub's button reads "Review and publish" (0026's one label), so it does not clash with the sheet's own Publish.
 9. `RichField` makes its Tiptap editor only on click or focus (idle start-up comes in G's milestone 2). In tests use `typeIn()`, or wait for `.ProseMirror` to have focus before typing.
 10. No stored file is deleted yet; the deletion rule comes in G's milestone 2.
+
+## From agent H (the top bar, merged into phase-2-r3)
+
+- `components/exhbt-editor/topbar/`: `TopBar.tsx`, `LayoutMenu.tsx` (with `MENU_LINES`), `UndoButton.tsx`, `WordBar.tsx`, `ThingsToFix.tsx`, `SaveStatus.tsx`, `MenuButton.tsx`, `Popover.tsx` (the shared panel button and `useNarrow`).
+- On a phone (under 48rem) the row keeps only the back link, the word count, things to fix (icon plus count), the save status, the menu and "Review and publish". The phone's menu holds the layout menu, Undo, "See as a visitor" and "Card and link details": a test at phone width must open "Menu" first.
+- Under 100rem some buttons are icon-only with full accessible names; the word bar's "aim for N, at most M" shows from 88rem; "Review and publish" wraps under 64rem; the row is full window width.
+- Names: the layout button is "Layout: <name>"; Undo's accessible name is always "Undo: <label>" (visible label from 100rem); issue buttons in the panel carry `data-issue-path`; the layout status line is `[data-layout-status]`; "Show me"; "That's right: <number>".
+- Things to fix: before publishing has been tried, its count and visibility come from `useIssues().shown` plus the numbers to check, so a blank exhbt shows no button.
+- Right after an AI draft, `LayoutMenu.tsx` says the layout line once and removes `drafted`, `why` and `fig` from the address.
+- The `h1` (`#xe-heading`, `tabIndex={-1}`) is visually hidden until 100rem; Undo sends focus to it when nothing is left to undo, otherwise to the first field of the section brought back, or its frame.
+- The Draft/Live chip and "Unpublish" read `env` props from page load; G is adding a live status that I's publish sheet updates.
