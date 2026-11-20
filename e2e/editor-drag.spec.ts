@@ -1,7 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { LIMITS, wordCount, type ExhbtDoc, type Section } from "../lib/exhbt/blocks";
 import { formatOf, FORMAT_RULES, type Format } from "../lib/exhbt/formats";
-import { pageItems, rowsFor, type Cell, type Row } from "../lib/exhbt/layouts";
+import { blockOptions, pageItems, rowsFor, type Cell, type Row } from "../lib/exhbt/layouts";
+import { openBankingDoc } from "../lib/exhbt/sample";
+import { newImageSection, newSection, roomFor } from "../lib/exhbt/sections";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import { labelOf } from "../components/exhbt-editor/labels";
 import { HYSTERESIS, makePlan, orderWith, placeAt, pointFor, rowsInfo, type Box } from "../components/exhbt-editor/drag/plan";
@@ -616,5 +619,570 @@ test.describe("dragging with a mouse", () => {
     // At the top, move up is off and the focus goes to move down.
     await expect(frame(page, id).locator('[data-tool="up"]')).toBeDisabled();
     await expect(frame(page, id).locator('[data-tool="down"]')).toBeFocused();
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * The page scrolling itself, reduced motion, the look's colours, axe
+ * ---------------------------------------------------------------------------------------------- */
+
+const scrollY = (page: Page) => page.evaluate(() => window.scrollY);
+const atFoot = (page: Page) => page.evaluate(() => Math.ceil(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight - 1);
+const pageHeight = (page: Page) => page.evaluate(() => document.documentElement.scrollHeight);
+
+/** A colour as the look draws it: `value` (a CSS colour, e.g. var(--xp-link)) resolved inside the exhbt's page. */
+const lookColour = (page: Page, value: string) =>
+  page.evaluate((v) => {
+    const probe = document.createElement("span");
+    probe.style.color = v;
+    document.querySelector(`[data-editor="page"] article`)!.appendChild(probe);
+    const c = getComputedStyle(probe).color;
+    probe.remove();
+    return c;
+  }, value);
+
+/** WCAG contrast between two rgb() colours. */
+function contrast(a: string, b: string): number {
+  const lum = (c: string) => {
+    const [r, g, bl] = c
+      .match(/[\d.]+/g)!
+      .slice(0, 3)
+      .map((n) => {
+        const v = Number(n) / 255;
+        return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+      });
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * bl!;
+  };
+  const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
+  return (x! + 0.05) / (y! + 0.05);
+}
+
+test.describe("while carrying", () => {
+  test.skip(({ isMobile }) => isMobile, "the touch checks are below");
+
+  test("the page scrolls itself with the pointer still near the bottom edge and near the top edge, and stops at its ends", async ({ page }) => {
+    await open(page, "gallery");
+    const order = await pageOrder(page);
+    const height = await pageHeight(page);
+    const view = page.viewportSize()!;
+    await pickUp(page, order[0]!);
+    await page.mouse.move(view.width / 2, view.height - 12, { steps: 12 });
+    const p0 = await place(page);
+    await expect.poll(() => scrollY(page), { timeout: 10_000 }).toBeGreaterThan(300);
+    await expect.poll(() => atFoot(page), { timeout: 30_000 }).toBe(true);
+    // It stops at its end: the carried copy never makes the page longer.
+    await page.waitForTimeout(500);
+    expect(await pageHeight(page)).toBe(height);
+    // The place keeps up with the page moving under a still pointer.
+    expect(await place(page)).not.toBe(p0);
+    // Near the top edge it scrolls back, and stops at the top.
+    await page.mouse.move(view.width / 2, 70, { steps: 12 });
+    await expect.poll(() => scrollY(page), { timeout: 30_000 }).toBe(0);
+    await page.mouse.up();
+    await expect(lifting(page)).toHaveCount(0);
+  });
+
+  test("with reduced motion nothing animates, during or after a drag, from the keyboard or from the move buttons", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize(TALL);
+    await open(page, "case-study");
+    const motion = () => page.evaluate((root) => document.getAnimations().filter((a) => ((a.effect as KeyframeEffect).target as Element | null)?.closest(root)).length, READY);
+    const order = await pageOrder(page);
+    const before = await client(page);
+    const last = order[order.length - 1]!;
+    await pickUp(page, last);
+    const target = before[order[1]!]!;
+    await page.mouse.move(target.x + target.w / 2, target.y - 12, { steps: 10 });
+    await expect.poll(() => place(page)).toBe(1);
+    expect(await page.locator(FRAMES).evaluateAll((els) => els.map((e) => getComputedStyle(e).transitionDuration))).toEqual(order.map(() => "0s"));
+    expect(await motion()).toBe(0);
+    await page.mouse.up();
+    expect(await motion()).toBe(0);
+    expect(await pageOrder(page)).toEqual(orderWith(order, last, 1));
+    // Dropped straight into its place.
+    const after = await client(page);
+    expect(Math.abs(after[last]!.y - before[order[1]!]!.y)).toBeLessThan(1);
+    await grip(page, last).focus();
+    await page.keyboard.press("Space");
+    await page.keyboard.press("ArrowDown");
+    expect(await motion()).toBe(0);
+    await page.keyboard.press("Space");
+    expect(await motion()).toBe(0);
+    await frame(page, last).hover();
+    await frame(page, last).locator('[data-tool="down"]').click();
+    expect(await motion()).toBe(0);
+  });
+
+  test("the frame, the line, the room made and the lifted copy take the look's colours, and pass contrast in all eight looks", async ({ page }) => {
+    await page.setViewportSize(TALL);
+    for (const theme of PORTFOLIO_THEMES) {
+      await open(page, "case-study", theme.id);
+      const link = await lookColour(page, "var(--xp-link)");
+      const ground = await page.locator(`${READY} article`).evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(contrast(link, ground), `${theme.id}: the link colour on the ground`).toBeGreaterThanOrEqual(3);
+      if (theme.id === "exhbt") expect(link).toBe("rgb(0, 117, 93)");
+      // The frame, while the focus is in the section.
+      await grip(page, "findings").focus();
+      expect(await frame(page, "findings").evaluate((el) => getComputedStyle(el).outlineColor), theme.id).toBe(link);
+      // Lifted from the keyboard, the section itself is the card: the ground, an outline in the link colour, the pack shadow.
+      await page.keyboard.press("Space");
+      const card = await frame(page, "findings").evaluate((el) => {
+        const s = getComputedStyle(el, "::before");
+        return { bg: s.backgroundColor, outline: s.outlineColor, width: s.outlineWidth, shadow: s.boxShadow };
+      });
+      expect(card, theme.id).toMatchObject({ bg: ground, outline: link, width: "2px" });
+      expect(card.shadow).not.toBe("none");
+      await page.keyboard.press("Escape");
+      // The flowchart's line.
+      await grip(page, "flow").focus();
+      await page.keyboard.press("Space");
+      await page.keyboard.press("ArrowDown");
+      expect(await page.locator(`${READY} [data-xe-line]`).evaluate((el) => getComputedStyle(el).backgroundColor), theme.id).toBe(link);
+      await page.keyboard.press("Escape");
+      if (theme.id !== "exhbt" && theme.id !== "night") continue;
+      // With a mouse: the copy's card and the dashed room made.
+      const at = await client(page);
+      await pickUp(page, "findings");
+      const copy = await page.locator(`${READY} [data-xe-copy] .xe-card`).evaluate((el) => {
+        const s = getComputedStyle(el);
+        return { bg: s.backgroundColor, outline: s.outlineColor, width: s.outlineWidth };
+      });
+      expect(copy, theme.id).toEqual({ bg: ground, outline: link, width: "2px" });
+      const end = at[(await pageOrder(page)).at(-1)!]!;
+      await page.mouse.move(end.x + end.w / 2, end.y + end.h + 30, { steps: 10 });
+      expect(await page.locator(`${READY} [data-xe-landing]`).evaluate((el) => getComputedStyle(el).borderTopColor), theme.id).toBe(link);
+      await page.keyboard.press("Escape");
+      await page.mouse.up();
+    }
+  });
+
+  for (const f of offered()) {
+    test(`${f}: axe finds nothing with a section lifted`, async ({ page }) => {
+      await open(page, f);
+      const order = await pageOrder(page);
+      await grip(page, order[1]!).focus();
+      await page.keyboard.press("Space");
+      await page.keyboard.press("ArrowDown");
+      await expect(lifting(page)).toHaveAttribute("data-xe-drag", "keys");
+      await axe(page, `${f} lifted`);
+      await page.keyboard.press("Escape");
+    });
+  }
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * The "+" between sections
+ * ---------------------------------------------------------------------------------------------- */
+
+/** What a menu or the tray offers: each kind, and whether it can be added. */
+const kindsIn = (page: Page, sel: string) =>
+  page.locator(sel).evaluateAll((els) => els.map((b) => `${b.getAttribute("data-kind")}${(b as HTMLButtonElement).disabled || b.getAttribute("aria-disabled") === "true" ? " (full)" : ""}`));
+const expectedKinds = (doc: ExhbtDoc) => blockOptions(doc).map((o) => `${o.kind}${o.full ? " (full)" : ""}`);
+const wordsLeftText = (doc: ExhbtDoc) => `${LIMITS.totalWords - wordCount(doc)} words left of ${LIMITS.totalWords}.`;
+const MENU = `${READY} [data-xe-menu]`;
+
+/** A case study with every kind the layout holds at its cap. */
+function fullCaseStudy(): ExhbtDoc {
+  const sections: Section[] = [...openBankingDoc.sections];
+  const f = "case-study" as const;
+  for (const kind of FORMAT_RULES[f].kinds) {
+    while (roomFor(sections, kind, f) > 0) sections.push(kind === "image" ? { ...newImageSection("x", sections, { w: 1200, h: 800 }), alt: "A picture" } : newSection(kind, sections));
+  }
+  return { ...openBankingDoc, format: "case-study", sections };
+}
+
+test.describe("the + between sections", () => {
+  test.skip(({ isMobile }) => isMobile, "desktop");
+
+  for (const f of offered()) {
+    test(`${f}: each + has its own name; the menu offers every kind the layout holds, with the real caps and reasons; nothing moves when it opens`, async ({ page }) => {
+      await open(page, f);
+      const doc = await docNow(page);
+      const rows = rowsFor(pageItems(doc), formatOf(doc));
+      const first = (r: Row) => (r.row === "one" ? ids(r.cell)[0]! : r.row === "pair" ? ids(r.left)[0]! : r.items[0]!.item.id);
+      const names = await page.locator(`${READY} .xe-plus`).evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
+      expect(names).toEqual([...rows.map((r) => `Add a section before ${labelOf(doc, first(r))}`), "Add a section"]);
+      expect(new Set(names).size).toBe(names.length);
+      const before = await drawn(page);
+      const end = page.locator(`${READY} #add-section`);
+      await expect(end).toHaveAttribute("data-path", "sections");
+      await end.click();
+      await expect(page.locator(MENU)).toBeVisible();
+      expect(await drawn(page)).toEqual(before);
+      expect(await kindsIn(page, `${MENU} .xe-plus-item`)).toEqual(expectedKinds(doc));
+      for (const o of blockOptions(doc)) {
+        const item = page.locator(`${MENU} [data-kind="${o.kind}"]`);
+        await expect(item).toContainText(o.name);
+        if (o.full) await expect(item).toHaveAccessibleDescription(o.full);
+      }
+      await expect(page.locator(`${MENU} [data-testid="words-left"]`)).toHaveText(wordsLeftText(doc));
+      await page.keyboard.press("Escape");
+      await expect(page.locator(MENU)).toHaveCount(0);
+      await expect(end).toBeFocused();
+    });
+
+    test(`${f}: a new block lands where its + was, with the cursor in it`, async ({ page }) => {
+      await open(page, f);
+      const order = await pageOrder(page);
+      const doc = await docNow(page);
+      const kind = blockOptions(doc).find((o) => !o.full && ["quote", "reflection", "link", "pullquote"].includes(o.kind))!;
+      const starts = await page.locator(`${READY} .xe-insert:not([data-end])`).evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-at"))));
+      const at = starts[Math.floor(starts.length / 2)]!;
+      await page.locator(`${READY} .xe-insert[data-at="${at}"] .xe-plus`).click();
+      await page.locator(`${MENU} [data-kind="${kind.kind}"]`).click();
+      const now = await pageOrder(page);
+      expect(now.length).toBe(order.length + 1);
+      const added = now[at]!;
+      expect(now.filter((id) => id !== added)).toEqual(order);
+      await expect(said(page)).toHaveText(`${kind.name} added, place ${at + 1} of ${now.length}.`);
+      await expect.poll(() => page.evaluate((id) => Boolean(document.activeElement?.closest(`[data-section-id="${id}"]`)), added)).toBe(true);
+    });
+  }
+
+  test("a new graph opens its figures sheet; on a full case study the + says so, and Things to fix opens it", async ({ page }) => {
+    await open(page, "case-study");
+    await page.locator(`${READY} #add-section`).click();
+    await page.locator(`${MENU} [data-kind="graph"]`).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    await openDoc(page, freshName("dragfull"), fullCaseStudy());
+    const doc = await docNow(page);
+    expect(blockOptions(doc).every((o) => o.full)).toBe(true);
+    await page.locator(`${READY} #add-section`).click();
+    await expect(page.locator(`${MENU} .xe-plus-full`)).toHaveText("This case study is full. Remove a section to add another, or try another layout.");
+    expect(await kindsIn(page, `${MENU} .xe-plus-item`)).toEqual(expectedKinds(doc));
+    // "Things to fix" landing on the end + opens its menu.
+    await page.keyboard.press("Escape");
+    await expect(page.locator(MENU)).toHaveCount(0);
+    await page.evaluate(() => window.__exhbtUi!.jumpTo("sections"));
+    await expect(page.locator(MENU)).toBeVisible();
+  });
+
+  test.fixme("a new link opens its Web address popover with the cursor in it", async () => {
+    // Waits for G's milestone 2 (the jump opens a popover first) and J's popover. board.add already calls ui.jumpTo on the new link's href.
+  });
+
+  test("on a gallery with the flowchart off, Flowchart from the + before the last section goes back there", async ({ page }) => {
+    await page.setViewportSize(TALL);
+    await open(page, "gallery");
+    await frame(page, "flow").hover();
+    await frame(page, "flow").locator('[data-tool="remove"]').click();
+    const order = await pageOrder(page);
+    expect(order).not.toContain("flow");
+    const starts = await page.locator(`${READY} .xe-insert:not([data-end])`).evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-at"))));
+    const at = starts[starts.length - 1]!;
+    const plus = page.locator(`${READY} .xe-insert[data-at="${at}"] .xe-plus`);
+    await expect(plus).toHaveAccessibleName(`Add a section before ${await nameOf(page, order[at]!)}`);
+    await plus.click();
+    await page.locator(`${MENU} [data-kind="flow"]`).click();
+    expect(await pageOrder(page)).toEqual(orderWith(order, "flow", at));
+    // The stored marker is there, not at the flowchart's usual place.
+    const doc = await docNow(page);
+    const marker = doc.sections.findIndex((s) => s.kind === "flow");
+    expect(doc.sections[marker + 1]!.id).toBe(order[at]);
+    expect(doc.flowOff).toBeUndefined();
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * The tray
+ * ---------------------------------------------------------------------------------------------- */
+
+const TRAY = `${READY} [data-xe-tray]`;
+const block = (page: Page, kind: string) => page.locator(`${TRAY} [data-kind="${kind}"]`);
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+
+/** Presses the mouse on a block in the tray and moves past the 6px threshold. */
+async function liftBlock(page: Page, kind: string) {
+  const g = (await block(page, kind).boundingBox())!;
+  await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(g.x + g.width / 2 - 5, g.y + g.height / 2 + 6, { steps: 4 });
+  await expect(lifting(page)).toHaveAttribute("data-xe-drag", "pointer");
+  return g;
+}
+
+test.describe("the tray", () => {
+  test.skip(({ isMobile }) => isMobile, "a desktop only; the touch check says it is not there");
+
+  test("it sits beside the page, never over it, clear of where the page scrolls itself, at 77rem and not at 76rem", async ({ page }) => {
+    for (const f of offered()) {
+      await open(page, f);
+      const tray = page.locator(TRAY);
+      await expect(tray).toBeVisible();
+      const view = page.viewportSize()!;
+      const t = (await tray.boundingBox())!;
+      const article = (await page.locator(`${READY} article`).boundingBox())!;
+      expect(t.x, f).toBeGreaterThanOrEqual(article.x + article.width);
+      expect(t.x + t.width, f).toBeLessThanOrEqual(view.width);
+      expect(t.y, f).toBeGreaterThanOrEqual(view.height * 0.2);
+      expect(t.y + t.height, f).toBeLessThanOrEqual(view.height * 0.8);
+      await page.evaluate(() => window.scrollTo(0, 900));
+      expect(await tray.boundingBox()).toEqual(t);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      // The same kinds as the +, and the words left.
+      const doc = await docNow(page);
+      expect(await kindsIn(page, `${TRAY} .xe-tray-block`)).toEqual(expectedKinds(doc));
+      await expect(page.locator(`${TRAY} [data-testid="tray-words-left"]`)).toHaveText(wordsLeftText(doc));
+    }
+    await page.setViewportSize({ width: 1232, height: 800 });
+    await expect(page.locator(TRAY)).toBeVisible();
+    const narrow = (await page.locator(TRAY).boundingBox())!;
+    const article = (await page.locator(`${READY} article`).boundingBox())!;
+    expect(narrow.x).toBeGreaterThanOrEqual(article.x + article.width);
+    expect(narrow.x + narrow.width).toBeLessThanOrEqual(1232);
+    await page.setViewportSize({ width: 1216, height: 800 });
+    await expect(page.locator(TRAY)).toBeHidden();
+  });
+
+  test("a block dragged from it lands in a gap, beside the findings and in the image grid, by the rules of a moved section", async ({ page }) => {
+    await page.setViewportSize(TALL);
+    await open(page, "case-study");
+    let order = await pageOrder(page);
+    let before = await drawn(page);
+    const boxes = await layout(page);
+    const tile = await liftBlock(page, "quote");
+    expect(await drawn(page)).toEqual(before);
+    expect(await place(page)).toBe(-1);
+    await expect(lifting(page)).toHaveAttribute("data-xe-style", "slide");
+    await expect(page.locator(`${READY} [data-xe-landing]`)).toBeHidden();
+    await expect(said(page)).toHaveText("Picked up a new block: quote. Carry it onto the page.");
+    const chip = (await page.locator(`${READY} [data-xe-chip]`).boundingBox())!;
+    expect([Math.round(chip.width), Math.round(chip.height)]).toEqual([Math.round(tile.width), Math.round(tile.height)]);
+    // Into the gap above the last section: the room is made, by transform.
+    let at = await client(page);
+    const last = order[order.length - 1]!;
+    const prev = union(order.slice(0, -1).map((id) => at[id]!));
+    await page.mouse.move(at[last]!.x + at[last]!.w / 2, (prev.y + prev.h + at[last]!.y) / 2, { steps: 25 });
+    await expect.poll(() => place(page)).toBe(order.length - 1);
+    await page.waitForTimeout(250);
+    await expect(said(page)).toHaveText(`Quote would go to place ${order.length} of ${order.length + 1}.`);
+    expect(await layout(page)).toEqual(boxes);
+    await expect(page.locator(`${READY} [data-xe-landing]`)).toBeVisible();
+    expect((await drawn(page))[last]!.y).toBeGreaterThan(before[last]!.y + 40);
+    await page.mouse.up();
+    let now = await pageOrder(page);
+    expect(now[order.length - 1]).toMatch(/^quote-/);
+    expect(now.filter((id) => id !== now[order.length - 1])).toEqual(order);
+    await expect(said(page)).toHaveText(`Quote added in place ${order.length} of ${order.length + 1}.`);
+    const motion = await frameMotion(page);
+    expect(motion.length).toBeGreaterThan(0);
+    for (const m of motion) expect(m.ms).toBe(180);
+    await settled(page);
+
+    // Let go off the page: nothing is added.
+    order = await pageOrder(page);
+    await liftBlock(page, "link");
+    await page.mouse.move(1400, 500, { steps: 6 });
+    expect(await place(page)).toBe(-1);
+    await page.mouse.up();
+    await expect(said(page)).toHaveText("Link was not added.");
+    expect(await pageOrder(page)).toEqual(order);
+
+    // Beside the findings: a picture dropped in the gap between the findings and the figure beside them is chosen there.
+    at = await client(page);
+    const pair = firstPair(await rowsNow(page))!;
+    const L = union(ids(pair.left).map((id) => at[id]!));
+    const R = union(ids(pair.right).map((id) => at[id]!));
+    await liftBlock(page, "image");
+    await page.mouse.move((L.x + L.w + R.x) / 2, R.y + R.h / 2, { steps: 25 });
+    const into = order.indexOf(ids(pair.right)[0]!);
+    await expect.poll(() => place(page)).toBe(into);
+    const chooser = page.waitForEvent("filechooser");
+    await page.mouse.up();
+    await (await chooser).setFiles({ name: "beside.png", mimeType: "image/png", buffer: PNG });
+    await expect.poll(async () => (await pageOrder(page)).length).toBe(order.length + 1);
+    now = await pageOrder(page);
+    expect(now[into]).toMatch(/^image-/);
+    expect(now.filter((id) => id !== now[into])).toEqual(order);
+
+    // Into the image grid of a gallery: between two tiles on one line.
+    await open(page, "gallery");
+    order = await pageOrder(page);
+    before = await drawn(page);
+    at = await client(page);
+    const ts = grid(await rowsNow(page))!.items.map((c) => c.item.id);
+    const k = ts.findIndex((id, i) => i > 0 && Math.abs(at[id]!.y - at[ts[i - 1]!]!.y) < 1);
+    const [a, b] = [at[ts[k - 1]!]!, at[ts[k]!]!];
+    await liftBlock(page, "quote");
+    await page.mouse.move((a.x + a.w + b.x) / 2, a.y + a.h / 2, { steps: 25 });
+    const between = order.indexOf(ts[k]!);
+    await expect.poll(() => place(page)).toBe(between);
+    await page.mouse.up();
+    now = await pageOrder(page);
+    expect(now[between]).toMatch(/^quote-/);
+    expect(now.filter((id) => id !== now[between])).toEqual(order);
+  });
+
+  test("with the flowchart off, its block dropped in a gap lands there", async ({ page }) => {
+    await page.setViewportSize(TALL);
+    await open(page, "gallery");
+    await frame(page, "flow").hover();
+    await frame(page, "flow").locator('[data-tool="remove"]').click();
+    const order = await pageOrder(page);
+    await expect(block(page, "flow")).toBeVisible();
+    const at = await client(page);
+    const lastRow = (await rowsNow(page)).at(-1)!;
+    const firstOfLast = lastRow.row === "group" ? lastRow.items[0]!.item.id : lastRow.row === "pair" ? ids(lastRow.left)[0]! : ids(lastRow.cell)[0]!;
+    const above = union(order.slice(0, order.indexOf(firstOfLast)).map((id) => at[id]!));
+    const target = at[firstOfLast]!;
+    await liftBlock(page, "flow");
+    await expect(lifting(page)).toHaveAttribute("data-xe-style", "line");
+    await page.mouse.move(target.x + 40, (above.y + above.h + target.y) / 2, { steps: 25 });
+    const p = order.indexOf(firstOfLast);
+    await expect.poll(() => place(page)).toBe(p);
+    await expect(page.locator(`${READY} [data-xe-line]`)).toBeVisible();
+    await page.mouse.up();
+    expect(await pageOrder(page)).toEqual(orderWith(order, "flow", p));
+    const doc = await docNow(page);
+    expect(doc.sections[doc.sections.findIndex((s) => s.kind === "flow") + 1]!.id).toBe(firstOfLast);
+    await expect(block(page, "flow")).toHaveCount(0);
+  });
+
+  test("from the keyboard: Enter adds a block after the section last in focus, or at the end; a full kind is refused with its reason", async ({ page }) => {
+    await open(page, "case-study");
+    const quote = block(page, "quote");
+    await quote.focus();
+    await expect(quote).toHaveAccessibleDescription(/Press Enter to add it after the section you were last in, or at the end of the page/);
+    let order = await pageOrder(page);
+    await page.keyboard.press("Enter");
+    await expect(said(page)).toHaveText(`Quote added at the end, place ${order.length + 1} of ${order.length + 1}.`);
+    expect((await pageOrder(page)).at(-1)).toMatch(/^quote-/);
+    await expect(quote).toBeFocused();
+    // After the section the focus was last in.
+    order = await pageOrder(page);
+    await grip(page, "findings").focus();
+    await block(page, "link").focus();
+    await page.keyboard.press("Enter");
+    const at = order.indexOf("findings") + 1;
+    await expect(said(page)).toHaveText(`Link added after ${lowerFirst(await nameOf(page, "findings"))}, place ${at + 1} of ${order.length + 1}.`);
+    expect((await pageOrder(page))[at]).toMatch(/^link-/);
+    // A full kind: dimmed, its reason read out and shown beside it, and it cannot be dragged.
+    const findings = block(page, "findings");
+    const reason = blockOptions(await docNow(page)).find((o) => o.kind === "findings")!.full!;
+    await expect(findings).toHaveAttribute("aria-disabled", "true");
+    await expect(findings).toHaveAccessibleDescription(reason);
+    order = await pageOrder(page);
+    await findings.focus();
+    await page.keyboard.press("Enter");
+    await expect(said(page)).toHaveText(`${reason}.`);
+    const g = (await findings.boundingBox())!;
+    await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(g.x - 300, g.y + 40, { steps: 10 });
+    await expect(lifting(page)).toHaveCount(0);
+    await page.mouse.up();
+    expect(await pageOrder(page)).toEqual(order);
+    await findings.hover();
+    await expect(page.locator(`${TRAY} #xe-tray-why-findings`)).toHaveCSS("opacity", "1");
+  });
+
+  test("carrying a block from it near the bottom edge scrolls the page, and stops at its end", async ({ page }) => {
+    await open(page, "gallery");
+    const height = await pageHeight(page);
+    const g = (await block(page, "quote").boundingBox())!;
+    await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(g.x - 300, g.y + 30, { steps: 8 });
+    await expect(lifting(page)).toHaveAttribute("data-xe-drag", "pointer");
+    const view = page.viewportSize()!;
+    await page.mouse.move(view.width / 2, view.height - 10, { steps: 10 });
+    const p0 = await place(page);
+    await expect.poll(() => scrollY(page), { timeout: 10_000 }).toBeGreaterThan(300);
+    await expect.poll(() => atFoot(page), { timeout: 30_000 }).toBe(true);
+    expect(await place(page)).not.toBe(p0);
+    await page.waitForTimeout(400);
+    expect(await pageHeight(page)).toBe(height);
+    await page.mouse.up();
+    expect((await pageOrder(page)).at(-1)).toMatch(/^quote-/);
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * By touch (the touch project: a Pixel 7)
+ * ---------------------------------------------------------------------------------------------- */
+
+test.describe("by touch", () => {
+  test.skip(({ isMobile }) => !isMobile, "runs in the touch project");
+
+  /** Real touch input through the browser, so scrolling and the press delay behave as they do under a finger. */
+  async function finger(page: Page) {
+    const cdp = await page.context().newCDPSession(page);
+    const send = (type: "touchStart" | "touchMove" | "touchEnd", x = 0, y = 0) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
+    return {
+      down: (x: number, y: number) => send("touchStart", x, y),
+      move: (x: number, y: number) => send("touchMove", x, y),
+      up: () => send("touchEnd"),
+      async slide(from: { x: number; y: number }, to: { x: number; y: number }, steps = 12) {
+        for (let i = 1; i <= steps; i++) {
+          await send("touchMove", from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
+          await page.waitForTimeout(16);
+        }
+      },
+    };
+  }
+
+  test("a swipe on a section's words or a picture scrolls and moves nothing; a quick swipe from a grip picks nothing up; a 260ms press does; no tray", async ({ page }) => {
+    await open(page, "gallery");
+    await expect(page.locator(TRAY)).toBeHidden();
+    const touch = await finger(page);
+    const order = await pageOrder(page);
+
+    const words = frame(page, "findings");
+    await words.scrollIntoViewIfNeeded();
+    const w = (await words.boundingBox())!;
+    const y0 = await scrollY(page);
+    await touch.down(w.x + 80, w.y + 40);
+    await touch.slide({ x: w.x + 80, y: w.y + 40 }, { x: w.x + 80, y: w.y - 260 });
+    await touch.up();
+    await expect.poll(() => scrollY(page)).toBeGreaterThan(y0 + 150);
+    expect(await pageOrder(page)).toEqual(order);
+    await expect(lifting(page)).toHaveCount(0);
+
+    const tiles = grid(await rowsNow(page))!.items.map((c) => c.item.id);
+    const picture = frame(page, tiles[2]!).locator("img").first();
+    await picture.scrollIntoViewIfNeeded();
+    const t = (await picture.boundingBox())!;
+    const y1 = await scrollY(page);
+    await touch.down(t.x + t.width / 2, t.y + t.height / 2);
+    await touch.slide({ x: t.x + t.width / 2, y: t.y + t.height / 2 }, { x: t.x + t.width / 2, y: t.y + t.height / 2 - 220 });
+    await touch.up();
+    await expect.poll(() => scrollY(page)).toBeGreaterThan(y1 + 120);
+    expect(await pageOrder(page)).toEqual(order);
+    await expect(lifting(page)).toHaveCount(0);
+
+    // A quick swipe that starts on a grip picks nothing up.
+    const id = tiles[1]!;
+    await frame(page, id).scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    let g = (await grip(page, id).boundingBox())!;
+    let at = { x: g.x + g.width / 2, y: g.y + g.height / 2 };
+    await touch.down(at.x, at.y);
+    await touch.slide(at, { x: at.x, y: at.y + 120 }, 5);
+    await touch.up();
+    await expect(lifting(page)).toHaveCount(0);
+    expect(await pageOrder(page)).toEqual(order);
+
+    // A 260ms press picks up; nothing moves as it does; carried over the next tile's far half, it drops after it.
+    g = (await grip(page, id).boundingBox())!;
+    at = { x: g.x + g.width / 2, y: g.y + g.height / 2 };
+    const still = await drawn(page);
+    const boxes = await layout(page);
+    await touch.down(at.x, at.y);
+    await page.waitForTimeout(260);
+    await touch.move(at.x, at.y + 2);
+    await expect(lifting(page)).toHaveAttribute("data-xe-drag", "pointer");
+    expect(await drawn(page)).toEqual(still);
+    const next = (await frame(page, tiles[2]!).boundingBox())!;
+    await touch.slide(at, { x: next.x + next.width * 0.8, y: next.y + next.height * 0.7 }, 14);
+    await page.waitForTimeout(250);
+    expect(await layout(page)).toEqual(boxes);
+    const shown = (await place(page))!;
+    expect(shown).not.toBe(order.indexOf(id));
+    await touch.up();
+    expect(await pageOrder(page)).toEqual(orderWith(order, id, shown));
+    await settled(page);
+    await expect(lifting(page)).toHaveCount(0);
   });
 });
