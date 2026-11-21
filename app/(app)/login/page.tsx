@@ -32,9 +32,6 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         {" · "}
         <Link href={`/login/link?next=${encodeURIComponent(next)}`} className="link">Email me a link</Link>
       </p>
-      <p className="hint mt-3">
-        You don&rsquo;t need an account to <Link href="/roadmap/new" className="link">start a roadmap</Link>.
-      </p>
     </div>
   );
 }
