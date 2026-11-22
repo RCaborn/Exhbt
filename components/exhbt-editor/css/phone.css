@@ -56,6 +56,12 @@
       inset: -0.5rem 0;
     }
 
+    /* The field's own address prompt (the bar's Link opens it): its input and buttons take a thumb. */
+    [data-editor="page"] .xe-link-ask input,
+    [data-editor="page"] .xe-link-ask-actions button {
+      min-height: 2.75rem;
+    }
+
     /* ---------- The bar's room ---------- */
     /* Below the exhbt, in the look's ground, so the last section can scroll clear of the bar. */
     [data-editor="page"]:has(> .xe-phonebar) > [data-look] {
