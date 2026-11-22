@@ -30,6 +30,13 @@ export type Files = {
   pick(at: number): void;
   /** Uploads pictures and puts them on the page from `at`, in the order they were picked. */
   addImages(files: File[], at: number): Promise<void>;
+  /**
+   * A picture uploaded for this exhbt that is put on the page some other way than addImages (the
+   * figure taken from the report, FigureSheet.tsx): its address for this visit, and the rule that
+   * deletes files knows of it from now on. Called as soon as the upload lands, before the doc changes:
+   * if the picture never reaches the page, the next run of the rule (settle) deletes it.
+   */
+  addUploaded(fileId: string, file: Blob): void;
   replaceImage(sectionId: string, file: File, picked: Picked, opts: { describeAgain: boolean }): Promise<void>;
   attachWork(file: File): Promise<void>;
   removeWork(): void;
@@ -193,6 +200,10 @@ export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: nu
       input?.click();
     },
     addImages,
+    addUploaded(fileId, file) {
+      seen.add(fileId);
+      addUrl(fileId, file);
+    },
     async replaceImage(sectionId, file, picked, o) {
       const problem = checkFile(file, "image", maxFileMb);
       if (problem) throw new UploadError(problem);
@@ -270,5 +281,5 @@ export function useImageUrls(): Record<string, string | null> {
 export function useFiles(): Files {
   const f = useFilesController();
   const s = useAtom(f.state);
-  return useMemo(() => ({ url: f.url, pick: f.pick, addImages: f.addImages, replaceImage: f.replaceImage, attachWork: f.attachWork, removeWork: f.removeWork, markPublished: f.markPublished, busy: s.busy, error: s.error, status: s.status }), [f, s]);
+  return useMemo(() => ({ url: f.url, pick: f.pick, addImages: f.addImages, addUploaded: f.addUploaded, replaceImage: f.replaceImage, attachWork: f.attachWork, removeWork: f.removeWork, markPublished: f.markPublished, busy: s.busy, error: s.error, status: s.status }), [f, s]);
 }

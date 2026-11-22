@@ -1,9 +1,10 @@
 "use client";
 
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { RichText } from "@/components/exhbt/RichText";
 import type { RichSlot } from "@/components/portfolio/page-ctx";
 import type { RichText as RichTextValue } from "@/lib/exhbt/blocks";
+import { useFieldPath } from "../Frame";
 import { MUTED } from "../geometry";
 import { enqueueEditor } from "./idle";
 import { IssueNote, issueId, useFieldIssue } from "./issues";
@@ -34,7 +35,11 @@ export function StaticRich({ value, placeholder, highlight }: { value: RichTextV
 /** Why the editor was started: in an idle moment (it must not take the focus), or by the person. */
 type Start = false | "idle" | "person";
 
-export function RichField(o: RichSlot) {
+/** Memoised: drawn again only when its own words, name or place change. */
+export const RichField = memo(function RichField(given: RichSlot) {
+  // Inside a frame, the path takes the frame's index in doc.sections now (Frame.tsx).
+  const path = useFieldPath(given.path);
+  const o = useMemo(() => (path === given.path ? given : { ...given, path }), [given, path]);
   const [start, setStart] = useState<Start>(false);
   const [ready, setReady] = useState(false);
   const at = useRef<{ x: number; y: number } | null>(null);
@@ -101,4 +106,4 @@ export function RichField(o: RichSlot) {
       <IssueNote id={issueId(id)} text={issue} />
     </div>
   );
-}
+});

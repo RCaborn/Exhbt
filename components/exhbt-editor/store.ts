@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useSyncExternalStore } from "react";
+import { createContext, useContext, useEffect, useRef, useSyncExternalStore } from "react";
 import type { ContentSection, ExhbtDoc } from "@/lib/exhbt/blocks";
 import type { EditorStore, Store } from "./store-core";
 
@@ -59,8 +59,14 @@ declare global {
 
 /** Counts a unit's renders on window.__exhbtRenders[unit], for e2e/editor-smooth.spec.ts. Units: "shell", "flow", and each section's id. */
 export function useRenderCount(unit: string): void {
-  // Counted after each commit, so React's second render of a component in development is not counted twice.
+  // Counted after each commit, so React's second render of a component in development is not counted twice. And once
+  // per render: in development React runs a part's effects again, with no render, when it mounts the part or moves its
+  // node (a section moved past it), and those are not renders.
+  const render = {};
+  const counted = useRef<object | null>(null);
   useEffect(() => {
+    if (counted.current === render) return;
+    counted.current = render;
     const counts = (window.__exhbtRenders ??= {});
     counts[unit] = (counts[unit] ?? 0) + 1;
   });

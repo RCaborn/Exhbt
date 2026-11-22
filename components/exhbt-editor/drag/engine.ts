@@ -444,22 +444,24 @@ function createEngine(store: Store, ui: UiApi, files: FilesController) {
     if (reducedMotion()) return;
     const main = mainColumn();
     if (!main) return;
-    for (const el of frames(main)) {
+    // Every read before any write: one style and layout pass for the page, not one for each frame.
+    const els = frames(main).filter((el) => first.has(el.dataset.sectionId!));
+    for (const el of els) for (const run of el.getAnimations()) if (run instanceof Animation && run.id === "xe-settle") run.cancel();
+    const now = els.map((el) => el.getBoundingClientRect());
+    els.forEach((el, i) => {
       const id = el.dataset.sectionId!;
-      const a = first.get(id);
-      if (!a) continue;
-      for (const run of el.getAnimations()) if (run instanceof Animation && run.id === "xe-settle") run.cancel();
-      const b = el.getBoundingClientRect();
+      const a = first.get(id)!;
+      const b = now[i]!;
       const dx = a.left - b.left;
       const dy = a.top - b.top;
-      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
       const anim = el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0px, 0px)" }], { duration: MOVE_MS, easing: EASE, id: "xe-settle" });
       if (id === lifted) {
         el.dataset.settling = "";
         const done = () => delete el.dataset.settling;
         anim.finished.then(done, done);
       }
-    }
+    });
   }
 
   /** Ends the drag: drops at the place shown (a new block is added there), or puts everything back. */

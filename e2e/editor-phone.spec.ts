@@ -248,6 +248,24 @@ test.describe("the bar's actions", () => {
     expect(await undoLabel(page)).toBeNull();
   });
 
+  test("after an Undo the focus is on the section's grip, not in its words, so the keyboard stays shut", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    const order = await pageOrder(page);
+    expect(order).toContain("quote-1");
+    await choose(page, "quote-1");
+    await onBar(page, /^Remove Quote/).tap();
+    await expect.poll(() => pageOrder(page)).toEqual(order.filter((id) => id !== "quote-1"));
+    await onBar(page, /^Undo: remove quote/).tap();
+    await expect.poll(() => pageOrder(page)).toEqual(order);
+    const focused = () =>
+      page.evaluate(() => {
+        const a = document.activeElement;
+        return a?.hasAttribute("data-grip") ? `grip of ${a.closest("[data-section-id]")?.getAttribute("data-section-id")}` : `${a?.tagName.toLowerCase()} ${a?.getAttribute("data-path") ?? ""}`;
+      });
+    expect(await focused()).toBe("grip of quote-1");
+  });
+
   test("the Undo offer lasts until the next change: typing takes it away", async ({ page }) => {
     await openTiming(page, "case-study", { full: true });
     await waitLive(page);
@@ -521,9 +539,10 @@ test.describe("at 390px wide", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   /**
-   * Controls whose press is smaller than 44px today, owned elsewhere and in L's report: a skill's
-   * remove button (core.css, 18px over the pill's corner: G, who is giving it a 44px press; then this
-   * list is empty).
+   * Controls whose press is smaller than 44px today, owned elsewhere and in L's report:
+   * - a skill's remove button (core.css: G): 18px to the eye with a 44px press, but where pills sit
+   *   closer than that (rows of pills are about 28px apart, and a short pill is narrower) the next
+   *   pill's press takes the overlap, so a crowded one has less.
    */
   const KNOWN = [".xe-pill-remove"];
 

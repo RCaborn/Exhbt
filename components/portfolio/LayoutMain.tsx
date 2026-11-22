@@ -151,12 +151,23 @@ export function LayoutMain({ doc, ctx }: { doc: ExhbtDoc; ctx: PageCtx }) {
     }
   }
 
+  // A row of one item is keyed by that item, so it keeps its node wherever it goes. A pair or a group is keyed by its
+  // shape and its count among rows of that shape, so when the items in it change its frames are moved, not drawn anew.
+  const seen = new Map<string, number>();
+  const keyOf = (row: Row): string => {
+    if (row.row === "one") return firstItem(row).id;
+    const shape = row.row === "pair" ? `pair:${row.ratio}` : `group:${row.of}`;
+    const n = seen.get(shape) ?? 0;
+    seen.set(shape, n + 1);
+    return `${shape}#${n}`;
+  };
+
   return (
     <>
       {rows.map((row, r) => {
         const at = placeOf.get(firstItem(row).id) ?? 0;
         return (
-          <Fragment key={firstItem(row).id}>
+          <Fragment key={keyOf(row)}>
             {edit?.insert({ at })}
             {drawRow(row, r === 0)}
           </Fragment>

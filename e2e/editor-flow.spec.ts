@@ -4,7 +4,7 @@ import { lineAt, moved, placeAt, within } from "../components/exhbt-editor/flow/
 import type { ExhbtDoc, FlowStep } from "../lib/exhbt/blocks";
 import { FORMAT_RULES, type Format } from "../lib/exhbt/formats";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
-import { allowEditOnly, boxes, differences, docNow, field, focusedPath, freshName, full, offered, openDoc, openTiming, READY, renders, sampleDoc, SAMPLES, seeAsVisitor, settle, undoLabel, waitReady } from "./page-editor";
+import { allowEditOnly, boxes, differences, docNow, field, focusedPath, freshName, full, offered, openDoc, openTiming, READY, renders, sampleDoc, SAMPLES, seeAsVisitor, settle, undoLabel, waitLive, waitReady } from "./page-editor";
 
 /*
  * The flowchart edited where it sits (decision 0026; docs/briefs/edit-on-page/r3-k-flowchart.md): type
@@ -447,17 +447,22 @@ for (const f of offered()) {
       expect(await keysNow(page)).toEqual(moved(keys, 1, 2));
     });
 
-    test("adding, removing and moving a box are each undone by Undo, and typing done in between is kept", async ({ page }) => {
+    test("adding, removing and moving a box are each undone by Undo, the focus lands in the flowchart at once, and typing done in between is kept", async ({ page }) => {
       await page.setViewportSize(TALL);
       await open(page, f, 4);
       const keys = await keysNow(page);
       const steps = await stepsNow(page);
-      const undo = async (label: string) => {
+      // Undo by Ctrl+Z (from the heading, out of any field) or by the top bar's button. The focus is where it belongs
+      // as soon as the key or the click has been handled, with no frame to wait for: `lands` is its path (a box's
+      // words, or "flow", the flowchart itself, when the undo took the box out).
+      const undo = async (label: string, lands: string, by: "keys" | "button" = "keys") => {
         expect(await undoLabel(page)).toBe(label);
-        await page.locator(`${READY} h1`).focus();
-        await page.keyboard.press("ControlOrMeta+z");
-        // Undo puts the focus where it belongs a frame or two later; let it land before carrying on.
-        await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(done)))));
+        if (by === "button") await page.getByRole("button", { name: `Undo: ${label}`, exact: true }).click();
+        else {
+          await page.locator(`${READY} h1`).focus();
+          await page.keyboard.press("ControlOrMeta+z");
+        }
+        expect(await focusedPath(page), `the focus after undoing ${label}`).toBe(lands);
       };
 
       // Add, then type in another box.
@@ -468,7 +473,7 @@ for (const f of offered()) {
       await field(page, "flow.4.step").click();
       await page.keyboard.press("ControlOrMeta+End");
       await page.keyboard.type(" (typed)");
-      await undo("add box 2");
+      await undo("add box 2", "flow");
       expect(await keysNow(page)).toEqual(keys);
       expect(await stepsNow(page)).toEqual([...steps.slice(0, 3), `${steps[3]} (typed)`]);
 
@@ -479,7 +484,7 @@ for (const f of offered()) {
       await field(page, "flow.0.step").click();
       await page.keyboard.press("ControlOrMeta+End");
       await page.keyboard.type(" (typed)");
-      await undo("remove box 2");
+      await undo("remove box 2", "flow.1.step", "button");
       expect(await keysNow(page)).toEqual(keys);
       expect(await stepsNow(page)).toEqual([`${steps[0]} (typed)`, steps[1], steps[2], `${steps[3]} (typed)`]);
 
@@ -496,9 +501,13 @@ for (const f of offered()) {
       await field(page, "flow.2.step").click();
       await page.keyboard.press("ControlOrMeta+End");
       await page.keyboard.type(" (typed)");
-      await undo("move box 1");
+      await undo("move box 1", "flow.0.step");
       expect(await keysNow(page)).toEqual(keys);
       expect(await stepsNow(page)).toEqual([`${steps[0]} (typed)`, steps[1], `${steps[2]} (typed)`, `${steps[3]} (typed)`]);
+      // Nothing moves the focus a frame later: a grip focused straight after an Undo keeps it.
+      await gripOf(page, 1).focus();
+      await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(done)))));
+      expect(await page.evaluate(() => document.activeElement?.getAttribute("data-flow-grip") ?? null)).toBe("2");
     });
 
     test("the dark box is always the last: after a move, an add at the end and a remove", async ({ page }) => {
@@ -671,6 +680,20 @@ test.describe("an empty flowchart", () => {
     // The count issue is on the list until there are three.
     await expect(list(page)).toHaveAttribute("data-invalid", "");
   });
+
+  for (const f of offered()) {
+    test(`${FORMAT_RULES[f].name.toLowerCase()}: with no boxes, the page is the visitor's box for box once what EDIT_ONLY_IN_FLOW allows is taken out`, async ({ page }) => {
+      await openDoc(page, freshName("flowemptyparity"), { ...sampleDoc(f), flow: [] });
+      await waitLive(page);
+      const taken = await allowEditOnly(page, "all");
+      expect(taken.some((t) => t.startsWith("the empty flowchart's")), taken.join("; ")).toBe(true);
+      await settle(page);
+      const editing = await boxes(page);
+      await seeAsVisitor(page, true);
+      await settle(page);
+      expect(differences(await boxes(page), editing), `with these taken out: ${taken.join("; ")}`).toEqual([]);
+    });
+  }
 });
 
 /* ------------------------------------------------------------------------------------------------
@@ -834,4 +857,40 @@ test.describe("by touch", () => {
       await expect(list(page)).not.toHaveAttribute("data-flow-drag", /./);
     });
   }
+});
+
+test.describe("blank boxes as a visitor sees them", () => {
+  const visitorList = (page: Page) => page.locator(`${READY} section[aria-label="Preview"]`).getByRole("list", { name: "Methodology" });
+
+  test("a blank last box is left out of 'See as a visitor', so the last filled step keeps the result box; the editing page still shows it; typing brings it in; all blank shows them all", async ({ page }) => {
+    const base = sampleDoc("case-study");
+    const filled = base.flow.slice(0, 3);
+    await openDoc(page, freshName("blankflow"), { ...base, flow: [...filled, { step: "" }] });
+    await settle(page);
+    // Editing: every box, the blank one too, so there is somewhere to type.
+    expect(await keysNow(page)).toHaveLength(4);
+    await seeAsVisitor(page, true);
+    const items = visitorList(page).getByRole("listitem");
+    await expect(items).toHaveCount(3);
+    await expect(items.last()).toContainText(filled[2]!.step);
+    await expect(visitorList(page).locator("[data-last]")).toHaveCount(1);
+    await expect(items.last().locator("[data-last]")).toBeVisible();
+    // Typing in the blank box brings it in as the last step.
+    await seeAsVisitor(page, false);
+    expect(await keysNow(page)).toHaveLength(4);
+    await page.evaluate(() => window.__exhbtEditor!.setAt("flow.3.step", "Wrote it up"));
+    await seeAsVisitor(page, true);
+    await expect(items).toHaveCount(4);
+    await expect(items.last()).toContainText("Wrote it up");
+    // Every box blank (a new exhbt): they all show.
+    await seeAsVisitor(page, false);
+    await page.evaluate(() =>
+      [0, 1, 2, 3].forEach((n) => {
+        window.__exhbtEditor!.setAt(`flow.${n}.step`, "");
+        window.__exhbtEditor!.setAt(`flow.${n}.detail`, "");
+      }),
+    );
+    await seeAsVisitor(page, true);
+    await expect(items).toHaveCount(4);
+  });
 });

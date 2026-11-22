@@ -2,7 +2,7 @@
 
 import "../css/figures.css";
 import { useState, type ReactNode } from "react";
-import { checkFile, readSize, removeFile, UploadError, uploadForExhbt } from "@/components/editor/media";
+import { checkFile, readSize, UploadError, uploadForExhbt } from "@/components/editor/media";
 import { asFile, Cropper, PagePicker, sourceBytes } from "@/components/editor/PickedFigure";
 import { Button } from "@/components/ui/Button";
 import type { ExhbtDoc, FigureBox } from "@/lib/exhbt/blocks";
@@ -65,9 +65,10 @@ function TakeFigure() {
       // Room is checked again: something may have been added while the page was being cut out.
       if (noRoom(store.get())) throw new UploadError(noRoom(store.get())!);
       uploaded = await uploadForExhbt(file, "image", env.id);
-      const size = await readSize(file);
       const fileIdNow = uploaded;
-      files.state.set((s) => ({ ...s, imageUrls: { ...s.imageUrls, [fileIdNow]: URL.createObjectURL(file) } }));
+      // Its address for this visit, and the rule that deletes files knows of it from now on: if it never reaches the page, it goes.
+      files.addUploaded(fileIdNow, file);
+      const size = await readSize(file);
       const placed = { id: "" };
       store.patchDoc((d) => {
         const next = withKeyFigure(d, { fileId: fileIdNow, alt: "", picked: { from: report.name, sourceFileId: report.fileId, page, box, shareOk: false } });
@@ -78,8 +79,6 @@ function TakeFigure() {
       }, "take a figure");
       if (!placed.id) throw new UploadError("There's no room for another image in this layout.");
       uploaded = null;
-      // The rule that deletes files now knows of the new picture (it is on the page, so it is kept).
-      files.settle();
       const id = placed.id;
       uiApi.close();
       uiApi.say(`The figure from page ${page} is on your exhbt. Describe it, and tick that you may share it.`);
@@ -96,8 +95,8 @@ function TakeFigure() {
     } catch (e) {
       setError(e instanceof UploadError ? e.message : "We couldn't take that page just now. Try again.");
     } finally {
-      // Uploaded but not placed: it goes.
-      if (uploaded) void removeFile(uploaded);
+      // Uploaded but not placed: nothing keeps it, so the rule deletes it now.
+      if (uploaded) files.settle();
       setBusy(false);
     }
   }
