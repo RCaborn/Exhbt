@@ -580,8 +580,7 @@ test.describe("Sections in the editor", () => {
 });
 
 test.describe("Sections in the editor: blank boxes as a visitor sees them", () => {
-  // FIXME(editor): "See as a visitor" draws a box that has just been added, still blank, as the dark last result box and counts it as a step; the classic preview left blank boxes out.
-  test.fixme("a blank last box is left out of the page, so the last filled step keeps the result box", async ({ page }) => {
+  test("a blank last box is left out of the page, so the last filled step keeps the result box", async ({ page }) => {
     await signInAs(page, "blanky");
     await startWithCore(page, "Blank boxes stay out of the preview");
     await seeAsVisitor(page);
