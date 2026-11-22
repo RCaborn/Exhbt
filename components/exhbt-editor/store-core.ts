@@ -1,4 +1,4 @@
-import { formatLimits, isContent, type ContentSection, type ExhbtDoc, type RichText } from "../../lib/exhbt/blocks";
+import { FLOW_ID, formatLimits, isContent, type ContentSection, type ExhbtDoc, type RichText } from "../../lib/exhbt/blocks";
 import { formatOf, FORMAT_RULES, type Format } from "../../lib/exhbt/formats";
 import { applyTemplate, insertBlock, insertImage, moveItem, pageItems, removeItem, type BlockKind } from "../../lib/exhbt/layouts";
 import { sectionLabel } from "../../lib/exhbt/sections";
@@ -67,8 +67,12 @@ export type StoreInternals = {
   entries(): readonly Entry[];
   /** Called with each entry that falls off the end of the list. */
   onDropped(fn: (e: Entry) => void): () => void;
-  /** Called after each undo with the section it was about, if that section is on the page. */
-  onUndone(fn: (subject: string | null) => void): () => void;
+  /**
+   * Called after each undo with the section it was about, if that section is on the page ("flow" for
+   * the flowchart and each of its box actions), and, for a box action, the box's lasting key (the box
+   * may be gone: the undo of an add takes it out).
+   */
+  onUndone(fn: (subject: string | null, box: string | null) => void): () => void;
   /** Replaces the doc outright (the backup offer). Not an undo entry; the undo list is cleared. */
   replace(doc: ExhbtDoc): void;
 };
@@ -123,7 +127,7 @@ export function createStore(initial: ExhbtDoc, opts: { onChange?: (doc: ExhbtDoc
   let mapFor: ExhbtDoc["sections"] | null = null;
   const listeners = new Set<() => void>();
   const dropped = new Set<(e: Entry) => void>();
-  const undone = new Set<(subject: string | null) => void>();
+  const undone = new Set<(subject: string | null, box: string | null) => void>();
 
   /** The flowchart's keys after a change that was not a flowchart action: kept while the count is the same. */
   const syncKeys = () => {
@@ -236,7 +240,7 @@ export function createStore(initial: ExhbtDoc, opts: { onChange?: (doc: ExhbtDoc
       const key = newKey();
       const before = doc;
       keys = [...keys.slice(0, to), key, ...keys.slice(to)];
-      commit({ ...doc, flow: [...doc.flow.slice(0, to), { step: "" }, ...doc.flow.slice(to)] }, { label: `add box ${to + 1}`, flow: { op: "add", key }, unverified: before.unverified ?? [], files: [] });
+      commit({ ...doc, flow: [...doc.flow.slice(0, to), { step: "" }, ...doc.flow.slice(to)] }, { label: `add box ${to + 1}`, subject: FLOW_ID, flow: { op: "add", key }, unverified: before.unverified ?? [], files: [] });
       return key;
     },
 
@@ -246,7 +250,7 @@ export function createStore(initial: ExhbtDoc, opts: { onChange?: (doc: ExhbtDoc
       const step = doc.flow[at]!;
       const before = doc;
       keys = keys.filter((_, i) => i !== at);
-      commit({ ...doc, flow: doc.flow.filter((_, i) => i !== at) }, { label: `remove box ${at + 1}`, flow: { op: "remove", key, step, at }, unverified: before.unverified ?? [], files: [] });
+      commit({ ...doc, flow: doc.flow.filter((_, i) => i !== at) }, { label: `remove box ${at + 1}`, subject: FLOW_ID, flow: { op: "remove", key, step, at }, unverified: before.unverified ?? [], files: [] });
     },
 
     flowMove(key, to) {
@@ -260,7 +264,7 @@ export function createStore(initial: ExhbtDoc, opts: { onChange?: (doc: ExhbtDoc
       k.splice(from, 1);
       k.splice(t, 0, key);
       keys = k;
-      commit({ ...doc, flow }, { label: `move box ${from + 1}`, flow: { op: "move", key, from }, unverified: doc.unverified ?? [], files: [] });
+      commit({ ...doc, flow }, { label: `move box ${from + 1}`, subject: FLOW_ID, flow: { op: "move", key, from }, unverified: doc.unverified ?? [], files: [] });
     },
 
     undo() {
@@ -272,8 +276,10 @@ export function createStore(initial: ExhbtDoc, opts: { onChange?: (doc: ExhbtDoc
       // The entry is gone already, so the listeners see the shorter list.
       const forced = r.doc === doc ? { ...doc } : r.doc;
       commit(forced);
-      const subject = e.subject && (e.subject === "flow" ? pageItems(doc).some((it) => it.id === "flow") : doc.sections.some((s) => s.id === e.subject)) ? e.subject : null;
-      for (const fn of undone) fn(subject);
+      const subject = e.subject && (e.subject === FLOW_ID ? pageItems(doc).some((it) => it.id === FLOW_ID) : doc.sections.some((s) => s.id === e.subject)) ? e.subject : null;
+      // A box action's box, by its lasting key: there again after the undo of a remove or a move, gone after the undo of an add.
+      const box = subject === FLOW_ID && e.flow ? e.flow.key : null;
+      for (const fn of undone) fn(subject, box);
     },
 
     undoLabel: () => stack[stack.length - 1]?.label ?? null,

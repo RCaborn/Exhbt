@@ -424,17 +424,22 @@ for (const f of offered()) {
       expect(await keysNow(page)).toEqual(moved(keys, 1, 2));
     });
 
-    test("adding, removing and moving a box are each undone by Undo, and typing done in between is kept", async ({ page }) => {
+    test("adding, removing and moving a box are each undone by Undo, the focus lands in the flowchart at once, and typing done in between is kept", async ({ page }) => {
       await page.setViewportSize(TALL);
       await open(page, f, 4);
       const keys = await keysNow(page);
       const steps = await stepsNow(page);
-      const undo = async (label: string) => {
+      // Undo by Ctrl+Z (from the heading, out of any field) or by the top bar's button. The focus is where it belongs
+      // as soon as the key or the click has been handled, with no frame to wait for: `lands` is its path (a box's
+      // words, or "flow", the flowchart itself, when the undo took the box out).
+      const undo = async (label: string, lands: string, by: "keys" | "button" = "keys") => {
         expect(await undoLabel(page)).toBe(label);
-        await page.locator(`${READY} h1`).focus();
-        await page.keyboard.press("ControlOrMeta+z");
-        // Undo puts the focus where it belongs a frame or two later; let it land before carrying on.
-        await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(done)))));
+        if (by === "button") await page.getByRole("button", { name: `Undo: ${label}`, exact: true }).click();
+        else {
+          await page.locator(`${READY} h1`).focus();
+          await page.keyboard.press("ControlOrMeta+z");
+        }
+        expect(await focusedPath(page), `the focus after undoing ${label}`).toBe(lands);
       };
 
       // Add, then type in another box.
@@ -445,7 +450,7 @@ for (const f of offered()) {
       await field(page, "flow.4.step").click();
       await page.keyboard.press("ControlOrMeta+End");
       await page.keyboard.type(" (typed)");
-      await undo("add box 2");
+      await undo("add box 2", "flow");
       expect(await keysNow(page)).toEqual(keys);
       expect(await stepsNow(page)).toEqual([...steps.slice(0, 3), `${steps[3]} (typed)`]);
 
@@ -456,7 +461,7 @@ for (const f of offered()) {
       await field(page, "flow.0.step").click();
       await page.keyboard.press("ControlOrMeta+End");
       await page.keyboard.type(" (typed)");
-      await undo("remove box 2");
+      await undo("remove box 2", "flow.1.step", "button");
       expect(await keysNow(page)).toEqual(keys);
       expect(await stepsNow(page)).toEqual([`${steps[0]} (typed)`, steps[1], steps[2], `${steps[3]} (typed)`]);
 
@@ -473,9 +478,13 @@ for (const f of offered()) {
       await field(page, "flow.2.step").click();
       await page.keyboard.press("ControlOrMeta+End");
       await page.keyboard.type(" (typed)");
-      await undo("move box 1");
+      await undo("move box 1", "flow.0.step");
       expect(await keysNow(page)).toEqual(keys);
       expect(await stepsNow(page)).toEqual([`${steps[0]} (typed)`, steps[1], `${steps[2]} (typed)`, `${steps[3]} (typed)`]);
+      // Nothing moves the focus a frame later: a grip focused straight after an Undo keeps it.
+      await gripOf(page, 1).focus();
+      await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(done)))));
+      expect(await page.evaluate(() => document.activeElement?.getAttribute("data-flow-grip") ?? null)).toBe("2");
     });
 
     test("the dark box is always the last: after a move, an add at the end and a remove", async ({ page }) => {

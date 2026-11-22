@@ -2,6 +2,7 @@
 
 import "./css/core.css";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { IMAGE_ACCEPT } from "@/components/editor/media";
 import { clearBackup, readBackup, writeBackup, type Backup } from "@/components/editor/useAutosave";
 import { Button } from "@/components/ui/Button";
@@ -35,6 +36,7 @@ import { WorkPanel } from "./sheets/WorkPanel";
 import { StoreContext, useDoc, useRenderCount, useShell, useStoreInternal } from "./store";
 import { createStore, type Store } from "./store-core";
 import { TopBar } from "./topbar/TopBar";
+import { HEADING_ID } from "./topbar/UndoButton";
 import { Tray } from "./Tray";
 
 /*
@@ -268,18 +270,19 @@ function UndoKeys(): ReactNode {
       uiApi.say(`Undone: ${label}.`);
     };
     document.addEventListener("keydown", onKey);
-    // After an Undo (from here or from the top bar), the focus goes to the first field of the section it brought
-    // back or moved; with no such section it stays where it is (on Undo) while Undo can still be pressed, and
-    // otherwise goes to the top bar's heading (decision 0026).
-    const off = store.onUndone((subject) => {
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => {
-          const frame = subject ? document.querySelector(`[data-editor="page"] [data-section-id="${CSS.escape(subject)}"]`) : null;
-          const target = frame?.querySelector<HTMLElement>(FIELDS) ?? frame?.querySelector<HTMLElement>("[data-grip]");
-          if (target) target.focus();
-          else if (!store.undoLabel()) document.querySelector<HTMLElement>('[data-editor="page"] h1')?.focus();
-        }),
-      );
+    // After an Undo (from here or from the top bar's Undo, which leaves the focus to this), the focus goes to what
+    // it brought back or moved: the first field of a section, or a flowchart box's words (the flowchart itself when
+    // the undo took that box out). With none, it stays where it is (on Undo) while Undo can still be pressed, and
+    // otherwise goes to the top bar's heading (decision 0026). The page is drawn first and the focus moves in the
+    // same frame as the Undo: a frame later it could take the focus from wherever the person had gone since.
+    const off = store.onUndone((subject, box) => {
+      flushSync(() => {});
+      const target = undoneTarget(subject, box);
+      if (target) target.focus();
+      else if (store.undoLabel()) {
+        // The focus was in what the undo took out: Undo keeps it.
+        if (!document.activeElement || document.activeElement === document.body) document.getElementById("xe-undo")?.focus();
+      } else document.getElementById(HEADING_ID)?.focus();
     });
     return () => {
       document.removeEventListener("keydown", onKey);
@@ -289,7 +292,20 @@ function UndoKeys(): ReactNode {
   return null;
 }
 
-const FIELDS = 'textarea, input:not([type=file]), [contenteditable]:not([contenteditable="false"]), [role=textbox]';
+const FIELDS = 'textarea, input:not([type=file]):not([type=hidden]), [contenteditable]:not([contenteditable="false"]), [role=textbox]';
+
+/** Where the focus goes after an undo: a box's words (or the flowchart, the box gone), else the section's first field, its grip, or the frame itself. */
+function undoneTarget(subject: string | null, box: string | null): HTMLElement | null {
+  const page = document.querySelector<HTMLElement>('[data-editor="page"]');
+  if (!page || !subject) return null;
+  if (box !== null) return page.querySelector<HTMLElement>(`[data-flow-step="${CSS.escape(box)}"] [data-path$=".step"]`) ?? page.querySelector<HTMLElement>('[data-path="flow"]');
+  const frame = page.querySelector<HTMLElement>(`[data-section-id="${CSS.escape(subject)}"]`);
+  if (!frame) return null;
+  const inner = frame.querySelector<HTMLElement>(FIELDS) ?? frame.querySelector<HTMLElement>("[data-grip]");
+  if (inner) return inner;
+  if (!frame.hasAttribute("tabindex")) frame.tabIndex = -1;
+  return frame;
+}
 
 /** Sections the layout keeps but does not draw (decision 0027): a list at the foot of the page, each with Remove. Not on the visitor's page. */
 function KeptList() {
