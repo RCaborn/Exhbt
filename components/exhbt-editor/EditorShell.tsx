@@ -4,9 +4,7 @@ import "./css/core.css";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { IMAGE_ACCEPT } from "@/components/editor/media";
-import { clearBackup, readBackup, writeBackup, type Backup } from "@/components/editor/useAutosave";
-import { Button } from "@/components/ui/Button";
-import { normaliseDoc } from "@/lib/exhbt/blocks";
+import { writeBackup } from "@/components/editor/useAutosave";
 import { drawnFlow, keptItems, pageItems } from "@/lib/exhbt/layouts";
 import type { PageCtx } from "@/components/portfolio/page-ctx";
 import { ProjectView, type Owner } from "@/components/portfolio/ProjectView";
@@ -14,6 +12,7 @@ import { lookAttrs, themeStyle } from "@/components/portfolio/themeFonts";
 import { formatOf } from "@/lib/exhbt/formats";
 import { useAdapter } from "./adapter";
 import { Autosave } from "./Autosave";
+import { BackupOffer } from "./BackupOffer";
 import { createRuntime, RuntimeContext, useEnv, useRuntime, useUiState, type PageEditorProps, type Runtime, type UiApi } from "./context";
 import { createDraftTools, DraftToolsContext } from "./draft-tools";
 import { DragBoard } from "./drag";
@@ -340,47 +339,6 @@ function KeptList() {
         ))}
       </ul>
     </section>
-  );
-}
-
-/** A copy kept in this browser that is newer than the server's, offered back, as the classic editor does. Over the page, under the top bar. */
-function BackupOffer() {
-  const env = useEnv();
-  const store = useStoreInternal();
-  const [offer, setOffer] = useState<Backup | null>(() => {
-    const b = readBackup(env.id);
-    if (!b) return null;
-    if (b.at > Date.parse(env.updatedAt) && JSON.stringify(b.doc) !== JSON.stringify(env.initialDoc)) return b;
-    clearBackup(env.id);
-    return null;
-  });
-  if (!offer) return null;
-  return (
-    <div role="status" className="xe-offer">
-      <p className="font-semibold">We kept changes from {new Date(offer.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} that never reached the server.</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => {
-            // Kept in this browser, maybe in an older shape: read into the current one.
-            store.replace(normaliseDoc(offer.doc));
-            setOffer(null);
-          }}
-        >
-          Restore them
-        </Button>
-        <Button
-          size="sm"
-          onClick={() => {
-            clearBackup(env.id);
-            setOffer(null);
-          }}
-        >
-          Discard them
-        </Button>
-      </div>
-    </div>
   );
 }
 

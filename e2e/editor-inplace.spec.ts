@@ -945,6 +945,71 @@ test("a copy kept in this browser that never reached the server is offered back;
   expect((await readStored(page, id)).working.title).toBe("Words the server never got");
 });
 
+test.describe("the copy kept in this browser (the review's data-safety-3)", () => {
+  type Kept = { doc: ExhbtDoc; at: number };
+  /** Writes a copy of exhbt `id` into this browser's storage, as the editor keeps one. */
+  const keep = (page: Page, id: string, copy: Kept) => page.evaluate(([k, v]) => localStorage.setItem(k, v), [`exhbt-backup:${id}`, JSON.stringify(copy)] as const);
+  const keptNow = (page: Page, id: string): Promise<Kept | null> => page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? "null") as Kept | null, `exhbt-backup:${id}`);
+  const OFFER = /^We kept changes from .+ that never reached the server\.$/;
+  /** Opens a case study, then reloads it with a copy in this browser, newer than the server's, whose title is `title`. */
+  async function withCopy(page: Page, tag: string, title: string) {
+    const doc = sampleDoc("case-study");
+    const { id } = await openDoc(page, freshName(tag), doc);
+    const at = Date.now() + 60_000;
+    await keep(page, id, { doc: { ...doc, title }, at });
+    await page.reload();
+    await waitReady(page);
+    await expect(page.getByText(OFFER)).toBeVisible();
+    return { id, doc, at };
+  }
+
+  test("a change made first hides the offer, so the older copy can no longer be put over newer work", async ({ page }) => {
+    const { id } = await withCopy(page, "newer", "From an older visit");
+    await typeIn(page, "title", "Typed since");
+    await expect(page.getByText(OFFER)).toHaveCount(0);
+    await waitSaved(page, id);
+    expect((await readStored(page, id)).working.title).toBe("Typed since");
+    await page.reload();
+    await waitReady(page);
+    await expect(field(page, "title")).toHaveValue("Typed since");
+    await expect(page.getByText(OFFER)).toHaveCount(0);
+  });
+
+  test("Restore is one undo entry: Undo puts back what the server had, and saves it", async ({ page }) => {
+    const { id, doc } = await withCopy(page, "restore", "From an older visit");
+    await page.getByRole("button", { name: "Restore them" }).click();
+    await expect(field(page, "title")).toHaveValue("From an older visit");
+    await expect(page.getByText(OFFER)).toHaveCount(0);
+    expect(await undoLabel(page)).toBe("restore the kept changes");
+    await waitSaved(page, id);
+    expect((await readStored(page, id)).working.title).toBe("From an older visit");
+    await pressUndo(page);
+    await expect(field(page, "title")).toHaveValue(doc.title);
+    await waitSaved(page, id);
+    expect((await readStored(page, id)).working.title).toBe(doc.title);
+  });
+
+  test("Discard takes out only the copy it offered: a copy written since is kept", async ({ page }) => {
+    const { id, doc } = await withCopy(page, "discard", "From an older visit");
+    // Nothing the editor does by itself on opening (its formatted fields starting in idle moments) takes the offer away.
+    await page.waitForTimeout(2500);
+    await expect(page.getByText(OFFER)).toBeVisible();
+    // Another tab of this exhbt keeps a newer copy meanwhile.
+    const newer = { doc: { ...doc, title: "From the other tab" }, at: Date.now() + 120_000 };
+    await keep(page, id, newer);
+    await page.getByRole("button", { name: "Discard them" }).click();
+    await expect(page.getByText(OFFER)).toHaveCount(0);
+    expect((await keptNow(page, id))?.at).toBe(newer.at);
+    // The copy offered is the one there: Discard takes it out.
+    await page.reload();
+    await waitReady(page);
+    await expect(page.getByText(OFFER)).toBeVisible();
+    await page.getByRole("button", { name: "Discard them" }).click();
+    expect(await keptNow(page, id)).toBeNull();
+    await expect(field(page, "title")).toHaveValue(doc.title);
+  });
+});
+
 test("sections a layout keeps but does not draw are listed under the page; Remove takes one out and Undo puts it back", async ({ page }) => {
   await openDoc(page, freshName("kept"), sampleDoc("research"));
   await expect(page.getByRole("region", { name: "Kept, not shown in this layout" })).toHaveCount(0);
