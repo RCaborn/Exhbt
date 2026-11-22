@@ -4,6 +4,7 @@ import { emptyDoc, plain, text, type ExhbtDoc, type RichText, type Section } fro
 import { FORMAT_RULES, formatOf } from "../lib/exhbt/formats";
 import { flowShown, hasMarker, pageItems } from "../lib/exhbt/layouts";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
+import { createFiles } from "../components/exhbt-editor/files";
 import { createStore } from "../components/exhbt-editor/store-core";
 import { ORDER_FIXTURES } from "./fixtures/order-docs";
 import {
@@ -322,6 +323,66 @@ test.describe("the store, in-process: a flowchart box's and a finding's actions,
   });
 });
 
+test.describe("the files, in-process: an upload still waiting to be placed is never deleted (the review's data-safety-1)", () => {
+  // The browser's fetch and createImageBitmap, stood in for: each upload gets the next id, and every DELETE is noted.
+  const g = globalThis as unknown as Record<string, unknown>;
+  let before: Record<string, unknown> = {};
+  let deleted: string[] = [];
+  let n = 0;
+  test.beforeEach(() => {
+    before = { fetch: g.fetch, createImageBitmap: g.createImageBitmap };
+    deleted = [];
+    n = 0;
+    g.fetch = async (url: string, init?: RequestInit) => {
+      if (url === "/api/files/upload-url") return Response.json({ fileId: `new-${++n}`, uploadUrl: "/put", headers: {} });
+      if (init?.method === "DELETE") deleted.push(decodeURIComponent(url.split("/api/files/")[1]!));
+      return Response.json({});
+    };
+  });
+  test.afterEach(() => void Object.assign(g, before));
+  const picture = (): ExhbtDoc => ({ ...emptyDoc(), sections: [{ id: "image-1", kind: "image", fileId: "old", alt: "The queue", caption: [] }] });
+  const filesFor = (store: ReturnType<typeof createStore>, doc: ExhbtDoc) => createFiles({ store, exhbtId: "e", maxFileMb: 10, imageUrls: {}, liveFileIds: [], initialDoc: doc });
+
+  test("a replaced picture: a save that lands while its size is read deletes neither file; the old one goes once the save without it lands", async () => {
+    let sized: ((v: unknown) => void) | null = null;
+    g.createImageBitmap = () => new Promise((r) => (sized = r));
+    const doc = picture();
+    const store = createStore(doc);
+    const files = filesFor(store, doc);
+    const done = files.replaceImage("image-1", new File([new Uint8Array(png(40, 10))], "b.png", { type: "image/png" }), { from: "report.pdf", page: 2, shareOk: false }, { describeAgain: false });
+    // Uploaded, and its size being read: it is not on the page yet when this save lands.
+    await expect.poll(() => sized !== null).toBe(true);
+    files.noteSaved(store.get());
+    expect(deleted).toEqual([]);
+    sized!({ width: 40, height: 10, close() {} });
+    await done;
+    expect(store.get().sections[0]).toMatchObject({ fileId: "new-1", w: 40, h: 10 });
+    files.noteSaved(store.get());
+    expect(deleted).toEqual(["old"]);
+  });
+
+  test("a figure from the report: kept from its upload until it is placed; one that is never placed goes once it is let go", () => {
+    const doc = emptyDoc();
+    const store = createStore(doc);
+    const files = filesFor(store, doc);
+    files.addUploaded("figure", new Blob([new Uint8Array(png(40, 10))], { type: "image/png" }));
+    // A save lands before the figure is on the page.
+    files.noteSaved(store.get());
+    expect(deleted).toEqual([]);
+    expect(store.insertImage({ fileId: "figure", w: 40, h: 10 }, 0)).toBeTruthy();
+    files.release("figure");
+    files.noteSaved(store.get());
+    expect(deleted).toEqual([]);
+    // Taken, but there was no room for it after all: let go, the rule deletes it.
+    files.addUploaded("spare", new Blob([new Uint8Array(png(40, 10))], { type: "image/png" }));
+    files.settle();
+    expect(deleted).toEqual([]);
+    files.release("spare");
+    files.settle();
+    expect(deleted).toEqual(["spare"]);
+  });
+});
+
 test.describe("undo", () => {
   test("remove and put back a quote: it comes back with its words, in its place", async ({ page }) => {
     const { id } = await openDoc(page, freshName("quote"), sampleDoc("case-study"));
@@ -600,6 +661,48 @@ test.describe("the status line", () => {
     await waitSaved(page, id);
     const widths = (await readStored(page, id)).working.sections.flatMap((s) => (s.kind === "image" ? [s.w] : []));
     expect(widths).toEqual([30, 40, 50]);
+  });
+
+  test("pictures that finish uploading out of order: the save after the first is placed deletes none of those still waiting, and all three are kept", async ({ page }) => {
+    const { id } = await openDoc(page, freshName("order"), { ...sampleDoc("gallery"), sections: sampleDoc("gallery").sections.filter((s) => s.kind !== "image") });
+    // Each upload's file id, by its file's name, and every file the editor asks to delete.
+    const ids: Record<string, string> = {};
+    page.on("response", async (res) => {
+      if (!res.url().endsWith("/api/files/upload-url")) return;
+      ids[(res.request().postDataJSON() as { name: string }).name] = ((await res.json()) as { fileId: string }).fileId;
+    });
+    const deleted: string[] = [];
+    page.on("request", (req) => {
+      if (req.method() === "DELETE" && req.url().includes("/api/files/")) deleted.push(req.url());
+    });
+    // The second picture's upload is held back: the first is placed, and the third finishes and waits for the second.
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    await page.route("**/api/files/upload-url", async (route) => {
+      if ((route.request().postDataJSON() as { name: string }).name === "b.png") await held;
+      await route.continue();
+    });
+    await page.locator(`${READY} input[aria-label='Choose an image']`).setInputFiles([
+      { name: "a.png", mimeType: "image/png", buffer: png(30, 10) },
+      { name: "b.png", mimeType: "image/png", buffer: png(40, 10) },
+      { name: "c.png", mimeType: "image/png", buffer: png(50, 10) },
+    ]);
+    await expect(page.locator(`${READY} [data-kind="image"]`)).toHaveCount(1);
+    await expect.poll(() => ids["c.png"] ?? null).not.toBeNull();
+    // Placing the first is a change, so it is saved, with nothing typed. The third is uploaded but not placed.
+    await waitSaved(page, id);
+    await page.waitForTimeout(500);
+    expect(deleted).toEqual([]);
+    expect(await fileExists(page, ids["c.png"]!)).toBe(true);
+    release();
+    await expect(page.locator(`${READY} [data-kind="image"]`)).toHaveCount(3);
+    await waitSaved(page, id);
+    const stored = (await readStored(page, id)).working.sections.flatMap((s) => (s.kind === "image" ? [s.fileId] : []));
+    expect(stored).toEqual([ids["a.png"], ids["b.png"], ids["c.png"]]);
+    await page.reload();
+    await waitReady(page);
+    await expect(page.locator(`${READY} [data-kind="image"]`)).toHaveCount(3);
+    expect(deleted).toEqual([]);
   });
 
   test("a picture over the size limit says why in the alert, and adds nothing", async ({ page }) => {

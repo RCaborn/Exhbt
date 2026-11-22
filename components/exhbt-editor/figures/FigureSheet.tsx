@@ -55,7 +55,9 @@ function TakeFigure() {
     if (!report || page === null || busy) return;
     setBusy(true);
     setError(null);
+    // The figure's file once it is uploaded, and whether it reached the page.
     let uploaded: string | null = null;
+    let onPage = false;
     try {
       const { pdfFigure } = await import("@/lib/figures/pdf");
       const blob = await pdfFigure(await sourceBytes(report.fileId, report.url), page, box, { margin: false });
@@ -66,7 +68,8 @@ function TakeFigure() {
       if (noRoom(store.get())) throw new UploadError(noRoom(store.get())!);
       uploaded = await uploadForExhbt(file, "image", env.id);
       const fileIdNow = uploaded;
-      // Its address for this visit, and the rule that deletes files knows of it from now on: if it never reaches the page, it goes.
+      // Its address for this visit, and the rule that deletes files knows of it from now on. It is held (no save
+      // landing while its size is read deletes it) until it is let go below: then, if it never reached the page, it goes.
       files.addUploaded(fileIdNow, file);
       const size = await readSize(file);
       const placed = { id: "" };
@@ -78,7 +81,7 @@ function TakeFigure() {
         return size ? { ...next, sections: next.sections.map((x) => (x.id === s.id ? { ...x, ...size } : x)) } : next;
       }, "take a figure");
       if (!placed.id) throw new UploadError("There's no room for another image in this layout.");
-      uploaded = null;
+      onPage = true;
       const id = placed.id;
       uiApi.close();
       uiApi.say(`The figure from page ${page} is on your exhbt. Describe it, and tick that you may share it.`);
@@ -95,8 +98,11 @@ function TakeFigure() {
     } catch (e) {
       setError(e instanceof UploadError ? e.message : "We couldn't take that page just now. Try again.");
     } finally {
-      // Uploaded but not placed: nothing keeps it, so the rule deletes it now.
-      if (uploaded) files.settle();
+      if (uploaded) {
+        // On the page, or never to be: let go. Uploaded but not placed, nothing keeps it, so the rule deletes it now.
+        files.release(uploaded);
+        if (!onPage) files.settle();
+      }
       setBusy(false);
     }
   }
