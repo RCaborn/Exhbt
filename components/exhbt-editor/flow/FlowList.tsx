@@ -35,10 +35,13 @@ import { lineAt, placeAt, within, type Span } from "./geometry";
  * the drag board's), the anchor "Things to fix" jumps to for the count issue (data-path="flow"), and
  * that issue's outline and message, which take no room.
  *
- * A box is carried in one of two ways, by FLOW_BOX_STYLE (drag/options.ts):
+ * A box is carried in one of two ways, by FLOW_BOX_STYLE (drag/options.ts). Rory chose sliding on
+ * 22 Nov 2026 ("Boxes sliding is better"); the line stays one constant away for this release.
+ *  - "slide" (the default): the box itself follows the pointer, lifted, and the other boxes slide aside
+ *    to show where it will land (dnd-kit's sortable list, 180ms, transforms only); on the drop every box
+ *    goes from where it was drawn to its place, the dropped one from where it was let go.
  *  - "line": the flowchart stays still; a copy the size of the box follows the pointer; a line in the
  *    gap shows where it will go; on the drop the boxes move to their places, 180ms, transforms only.
- *  - "slide": dnd-kit's sortable list; the other boxes slide aside.
  * The flowchart is a row or a column by its container's width (MethodFlow), so the axis is read from
  * the list itself and the boxes sort along it. The place comes from the pointer and the boxes as they
  * were at pick-up, and another place must be nearer by 10px before it takes over, so it cannot flicker.
@@ -113,7 +116,9 @@ export function FlowList({ children }: { children: ReactNode }) {
   }, []);
 
   // One place at a time along the flowchart, whichever way it runs: right and down go on, left and up go back.
-  const byKey = useCallback<KeyboardCoordinateGetter>((event, { context, currentCoordinates }) => {
+  // Each step moves the box by the distance between the two places, measured at pick-up along the
+  // flowchart's axis, so it never waits for dnd-kit to have measured the boxes (an arrow pressed at once).
+  const byKey = useCallback<KeyboardCoordinateGetter>((event, { currentCoordinates }) => {
     const by = NEXT.has(event.code) ? 1 : BACK.has(event.code) ? -1 : 0;
     const p = plan.current;
     if (!by || !p) return undefined;
@@ -122,10 +127,9 @@ export function FlowList({ children }: { children: ReactNode }) {
     const to = Math.max(0, Math.min(p.keys.length - 1, cur + by));
     if (to === cur) return undefined;
     p.target = to;
-    const rect = context.droppableRects.get(p.keys[to]!);
-    const at = context.collisionRect;
-    if (!rect || !at) return { ...currentCoordinates };
-    return { x: currentCoordinates.x + rect.left + rect.width / 2 - (at.left + at.width / 2), y: currentCoordinates.y + rect.top + rect.height / 2 - (at.top + at.height / 2) };
+    const mid = (s: Span) => (s.start + s.end) / 2;
+    const d = mid(p.spans[to]!) - mid(p.spans[cur]!);
+    return p.axis === "row" ? { x: currentCoordinates.x + d, y: currentCoordinates.y } : { x: currentCoordinates.x, y: currentCoordinates.y + d };
   }, []);
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -199,35 +203,50 @@ export function FlowList({ children }: { children: ReactNode }) {
     uiApi.say(to === null ? "The box isn't over a place." : `The box would go to place ${to + 1} of ${p.keys.length}.`);
   }
 
+  /**
+   * The drop's motion (180ms, transforms only, none under reduced motion): each box is measured where
+   * it is drawn now, the change is made at once (`change`, with the drag's end), and each box then goes
+   * from where it was drawn to its place. In slide style that is every box still on its way, the
+   * dropped one from where it was let go; in line style the boxes that make way, as the carried copy
+   * takes the dropped box itself.
+   */
+  function settle(p: Plan, change: () => void) {
+    const before = new Map(boxesNow(p.keys).map((el, i) => [p.keys[i]!, el?.getBoundingClientRect()]));
+    flushSync(change);
+    if (reducedNow()) return;
+    for (const el of boxesNow(store.flowKeys())) {
+      const k = el?.dataset.flowStep;
+      if (!el || !k || (style === "line" && k === p.key)) continue;
+      const a = before.get(k);
+      const b = el.getBoundingClientRect();
+      if (!a || (Math.abs(a.left - b.left) < 0.5 && Math.abs(a.top - b.top) < 0.5)) continue;
+      el.animate([{ transform: `translate(${a.left - b.left}px, ${a.top - b.top}px)` }, { transform: "translate(0px, 0px)" }], { duration: MOVE_MS, easing: EASE });
+    }
+  }
+
   function onDragEnd({ over }: DragEndEvent) {
     const p = plan.current;
     plan.current = null;
-    setView(null);
-    if (!p) return;
+    if (!p) return setView(null);
     const to = over ? p.keys.indexOf(String(over.id)) : -1;
-    if (to < 0 || to === p.from) return uiApi.say("Box dropped where it was.");
-    if (style === "slide" || reducedNow()) store.flowMove(p.key, to);
-    else {
-      // Line style: the boxes haven't moved yet, so each goes from where it was to its new place (180ms, transforms only).
-      const before = new Map(boxesNow(p.keys).map((el, i) => [p.keys[i]!, el?.getBoundingClientRect()]));
-      flushSync(() => store.flowMove(p.key, to));
-      for (const el of boxesNow(store.flowKeys())) {
-        const k = el?.dataset.flowStep;
-        // The carried copy takes the dropped box to its place itself.
-        if (!el || !k || k === p.key) continue;
-        const a = before.get(k);
-        const b = el.getBoundingClientRect();
-        if (!a || (Math.abs(a.left - b.left) < 0.5 && Math.abs(a.top - b.top) < 0.5)) continue;
-        el.animate([{ transform: `translate(${a.left - b.left}px, ${a.top - b.top}px)` }, { transform: "translate(0px, 0px)" }], { duration: MOVE_MS, easing: EASE });
-      }
+    if (to < 0 || to === p.from) {
+      // Slide style: the boxes moved aside go back, and the box from where it was let go. (Line style: the copy goes back.)
+      if (style === "slide") settle(p, () => setView(null));
+      else setView(null);
+      return uiApi.say("Box dropped where it was.");
     }
+    settle(p, () => {
+      setView(null);
+      store.flowMove(p.key, to);
+    });
     uiApi.say(`Box dropped in place ${to + 1} of ${p.keys.length}.`);
   }
 
   function onDragCancel() {
     const p = plan.current;
     plan.current = null;
-    setView(null);
+    if (p && style === "slide") settle(p, () => setView(null));
+    else setView(null);
     if (p) uiApi.say("Moving the box cancelled. It's back where it was.");
   }
 
@@ -266,16 +285,19 @@ export function FlowList({ children }: { children: ReactNode }) {
           createPortal(
             <div ref={layer} className="xe-flow-layer" data-edit-only aria-hidden>
               {line && <div data-flow-line className="xe-flow-line" style={{ left: line.x, top: line.y, width: line.w, height: line.h }} />}
-              <DragOverlay zIndex={1} dropAnimation={reduced ? null : DROP}>
-                {copy ? (
-                  <div className="xe-flow-carried" style={{ width: copy.w, height: copy.h }}>
-                    <div data-flow-copy data-last={copy.last || undefined} className="xp-flow-box xe-flow-copy px-3 py-3" style={{ left: copy.box.x, top: copy.box.y, width: copy.box.w, height: copy.box.h }}>
-                      <span className="block text-[0.8125rem] leading-snug font-semibold break-words">{copy.step || (copy.last ? "The result" : "What you did")}</span>
-                      {copy.detail && <span className="xp-flow-detail mt-1 block text-[0.8125rem] leading-snug">{copy.detail}</span>}
+              {/* Line style only: in slide style the box itself is carried (an overlay, even an empty one, would hold it in place). */}
+              {style === "line" && (
+                <DragOverlay zIndex={1} dropAnimation={reduced ? null : DROP}>
+                  {copy ? (
+                    <div className="xe-flow-carried" style={{ width: copy.w, height: copy.h }}>
+                      <div data-flow-copy data-last={copy.last || undefined} className="xp-flow-box xe-flow-copy px-3 py-3" style={{ left: copy.box.x, top: copy.box.y, width: copy.box.w, height: copy.box.h }}>
+                        <span className="block text-[0.8125rem] leading-snug font-semibold break-words">{copy.step || (copy.last ? "The result" : "What you did")}</span>
+                        {copy.detail && <span className="xp-flow-detail mt-1 block text-[0.8125rem] leading-snug">{copy.detail}</span>}
+                      </div>
                     </div>
-                  </div>
-                ) : null}
-              </DragOverlay>
+                  ) : null}
+                </DragOverlay>
+              )}
             </div>,
             look,
           )}

@@ -43,8 +43,10 @@ export function FlowBox({ boxKey, className, children }: { boxKey: string; class
   const reduced = useReducedMotion();
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: boxKey,
-    // Line style: the box stays where it is while it, or another, is carried. Slide: the others move aside, 180ms.
+    // Slide style: the others move aside, 180ms, transforms only. Line: the box stays where it is while it, or another, is carried.
     transition: slide && !reduced ? { duration: MOVE_MS, easing: EASE } : null,
+    // The drop's own motion is the list's (FlowList.tsx, settle), from where each box was drawn; not dnd-kit's.
+    animateLayoutChanges: () => false,
     attributes: { roleDescription: "draggable box" },
   });
   const grip = useMemo(() => ({ ...attributes, ...listeners }), [attributes, listeners]);

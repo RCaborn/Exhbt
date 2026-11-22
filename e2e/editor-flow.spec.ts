@@ -13,9 +13,9 @@ import { allowEditOnly, boxes, differences, docNow, field, focusedPath, freshNam
  * change here): a case study's flowchart is a row (with five boxes or fewer at 1440 wide), a gallery's
  * a column beside "What happened", research's a column under "Method".
  *
- * The box style (FLOW_BOX_STYLE, "line" or "slide") is read from the page (data-flow-style), so the
- * file passes either way. Desktop project: everything but the touch checks. Touch project (Pixel 7):
- * the touch checks.
+ * The box style (FLOW_BOX_STYLE) is "slide", as Rory chose on 22 Nov 2026; it is read from the page
+ * (data-flow-style), so the file passes with "line" too, whose own checks run only then. Desktop
+ * project: everything but the touch checks. Touch project (Pixel 7): the touch checks.
  */
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -325,11 +325,14 @@ for (const f of offered()) {
       const layout = await laidOut(page);
       const page0 = await boxes(page, { frames: true });
 
-      // Nothing moves when it lifts.
+      // Nothing moves when it lifts: no layout box changes, and no other box is drawn anywhere else. (Sliding, the
+      // lifted box is under the pointer, which has moved past the 6px threshold: by transform only.)
       await pickUp(page, 0);
       await expect(said(page)).toHaveText(`Picked up box 1 of ${n}.`);
-      expect(near(await drawn(page), still)).toBe(true);
-      expect(differences(page0, await boxes(page, { frames: true }))).toEqual([]);
+      expect(near(await laidOut(page), layout)).toBe(true);
+      expect(near((await drawn(page)).slice(style === "line" ? 0 : 1), still.slice(style === "line" ? 0 : 1))).toBe(true);
+      const outside0 = (all: Awaited<ReturnType<typeof boxes>>) => all.filter((b) => !b.key.startsWith("flowchart box"));
+      expect(differences(outside0(page0), outside0(await boxes(page, { frames: true })))).toEqual([]);
       if (style === "line") await expect(copy(page)).toBeVisible();
 
       // Over the far part of box 3: place 3, shown.
@@ -643,19 +646,32 @@ for (const f of offered()) {
       const to = along(before[2]!, axis, 0.7);
       await page.mouse.move(to.x, to.y, { steps: 10 });
       await expect(said(page)).toHaveText(`The box would go to place 3 of ${keys.length}.`);
+      if (style === "slide") {
+        // While carried: the boxes that make room slide by the editor's own 180ms transform, not dnd-kit's default; nothing else moves.
+        const moving = await page.locator(BOX).evaluateAll((els) => els.map((e) => ({ property: getComputedStyle(e).transitionProperty, ms: getComputedStyle(e).transitionDuration, ease: getComputedStyle(e).transitionTimingFunction })));
+        for (const i of [1, 2]) expect(moving[i], `box ${i + 1} making room`).toEqual({ property: "transform", ms: "0.18s", ease: "cubic-bezier(0.2, 0, 0, 1)" });
+        expect(await page.evaluate(() => (window as unknown as { __motion: unknown[] }).__motion.length)).toBe(0);
+      }
       await page.mouse.up();
       await settled(page);
       const motion = await page.evaluate(() => (window as unknown as { __motion: { on: string; ms: unknown; props: string[] }[] }).__motion);
-      if (style === "line") {
+      if (style === "slide") {
+        // Box 1 settles from where it was let go; boxes 2 and 3 only if their slide aside was still on its way; boxes 4 on stay still.
+        const on = motion.map((m) => m.on);
+        expect(on, JSON.stringify({ motion, keys })).toContain(keys[0]);
+        expect(on.every((k) => [keys[0], keys[1], keys[2]].includes(k)), JSON.stringify({ motion, keys })).toBe(true);
+      } else {
         // Boxes 2 and 3 move back a place, the copy takes box 1 to its new place; boxes 4 on stay still.
         expect(motion.filter((m) => m.on !== "copy").map((m) => m.on).sort()).toEqual([keys[1], keys[2]].sort());
         expect(motion.some((m) => m.on === "copy")).toBe(true);
-        for (const m of motion) {
-          expect(m.ms).toBe(180);
-          expect(m.props).toEqual(["transform"]);
-        }
       }
+      for (const m of motion) {
+        expect(m.ms).toBe(180);
+        expect(m.props).toEqual(["transform"]);
+      }
+      // Once settled, no box is left with a transform or a transition: the drop is the editor's motion, not dnd-kit's.
       expect(await placed(page)).toBe(true);
+      expect(await page.locator(BOX).evaluateAll((els) => els.map((e) => getComputedStyle(e).transitionDuration))).toEqual(keys.map(() => "0s"));
     });
   });
 }
@@ -842,11 +858,15 @@ test.describe("by touch", () => {
       g = (await gripOf(page, 0).boundingBox())!;
       at = { x: g.x + g.width / 2, y: g.y + g.height / 2 };
       const still = await drawn(page);
+      const layout = await laidOut(page);
+      const sliding = (await list(page).getAttribute("data-flow-style")) === "slide";
       await touch.down(at.x, at.y);
       await page.waitForTimeout(220);
       await touch.move(at.x, at.y + 2);
       await expect(list(page)).toHaveAttribute("data-flow-drag", "pointer");
-      expect(near(await drawn(page), still)).toBe(true);
+      // No layout box changes, and no other box is drawn anywhere else (sliding, the lifted box is under the finger, by transform).
+      expect(near(await laidOut(page), layout)).toBe(true);
+      expect(near((await drawn(page)).slice(sliding ? 1 : 0), still.slice(sliding ? 1 : 0))).toBe(true);
       const third = (await box(page, 2).locator(".xp-flow-box").boundingBox())!;
       await touch.slide(at, { x: third.x + third.width / 2, y: third.y + third.height * 0.7 }, 14);
       await expect(said(page)).toHaveText("The box would go to place 3 of 4.");
