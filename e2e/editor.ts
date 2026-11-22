@@ -262,6 +262,7 @@ export const publishSheet = (page: Page) => page.locator('dialog[data-sheet="pub
 
 /** Opens the publish sheet (if it is not open). */
 export async function openPublishSheet(page: Page) {
+  if (!(await publishSheet(page).evaluate((d) => (d as HTMLDialogElement).open))) await closeOpenSheet(page);
   if (!(await publishSheet(page).evaluate((d) => (d as HTMLDialogElement).open))) await reviewButton(page).click();
   await expect(publishSheet(page)).toBeVisible();
 }
@@ -313,6 +314,36 @@ export const sectionsArea = (page: Page) => page.locator(`${READY} article[data-
 export const card = (page: Page, name: string) =>
   page.locator(`${READY} [data-section-id]`).filter({ has: page.getByRole("toolbar", { name: `${name}: tools`, exact: true }) });
 
+/** Presses one of a section's toolbar buttons ("Remove Image 1", "Move Quote up"): the toolbar shows when the pointer is over the frame. */
+export async function pressTool(page: Page, label: string, name: string) {
+  await card(page, label).hover();
+  await page.getByRole("toolbar", { name: `${label}: tools`, exact: true }).getByRole("button", { name, exact: true }).click();
+}
+
+/** Removes a section by its name on the page ("Image 1"). */
+export const removeSection = (page: Page, label: string) => pressTool(page, label, `Remove ${label}`);
+
+/** The frames of one kind ("image", "link", "aim"). */
+export const framesOf = (page: Page, kind: string) => page.locator(`${READY} article [data-section-id][data-kind="${kind}"]`);
+
+/** A section's formatted or plain field by its kind and the end of its path (".text", ".caption", ".items.0"): the first of that kind. */
+export const sectionField = (page: Page, kind: string, pathEnd: string) => framesOf(page, kind).first().locator(`[data-path$="${pathEnd}"]`).first();
+
+/** The "Kept, not shown in this layout" list at the foot of the page. */
+export const keptList = (page: Page) => page.getByRole("region", { name: "Kept, not shown in this layout" });
+
+/**
+ * A link's "Web address" field: its button ("Web address: <label>") over the link opens a popover holding the field.
+ * Opens the popover of link `n` (1-based) and returns the field.
+ */
+export async function openWebAddress(page: Page, n = 1): Promise<Locator> {
+  const frame = framesOf(page, "link").nth(n - 1);
+  await frame.getByRole("button", { name: /^Web address:/ }).click();
+  const field = frame.locator('input[data-path$=".href"]');
+  await expect(field).toBeVisible();
+  return field;
+}
+
 /** Every frame, in page order. */
 export const frames = (page: Page) => page.locator(`${READY} article [data-section-id]`);
 
@@ -341,6 +372,8 @@ export const images = (page: Page) => page.locator(SEL.imageInput);
 
 /** Chooses image files as a person would: through the picker's file input (it is added to the end of the page). */
 export async function pickImages(page: Page, files: Parameters<ReturnType<typeof images>["setInputFiles"]>[0]) {
+  // After the browser's own chooser the focus is on the page, not on a button: the editor puts the cursor in the first new description only then.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await images(page).first().setInputFiles(files);
 }
 
@@ -371,6 +404,10 @@ const BLOCK_OF_BUTTON: Record<string, string> = {
   "Add a link": "link",
   "Add an image": "image",
   "Add a pull quote": "pullquote",
+  "Add aim or hypothesis": "aim",
+  "Add conclusion": "conclusion",
+  "Add a reference": "link",
+  "Add limitations and next steps": "reflection",
 };
 
 /** One entry of the open menu by its classic button name ("Add a quote") or by its words in the menu. */
@@ -418,6 +455,7 @@ export async function pickGraphKind(g: Locator, kind: string) {
 
 /** Adds a graph through the end "+" (a graph just added opens its figures sheet). */
 export async function addGraphSection(page: Page) {
+  await closeOpenSheet(page);
   await addSection(page, SEL.addGraphButton);
   await expect(chartSheet(page)).toBeVisible();
 }
@@ -429,6 +467,11 @@ export async function addGraph(page: Page, n: number, kind: string, title: strin
   await pickGraphKind(g, kind);
   await g.getByLabel("Title", { exact: true }).fill(title);
   return g;
+}
+
+/** Closes whatever sheet is open (a sheet is modal: the top bar and the "+" can't be pressed behind it); nothing when none is. */
+export async function closeOpenSheet(page: Page) {
+  if (await page.locator("dialog[open]").count()) await closeSheet(page);
 }
 
 /** Closes the open sheet (its "Close" button). */
@@ -447,11 +490,23 @@ export const findingsField = (page: Page) => finding(page, 1);
 /** The "N of M rewrites left" line inside a block's tools (visible once its "More actions" is open). */
 export const rewritesLeft = (page: Page, block: string) => page.getByTestId(SEL.toolsTestId(block)).getByTestId(SEL.rewritesLeftTestId);
 
-/** The "More actions for <block's name>" button on a drafted block. */
-export const cardMenuButton = (page: Page, block: string) => page.getByRole("button", { name: SEL.cardMenuButton(SEL.cards[block]!) });
+/** The "More actions for <block's name>" button on a drafted block (inside the block's tools, whatever the layout calls the block). */
+export const cardMenuButton = (page: Page, block: string) => page.getByTestId(SEL.toolsTestId(block)).getByRole("button", { name: /^More actions for/ });
+
+/** What to put the pointer on to show a block's tools: a section's toolbar shows over its frame, a shell part's corner toolbar over the part. */
+const HOVER_FOR: Record<string, string> = {
+  header: '[data-path="title"]',
+  gap: '[data-path="gap"]',
+  skills: '[data-path="skills"]',
+  flow: '[data-kind="flow"]',
+  findings: '[data-kind="findings"]',
+};
 
 /** Opens a block's "More actions" menu. */
-export const openCardMenu = (page: Page, block: string) => cardMenuButton(page, block).click();
+export async function openCardMenu(page: Page, block: string) {
+  await page.locator(`${READY} ${HOVER_FOR[block]!}`).first().hover();
+  await cardMenuButton(page, block).click();
+}
 
 /** Opens the block's menu and presses "Rewrite this block". */
 export async function startRewrite(page: Page, block: string) {
@@ -461,3 +516,30 @@ export async function startRewrite(page: Page, block: string) {
 
 /** The "Back to the AI version" button inside a block's tools. */
 export const backToAiVersion = (page: Page, block: string) => page.getByTestId(SEL.toolsTestId(block)).getByRole("button", { name: SEL.backToAiVersion });
+
+/* ------------------------------------------------------------------------------------------------
+ * The work, and the things to fix
+ * ---------------------------------------------------------------------------------------------- */
+
+/** The sheet that holds the work (a link or a file). */
+export const workSheet = (page: Page) => page.locator('dialog[data-sheet="work"]');
+
+/** Opens the work sheet from the sidebar's button ("Add the work", or "See the work: <name>"), if it is not open. */
+export async function openWorkSheet(page: Page) {
+  if (await workSheet(page).evaluate((d) => (d as HTMLDialogElement).open)) return;
+  await closeOpenSheet(page);
+  await page.locator(`${READY} [data-path="evidence"] button`).click();
+  await expect(workSheet(page)).toBeVisible();
+}
+
+/** The top bar's "N things to fix" / "N numbers to check" button. */
+export const thingsButton = (page: Page) => page.getByRole("button", { name: /(things? to fix|numbers? to check)$/ });
+
+/** Opens "Things to fix before publishing" and returns the region. */
+export async function openThingsToFix(page: Page) {
+  await closeOpenSheet(page);
+  const region = page.getByRole("region", { name: "Things to fix before publishing" });
+  if (!(await region.isVisible())) await thingsButton(page).click();
+  await expect(region).toBeVisible();
+  return region;
+}
