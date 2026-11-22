@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { askToJoinAction, notTogetherAction } from "@/app/(app)/team/actions";
 import { Button } from "@/components/ui/Button";
 import { ROLE_MAX_CHARS } from "@/lib/team-rules";
 import { MATCH_EVENT, type MatchDetail } from "./finish-upload";
 
 type Step = "ask" | "form" | "asked" | "mine";
+/** `modal`: a sheet (a modal dialog) was open when the file matched, so the page behind it is inert and a panel there could not be answered. */
+type Queued = MatchDetail & { modal: boolean };
 
 /**
  * The calm question after an upload whose file is already on someone else's exhbt (decision
@@ -15,9 +17,13 @@ type Step = "ask" | "form" | "asked" | "mine";
  * nothing else happens. Mounted once on pages that upload (the draft page, the editor), and
  * shown when finishUpload raises MATCH_EVENT. A panel at the foot of the screen, not a modal:
  * it doesn't take the cursor out of the field someone is typing in; screen readers hear it.
+ * When a modal sheet is open (the editor's "The work"), everything outside the sheet is inert, so the
+ * same prompt is drawn as a modal dialog of its own, above the sheet: the focus moves into it, and
+ * back to where it was when it closes. Same words, same buttons.
  */
 export function MatchPrompt() {
-  const [queue, setQueue] = useState<MatchDetail[]>([]);
+  const [queue, setQueue] = useState<Queued[]>([]);
+  const dialog = useRef<HTMLDialogElement>(null);
   const [step, setStep] = useState<Step>("ask");
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
@@ -27,13 +33,25 @@ export function MatchPrompt() {
   useEffect(() => {
     const on = (e: Event) => {
       const d = (e as CustomEvent<MatchDetail>).detail;
-      setQueue((q) => (q.some((x) => x.matchId === d.matchId) ? q : [...q, d]));
+      setQueue((q) => (q.some((x) => x.matchId === d.matchId) ? q : [...q, { ...d, modal: document.querySelector("dialog:modal") !== null }]));
     };
     window.addEventListener(MATCH_EVENT, on);
     return () => window.removeEventListener(MATCH_EVENT, on);
   }, []);
 
   const current = queue[0];
+  const modal = current?.modal ?? false;
+  const matchId = current?.matchId;
+  // Drawn as its own modal dialog: opened on top of the sheet, so the focus goes in.
+  useEffect(() => {
+    const d = dialog.current;
+    if (modal && d && !d.open) d.showModal();
+  }, [modal, matchId]);
+  // Each step swaps its buttons: keep the focus inside the dialog.
+  useEffect(() => {
+    const d = dialog.current;
+    if (modal && d?.open && !d.contains(document.activeElement)) d.querySelector<HTMLElement>("input, button")?.focus();
+  }, [modal, matchId, step]);
   const next = () => {
     setQueue((q) => q.slice(1));
     setStep("ask");
@@ -55,13 +73,20 @@ export function MatchPrompt() {
     }
   }
 
+  // Closing the modal dialog restores the focus to where it was (the sheet); its close event moves on to the next prompt.
+  const leave = () => (dialog.current?.open ? dialog.current.close() : next());
+  const Box = (modal ? "dialog" : "section") as "section";
+  const box = (modal ? { ref: dialog, onClose: next } : {}) as Record<string, never>;
+
   return (
     <div aria-live="polite">
       {current && (
-        <section
+        <Box
+          key={`${current.matchId}-${modal}`}
+          {...box}
           aria-labelledby="match-title"
           data-testid="match-prompt"
-          className="fixed inset-x-4 bottom-4 z-40 rounded-[16px] border border-line bg-surface p-5 shadow-pack sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-[26rem]"
+          className={`fixed inset-x-4 bottom-4 z-40 rounded-[16px] border border-line bg-surface p-5 shadow-pack sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-[26rem]${modal ? " m-0 top-auto text-ink" : ""}`}
         >
           {step === "ask" && (
             <>
@@ -77,7 +102,7 @@ export function MatchPrompt() {
                 <Button size="sm" loading={pending} disabled={pending} onClick={() => void run(() => notTogetherAction(current.matchId), "mine")}>
                   No, it&apos;s mine
                 </Button>
-                <button type="button" onClick={next} className="link px-1 text-sm font-semibold text-ink">
+                <button type="button" onClick={leave} className="link px-1 text-sm font-semibold text-ink">
                   Decide later
                 </button>
               </div>
@@ -145,7 +170,7 @@ export function MatchPrompt() {
                   : "Nothing about this shows on any exhbt. We keep a private note of file matches in case one needs looking into."}
               </p>
               <div className="mt-4">
-                <Button size="sm" onClick={next}>
+                <Button size="sm" onClick={leave}>
                   Close
                 </Button>
               </div>
@@ -157,7 +182,7 @@ export function MatchPrompt() {
               {error}
             </p>
           )}
-        </section>
+        </Box>
       )}
     </div>
   );

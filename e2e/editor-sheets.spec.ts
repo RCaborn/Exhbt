@@ -240,3 +240,40 @@ test.describe("every sheet", () => {
 test.afterEach(async ({ page }) => {
   await expect(page.locator(READY)).toBeAttached();
 });
+
+test.describe("a file already on someone else's exhbt, attached in the work sheet", () => {
+  test("the question appears above the sheet and can be answered without closing it; the focus goes in and comes back", async ({ page }) => {
+    const notes = Buffer.from(`Survey of 412 patients about reminders, cleaned in Python. Ref ${freshName("n")}.`);
+    // The owner uploads it to their exhbt.
+    const ownerId = await openNew(page, freshName("orig"));
+    const ticket = await page.request.post("/api/files/upload-url", { data: { name: "report.txt", mime: "text/plain", bytes: notes.length, kind: "evidence", exhbtId: ownerId } });
+    expect(ticket.ok()).toBe(true);
+    const { fileId, uploadUrl } = (await ticket.json()) as { fileId: string; uploadUrl: string };
+    expect((await page.request.put(uploadUrl, { data: notes, headers: { "content-type": "text/plain" } })).status()).toBe(200);
+    expect((await page.request.post(`/api/files/${fileId}/complete`)).ok()).toBe(true);
+
+    // Someone else attaches the same file as their work.
+    await openNew(page, freshName("str"));
+    await page.getByRole("button", { name: "Add the work" }).click();
+    const s = sheet(page, "work");
+    await expect(s).toBeVisible();
+    await s.locator("input[aria-label='Choose a file']").setInputFiles({ name: "my-report.txt", mimeType: "text/plain", buffer: notes });
+    const prompt = page.getByTestId("match-prompt");
+    await expect(prompt.getByRole("heading", { name: "This file is already on someone else's exhbt" })).toBeVisible();
+    // Above the sheet, with the focus in it, and a real press reaches it (no `intercepts pointer events`).
+    await expect(prompt.getByRole("button", { name: "Ask to join" })).toBeFocused();
+    expect(await prompt.evaluate((el) => el.matches(":modal"))).toBe(true);
+    await prompt.getByRole("button", { name: "Ask to join" }).click();
+    await expect(prompt.getByLabel(/Your part in it/)).toBeVisible();
+    await expect(s).toBeAttached();
+    await prompt.getByRole("button", { name: "Back" }).click();
+    await prompt.getByRole("button", { name: "Decide later" }).click();
+    await expect(prompt).toHaveCount(0);
+    // Back in the sheet, which stayed open with the file attached, the focus inside it.
+    await expect(s).toBeVisible();
+    await expect(s.getByText("File attached:")).toBeVisible();
+    expect(await s.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(s).toBeHidden();
+  });
+});
