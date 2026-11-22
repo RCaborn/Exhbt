@@ -248,6 +248,23 @@ test.describe("the bar's actions", () => {
     expect(await undoLabel(page)).toBeNull();
   });
 
+  test("the Add a skill box has an Add button of 44px; it makes the typed words a skill", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    // The sample is at the most skills a page holds; take two off so there is room.
+    await page.evaluate(() => window.__exhbtEditor!.patchDoc((d) => ({ ...d, skills: d.skills.slice(0, 3) })));
+    const before = (await docNow(page)).skills;
+    expect(before).toHaveLength(3);
+    const add = page.locator(`${READY} [data-path="skills"] button`, { hasText: /^Add/ });
+    await expect(add).toBeVisible();
+    const box = await add.boundingBox();
+    expect(box!.width).toBeGreaterThanOrEqual(44);
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+    await page.locator(`${READY} #skill-new`).fill("Stakeholder interviews");
+    await add.tap();
+    await expect.poll(async () => (await docNow(page)).skills).toEqual([...before, "Stakeholder interviews"]);
+  });
+
   test("a tapped skill is named on the bar with Remove; the pills' own remove buttons are hidden", async ({ page }) => {
     await openTiming(page, "case-study", { full: true });
     await waitLive(page);

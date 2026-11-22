@@ -20,6 +20,7 @@ import { canPublish, getPlan } from "@/lib/plan";
 import { mediaFor, portfolioLook } from "@/lib/portfolio";
 import { themeFor } from "@/lib/portfolio-themes";
 import { rewriteAllowance } from "@/lib/rewriting";
+import { teamFor } from "@/lib/team";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
 
@@ -125,6 +126,9 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
         // The look the person's public pages use (as app/(portfolio)/p/[username]/[slug]/layout.tsx gets it); with no username yet, the one their plan allows.
         theme={profile.username ? await portfolioLook(profile.username) : themeFor(profile, plan)}
         reportFiles={await reportFilesOf(user.id, record.id)}
+        // What "See as a visitor" draws as the public page does: the team byline and the date beside the checks.
+        team={await teamFor(record, onAppHost && profile.username ? portfolioHost(profile.username) : (await headers()).get("host"))}
+        publishedAt={record.publishedAt}
       />
     )}
     </>

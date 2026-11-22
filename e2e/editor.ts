@@ -239,11 +239,11 @@ export async function fillValid(page: Page, title: string) {
 }
 
 /**
- * Waits for the autosave after the last change. The status words are "Saving…" then "Saved" (a `role=status`);
+ * Waits for the autosave after the last change. The status words are "Saving…" then "Saved";
  * the save can land before the first looks, so `mustSeeSaving` defaults to false here.
  */
 export async function waitForSave(page: Page, opts: { mustSeeSaving?: boolean } = {}) {
-  if (opts.mustSeeSaving) await expect(page.locator(`${READY} [role=status]`, { hasText: SEL.saving })).toBeVisible();
+  if (opts.mustSeeSaving) await expect(page.locator(`${READY} .xe-save`, { hasText: SEL.saving })).toBeVisible();
   await waitSavedNow(page);
 }
 

@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { slugify, uniqueSlug, SLUG_MAX } from "../lib/exhbt/slug";
 import { docToRuns, runsToDoc } from "../lib/exhbt/richtext-tiptap";
 import { LIMITS } from "../lib/exhbt/blocks";
-import { addGraphSection, addSkill, box, fieldAt, fillBox, fillContext, fillFinding, fillPlain, fillTitle, finding, openPublishSheet, publishSheet, reviewButton, seeAsVisitor, signInAs, startFromScratch, visitorRegion, waitForSave, waitEditor } from "./editor";
+import { addGraphSection, addSkill, box, closeSheet, fieldAt, fillBox, fillContext, fillFinding, fillPlain, fillTitle, fillValid, finding, openPublishSheet, publish, publishSheet, reviewButton, seeAsVisitor, signInAs, startFromScratch, visitorRegion, waitForSave, waitEditor } from "./editor";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -170,11 +170,47 @@ test.describe("the exhbt editor", () => {
     await expect(page.getByRole("button", { name: "Start from scratch" })).toHaveCount(0);
   });
 
+  test("See as a visitor draws the article the public page draws: Save as PDF, the checked-on date, the checks link", async ({ page }) => {
+    await signInAs(page, "vera", "premium");
+    await startFromScratch(page);
+    await fillValid(page, "Would a second till help at lunch?");
+    await waitForSave(page);
+    // A draft first: no date yet, so the preview shows the day it would say if it went live now.
+    await seeAsVisitor(page, true);
+    const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    await expect(visitorRegion(page)).toContainText(`Checked by exhbt, ${today}`);
+    await expect(visitorRegion(page).getByRole("button", { name: /Save as PDF/ })).toBeVisible();
+    await expect(page.locator("[data-visitor-signoff]").getByLabel("Made with exhbt")).toBeVisible();
+    await seeAsVisitor(page, false);
+
+    await publish(page);
+    const live = (await publishSheet(page).getByRole("link", { name: /^\/p\/vera\// }).textContent())!.trim();
+    await closeSheet(page);
+    await seeAsVisitor(page, true);
+    // What each page is made of: the elements and their classes in order (headings sit one level lower in the editor), and the words.
+    const read = () =>
+      page.locator("article[data-exhbt-page]").evaluate((a) => ({
+        shape: [a, ...a.querySelectorAll("*")].map((e) => `${/^H[1-3]$/.test(e.tagName) ? "H" : e.tagName}.${[...e.classList].sort().join(".")}`),
+        words: (a as HTMLElement).innerText,
+      }));
+    const preview = await read();
+    await page.goto(live);
+    await expect(page.getByRole("heading", { level: 1, name: "Would a second till help at lunch?" })).toBeVisible();
+    const publicPage = await read();
+    expect(publicPage.words).toContain("Save as PDF");
+    expect(publicPage.words).toContain("Checked by exhbt");
+    expect(preview.words).toBe(publicPage.words);
+    expect(preview.shape).toEqual(publicPage.shape);
+  });
+
   test("a title over the limit shows the issue beside it and blocks publishing", async ({ page }) => {
     await signInAs(page, "lena", "premium");
     await startFromScratch(page);
-    // The title field stops typing at the limit (maxLength), so an over-long title can only come from outside the field (here, the store).
-    await page.evaluate((words) => window.__exhbtEditor!.setAt("title", words), "A".repeat(LIMITS.titleChars + 5));
+    // The title field does not cut what is typed or pasted: past the limit it says so, and publishing waits.
+    const long = "A".repeat(LIMITS.titleChars + 5);
+    await page.locator("#title").click();
+    await page.keyboard.type(long);
+    await expect(page.locator("#title")).toHaveValue(long);
     await expect(page.locator("#title-issue")).toContainText(`Keep the title to ${LIMITS.titleChars} characters.`);
     await openPublishSheet(page);
     await page.getByLabel("This is my work, and the numbers are true").check();

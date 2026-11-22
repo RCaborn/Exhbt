@@ -67,6 +67,8 @@ export function Insert({ at, end }: InsertSlot) {
   }, [open]);
 
   const choose = (run: () => void) => {
+    // The item pressed is about to unmount; the "+" stays, so a sheet that opens next records it as its opener.
+    button.current?.focus({ preventScroll: true });
     setOpen(null);
     run();
   };

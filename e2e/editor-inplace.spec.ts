@@ -153,6 +153,20 @@ test.describe("a new exhbt in the new editor", () => {
     expect(await undoLabel(page)).toBeNull();
   });
 
+  test("text typed in the Add a skill box is kept as a skill when the person moves on, and stored", async ({ page }) => {
+    const id = await openNew(page, freshName("skillblur"));
+    const box = page.locator(`${READY} #skill-new`);
+    await box.fill("Python");
+    // No Enter, no comma: the focus just moves to the title.
+    await page.locator(`${READY} [data-path="title"]`).first().click();
+    await expect(box).toHaveValue("");
+    await expect.poll(async () => (await docNow(page)).skills).toContain("Python");
+    await waitSaved(page, id);
+    expect((await readStored(page, id)).working.skills).toContain("Python");
+    // There is no Add button with a mouse: it is for touch screens.
+    await expect(page.locator(`${READY} [data-path="skills"] button`, { hasText: /^Add/ })).toBeHidden();
+  });
+
   test("a picture can be added: it goes on the page and is stored", async ({ page }) => {
     const id = await openNew(page, freshName("picture"));
     await page.locator(`${READY} input[aria-label='Choose an image']`).setInputFiles({ name: "queue.png", mimeType: "image/png", buffer: png(4, 3) });
@@ -786,10 +800,13 @@ test.describe("the status line", () => {
   });
 });
 
+/** The stale editor's words as the top bar's save status draws them (its live region says them too, out of sight). */
+const staleWords = (page: Page) => page.locator(`${READY} .xe-save-words`, { hasText: "The editor was updated. Reload to carry on; your changes are kept in this browser." });
+
 test("a stale editor: a save that fails for another reason than the network says to reload", async ({ page }) => {
   await openDoc(page, freshName("stale"), sampleDoc("case-study"), { query: "?save=stale" });
   await typeIn(page, "title", "A change that cannot be saved");
-  await expect(page.getByText("The editor was updated. Reload to carry on; your changes are kept in this browser.")).toBeVisible();
+  await expect(staleWords(page)).toBeVisible();
   await expect(page.getByRole("button", { name: "Reload" })).toBeVisible();
 });
 
@@ -826,7 +843,7 @@ test.describe("a save the server fails (the review's data-safety-2)", () => {
       return route.fulfill({ status: 404, headers: { "x-nextjs-action-not-found": "1" }, contentType: "text/plain", body: "Server action not found." });
     });
     await typeIn(page, "title", "A change for an older editor");
-    await expect(page.getByText(STALE)).toBeVisible();
+    await expect(staleWords(page)).toBeVisible();
     await expect(page.getByRole("button", { name: "Reload" })).toBeVisible();
     await page.waitForTimeout(3000);
     expect(posts).toBe(1);
@@ -982,7 +999,7 @@ test("a copy kept in this browser that never reached the server is offered back;
   // A stale editor: the change is kept in this browser, and the server never gets it.
   const { id } = await openDoc(page, freshName("backup"), sampleDoc("case-study"), { query: "?save=stale" });
   await typeIn(page, "title", "Words the server never got");
-  await expect(page.getByText("The editor was updated. Reload to carry on; your changes are kept in this browser.")).toBeVisible();
+  await expect(staleWords(page)).toBeVisible();
   // Leaving asks first while something is unsaved: say yes.
   page.on("dialog", (d) => void d.accept());
   await page.goto(`/exhbts/${id}/edit`);

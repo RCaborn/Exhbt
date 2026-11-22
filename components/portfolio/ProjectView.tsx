@@ -215,7 +215,7 @@ export function ProjectView({
           {team}
 
           <H className={`xp-title xp-display ${leads ? "mt-3 @2xl/main:mt-5" : "mt-5"} text-[clamp(2rem,7cqi,3.4rem)] leading-[1.02] text-balance print:mt-2 print:text-[2rem]${edit ? " relative" : ""}`}>
-            {edit ? edit.text({ path: "title", value: doc.title, label: copy.title, placeholder: copy.emptyTitle, id: "title", maxChars: L.titleChars }) : doc.title}
+            {edit ? edit.text({ path: "title", value: doc.title, label: copy.title, placeholder: copy.emptyTitle, id: "title" }) : doc.title}
             {edit?.tools({ block: "header" })}
           </H>
           {edit ? (

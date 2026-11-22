@@ -215,6 +215,8 @@ const SkillsEdit = memo(function SkillsEdit() {
           maxLength={LIMITS.skills.charsEach}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          // What is typed is kept when the person moves on, so it is not lost with the box (data-safety-4).
+          onBlur={add}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === ",") {
               e.preventDefault();
@@ -222,6 +224,19 @@ const SkillsEdit = memo(function SkillsEdit() {
             }
           }}
         />
+        {/* A phone keyboard often has no comma: on a touch screen the box has an Add button, 44px. */}
+        <button
+          type="button"
+          data-edit-only
+          className="hidden min-h-11 min-w-11 items-center justify-center rounded-full bg-ink px-4 text-sm font-medium text-white pointer-coarse:inline-flex"
+          onClick={() => {
+            add();
+            document.getElementById("skill-new")?.focus({ preventScroll: true });
+          }}
+        >
+          Add
+          <span className="sr-only"> skill</span>
+        </button>
       </li>
     </ul>
   );
