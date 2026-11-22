@@ -1,7 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { SCHEMA_VERSION, text, type ExhbtDoc } from "../lib/exhbt/blocks";
 import { flushPending, notePending, registerSender } from "../components/exhbt-editor/pending";
-import { SEL } from "./editor";
+import { SEL } from "./editor-classic-helpers";
 
 // The way back to the classic editor (decision 0026, "The classic editor: the switch, the fallback, the escape";
 // docs/briefs/edit-on-page/README.md, "The kill switch, and how it is tested"): the switch (EXHBT_EDITOR, which
