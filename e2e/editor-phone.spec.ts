@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { plain, type RichText } from "../lib/exhbt/blocks";
+import { plain, text, type ExhbtDoc, type RichText, type Section } from "../lib/exhbt/blocks";
 import { FORMAT_RULES } from "../lib/exhbt/formats";
 import {
   allowEditOnly,
@@ -158,8 +158,12 @@ test.describe("each section shows only its grip", () => {
     expect(await page.evaluate(() => [window.innerWidth, document.documentElement.scrollWidth - document.documentElement.clientWidth])).toEqual([page.viewportSize()!.width, 0]);
     for (const name of ["Move Graph 1 up", "Move Graph 1 down", "Remove Graph 1", "Reorder sections"]) await expect(onBar(page, name)).toBeVisible();
 
-    // A tap on a part with no field (the graph's drawing) follows it too.
-    await frame(page, "graph-2").locator("svg").first().tap();
+    // A tap on a part with no field follows it too: the graph's drawing (which opens its figures; closed, the bar is on it).
+    await frame(page, "graph-2").locator(".xe-fig-graph").tap();
+    const chart = page.locator(`${READY} dialog[data-sheet="chart"]`);
+    await expect(chart).toBeVisible();
+    await chart.getByRole("button", { name: "Close" }).tap();
+    await expect(chart).toBeHidden();
     await expect(bar(page)).toHaveAttribute("aria-label", "Graph 2: tools");
 
     // The flowchart in a case study has no Remove (the layout always has one).
@@ -688,4 +692,130 @@ test("a drafted part: the bar offers its More actions, and the menu opens above 
   expect(sizes.every((h) => h >= 44)).toBe(true);
   await bar(page).getByRole("button", { name: "Cancel" }).tap();
   await expect(form).toHaveCount(0);
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * At 390px: J's figures, pictures and links; the figures sheet; the top bar's menu
+ * ---------------------------------------------------------------------------------------------- */
+
+test.describe("figures, pictures and links at 390px", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  /** Every visible control in `root` under 44px tall, by name. */
+  const small = (root: Locator) =>
+    root.evaluate((el) =>
+      [...el.querySelectorAll<HTMLElement>('button, select, input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]), label:has(input[type="radio"]), label:has(input[type="checkbox"])')]
+        .filter((c) => c.getClientRects().length > 0 && !c.closest(".sr-only"))
+        .map((c) => ({ name: c.getAttribute("aria-label") ?? c.textContent?.trim().slice(0, 30) ?? c.tagName, h: c.getBoundingClientRect().height }))
+        .filter((c) => Math.round(c.h) < 44)
+        .map((c) => `${c.name} (${Math.round(c.h)}px)`),
+    );
+  const inScreen = async (page: Page, l: Locator) => {
+    const r = await rect(l);
+    const w = page.viewportSize()!.width;
+    return r.left >= -0.5 && r.right <= w + 0.5 && r.top >= -0.5;
+  };
+  const overlap = (a: DOMRect, b: DOMRect) => a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom;
+
+  test("the chips clear the grips and the +; a picked figure's label clears its grip and opens its strip; Web address opens in the screen; the figures sheet fills the screen with 44px controls", async ({ page }) => {
+    const picked: Section = { id: "image-1", kind: "image", fileId: "x", alt: "", caption: text("Missed appointments by reminder time"), w: 1200, h: 700, picked: { from: "report.pdf", page: 3, box: { x: 0, y: 0, w: 1, h: 0.5 }, shareOk: false } };
+    const doc = full({ ...sampleDoc("case-study"), sections: [...sampleDoc("case-study").sections, picked] } as ExhbtDoc);
+    await openDoc(page, freshName("phonefig"), doc);
+    await waitLive(page);
+
+    // No chip ("Edit figures", "Web address") lies over a grip, a "+" or a flowchart box's tools.
+    const clashes = await page.evaluate(() => {
+      const others = [...document.querySelectorAll('[data-editor="page"] :is([data-grip], .xe-plus, .xe-flow-chip)')].map((o) => ({ name: o.getAttribute("aria-label"), r: o.getBoundingClientRect() }));
+      return [...document.querySelectorAll('[data-editor="page"] .xe-fig-corner')].flatMap((c) => {
+        const r = c.getBoundingClientRect();
+        return others.filter((o) => o.r.width && r.right > o.r.left && r.left < o.r.right && r.bottom > o.r.top && r.top < o.r.bottom).map((o) => `${c.getAttribute("aria-label")} over ${o.name}`);
+      });
+    });
+    expect(clashes).toEqual([]);
+
+    // The picked figure: its label clears the picture's grip; a tap on its source opens the strip, in the screen, and ticks nothing.
+    const fig = frame(page, "image-1");
+    await fig.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    const label = fig.locator(".xe-fig-picked");
+    expect(overlap(await rect(label), await rect(grip(page, "image-1")))).toBe(false);
+    await fig.locator(".xe-fig-picked-open").tap();
+    const strip = fig.locator("[popover]").first();
+    await expect(strip).toBeVisible();
+    expect(await inScreen(page, strip)).toBe(true);
+    expect(((await docNow(page)).sections.find((s) => s.id === "image-1") as { picked: { shareOk: boolean } }).picked.shareOk).toBe(false);
+    await page.keyboard.press("Escape");
+    await expect(strip).toBeHidden();
+    // Its description field is there, under the picture.
+    await expect(fig.locator('[data-edit-only="image-description"]')).toBeVisible();
+
+    // A link's Web address: its popover in the screen, above the bar, the cursor in its field.
+    const link = frame(page, "link-1");
+    await link.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await link.locator(".xe-fig-corner").tap();
+    const pop = link.locator("[popover]").first();
+    await expect(pop).toBeVisible();
+    expect(await inScreen(page, pop)).toBe(true);
+    expect((await rect(pop)).bottom).toBeLessThanOrEqual((await rect(bar(page))).top);
+    await expect(pop.locator("input")).toBeFocused();
+    await page.keyboard.press("Escape");
+
+    // The figures sheet: the whole screen, nothing sideways, the close within a thumb's reach, every control 44px.
+    const graph = frame(page, "graph-1");
+    await graph.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await graph.locator(".xe-fig-corner").tap();
+    const chart = page.locator(`${READY} dialog[data-sheet="chart"]`);
+    await expect(chart).toBeVisible();
+    expect(await rect(chart)).toMatchObject({ x: 0, y: 0, width: 390, height: 844 });
+    expect(await chart.evaluate((d) => d.scrollWidth - d.clientWidth)).toBeLessThanOrEqual(0);
+    const close = await rect(chart.getByRole("button", { name: "Close" }));
+    expect([Math.round(close.width), Math.round(close.height)]).toEqual([44, 44]);
+    expect(await small(chart)).toEqual([]);
+    expect(await scan(page)).toEqual([]);
+  });
+
+  test("Take a figure from my report: the sheet fills the screen, its page picker and crop take a thumb", async ({ page }) => {
+    // Drafts from a report (its pick made to fail, so nothing is picked) and draws its pages: several routes compiled for the first time in development.
+    test.setTimeout(180_000);
+    await page.route("**/api/exhbts/figure-pick", (r) => r.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "We couldn't pick a figure just now." }) }));
+    const username = freshName("phonetake");
+    await page.goto(`/dev/portfolio?username=${username}&plan=premium&count=0`);
+    await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts/new`);
+    await expect(page.locator("form[data-ready=true]")).toBeAttached();
+    await page.locator("#files").setInputFiles("e2e/fixtures/report-with-chart.pdf");
+    await expect(page.getByTestId("file-status")).toContainText("uploaded");
+    await page.getByRole("button", { name: "Draft my exhbt" }).click();
+    await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit/, { timeout: 120_000 });
+    await expect(page.locator(READY)).toBeAttached();
+
+    await onBar(page, "Add a section at the end").tap();
+    const item = page.locator(`${READY} [data-xe-menu] [data-block="figure"]`);
+    await expect(item).toBeEnabled();
+    await item.tap();
+    const take = page.locator(`${READY} dialog[data-sheet="figure"]`);
+    await expect(take).toBeVisible();
+    expect(await rect(take)).toMatchObject({ x: 0, y: 0, width: 390, height: 844 });
+    const picker = take.getByTestId("page-picker");
+    await expect(picker.getByRole("button", { name: /^Page \d/ })).toHaveCount(4);
+    expect(await take.evaluate((d) => d.scrollWidth - d.clientWidth)).toBeLessThanOrEqual(0);
+    expect(await small(take)).toEqual([]);
+    await picker.getByRole("button", { name: "Page 3", exact: true }).tap();
+    const cropper = take.getByTestId("cropper");
+    await expect(cropper.getByRole("img", { name: "Page 3 of report-with-chart.pdf" })).toBeVisible({ timeout: 60_000 });
+    expect(await take.evaluate((d) => d.scrollWidth - d.clientWidth)).toBeLessThanOrEqual(0);
+    expect(await small(take)).toEqual([]);
+    await expect(take.getByRole("button", { name: "Close" })).toBeVisible();
+  });
+
+  test("the top bar's menu: Delete this exhbt, and its question, take a 44px press", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    await page.getByRole("button", { name: "Menu" }).tap();
+    const menu = page.locator(`${READY} .xe-menu-items`);
+    await expect(menu.getByRole("button", { name: "Delete this exhbt" })).toBeVisible();
+    expect(await small(menu)).toEqual([]);
+    await menu.getByRole("button", { name: "Delete this exhbt" }).tap();
+    await expect(menu.getByRole("button", { name: "Yes, delete" })).toBeVisible();
+    expect(await small(menu)).toEqual([]);
+    await menu.getByRole("button", { name: "Cancel" }).tap();
+  });
 });
