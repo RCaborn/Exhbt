@@ -294,14 +294,23 @@ function UndoKeys(): ReactNode {
 
 const FIELDS = 'textarea, input:not([type=file]):not([type=hidden]), [contenteditable]:not([contenteditable="false"]), [role=textbox]';
 
-/** Where the focus goes after an undo: a box's words (or the flowchart, the box gone), else the section's first field, its grip, or the frame itself. */
+/**
+ * Where the focus goes after an undo: a box's words (or the flowchart, the box gone), else the section's first field,
+ * its grip, or the frame itself. Under a finger the grip (the box's or the section's) comes before the words, so a
+ * phone's or a tablet's keyboard does not open on its own.
+ */
 function undoneTarget(subject: string | null, box: string | null): HTMLElement | null {
   const page = document.querySelector<HTMLElement>('[data-editor="page"]');
   if (!page || !subject) return null;
-  if (box !== null) return page.querySelector<HTMLElement>(`[data-flow-step="${CSS.escape(box)}"] [data-path$=".step"]`) ?? page.querySelector<HTMLElement>('[data-path="flow"]');
+  const finger = window.matchMedia("(pointer: coarse)").matches;
+  if (box !== null) {
+    const step = page.querySelector<HTMLElement>(`[data-flow-step="${CSS.escape(box)}"]`);
+    return (finger ? step?.querySelector<HTMLElement>("[data-flow-grip]") : null) ?? step?.querySelector<HTMLElement>('[data-path$=".step"]') ?? page.querySelector<HTMLElement>('[data-path="flow"]');
+  }
   const frame = page.querySelector<HTMLElement>(`[data-section-id="${CSS.escape(subject)}"]`);
   if (!frame) return null;
-  const inner = frame.querySelector<HTMLElement>(FIELDS) ?? frame.querySelector<HTMLElement>("[data-grip]");
+  const grip = frame.querySelector<HTMLElement>("[data-grip]");
+  const inner = (finger ? grip : null) ?? frame.querySelector<HTMLElement>(FIELDS) ?? grip;
   if (inner) return inner;
   if (!frame.hasAttribute("tabindex")) frame.tabIndex = -1;
   return frame;

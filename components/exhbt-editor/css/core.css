@@ -517,9 +517,16 @@
   .xe-pill:focus-within > .xe-pill-remove {
     opacity: 1;
   }
+  /* Under a finger: always shown, 18px to the eye and a 44px press, over the pills beside it. */
   @media (pointer: coarse) {
     .xe-pill-remove {
+      z-index: 1;
       opacity: 1;
+    }
+    .xe-pill-remove::before {
+      content: "";
+      position: absolute;
+      inset: -0.8125rem;
     }
   }
   /* The "Add a skill" box: a pill the size of its words (or of "Add a skill"). */
