@@ -172,7 +172,8 @@ test.describe("each section shows only its grip", () => {
     const why = "A case study always has a flowchart. Choose another layout to take it off.";
     await expect(onBar(page, "Remove Flowchart")).toHaveAttribute("aria-disabled", "true");
     await expect(onBar(page, "Remove Flowchart")).toHaveAccessibleDescription(why);
-    await onBar(page, "Remove Flowchart").tap();
+    // aria-disabled, so Playwright won't tap it unless told: a person can.
+    await onBar(page, "Remove Flowchart").tap({ force: true });
     await expect(bar(page).getByText(why)).toBeVisible();
     await expect(frame(page, "flow")).toBeVisible();
 

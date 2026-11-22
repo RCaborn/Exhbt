@@ -292,7 +292,8 @@ test.describe("each section's toolbar, at 1440 wide", () => {
       await expect(remove).toHaveAccessibleDescription(WHY[f]);
       await expect(remove).toHaveAttribute("data-tip", WHY[f]);
       await frame(page, "flow").hover();
-      await remove.click();
+      // aria-disabled, so Playwright won't press it unless told: a person can.
+      await remove.click({ force: true });
       await expect(said(page)).toHaveText(WHY[f]);
       expect(await pageOrder(page)).toEqual(order);
       // Shown as well as said: the reason in its tooltip, while the button keeps the focus.
@@ -314,8 +315,17 @@ test.describe("each section's toolbar, at 1440 wide", () => {
       );
     // One stop each, the grip.
     for (const s of await stops()) expect(s).toEqual([expect.stringMatching(/^Drag .* to move it$/)]);
-    const id = "quote-1";
+    // Inside a graph's corner the toolbar runs leftwards from its grip: the left arrow goes along it.
+    const corner = frame(page, "graph-1").locator(":scope > .xe-tools");
+    await grip(page, "graph-1").focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(corner.locator('[data-tool="up"]')).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    await expect(grip(page, "graph-1")).toBeFocused();
+    // Above its corner, left to right from the grip.
+    const id = "reflection-1";
     const tools = frame(page, id).locator(":scope > .xe-tools");
+    await expect(tools).not.toHaveAttribute("data-place", "inside");
     const name = await nameOf(page, id);
     await grip(page, id).focus();
     await page.keyboard.press("ArrowRight");

@@ -290,9 +290,18 @@
       max-width: calc(100% - var(--xe-inset) - 0.5rem);
       padding-bottom: 0;
     }
+    /* Half over the section's top edge, where the gap above holds that half (Toolbar.tsx measures): a row of buttons is 36px, 44px on a touch screen. */
+    .xe-frame > .xe-tools[data-place="edge"] {
+      top: -1.125rem;
+      bottom: auto;
+      padding-bottom: 0;
+    }
     /* A flowchart's boxes carry their own grip and Remove on their right edges (flow.css): the section's toolbar keeps clear of them. */
     .xe-frame[data-kind="flow"] > .xe-tools[data-place="inside"] {
       --xe-inset: var(--xe-tools-right, 2rem);
+    }
+    .xe-frame[data-kind="flow"] > .xe-tools[data-place="edge"] {
+      right: 2rem;
     }
     /* A figure picked from the report has its label along the picture's top edge (figures.css): the toolbar sits under it. */
     .xe-frame[data-kind="image"]:has(.xe-fig-picked) > .xe-tools {
@@ -443,6 +452,10 @@
   @media (pointer: coarse) and (min-width: 48rem) {
     .xe-frame[data-as="tile"]:not(:focus-within) > .xe-tools > [data-tool] {
       display: none;
+    }
+    /* Half over the top edge: half of a 44px row. */
+    .xe-frame > .xe-tools[data-place="edge"] {
+      top: -1.375rem;
     }
   }
 

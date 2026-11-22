@@ -25,7 +25,8 @@ import type { Store } from "./store-core";
  * find them.
  *
  * Where it sits (css/core.css): above the section's top right corner, in the gap over it, where the
- * gap holds it; inside that corner where it would cover the words above it. A picture's and a graph's
+ * gap holds it; half over the section's top edge where the gap holds half of it; inside that corner
+ * where even that would cover the words above it. A picture's and a graph's
  * toolbar is always inside its corner, as in the prototype Rory tried, so in the gallery's grid it
  * never lies over the caption of the picture above. For the rest the gap is measured (`placeTools`).
  */
@@ -65,8 +66,9 @@ let queued = 0;
 /**
  * For every toolbar not inside by its kind: would it, above its section's corner, lie over any other
  * section or the words above the first row (the skills, the title, the context line)? Then it goes
- * inside the corner (data-place="inside"). Written straight to the toolbar, so nothing draws again;
- * it changes only when the page's rows or width do.
+ * half over the section's top edge (data-place="edge"), or where that would too, inside the corner
+ * (data-place="inside"). Written straight to the toolbar, so nothing draws again; it changes only when
+ * the page's rows or width do.
  */
 function placeTools() {
   queued = 0;
@@ -116,17 +118,24 @@ function placeTools() {
     // A row of buttons is the grip's height ("More actions" wraps its button in parts that may be taller, and never shows them there).
     const height = (tools.querySelector<HTMLElement>("[data-grip]")?.offsetHeight ?? 0) + bridge;
     const f = boxes.get(frame) ?? pageBox(frame);
-    const above = { x: f.x + f.w - width, y: f.y - height, w: width, h: height };
-    const covers = [...boxes].some(([el, b]) => el !== frame && b.w > 0 && b.h > 0 && overlap(above, b));
-    if (!covers) {
+    const clear = (b: Box) => ![...boxes].some(([el, o]) => el !== frame && o.w > 0 && o.h > 0 && overlap(b, o));
+    tools.style.removeProperty("--xe-tools-right");
+    if (clear({ x: f.x + f.w - width, y: f.y - height, w: width, h: height })) {
       tools.removeAttribute("data-place");
-      tools.style.removeProperty("--xe-tools-right");
+      continue;
+    }
+    // A flowchart's toolbar keeps clear of its boxes' own grips and Removes on their right edges (flow.css).
+    const right = frame.dataset.kind === "flow" ? 32 : 0;
+    const buttons = height - bridge;
+    // Half over the section's top edge, where the gap holds that half (a stack's second part, the first row under the context
+    // line): it covers no more of the section's own top than its first line's right end.
+    if (clear({ x: f.x + f.w - right - width, y: f.y - buttons / 2, w: width, h: buttons })) {
+      tools.setAttribute("data-place", "edge");
       continue;
     }
     tools.setAttribute("data-place", "inside");
     // Inside the corner, it keeps clear of the chips there (a reference line's "Web address" sits on the rule under it, and the one above's on the rule over it).
-    const right = frame.dataset.kind === "flow" ? 32 : 8;
-    const inside = { x: f.x + f.w - right - width, y: f.y + 8, w: width, h: height - bridge };
+    const inside = { x: f.x + f.w - Math.max(right, 8) - width, y: f.y + 8, w: width, h: buttons };
     const chips = [...boxes].filter(([el, b]) => el.matches(CHIPS) && b.w > 0 && overlap(inside, b)).map(([, b]) => b);
     if (chips.length) tools.style.setProperty("--xe-tools-right", `${Math.ceil(f.x + f.w - Math.min(...chips.map((b) => b.x)) + 4)}px`);
     else tools.style.removeProperty("--xe-tools-right");
