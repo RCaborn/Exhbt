@@ -10,6 +10,11 @@
     [data-editor="page"] .xe-add-finding {
       left: 3.25rem;
     }
+    /* A sheet's close button takes a thumb. */
+    .xe-sheet-close {
+      width: 2.75rem;
+      height: 2.75rem;
+    }
   }
 
   @media (max-width: 47.99rem) and (pointer: coarse) {
@@ -82,12 +87,6 @@
     /* While a section is carried the bar steps aside: the foot of the screen is where the page scrolls itself. */
     [data-editor="page"]:has([data-xe-drag]) > .xe-phonebar {
       visibility: hidden;
-    }
-
-    /* ---------- Sheets fill the screen; their close button takes a thumb ---------- */
-    .xe-sheet-close {
-      width: 2.75rem;
-      height: 2.75rem;
     }
   }
 
