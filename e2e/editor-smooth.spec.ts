@@ -134,7 +134,8 @@ test("a move draws the shell again and no section's part, and every field's path
 });
 
 test("the field-sizing fallback: a field that wraps to three lines is the same size with the mirror", async ({ page }) => {
-  const words = "Would a second till at lunch, opened for the busiest hour on weekdays, cut the queue by half for students and staff?";
+  // Within the title's 80 characters: the field no longer cuts what is typed at 80 (5a8ff46), so a longer title wrapped to four lines.
+  const words = "Would a second till, open in the busiest hour on weekdays, cut the lunch queue?";
   const measure = async (grow?: "mirror") => {
     await openTiming(page, "case-study", { grow });
     const title = field(page, "title");
