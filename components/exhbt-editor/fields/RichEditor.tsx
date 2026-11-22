@@ -111,11 +111,14 @@ export default function RichEditor({ slot, id, at, focusOnReady, issue, onReady,
     if (editor && !sameRuns(slot.value, docToRuns(editor.getJSON() as TiptapNode))) editor.commands.setContent(runsToDoc(slot.value), { emitUpdate: false });
   }, [editor, slot.value]);
 
-  // Ready: the field is the editor now. Started by the person, it takes the cursor where they clicked (or at the end).
+  // Ready: the field is the editor now. Started by the person, it takes the cursor where they clicked (or at the end),
+  // unless they have gone on to another field while it loaded: then the cursor stays where they are.
   useEffect(() => {
     if (!editor) return;
     onReady();
-    if (wantsFocus.current || document.activeElement === editor.view.dom.closest(".xe-rich")) {
+    const active = document.activeElement;
+    const own = editor.view.dom.closest(".xe-rich");
+    if ((active && own?.contains(active)) || (wantsFocus.current && (!active || active === document.body))) {
       const p = at.current;
       const pos = p ? editor.view.posAtCoords({ left: p.x, top: p.y })?.pos : undefined;
       editor.commands.focus(pos ?? "end");
