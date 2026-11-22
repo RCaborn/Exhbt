@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, useLayoutEffect, useRef, useSyncExternalStore } from "react";
+import { createContext, memo, useContext, useLayoutEffect, useRef, useSyncExternalStore } from "react";
 import type { TextSlot } from "@/components/portfolio/page-ctx";
+import { useFieldPath } from "../Frame";
 import { useStore } from "../store";
 import { IssueNote, issueId, useFieldIssue } from "./issues";
 
@@ -41,8 +42,11 @@ const oneLine = (s: string) => s.replace(/\r?\n/g, " ");
 
 type Props = { path: string; value: string; label: string; placeholder: string; id: string; maxChars?: number; issue: string; onText(t: string): void };
 
-export function InlineText({ path, value, label, placeholder, id, maxChars }: TextSlot) {
+/** Memoised: the page parts draw it with plain values, so it draws again only when its own words, name or place change. */
+export const InlineText = memo(function InlineText({ path: given, value, label, placeholder, id, maxChars }: TextSlot) {
   const store = useStore();
+  // Inside a frame, the path takes the frame's index in doc.sections now (Frame.tsx).
+  const path = useFieldPath(given);
   const domId = id ?? path.replace(/\./g, "-");
   const issue = useFieldIssue(path);
   const props: Props = { path, value, label, placeholder, id: domId, maxChars, issue, onText: (t) => store.setAt(path, t) };
@@ -58,7 +62,7 @@ export function InlineText({ path, value, label, placeholder, id, maxChars }: Te
       <IssueNote id={issueId(domId)} text={issue} />
     </span>
   );
-}
+});
 
 function BlockText({ path, value, label, placeholder, id, maxChars, issue, onText }: Props) {
   const forced = useContext(GrowContext);

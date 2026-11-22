@@ -70,25 +70,32 @@ export default function RichEditor({ slot, id, at, focusOnReady, issue, onReady,
   const [asking, setAsking] = useState(false);
   const [below, setBelow] = useState(false);
   const cell = useRef<HTMLDivElement>(null);
+  // Tiptap compares its options on every render and hands the editor new ones when any differ, which
+  // updates the whole view. The words and the attributes it starts with are kept from the first render,
+  // so a render for anything else (the section moved, so the path changed) costs the editor nothing;
+  // the effects below write what changes.
+  const [start] = useState(() => ({
+    content: runsToDoc(slot.value),
+    editorProps: { attributes: { id, role: "textbox", "aria-multiline": "true", "aria-label": slot.label, "aria-placeholder": slot.placeholder, class: "xe-pm", spellcheck: "true" } },
+  }));
 
   const editor = useEditor({
     immediatelyRender: false,
     injectCSS: false,
     shouldRerenderOnTransaction: false,
     extensions: [OneParagraph, Paragraph, Text, slot.highlight ? Highlight : PageBold, Italic, History, NoNewParagraphs, PageLink],
-    content: runsToDoc(slot.value),
-    editorProps: {
-      attributes: { id, role: "textbox", "aria-multiline": "true", "aria-label": slot.label, "aria-placeholder": slot.placeholder, class: "xe-pm", spellcheck: "true" },
-    },
+    content: start.content,
+    editorProps: start.editorProps,
     onUpdate: ({ editor: e }) => store.setAt(path.current, docToRuns(e.getJSON() as TiptapNode)),
     onFocus: () => setBelow(onFirstLine(cell.current)),
   });
 
-  // The field's name and its issue follow its place ("Finding 2" becomes "Finding 1" when the first is removed).
+  // The field's name, its placeholder and its issue follow its place ("Finding 2" becomes "Finding 1" when the first is removed).
   useEffect(() => {
     const dom = editor?.view.dom;
     if (!dom) return;
     dom.setAttribute("aria-label", slot.label);
+    dom.setAttribute("aria-placeholder", slot.placeholder);
     dom.setAttribute("id", id);
     if (issue) {
       dom.setAttribute("aria-invalid", "true");
@@ -97,18 +104,21 @@ export default function RichEditor({ slot, id, at, focusOnReady, issue, onReady,
       dom.removeAttribute("aria-invalid");
       dom.removeAttribute("aria-describedby");
     }
-  }, [editor, slot.label, id, issue]);
+  }, [editor, slot.label, slot.placeholder, id, issue]);
 
   // Changes from outside (an undo, a rewrite) replace the words; typing doesn't.
   useEffect(() => {
     if (editor && !sameRuns(slot.value, docToRuns(editor.getJSON() as TiptapNode))) editor.commands.setContent(runsToDoc(slot.value), { emitUpdate: false });
   }, [editor, slot.value]);
 
-  // Ready: the field is the editor now. Started by the person, it takes the cursor where they clicked (or at the end).
+  // Ready: the field is the editor now. Started by the person, it takes the cursor where they clicked (or at the end),
+  // unless they have gone on to another field while it loaded: then the cursor stays where they are.
   useEffect(() => {
     if (!editor) return;
     onReady();
-    if (wantsFocus.current || document.activeElement === editor.view.dom.closest(".xe-rich")) {
+    const active = document.activeElement;
+    const own = editor.view.dom.closest(".xe-rich");
+    if ((active && own?.contains(active)) || (wantsFocus.current && (!active || active === document.body))) {
       const p = at.current;
       const pos = p ? editor.view.posAtCoords({ left: p.x, top: p.y })?.pos : undefined;
       editor.commands.focus(pos ?? "end");
