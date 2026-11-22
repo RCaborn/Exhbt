@@ -459,6 +459,34 @@ test("with the keyboard up the bar sits on it, and the line being typed stays cl
  * ---------------------------------------------------------------------------------------------- */
 
 test.describe("reorder sections", () => {
+  test("the sheet's live region is emptied and set again for every message, so words said twice are announced twice", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    await onBar(page, "Reorder sections").tap();
+    await expect(sheet(page)).toBeVisible();
+    const region = sheet(page).locator("[aria-live][data-said]");
+    await expect(region).toHaveCount(1);
+    // What the region holds, each time it changes: an emptied region is not recorded, a set one is.
+    await region.evaluate((el) => {
+      const seen: string[] = [];
+      (window as unknown as { __said: string[] }).__said = seen;
+      new MutationObserver(() => el.textContent && seen.push(el.textContent)).observe(el, { childList: true, characterData: true, subtree: true });
+    });
+    const said = () => page.evaluate(() => (window as unknown as { __said: string[] }).__said);
+    const order = await pageOrder(page);
+    const q = order.indexOf("quote-1");
+    // Up, down, up: the third message is the first one again. Each is its own change of the region's words.
+    const up = `Quote moved up, to place ${q} of ${order.length}.`;
+    const down = `Quote moved down, to place ${q + 1} of ${order.length}.`;
+    await sheet(page).getByRole("button", { name: "Move Quote up" }).tap();
+    await expect(region).toHaveText(up);
+    await sheet(page).getByRole("button", { name: "Move Quote down" }).tap();
+    await expect(region).toHaveText(down);
+    await sheet(page).getByRole("button", { name: "Move Quote up" }).tap();
+    await expect(region).toHaveText(up);
+    expect(await said()).toEqual([up, down, up]);
+  });
+
   test("Reorder opens the sheet; a row moved by its buttons and a row dragged after a short press move the page; Done returns to that section", async ({ page }) => {
     await openTiming(page, "case-study", { full: true });
     await waitLive(page);
