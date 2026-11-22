@@ -77,7 +77,7 @@ export function ProjectView({
   confirmed?: boolean;
   /** Where "Checked by exhbt" explains the checks. On a portfolio host, the marketing site's full address. */
   checksHref?: string;
-  /** The "Save as PDF" link: on the public page, not in the editor's preview. */
+  /** The "Save as PDF" button: on the public page, and drawn the same by the edit-on-page editor (inert while editing, so the two pages match box for box). */
   saveAsPdf?: boolean;
   /** Draws the sections instead (the editor's preview, while arranging them). */
   sectionsSlot?: React.ReactNode;
@@ -105,7 +105,7 @@ export function ProjectView({
       key: "checked",
       done: Boolean(checkedOn),
       label: checkedOn ? (
-        <a href={checksHref} className="xp-link">
+        <a href={checksHref} inert={edit ? true : undefined} className="xp-link">
           Checked by exhbt, {checkedOn}
         </a>
       ) : (
@@ -190,7 +190,8 @@ export function ProjectView({
             </div>
           )}
           {saveAsPdf && (
-            <div className="mt-4 flex justify-center print:hidden">
+            // While editing it is drawn the same but does nothing: nothing on the editing page acts (decision 0026).
+            <div inert={edit ? true : undefined} className="mt-4 flex justify-center print:hidden">
               <PrintButton />
             </div>
           )}
@@ -211,7 +212,13 @@ export function ProjectView({
               ))}
             </ul>
           )}
-          {team}
+          {edit && team ? (
+            <div inert className="contents">
+              {team}
+            </div>
+          ) : (
+            team
+          )}
 
           <H className={`xp-title xp-display ${leads ? "mt-3 @2xl/main:mt-5" : "mt-5"} text-[clamp(2rem,7cqi,3.4rem)] leading-[1.02] text-balance print:mt-2 print:text-[2rem]${edit ? " relative" : ""}`}>
             {edit ? edit.text({ path: "title", value: doc.title, label: copy.title, placeholder: copy.emptyTitle, id: "title" }) : doc.title}

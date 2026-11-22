@@ -168,6 +168,14 @@ export function boxes(page: Page, opts: { frames?: boolean } = {}): Promise<Box[
     // The "Add a skill" box (the stand-in's inert copy, or the editor's field): on EDIT_ONLY_IN_FLOW.
     const addSkill = article.querySelector('[data-edit-only="add-skill"]');
     if (addSkill) add("the Add a skill box", addSkill);
+    // Its Add button on a touch screen (the stand-in's inert copy, or the editor's): on EDIT_ONLY_IN_FLOW too.
+    const addButton = article.querySelector('[data-edit-only="add-skill-button"]');
+    if (addButton && addButton.getClientRects().length > 0) add("the Add a skill box's Add button", addButton);
+    // The sidebar's own parts besides the facts, which the editing page draws as the visitor's page does.
+    for (const [key, sel] of [["Save as PDF", "[data-save-pdf]"], ["the checks", "[data-checks]"], ["the team byline", "[data-team]"]] as const) {
+      const el = article.querySelector(sel);
+      if (el) add(key, el);
+    }
     article.querySelectorAll(".xp-flow-box").forEach((el, i) => add(`flowchart box ${i + 1}`, el));
     article.querySelectorAll("[data-part] li.xp-finding").forEach((el) => add(nth("finding"), el));
     // The editing page's frames, by id (the "nothing moves" checks).
@@ -375,6 +383,8 @@ export const EDIT_ONLY_IN_FLOW: { name: string; selector: string; always: boolea
   // The two edit-only fields, always there while editing.
   { name: "an image's description field", selector: '[data-edit-only="image-description"]', always: true },
   { name: "the Add a skill box", selector: '[data-edit-only="add-skill"]', always: true },
+  // On a touch screen only (hidden with a mouse): the box's Add button, after it on the pills' line, taking its width but no height.
+  { name: "the Add a skill box's Add button", selector: '[data-edit-only="add-skill-button"]', always: true },
   // The placeholders, each there only while its part is empty.
   { name: "the context line", selector: '[data-path="gap"][data-empty]', always: false },
   { name: "What it is", selector: '.xp-fact:has([data-path="context"][data-empty])', always: false },

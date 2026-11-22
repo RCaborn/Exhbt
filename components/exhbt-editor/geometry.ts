@@ -14,6 +14,16 @@ export const PILL = "xp-pill px-2 py-[0.2rem] text-[0.78rem] font-medium";
 /** The skills list's classes, as the page draws it. */
 export const SKILLS_LIST = "flex flex-wrap gap-1 @2xl/main:justify-end";
 
+/**
+ * The "Add a skill" box's Add button, on touch screens only (a phone keyboard often has no comma): a
+ * 44px press with a small chip to the eye. It is after the box on the pills' line and takes its width
+ * there, but no height: its margins are less than a pill's height and it is centred on the line, so no
+ * pill and no line grows. On EDIT_ONLY_IN_FLOW (e2e/page-editor.ts) by name; the stand-in draws it too.
+ */
+export const ADD_SKILL_BUTTON = "hidden min-h-11 min-w-11 -my-3 self-center items-center justify-center pointer-coarse:inline-flex";
+/** The chip inside it, in the look's own ink, as a pill's remove button is (css/core.css). */
+export const ADD_SKILL_CHIP = "rounded-full bg-[var(--xp-ink)] px-2.5 py-[0.2rem] text-[0.78rem] font-medium text-[color:var(--xp-card)]";
+
 /** The edit-mode-only placeholder colour, as an inline style. */
 export const MUTED = { color: "var(--xp-muted)" } as const;
 

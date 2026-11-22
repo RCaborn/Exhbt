@@ -14,7 +14,7 @@ import { ImageExtras } from "./figures/ImageExtras";
 import { LinkExtras } from "./figures/LinkExtras";
 import { useFlowEdit } from "./flow/FlowEdit";
 import { Frame, useFieldPath, useFrame } from "./Frame";
-import { PILL, SKILLS_LIST } from "./geometry";
+import { ADD_SKILL_BUTTON, ADD_SKILL_CHIP, PILL, SKILLS_LIST } from "./geometry";
 import { Insert } from "./Insert";
 import { labelAt } from "./labels";
 import { WorkButton } from "./sheets/WorkButton";
@@ -224,18 +224,20 @@ const SkillsEdit = memo(function SkillsEdit() {
             }
           }}
         />
-        {/* A phone keyboard often has no comma: on a touch screen the box has an Add button, 44px. */}
+        {/* A phone keyboard often has no comma: on a touch screen the box has an Add button, a 44px press that adds no height (geometry.ts). */}
         <button
           type="button"
-          data-edit-only
-          className="hidden min-h-11 min-w-11 items-center justify-center rounded-full bg-ink px-4 text-sm font-medium text-white pointer-coarse:inline-flex"
+          data-edit-only="add-skill-button"
+          className={ADD_SKILL_BUTTON}
           onClick={() => {
             add();
             document.getElementById("skill-new")?.focus({ preventScroll: true });
           }}
         >
-          Add
-          <span className="sr-only"> skill</span>
+          <span className={ADD_SKILL_CHIP}>
+            Add
+            <span className="sr-only"> skill</span>
+          </span>
         </button>
       </li>
     </ul>
