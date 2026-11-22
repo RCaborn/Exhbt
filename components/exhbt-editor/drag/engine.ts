@@ -178,6 +178,23 @@ function createEngine(store: Store, ui: UiApi, files: FilesController) {
     return { doc, f, list, rows, as, els, boxes, frozen, items, rect: o, origin: { x: o.left + window.scrollX, y: o.top + window.scrollY } };
   }
 
+  /**
+   * The grabbing cursor while a mouse carries something: a layer over the window of its own (css/drag.css,
+   * .xe-drag-cursor), not a style on the main column. The cursor is inherited, so set on the column it
+   * restyled every element in it at the pick-up and again at the drop (about 12ms of the drop at 4x).
+   */
+  const byTouch = new WeakSet<object>();
+  let cursorLayer: HTMLElement | null = null;
+  function grabbing(on: boolean) {
+    if (!on) return void cursorLayer?.remove();
+    if (!cursorLayer) {
+      cursorLayer = document.createElement("div");
+      cursorLayer.className = "xe-drag-cursor";
+      cursorLayer.setAttribute("aria-hidden", "true");
+    }
+    document.body.appendChild(cursorLayer);
+  }
+
   /** The hidden copy the drag measures in: inside the main column, out of the flow, unseen, never read out. */
   function makeHost(main: HTMLElement, width: number): HTMLElement {
     const host = document.createElement("div");
@@ -418,6 +435,7 @@ function createEngine(store: Store, ui: UiApi, files: FilesController) {
     o.space.style.top = `${l.origin.y}px`;
     l.main.dataset.xeDrag = l.mode;
     l.main.dataset.xeStyle = l.style;
+    if (l.mode === "pointer" && !(l.sensor && byTouch.has(l.sensor))) grabbing(true);
     const mine = l.els[l.plan.id];
     if (mine && !l.draft) {
       if (l.mode === "pointer") mine.style.opacity = l.style === "slide" ? "0" : "0.35";
@@ -481,6 +499,7 @@ function createEngine(store: Store, ui: UiApi, files: FilesController) {
       el.style.opacity = "";
       delete el.dataset.lifted;
     }
+    grabbing(false);
     delete l.main.dataset.xeDrag;
     delete l.main.dataset.xeStyle;
     delete l.main.dataset.xePlace;
@@ -522,6 +541,7 @@ function createEngine(store: Store, ui: UiApi, files: FilesController) {
     if (touch ? e.touches.length > 1 : (e as MouseEvent).button !== 0) return;
     const Sensor = touch ? TouchSensor : MouseSensor;
     const token = {};
+    if (touch) byTouch.add(token);
     let started = false;
     const mine = () => live?.sensor === token;
     const instance = new Sensor({
