@@ -102,10 +102,12 @@
     border: 1px solid var(--xp-error);
     border-radius: 999px;
     color: var(--xp-error);
-    font: 600 0.6875rem/1.45 var(--xp-font, var(--font-sans));
+    font: 600 0.6875rem/1.15 var(--xp-font, var(--font-sans));
     letter-spacing: normal;
     white-space: nowrap;
-    vertical-align: 0.0625rem;
+    /* At the top of its line: beside the last word, and, when it has to go under it, inside the figure's own padding. */
+    vertical-align: top;
+    margin-top: 1px;
   }
 
   /* ---------- A figure picked from the report: the label over the picture's top edge ---------- */
@@ -267,6 +269,25 @@
   @media (width >= 40rem) {
     .xe-fig-drafted {
       padding-inline: 2rem;
+    }
+  }
+
+  /* ---------- On a touch screen: each control's hit area is 44px, though it looks the same ---------- */
+  @media (pointer: coarse) {
+    .xe-fig-chip,
+    .xe-fig-picked-open,
+    .xe-fig-picked-tick {
+      position: relative;
+    }
+    .xe-fig-corner {
+      position: absolute;
+    }
+    .xe-fig-chip::after,
+    .xe-fig-picked-open::after,
+    .xe-fig-picked-tick::after {
+      content: "";
+      position: absolute;
+      inset: -0.5625rem -0.25rem;
     }
   }
 }

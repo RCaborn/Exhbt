@@ -1,7 +1,7 @@
 "use client";
 
 import "../css/figures.css";
-import { useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { Link2 } from "lucide-react";
 import type { ExtraSlot } from "@/components/portfolio/page-ctx";
 import { formatLimits, safeHref } from "@/lib/exhbt/blocks";
@@ -39,7 +39,18 @@ function WebAddress({ sectionId }: { sectionId: string }) {
   const fieldId = `${id}-href`;
   const button = useRef<HTMLButtonElement>(null);
   const pop = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
   useAnchoredPopover(button, pop, "end");
+  // Opened by its button, the cursor goes straight into the field (the jump to an issue puts it there itself).
+  useEffect(() => {
+    const p = pop.current;
+    if (!p) return;
+    const onToggle = (e: Event) => {
+      if ((e as ToggleEvent).newState === "open" && !p.contains(document.activeElement)) input.current?.focus();
+    };
+    p.addEventListener("toggle", onToggle);
+    return () => p.removeEventListener("toggle", onToggle);
+  }, []);
   if (index < 0) return null;
   // Missing (where the layout needs one) or not a usable https:// address: the button says so.
   const wrong = href.trim() ? safeHref(href) === null : !optional;
@@ -72,6 +83,7 @@ function WebAddress({ sectionId }: { sectionId: string }) {
           Web address {optional && <span className="xe-fig-pop-optional">(optional)</span>}
         </label>
         <input
+          ref={input}
           id={fieldId}
           type="url"
           inputMode="url"

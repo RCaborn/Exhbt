@@ -51,7 +51,7 @@ function ChartBody() {
 
   if (!chart) return <p className="text-graphite">This graph is no longer on the page.</p>;
   return (
-    <div ref={root} className="xe-fig-chart" data-section-id={id}>
+    <div ref={root} className="xe-fig-chart" data-chart-of={id}>
       <p className="mb-4 text-sm text-graphite">{label} on the page changes as you type.</p>
       <ChartEditor chart={chart} index={at} base={base} bare onChange={(c) => store.patch(id, (x) => (x.kind === "graph" ? { ...x, chart: c } : x))} issues={issues.shown} />
       <div className="mt-6 flex justify-end">
