@@ -151,6 +151,20 @@ test.describe("a new exhbt in the new editor", () => {
     expect(await undoLabel(page)).toBeNull();
   });
 
+  test("text typed in the Add a skill box is kept as a skill when the person moves on, and stored", async ({ page }) => {
+    const id = await openNew(page, freshName("skillblur"));
+    const box = page.locator(`${READY} #skill-new`);
+    await box.fill("Python");
+    // No Enter, no comma: the focus just moves to the title.
+    await page.locator(`${READY} [data-path="title"]`).first().click();
+    await expect(box).toHaveValue("");
+    await expect.poll(async () => (await docNow(page)).skills).toContain("Python");
+    await waitSaved(page, id);
+    expect((await readStored(page, id)).working.skills).toContain("Python");
+    // There is no Add button with a mouse: it is for touch screens.
+    await expect(page.locator(`${READY} [data-path="skills"] button`, { hasText: /^Add/ })).toBeHidden();
+  });
+
   test("a picture can be added: it goes on the page and is stored", async ({ page }) => {
     const id = await openNew(page, freshName("picture"));
     await page.locator(`${READY} input[aria-label='Choose an image']`).setInputFiles({ name: "queue.png", mimeType: "image/png", buffer: png(4, 3) });
