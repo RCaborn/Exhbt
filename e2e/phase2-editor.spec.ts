@@ -3,8 +3,7 @@ import { expect, test } from "@playwright/test";
 import { slugify, uniqueSlug, SLUG_MAX } from "../lib/exhbt/slug";
 import { docToRuns, runsToDoc } from "../lib/exhbt/richtext-tiptap";
 import { LIMITS } from "../lib/exhbt/blocks";
-import { addGraphSection, addSkill, box, contextField, fieldAt, fillBox, fillContext, fillFinding, fillPlain, fillTitle, finding, openPublishSheet, publishSheet, reviewButton, seeAsVisitor, signInAs, skillsList, startFromScratch, visitorRegion, waitForSave, waitEditor } from "./editor";
-import { READY } from "./page-editor";
+import { addGraphSection, addSkill, box, fieldAt, fillBox, fillContext, fillFinding, fillPlain, fillTitle, finding, openPublishSheet, publishSheet, reviewButton, seeAsVisitor, signInAs, startFromScratch, visitorRegion, waitForSave, waitEditor } from "./editor";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
