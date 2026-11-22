@@ -107,6 +107,29 @@ async function pickUp(page: Page, i: number) {
 /** The point `share` of the way along box `i` (along the flowchart's axis), across its middle. */
 const along = (r: Rect, axis: "row" | "column", share: number) => (axis === "row" ? { x: r.x + r.w * share, y: r.y + r.h / 2 } : { x: r.x + r.w / 2, y: r.y + r.h * share });
 
+/**
+ * Each of the flowchart's chips that shows now, against each control of the drag board's and the
+ * sections' that shows now (`theirs`, a selector inside the editor): every pair that overlaps, in words.
+ */
+const overlaps = (page: Page, theirs: string) =>
+  page.evaluate((sel) => {
+    const shown = (e: Element) => {
+      for (let n: Element | null = e; n; n = n.parentElement) if (getComputedStyle(n).opacity === "0" || getComputedStyle(n).display === "none") return false;
+      return true;
+    };
+    const root = document.querySelector('[data-editor="page"]')!;
+    const mine = [...root.querySelectorAll(".xe-flow-chip")].filter(shown);
+    const others = [...root.querySelectorAll(sel)].filter(shown);
+    const out: string[] = [];
+    for (const a of mine)
+      for (const b of others) {
+        const p = a.getBoundingClientRect();
+        const q = b.getBoundingClientRect();
+        if (Math.min(p.right, q.right) - Math.max(p.left, q.left) > 0.5 && Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top) > 0.5) out.push(`${a.getAttribute("aria-label")} on ${b.getAttribute("aria-label")}`);
+      }
+    return out;
+  }, theirs);
+
 const axe = async (page: Page, where: string) => {
   const { violations } = await new AxeBuilder({ page }).include(READY).withTags(WCAG).analyze();
   expect(violations.map((v) => `${where} ${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
@@ -559,6 +582,33 @@ for (const f of offered()) {
       expect(await motion()).toBe(0);
     });
 
+    test("beside the drag board: nothing of the flowchart's sits on a section's + or toolbar, and all of it hides while a section is carried", async ({ page }) => {
+      await page.setViewportSize(TALL);
+      await open(page, f, DRAG_BOXES[f]);
+      // With the first box's tools showing, then the last's (the gaps above and below the flowchart hold the sections' own controls).
+      for (const i of [0, (await keysNow(page)).length - 1]) {
+        await box(page, i).hover();
+        await expect(gripOf(page, i)).toBeVisible();
+        expect(await overlaps(page, ".xe-plus, .xe-tools > *"), `box ${i + 1}`).toEqual([]);
+      }
+      // The drag board carries another section: the flowchart offers nothing, even under the pointer.
+      const other = (await page.locator(`${READY} article [data-section-id]`).evaluateAll((els) => els.map((e) => e.getAttribute("data-section-id")!))).find((id) => id !== "flow")!;
+      const frameOf = page.locator(`${READY} [data-section-id="${other}"]`);
+      await frameOf.hover();
+      const g = (await frameOf.locator("[data-grip]").boundingBox())!;
+      await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(g.x + g.width / 2 + 4, g.y + g.height / 2 + 8, { steps: 4 });
+      await expect(page.locator(`${READY} [data-xe-drag]`)).toHaveAttribute("data-xe-drag", "pointer");
+      const b = (await box(page, 1).locator(".xp-flow-box").boundingBox())!;
+      await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 8 });
+      expect(await page.locator(`${LIST} :is(.xe-flow-tools, .xe-flow-add)`).evaluateAll((els) => els.length > 0 && els.every((e) => getComputedStyle(e).opacity === "0" && getComputedStyle(e).pointerEvents === "none"))).toBe(true);
+      expect(await page.locator(`${LIST} .xe-flow-chip`).evaluateAll((els) => els.every((e) => getComputedStyle(e).pointerEvents === "none"))).toBe(true);
+      await page.keyboard.press("Escape");
+      await page.mouse.up();
+      await expect(page.locator(`${READY} [data-xe-drag]`)).toHaveCount(0);
+    });
+
     test("the drop's motion is 180ms of transforms, and only the boxes that moved get it", async ({ page }) => {
       await page.setViewportSize(TALL);
       await open(page, f, DRAG_BOXES[f]);
@@ -735,6 +785,9 @@ test.describe("by touch", () => {
         const r = el.getBoundingClientRect();
         return Math.min(r.width - parseFloat(s.left) - parseFloat(s.right), r.height - parseFloat(s.top) - parseFloat(s.bottom));
       })).toBeGreaterThanOrEqual(44);
+      // The grip on a box's right edge, Remove on its left, and the "+" between boxes clear of the drag board's "+" at the left of each gap.
+      // (The sections' toolbars on a phone are L's phone.css, which keeps only their grip at the right.)
+      expect(await overlaps(page, ".xe-plus")).toEqual([]);
       const touch = await finger(page);
       const keys = await keysNow(page);
       const steps = await stepsNow(page);
