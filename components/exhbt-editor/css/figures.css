@@ -85,6 +85,12 @@
     inset: 0;
     pointer-events: none;
   }
+  /* A reference line has no card and no padding of its own: its chip sits on the rule under the line, in the
+     line's own 0.75rem of space above the rule and the next line's below it, clear of both lines' words. */
+  .xe-frame[data-as="listed"] .xe-fig-link > .xe-fig-corner {
+    right: 0;
+    bottom: -1.5625rem;
+  }
 
   /* ---------- A picture's description: "Needs a description" just after the placeholder's last word ---------- */
   .xe-fig-needs-line {
@@ -148,6 +154,11 @@
     letter-spacing: normal;
     text-transform: none;
     text-align: left;
+  }
+  /* The lead image's frame clips (it rounds the picture): just inside its top edge. */
+  .xe-fig-picked[data-inside] {
+    top: 0.5rem;
+    transform: none;
   }
   .xe-fig-picked[data-invalid] {
     outline: 2px solid var(--xp-error);
@@ -295,8 +306,14 @@
     .xe-fig-picked-tick {
       position: relative;
     }
-    .xe-fig-corner {
+    /* The gap under a part holds the "+" at its left and the next section's toolbar at its right on a touch
+       screen (both always shown there): the chip sits in the middle of the part's bottom edge. */
+    .xe-fig-corner,
+    .xe-frame[data-as="listed"] .xe-fig-link > .xe-fig-corner {
       position: absolute;
+      right: auto;
+      left: 50%;
+      transform: translateX(-50%);
     }
     .xe-fig-chip::after,
     .xe-fig-picked-open::after,

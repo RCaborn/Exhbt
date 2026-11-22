@@ -116,8 +116,10 @@ function PickedLabelOf({ s }: { s: SectionOf<"image"> & { picked: Picked } }) {
   const sourceUrl = sourceId ? (env.figureSources?.[sourceId] ?? env.reportFiles.find((f) => f.fileId === sourceId)?.url ?? null) : null;
   const tick = (on: boolean) => store.patch(s.id, (x) => (x.kind === "image" && x.picked ? { ...x, picked: { ...x.picked, shareOk: on } } : x));
   const where = `From your report, ${whereFrom(p)}`;
+  // The lead image's frame clips what overhangs it (it rounds the picture): there the label sits just inside its top edge.
+  const inside = useFrame()?.as === "lead";
   return (
-    <span className="xe-fig-picked" data-edit-only data-ticked={p.shareOk ? "" : undefined} data-invalid={issue ? "" : undefined}>
+    <span className="xe-fig-picked" data-edit-only data-inside={inside ? "" : undefined} data-ticked={p.shareOk ? "" : undefined} data-invalid={issue ? "" : undefined}>
       <button ref={button} type="button" className="xe-fig-picked-open" popoverTarget={`${id}-pop`} aria-label={`${where}: crop it, choose another page, or say you may share it`}>
         <FileText aria-hidden size={13} strokeWidth={2.25} />
         {where}

@@ -106,7 +106,7 @@ test.describe("a graph's figures", () => {
   test("a new graph opens its sheet; typing redraws the graph behind it; the kind changes; a chart issue jumps to its field; the chip covers no words", async ({ page }) => {
     // The first test of a run compiles the editor in development.
     test.setTimeout(150_000);
-    await openNew(page, freshName("graph"));
+    const id = await openNew(page, freshName("graph"));
     await openEndPlus(page);
     await page.locator(`${MENU} [data-block="graph"]`).click();
     const s = sheet(page, "chart");
@@ -164,8 +164,7 @@ test.describe("a graph's figures", () => {
     expect(words.filter((w) => overlaps(c, w)).map((w) => `${w.text} at ${[w.x, w.y, w.w, w.h].map(Math.round).join(",")}`), `the chip at ${[c.x, c.y, c.w, c.h].map(Math.round).join(",")}`).toEqual([]);
     const tools = rectOf((await frame(page, graphId).locator(".xe-tools").boundingBox())!);
     expect(overlaps(c, tools)).toBe(false);
-    // Saved (the stored copy is read into the schema's shape, so it is not compared key for key here).
-    await waitSaved(page);
+    await waitSaved(page, id);
   });
 });
 

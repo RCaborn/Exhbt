@@ -45,7 +45,7 @@ function GraphOver({ sectionId }: { sectionId: string }) {
           Add your numbers
         </span>
       )}
-      <button type="button" className="xe-fig-chip xe-fig-corner" aria-label={`Edit figures: ${label}`} data-tip={`Edit figures: ${label}`}>
+      <button type="button" className="xe-fig-chip xe-fig-corner" aria-label={`Edit figures: ${label}`}>
         <SlidersHorizontal aria-hidden size={13} strokeWidth={2.25} />
         Edit figures
       </button>
