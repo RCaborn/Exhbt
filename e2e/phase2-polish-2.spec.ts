@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { devices, expect, test, type Page } from "@playwright/test";
 import { uniqueEmail } from "./helpers";
-import { cardMenuButton, draftAndOpen, fillBox, finding, seeAsVisitor, visitorRegion } from "./editor";
+import { cardMenuButton, draftAndOpen, fillBox, finding, openCardMenu, seeAsVisitor, visitorRegion } from "./editor";
 import { READY } from "./page-editor";
 
 // Phase 2 polish, second pass: the phone header menu, one catalogue number, the per-card
@@ -21,12 +21,6 @@ async function seed(page: Page, username: string, plan: string) {
 
 const signInAs = (page: Page, email: string, next: string) => page.goto(`/auth/dev?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}`);
 const noSideScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
-/** A block's tools show while its part has the pointer (decision 0026): move onto the part, then press its "More actions". */
-async function openMore(page: Page, block: string) {
-  const part = block === "findings" || block === "flow" ? page.locator(`${READY} [data-kind="${block}"]`).first() : page.locator(`${READY} .xe-shell-tools[data-block="${block}"]`).locator("xpath=..");
-  await part.hover();
-  await cardMenuButton(page, block).click();
-}
 const direction = (page: Page, selector: string) => page.locator(selector).first().evaluate((el) => getComputedStyle(el).flexDirection);
 
 test.describe("Phone header", () => {
@@ -131,7 +125,7 @@ test.describe("Editor", () => {
     await expect(page.getByRole("button", { name: "Rewrite the findings" })).toHaveCount(0);
     await expect(more).toHaveAttribute("aria-expanded", "false");
 
-    await openMore(page, "findings");
+    await openCardMenu(page, "findings");
     await expect(more).toHaveAttribute("aria-expanded", "true");
     await expect(tools.getByRole("button", { name: "Rewrite this block" })).toBeVisible();
     await expect(tools.getByTestId("rewrites-left")).toHaveText(/^\d+ of \d+ rewrites left$/);
@@ -146,7 +140,7 @@ test.describe("Editor", () => {
     await findings.click();
     await page.keyboard.press("End");
     await page.keyboard.type(" MY EDIT");
-    await openMore(page, "findings");
+    await openCardMenu(page, "findings");
     await tools.getByRole("button", { name: "Back to the AI version" }).click();
     await expect(findings).not.toContainText("MY EDIT");
     await expect(findings).toContainText("Preview rewrite 1");
@@ -163,7 +157,7 @@ test.describe("Editor", () => {
 
   test("no accessibility violations with a More actions menu open", async ({ page }) => {
     await draftAndOpen(page, "axe", { waitForForm: false });
-    await openMore(page, "flow");
+    await openCardMenu(page, "flow");
     await expect(page.getByTestId("tools-flow").getByRole("button", { name: "Rewrite this block" })).toBeVisible();
     const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
     expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);

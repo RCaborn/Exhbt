@@ -39,6 +39,8 @@ import {
   listOrder,
   menuItem,
   openAddSectionMenu,
+  openThingsToFix,
+  openWebAddress,
   openPublishSheet,
   pageOrder,
   publish,
@@ -229,8 +231,10 @@ const items = (page: Page) => page.locator(`${READY} article [data-section-id]`)
 
 /** Types a link's address: its "Web address" popover opens from the button over the link. */
 async function setLinkAddress(page: Page, href: string) {
+  // A new link opens its popover with the cursor in it; pressing the button again would close it.
   const input = inSection(page, "link", "href");
-  if (!(await input.isVisible())) await page.getByRole("button", { name: /^Web address: / }).click();
+  const opened = await input.waitFor({ state: "visible", timeout: 3000 }).then(() => true, () => false);
+  if (!opened) await openWebAddress(page);
   await input.fill(href);
   await page.keyboard.press("Enter");
 }
@@ -454,9 +458,7 @@ test.describe("Sections in the editor", () => {
     await openPublishSheet(page);
     await publishSheet(page).getByLabel(SEL.publishConfirm).check();
     await publishSheet(page).getByRole("button", { name: "Publish", exact: true }).click();
-    await closeSheet(page);
-    await page.getByRole("button", { name: /things? to fix/ }).click();
-    await expect(page.getByRole("region", { name: "Things to fix before publishing" })).toContainText(`Keep the whole exhbt to ${LIMITS.totalWords} words (it's ${total + LIMITS.quote.words + 2}).`);
+    await expect(await openThingsToFix(page)).toContainText(`Keep the whole exhbt to ${LIMITS.totalWords} words (it's ${total + LIMITS.quote.words + 2}).`);
     await expect(page.getByText("It's live.")).toHaveCount(0);
   });
 
@@ -485,9 +487,7 @@ test.describe("Sections in the editor", () => {
     await openPublishSheet(page);
     await publishSheet(page).getByLabel(SEL.publishConfirm).check();
     await publishSheet(page).getByRole("button", { name: "Publish", exact: true }).click();
-    await closeSheet(page);
-    await page.getByRole("button", { name: /things? to fix/ }).click();
-    const problems = page.getByRole("region", { name: "Things to fix before publishing" });
+    const problems = await openThingsToFix(page);
     await problems.getByRole("button", { name: "Sections: Add findings or a graph, so the exhbt shows what came of the work." }).click();
     await expect(page.getByRole("button", { name: "Add a section", exact: true })).toBeFocused();
   });

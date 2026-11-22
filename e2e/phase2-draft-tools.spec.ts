@@ -1,27 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { ENTITLEMENTS } from "../lib/entitlements";
 import { emptyDoc, text, type ExhbtDoc, type RichText } from "../lib/exhbt/blocks";
 import { aiVersionOf, blockValue, replaceBlock, sameBlock } from "../lib/exhbt/draft-blocks";
-import { backToAiVersion, cardMenuButton, DRAFT_PROJECT as PROJECT, draftAndOpen, findingsField, rewritesLeft, SEL, signInToDraft } from "./editor";
-import { READY } from "./page-editor";
-
-/**
- * A part's tools show while the part has the pointer or the focus (decision 0026), so a person moves onto the
- * part first. The findings and the flowchart have them in their section's toolbar; the title, the context line
- * and the skills in a corner toolbar over the part.
- */
-async function openCardMenu(page: Page, block: string) {
-  const part = block === "findings" || block === "flow" ? page.locator(`${READY} [data-kind="${block}"]`).first() : page.locator(`${READY} .xe-shell-tools[data-block="${block}"]`).locator("xpath=..");
-  await part.hover();
-  await cardMenuButton(page, block).click();
-}
-
-/** Opens the block's menu and presses "Rewrite this block". */
-async function startRewrite(page: Page, block: string) {
-  await openCardMenu(page, block);
-  await page.getByTestId(SEL.toolsTestId(block)).getByRole("button", { name: SEL.rewriteThisBlock }).click();
-}
+import { backToAiVersion, cardMenuButton, DRAFT_PROJECT as PROJECT, draftAndOpen, findingsField, openCardMenu, rewritesLeft, signInToDraft, startRewrite } from "./editor";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
