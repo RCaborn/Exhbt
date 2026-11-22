@@ -1059,6 +1059,17 @@ test.describe("the copy kept in this browser (the review's data-safety-3)", () =
     expect(await keptNow(page, id)).toBeNull();
     await expect(field(page, "title")).toHaveValue(doc.title);
   });
+
+  test("publishing with nothing changed clears the copy, and the offer goes with it", async ({ page }) => {
+    const { id } = await withCopy(page, "publish", "From an older visit");
+    await page.getByRole("button", { name: "Review and publish" }).click();
+    await page.getByLabel("This is my work, and the numbers are true").check();
+    await page.getByRole("button", { name: /^Publish( changes)?$/ }).click();
+    await expect(page.getByText(/^(It's live|Your changes are live)\.$/)).toBeVisible();
+    await expect(page.getByText(OFFER)).toHaveCount(0);
+    expect(await keptNow(page, id)).toBeNull();
+    expect((await readStored(page, id)).working.title).not.toBe("From an older visit");
+  });
 });
 
 test.describe("deleting takes this browser's copies out (the review's security-2)", () => {
