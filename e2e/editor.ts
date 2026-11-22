@@ -317,11 +317,32 @@ export const card = (page: Page, name: string) =>
 /** Presses one of a section's toolbar buttons ("Remove Image 1", "Move Quote up"): the toolbar shows when the pointer is over the frame. */
 export async function pressTool(page: Page, label: string, name: string) {
   await card(page, label).hover();
-  await page.getByRole("button", { name, exact: true }).click();
+  await page.getByRole("toolbar", { name: `${label}: tools`, exact: true }).getByRole("button", { name, exact: true }).click();
 }
 
 /** Removes a section by its name on the page ("Image 1"). */
 export const removeSection = (page: Page, label: string) => pressTool(page, label, `Remove ${label}`);
+
+/** The frames of one kind ("image", "link", "aim"). */
+export const framesOf = (page: Page, kind: string) => page.locator(`${READY} article [data-section-id][data-kind="${kind}"]`);
+
+/** A section's formatted or plain field by its kind and the end of its path (".text", ".caption", ".items.0"): the first of that kind. */
+export const sectionField = (page: Page, kind: string, pathEnd: string) => framesOf(page, kind).first().locator(`[data-path$="${pathEnd}"]`).first();
+
+/** The "Kept, not shown in this layout" list at the foot of the page. */
+export const keptList = (page: Page) => page.getByRole("region", { name: "Kept, not shown in this layout" });
+
+/**
+ * A link's "Web address" field: its button ("Web address: <label>") over the link opens a popover holding the field.
+ * Opens the popover of link `n` (1-based) and returns the field.
+ */
+export async function openWebAddress(page: Page, n = 1): Promise<Locator> {
+  const frame = framesOf(page, "link").nth(n - 1);
+  await frame.getByRole("button", { name: /^Web address:/ }).click();
+  const field = frame.locator('input[data-path$=".href"]');
+  await expect(field).toBeVisible();
+  return field;
+}
 
 /** Every frame, in page order. */
 export const frames = (page: Page) => page.locator(`${READY} article [data-section-id]`);
@@ -351,6 +372,8 @@ export const images = (page: Page) => page.locator(SEL.imageInput);
 
 /** Chooses image files as a person would: through the picker's file input (it is added to the end of the page). */
 export async function pickImages(page: Page, files: Parameters<ReturnType<typeof images>["setInputFiles"]>[0]) {
+  // After the browser's own chooser the focus is on the page, not on a button: the editor puts the cursor in the first new description only then.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await images(page).first().setInputFiles(files);
 }
 
@@ -381,6 +404,10 @@ const BLOCK_OF_BUTTON: Record<string, string> = {
   "Add a link": "link",
   "Add an image": "image",
   "Add a pull quote": "pullquote",
+  "Add aim or hypothesis": "aim",
+  "Add conclusion": "conclusion",
+  "Add a reference": "link",
+  "Add limitations and next steps": "reflection",
 };
 
 /** One entry of the open menu by its classic button name ("Add a quote") or by its words in the menu. */
@@ -463,11 +490,23 @@ export const findingsField = (page: Page) => finding(page, 1);
 /** The "N of M rewrites left" line inside a block's tools (visible once its "More actions" is open). */
 export const rewritesLeft = (page: Page, block: string) => page.getByTestId(SEL.toolsTestId(block)).getByTestId(SEL.rewritesLeftTestId);
 
-/** The "More actions for <block's name>" button on a drafted block. */
-export const cardMenuButton = (page: Page, block: string) => page.getByRole("button", { name: SEL.cardMenuButton(SEL.cards[block]!) });
+/** The "More actions for <block's name>" button on a drafted block (inside the block's tools, whatever the layout calls the block). */
+export const cardMenuButton = (page: Page, block: string) => page.getByTestId(SEL.toolsTestId(block)).getByRole("button", { name: /^More actions for/ });
+
+/** What to put the pointer on to show a block's tools: a section's toolbar shows over its frame, a shell part's corner toolbar over the part. */
+const HOVER_FOR: Record<string, string> = {
+  header: '[data-path="title"]',
+  gap: '[data-path="gap"]',
+  skills: '[data-path="skills"]',
+  flow: '[data-kind="flow"]',
+  findings: '[data-kind="findings"]',
+};
 
 /** Opens a block's "More actions" menu. */
-export const openCardMenu = (page: Page, block: string) => cardMenuButton(page, block).click();
+export async function openCardMenu(page: Page, block: string) {
+  await page.locator(`${READY} ${HOVER_FOR[block]!}`).first().hover();
+  await cardMenuButton(page, block).click();
+}
 
 /** Opens the block's menu and presses "Rewrite this block". */
 export async function startRewrite(page: Page, block: string) {
