@@ -296,9 +296,8 @@ test.describe("The same file on someone else's exhbt", () => {
     expect(Object.keys(body.match).sort()).toEqual(["id", "name"]);
     expect(JSON.stringify(body)).not.toContain(own);
 
-    // The prompt is drawn on the page, under the work sheet the file was chosen in (a modal dialog): close the sheet to answer it.
-    await closeSheet(page);
-
+    // The work sheet the file was chosen in is a modal dialog, so the prompt is a modal dialog of its own above it (MatchPrompt.tsx,
+    // f6a0abf): it is answered there, with the sheet still open, and the sheet is closed after.
     const prompt = page.getByTestId("match-prompt");
     await expect(prompt.getByRole("heading", { name: "This file is already on someone else's exhbt" })).toBeVisible();
     await expect(prompt).toContainText("Were you on that project together?");
@@ -313,6 +312,9 @@ test.describe("The same file on someone else's exhbt", () => {
     await prompt.getByRole("button", { name: "Send request" }).click();
     await expect(prompt.getByRole("heading", { name: "Request sent" })).toBeVisible();
     for (const secret of ["Amara", own, "GP appointments"]) await expect(prompt).not.toContainText(secret);
+    await prompt.getByRole("button", { name: "Close" }).click();
+    await expect(prompt).toHaveCount(0);
+    await closeSheet(page);
 
     // The owner hears by email and on their exhbts page, with who is asking.
     await page.goto("/dev/emails");

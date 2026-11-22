@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { ENTITLEMENTS } from "../lib/entitlements";
 import { emptyDoc, text, type ExhbtDoc, type RichText } from "../lib/exhbt/blocks";
 import { aiVersionOf, blockValue, replaceBlock, sameBlock } from "../lib/exhbt/draft-blocks";
-import { backToAiVersion, cardMenuButton, DRAFT_PROJECT as PROJECT, draftAndOpen, findingsField, openCardMenu, rewritesLeft, signInToDraft, startRewrite } from "./editor";
+import { backToAiVersion, cardMenuButton, DRAFT_PROJECT as PROJECT, draftAndOpen, findingsField, openCardMenu, rewritesLeft, signInToDraft, startRewrite, waitForSaved } from "./editor";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -87,7 +87,8 @@ test.describe("Rewrite and back to the AI version", () => {
     await expect(page.getByTestId("tools-findings").getByTestId("tools-status")).toContainText("Rewritten.");
 
     // It survives a reload (autosave) and the count is the server's.
-    await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeVisible();
+    // "Saved" is on screen but not announced (SaveStatus.tsx says only failures), so it is not in a status region: wait for the words and the stored doc.
+    await waitForSaved(page);
     await page.reload();
     await expect(findingsField(page)).toContainText("Preview rewrite 1");
     await expect(rewritesLeft(page, "findings")).toContainText(`${FREE_REWRITES - 1} of`);
