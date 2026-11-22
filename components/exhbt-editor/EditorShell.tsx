@@ -264,11 +264,9 @@ function UndoKeys(): ReactNode {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "z") return;
       if (inField(document.activeElement)) return;
-      const label = store.undoLabel();
-      if (!label) return;
+      if (!store.undoLabel()) return;
       e.preventDefault();
-      store.undo();
-      uiApi.say(`Undone: ${label}.`);
+      uiApi.say(store.undo().words);
     };
     document.addEventListener("keydown", onKey);
     // After an Undo (from here or from the top bar's Undo, which leaves the focus to this), the focus goes to what

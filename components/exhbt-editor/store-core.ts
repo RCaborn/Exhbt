@@ -2,7 +2,7 @@ import { FLOW_ID, formatLimits, isContent, type ContentSection, type ExhbtDoc, t
 import { formatOf, FORMAT_RULES, type Format } from "../../lib/exhbt/formats";
 import { applyTemplate, insertBlock, insertImage, moveItem, pageItems, removeItem, type BlockKind } from "../../lib/exhbt/layouts";
 import { sectionLabel } from "../../lib/exhbt/sections";
-import { applyUndo, diffEntry, structuralEntry, UNDO_LIMIT, type Entry } from "./undo";
+import { applyUndo, canUndo, diffEntry, structuralEntry, undoneWords, UNDO_LIMIT, type Entry, type UndoResult } from "./undo";
 
 /*
  * The editor's doc, held outside React (decision 0026, "What re-renders"), with no React in this
@@ -45,9 +45,13 @@ export type EditorStore = {
   flowRemove(key: string): void;
   flowMove(key: string, to: number): void;
 
-  /** Writes back only what the last entry changed, so typing done since in other fields is kept. The numbers to check come back as the list now joined with the list before, limited to numbers on the page after the undo. */
-  undo(): void;
-  /** "remove graph 1", or null when there is nothing to undo. */
+  /**
+   * Writes back only what the last entry changed, so typing done since in other fields is kept. The numbers to check
+   * come back as the list now joined with the list before, limited to numbers on the page after the undo. An entry
+   * that can no longer be done is skipped, never popped in silence: the result names it, and its `words` say so.
+   */
+  undo(): UndoResult;
+  /** What Undo will undo ("remove graph 1"): the newest entry that can still be done. Null when there is nothing to undo. */
   undoLabel(): string | null;
 };
 
@@ -73,7 +77,7 @@ export type StoreInternals = {
    * may be gone: the undo of an add takes it out).
    */
   onUndone(fn: (subject: string | null, box: string | null) => void): () => void;
-  /** Replaces the doc outright (the backup offer). Not an undo entry; the undo list is cleared. */
+  /** Replaces the doc outright. Not an undo entry; the undo list is cleared. (The backup offer restores through patchDoc, as one undo entry.) */
   replace(doc: ExhbtDoc): void;
 };
 
@@ -165,6 +169,19 @@ export function createStore(initial: ExhbtDoc, opts: { onChange?: (doc: ExhbtDoc
     return id === "flow" ? "flowchart" : "section";
   };
 
+  /** A named change's entry; when it changed the boxes (a rewrite of the flowchart), it keeps their keys from before. */
+  const named = (label: string, next: ExhbtDoc, id?: string): Entry => {
+    const e = diffEntry(label, doc, next, id);
+    return next.flow !== doc.flow ? { ...e, boxKeys: [...keys] } : e;
+  };
+
+  /** Where the newest entry that can still be done sits in the list, or -1. */
+  const undoable = (): number => {
+    let i = stack.length - 1;
+    while (i >= 0 && !canUndo({ doc, keys }, stack[i]!)) i--;
+    return i;
+  };
+
   /** A structural change, as one undo entry. */
   function structural(next: ExhbtDoc, label: string, subject?: string) {
     if (next === doc) return;
@@ -194,13 +211,13 @@ export function createStore(initial: ExhbtDoc, opts: { onChange?: (doc: ExhbtDoc
       const sections = [...doc.sections];
       sections[i] = ns;
       const next = { ...doc, sections };
-      commit(next, undo ? diffEntry(undo, doc, next, id) : undefined);
+      commit(next, undo ? named(undo, next, id) : undefined);
     },
 
     patchDoc(fn, undo) {
       const next = fn(doc);
       if (next === doc) return;
-      commit(next, undo ? diffEntry(undo, doc, next) : undefined);
+      commit(next, undo ? named(undo, next) : undefined);
     },
 
     move(id, place) {
@@ -268,9 +285,12 @@ export function createStore(initial: ExhbtDoc, opts: { onChange?: (doc: ExhbtDoc
     },
 
     undo() {
-      const e = stack[stack.length - 1];
-      if (!e) return;
-      stack = stack.slice(0, -1);
+      const at = undoable();
+      // Entries above it can no longer be done: they go, and are named, rather than doing nothing.
+      const skipped = stack.slice(at + 1).map((x) => x.label).reverse();
+      const e = stack[at];
+      stack = stack.slice(0, Math.max(0, at));
+      if (!e) return { undone: null, skipped, words: undoneWords({ undone: null, skipped }) };
       const r = applyUndo({ doc, keys }, e);
       keys = r.keys;
       // The entry is gone already, so the listeners see the shorter list.
@@ -280,9 +300,10 @@ export function createStore(initial: ExhbtDoc, opts: { onChange?: (doc: ExhbtDoc
       // A box action's box, by its lasting key: there again after the undo of a remove or a move, gone after the undo of an add.
       const box = subject === FLOW_ID && e.flow ? e.flow.key : null;
       for (const fn of undone) fn(subject, box);
+      return { undone: e.label, skipped, words: undoneWords({ undone: e.label, skipped }) };
     },
 
-    undoLabel: () => stack[stack.length - 1]?.label ?? null,
+    undoLabel: () => stack[undoable()]?.label ?? null,
 
     shell: () => shellDoc,
     version: () => ver,

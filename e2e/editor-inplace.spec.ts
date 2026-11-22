@@ -6,6 +6,7 @@ import { flowShown, hasMarker, pageItems } from "../lib/exhbt/layouts";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import { createFiles } from "../components/exhbt-editor/files";
 import { createStore } from "../components/exhbt-editor/store-core";
+import { undoneWords } from "../components/exhbt-editor/undo";
 import { ORDER_FIXTURES } from "./fixtures/order-docs";
 import {
   allowEditOnly,
@@ -320,6 +321,56 @@ test.describe("the store, in-process: a flowchart box's and a finding's actions,
     s.setAt("sections.1.text", "Calmer, typed.");
     s.undo();
     expect(s.get().sections[1]).toMatchObject({ text: "Calmer, typed.", role: "" });
+  });
+
+  // The review's data-safety-5: "Back to the AI version" (or a rewrite) of the flowchart changes the number of boxes.
+  const toTheAi = (s: ReturnType<typeof createStore>, steps: string[]) => s.patchDoc((d) => ({ ...d, flow: steps.map((step) => ({ step })) }), "back to the AI version of the method");
+
+  test("a box added, then the flowchart put back to the AI version with fewer boxes: Undo puts the boxes back, then takes the added one out", () => {
+    const s = createStore(start());
+    const added = s.flowAdd(3)!;
+    s.setAt("flow.3.step", "Four");
+    toTheAi(s, ["A", "B"]);
+    s.undo();
+    expect(steps(s.get())).toEqual(["One", "Two", "Three", "Four"]);
+    expect(s.flowKeys()[3]).toBe(added);
+    expect(s.undoLabel()).toBe("add box 4");
+    s.undo();
+    expect(steps(s.get())).toEqual(["One", "Two", "Three"]);
+    expect(s.undoLabel()).toBeNull();
+  });
+
+  test("a box moved to the end, then the flowchart rewritten to fewer boxes and to more: each Undo puts back what it should", () => {
+    const s = createStore({ ...start(), flow: [{ step: "One" }, { step: "Two" }, { step: "Three" }, { step: "Four" }] });
+    const one = s.flowKeys()[0]!;
+    s.flowMove(one, 3);
+    expect(steps(s.get())).toEqual(["Two", "Three", "Four", "One"]);
+    toTheAi(s, ["A", "B", "C"]);
+    toTheAi(s, ["A", "B", "C", "D", "E"]);
+    s.undo();
+    s.undo();
+    expect(steps(s.get())).toEqual(["Two", "Three", "Four", "One"]);
+    expect(s.flowKeys()[3]).toBe(one);
+    s.undo();
+    expect(steps(s.get())).toEqual(["One", "Two", "Three", "Four"]);
+    expect(s.flowKeys()[0]).toBe(one);
+  });
+
+  test("an undo that can no longer be done is skipped, and Undo says so", () => {
+    const s = createStore({ ...start(), sections: [...start().sections, { id: "quote-1", kind: "quote", text: "Calmer.", name: "Sam", role: "" }] });
+    s.move("quote-1", 0);
+    const moved = s.undoLabel()!;
+    s.flowAdd(3);
+    // The boxes change in number with no undo entry (nothing in the editor does this now): the added box's key goes.
+    s.patchDoc((d) => ({ ...d, flow: d.flow.slice(0, 2) }));
+    // Undo names what it will do, not the entry it has to skip.
+    expect(s.undoLabel()).toBe(moved);
+    const r = s.undo();
+    expect(r).toEqual({ undone: moved, skipped: ["add box 4"], words: `Undone: ${moved}. Add box 4 can't be undone any more, so Undo skipped it.` });
+    expect(s.get().sections.map((x) => x.id)).toEqual(["findings", "quote-1"]);
+    expect(s.undoLabel()).toBeNull();
+    expect(undoneWords({ undone: "remove quote", skipped: [] })).toBe("Undone: remove quote.");
+    expect(undoneWords({ undone: null, skipped: ["add box 4", "move box 2"] })).toBe("Add box 4 and move box 2 can't be undone any more, so Undo skipped them.");
   });
 });
 

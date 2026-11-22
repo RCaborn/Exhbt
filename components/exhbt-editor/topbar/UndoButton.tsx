@@ -22,10 +22,8 @@ export function UndoButton(): ReactNode {
   const name = label ? `Undo: ${label}` : "Undo";
 
   function undo() {
-    const was = store.undoLabel();
-    if (!was) return;
-    store.undo();
-    ui.say(`Undone: ${was}.`);
+    if (!store.undoLabel()) return;
+    ui.say(store.undo().words);
   }
 
   return (
