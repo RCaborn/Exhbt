@@ -285,6 +285,38 @@ test.describe("each section's toolbar, at 1440 wide", () => {
     });
   }
 
+  test("a tile too narrow for the row takes a column down its right edge from the grip (grip, up, down, the action, remove), inside its picture", async ({ page }) => {
+    await openTiming(page, "gallery", { full: true });
+    await waitLive(page);
+    const tiles = await page.locator(`${READY} article [data-as="tile"]`).evaluateAll((els) =>
+      els.map((fr) => {
+        const tools = fr.querySelector<HTMLElement>(":scope > .xe-tools")!;
+        const pic = fr.querySelector("img")!.getBoundingClientRect();
+        const buttons = [...tools.querySelectorAll("button")].filter((b) => b.getClientRects().length > 0).map((b) => ({ tool: b.getAttribute("data-tool") ?? "grip", r: b.getBoundingClientRect() }));
+        const grip = buttons.find((b) => b.tool === "grip")!.r;
+        // The first column: the buttons under the grip, at its right edge, top to bottom.
+        const column = buttons.filter((b) => Math.abs(b.r.right - grip.right) < 1).sort((a, b) => a.r.top - b.r.top).map((b) => b.tool);
+        return {
+          id: fr.getAttribute("data-section-id"),
+          shape: tools.dataset.shape ?? "row",
+          column,
+          inside: buttons.every((b) => b.r.left >= pic.left - 0.5 && b.r.right <= pic.right + 0.5 && b.r.top >= pic.top - 0.5 && b.r.bottom <= pic.bottom + 0.5),
+          n: buttons.length,
+        };
+      }),
+    );
+    // The sample has both: narrow tiles at 1440 (design round 2, item 6), and wide ones keeping the row.
+    expect(tiles.some((t) => t.shape === "row")).toBe(true);
+    expect(tiles.some((t) => t.shape !== "row")).toBe(true);
+    for (const t of tiles) {
+      expect(t.inside, `${t.id}: inside its picture`).toBe(true);
+      if (t.shape === "row") continue;
+      // From the top: grip, move up, move down, the action (Make lead image), then Remove, which goes on in a second column only where the picture is too short.
+      expect(t.column.slice(0, 4), `${t.id} (${t.shape})`).toEqual(["grip", "up", "down", "action"]);
+      if (t.shape === "column") expect(t.column, t.id!).toEqual(["grip", "up", "down", "action", "remove"]);
+    }
+  });
+
   test("a case study's and research's flowchart: Remove is there but off, and says why when focused or pressed; a gallery's takes it off", async ({ page }) => {
     const WHY = { "case-study": "A case study always has a flowchart. Choose another layout to take it off.", research: "Research always has a flowchart. Choose another layout to take it off." } as const;
     for (const f of ["case-study", "research"] as const) {

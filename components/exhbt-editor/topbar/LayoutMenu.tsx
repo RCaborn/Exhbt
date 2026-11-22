@@ -77,7 +77,7 @@ export function LayoutMenu({ inline = false }: { inline?: boolean } = {}): React
       panelClassName="xe-layout-panel"
       focusIn={(p) => p.querySelector<HTMLElement>("input:checked")}
       trigger={({ id, open, toggle, panelId }) => (
-        <Button id={id} size="sm" className="xe-tb" aria-expanded={open} aria-controls={open ? panelId : undefined} label={`Layout: ${name}`} onClick={toggle}>
+        <Button id={id} size="sm" className="xe-tb xe-layout-button" aria-expanded={open} aria-controls={open ? panelId : undefined} label={`Layout: ${name}`} onClick={toggle}>
           <LayoutTemplate aria-hidden size={16} strokeWidth={2.25} className="shrink-0" />
           <span className="xe-tb-text">{name}</span>
           <ChevronDown aria-hidden size={14} strokeWidth={2.25} className="shrink-0" />

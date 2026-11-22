@@ -310,9 +310,25 @@
     .xe-topbar .xe-undo-button .xe-tb-text {
       display: none;
     }
-    /* On one line, with a little less room round its words, so a 48rem window's row still fits. */
+    /* "Review and publish" stays on one line (design round 2, item 3), so the row makes room for it, and
+       for a failed save's Retry, down to a 48rem window: tighter gaps, a little less padding round its
+       words, the layout's name in its button's accessible name only (as Undo's is), and a failed save's
+       words said and kept for screen readers, with Retry on the row, as on a phone. */
+    .xe-topbar .xe-topbar-row {
+      gap: 0.25rem;
+    }
     .xe-topbar .xe-publish {
       padding-inline: 0.625rem;
+    }
+    .xe-topbar .xe-layout-button .xe-tb-text {
+      display: none;
+    }
+    .xe-save-bad .xe-save-words {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
     }
   }
   .xe-back-text,
