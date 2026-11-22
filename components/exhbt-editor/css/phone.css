@@ -259,6 +259,27 @@
   .xe-bar-row > :not(.xe-bar-more) {
     order: 1;
   }
+  /* A section's actions in the order its toolbar draws them (design round 2, item 2): after its name,
+     Remove, More actions, the layout's action, Move up, Move down, and Reorder at the right end, where
+     the toolbar has its grip. The reading and Tab order stay the markup's. */
+  .xe-bar-row > [data-tool="remove"] {
+    order: 2;
+  }
+  .xe-bar-more > [data-testid] > .relative {
+    order: 3;
+  }
+  .xe-bar-row > [data-tool="action"] {
+    order: 4;
+  }
+  .xe-bar-row > [data-tool="up"] {
+    order: 5;
+  }
+  .xe-bar-row > [data-tool="down"] {
+    order: 6;
+  }
+  .xe-bar-row > [data-tool="reorder"] {
+    order: 7;
+  }
 
   /* ---------- Reorder sections (phone/ReorderSheet.tsx) ---------- */
   .xe-reorder-list {

@@ -427,8 +427,9 @@ export function allowEditOnly(page: Page, which: "always" | "all"): Promise<stri
  * layout draws itself ("References") by its words; the pictures, links and buttons of any
  * other section; another toolbar's buttons; and the edit-only chips and labels on the page, its own
  * section's included (the aim's switch, a picked figure's label, "Edit figures", "Web address", a
- * flowchart box's chips). A toolbar may lie over its own section's words and picture: it sits in that
- * corner by design. Returns each clash in words; [] when there are none.
+ * flowchart box's chips). A toolbar may lie over its own section's words and picture, where it sits in
+ * that corner by design, but never over a graph's own title, legend or labels. Returns each clash in
+ * words; [] when there are none.
  */
 export function toolbarClashes(page: Page): Promise<string[]> {
   return page.evaluate(() => {
@@ -460,7 +461,8 @@ export function toolbarClashes(page: Page): Promise<string[]> {
         const box = b.getBoundingClientRect();
         const name = `${b.getAttribute("aria-label") ?? "a tool"} (${r(box)})`;
         for (const { el: w, boxes } of worded) {
-          if (fr.contains(w) || !boxes.some((q) => over(box, q))) continue;
+          // A graph's own words count as well: its title and legend are never under its toolbar (design round 2, item 1).
+          if ((fr.contains(w) && fr.dataset.kind !== "graph") || !boxes.some((q) => over(box, q))) continue;
           out.push(`${name} covers "${(w.matches("textarea, input") ? (w as HTMLTextAreaElement).value : (w.textContent ?? "")).trim().slice(0, 30)}" in ${sectionOf(w)}`);
         }
         for (const other of frames) {

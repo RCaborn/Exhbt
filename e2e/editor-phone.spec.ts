@@ -610,14 +610,21 @@ test("the bar is one Tab stop: the arrows, Home and End move along it, and the s
   await choose(page, "quote-1");
   const stops = () => bar(page).locator("button").evaluateAll((bs) => bs.filter((b) => b.tabIndex === 0 && b.getClientRects().length > 0).map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim()));
   expect(await stops()).toHaveLength(1);
+  // Drawn in the toolbars' order (design round 2, item 2): Remove after the name, the moves and Reorder at the right end.
+  const drawn = await bar(page)
+    .locator(".xe-bar-row button")
+    .evaluateAll((bs) => bs.filter((b) => b.getClientRects().length > 0).sort((p, q) => p.getBoundingClientRect().left - q.getBoundingClientRect().left).map((b) => b.getAttribute("aria-label")));
+  expect(drawn).toEqual(["Remove Quote", "Move Quote up", "Move Quote down", "Reorder sections"]);
+  // The stop is the first in the reading order, Move up; the arrows go as drawn.
   const first = bar(page).locator("button").first();
+  await expect(first).toHaveAccessibleName("Move Quote up");
   await first.focus();
   await page.keyboard.press("ArrowRight");
   await expect(onBar(page, "Move Quote down")).toBeFocused();
   await page.keyboard.press("End");
   await expect(onBar(page, "Reorder sections")).toBeFocused();
   await page.keyboard.press("Home");
-  await expect(first).toBeFocused();
+  await expect(onBar(page, "Remove Quote")).toBeFocused();
   await page.keyboard.press("End");
   expect(await stops()).toEqual(["Reorder sections"]);
   await grip(page, "quote-1").focus();

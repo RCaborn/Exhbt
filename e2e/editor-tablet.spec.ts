@@ -73,7 +73,7 @@ const toolbarsNow = (page: Page, tiles: "grip" | "all") =>
       const buttons = [...tools.querySelectorAll<HTMLElement>("button")].filter((b) => b.getClientRects().length > 0);
       if (!buttons.some((b) => b.hasAttribute("data-grip"))) bad.push(`${id}: no grip`);
       const tile = fr.dataset.as === "tile";
-      const over = ["image", "graph"].includes(fr.dataset.kind!) || ["inside", "edge"].includes(tools.dataset.place ?? "");
+      const over = fr.dataset.kind === "image" || ["inside", "edge"].includes(tools.dataset.place ?? "");
       if (over && tiles === "grip" && buttons.length !== 1) bad.push(`${id}: over its own section, it shows ${buttons.map((b) => b.getAttribute("aria-label")).join(", ")}`);
       if ((!over || tiles === "all") && !buttons.some((b) => b.getAttribute("data-tool") === "up")) bad.push(`${id}: no move up`);
       const box = fr.getBoundingClientRect();

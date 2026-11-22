@@ -226,7 +226,7 @@ function UndoOffer({ label, store }: { label: string; store: Store }) {
 function ReorderButton() {
   const { uiApi } = useRuntime();
   return (
-    <Button size="sm" className="xe-bar-btn" label="Reorder sections" onClick={() => uiApi.open("reorder")}>
+    <Button size="sm" className="xe-bar-btn" data-tool="reorder" label="Reorder sections" onClick={() => uiApi.open("reorder")}>
       <ArrowUpDown {...ICON} className="shrink-0" />
       Reorder
     </Button>
@@ -246,15 +246,15 @@ function SectionTools({ id, info }: { id: string; info: Info }) {
   return (
     <>
       <span className={told ? "xe-bar-name xe-bar-hint xe-bar-why" : "xe-bar-name"}>{told && stays ? stays : label}</span>
-      <Button size="sm" className="xe-bar-btn" label={`Move ${label} up`} disabled={place <= 0} onClick={() => board.moveBy(id, -1)}>
+      <Button size="sm" className="xe-bar-btn" data-tool="up" label={`Move ${label} up`} disabled={place <= 0} onClick={() => board.moveBy(id, -1)}>
         <ArrowUp {...ICON} />
       </Button>
-      <Button size="sm" className="xe-bar-btn" label={`Move ${label} down`} disabled={place >= count - 1} onClick={() => board.moveBy(id, 1)}>
+      <Button size="sm" className="xe-bar-btn" data-tool="down" label={`Move ${label} down`} disabled={place >= count - 1} onClick={() => board.moveBy(id, 1)}>
         <ArrowDown {...ICON} />
       </Button>
       {/* The layout's own actions, as the section's toolbar has them (Toolbar.tsx); the lead's star at the bar's size. */}
       {actionsFor(store.get(), id, kind, f, store).map((a) => (
-        <Button key={a.name} size="sm" className="xe-bar-btn" label={a.name} aria-pressed={a.pressed} onClick={a.run}>
+        <Button key={a.name} size="sm" className="xe-bar-btn" data-tool="action" label={a.name} aria-pressed={a.pressed} onClick={a.run}>
           {a.icon ? <Star {...ICON} /> : a.name}
         </Button>
       ))}
@@ -269,6 +269,7 @@ function SectionTools({ id, info }: { id: string; info: Info }) {
           <Button
             size="sm"
             className="xe-bar-btn xe-bar-off"
+            data-tool="remove"
             label={`Remove ${label}`}
             aria-disabled="true"
             aria-describedby={why}
@@ -284,7 +285,7 @@ function SectionTools({ id, info }: { id: string; info: Info }) {
           </span>
         </>
       ) : (
-        <Button size="sm" className="xe-bar-btn" label={`Remove ${label}`} onClick={() => board.remove(id)}>
+        <Button size="sm" className="xe-bar-btn" data-tool="remove" label={`Remove ${label}`} onClick={() => board.remove(id)}>
           <Trash2 {...ICON} />
         </Button>
       )}
@@ -304,6 +305,7 @@ function ShellTools({ block, name, skill }: { block: ShellBlock; name: string; s
         <Button
           size="sm"
           className="xe-bar-btn"
+          data-tool="remove"
           label={`Remove ${skill}`}
           onClick={() => {
             store.patchDoc((d) => ({ ...d, skills: d.skills.filter((x) => x !== skill) }));

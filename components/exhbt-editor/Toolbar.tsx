@@ -53,11 +53,54 @@ function wordsBox(el: HTMLElement): Box | null {
 
 const overlap = (a: Box, b: Box) => Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 0.5 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 0.5;
 
+/** A graph's own words (its title, legend, labels and values), where they are drawn: a toolbar on its edge never lies over them. */
+function graphWords(frame: HTMLElement): Box[] {
+  const out: Box[] = [];
+  const walker = document.createTreeWalker(frame, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+    if (!t.textContent?.trim() || t.parentElement?.closest(".xe-tools, .sr-only, [hidden], [data-edit-only]")) continue;
+    range.selectNodeContents(t);
+    for (const r of range.getClientRects()) if (r.width > 0 && r.height > 0) out.push({ x: r.left + window.scrollX, y: r.top + window.scrollY, w: r.width, h: r.height });
+  }
+  return out;
+}
+
 const OUT_OF_PAGE = ".xe-insert, .xe-measure, .xe-drag-overlay, [data-edit-only]";
 /** Edit-only chips and labels that may reach out of their section. */
 const CHIPS = ".xe-fig-chip, .xe-fig-picked, .xe-chip, .xe-above";
-/** Kinds whose toolbar is always inside the corner (css/core.css): they have a card of their own. */
-const INSIDE_KINDS = new Set(["image", "graph"]);
+/** Kinds whose toolbar is always inside the corner (css/core.css): a picture, which has no words there. */
+const INSIDE_KINDS = new Set(["image"]);
+/** The gap between a toolbar's buttons (css/core.css). */
+const GAP = 4;
+
+/**
+ * The shape of a toolbar inside a part's corner (design round 2, item 6): a row, from the grip in the
+ * corner, where the part is wide enough; else one column down the part's right edge from the grip
+ * (grip, move up, move down, the action, more, remove); and only where the picture is too short for
+ * that, the column wraps into another to its left. Returns the writes, so all the reads come first.
+ */
+function shapeOf(tools: HTMLElement, frame: HTMLElement, f: Box, kids: HTMLElement[], unit: number, width: number): () => void {
+  const s = getComputedStyle(tools);
+  const right = parseFloat(s.right) || 0;
+  const top = parseFloat(s.top) || 0;
+  // What it may cover: a picture's own picture, never its caption or description; any other part's own box.
+  const room = frame.dataset.kind === "image" ? (frame.querySelector("img") ?? frame) : frame;
+  const r = pageBox(room);
+  const across = f.w - right - 8;
+  const down = r.y + r.h - (f.y + top) - 8;
+  const n = kids.length;
+  const wide = Math.max(unit, ...kids.map((c) => (c.getClientRects().length > 0 ? c.offsetWidth : unit)));
+  const each = Math.max(1, Math.floor((down + GAP) / (unit + GAP)));
+  const shape = width <= across + 0.5 ? null : n * unit + (n - 1) * GAP <= down + 0.5 && wide <= across + 0.5 ? "column" : "wrap";
+  const columns = Math.ceil(n / each);
+  // Read above, written here: every toolbar's reads come before any of these writes.
+  return () => {
+    attr(tools, "data-shape", shape);
+    prop(tools, "--xe-tools-h", shape === "wrap" ? `${each * unit + (each - 1) * GAP}px` : null);
+    prop(tools, "--xe-tools-w", shape === "wrap" ? `${columns * wide + (columns - 1) * GAP}px` : null);
+  };
+}
 /** Toolbars on the page, for `placeTools`. */
 const toolbars = new Set<HTMLElement>();
 const watched = new WeakSet<Element>();
@@ -107,43 +150,70 @@ function placeTools() {
   collect(main);
   // The gap a toolbar above needs: its buttons, and on a mouse the strip under them that keeps the pointer on the section.
   const bridge = window.matchMedia("(pointer: coarse)").matches ? 0 : 6;
+  // First every read, then every write: a pass reads the page's layout once, and one that changes nothing invalidates nothing.
+  type Plan = { tools: HTMLElement; frame: HTMLElement; f: Box; kids: HTMLElement[]; unit: number; width: number; place: "edge" | "inside" | null; shift: string | null };
+  const plans: Plan[] = [];
   for (const tools of toolbars) {
     const frame = tools.parentElement;
     if (!frame || !tools.isConnected || !main.contains(tools)) continue;
-    if (INSIDE_KINDS.has(frame.dataset.kind ?? "")) {
-      tools.removeAttribute("data-place");
-      continue;
-    }
     // Its whole width, the buttons a tablet hides until the section is touched counted at the grip's size, so where it goes
     // doesn't change as they show and hide. A row of buttons is the grip's height ("More actions" wraps its button in parts that may be taller).
     const grip = tools.querySelector<HTMLElement>("[data-grip]");
     const unit = grip?.offsetWidth ?? 0;
     const kids = [...tools.children].filter((c): c is HTMLElement => c instanceof HTMLElement && !c.hidden);
-    const width = kids.reduce((w, c) => w + (c.getClientRects().length > 0 ? c.offsetWidth : unit), 0) + 4 * Math.max(0, kids.length - 1);
+    const width = kids.reduce((w, c) => w + (c.getClientRects().length > 0 ? c.offsetWidth : unit), 0) + GAP * Math.max(0, kids.length - 1);
     const height = (grip?.offsetHeight ?? 0) + bridge;
     const f = boxes.get(frame) ?? pageBox(frame);
-    const clear = (b: Box) => ![...boxes].some(([el, o]) => el !== frame && o.w > 0 && o.h > 0 && overlap(b, o));
-    tools.style.removeProperty("--xe-tools-right");
-    if (clear({ x: f.x + f.w - width, y: f.y - height, w: width, h: height })) {
-      tools.removeAttribute("data-place");
-      continue;
-    }
-    // A flowchart's toolbar keeps clear of its boxes' own grips and Removes on their right edges (flow.css).
+    const plan: Plan = { tools, frame, f, kids, unit, width, place: null, shift: null };
+    plans.push(plan);
+    // A picture's is always inside its corner (css/core.css).
+    if (INSIDE_KINDS.has(frame.dataset.kind ?? "")) continue;
+    // A graph's own words count too: its toolbar sits on its card's edge only where the card's top padding takes the lower half.
+    const own = frame.dataset.kind === "graph" ? graphWords(frame) : [];
+    const clear = (b: Box) => ![...boxes].some(([el, o]) => el !== frame && o.w > 0 && o.h > 0 && overlap(b, o)) && !own.some((o) => overlap(b, o));
+    if (clear({ x: f.x + f.w - width, y: f.y - height, w: width, h: height })) continue;
+    // A flowchart's toolbar keeps clear of its first box's own grip on that box's top right corner (flow.css).
     const right = frame.dataset.kind === "flow" ? 32 : 0;
     const buttons = height - bridge;
     // Half over the section's top edge, where the gap holds that half (a stack's second part, the first row under the context
-    // line): it covers no more of the section's own top than its first line's right end.
+    // line): it covers no more of the section's own top than its first line's right end, and none of a graph's words.
     if (clear({ x: f.x + f.w - right - width, y: f.y - buttons / 2, w: width, h: buttons })) {
-      tools.setAttribute("data-place", "edge");
+      plan.place = "edge";
       continue;
     }
-    tools.setAttribute("data-place", "inside");
+    plan.place = "inside";
     // Inside the corner, it keeps clear of the chips there (a reference line's "Web address" sits on the rule under it, and the one above's on the rule over it).
-    const inside = { x: f.x + f.w - Math.max(right, 8) - width, y: f.y + 8, w: width, h: buttons };
-    const chips = [...boxes].filter(([el, b]) => el.matches(CHIPS) && b.w > 0 && overlap(inside, b)).map(([, b]) => b);
-    if (chips.length) tools.style.setProperty("--xe-tools-right", `${Math.ceil(f.x + f.w - Math.min(...chips.map((b) => b.x)) + 4)}px`);
-    else tools.style.removeProperty("--xe-tools-right");
+    const box = { x: f.x + f.w - Math.max(right, 8) - width, y: f.y + 8, w: width, h: buttons };
+    const chips = [...boxes].filter(([el, b]) => el.matches(CHIPS) && b.w > 0 && overlap(box, b)).map(([, b]) => b);
+    if (chips.length) plan.shift = `${Math.ceil(f.x + f.w - Math.min(...chips.map((b) => b.x)) + 4)}px`;
   }
+  for (const p of plans) {
+    attr(p.tools, "data-place", p.place);
+    prop(p.tools, "--xe-tools-right", p.shift);
+  }
+  // Each toolbar inside a corner takes its shape from where it is now drawn (one more read of the page for them all).
+  const inCorner = plans.filter((p) => p.place === "inside" || INSIDE_KINDS.has(p.frame.dataset.kind ?? ""));
+  const shapes = inCorner.map((p) => shapeOf(p.tools, p.frame, p.f, p.kids, p.unit, p.width));
+  for (const write of shapes) write();
+  for (const p of plans) {
+    if (inCorner.includes(p)) continue;
+    attr(p.tools, "data-shape", null);
+    prop(p.tools, "--xe-tools-w", null);
+    prop(p.tools, "--xe-tools-h", null);
+  }
+}
+
+/** Writes an attribute only when it changes, so a pass that changes nothing invalidates no style. */
+function attr(el: HTMLElement, name: string, value: string | null) {
+  if (el.getAttribute(name) === value) return;
+  if (value === null) el.removeAttribute(name);
+  else el.setAttribute(name, value);
+}
+/** The same for a custom property in the element's own style. */
+function prop(el: HTMLElement, name: string, value: string | null) {
+  if ((el.style.getPropertyValue(name) || null) === value) return;
+  if (value === null) el.style.removeProperty(name);
+  else el.style.setProperty(name, value);
 }
 
 /** Places the toolbars before the next paint. */

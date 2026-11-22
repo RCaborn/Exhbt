@@ -271,24 +271,59 @@
     opacity: 1;
     pointer-events: auto;
   }
-  /* Inside the corner, as in the prototype Rory tried ("Grip thing good"): a picture's and a graph's
-     toolbar sits in its own top right corner, over its card, so in the gallery's grid it never lies
-     over the caption of the picture above; any other section's does too where the gap above it is
-     too small to hold it without covering the words above (Toolbar.tsx measures: data-place). The
-     grip is in the corner itself and the other buttons run in from it, wrapping inside a narrow part,
-     so the grip never moves as the rest show or hide. A phone places its grips itself (phone.css). */
+  /* One order everywhere, as drawn from left to right: Remove, More actions, the layout's action, Move
+     up, Move down, the grip. So the grip is always at the section's corner, wherever the toolbar sits,
+     and Remove is farthest from it (design round 2, item 2). The reading and Tab order stay the
+     markup's: the grip first. */
+  .xe-tools > [data-grip] {
+    order: 6;
+  }
+  .xe-tools > [data-tool="down"] {
+    order: 5;
+  }
+  .xe-tools > [data-tool="up"] {
+    order: 4;
+  }
+  .xe-tools > [data-tool="action"] {
+    order: 3;
+  }
+  .xe-tools > [data-tool="more"] {
+    order: 2;
+  }
+  .xe-tools > [data-tool="remove"] {
+    order: 1;
+  }
+  /* Inside the corner, as in the prototype Rory tried ("Grip thing good"): a picture's toolbar sits in
+     its own top right corner, over the picture, so in the gallery's grid it never lies over the caption
+     of the picture above; any other section's does too where the gap above it is too small to hold it,
+     on its top edge or above it, without covering words (Toolbar.tsx measures: data-place). Where a
+     narrow part can't hold the row, it is one column down its right edge from the grip, and only where
+     the picture is too short for that, the column wraps (data-shape). A phone places its grips itself
+     (phone.css). */
   @media not all and (max-width: 47.99rem) and (pointer: coarse) {
-    .xe-frame:is([data-kind="image"], [data-kind="graph"]) > .xe-tools,
+    .xe-frame[data-kind="image"] > .xe-tools,
     .xe-frame > .xe-tools[data-place="inside"] {
       /* Toolbar.tsx moves it along, clear of the section's own chips in that corner, where it must. */
       --xe-inset: var(--xe-tools-right, 0.5rem);
       top: 0.5rem;
       right: var(--xe-inset);
       bottom: auto;
-      flex-direction: row-reverse;
-      flex-wrap: wrap;
-      max-width: calc(100% - var(--xe-inset) - 0.5rem);
       padding-bottom: 0;
+    }
+    /* Down the right edge from the grip: grip, move up, move down, the action, more, remove. */
+    .xe-frame > .xe-tools:is([data-shape="column"], [data-shape="wrap"]) {
+      flex-direction: column;
+      align-items: flex-end;
+    }
+    .xe-frame > .xe-tools:is([data-shape="column"], [data-shape="wrap"]) > * {
+      order: 0;
+    }
+    /* Too short for one column: it goes on in another to its left, the grip still in the corner. */
+    .xe-frame > .xe-tools[data-shape="wrap"] {
+      flex-wrap: wrap-reverse;
+      align-content: flex-start;
+      width: var(--xe-tools-w);
+      max-height: var(--xe-tools-h);
     }
     /* Half over the section's top edge, where the gap above holds that half (Toolbar.tsx measures): a row of buttons is 36px, 44px on a touch screen. */
     .xe-frame > .xe-tools[data-place="edge"] {
@@ -447,13 +482,12 @@
     }
   }
   /* On a tablet the toolbars are always shown, so one that lies over its own section (inside a
-     picture's or a graph's corner, a tile's in the gallery's grid among them, or on a section's top
-     edge) shows only its grip, in its place: five 44px buttons are wider than a tile, and would hide a
-     graph's title all the time. The rest show while the section is touched or the focus is in it (its
-     caption, its description, or the grip from the keyboard), running in from the grip, which stays
-     where it is, and wrapping inside the part. */
+     picture's corner, a tile's in the gallery's grid among them, or inside or on the top edge of any
+     other) shows only its grip, in its place: five 44px buttons are wider than a tile. The rest show
+     while the section is touched or the focus is in it (its caption, its description, or the grip from
+     the keyboard), running in from the grip, which stays where it is. */
   @media (pointer: coarse) and (min-width: 48rem) {
-    .xe-frame:is([data-kind="image"], [data-kind="graph"]):not(:hover):not(:focus-within) > .xe-tools > [data-tool],
+    .xe-frame[data-kind="image"]:not(:hover):not(:focus-within) > .xe-tools > [data-tool],
     .xe-frame:not(:hover):not(:focus-within) > .xe-tools:is([data-place="inside"], [data-place="edge"]) > [data-tool] {
       display: none;
     }

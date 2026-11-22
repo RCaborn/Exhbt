@@ -263,19 +263,22 @@ test.describe("each section's toolbar, at 1440 wide", () => {
   test.skip(({ isMobile }) => isMobile, "the phone and tablet specs check their own");
 
   for (const f of offered()) {
-    test(`${f}: no toolbar covers another section's words, pictures or controls, nor a chip; a picture's and a graph's sit inside their own top right corner`, async ({ page }) => {
+    test(`${f}: no toolbar covers another section's words, pictures or controls, a chip, or a graph's own words; the grip is always at the corner, and a picture's toolbar inside its own`, async ({ page }) => {
       await openTiming(page, f, { full: true });
       await waitLive(page);
       expect(await toolbarClashes(page)).toEqual([]);
-      const corners = await page.locator(`${READY} article [data-section-id]:is([data-kind="image"], [data-kind="graph"])`).evaluateAll((els) =>
+      const corners = await page.locator(`${READY} article [data-section-id]`).evaluateAll((els) =>
         els.flatMap((fr) => {
+          const id = fr.getAttribute("data-section-id");
           const box = fr.getBoundingClientRect();
           const grip = fr.querySelector(":scope > .xe-tools [data-grip]")!.getBoundingClientRect();
-          const tools = [...fr.querySelectorAll(":scope > .xe-tools button")].map((b) => b.getBoundingClientRect());
-          const inside = tools.every((r) => r.left >= box.left - 0.5 && r.right <= box.right + 0.5 && r.top >= box.top - 0.5);
-          // The grip is the one in the corner: nearest the frame's right edge, in the top row.
-          const corner = tools.every((r) => r.right <= grip.right + 0.5 && r.top >= grip.top - 0.5);
-          return inside && corner ? [] : [`${fr.getAttribute("data-section-id")}: ${inside ? "grip not in the corner" : "toolbar not inside"}`];
+          const tools = [...fr.querySelectorAll(":scope > .xe-tools button")].filter((b) => b.getClientRects().length > 0).map((b) => b.getBoundingClientRect());
+          const bad: string[] = [];
+          // The grip is at the corner, wherever the toolbar sits: no button to its right, none above it (design round 2, item 2).
+          if (!tools.every((r) => r.right <= grip.right + 0.5 && r.top >= grip.top - 0.5)) bad.push(`${id}: the grip is not at the corner`);
+          // A picture's toolbar is inside its own top right corner, over the picture (design round 2, item 1: only pictures).
+          if (fr.getAttribute("data-kind") === "image" && !tools.every((r) => r.left >= box.left - 0.5 && r.right <= box.right + 0.5 && r.top >= box.top - 0.5)) bad.push(`${id}: not inside`);
+          return bad;
         }),
       );
       expect(corners).toEqual([]);
@@ -316,31 +319,33 @@ test.describe("each section's toolbar, at 1440 wide", () => {
       );
     // One stop each, the grip.
     for (const s of await stops()) expect(s).toEqual([expect.stringMatching(/^Drag .* to move it$/)]);
-    // Inside a graph's corner the toolbar runs leftwards from its grip: the left arrow goes along it.
-    const corner = frame(page, "graph-1").locator(":scope > .xe-tools");
-    await grip(page, "graph-1").focus();
-    await page.keyboard.press("ArrowLeft");
-    await expect(corner.locator('[data-tool="up"]')).toBeFocused();
-    await page.keyboard.press("ArrowRight");
-    await expect(grip(page, "graph-1")).toBeFocused();
-    // Above its corner, left to right from the grip.
+    // Every toolbar is drawn in one order, Remove farthest from the grip and the grip at the corner (design round 2, item 2):
+    // from the grip, the left arrow goes along it, button by button as drawn, and Home and End go to its ends.
     const id = "reflection-1";
     const tools = frame(page, id).locator(":scope > .xe-tools");
-    await expect(tools).not.toHaveAttribute("data-place", "inside");
     const name = await nameOf(page, id);
+    const drawn = await tools.locator("button").evaluateAll((bs) =>
+      bs
+        .filter((b) => b.getClientRects().length > 0)
+        .map((b) => ({ name: b.getAttribute("aria-label")!, r: b.getBoundingClientRect() }))
+        .sort((p, q) => (Math.abs(p.r.top - q.r.top) > 4 ? p.r.top - q.r.top : p.r.left - q.r.left))
+        .map((b) => b.name),
+    );
+    expect(drawn).toEqual([`Remove ${name}`, `Move ${name} up`, `Move ${name} down`, `Drag ${name} to move it`]);
+    const focused = () => page.evaluate(() => document.activeElement?.getAttribute("aria-label"));
     await grip(page, id).focus();
-    await page.keyboard.press("ArrowRight");
-    await expect(tools.locator('[data-tool="up"]')).toBeFocused();
-    await page.keyboard.press("ArrowRight");
-    await expect(tools.locator('[data-tool="down"]')).toBeFocused();
     await page.keyboard.press("ArrowLeft");
-    await expect(tools.locator('[data-tool="up"]')).toBeFocused();
-    await page.keyboard.press("End");
-    await expect(tools.getByRole("button", { name: `Remove ${name}` })).toBeFocused();
+    expect(await focused()).toBe(`Move ${name} down`);
+    await page.keyboard.press("ArrowLeft");
+    expect(await focused()).toBe(`Move ${name} up`);
+    await page.keyboard.press("ArrowRight");
+    expect(await focused()).toBe(`Move ${name} down`);
     await page.keyboard.press("Home");
+    expect(await focused()).toBe(`Remove ${name}`);
+    await page.keyboard.press("End");
     await expect(grip(page, id)).toBeFocused();
     // The stop follows the focus while it is in the toolbar, and Tab leaves the toolbar in one press, from any of its buttons.
-    await page.keyboard.press("End");
+    await page.keyboard.press("Home");
     await page.keyboard.press("Tab");
     expect(await page.evaluate((i) => Boolean(document.activeElement?.closest(`[data-section-id="${i}"] > .xe-tools`)), id)).toBe(false);
     // Back with Shift+Tab: the stop went back to the grip when the focus left.
@@ -362,8 +367,8 @@ test.describe("each section's toolbar, at 1440 wide", () => {
     await page.keyboard.press("Escape");
     await expect(lifting(page)).toHaveCount(0);
     expect(await pageOrder(page)).toEqual(order);
-    await page.keyboard.press("ArrowRight");
-    await expect(tools.locator('[data-tool="up"]')).toBeFocused();
+    await page.keyboard.press("ArrowLeft");
+    expect(await focused()).toBe(`Move ${name} down`);
   });
 
   test("research with two reference lines: neither toolbar covers the line above, the References heading or a Web address chip", async ({ page }) => {
