@@ -27,9 +27,11 @@ import type { Store } from "./store-core";
  *
  * Where it sits (css/core.css): above the section's top right corner, in the gap over it, where the
  * gap holds it; half over the section's top edge where the gap holds half of it; inside that corner
- * where even that would cover the words above it. A picture's and a graph's
- * toolbar is always inside its corner, as in the prototype Rory tried, so in the gallery's grid it
- * never lies over the caption of the picture above. For the rest the gap is measured (`placeTools`).
+ * where even that would cover the words above it, a graph's own words included (`placeTools`). A
+ * picture's toolbar is always inside its corner, as in the prototype Rory tried, so in the gallery's
+ * grid it never lies over the caption of the picture above; where a tile is too narrow for the row,
+ * one column down its right edge. Wherever it sits it is drawn in one order, Remove first and the grip
+ * last, so the grip is always at the section's corner (css/core.css; the markup keeps the grip first).
  */
 
 type Box = { x: number; y: number; w: number; h: number };
