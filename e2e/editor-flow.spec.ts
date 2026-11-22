@@ -4,7 +4,7 @@ import { lineAt, moved, placeAt, within } from "../components/exhbt-editor/flow/
 import type { ExhbtDoc, FlowStep } from "../lib/exhbt/blocks";
 import { FORMAT_RULES, type Format } from "../lib/exhbt/formats";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
-import { allowEditOnly, boxes, differences, docNow, field, focusedPath, freshName, full, offered, openDoc, openTiming, READY, renders, sampleDoc, SAMPLES, seeAsVisitor, settle, undoLabel, waitReady } from "./page-editor";
+import { allowEditOnly, boxes, differences, docNow, field, focusedPath, freshName, full, offered, openDoc, openTiming, READY, renders, sampleDoc, SAMPLES, seeAsVisitor, settle, undoLabel, waitLive, waitReady } from "./page-editor";
 
 /*
  * The flowchart edited where it sits (decision 0026; docs/briefs/edit-on-page/r3-k-flowchart.md): type
@@ -630,6 +630,20 @@ test.describe("an empty flowchart", () => {
     // The count issue is on the list until there are three.
     await expect(list(page)).toHaveAttribute("data-invalid", "");
   });
+
+  for (const f of offered()) {
+    test(`${FORMAT_RULES[f].name.toLowerCase()}: with no boxes, the page is the visitor's box for box once what EDIT_ONLY_IN_FLOW allows is taken out`, async ({ page }) => {
+      await openDoc(page, freshName("flowemptyparity"), { ...sampleDoc(f), flow: [] });
+      await waitLive(page);
+      const taken = await allowEditOnly(page, "all");
+      expect(taken.some((t) => t.startsWith("the empty flowchart's")), taken.join("; ")).toBe(true);
+      await settle(page);
+      const editing = await boxes(page);
+      await seeAsVisitor(page, true);
+      await settle(page);
+      expect(differences(await boxes(page), editing), `with these taken out: ${taken.join("; ")}`).toEqual([]);
+    });
+  }
 });
 
 /* ------------------------------------------------------------------------------------------------
