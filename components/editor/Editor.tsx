@@ -12,7 +12,7 @@ import { CopyLink } from "@/components/ui/CopyLink";
 import type { Plan } from "@/lib/entitlements";
 import { formatLimits, LIMITS, normaliseDoc, safeHref, validateForPublish, wordCount, type ExhbtDoc, type Picked } from "@/lib/exhbt/blocks";
 import { flowShown, FORMAT_COPY, formatOf } from "@/lib/exhbt/formats";
-import { isArranged, restoreFlow } from "@/lib/exhbt/layouts";
+import { drawnFlow, isArranged, restoreFlow } from "@/lib/exhbt/layouts";
 import { hasData } from "@/lib/exhbt/charts";
 import { newImageSection, roomFor } from "@/lib/exhbt/sections";
 import { LayoutPicker, type Drafted } from "./LayoutPicker";
@@ -365,11 +365,10 @@ export function Editor(props: EditorProps) {
   const evidenceHref = doc.evidence?.kind === "link" ? safeHref(doc.evidence.href) : doc.evidence?.kind === "file" ? workUrl : null;
   // Graphs show in the preview once something is typed in them.
   // Blank boxes are left out of the flowchart, so a box just added doesn't draw as the dark result box; if every box is blank (a new exhbt) they all show.
-  const filledSteps = doc.flow.filter((s) => s.step.trim() !== "" || (s.detail ?? "").trim() !== "");
   const previewDoc: ExhbtDoc = {
     ...doc,
     title: doc.title.trim() || copy.emptyTitle,
-    flow: filledSteps.length > 0 ? filledSteps : doc.flow,
+    flow: drawnFlow(doc.flow),
     sections: doc.sections.filter((s) => s.kind !== "graph" || hasData(s.chart)),
   };
   const liveUrl = liveBase && slug ? `${liveBase}/${slug}` : null;

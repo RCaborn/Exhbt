@@ -7,7 +7,7 @@ import { IMAGE_ACCEPT } from "@/components/editor/media";
 import { clearBackup, readBackup, writeBackup, type Backup } from "@/components/editor/useAutosave";
 import { Button } from "@/components/ui/Button";
 import { normaliseDoc } from "@/lib/exhbt/blocks";
-import { keptItems, pageItems } from "@/lib/exhbt/layouts";
+import { drawnFlow, keptItems, pageItems } from "@/lib/exhbt/layouts";
 import type { PageCtx } from "@/components/portfolio/page-ctx";
 import { ProjectView, type Owner } from "@/components/portfolio/ProjectView";
 import { lookAttrs, themeStyle } from "@/components/portfolio/themeFonts";
@@ -212,7 +212,9 @@ function Canvas() {
 /** "See as a visitor": the same doc with no adapter (decision 0026). */
 function Visitor() {
   const store = useStoreInternal();
-  const doc = useSyncExternalStore(store.subscribe, store.get, store.get);
+  const stored = useSyncExternalStore(store.subscribe, store.get, store.get);
+  // Blank flowchart boxes stay out of the visitor's page (the editing page shows every box).
+  const doc = useMemo(() => ({ ...stored, flow: drawnFlow(stored.flow) }), [stored]);
   const imageUrls = useImageUrls();
   const confirmed = useUiState((s) => s.confirmed);
   const owner = useOwner();

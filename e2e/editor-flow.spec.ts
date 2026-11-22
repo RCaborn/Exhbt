@@ -858,3 +858,39 @@ test.describe("by touch", () => {
     });
   }
 });
+
+test.describe("blank boxes as a visitor sees them", () => {
+  const visitorList = (page: Page) => page.locator(`${READY} section[aria-label="Preview"]`).getByRole("list", { name: "Methodology" });
+
+  test("a blank last box is left out of 'See as a visitor', so the last filled step keeps the result box; the editing page still shows it; typing brings it in; all blank shows them all", async ({ page }) => {
+    const base = sampleDoc("case-study");
+    const filled = base.flow.slice(0, 3);
+    await openDoc(page, freshName("blankflow"), { ...base, flow: [...filled, { step: "" }] });
+    await settle(page);
+    // Editing: every box, the blank one too, so there is somewhere to type.
+    expect(await keysNow(page)).toHaveLength(4);
+    await seeAsVisitor(page, true);
+    const items = visitorList(page).getByRole("listitem");
+    await expect(items).toHaveCount(3);
+    await expect(items.last()).toContainText(filled[2]!.step);
+    await expect(visitorList(page).locator("[data-last]")).toHaveCount(1);
+    await expect(items.last().locator("[data-last]")).toBeVisible();
+    // Typing in the blank box brings it in as the last step.
+    await seeAsVisitor(page, false);
+    expect(await keysNow(page)).toHaveLength(4);
+    await page.evaluate(() => window.__exhbtEditor!.setAt("flow.3.step", "Wrote it up"));
+    await seeAsVisitor(page, true);
+    await expect(items).toHaveCount(4);
+    await expect(items.last()).toContainText("Wrote it up");
+    // Every box blank (a new exhbt): they all show.
+    await seeAsVisitor(page, false);
+    await page.evaluate(() =>
+      [0, 1, 2, 3].forEach((n) => {
+        window.__exhbtEditor!.setAt(`flow.${n}.step`, "");
+        window.__exhbtEditor!.setAt(`flow.${n}.detail`, "");
+      }),
+    );
+    await seeAsVisitor(page, true);
+    await expect(items).toHaveCount(4);
+  });
+});
