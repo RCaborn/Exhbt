@@ -10,5 +10,5 @@
 export const SECTION_STYLE: "slide" | "line" = "slide";
 /** The flowchart section. */
 export const FLOW_SECTION_STYLE: "slide" | "line" = "line";
-/** A box inside the flowchart. Rory has not yet confirmed a line against sliding (open question 1). */
-export const FLOW_BOX_STYLE: "slide" | "line" = "line";
+/** A box inside the flowchart. Rory, 22 Nov 2026: "Boxes sliding is better" (open question 1). "line" stays one change away until he has tried the real editor. */
+export const FLOW_BOX_STYLE: "slide" | "line" = "slide";
