@@ -117,7 +117,7 @@ export async function GET(req: NextRequest) {
     let doc = seed !== undefined ? normaliseDoc(seed) : { ...base, title: MORE_TITLES[i - sampleSeeds.length]! };
     if (noGraphs) doc = { ...doc, sections: doc.sections.filter((s) => s.kind !== "graph") };
     const id = await store.createExhbt(userId, doc);
-    await store.publishExhbt(id, userId, i === 0 ? "gp-reminders" : i === 1 ? "library-footfall" : `project-${i + 1}`);
+    await store.publishExhbt(id, userId, i === 0 ? "gp-reminders" : i === 1 ? "library-footfall" : `project-${i + 1}`, { unchecked: true });
     // As stored before sections, both copies (createExhbt and publishing write the current shape).
     if (seed !== undefined && !converted && !noGraphs && (seed as ExhbtDoc).sections === undefined) {
       setStoredCopiesForDevelopment(id, { doc: seed, published: seed });
@@ -126,19 +126,19 @@ export async function GET(req: NextRequest) {
   // The exhbt in the page layout of decision 0022 (title as the question, summary, where and when), last.
   if (withs.has("open-banking")) {
     const id = await store.createExhbt(userId, noGraphs ? { ...openBankingDoc, sections: openBankingDoc.sections.filter((s) => s.kind !== "graph") } : openBankingDoc);
-    await store.publishExhbt(id, userId, "open-banking");
+    await store.publishExhbt(id, userId, "open-banking", { unchecked: true });
   }
   // The same with every section but an image, near the word cap (the one-page print check).
   if (withs.has("full")) {
     const id = await store.createExhbt(userId, fullDoc);
-    await store.publishExhbt(id, userId, "open-banking-full");
+    await store.publishExhbt(id, userId, "open-banking-full", { unchecked: true });
   }
   // Case studies with five and six boxes of longer wording, to check no word splits (decision 0022): /flow-five and /flow-six.
   if (withs.has("flow")) {
     const six = ["Define bank and fintech strategies", "Set payoff matrix with openness parameter", "Derive replicator equations and rest points", "Classify stability of each equilibrium", "Select outcome via risk dominance", "Compare with the mandate's aims"];
     for (const [slug, steps] of [["flow-six", six], ["flow-five", six.slice(1)]] as const) {
       const id = await store.createExhbt(userId, { ...openBankingDoc, title: `Flowchart with ${steps.length} boxes`, flow: steps.map((step) => ({ step })) });
-      await store.publishExhbt(id, userId, slug);
+      await store.publishExhbt(id, userId, slug, { unchecked: true });
     }
   }
   // The gallery and research layouts (decision 0024), each with pictures that are the user's own stored files.
@@ -146,12 +146,12 @@ export async function GET(req: NextRequest) {
     const ids: string[] = [];
     for (const [i, im] of GALLERY_IMAGES.entries()) ids.push(await placeholderPicture(userId, im.w, im.h, `Picture ${i + 1}`, i));
     const id = await store.createExhbt(userId, galleryDoc(ids));
-    await store.publishExhbt(id, userId, "freshers-campaign");
+    await store.publishExhbt(id, userId, "freshers-campaign", { unchecked: true });
   }
   if (withs.has("research") || withs.has("formats")) {
     const fileId = await placeholderPicture(userId, RESEARCH_IMAGE.w, RESEARCH_IMAGE.h, "Walking route", 1);
     const id = await store.createExhbt(userId, researchDoc(fileId));
-    await store.publishExhbt(id, userId, "walk-and-recall");
+    await store.publishExhbt(id, userId, "walk-and-recall", { unchecked: true });
   }
   // The four layouts of decision 0028, each with flat placeholder pictures stored as the user's own files.
   const all = withs.has("layouts");
@@ -159,24 +159,24 @@ export async function GET(req: NextRequest) {
     const ids: string[] = [];
     for (const [i, im] of BUILD_IMAGES.entries()) ids.push(await placeholderPicture(userId, im.w, im.h, `Screenshot ${i + 1}`, i));
     const id = await store.createExhbt(userId, buildDoc(ids));
-    await store.publishExhbt(id, userId, "shift-swap");
+    await store.publishExhbt(id, userId, "shift-swap", { unchecked: true });
   }
   if (all || withs.has("essay")) {
     const fileId = await placeholderPicture(userId, ESSAY_IMAGE.w, ESSAY_IMAGE.h, "Reform meeting notice", 1);
     const id = await store.createExhbt(userId, essayDoc(fileId));
-    await store.publishExhbt(id, userId, "reform-act");
+    await store.publishExhbt(id, userId, "reform-act", { unchecked: true });
   }
   if (all || withs.has("before-after")) {
     const ids: string[] = [];
     for (const [i, im] of BEFORE_AFTER_IMAGES.entries()) ids.push(await placeholderPicture(userId, im.w, im.h, `${im.stage === "before" ? "Before" : "After"} ${Math.floor(i / 2) + 1}`, i));
     const id = await store.createExhbt(userId, beforeAfterDoc(ids));
-    await store.publishExhbt(id, userId, "cafe-checkout");
+    await store.publishExhbt(id, userId, "cafe-checkout", { unchecked: true });
   }
   if (all || withs.has("event")) {
     const ids: string[] = [];
     for (const [i, im] of EVENT_IMAGES.entries()) ids.push(await placeholderPicture(userId, im.w, im.h, i === 0 ? "Poster" : `Photo ${i}`, i));
     const id = await store.createExhbt(userId, eventDoc(ids));
-    await store.publishExhbt(id, userId, "the-crucible");
+    await store.publishExhbt(id, userId, "the-crucible", { unchecked: true });
   }
   return NextResponse.redirect(new URL(`/p/${username}`, req.url));
 }

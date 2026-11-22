@@ -3,13 +3,18 @@
 import "./css/core.css";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { flushSync } from "react-dom";
+import { CHECKS_GUIDE } from "@/components/brand/Seal";
+import { MadeWith } from "@/components/brand/MadeWith";
 import { IMAGE_ACCEPT } from "@/components/editor/media";
 import { clearBackup, readBackup, writeBackup, type Backup } from "@/components/editor/useAutosave";
 import { Button } from "@/components/ui/Button";
-import { normaliseDoc } from "@/lib/exhbt/blocks";
+import { checkedOnLabel } from "@/lib/checked-on";
+import { normaliseDoc, safeHref } from "@/lib/exhbt/blocks";
+import { MARKETING_HOST } from "@/lib/hosts";
 import { drawnFlow, keptItems, pageItems } from "@/lib/exhbt/layouts";
 import type { PageCtx } from "@/components/portfolio/page-ctx";
 import { ProjectView, type Owner } from "@/components/portfolio/ProjectView";
+import { TeamByline } from "@/components/portfolio/TeamByline";
 import { lookAttrs, themeStyle } from "@/components/portfolio/themeFonts";
 import { formatOf } from "@/lib/exhbt/formats";
 import { useAdapter } from "./adapter";
@@ -220,8 +225,31 @@ function Visitor() {
   const confirmed = useUiState((s) => s.confirmed);
   const owner = useOwner();
   const env = useEnv();
-  const evidenceUrl = doc.evidence?.kind === "link" ? doc.evidence.href : doc.evidence?.kind === "file" ? env.fileEvidenceUrl : null;
-  return <ProjectView doc={doc} owner={owner} imageUrls={imageUrls} evidenceUrl={evidenceUrl} headingLevel="h2" confirmed={confirmed} />;
+  // A link is drawn only if it is https, as on the public page (lib/portfolio.ts mediaFor).
+  const evidenceUrl = doc.evidence?.kind === "link" ? safeHref(doc.evidence.href) : doc.evidence?.kind === "file" ? env.fileEvidenceUrl : null;
+  // The date the public page draws beside the checks: the publish date, or for a draft the day it would say if it went live now.
+  const checkedOn = checkedOnLabel(env.publishedAt ?? null) ?? checkedOnLabel(new Date().toISOString());
+  // On the person's own host (alex.exhbt.co.uk) the guide is on our site, as the public page does it.
+  const onPortfolioHost = Boolean(env.liveBase?.startsWith("https://"));
+  return (
+    <>
+      <ProjectView
+        doc={doc}
+        owner={owner}
+        imageUrls={imageUrls}
+        evidenceUrl={evidenceUrl}
+        checkedOn={checkedOn}
+        team={env.team && env.team.length > 0 ? <TeamByline team={env.team} /> : undefined}
+        saveAsPdf
+        checksHref={onPortfolioHost ? `https://${MARKETING_HOST}${CHECKS_GUIDE}` : undefined}
+        headingLevel="h2"
+        confirmed={confirmed}
+      />
+      <div data-visitor-signoff>
+        <MadeWith startHref={onPortfolioHost ? `https://${MARKETING_HOST}/start` : "/start"} />
+      </div>
+    </>
+  );
 }
 
 /** A small line fixed at the foot of the window, out of the flow: the upload's progress, and under it what went wrong. On a phone L's bar lifts it (css/phone.css). */

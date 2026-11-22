@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { headers } from "next/headers";
-import { imagesOf, type ExhbtDoc } from "./exhbt/blocks";
+import { imagesOf, safeHref, type ExhbtDoc } from "./exhbt/blocks";
 import { signedFileUrl } from "./files";
 import { parseHost, portfolioHost } from "./hosts";
 import { ENTITLEMENTS } from "./entitlements";
@@ -123,14 +123,14 @@ export async function loadPortfolio(username: string, rest = ""): Promise<Loaded
 const toItem = (e: ExhbtRecord): Omit<PortfolioItem, "team"> => ({ id: e.id, slug: e.slug!, doc: e.published!, publishedAt: e.publishedAt });
 
 /**
- * Signed URLs for one exhbt's images and its evidence file (links pass through). `ownerId` is the exhbt's
+ * Signed URLs for one exhbt's images and its evidence file (a link passes through only if it is https, else null). `ownerId` is the exhbt's
  * owner: a file that isn't theirs gets no URL, so a doc can never show someone else's file.
  */
 export async function mediaFor(doc: ExhbtDoc, ownerId: string): Promise<{ imageUrls: Record<string, string | null>; evidenceUrl: string | null }> {
   const imageUrls: Record<string, string | null> = {};
   for (const im of imagesOf(doc)) imageUrls[im.fileId] = await signedFileUrl(im.fileId, ownerId);
   const ev = doc.evidence;
-  const evidenceUrl = !ev ? null : ev.kind === "link" ? ev.href : await signedFileUrl(ev.fileId, ownerId);
+  const evidenceUrl = !ev ? null : ev.kind === "link" ? safeHref(ev.href) : await signedFileUrl(ev.fileId, ownerId);
   return { imageUrls, evidenceUrl };
 }
 
@@ -147,6 +147,4 @@ export const portfolioLook = cache(async (username: string): Promise<PortfolioTh
   return themeFor(profile, plan);
 });
 
-/** "12 Nov 2026", for the date beside the checks. */
-export const checkedOnLabel = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : undefined;
+export { checkedOnLabel } from "./checked-on";
