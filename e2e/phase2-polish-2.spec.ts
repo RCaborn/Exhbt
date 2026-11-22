@@ -1,10 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
 import { devices, expect, test, type Page } from "@playwright/test";
 import { uniqueEmail } from "./helpers";
-import { draftAndOpen, keepClassic } from "./editor";
-
-// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
-test.beforeEach(({ page }) => keepClassic(page));
+import { cardMenuButton, draftAndOpen, fillBox, finding, seeAsVisitor, visitorRegion } from "./editor";
+import { READY } from "./page-editor";
 
 // Phase 2 polish, second pass: the phone header menu, one catalogue number, the per-card
 // "More actions" menu, the flowchart as a row on wide screens and a column on phones, the exhbt
@@ -23,6 +21,12 @@ async function seed(page: Page, username: string, plan: string) {
 
 const signInAs = (page: Page, email: string, next: string) => page.goto(`/auth/dev?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}`);
 const noSideScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+/** A block's tools show while its part has the pointer (decision 0026): move onto the part, then press its "More actions". */
+async function openMore(page: Page, block: string) {
+  const part = block === "findings" || block === "flow" ? page.locator(`${READY} [data-kind="${block}"]`).first() : page.locator(`${READY} .xe-shell-tools[data-block="${block}"]`).locator("xpath=..");
+  await part.hover();
+  await cardMenuButton(page, block).click();
+}
 const direction = (page: Page, selector: string) => page.locator(selector).first().evaluate((el) => getComputedStyle(el).flexDirection);
 
 test.describe("Phone header", () => {
@@ -121,13 +125,13 @@ test.describe("Project page on a phone", () => {
 test.describe("Editor", () => {
   test("each card has one More actions menu: rewrite, back to the AI version, and the count", async ({ page }) => {
     await draftAndOpen(page, "menu", { waitForForm: false });
-    const more = page.getByRole("button", { name: "More actions for Findings" });
+    const more = cardMenuButton(page, "findings");
     const tools = page.getByTestId("tools-findings");
     // No old two-button bar.
     await expect(page.getByRole("button", { name: "Rewrite the findings" })).toHaveCount(0);
     await expect(more).toHaveAttribute("aria-expanded", "false");
 
-    await more.click();
+    await openMore(page, "findings");
     await expect(more).toHaveAttribute("aria-expanded", "true");
     await expect(tools.getByRole("button", { name: "Rewrite this block" })).toBeVisible();
     await expect(tools.getByTestId("rewrites-left")).toHaveText(/^\d+ of \d+ rewrites left$/);
@@ -135,32 +139,31 @@ test.describe("Editor", () => {
 
     await tools.getByRole("button", { name: "Rewrite this block" }).click();
     await page.getByRole("button", { name: "Rewrite the findings now" }).click();
-    const findings = page.getByRole("textbox", { name: "Finding 1" });
+    const findings = finding(page, 1);
     await expect(findings).toContainText("Preview rewrite 1");
 
     // Edit, then go back to the AI's wording.
     await findings.click();
     await page.keyboard.press("End");
     await page.keyboard.type(" MY EDIT");
-    await more.click();
+    await openMore(page, "findings");
     await tools.getByRole("button", { name: "Back to the AI version" }).click();
     await expect(findings).not.toContainText("MY EDIT");
     await expect(findings).toContainText("Preview rewrite 1");
   });
 
-  test("the preview is wide enough for the flowchart to be a row at 1440, and the process card is a wrapping row", async ({ page }) => {
+  test("the flowchart is a row at 1440 on the editing page and on the page a visitor sees, and nothing scrolls sideways", async ({ page }) => {
     await draftAndOpen(page, "row", { waitForForm: false });
-    expect(await direction(page, 'section[aria-label="Preview"] ol[aria-label="Methodology"]')).toBe("row");
-    expect(await direction(page, 'ol[aria-label="Process flowchart"]')).toBe("row");
-    expect(await page.locator('ol[aria-label="Process flowchart"]').first().evaluate((el) => getComputedStyle(el).flexWrap)).toBe("wrap");
+    expect(await direction(page, `${READY} ol[aria-label="Methodology"]`)).toBe("row");
     expect(await noSideScroll(page)).toBe(true);
-    // The boxes keep their move buttons, as left and right arrows.
-    await expect(page.getByRole("button", { name: "Move box 1 later" })).toBeVisible();
+    await seeAsVisitor(page);
+    expect(await direction(page, 'section[aria-label="Preview"] ol[aria-label="Methodology"]')).toBe("row");
+    expect(await noSideScroll(page)).toBe(true);
   });
 
   test("no accessibility violations with a More actions menu open", async ({ page }) => {
     await draftAndOpen(page, "axe", { waitForForm: false });
-    await page.getByRole("button", { name: "More actions for Process" }).click();
+    await openMore(page, "flow");
     await expect(page.getByTestId("tools-flow").getByRole("button", { name: "Rewrite this block" })).toBeVisible();
     const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
     expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
@@ -169,11 +172,13 @@ test.describe("Editor", () => {
 
 test.describe("Editor on a phone", () => {
   test.use(PIXEL_7);
-  test("the process card and the preview stay vertical", async ({ page }) => {
+  test("the flowchart stays vertical on the page, and as a visitor sees it", async ({ page }) => {
     await draftAndOpen(page, "phone", { waitForForm: false });
-    expect(await direction(page, 'ol[aria-label="Process flowchart"]')).toBe("column");
+    expect(await direction(page, `${READY} ol[aria-label="Methodology"]`)).toBe("column");
     expect(await noSideScroll(page)).toBe(true);
-    await page.getByRole("button", { name: "Preview" }).first().click();
+    // On a phone "See as a visitor" is in the top bar's menu.
+    await page.locator(READY).getByRole("button", { name: "Menu" }).click();
+    await page.getByRole("button", { name: "See as a visitor" }).click();
     await expect(page.locator('section[aria-label="Preview"] ol[aria-label="Methodology"]')).toBeVisible();
     expect(await direction(page, 'section[aria-label="Preview"] ol[aria-label="Methodology"]')).toBe("column");
     expect(await noSideScroll(page)).toBe(true);
@@ -225,11 +230,11 @@ test.describe("Profile photo on Free", () => {
     await expect(page.getByRole("button", { name: "Change photo" })).toBeVisible();
     await expect(page.locator('[data-avatar="photo"]').first()).toBeVisible();
 
-    // It shows beside the name in the editor's preview.
+    // It shows beside the name on the editing page.
     await page.goto("/exhbts");
     await page.getByRole("button", { name: /start from scratch/i }).click();
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
-    await expect(page.locator('section[aria-label="Preview"] [data-avatar="photo"]')).toBeVisible();
+    await expect(page.locator(`${READY} article [data-avatar="photo"]`)).toBeVisible();
 
     await page.goto("/portfolio?step=you");
     await choose("second.png");
@@ -241,13 +246,16 @@ test.describe("Profile photo on Free", () => {
 });
 
 test.describe("Editor preview: the flowchart's words", () => {
-  test("a six-box flowchart at 1440 breaks no word in the preview", async ({ page }) => {
+  test("a six-box flowchart at 1440 breaks no word on the page a visitor sees", async ({ page }) => {
     await draftAndOpen(page, "six", { waitForForm: false });
     const steps = ["Define bank and fintech strategies", "Set payoff matrix with openness parameter", "Derive replicator equations and rest points", "Classify stability of each equilibrium", "Select outcome via risk dominance", "Compare with the mandate's aims"];
-    const add = page.getByRole("button", { name: "Add a box at the end" });
-    while ((await page.getByLabel(/^Box \d$/).count()) < steps.length) await add.click();
-    for (const [i, step] of steps.entries()) await page.getByLabel(`Box ${i + 1}`, { exact: true }).fill(step);
-    const list = page.locator('section[aria-label="Preview"] ol[aria-label="Methodology"]');
+    while ((await page.getByLabel(/^Box \d$/).count()) < steps.length) {
+      await page.locator(`${READY} [data-kind="flow"]`).hover();
+      await page.getByRole("button", { name: "Add a box at the end" }).click();
+    }
+    for (const [i, step] of steps.entries()) await fillBox(page, i + 1, step);
+    await seeAsVisitor(page);
+    const list = visitorRegion(page).getByRole("list", { name: "Methodology" });
     await expect(list.getByRole("listitem")).toHaveCount(6);
     const split = await list.evaluate((ol) => {
       const out: string[] = [];
