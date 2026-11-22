@@ -96,11 +96,13 @@
       min-height: 2.75rem;
     }
 
-    /* A finding's own small controls, the shell parts' corner toolbars and the formatting buttons over a
-       field are on the bar instead. */
+    /* A finding's own small controls, the shell parts' corner toolbars, the formatting buttons over a
+       field and a skill's remove button are on the bar instead (a tapped skill is named there, with
+       "Remove <skill>": the pills sit too close for each remove to take a 44px press). */
     [data-editor="page"] .xe-list-tools,
     [data-editor="page"] .xe-shell-tools,
-    [data-editor="page"] .xe-format {
+    [data-editor="page"] .xe-format,
+    [data-editor="page"] .xe-pill-remove {
       display: none;
     }
 

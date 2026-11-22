@@ -248,6 +248,23 @@ test.describe("the bar's actions", () => {
     expect(await undoLabel(page)).toBeNull();
   });
 
+  test("a tapped skill is named on the bar with Remove; the pills' own remove buttons are hidden", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    const skills = (await docNow(page)).skills;
+    expect(skills.length).toBeGreaterThan(1);
+    const pill = field(page, "skills.0");
+    await expect(pill.locator(".xe-pill-remove")).toBeHidden();
+    await pill.tap();
+    await expect(bar(page)).toHaveAttribute("aria-label", `${skills[0]}: tools`);
+    await expect(bar(page).locator(".xe-bar-name")).toHaveText(skills[0]!);
+    await onBar(page, `Remove ${skills[0]}`).tap();
+    await expect.poll(async () => (await docNow(page)).skills).toEqual(skills.slice(1));
+    // The skill is gone, so the bar is on the skills again.
+    await expect(bar(page)).toHaveAttribute("aria-label", "Skills used: tools");
+    await expect(onBar(page, /^Remove /)).toHaveCount(0);
+  });
+
   test("after an Undo the focus is on the section's grip, not in its words, so the keyboard stays shut", async ({ page }) => {
     await openTiming(page, "case-study", { full: true });
     await waitLive(page);
@@ -538,13 +555,8 @@ test("a swipe on a section's words scrolls and moves nothing; a 260ms press on a
 test.describe("at 390px wide", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  /**
-   * Controls whose press is smaller than 44px today, owned elsewhere and in L's report:
-   * - a skill's remove button (core.css: G): 18px to the eye with a 44px press, but where pills sit
-   *   closer than that (rows of pills are about 28px apart, and a short pill is narrower) the next
-   *   pill's press takes the overlap, so a crowded one has less.
-   */
-  const KNOWN = [".xe-pill-remove"];
+  /** Controls whose press is smaller than 44px today, each owned elsewhere: none. (A skill's remove is on the bar on a phone.) */
+  const KNOWN: string[] = [];
 
   for (const f of offered()) {
     test(`${FORMAT_RULES[f].name.toLowerCase()}'s sample: nothing scrolls sideways, and every control takes a 44px press`, async ({ page }) => {

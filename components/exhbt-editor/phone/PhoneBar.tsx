@@ -15,6 +15,7 @@ import { jumpTo } from "../jump";
 import { labelOf } from "../labels";
 import { useStoreInternal } from "../store";
 import type { Store } from "../store-core";
+import { actionsFor } from "../Toolbar";
 import { usePhone } from "./usePhone";
 
 /*
@@ -24,7 +25,8 @@ import { usePhone } from "./usePhone";
  *  - a section: Move up, Move down, the layout's own action, More actions where the AI drafted it,
  *    Remove (not the flowchart where the layout always has one), Reorder. They go through the drag
  *    board (`moveBy`, `remove`) and the store, as the section's own toolbar does;
- *  - the title, the context line or the skills: the part's More actions, and Reorder;
+ *  - the title, the context line or the skills: the part's More actions, and Reorder; a tapped skill
+ *    is named, with "Remove <skill>" (the pills' own remove buttons are hidden on a phone);
  *  - nothing yet: Add (the "+" at the end of the page) and Reorder;
  *  - while a formatted field has the cursor: its formatting buttons (Highlight on the context line;
  *    Bold and Italic elsewhere; Link), a finding's own move and remove, and Done. A press on them
@@ -43,7 +45,8 @@ export function PhoneBar(): ReactNode {
 }
 
 type ShellBlock = "header" | "gap" | "skills";
-type Part = { section: string } | { shell: ShellBlock };
+/** `skill`: the pill tapped, by its words (a pill takes no focus). */
+type Part = { section: string } | { shell: ShellBlock; skill?: string };
 
 const ICON = { "aria-hidden": true, size: 18, strokeWidth: 2.25 } as const;
 const FIELD = 'textarea, input:not([type=file]):not([type=hidden]):not([type=checkbox]):not([type=radio]), [contenteditable]:not([contenteditable="false"]), [role=textbox]';
@@ -63,7 +66,10 @@ function Bar() {
   const section = where.part && "section" in where.part ? where.part.section : null;
   const info = useSectionInfo(section);
   const shell = where.part && "shell" in where.part ? where.part.shell : null;
-  const name = rich ? null : info ? info.label : shell ? FORMAT_COPY[formatOf(store.shell())][shell] : null;
+  // A tapped skill, while it is still one (Remove takes it away, and the bar goes back to the skills).
+  const tapped = where.part && "shell" in where.part ? where.part.skill : undefined;
+  const skill = useSyncExternalStore(store.subscribe, () => (tapped && store.get().skills.includes(tapped) ? tapped : null), () => null);
+  const name = rich ? null : info ? info.label : skill ? skill : shell ? FORMAT_COPY[formatOf(store.shell())][shell] : null;
 
   return (
     <div
@@ -84,7 +90,7 @@ function Bar() {
         ) : section && info ? (
           <SectionTools id={section} info={info} />
         ) : shell ? (
-          <ShellTools block={shell} name={name!} />
+          <ShellTools block={shell} name={name!} skill={skill} />
         ) : (
           <NothingYet />
         )}
@@ -105,11 +111,16 @@ function partAt(el: Element): Part | undefined {
   const path = el.closest("[data-path]")?.getAttribute("data-path") ?? "";
   if (HEADER.has(path)) return { shell: "header" };
   if (path === "gap") return { shell: "gap" };
-  if (path === "skills" || path.startsWith("skills.")) return { shell: "skills" };
+  if (path.startsWith("skills.")) {
+    // A pill holds its skill's words, then (on a wider screen) its remove button.
+    const skill = el.closest('[data-path^="skills."]')?.firstChild?.textContent?.trim();
+    return skill ? { shell: "skills", skill } : { shell: "skills" };
+  }
+  if (path === "skills") return { shell: "skills" };
   return undefined;
 }
 
-const keyOf = (p: Part | null) => (!p ? "" : "section" in p ? `s:${p.section}` : `p:${p.shell}`);
+const keyOf = (p: Part | null) => (!p ? "" : "section" in p ? `s:${p.section}` : `p:${p.shell}${p.skill ? `:${p.skill}` : ""}`);
 
 /** The part the focus is in or was last in (or that was last tapped), and the path of the field the focus was last in. */
 function useWhere(): { part: Part | null; path: string | null } {
@@ -221,26 +232,6 @@ function ReorderButton() {
   );
 }
 
-type Action = { name: string; pressed?: boolean; icon?: ReactNode; run(): void };
-
-/** The layout's own action for a section, as its toolbar has it (Toolbar.tsx): make it the lead image or the key figure, or mark a picture Before or After. */
-function layoutActions(store: Store, id: string, info: Info): Action[] {
-  const first = FORMAT_RULES[info.f].first;
-  if (first && (first.kinds as readonly string[]).includes(info.kind)) {
-    const lead = pageItems(store.get()).findIndex((it) => (first.kinds as readonly string[]).includes(it.kind));
-    if (lead !== info.place) return [{ name: first.as === "lead" ? "Make lead image" : "Make key figure", icon: <Star {...ICON} />, run: () => store.move(id, Math.max(0, lead)) }];
-  }
-  if (info.f === "before-after" && info.kind === "image") {
-    const label = info.label.toLowerCase();
-    return (["before", "after"] as const).map((v) => ({
-      name: v === "before" ? "Before" : "After",
-      pressed: info.stage === v,
-      run: () => store.patch(id, (x) => (x.kind === "image" ? (x.stage === v ? (({ stage: _s, ...rest }) => (void _s, rest))(x) : { ...x, stage: v }) : x), `${v} on ${label}`),
-    }));
-  }
-  return [];
-}
-
 function SectionTools({ id, info }: { id: string; info: Info }) {
   const store = useStoreInternal();
   const board = useBoard();
@@ -256,9 +247,10 @@ function SectionTools({ id, info }: { id: string; info: Info }) {
       <Button size="sm" className="xe-bar-btn" label={`Move ${label} down`} disabled={place >= count - 1} onClick={() => board.moveBy(id, 1)}>
         <ArrowDown {...ICON} />
       </Button>
-      {layoutActions(store, id, info).map((a) => (
+      {/* The layout's own actions, as the section's toolbar has them (Toolbar.tsx); the lead's star at the bar's size. */}
+      {actionsFor(store.get(), id, kind, f, store).map((a) => (
         <Button key={a.name} size="sm" className="xe-bar-btn" label={a.name} aria-pressed={a.pressed} onClick={a.run}>
-          {a.icon ?? a.name}
+          {a.icon ? <Star {...ICON} /> : a.name}
         </Button>
       ))}
       {block && (
@@ -276,10 +268,26 @@ function SectionTools({ id, info }: { id: string; info: Info }) {
   );
 }
 
-function ShellTools({ block, name }: { block: ShellBlock; name: string }) {
+/** A shell part's tools: its More actions, and Reorder; for a tapped skill, its name and "Remove <skill>" first (the pills' own remove buttons are hidden on a phone). */
+function ShellTools({ block, name, skill }: { block: ShellBlock; name: string; skill: string | null }) {
+  const store = useStoreInternal();
+  const { uiApi } = useRuntime();
   return (
     <>
       <span className="xe-bar-name">{name}</span>
+      {skill && (
+        <Button
+          size="sm"
+          className="xe-bar-btn"
+          label={`Remove ${skill}`}
+          onClick={() => {
+            store.patchDoc((d) => ({ ...d, skills: d.skills.filter((x) => x !== skill) }));
+            uiApi.say(`${skill} removed.`);
+          }}
+        >
+          <Trash2 {...ICON} />
+        </Button>
+      )}
       <span className="xe-bar-more">
         <MoreActions block={block} />
       </span>
