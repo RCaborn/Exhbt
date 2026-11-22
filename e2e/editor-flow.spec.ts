@@ -183,7 +183,7 @@ for (const f of offered()) {
       await open(page, f);
       const f1 = field(page, "flow.1.step");
       await f1.click();
-      await page.keyboard.press("End");
+      await page.keyboard.press("ControlOrMeta+End");
       // Each box keeps its node while it is typed in.
       await page.locator(BOX).evaluateAll((els) => els.forEach((e, i) => ((e as HTMLElement & { __mark?: number }).__mark = i)));
       for (const key of ["a", "b", "c"]) {
@@ -432,6 +432,8 @@ for (const f of offered()) {
         expect(await undoLabel(page)).toBe(label);
         await page.locator(`${READY} h1`).focus();
         await page.keyboard.press("ControlOrMeta+z");
+        // Undo puts the focus where it belongs a frame or two later; let it land before carrying on.
+        await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(done)))));
       };
 
       // Add, then type in another box.
@@ -440,7 +442,7 @@ for (const f of offered()) {
       await expect.poll(() => focusedPath(page)).toBe("flow.1.step");
       await page.keyboard.type("Added");
       await field(page, "flow.4.step").click();
-      await page.keyboard.press("End");
+      await page.keyboard.press("ControlOrMeta+End");
       await page.keyboard.type(" (typed)");
       await undo("add box 2");
       expect(await keysNow(page)).toEqual(keys);
@@ -451,7 +453,7 @@ for (const f of offered()) {
       await removeOf(page, 1).click();
       await expect(said(page)).toHaveText("Box 2 removed.");
       await field(page, "flow.0.step").click();
-      await page.keyboard.press("End");
+      await page.keyboard.press("ControlOrMeta+End");
       await page.keyboard.type(" (typed)");
       await undo("remove box 2");
       expect(await keysNow(page)).toEqual(keys);
@@ -459,6 +461,7 @@ for (const f of offered()) {
 
       // Move, then type.
       await gripOf(page, 0).focus();
+      await expect(gripOf(page, 0)).toBeFocused();
       await page.keyboard.press("Space");
       await expect(said(page)).toHaveText("Picked up box 1 of 4.");
       await page.keyboard.press("ArrowRight");
@@ -467,7 +470,7 @@ for (const f of offered()) {
       await expect(said(page)).toHaveText("Box dropped in place 2 of 4.");
       expect(await keysNow(page)).toEqual(moved(keys, 0, 1));
       await field(page, "flow.2.step").click();
-      await page.keyboard.press("End");
+      await page.keyboard.press("ControlOrMeta+End");
       await page.keyboard.type(" (typed)");
       await undo("move box 1");
       expect(await keysNow(page)).toEqual(keys);
