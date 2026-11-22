@@ -192,3 +192,12 @@ What it built (`components/exhbt-editor/phone/PhoneBar.tsx`, `ReorderSheet.tsx`,
 - Requests: G, export `actionsFor` from `Toolbar.tsx` (the bar re-derives the layout action); `.xe-pill-remove` is an 18px press under touch; after an Undo on a phone, focusing the grip rather than the first field may stop the keyboard opening. F: on a phone the "+" at the left of a small gap covers the first letters of the next heading (research's "Hypothesis"). K: the last box's Remove press is trimmed by "Add a box at the end". H: "Delete this exhbt" in the phone menu may be under 44px.
 - For Rory to try with his thumb: the bar with the keyboard open (Android Chrome and an iPhone); the 150ms press; thumb reach; the corner grips while scrolling the right edge; scrolling while a section is held; Undo popping the keyboard open.
 - Not verified: Safari on an iPhone (`visualViewport`, fixed positions, `:has()`), Firefox, a screen reader, pinch zoom.
+
+## From agent K, follow-up beside F's drag (merged into phase-2-r3 at 3c50016)
+
+- On a touch screen in a column, a box's grip sits on its right edge and Remove on its left, near the top and 15px out into the page's gutter, clear of the "+" between sections and the next section's toolbar. Desktop is unchanged.
+- K's tools and box "+" are hidden, and take no pointer, while F carries a section (`[data-xe-drag]`) and while one of K's boxes is carried.
+- Remove's larger target reaches down, not up, so it no longer trims the "+" before a case study's flowchart. Every flowchart chip measures as a full 44px press by L's method, so L's `KNOWN` list can drop `.xp-flow-box[data-last] [data-flow-remove]`.
+- Tests on the merged branch: `editor-flow` + `editor-phone` (touch) 30 passed; the 27 flowchart tests of `editor-inplace` passed; `editor-flow` (both projects) 52 passed; `editor-drag` 47 passed, 2 failed from Chrome crashes when memory ran out.
+- For whoever owns `e2e/editor-drag.spec.ts` now: F's eight-looks contrast test (about line 749) can run past its 90s limit on a busy machine. Split it into one test per look, as K did for the flowchart.
+- G's `RichEditor.tsx` (line 111) took the focus when an editor finished loading, even after the person had moved on; G's 2caae8c addresses it.
