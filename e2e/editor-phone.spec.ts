@@ -12,6 +12,7 @@ import {
   freshName,
   full,
   grip,
+  holdRichEditor,
   offered,
   openDoc,
   openTiming,
@@ -201,6 +202,30 @@ test.describe("each section shows only its grip", () => {
 /* ------------------------------------------------------------------------------------------------
  * The bar's actions, and Undo
  * ---------------------------------------------------------------------------------------------- */
+
+test("a tap on a finding and typing at once, before its editor has loaded, keep every key; the editor takes over with the caret and it is saved", async ({ page }) => {
+  const release = await holdRichEditor(page);
+  const doc = full(sampleDoc("case-study"));
+  const path = `sections.${doc.sections.findIndex((s) => s.kind === "findings")}.items.0`;
+  const { id } = await openDoc(page, freshName("phonetype"), doc);
+  const box = field(page, path);
+  const findings = (await docNow(page)).sections.find((s) => s.kind === "findings") as Extract<Section, { kind: "findings" }>;
+  const before = plain(findings.items[0]!);
+  await box.locator(".xe-rest").scrollIntoViewIfNeeded();
+  await box.locator(".xe-rest").tap();
+  // The resting field is where the tap put the cursor (so a phone opens its keyboard), and takes the keys.
+  await expect(box.locator(".xe-rest")).toBeFocused();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.type(" Tapped and typed.");
+  await expect(box).not.toHaveAttribute("data-live");
+  release();
+  await expect(box).toHaveAttribute("data-live", "true");
+  await expect(box.locator(".ProseMirror")).toBeFocused();
+  await page.keyboard.type(" More.");
+  const want = `${before} Tapped and typed. More.`;
+  await expect(box.locator(".ProseMirror")).toHaveText(want);
+  await waitSaved(page, id);
+});
 
 test.describe("the bar's actions", () => {
   test("Move up, Move down and Remove act on the section in focus; Undo in the top bar's menu puts a removed one back", async ({ page }) => {

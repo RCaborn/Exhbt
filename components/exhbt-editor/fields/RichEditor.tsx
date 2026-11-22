@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Extension, mergeAttributes, type Editor } from "@tiptap/core";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import Document from "@tiptap/extension-document";
@@ -58,15 +58,18 @@ const LINK_ERROR = "Links must start with https://.";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 
-type Props = { slot: RichSlot; id: string; at: RefObject<{ x: number; y: number } | null>; focusOnReady: boolean; issue: string; onReady(): void; fallback: ReactNode };
+/**
+ * `live`: the resting field has handed over to this editor (RichField.tsx). Until then the editor is drawn
+ * out of the flow, unseen and inert, while the resting field still takes the typing. `onReady` starts the
+ * hand-over once the editor exists; `name` gives the editor its id, role and name once it is live.
+ */
+type Props = { slot: RichSlot; id: string; issue: string; live: boolean; onReady(editor: Editor, name: () => void): void };
 
-export default function RichEditor({ slot, id, at, focusOnReady, issue, onReady, fallback }: Props) {
+export default function RichEditor({ slot, id, issue, live, onReady }: Props) {
   const store = useStore();
   const rt = useRuntime();
   const path = useRef(slot.path);
   path.current = slot.path;
-  const wantsFocus = useRef(focusOnReady);
-  wantsFocus.current = focusOnReady;
   const [asking, setAsking] = useState(false);
   const [below, setBelow] = useState(false);
   const cell = useRef<HTMLDivElement>(null);
@@ -76,7 +79,8 @@ export default function RichEditor({ slot, id, at, focusOnReady, issue, onReady,
   // the effects below write what changes.
   const [start] = useState(() => ({
     content: runsToDoc(slot.value),
-    editorProps: { attributes: { id, role: "textbox", "aria-multiline": "true", "aria-label": slot.label, "aria-placeholder": slot.placeholder, class: "xe-pm", spellcheck: "true" } },
+    // The id, the role and the name come when it is live (`name` below): until then the resting field has them.
+    editorProps: { attributes: { "aria-multiline": "true", class: "xe-pm", spellcheck: "true" } },
   }));
 
   const editor = useEditor({
@@ -91,9 +95,12 @@ export default function RichEditor({ slot, id, at, focusOnReady, issue, onReady,
   });
 
   // The field's name, its placeholder and its issue follow its place ("Finding 2" becomes "Finding 1" when the first is removed).
-  useEffect(() => {
+  const liveNow = useRef(live);
+  liveNow.current = live;
+  const name = () => {
     const dom = editor?.view.dom;
-    if (!dom) return;
+    if (!dom || !liveNow.current) return;
+    dom.setAttribute("role", "textbox");
     dom.setAttribute("aria-label", slot.label);
     dom.setAttribute("aria-placeholder", slot.placeholder);
     dom.setAttribute("id", id);
@@ -104,26 +111,19 @@ export default function RichEditor({ slot, id, at, focusOnReady, issue, onReady,
       dom.removeAttribute("aria-invalid");
       dom.removeAttribute("aria-describedby");
     }
-  }, [editor, slot.label, slot.placeholder, id, issue]);
+  };
+  const nameNow = useRef(name);
+  nameNow.current = name;
+  useEffect(name, [editor, live, slot.label, slot.placeholder, id, issue]);
 
   // Changes from outside (an undo, a rewrite) replace the words; typing doesn't.
   useEffect(() => {
     if (editor && !sameRuns(slot.value, docToRuns(editor.getJSON() as TiptapNode))) editor.commands.setContent(runsToDoc(slot.value), { emitUpdate: false });
   }, [editor, slot.value]);
 
-  // Ready: the field is the editor now. Started by the person, it takes the cursor where they clicked (or at the end),
-  // unless they have gone on to another field while it loaded: then the cursor stays where they are.
+  // Made: the resting field hands over its words, and its cursor if it has it (RichField.tsx).
   useEffect(() => {
-    if (!editor) return;
-    onReady();
-    const active = document.activeElement;
-    const own = editor.view.dom.closest(".xe-rich");
-    if ((active && own?.contains(active)) || (wantsFocus.current && (!active || active === document.body))) {
-      const p = at.current;
-      const pos = p ? editor.view.posAtCoords({ left: p.x, top: p.y })?.pos : undefined;
-      editor.commands.focus(pos ?? "end");
-    }
-    at.current = null;
+    if (editor) onReady(editor, () => nameNow.current());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor]);
 
@@ -167,19 +167,24 @@ export default function RichEditor({ slot, id, at, focusOnReady, issue, onReady,
   const italic = editor?.isActive("italic") ?? false;
   const link = editor?.isActive("link") ?? false;
 
-  if (!editor) return <>{fallback}</>;
+  if (!editor) return null;
   const keep = (e: React.MouseEvent) => e.preventDefault();
   const linkClick = () => (link ? editor.chain().focus().extendMarkRange("link").unsetLink().run() : setAsking(true));
+  const content = (
+    <div ref={cell} className={cx("xe-rich-cell", !live && "xe-rich-pending")} inert={!live || undefined} aria-hidden={!live || undefined}>
+      {empty && (
+        <span aria-hidden className="xe-rich-ph">
+          {slot.placeholder}
+        </span>
+      )}
+      <EditorContent editor={editor} className="xe-rich-content" />
+    </div>
+  );
+  // Not yet live: no buttons (the resting field has the focus, and they would act on words it has not handed over).
+  if (!live) return <>{content}</>;
   return (
     <>
-      <div ref={cell} className="xe-rich-cell">
-        {empty && (
-          <span aria-hidden className="xe-rich-ph">
-            {slot.placeholder}
-          </span>
-        )}
-        <EditorContent editor={editor} className="xe-rich-content" />
-      </div>
+      {content}
       <div role="toolbar" aria-label="Formatting" className={cx("xe-format", below && "xe-format-below")} data-edit-only onMouseDown={keep}>
         {slot.highlight ? (
           <button type="button" className="xe-chip" aria-pressed={bold} onClick={() => editor.chain().focus().toggleBold().run()}>

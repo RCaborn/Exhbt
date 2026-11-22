@@ -79,7 +79,21 @@ export const field = (page: Page, path: string): Locator => page.locator(`${READ
  * words as the page drew them, or, once its editor has started, its editor (not the buttons beside it).
  */
 export const textbox = (page: Page, path: string): Locator =>
-  page.locator(`${READY} [data-path="${path}"]:is(textarea, [role=textbox]), ${READY} [data-path="${path}"] .ProseMirror`).first();
+  page.locator(`${READY} [data-path="${path}"]:is(textarea, [role=textbox]), ${READY} [data-path="${path}"] > .xe-rest, ${READY} [data-path="${path}"] .ProseMirror`).first();
+
+/**
+ * Holds back the formatted fields' editor chunk (fields/RichEditor.tsx) until the returned function is
+ * called, so the resting fields stay as they are: what a slow connection does to the first click.
+ */
+export async function holdRichEditor(page: Page): Promise<() => void> {
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  await page.route(/RichEditor/, async (route) => {
+    await held;
+    await route.continue();
+  });
+  return release;
+}
 
 /**
  * The path of the field that has the cursor: the closest `[data-path]` of the focused element. Check this
@@ -382,9 +396,8 @@ export function full(doc: ExhbtDoc): ExhbtDoc {
 export const EDIT_ONLY_IN_FLOW: { name: string; selector: string; always: boolean }[] = [
   // The two edit-only fields, always there while editing.
   { name: "an image's description field", selector: '[data-edit-only="image-description"]', always: true },
-  { name: "the Add a skill box", selector: '[data-edit-only="add-skill"]', always: true },
-  // On a touch screen only (hidden with a mouse): the box's Add button, after it on the pills' line, taking its width but no height.
-  { name: "the Add a skill box's Add button", selector: '[data-edit-only="add-skill-button"]', always: true },
+  // With its Add button on a touch screen (hidden with a mouse), after it on the pills' line: its width there, no height.
+  { name: "the Add a skill box, with its Add button on touch screens", selector: '[data-edit-only="add-skill"], [data-edit-only="add-skill-button"]', always: true },
   // The placeholders, each there only while its part is empty.
   { name: "the context line", selector: '[data-path="gap"][data-empty]', always: false },
   { name: "What it is", selector: '.xp-fact:has([data-path="context"][data-empty])', always: false },

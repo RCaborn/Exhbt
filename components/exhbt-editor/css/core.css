@@ -92,6 +92,7 @@
   .xe-text:focus,
   .xe-inline:focus,
   .xe-rich:focus,
+  .xe-rest:focus,
   .xe-pm:focus,
   .xe-skill-new:focus {
     outline: 2px solid var(--xp-link);
@@ -109,6 +110,22 @@
   .xe-rich {
     position: relative;
     cursor: text;
+  }
+  /* The resting field (RichField.tsx): the words as the page draws them, typed in before the editor has loaded. */
+  .xe-rest:empty::before {
+    content: attr(data-placeholder);
+    color: var(--xp-muted);
+  }
+  .xp-flow-box[data-last] .xe-rest:empty::before {
+    color: var(--xp-flow-end-soft);
+  }
+  /* The editor before the hand-over: out of the flow and unseen, so nothing moves and the resting field keeps the typing. */
+  .xe-rich-pending {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
   }
   .xe-rich-cell {
     display: grid;
