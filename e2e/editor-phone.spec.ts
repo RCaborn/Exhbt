@@ -521,12 +521,11 @@ test.describe("at 390px wide", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   /**
-   * Controls whose press is smaller than 44px today, each owned elsewhere and in L's report:
-   * - a skill's remove button (core.css, 18px over the pill's corner: G);
-   * - the last flowchart box's Remove, whose press the "Add a box at the end" under it trims by a
-   *   pixel or two (flow.css: K).
+   * Controls whose press is smaller than 44px today, owned elsewhere and in L's report: a skill's
+   * remove button (core.css, 18px over the pill's corner: G, who is giving it a 44px press; then this
+   * list is empty).
    */
-  const KNOWN = [".xe-pill-remove", ".xp-flow-box[data-last] [data-flow-remove]"];
+  const KNOWN = [".xe-pill-remove"];
 
   for (const f of offered()) {
     test(`${FORMAT_RULES[f].name.toLowerCase()}'s sample: nothing scrolls sideways, and every control takes a 44px press`, async ({ page }) => {
