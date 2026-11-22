@@ -4,14 +4,15 @@ import { LIMITS } from "../lib/exhbt/blocks";
 import { buildRoadmap, unlockProjects, uniqueEmail, waitForResult } from "./helpers";
 import { closeOpenSheet, editorRoot, fieldAt, fillContext, fillPlain, fillTitle, fillValid, openPublishSheet, openThingsToFix, openWorkSheet, pickImages, removeSection, publish, publishSheet, seeAsVisitor, signInAs, startFromScratch, visitorRegion, waitEditor, waitForSaved, workSheet } from "./editor";
 import { docNow, READY } from "./page-editor";
+import { uniqueBytes } from "./unique-bytes";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
 // Editor round two: images and the work as a file, autosave that can't lose work, word guidance,
 // the first-exhbt checklist, roadmap to exhbt, the Free and signed-in screens, the publish moment.
 
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
-const PDF_TEXT = "%PDF-1.4\n% a tiny stand-in report\n";
+const PNG = uniqueBytes(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
+const PDF_TEXT = `%PDF-1.4\n% a tiny stand-in report\n%%EOF\n% ${uniqueBytes(Buffer.alloc(0)).toString("hex")}\n`;
 
 test.describe("images and the work as a file", () => {
   test("add an image, publishing waits for its description, removing deletes the file", async ({ page }) => {
@@ -132,7 +133,7 @@ test.describe("autosave that can't lose work", () => {
       return route.continue();
     });
     await fillTitle(page, "Retried save");
-    await expect(page.locator(`${READY} [role=status]`, { hasText: /^Saved$/ })).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator(`${READY} .xe-save`, { hasText: /^Saved$/ })).toBeVisible({ timeout: 30_000 });
     expect(posts).toBe(3);
     await expect(page.getByRole("button", { name: /Not saved/ })).toHaveCount(0);
     await page.reload();
@@ -174,6 +175,42 @@ test.describe("autosave that can't lose work", () => {
     await page.unroute(/\/exhbts\/[0-9a-f-]{36}\/edit/);
     await page.getByRole("button", { name: "Not saved. Retry" }).click();
     await waitForSaved(page);
+  });
+});
+
+test.describe("the save status for a screen reader", () => {
+  test("one live region from the start says only a failure and the recovery, not the routine Saving and Saved", async ({ page }) => {
+    await signInAs(page, "gus", "premium");
+    await startFromScratch(page);
+    const region = page.locator(`${READY} [data-topbar] div[role=status].sr-only`);
+    await expect(region).toHaveCount(1);
+    await expect(region).toBeEmpty();
+    // Everything the region holds from now on.
+    await region.evaluate((el) => {
+      const seen: string[] = [];
+      (window as unknown as { __said: string[] }).__said = seen;
+      new MutationObserver(() => el.textContent && seen.push(el.textContent)).observe(el, { childList: true, characterData: true, subtree: true });
+    });
+    const said = () => page.evaluate(() => (window as unknown as { __said: string[] }).__said);
+    // An ordinary save: "Saving…" and "Saved" are drawn, and nothing is said.
+    await fillTitle(page, "Routine words");
+    await waitForSaved(page);
+    expect(await said()).toEqual([]);
+    expect(await region.evaluate((el) => el.isConnected)).toBe(true);
+
+    // A failed save is said in the same region.
+    await page.route(/\/exhbts\/[0-9a-f-]{36}\/edit/, (route) => (route.request().method() === "POST" ? route.abort() : route.continue()));
+    await fillTitle(page, "Routine words, then offline");
+    await expect(page.getByRole("button", { name: "Not saved. Retry" })).toBeVisible({ timeout: 30_000 });
+    await expect(region).toContainText("Not saved.");
+    expect(await region.evaluate((el) => el.isConnected)).toBe(true);
+
+    // And so is the recovery, in plain words.
+    await page.unroute(/\/exhbts\/[0-9a-f-]{36}\/edit/);
+    await page.getByRole("button", { name: "Not saved. Retry" }).click();
+    await waitForSaved(page);
+    await expect(region).toContainText("Saved again.");
+    expect((await said()).some((t) => /^Saving/.test(t) || t === "Saved")).toBe(false);
   });
 });
 

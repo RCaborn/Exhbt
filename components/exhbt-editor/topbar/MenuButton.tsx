@@ -4,6 +4,7 @@ import { useSyncExternalStore, type ReactNode } from "react";
 import { Ellipsis } from "lucide-react";
 import { deleteExhbt, unpublishExhbt } from "@/app/(app)/exhbts/[id]/actions";
 import { ConfirmAction } from "@/components/editor/ConfirmAction";
+import { DeleteExhbt } from "@/components/editor/DeleteExhbt";
 import { Button } from "@/components/ui/Button";
 import { setLive, useEnv, useLive, useSave, useUi } from "../context";
 import { Popover } from "./Popover";
@@ -82,7 +83,7 @@ export function MenuButton({ before }: { before?: (close: (restoreFocus?: boolea
               }}
             />
           )}
-          <ConfirmAction label="Delete this exhbt" variant="danger" question="Delete it for good?" confirmLabel="Yes, delete" action={() => deleteExhbt(env.id)} />
+          <DeleteExhbt id={env.id} action={() => deleteExhbt(env.id)} />
           <Button size="sm" className="xe-tb" onClick={() => void classic()}>
             Use the classic editor
           </Button>

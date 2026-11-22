@@ -17,7 +17,11 @@ import { normaliseNumber, numbersInDoc } from "../../lib/exhbt/verify";
  *    only those.
  *  - A flowchart box is found by a key that lasts for the visit; a finding by its place in its
  *    section, found by the section's id. Undo is last in, first out, and typing never changes a place,
- *    so a place is exact.
+ *    so a place is exact. An entry that changes the boxes some other way (a rewrite of the flowchart,
+ *    "Back to the AI version") keeps the boxes' keys from before it and puts them back with the boxes,
+ *    so the box actions before it still find their boxes (the review's data-safety-5).
+ *  - An entry that can no longer be done (its box or finding is not there) is never popped in silence:
+ *    Undo skips it, does the next one that can be done, and says so (`undoneWords`).
  *  - The numbers to check are never written back as they were: Undo sets them to the list now joined
  *    with the list before the action, limited to numbers on the page after the undo.
  *  - Each entry lists the stored files it could bring back, for the rule that deletes files.
@@ -57,6 +61,8 @@ export type Entry = {
   keys?: { key: string; before: unknown }[];
   flow?: FlowOp;
   list?: ListOp;
+  /** The flowchart's box keys before the action, kept when it changed the boxes other than by a box action (a rewrite): put back with them. */
+  boxKeys?: string[];
   /** The numbers to check before the action. */
   unverified: string[];
   /** Stored files the action took off the page, which an undo could bring back. */
@@ -170,6 +176,33 @@ function withItems(doc: ExhbtDoc, id: string, fn: (items: RichText[]) => RichTex
   return { ...doc, sections };
 }
 
+/** Whether `e` can still be done in `state`: its box, or its finding, is where the undo needs it. Any other entry always can. */
+export function canUndo(state: UndoState, e: Entry): boolean {
+  if (e.flow) {
+    const there = state.keys.includes(e.flow.key);
+    return e.flow.op === "remove" ? !there : there;
+  }
+  const l = e.list;
+  if (l) {
+    const s = state.doc.sections.find((x) => x.id === l.id);
+    if (!s || s.kind !== "findings") return false;
+    return l.op === "add" ? l.at < s.items.length : l.op === "move" ? l.to < s.items.length && l.from < s.items.length : l.at <= s.items.length;
+  }
+  return true;
+}
+
+/** What an Undo did: the entry it undid, those it had to skip first (newest first), and the words to say (undoneWords). */
+export type UndoResult = { undone: string | null; skipped: string[]; words: string };
+
+const listed = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
+
+/** The words said after an Undo: "Undone: remove graph 1.", and any entry it skipped. */
+export function undoneWords(r: Pick<UndoResult, "undone" | "skipped">): string {
+  const skipped = listed(r.skipped);
+  const why = skipped ? `${skipped.charAt(0).toUpperCase()}${skipped.slice(1)} can't be undone any more, so Undo skipped ${r.skipped.length === 1 ? "it" : "them"}.` : "";
+  return [r.undone ? `Undone: ${r.undone}.` : "", why].filter(Boolean).join(" ");
+}
+
 /** The state with one entry undone. */
 export function applyUndo(state: UndoState, e: Entry): UndoState {
   let doc = state.doc;
@@ -195,6 +228,8 @@ export function applyUndo(state: UndoState, e: Entry): UndoState {
     }
     doc = next as ExhbtDoc;
   }
+  // The boxes are back as they were before the rewrite: so are their keys.
+  if (e.boxKeys && doc.flow.length === e.boxKeys.length) keys = [...e.boxKeys];
   if (e.flow) {
     const f = e.flow;
     const at = keys.indexOf(f.key);

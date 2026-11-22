@@ -52,6 +52,7 @@ import {
   waitForSaved,
   wordsOnBar,
 } from "./editor";
+import { uniqueBytes } from "./unique-bytes";
 
 // Exhbt layouts (decision 0024): case study, gallery and research. One optional field, `format`;
 // no migration; a doc without one (or with one this code doesn't know) is a case study.
@@ -540,7 +541,7 @@ test.describe("Looks and the home page", () => {
 
 /* ---------------- The editor ---------------- */
 
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+const PNG = uniqueBytes(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
 const png = (name: string) => ({ name, mimeType: "image/png", buffer: PNG });
 
 test.describe("The layout choice in the editor", () => {

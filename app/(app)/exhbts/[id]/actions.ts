@@ -170,7 +170,7 @@ export async function publishExhbt(id: string, raw: unknown, confirmed: boolean)
   const me = all.find((e) => e.id === id)!;
   // One slug space per person: a new exhbt slug also misses their job links (lib/slugs.ts).
   const slug = me.slug ?? uniqueSlug(slugify(doc.title), await takenSlugs(user.id, { exceptExhbtId: id }));
-  if (!(await store.publishExhbt(id, user.id, slug))) return { ok: false, reasons: ["This exhbt isn't yours to publish."] };
+  if (!(await store.publishExhbt(id, user.id, slug))) return { ok: false, reasons: ["This exhbt isn't yours to publish, or it changed while it was being published. Reload the page and try again."] };
   revalidatePath("/exhbts");
   revalidatePath(`/exhbts/${id}/edit`);
   revalidatePath(`/p/${profile.username}`, "layout");

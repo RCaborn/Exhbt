@@ -18,6 +18,7 @@ import { newImageSection, roomFor } from "@/lib/exhbt/sections";
 import { LayoutPicker, type Drafted } from "./LayoutPicker";
 import { BlockTools, useDraftTools, type DraftToolsInit } from "./BlockTools";
 import { ConfirmAction } from "./ConfirmAction";
+import { DeleteExhbt } from "./DeleteExhbt";
 import { FieldIssues } from "./FieldIssues";
 import { FlowEditor } from "./FlowEditor";
 import { Checklist, isBlank, stepsFor } from "./Checklist";
@@ -89,6 +90,9 @@ const GUIDE_KEY = "exhbt-guide-hidden";
  * (useAutosave: retries, a copy kept in this browser, a warning before leaving unsaved);
  * publishing runs the same checks again on the server.
  */
+/** Whether `now` is the very copy `offered` (the same time and the same doc). */
+const sameCopy = (now: Backup | null, offered: Backup) => Boolean(now && now.at === offered.at && JSON.stringify(now.doc) === JSON.stringify(offered.doc));
+
 export function Editor(props: EditorProps) {
   const { id, status, slug, liveBase, owner, planBlock, canGoLive, maxFileMb } = props;
   const [doc, setDoc] = useState<ExhbtDoc>(props.initialDoc);
@@ -110,6 +114,8 @@ export function Editor(props: EditorProps) {
   const [arranging, setArranging] = useState(false);
   const [ready, setReady] = useState(false);
   const [offer, setOffer] = useState<Backup | null>(null);
+  // The doc as it was when the offer was made: the offer is for that doc and goes as soon as it changes.
+  const offeredOn = useRef<ExhbtDoc | null>(null);
   const [guided] = useState(() => isBlank(props.initialDoc));
   const [guideHidden, setGuideHidden] = useState(false);
   const [imageUrls, setImageUrls] = useState(props.imageUrls);
@@ -153,13 +159,22 @@ export function Editor(props: EditorProps) {
     // A copy kept in this browser that is newer than the server's: offer it back.
     const b = readBackup(id);
     if (b) {
-      if (b.at > Date.parse(props.updatedAt) && JSON.stringify(b.doc) !== JSON.stringify(props.initialDoc)) setOffer(b);
+      if (b.at > Date.parse(props.updatedAt) && JSON.stringify(b.doc) !== JSON.stringify(props.initialDoc)) {
+        offeredOn.current = docRef.current;
+        setOffer(b);
+      }
       else clearBackup(id);
     }
     // What the draft page passed on is said once: it comes off the address, so a reload doesn't repeat it.
     if (drafted && window.location.search) window.history.replaceState(null, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A save or a publish clears the kept copy, and another tab may replace it: the offer is only for the copy it showed.
+  const offerLive = offer !== null && doc === offeredOn.current;
+  useEffect(() => {
+    if (offer && !sameCopy(readBackup(id), offer)) setOffer(null);
+  }, [offer, save, doc, id]);
 
   const all = useMemo(() => validateForPublish(doc), [doc]);
   const issues = useMemo(() => visibleIssues(doc, all, triedPublish), [doc, all, triedPublish]);
@@ -444,7 +459,7 @@ export function Editor(props: EditorProps) {
           </div>
         </div>
 
-        {offer && (
+        {offer && offerLive && (
           <div role="status" className="mt-4 rounded-[16px] border border-ink bg-surface p-4">
             <p className="font-semibold">
               We kept changes from {new Date(offer.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} that never reached the server.
@@ -454,8 +469,8 @@ export function Editor(props: EditorProps) {
                 variant="primary"
                 size="sm"
                 onClick={() => {
-                  // Kept in this browser, maybe before sections: read into the current shape.
-                  setDoc(normaliseDoc(offer.doc));
+                  // Kept in this browser, maybe before sections: read into the current shape. Only while nothing has changed and it is still the copy offered.
+                  if (docRef.current === offeredOn.current && sameCopy(readBackup(id), offer)) setDoc(normaliseDoc(offer.doc));
                   setOffer(null);
                 }}
               >
@@ -464,7 +479,8 @@ export function Editor(props: EditorProps) {
               <Button
                 size="sm"
                 onClick={() => {
-                  clearBackup(id);
+                  // A copy written since (by another tab) is not the one offered: it stays.
+                  if (sameCopy(readBackup(id), offer)) clearBackup(id);
                   setOffer(null);
                 }}
               >
@@ -815,7 +831,7 @@ export function Editor(props: EditorProps) {
             </section>
 
             <div className="flex justify-end pt-2">
-              <ConfirmAction label="Delete this exhbt" variant="danger" question="Delete it for good?" confirmLabel="Yes, delete" action={() => deleteExhbt(id)} />
+              <DeleteExhbt id={id} action={() => deleteExhbt(id)} />
             </div>
           </div>
 

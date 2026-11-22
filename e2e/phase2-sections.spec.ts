@@ -57,13 +57,14 @@ import {
   wordsOnBar,
 } from "./editor";
 import { READY } from "./page-editor";
+import { uniqueBytes } from "./unique-bytes";
 
 // Sections (decision 0015): the core (header, the question, the flowchart) is on every exhbt;
 // below it, findings, graphs, images, a quote, what I'd do next and a link can be added, removed
 // and reordered, all inside the 200-word cap. Old docs read as sections in their old order.
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+const PNG = uniqueBytes(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
 const nWords = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
 
 /* ---------------- The model ---------------- */

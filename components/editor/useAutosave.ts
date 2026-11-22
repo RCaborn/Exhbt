@@ -10,7 +10,8 @@ import type { ExhbtDoc } from "@/lib/exhbt/blocks";
  *  - a save that fails to reach the server is tried 3 times, with a pause between; after that the
  *    state is "error" and stays so until a save works (the person can press Retry, or just keep typing);
  *  - every change is also kept in this browser (localStorage, per exhbt) until the server has it,
- *    and offered back on the next visit if it is newer than the server's copy;
+ *    and offered back on the next visit if it is newer than the server's copy; deleting the exhbt or
+ *    the account takes it out (forgetBrowserCopies);
  *  - `beforeunload` asks before leaving while anything is unsaved.
  * Sequence numbers: each change gets the next number, and a response only marks the doc "saved"
  * if no newer change has been made since the request went out.
@@ -50,6 +51,36 @@ export function clearBackup(id: string) {
   } catch {
     // Nothing to clear.
   }
+}
+
+/**
+ * Takes this browser's copies out of its storage (the review's security-2), so a shared computer keeps no one's
+ * unsent words: with an id, that exhbt's copy, when the exhbt is deleted; with none, every exhbt's copy and the
+ * editor's other keys (everything under "exhbt-"), when the account is. Returns how to put back what it took, for a
+ * delete that does not go through.
+ */
+export function forgetBrowserCopies(id?: string): () => void {
+  const taken: { store: Storage; k: string; v: string }[] = [];
+  try {
+    for (const store of [window.localStorage, window.sessionStorage]) {
+      for (const k of Object.keys(store)) {
+        if (id ? k !== key(id) : !k.startsWith("exhbt-")) continue;
+        taken.push({ store, k, v: store.getItem(k) ?? "" });
+        store.removeItem(k);
+      }
+    }
+  } catch {
+    // Storage blocked: there is nothing kept to take out.
+  }
+  return () => {
+    for (const t of taken) {
+      try {
+        t.store.setItem(t.k, t.v);
+      } catch {
+        // Full or blocked: the server copy is still the one that counts.
+      }
+    }
+  };
 }
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));

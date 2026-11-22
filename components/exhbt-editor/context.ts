@@ -4,6 +4,7 @@ import { createContext, useContext, useMemo, useSyncExternalStore } from "react"
 import { validateForPublish, type ExhbtDoc, type Issue } from "@/lib/exhbt/blocks";
 import type { FieldPath } from "@/components/portfolio/page-ctx";
 import type { PortfolioTheme } from "@/lib/portfolio-themes";
+import type { Teammate } from "@/lib/team-rules";
 import type { EditorProps } from "@/components/editor/Editor";
 import { visibleIssues } from "@/components/editor/model";
 import { atom, useAtom, type Atom } from "./atom";
@@ -21,6 +22,10 @@ export type PageEditorProps = EditorProps & {
   theme: PortfolioTheme;
   /** The person's stored PDFs for this exhbt, for "Take a figure from my report" when nothing was picked. */
   reportFiles: { fileId: string; name: string; url: string }[];
+  /** The people on a team project besides the author, as the public page draws them: "See as a visitor" shows the byline. */
+  team?: Teammate[];
+  /** When this exhbt was last published (ISO), or null while it is a draft: the date the public page draws beside the checks. */
+  publishedAt?: string | null;
 };
 
 export type SheetName = "publish" | "card" | "work" | "chart" | "figure" | "reorder";

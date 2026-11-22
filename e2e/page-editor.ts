@@ -124,7 +124,7 @@ export function canon(v: unknown): string {
 
 /** Waits until the server holds the editor's doc as it is now, and the save status says "Saved". */
 export async function waitSaved(page: Page, id?: string) {
-  await expect(page.locator(`${READY} [role=status]`, { hasText: /^Saved$/ })).toBeVisible();
+  await expect(page.locator(`${READY} .xe-save`, { hasText: /^Saved$/ })).toBeVisible();
   if (!id) return;
   await expect
     .poll(async () => {

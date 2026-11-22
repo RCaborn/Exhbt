@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
 
   // Made from an empty doc (the store reads a doc into the current shape), then both copies set exactly as given.
   const id = await store.createExhbt(userId, emptyDoc());
-  await store.publishExhbt(id, userId, slug);
+  await store.publishExhbt(id, userId, slug, { unchecked: true });
   setStoredCopiesForDevelopment(id, { doc: working, published: doc });
   // The store has no method for the publish date: set on the stored record.
   const record = memorySnapshot()?.exhbts.get(id);

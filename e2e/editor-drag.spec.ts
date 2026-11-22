@@ -9,6 +9,7 @@ import { ALL_THEMES, PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import { labelOf } from "../components/exhbt-editor/labels";
 import { HYSTERESIS, makePlan, orderWith, placeAt, pointFor, rowsInfo, type Box } from "../components/exhbt-editor/drag/plan";
 import { docNow, frame, freshName, grip, offered, openDoc, openTiming, pageOrder, READY, SAMPLES, toolbarClashes, waitLive, waitReady } from "./page-editor";
+import { uniqueBytes } from "./unique-bytes";
 
 /*
  * Dragging on the edit-on-page editor (decision 0026, "Dragging" and "Smoothness"; the prototype's
@@ -1002,6 +1003,40 @@ test.describe("the + between sections", () => {
     });
   }
 
+  test("the same words said twice are announced twice: the live region is emptied and set again", async ({ page }) => {
+    await open(page, "case-study");
+    const region = said(page);
+    await expect(region).toHaveCount(1);
+    await region.evaluate((el) => {
+      const seen: string[] = [];
+      (window as unknown as { __said: string[] }).__said = seen;
+      new MutationObserver(() => el.textContent && seen.push(el.textContent)).observe(el, { childList: true, characterData: true, subtree: true });
+    });
+    const words = "There is no room for it.";
+    await page.evaluate((w) => window.__exhbtUi!.say(w), words);
+    await expect(region).toHaveText(words);
+    await page.evaluate((w) => window.__exhbtUi!.say(w), words);
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __said: string[] }).__said.length)).toBe(2);
+    await expect(region).toHaveText(words);
+  });
+
+  test("closing the figures sheet of a graph just added puts the focus on that graph's Edit figures, from the keyboard too", async ({ page }) => {
+    await open(page, "case-study");
+    const before = await docNow(page);
+    await page.locator(`${READY} #add-section`).focus();
+    await page.keyboard.press("Enter");
+    await page.locator(`${MENU} [data-block="graph"]`).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toBeHidden();
+    const doc = await docNow(page);
+    const added = await page.evaluate(() => (document.activeElement as HTMLElement | null)?.closest("[data-section-id]")?.getAttribute("data-section-id") ?? null);
+    expect(doc.sections.some((x) => x.id === added && x.kind === "graph")).toBe(true);
+    expect(before.sections.some((x) => x.id === added)).toBe(false);
+    await expect(page.locator(":focus")).toHaveAccessibleName(/^Edit figures/);
+  });
+
   test("a new graph opens its figures sheet; on a full case study the + says so, and Things to fix opens it", async ({ page }) => {
     await open(page, "case-study");
     await page.locator(`${READY} #add-section`).click();
@@ -1121,7 +1156,7 @@ test.describe("the + between sections", () => {
 
 const TRAY = `${READY} [data-xe-tray]`;
 const block = (page: Page, kind: string) => page.locator(`${TRAY} [data-block="${kind}"]`);
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+const PNG = uniqueBytes(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
 
 /** Presses the mouse on a block in the tray and moves past the 6px threshold. */
 async function liftBlock(page: Page, kind: string) {

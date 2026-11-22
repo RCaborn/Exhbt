@@ -211,11 +211,9 @@ function UndoOffer({ label, store }: { label: string; store: Store }) {
         className="xe-bar-btn"
         label={`Undo: ${label}`}
         onClick={() => {
-          const was = store.undoLabel();
-          if (!was) return;
+          if (!store.undoLabel()) return;
           // Where the focus goes after it is the editor's rule for every undo (EditorShell.tsx, UndoKeys).
-          store.undo();
-          uiApi.say(`Undone: ${was}.`);
+          uiApi.say(store.undo().words);
         }}
       >
         <Undo2 {...ICON} className="shrink-0" />

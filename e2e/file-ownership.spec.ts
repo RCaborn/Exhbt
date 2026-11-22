@@ -2,11 +2,12 @@ import { expect, test, type Browser } from "@playwright/test";
 import { SCHEMA_VERSION } from "../lib/exhbt/blocks";
 import { fillPlain, fillValid, pickImages, publish, signInAs, startFromScratch, waitEditor, waitForSaved } from "./editor";
 import { READY } from "./page-editor";
+import { uniqueBytes } from "./unique-bytes";
 
 // A file can only be shown as part of its owner's exhbt. Someone who learns another person's file id
 // can't put it in their own exhbt and get a link to it: the save strips it, and no page signs it.
 
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+const PNG = uniqueBytes(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
 const unique = (tag: string) => `${tag}-${Date.now().toString(36)}${Math.floor(Math.random() * 1e3)}`;
 
 async function asSecondPerson(browser: Browser, baseURL: string | undefined) {

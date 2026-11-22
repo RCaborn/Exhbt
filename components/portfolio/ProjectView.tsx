@@ -8,7 +8,7 @@ import { LayoutMain } from "@/components/portfolio/LayoutMain";
 import type { EditAdapter, PageCtx } from "@/components/portfolio/page-ctx";
 import { PrintButton } from "@/components/portfolio/PrintButton";
 import { Button } from "@/components/ui/Button";
-import { formatLimits, type ExhbtDoc } from "@/lib/exhbt/blocks";
+import type { ExhbtDoc } from "@/lib/exhbt/blocks";
 import { FORMAT_COPY, FORMAT_RULES, formatOf } from "@/lib/exhbt/formats";
 
 /** The editor's arrange preview imports this from here. */
@@ -89,7 +89,6 @@ export function ProjectView({
   const H = headingLevel;
   const format = formatOf(doc);
   const copy = FORMAT_COPY[format];
-  const L = formatLimits(format);
   const Sub: Sub = headingLevel === "h1" ? "h2" : "h3";
   // A layout that leads with a picture (the gallery, Build, Event) sets the title and the context line a little closer on a narrow page.
   const leads = FORMAT_RULES[format].first?.as === "lead";
@@ -152,9 +151,9 @@ export function ProjectView({
           <dl className="mt-4 grid grid-cols-1 gap-x-6 px-1 @md/xp:grid-cols-2 @3xl/xp:mt-6 @3xl/xp:block @3xl/xp:px-5 print:row-span-2 print:mt-0 print:grid print:grid-cols-3 print:gap-x-5 print:px-0">
             {edit ? (
               <>
-                <Fact term="What it is">{edit.text({ path: "context", value: doc.context, label: "What it is", placeholder: "e.g. MSc Finance dissertation", id: "context", maxChars: L.contextChars })}</Fact>
-                <Fact term="Where and when">{edit.text({ path: "whereWhen", value: doc.whereWhen ?? "", label: "Where and when", placeholder: "e.g. University of Leeds, May 2026", id: "whereWhen", maxChars: L.whereWhenChars })}</Fact>
-                <Fact term="My role">{edit.text({ path: "myRole", value: doc.myRole ?? "", label: "My role", placeholder: "e.g. Stage manager", id: "myRole", maxChars: L.myRoleChars })}</Fact>
+                <Fact term="What it is">{edit.text({ path: "context", value: doc.context, label: "What it is", placeholder: "e.g. MSc Finance dissertation", id: "context" })}</Fact>
+                <Fact term="Where and when">{edit.text({ path: "whereWhen", value: doc.whereWhen ?? "", label: "Where and when", placeholder: "e.g. University of Leeds, May 2026", id: "whereWhen" })}</Fact>
+                <Fact term="My role">{edit.text({ path: "myRole", value: doc.myRole ?? "", label: "My role", placeholder: "e.g. Stage manager", id: "myRole" })}</Fact>
               </>
             ) : (
               <>
@@ -215,7 +214,7 @@ export function ProjectView({
           {team}
 
           <H className={`xp-title xp-display ${leads ? "mt-3 @2xl/main:mt-5" : "mt-5"} text-[clamp(2rem,7cqi,3.4rem)] leading-[1.02] text-balance print:mt-2 print:text-[2rem]${edit ? " relative" : ""}`}>
-            {edit ? edit.text({ path: "title", value: doc.title, label: copy.title, placeholder: copy.emptyTitle, id: "title", maxChars: L.titleChars }) : doc.title}
+            {edit ? edit.text({ path: "title", value: doc.title, label: copy.title, placeholder: copy.emptyTitle, id: "title" }) : doc.title}
             {edit?.tools({ block: "header" })}
           </H>
           {edit ? (

@@ -3,17 +3,22 @@
 import "./css/core.css";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { flushSync } from "react-dom";
+import { CHECKS_GUIDE } from "@/components/brand/Seal";
+import { MadeWith } from "@/components/brand/MadeWith";
 import { IMAGE_ACCEPT } from "@/components/editor/media";
-import { clearBackup, readBackup, writeBackup, type Backup } from "@/components/editor/useAutosave";
-import { Button } from "@/components/ui/Button";
-import { normaliseDoc } from "@/lib/exhbt/blocks";
+import { writeBackup } from "@/components/editor/useAutosave";
+import { checkedOnLabel } from "@/lib/checked-on";
+import { safeHref } from "@/lib/exhbt/blocks";
+import { MARKETING_HOST } from "@/lib/hosts";
 import { drawnFlow, keptItems, pageItems } from "@/lib/exhbt/layouts";
 import type { PageCtx } from "@/components/portfolio/page-ctx";
 import { ProjectView, type Owner } from "@/components/portfolio/ProjectView";
+import { TeamByline } from "@/components/portfolio/TeamByline";
 import { lookAttrs, themeStyle } from "@/components/portfolio/themeFonts";
 import { formatOf } from "@/lib/exhbt/formats";
 import { useAdapter } from "./adapter";
 import { Autosave } from "./Autosave";
+import { BackupOffer } from "./BackupOffer";
 import { createRuntime, RuntimeContext, useEnv, useRuntime, useUiState, type PageEditorProps, type Runtime, type UiApi } from "./context";
 import { createDraftTools, DraftToolsContext } from "./draft-tools";
 import { DragBoard } from "./drag";
@@ -38,6 +43,7 @@ import { createStore, type Store } from "./store-core";
 import { TopBar } from "./topbar/TopBar";
 import { HEADING_ID } from "./topbar/UndoButton";
 import { Tray } from "./Tray";
+import { Said } from "./ui/Said";
 
 /*
  * The edit-on-page editor (decision 0026): the exhbt page itself, in the person's own look, with every
@@ -219,8 +225,31 @@ function Visitor() {
   const confirmed = useUiState((s) => s.confirmed);
   const owner = useOwner();
   const env = useEnv();
-  const evidenceUrl = doc.evidence?.kind === "link" ? doc.evidence.href : doc.evidence?.kind === "file" ? env.fileEvidenceUrl : null;
-  return <ProjectView doc={doc} owner={owner} imageUrls={imageUrls} evidenceUrl={evidenceUrl} headingLevel="h2" confirmed={confirmed} />;
+  // A link is drawn only if it is https, as on the public page (lib/portfolio.ts mediaFor).
+  const evidenceUrl = doc.evidence?.kind === "link" ? safeHref(doc.evidence.href) : doc.evidence?.kind === "file" ? env.fileEvidenceUrl : null;
+  // The date the public page draws beside the checks: the publish date, or for a draft the day it would say if it went live now.
+  const checkedOn = checkedOnLabel(env.publishedAt ?? null) ?? checkedOnLabel(new Date().toISOString());
+  // On the person's own host (alex.exhbt.co.uk) the guide is on our site, as the public page does it.
+  const onPortfolioHost = Boolean(env.liveBase?.startsWith("https://"));
+  return (
+    <>
+      <ProjectView
+        doc={doc}
+        owner={owner}
+        imageUrls={imageUrls}
+        evidenceUrl={evidenceUrl}
+        checkedOn={checkedOn}
+        team={env.team && env.team.length > 0 ? <TeamByline team={env.team} /> : undefined}
+        saveAsPdf
+        checksHref={onPortfolioHost ? `https://${MARKETING_HOST}${CHECKS_GUIDE}` : undefined}
+        headingLevel="h2"
+        confirmed={confirmed}
+      />
+      <div data-visitor-signoff>
+        <MadeWith startHref={onPortfolioHost ? `https://${MARKETING_HOST}/start` : "/start"} />
+      </div>
+    </>
+  );
 }
 
 /** A small line fixed at the foot of the window, out of the flow: the upload's progress, and under it what went wrong. On a phone L's bar lifts it (css/phone.css). */
@@ -232,9 +261,11 @@ function StatusLine() {
       <p role="status" className="xe-status-line">
         {files.status}
       </p>
-      <p role="alert" className="xe-status-error">
-        {error}
-      </p>
+      {error && (
+        <p role="alert" className="xe-status-error">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -243,9 +274,7 @@ function StatusLine() {
 function LiveRegion() {
   const said = useUiState((s) => s.said);
   return (
-    <div aria-live="polite" className="sr-only" data-said={said.n}>
-      {said.text}
-    </div>
+    <Said text={said.text} n={said.n} data-said={said.n} />
   );
 }
 
@@ -265,11 +294,9 @@ function UndoKeys(): ReactNode {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "z") return;
       if (inField(document.activeElement)) return;
-      const label = store.undoLabel();
-      if (!label) return;
+      if (!store.undoLabel()) return;
       e.preventDefault();
-      store.undo();
-      uiApi.say(`Undone: ${label}.`);
+      uiApi.say(store.undo().words);
     };
     document.addEventListener("keydown", onKey);
     // After an Undo (from here or from the top bar's Undo, which leaves the focus to this), the focus goes to what
@@ -340,47 +367,6 @@ function KeptList() {
         ))}
       </ul>
     </section>
-  );
-}
-
-/** A copy kept in this browser that is newer than the server's, offered back, as the classic editor does. Over the page, under the top bar. */
-function BackupOffer() {
-  const env = useEnv();
-  const store = useStoreInternal();
-  const [offer, setOffer] = useState<Backup | null>(() => {
-    const b = readBackup(env.id);
-    if (!b) return null;
-    if (b.at > Date.parse(env.updatedAt) && JSON.stringify(b.doc) !== JSON.stringify(env.initialDoc)) return b;
-    clearBackup(env.id);
-    return null;
-  });
-  if (!offer) return null;
-  return (
-    <div role="status" className="xe-offer">
-      <p className="font-semibold">We kept changes from {new Date(offer.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} that never reached the server.</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => {
-            // Kept in this browser, maybe in an older shape: read into the current one.
-            store.replace(normaliseDoc(offer.doc));
-            setOffer(null);
-          }}
-        >
-          Restore them
-        </Button>
-        <Button
-          size="sm"
-          onClick={() => {
-            clearBackup(env.id);
-            setOffer(null);
-          }}
-        >
-          Discard them
-        </Button>
-      </div>
-    </div>
   );
 }
 

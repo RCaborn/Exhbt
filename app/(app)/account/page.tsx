@@ -12,6 +12,7 @@ import { portfolioHost } from "@/lib/hosts";
 import { portfolioHref } from "@/lib/portfolio-links";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
+import { DeleteAccountForm } from "./DeleteAccountForm";
 
 export const metadata: Metadata = { title: "Account", robots: { index: false } };
 
@@ -92,13 +93,7 @@ export default async function AccountPage() {
         <p className="mt-3">
           This removes your account, your CV text, your roadmaps, your exhbts and every file you uploaded straight away. It cannot be undone.
         </p>
-        <form action="/api/account/delete" method="post" className="mt-4 space-y-4">
-          <label className="flex items-start gap-3">
-            <input type="checkbox" name="confirm" value="yes" required className="mt-1.5 size-4 accent-error" />
-            <span>I understand this deletes everything.</span>
-          </label>
-          <Button type="submit" variant="danger">Delete my account</Button>
-        </form>
+        <DeleteAccountForm />
       </section>
     </div>
   );

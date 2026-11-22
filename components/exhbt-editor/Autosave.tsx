@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef } from "react";
+import { unstable_isUnrecognizedActionError } from "next/navigation";
 import { saveDraft } from "@/app/(app)/exhbts/[id]/actions";
 import { useAutosave, type SaveResult } from "@/components/editor/useAutosave";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
@@ -14,23 +15,29 @@ import { useDoc } from "./store";
  * it is, run by a component that draws nothing, so the only part of the editor that renders on every
  * change of the whole doc is this one. useSave() reads what it publishes.
  *
- * A save that throws for a reason other than the network (a TypeError from fetch, or the browser
- * offline) means the page's server actions are gone, after a deploy or a rollback: it is not tried
- * again, and the status says so (STALE_EDITOR). In development, `?save=stale` makes every save fail
- * that way, for the test.
+ * A save the server cannot run because the page's server actions are gone (after a deploy or a
+ * rollback Next answers that it has no such action, and throws UnrecognizedActionError) is a stale
+ * editor: it is not tried again, and the status says so (STALE_EDITOR). Every other failure (a dropped
+ * connection, a server error or timeout, a gateway's error page, "An error occurred in the Server
+ * Components render") is thrown on to useAutosave, which tries it three times like any save that did
+ * not land (the review's data-safety-2). In development, `?save=stale` makes every save fail as a
+ * stale editor's does, for the test.
  */
 
-const isNetwork = (e: unknown) => e instanceof TypeError || (typeof navigator !== "undefined" && navigator.onLine === false);
+/** Next's words for an action it does not have: its error's, and the body it sends when a proxy drops its header. */
+const NO_SUCH_ACTION = /Server Action ".*" was not found on the server|Failed to find Server Action|^Server action not found/i;
+const isStale = (e: unknown) => unstable_isUnrecognizedActionError(e) || (e instanceof Error && (e.name === "UnrecognizedActionError" || NO_SUCH_ACTION.test(e.message)));
 
 const devStale = () => process.env.NODE_ENV !== "production" && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("save") === "stale";
 
 async function send(id: string, doc: ExhbtDoc): Promise<SaveResult> {
   try {
-    if (devStale()) throw new Error("The save was told to fail as a stale editor's would (?save=stale, development only).");
+    if (devStale()) throw Object.assign(new Error('Server Action "dev" was not found on the server. (?save=stale, development only)'), { name: "UnrecognizedActionError" });
     return await saveDraft(id, doc);
   } catch (e) {
-    if (isNetwork(e)) throw e;
-    console.error("Saving failed in a way the network does not explain: this editor is older than the site.", e);
+    // Tried again by useAutosave.
+    if (!isStale(e)) throw e;
+    console.error("The server has no such action: this editor is older than the site.", e);
     return { ok: false, error: STALE_EDITOR };
   }
 }

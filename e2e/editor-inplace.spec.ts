@@ -4,7 +4,9 @@ import { emptyDoc, plain, text, type ExhbtDoc, type RichText, type Section } fro
 import { FORMAT_RULES, formatOf } from "../lib/exhbt/formats";
 import { flowShown, hasMarker, pageItems } from "../lib/exhbt/layouts";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
+import { createFiles } from "../components/exhbt-editor/files";
 import { createStore } from "../components/exhbt-editor/store-core";
+import { undoneWords } from "../components/exhbt-editor/undo";
 import { ORDER_FIXTURES } from "./fixtures/order-docs";
 import {
   allowEditOnly,
@@ -149,6 +151,20 @@ test.describe("a new exhbt in the new editor", () => {
     expect(hasMarker(undone)).toBe(false);
     expect(undone.sections).toEqual(before.sections);
     expect(await undoLabel(page)).toBeNull();
+  });
+
+  test("text typed in the Add a skill box is kept as a skill when the person moves on, and stored", async ({ page }) => {
+    const id = await openNew(page, freshName("skillblur"));
+    const box = page.locator(`${READY} #skill-new`);
+    await box.fill("Python");
+    // No Enter, no comma: the focus just moves to the title.
+    await page.locator(`${READY} [data-path="title"]`).first().click();
+    await expect(box).toHaveValue("");
+    await expect.poll(async () => (await docNow(page)).skills).toContain("Python");
+    await waitSaved(page, id);
+    expect((await readStored(page, id)).working.skills).toContain("Python");
+    // There is no Add button with a mouse: it is for touch screens.
+    await expect(page.locator(`${READY} [data-path="skills"] button`, { hasText: /^Add/ })).toBeHidden();
   });
 
   test("a picture can be added: it goes on the page and is stored", async ({ page }) => {
@@ -319,6 +335,116 @@ test.describe("the store, in-process: a flowchart box's and a finding's actions,
     s.setAt("sections.1.text", "Calmer, typed.");
     s.undo();
     expect(s.get().sections[1]).toMatchObject({ text: "Calmer, typed.", role: "" });
+  });
+
+  // The review's data-safety-5: "Back to the AI version" (or a rewrite) of the flowchart changes the number of boxes.
+  const toTheAi = (s: ReturnType<typeof createStore>, steps: string[]) => s.patchDoc((d) => ({ ...d, flow: steps.map((step) => ({ step })) }), "back to the AI version of the method");
+
+  test("a box added, then the flowchart put back to the AI version with fewer boxes: Undo puts the boxes back, then takes the added one out", () => {
+    const s = createStore(start());
+    const added = s.flowAdd(3)!;
+    s.setAt("flow.3.step", "Four");
+    toTheAi(s, ["A", "B"]);
+    s.undo();
+    expect(steps(s.get())).toEqual(["One", "Two", "Three", "Four"]);
+    expect(s.flowKeys()[3]).toBe(added);
+    expect(s.undoLabel()).toBe("add box 4");
+    s.undo();
+    expect(steps(s.get())).toEqual(["One", "Two", "Three"]);
+    expect(s.undoLabel()).toBeNull();
+  });
+
+  test("a box moved to the end, then the flowchart rewritten to fewer boxes and to more: each Undo puts back what it should", () => {
+    const s = createStore({ ...start(), flow: [{ step: "One" }, { step: "Two" }, { step: "Three" }, { step: "Four" }] });
+    const one = s.flowKeys()[0]!;
+    s.flowMove(one, 3);
+    expect(steps(s.get())).toEqual(["Two", "Three", "Four", "One"]);
+    toTheAi(s, ["A", "B", "C"]);
+    toTheAi(s, ["A", "B", "C", "D", "E"]);
+    s.undo();
+    s.undo();
+    expect(steps(s.get())).toEqual(["Two", "Three", "Four", "One"]);
+    expect(s.flowKeys()[3]).toBe(one);
+    s.undo();
+    expect(steps(s.get())).toEqual(["One", "Two", "Three", "Four"]);
+    expect(s.flowKeys()[0]).toBe(one);
+  });
+
+  test("an undo that can no longer be done is skipped, and Undo says so", () => {
+    const s = createStore({ ...start(), sections: [...start().sections, { id: "quote-1", kind: "quote", text: "Calmer.", name: "Sam", role: "" }] });
+    s.move("quote-1", 0);
+    const moved = s.undoLabel()!;
+    s.flowAdd(3);
+    // The boxes change in number with no undo entry (nothing in the editor does this now): the added box's key goes.
+    s.patchDoc((d) => ({ ...d, flow: d.flow.slice(0, 2) }));
+    // Undo names what it will do, not the entry it has to skip.
+    expect(s.undoLabel()).toBe(moved);
+    const r = s.undo();
+    expect(r).toEqual({ undone: moved, skipped: ["add box 4"], words: `Undone: ${moved}. Add box 4 can't be undone any more, so Undo skipped it.` });
+    expect(s.get().sections.map((x) => x.id)).toEqual(["findings", "quote-1"]);
+    expect(s.undoLabel()).toBeNull();
+    expect(undoneWords({ undone: "remove quote", skipped: [] })).toBe("Undone: remove quote.");
+    expect(undoneWords({ undone: null, skipped: ["add box 4", "move box 2"] })).toBe("Add box 4 and move box 2 can't be undone any more, so Undo skipped them.");
+  });
+});
+
+test.describe("the files, in-process: an upload still waiting to be placed is never deleted (the review's data-safety-1)", () => {
+  // The browser's fetch and createImageBitmap, stood in for: each upload gets the next id, and every DELETE is noted.
+  const g = globalThis as unknown as Record<string, unknown>;
+  let before: Record<string, unknown> = {};
+  let deleted: string[] = [];
+  let n = 0;
+  test.beforeEach(() => {
+    before = { fetch: g.fetch, createImageBitmap: g.createImageBitmap };
+    deleted = [];
+    n = 0;
+    g.fetch = async (url: string, init?: RequestInit) => {
+      if (url === "/api/files/upload-url") return Response.json({ fileId: `new-${++n}`, uploadUrl: "/put", headers: {} });
+      if (init?.method === "DELETE") deleted.push(decodeURIComponent(url.split("/api/files/")[1]!));
+      return Response.json({});
+    };
+  });
+  test.afterEach(() => void Object.assign(g, before));
+  const picture = (): ExhbtDoc => ({ ...emptyDoc(), sections: [{ id: "image-1", kind: "image", fileId: "old", alt: "The queue", caption: [] }] });
+  const filesFor = (store: ReturnType<typeof createStore>, doc: ExhbtDoc) => createFiles({ store, exhbtId: "e", maxFileMb: 10, imageUrls: {}, liveFileIds: [], initialDoc: doc });
+
+  test("a replaced picture: a save that lands while its size is read deletes neither file; the old one goes once the save without it lands", async () => {
+    let sized: ((v: unknown) => void) | null = null;
+    g.createImageBitmap = () => new Promise((r) => (sized = r));
+    const doc = picture();
+    const store = createStore(doc);
+    const files = filesFor(store, doc);
+    const done = files.replaceImage("image-1", new File([new Uint8Array(png(40, 10))], "b.png", { type: "image/png" }), { from: "report.pdf", page: 2, shareOk: false }, { describeAgain: false });
+    // Uploaded, and its size being read: it is not on the page yet when this save lands.
+    await expect.poll(() => sized !== null).toBe(true);
+    files.noteSaved(store.get());
+    expect(deleted).toEqual([]);
+    sized!({ width: 40, height: 10, close() {} });
+    await done;
+    expect(store.get().sections[0]).toMatchObject({ fileId: "new-1", w: 40, h: 10 });
+    files.noteSaved(store.get());
+    expect(deleted).toEqual(["old"]);
+  });
+
+  test("a figure from the report: kept from its upload until it is placed; one that is never placed goes once it is let go", () => {
+    const doc = emptyDoc();
+    const store = createStore(doc);
+    const files = filesFor(store, doc);
+    files.addUploaded("figure", new Blob([new Uint8Array(png(40, 10))], { type: "image/png" }));
+    // A save lands before the figure is on the page.
+    files.noteSaved(store.get());
+    expect(deleted).toEqual([]);
+    expect(store.insertImage({ fileId: "figure", w: 40, h: 10 }, 0)).toBeTruthy();
+    files.release("figure");
+    files.noteSaved(store.get());
+    expect(deleted).toEqual([]);
+    // Taken, but there was no room for it after all: let go, the rule deletes it.
+    files.addUploaded("spare", new Blob([new Uint8Array(png(40, 10))], { type: "image/png" }));
+    files.settle();
+    expect(deleted).toEqual([]);
+    files.release("spare");
+    files.settle();
+    expect(deleted).toEqual(["spare"]);
   });
 });
 
@@ -602,6 +728,66 @@ test.describe("the status line", () => {
     expect(widths).toEqual([30, 40, 50]);
   });
 
+  test("pictures that finish uploading out of order: the save after the first is placed deletes none of those still waiting, and all three are kept", async ({ page }) => {
+    const { id } = await openDoc(page, freshName("order"), { ...sampleDoc("gallery"), sections: sampleDoc("gallery").sections.filter((s) => s.kind !== "image") });
+    // Each upload's file id, by its file's name, and every file the editor asks to delete.
+    const ids: Record<string, string> = {};
+    page.on("response", async (res) => {
+      if (!res.url().endsWith("/api/files/upload-url")) return;
+      ids[(res.request().postDataJSON() as { name: string }).name] = ((await res.json()) as { fileId: string }).fileId;
+    });
+    const deleted: string[] = [];
+    page.on("request", (req) => {
+      if (req.method() === "DELETE" && req.url().includes("/api/files/")) deleted.push(req.url());
+    });
+    // The second picture's upload is held back: the first is placed, and the third finishes and waits for the second.
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    await page.route("**/api/files/upload-url", async (route) => {
+      if ((route.request().postDataJSON() as { name: string }).name === "b.png") await held;
+      await route.continue();
+    });
+    await page.locator(`${READY} input[aria-label='Choose an image']`).setInputFiles([
+      { name: "a.png", mimeType: "image/png", buffer: png(30, 10) },
+      { name: "b.png", mimeType: "image/png", buffer: png(40, 10) },
+      { name: "c.png", mimeType: "image/png", buffer: png(50, 10) },
+    ]);
+    await expect(page.locator(`${READY} [data-kind="image"]`)).toHaveCount(1);
+    await expect.poll(() => ids["c.png"] ?? null).not.toBeNull();
+    // Placing the first is a change, so it is saved, with nothing typed. The third is uploaded but not placed.
+    await waitSaved(page, id);
+    await page.waitForTimeout(500);
+    expect(deleted).toEqual([]);
+    expect(await fileExists(page, ids["c.png"]!)).toBe(true);
+    release();
+    await expect(page.locator(`${READY} [data-kind="image"]`)).toHaveCount(3);
+    await waitSaved(page, id);
+    const stored = (await readStored(page, id)).working.sections.flatMap((s) => (s.kind === "image" ? [s.fileId] : []));
+    expect(stored).toEqual([ids["a.png"], ids["b.png"], ids["c.png"]]);
+    await page.reload();
+    await waitReady(page);
+    await expect(page.locator(`${READY} [data-kind="image"]`)).toHaveCount(3);
+    expect(deleted).toEqual([]);
+  });
+
+  test("pictures added with the focus left on the tray's button or on a '+': the cursor goes to the first new picture's description", async ({ page }) => {
+    await openDoc(page, freshName("adds"), { ...sampleDoc("gallery"), sections: sampleDoc("gallery").sections.filter((s) => s.kind !== "image") });
+    // From the tray: the button keeps the focus while the picker is open.
+    const block = page.locator(`${READY} [data-xe-tray] [data-block="image"]`);
+    const chooser = page.waitForEvent("filechooser");
+    await block.click();
+    await expect(block).toBeFocused();
+    await (await chooser).setFiles({ name: "a.png", mimeType: "image/png", buffer: png(30, 10) });
+    await expect(page.locator(`${READY} [data-kind="image"]`)).toHaveCount(1);
+    await expect(page.locator("#image-0-alt")).toBeFocused();
+    // With the focus on the "+" at the end of the page.
+    const plus = page.locator(`${READY} [data-path="sections"] button`).first();
+    await plus.focus();
+    await page.locator(`${READY} input[aria-label='Choose an image']`).setInputFiles({ name: "b.png", mimeType: "image/png", buffer: png(40, 10) });
+    await expect(page.locator(`${READY} [data-kind="image"]`)).toHaveCount(2);
+    await expect(page.locator("#image-1-alt")).toBeFocused();
+  });
+
   test("a picture over the size limit says why in the alert, and adds nothing", async ({ page }) => {
     const id = await openNew(page, freshName("big"), "free");
     // A GIF is never shrunk in the browser, so one over the plan's limit stays over it.
@@ -614,11 +800,54 @@ test.describe("the status line", () => {
   });
 });
 
+/** The stale editor's words as the top bar's save status draws them (its live region says them too, out of sight). */
+const staleWords = (page: Page) => page.locator(`${READY} .xe-save-words`, { hasText: "The editor was updated. Reload to carry on; your changes are kept in this browser." });
+
 test("a stale editor: a save that fails for another reason than the network says to reload", async ({ page }) => {
   await openDoc(page, freshName("stale"), sampleDoc("case-study"), { query: "?save=stale" });
   await typeIn(page, "title", "A change that cannot be saved");
-  await expect(page.getByText("The editor was updated. Reload to carry on; your changes are kept in this browser.")).toBeVisible();
+  await expect(staleWords(page)).toBeVisible();
   await expect(page.getByRole("button", { name: "Reload" })).toBeVisible();
+});
+
+test.describe("a save the server fails (the review's data-safety-2)", () => {
+  const EDIT = /\/exhbts\/[0-9a-f-]{36}\/edit/;
+  const STALE = "The editor was updated. Reload to carry on; your changes are kept in this browser.";
+
+  test("a server error and a bad answer are tried again, and the save lands with no word about reloading", async ({ page }) => {
+    const { id } = await openDoc(page, freshName("blip"), sampleDoc("case-study"));
+    let posts = 0;
+    await page.route(EDIT, async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      posts++;
+      // A server error as the action's own words, then a gateway's page: neither is a stale editor.
+      if (posts === 1) return route.fulfill({ status: 500, contentType: "text/plain", body: "An error occurred in the Server Components render." });
+      if (posts === 2) return route.fulfill({ status: 502, contentType: "text/html", body: "<h1>Bad gateway</h1>" });
+      return route.continue();
+    });
+    await typeIn(page, "title", "Saved after a blip");
+    await waitSaved(page, id);
+    expect(posts).toBe(3);
+    expect((await readStored(page, id)).working.title).toBe("Saved after a blip");
+    await expect(page.getByText(STALE)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Reload" })).toHaveCount(0);
+  });
+
+  test("an action the server no longer has is a stale editor: it says to reload, and is not tried again", async ({ page }) => {
+    await openDoc(page, freshName("gone"), sampleDoc("case-study"));
+    let posts = 0;
+    await page.route(EDIT, async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      posts++;
+      // What Next answers for a server action it does not have (after a deploy or a rollback).
+      return route.fulfill({ status: 404, headers: { "x-nextjs-action-not-found": "1" }, contentType: "text/plain", body: "Server action not found." });
+    });
+    await typeIn(page, "title", "A change for an older editor");
+    await expect(staleWords(page)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Reload" })).toBeVisible();
+    await page.waitForTimeout(3000);
+    expect(posts).toBe(1);
+  });
 });
 
 test.describe("axe", () => {
@@ -770,7 +999,7 @@ test("a copy kept in this browser that never reached the server is offered back;
   // A stale editor: the change is kept in this browser, and the server never gets it.
   const { id } = await openDoc(page, freshName("backup"), sampleDoc("case-study"), { query: "?save=stale" });
   await typeIn(page, "title", "Words the server never got");
-  await expect(page.getByText("The editor was updated. Reload to carry on; your changes are kept in this browser.")).toBeVisible();
+  await expect(staleWords(page)).toBeVisible();
   // Leaving asks first while something is unsaved: say yes.
   page.on("dialog", (d) => void d.accept());
   await page.goto(`/exhbts/${id}/edit`);
@@ -782,6 +1011,123 @@ test("a copy kept in this browser that never reached the server is offered back;
   await expect(page.getByText(/^We kept changes from/)).toHaveCount(0);
   await waitSaved(page, id);
   expect((await readStored(page, id)).working.title).toBe("Words the server never got");
+});
+
+test.describe("the copy kept in this browser (the review's data-safety-3)", () => {
+  type Kept = { doc: ExhbtDoc; at: number };
+  /** Writes a copy of exhbt `id` into this browser's storage, as the editor keeps one. */
+  const keep = (page: Page, id: string, copy: Kept) => page.evaluate(([k, v]) => localStorage.setItem(k, v), [`exhbt-backup:${id}`, JSON.stringify(copy)] as const);
+  const keptNow = (page: Page, id: string): Promise<Kept | null> => page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? "null") as Kept | null, `exhbt-backup:${id}`);
+  const OFFER = /^We kept changes from .+ that never reached the server\.$/;
+  /** Opens a case study, then reloads it with a copy in this browser, newer than the server's, whose title is `title`. */
+  async function withCopy(page: Page, tag: string, title: string) {
+    const doc = sampleDoc("case-study");
+    const { id } = await openDoc(page, freshName(tag), doc);
+    const at = Date.now() + 60_000;
+    await keep(page, id, { doc: { ...doc, title }, at });
+    await page.reload();
+    await waitReady(page);
+    await expect(page.getByText(OFFER)).toBeVisible();
+    return { id, doc, at };
+  }
+
+  test("a change made first hides the offer, so the older copy can no longer be put over newer work", async ({ page }) => {
+    const { id } = await withCopy(page, "newer", "From an older visit");
+    await typeIn(page, "title", "Typed since");
+    await expect(page.getByText(OFFER)).toHaveCount(0);
+    await waitSaved(page, id);
+    expect((await readStored(page, id)).working.title).toBe("Typed since");
+    await page.reload();
+    await waitReady(page);
+    await expect(field(page, "title")).toHaveValue("Typed since");
+    await expect(page.getByText(OFFER)).toHaveCount(0);
+  });
+
+  test("Restore is one undo entry: Undo puts back what the server had, and saves it", async ({ page }) => {
+    const { id, doc } = await withCopy(page, "restore", "From an older visit");
+    await page.getByRole("button", { name: "Restore them" }).click();
+    await expect(field(page, "title")).toHaveValue("From an older visit");
+    await expect(page.getByText(OFFER)).toHaveCount(0);
+    expect(await undoLabel(page)).toBe("restore the kept changes");
+    await waitSaved(page, id);
+    expect((await readStored(page, id)).working.title).toBe("From an older visit");
+    await pressUndo(page);
+    await expect(field(page, "title")).toHaveValue(doc.title);
+    await waitSaved(page, id);
+    expect((await readStored(page, id)).working.title).toBe(doc.title);
+  });
+
+  test("Discard takes out only the copy it offered: a copy written since is kept", async ({ page }) => {
+    const { id, doc } = await withCopy(page, "discard", "From an older visit");
+    // Nothing the editor does by itself on opening (its formatted fields starting in idle moments) takes the offer away.
+    await page.waitForTimeout(2500);
+    await expect(page.getByText(OFFER)).toBeVisible();
+    // Another tab of this exhbt keeps a newer copy meanwhile.
+    const newer = { doc: { ...doc, title: "From the other tab" }, at: Date.now() + 120_000 };
+    await keep(page, id, newer);
+    await page.getByRole("button", { name: "Discard them" }).click();
+    await expect(page.getByText(OFFER)).toHaveCount(0);
+    expect((await keptNow(page, id))?.at).toBe(newer.at);
+    // The copy offered is the one there: Discard takes it out.
+    await page.reload();
+    await waitReady(page);
+    await expect(page.getByText(OFFER)).toBeVisible();
+    await page.getByRole("button", { name: "Discard them" }).click();
+    expect(await keptNow(page, id)).toBeNull();
+    await expect(field(page, "title")).toHaveValue(doc.title);
+  });
+
+  test("publishing with nothing changed clears the copy, and the offer goes with it", async ({ page }) => {
+    const { id } = await withCopy(page, "publish", "From an older visit");
+    await page.getByRole("button", { name: "Review and publish" }).click();
+    await page.getByLabel("This is my work, and the numbers are true").check();
+    await page.getByRole("button", { name: /^Publish( changes)?$/ }).click();
+    await expect(page.getByText(/^(It's live|Your changes are live)\.$/)).toBeVisible();
+    await expect(page.getByText(OFFER)).toHaveCount(0);
+    expect(await keptNow(page, id)).toBeNull();
+    expect((await readStored(page, id)).working.title).not.toBe("From an older visit");
+  });
+});
+
+test.describe("deleting takes this browser's copies out (the review's security-2)", () => {
+  /** Keeps a copy of exhbt `id`, and of another one, in this browser, as the editor does when saves fail. */
+  const keepCopies = (page: Page, id: string) =>
+    page.evaluate((mine) => {
+      for (const k of [`exhbt-backup:${mine}`, "exhbt-backup:another-exhbt"]) localStorage.setItem(k, JSON.stringify({ doc: { title: "Unsent words" }, at: Date.now() }));
+      localStorage.setItem("exhbt-guide-hidden", "1");
+    }, id);
+  const keys = (page: Page) => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("exhbt-")).sort());
+
+  test("from the editor's menu: that exhbt's copy goes, another exhbt's stays", async ({ page }) => {
+    const { id } = await openDoc(page, freshName("menudel"), sampleDoc("case-study"));
+    await keepCopies(page, id);
+    await page.getByRole("button", { name: "Menu" }).click();
+    await page.getByRole("button", { name: "Delete this exhbt" }).click();
+    await page.getByRole("button", { name: "Yes, delete" }).click();
+    await page.waitForURL(/\/exhbts$/);
+    expect(await keys(page)).toEqual(["exhbt-backup:another-exhbt", "exhbt-guide-hidden"]);
+  });
+
+  test("from the list of exhbts: that exhbt's copy goes, another exhbt's stays", async ({ page }) => {
+    const { id } = await openDoc(page, freshName("listdel"), sampleDoc("case-study"));
+    await page.goto("/exhbts");
+    await keepCopies(page, id);
+    const row = page.locator(`li:has(a[href="/exhbts/${id}/edit"])`);
+    await row.getByRole("button", { name: /^Delete / }).click();
+    await row.getByRole("button", { name: "Yes, delete" }).click();
+    await expect(page.locator(`a[href="/exhbts/${id}/edit"]`)).toHaveCount(0);
+    await expect.poll(() => keys(page)).toEqual(["exhbt-backup:another-exhbt", "exhbt-guide-hidden"]);
+  });
+
+  test("deleting the account takes every copy and the editor's own keys out of this browser", async ({ page }) => {
+    const { id } = await openDoc(page, freshName("acctdel"), sampleDoc("case-study"));
+    await page.goto("/account");
+    await keepCopies(page, id);
+    await page.getByLabel("I understand this deletes everything.").check();
+    await page.getByRole("button", { name: "Delete my account" }).click();
+    await page.waitForURL(/\/\?deleted=1$/);
+    expect(await keys(page)).toEqual([]);
+  });
 });
 
 test("sections a layout keeps but does not draw are listed under the page; Remove takes one out and Undo puts it back", async ({ page }) => {

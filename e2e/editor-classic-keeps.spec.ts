@@ -303,3 +303,58 @@ test.describe("what the other layouts write survives a visit", () => {
     expect(ids(after)).toEqual(["image-1", "flow", "image-2", "pullquote-1", "findings", "link-1"]);
   });
 });
+
+// The copy kept in this browser, offered back (the review's data-safety-3, as the new editor's BackupOffer): the offer is
+// for that one copy. It goes as soon as the doc changes or the copy is gone or replaced, and "Discard them" takes out only
+// the copy it offered.
+test.describe("the classic editor's offer of a copy kept in this browser", () => {
+  const OFFER = /^We kept changes from .+ that never reached the server\.$/;
+  type Kept = { doc: unknown; at: number };
+  const keep = (page: Page, id: string, copy: Kept) => page.evaluate(([k, v]) => localStorage.setItem(k, v), [`exhbt-backup:${id}`, JSON.stringify(copy)] as const);
+  const keptNow = (page: Page, id: string) => page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? "null") as Kept | null, `exhbt-backup:${id}`);
+
+  /** Opens the exhbt, then reloads it with a newer copy kept in this browser whose title is "From an older visit". */
+  async function withCopy(page: Page, tag: string) {
+    const { id } = await open(page, tag, core([FLOW, findings()]));
+    const base = await stored(page.request, id);
+    await keep(page, id, { doc: { ...base, title: "From an older visit" }, at: Date.now() + 60_000 });
+    await page.reload();
+    await expect(page.getByRole("heading", SEL.editHeading)).toBeVisible();
+    await expect(page.getByText(OFFER)).toBeVisible();
+    return { id, base };
+  }
+
+  test("a change made first takes the offer away, so the older copy cannot be put over newer work", async ({ page }) => {
+    const { id } = await withCopy(page, "cbnewer");
+    await page.locator(SEL.titleField).fill("Typed since");
+    await expect(page.getByText(OFFER)).toHaveCount(0);
+    await waitForSave(page);
+    expect((await stored(page.request, id)).title).toBe("Typed since");
+    await page.reload();
+    await expect(page.locator(SEL.titleField)).toHaveValue("Typed since");
+    await expect(page.getByText(OFFER)).toHaveCount(0);
+  });
+
+  test("Restore puts the kept copy in while nothing has changed", async ({ page }) => {
+    await withCopy(page, "cbrestore");
+    await page.getByRole("button", { name: "Restore them" }).click();
+    await expect(page.locator(SEL.titleField)).toHaveValue("From an older visit");
+    await expect(page.getByText(OFFER)).toHaveCount(0);
+  });
+
+  test("Discard takes out only the copy it offered: a copy written since is kept", async ({ page }) => {
+    const { id, base } = await withCopy(page, "cbdiscard");
+    const newer = { doc: { ...base, title: "From the other tab" }, at: Date.now() + 120_000 };
+    await keep(page, id, newer);
+    // Another tab wrote a newer copy: it is not the one offered, so Discard leaves it.
+    await page.getByRole("button", { name: "Discard them" }).click();
+    await expect(page.getByText(OFFER)).toHaveCount(0);
+    expect((await keptNow(page, id))?.at).toBe(newer.at);
+    // The copy offered, still there: Discard takes it out.
+    await page.reload();
+    await expect(page.getByText(OFFER)).toBeVisible();
+    await page.getByRole("button", { name: "Discard them" }).click();
+    expect(await keptNow(page, id)).toBeNull();
+    await expect(page.locator(SEL.titleField)).toHaveValue(base.title);
+  });
+});
