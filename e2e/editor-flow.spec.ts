@@ -601,6 +601,28 @@ for (const f of offered()) {
   });
 }
 
+test.describe("an empty flowchart", () => {
+  test.skip(({ isMobile }) => isMobile, "a desktop's check");
+
+  test("with no boxes, the one button is its placeholder: Add a box puts the cursor in box 1", async ({ page }) => {
+    await openDoc(page, freshName("flowempty"), { ...sampleDoc("case-study"), flow: [] });
+    await settle(page);
+    await expect(page.locator(BOX)).toHaveCount(0);
+    const first = page.locator(`${LIST} [data-flow-add]`);
+    await expect(first).toHaveCount(1);
+    await expect(first).toHaveAccessibleName("Add a box");
+    await expect(first).toBeVisible();
+    await first.click();
+    await expect(said(page)).toHaveText("Box added in place 1 of 1.");
+    await expect.poll(() => focusedPath(page)).toBe("flow.0.step");
+    await page.keyboard.type("The only step");
+    expect(await stepsNow(page)).toEqual(["The only step"]);
+    await expect(page.getByRole("button", { name: "Add a box", exact: true })).toHaveCount(0);
+    // The count issue is on the list until there are three.
+    await expect(list(page)).toHaveAttribute("data-invalid", "");
+  });
+});
+
 /* ------------------------------------------------------------------------------------------------
  * Looks: axe, and the contrast of what sits on the dark last box
  * ---------------------------------------------------------------------------------------------- */
@@ -634,9 +656,10 @@ test.describe("in the looks", () => {
     }
   }
 
-  test("in all eight looks, a placeholder and the tools on the dark last box, and the line, pass contrast", async ({ page }) => {
-    await page.setViewportSize(TALL);
-    for (const theme of PORTFOLIO_THEMES) {
+  // One test per look (all eight), so a cold server can't run one test out of time.
+  for (const theme of PORTFOLIO_THEMES) {
+    test(`in the ${theme.name || theme.id} look, a placeholder and the tools on the dark last box, and the line, pass contrast`, async ({ page }) => {
+      await page.setViewportSize(TALL);
       await openTiming(page, "gallery", { look: theme.id });
       await settle(page);
       const last = (await keysNow(page)).length - 1;
@@ -662,7 +685,7 @@ test.describe("in the looks", () => {
         expect(contrast(ink!, chip!), `${theme.id}: a tool's icon on its chip`).toBeGreaterThanOrEqual(3);
       }
       // The line (line style only), in the look's link colour, against the page's ground.
-      if ((await list(page).getAttribute("data-flow-style")) !== "line") continue;
+      if ((await list(page).getAttribute("data-flow-style")) !== "line") return;
       await gripOf(page, 0).focus();
       await page.keyboard.press("Space");
       await expect(said(page)).toHaveText(/^Picked up box 1 of/);
@@ -671,8 +694,8 @@ test.describe("in the looks", () => {
       const [link, page0] = await line(page).evaluate((el) => [getComputedStyle(el).backgroundColor, getComputedStyle(document.querySelector('[data-editor="page"] article')!).backgroundColor]);
       expect(contrast(link!, page0!), `${theme.id}: the line on the ground`).toBeGreaterThanOrEqual(3);
       await page.keyboard.press("Escape");
-    }
-  });
+    });
+  }
 });
 
 /* ------------------------------------------------------------------------------------------------
