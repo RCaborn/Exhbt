@@ -1,7 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
+import { emptyDoc, text, type ExhbtDoc } from "../lib/exhbt/blocks";
 import { FORMAT_RULES } from "../lib/exhbt/formats";
 import { flowShown, pageItems } from "../lib/exhbt/layouts";
-import { boxes, differences, docNow, field, freshName, offered, openDoc, openTiming, READY, renders, sampleDoc, settle, waitLive } from "./page-editor";
+import { boxes, differences, docNow, field, freshName, offered, openDoc, openTiming, READY, renders, sampleDoc, settle, typeIn, waitLive } from "./page-editor";
 
 /*
  * Smoothness (decision 0026, "Smoothness"), checks 1 and 2, on the sample of every layout the editor
@@ -88,6 +89,41 @@ for (const f of offered()) {
     });
   });
 }
+
+test("a move draws the shell again and no section's part, and every field's path follows its section", async ({ page }) => {
+  // A case study whose items each have a row of their own: a move changes every stored index after the first.
+  const doc: ExhbtDoc = {
+    ...emptyDoc(),
+    title: "Shorter queues",
+    flow: [{ step: "Timed it" }, { step: "Added a till" }, { step: "Timed it again" }],
+    sections: [
+      { id: "quote-1", kind: "quote", text: "Calmer at lunch.", name: "Sam Patel", role: "Manager" },
+      { id: "reflection-1", kind: "reflection", text: text("Time the evening queue too.") },
+      { id: "link-1", kind: "link", href: "https://example.com/code", label: "The code", description: "On GitHub" },
+    ],
+  };
+  await openDoc(page, freshName("move"), doc);
+  await waitLive(page);
+  const before = await renders(page);
+  // The first move on an untouched doc writes the flowchart's marker too, which shifts every index.
+  await page.evaluate(() => window.__exhbtEditor!.move("link-1", 0));
+  await frames(page);
+  const after = await renders(page);
+  const changed = Object.fromEntries(Object.keys({ ...before, ...after }).flatMap((k) => ((after[k] ?? 0) - (before[k] ?? 0) ? [[k, (after[k] ?? 0) - (before[k] ?? 0)]] : [])));
+  expect(changed).toEqual({ shell: 1 });
+  // Every field inside a frame carries that frame's stored index now.
+  const stale = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-editor="page"] article [data-section-id]')].flatMap((f) => {
+      const own = f.getAttribute("data-path");
+      return own ? [...f.querySelectorAll("[data-path]")].map((el) => el.getAttribute("data-path")!).filter((p) => p.startsWith("sections.") && !p.startsWith(`${own}.`)).map((p) => `${own}: ${p}`) : [];
+    }),
+  );
+  expect(stale).toEqual([]);
+  expect((await docNow(page)).sections.map((s) => s.id)).toEqual(["link-1", "flow", "quote-1", "reflection-1"]);
+  // And typing in a moved field is stored at its new place.
+  await typeIn(page, "sections.0.label", "The model code");
+  expect(((await docNow(page)).sections[0] as { label: string }).label).toBe("The model code");
+});
 
 test("the field-sizing fallback: a field that wraps to three lines is the same size with the mirror", async ({ page }) => {
   const words = "Would a second till at lunch, opened for the busiest hour on weekdays, cut the queue by half for students and staff?";

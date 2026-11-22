@@ -1,8 +1,8 @@
 "use client";
 
-import { useContext, useMemo, useRef, useState } from "react";
+import { memo, useContext, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
-import type { EditAdapter, ExtraSlot, ListSlot, RichSlot, ShellTools } from "@/components/portfolio/page-ctx";
+import type { EditAdapter, ExtraSlot, InsertSlot, ListSlot, RichSlot, ShellTools } from "@/components/portfolio/page-ctx";
 import { formatLimits, LIMITS } from "@/lib/exhbt/blocks";
 import { FORMAT_COPY, formatOf } from "@/lib/exhbt/formats";
 import { useRuntime } from "./context";
@@ -13,9 +13,10 @@ import { GraphExtras } from "./figures/GraphExtras";
 import { ImageExtras } from "./figures/ImageExtras";
 import { LinkExtras } from "./figures/LinkExtras";
 import { useFlowEdit } from "./flow/FlowEdit";
-import { Frame, useFrame } from "./Frame";
+import { Frame, useFieldPath, useFrame } from "./Frame";
 import { PILL, SKILLS_LIST } from "./geometry";
 import { Insert } from "./Insert";
+import { labelAt } from "./labels";
 import { WorkButton } from "./sheets/WorkButton";
 import { useDoc, useSection, useStoreInternal } from "./store";
 import { jumpTo } from "./jump";
@@ -31,6 +32,15 @@ import { jumpTo } from "./jump";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 
+// The other owners' plugs, memoised here: when a move draws the shell again, the work button and a "+" whose place and
+// name have not changed do not draw again. The "+" is named for the item at its place ("Add a section before Graph 1"),
+// which it reads from the store when it draws, so the wrapper draws it again whenever that name changes.
+const MemoWork = memo(WorkButton);
+const MemoInsert = memo(function PlaceInsert({ at, end }: InsertSlot) {
+  useDoc((d) => (end ? null : labelAt(d, at)));
+  return <Insert at={at} end={end} />;
+});
+
 export function useAdapter(): EditAdapter {
   const flow = useFlowEdit();
   // The flowchart's slots are K's hook; the adapter stays one object whatever that hook returns.
@@ -41,7 +51,7 @@ export function useAdapter(): EditAdapter {
       text: (o) => <InlineText {...o} />,
       rich: (o) => (CAPTION.test(o.path) ? <CaptionField {...o} /> : <RichField {...o} />),
       item: (o) => <Frame {...o} />,
-      insert: (o) => <Insert {...o} />,
+      insert: (o) => <MemoInsert {...o} />,
       extra: (o) => <Extra {...o} />,
       list: (o) => <ListControls {...o} />,
       flow: {
@@ -51,7 +61,7 @@ export function useAdapter(): EditAdapter {
         add: (o) => flowRef.current.add(o),
       },
       skills: () => <SkillsEdit />,
-      work: () => <WorkButton />,
+      work: () => <MemoWork />,
       tools: (o) => <ShellToolbar {...o} />,
     }),
     [],
@@ -63,7 +73,7 @@ export function useAdapter(): EditAdapter {
  * part's corner and out of the flow: "More actions" (rewrite, back to the AI version), with the test ids
  * tools-header, tools-gap and tools-skills, where the AI drafted the exhbt. Nothing otherwise.
  */
-function ShellToolbar({ block }: ShellTools) {
+const ShellToolbar = memo(function ShellToolbar({ block }: ShellTools) {
   const rt = useContext(DraftToolsContext);
   if (!rt?.init) return null;
   return (
@@ -71,17 +81,19 @@ function ShellToolbar({ block }: ShellTools) {
       <MoreActions block={block} />
     </div>
   );
-}
+});
 
-/** An image's caption: the page parts cannot know the picture's number, so its name ("Image 2 caption") comes from the path here. */
-const CAPTION = /^sections\.(\d+)\.caption$/;
-function CaptionField(o: RichSlot) {
-  const at = Number(o.path.match(CAPTION)![1]);
+/** An image's caption: the page parts cannot know the picture's number, so its name ("Image 2 caption") comes from its section here. */
+const CAPTION = /^sections\.(-?\d+)\.caption$/;
+const CaptionField = memo(function CaptionField(o: RichSlot) {
+  const frame = useFrame();
+  const path = useFieldPath(o.path);
+  const at = frame && frame.index >= 0 ? frame.index : Number(path.match(CAPTION)?.[1] ?? 0);
   const n = useDoc((d) => d.sections.slice(0, at + 1).filter((s) => s.kind === "image").length);
   return <RichField {...o} label={`Image ${Math.max(1, n)} caption`} />;
-}
+});
 
-function Extra(o: ExtraSlot) {
+const Extra = memo(function Extra(o: ExtraSlot) {
   switch (o.kind) {
     case "image":
       return <ImageExtras {...o} />;
@@ -94,10 +106,10 @@ function Extra(o: ExtraSlot) {
     default:
       return null;
   }
-}
+});
 
 /** The aim or hypothesis switch, over the aim's top edge (decision 0026). */
-function AimSwitch({ sectionId }: { sectionId: string }) {
+const AimSwitch = memo(function AimSwitch({ sectionId }: { sectionId: string }) {
   const store = useStoreInternal();
   const s = useSection(sectionId);
   const heading = s?.kind === "aim" ? (s.heading ?? "aim") : "aim";
@@ -110,11 +122,12 @@ function AimSwitch({ sectionId }: { sectionId: string }) {
       ))}
     </span>
   );
-}
+});
 
 /** A finding's controls (move up, move down, remove), drawn over its line; at `index === n`, "Add a finding", in the gap below the last. */
-function ListControls({ path, index, n }: ListSlot) {
+const ListControls = memo(function ListControls({ path: given, index, n }: ListSlot) {
   const frame = useFrame();
+  const path = useFieldPath(given);
   const store = useStoreInternal();
   const max = useDoc((d) => formatLimits(formatOf(d)).findings.max);
   const min = useDoc((d) => formatLimits(formatOf(d)).findings.min);
@@ -150,14 +163,14 @@ function ListControls({ path, index, n }: ListSlot) {
       </button>
     </span>
   );
-}
+});
 
 /**
  * The skills (decision 0026): the pills, each with a remove button over its corner, then the "Add a
  * skill" box (id skill-new), the size of a pill, at their end, in the flow and always drawn: on an
  * exhbt with no skills it is the block's placeholder. Enter makes what is typed a pill.
  */
-function SkillsEdit() {
+const SkillsEdit = memo(function SkillsEdit() {
   const store = useStoreInternal();
   const { uiApi } = useRuntime();
   const skills = useDoc((d) => d.skills);
@@ -212,4 +225,4 @@ function SkillsEdit() {
       </li>
     </ul>
   );
-}
+});
