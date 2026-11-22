@@ -742,6 +742,46 @@ test("a stale editor: a save that fails for another reason than the network says
   await expect(page.getByRole("button", { name: "Reload" })).toBeVisible();
 });
 
+test.describe("a save the server fails (the review's data-safety-2)", () => {
+  const EDIT = /\/exhbts\/[0-9a-f-]{36}\/edit/;
+  const STALE = "The editor was updated. Reload to carry on; your changes are kept in this browser.";
+
+  test("a server error and a bad answer are tried again, and the save lands with no word about reloading", async ({ page }) => {
+    const { id } = await openDoc(page, freshName("blip"), sampleDoc("case-study"));
+    let posts = 0;
+    await page.route(EDIT, async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      posts++;
+      // A server error as the action's own words, then a gateway's page: neither is a stale editor.
+      if (posts === 1) return route.fulfill({ status: 500, contentType: "text/plain", body: "An error occurred in the Server Components render." });
+      if (posts === 2) return route.fulfill({ status: 502, contentType: "text/html", body: "<h1>Bad gateway</h1>" });
+      return route.continue();
+    });
+    await typeIn(page, "title", "Saved after a blip");
+    await waitSaved(page, id);
+    expect(posts).toBe(3);
+    expect((await readStored(page, id)).working.title).toBe("Saved after a blip");
+    await expect(page.getByText(STALE)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Reload" })).toHaveCount(0);
+  });
+
+  test("an action the server no longer has is a stale editor: it says to reload, and is not tried again", async ({ page }) => {
+    await openDoc(page, freshName("gone"), sampleDoc("case-study"));
+    let posts = 0;
+    await page.route(EDIT, async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      posts++;
+      // What Next answers for a server action it does not have (after a deploy or a rollback).
+      return route.fulfill({ status: 404, headers: { "x-nextjs-action-not-found": "1" }, contentType: "text/plain", body: "Server action not found." });
+    });
+    await typeIn(page, "title", "A change for an older editor");
+    await expect(page.getByText(STALE)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Reload" })).toBeVisible();
+    await page.waitForTimeout(3000);
+    expect(posts).toBe(1);
+  });
+});
+
 test.describe("axe", () => {
 
   test("at rest, while typing, and with a sheet open", async ({ page }) => {

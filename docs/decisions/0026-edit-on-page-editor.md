@@ -274,7 +274,7 @@ Saving is `useAutosave`, unchanged: about a second and a half after the last cha
 
 Two things go round React, because React can lose them:
 - **The browser copy is written by the store,** in the same change that sets the words (`writeBackup`, under the key `useAutosave` uses), before anyone is told of the change. If the editor throws while drawing that change, React drops the render, so a backup written in an effect would never be made. The store also keeps the newest doc for `flushPending()`, which the crash fallback awaits.
-- **A save that fails for a reason other than the network** (after a deploy or a rollback the page's server actions no longer exist on the server) does not retry three times and then say "Not saved". It says "The editor was updated. Reload to carry on; your changes are kept in this browser." with a Reload button.
+- **A save the server has no action for** (after a deploy or a rollback the page's server actions no longer exist on the server, and Next throws its `UnrecognizedActionError`) does not retry three times and then say "Not saved". It says "The editor was updated. Reload to carry on; your changes are kept in this browser." with a Reload button. Every other failure, a server error, a timeout or a gateway's error page as much as a dropped connection, is tried three times like any save that did not land, and says "Not saved. Retry" if none of them works (`Autosave.tsx`; the release 3 review's data-safety-2 found every non-network error being taken for a stale editor).
 
 Typing never writes the flow marker; the first structural change does (0027).
 
