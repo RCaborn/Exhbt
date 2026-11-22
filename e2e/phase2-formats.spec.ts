@@ -770,7 +770,10 @@ test.describe("The draft suggests a layout", () => {
 
 test.describe("Pictures keep the order they were picked in", () => {
   test("a big first picture that finishes last is still the lead image", async ({ page }) => {
+    test.setTimeout(150_000); // a held-back upload and a cold route
     await startEditor(page, `ord${stamp()}`);
+    // Compile the upload route before the timing starts (a dev server builds it on the first request), so only the held-back upload is slow.
+    await page.request.post("/api/files/upload-url", { data: {} });
     await chooseLayout(page, "Gallery");
     await page.keyboard.press("Escape");
     const dataUrl = await page.evaluate(() => {
@@ -805,6 +808,8 @@ test.describe("Pictures keep the order they were picked in", () => {
 test.describe("Pictures land as each picked prefix settles", () => {
   test("the first picture lands at once, later ones wait for the held-back one, in picked order", async ({ page }) => {
     await startEditor(page, `pre${stamp()}`);
+    // Compile the upload route before the timing starts (a dev server builds it on the first request), so only the held-back upload is slow.
+    await page.request.post("/api/files/upload-url", { data: {} });
     await chooseLayout(page, "Gallery");
     await page.keyboard.press("Escape");
     const dataUrl = await page.evaluate(() => {
@@ -819,7 +824,7 @@ test.describe("Pictures land as each picked prefix settles", () => {
     const big = Buffer.from(dataUrl.split(",")[1]!, "base64");
     await page.route("**/api/files/upload-url", async (route) => {
       const body = route.request().postDataJSON() as { name: string };
-      if (body.name.startsWith("big")) await new Promise((r) => setTimeout(r, 3000));
+      if (body.name.startsWith("big")) await new Promise((r) => setTimeout(r, 9000)); // held long enough that a cold compile of the route cannot let it finish first
       await route.continue();
     });
     await pickImages(page, [png("first.png"), { name: "big.png", mimeType: "image/png", buffer: big }, png("third.png")]);
@@ -951,6 +956,8 @@ test.describe("A picture the person removed mid-batch is not deleted again by th
   test("only the normal drop deletes it, once; the later pictures still land", async ({ page }) => {
     test.setTimeout(150_000); // two held-back uploads, then leaving the editor
     await startEditor(page, `del${stamp()}`);
+    // Compile the upload route before the timing starts (a dev server builds it on the first request), so only the held-back upload is slow.
+    await page.request.post("/api/files/upload-url", { data: {} });
     await chooseLayout(page, "Gallery");
     await page.keyboard.press("Escape");
     const deletes: string[] = [];
@@ -969,7 +976,7 @@ test.describe("A picture the person removed mid-batch is not deleted again by th
     const big = Buffer.from(dataUrl.split(",")[1]!, "base64");
     await page.route("**/api/files/upload-url", async (route) => {
       const body = route.request().postDataJSON() as { name: string };
-      if (body.name.startsWith("big")) await new Promise((r) => setTimeout(r, 3000));
+      if (body.name.startsWith("big")) await new Promise((r) => setTimeout(r, 9000));
       await route.continue();
     });
     await pickImages(page, [png("first.png"), { name: "big.png", mimeType: "image/png", buffer: big }]);
