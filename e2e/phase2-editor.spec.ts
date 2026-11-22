@@ -221,6 +221,27 @@ test.describe("the exhbt editor", () => {
     await expect(page.getByRole("listitem").filter({ hasText: "Draft" })).toHaveCount(1);
   });
 
+  for (const [id, limit, label] of [
+    ["context", LIMITS.contextChars, "What it is"],
+    ["whereWhen", LIMITS.whereWhenChars, "Where and when"],
+    ["myRole", LIMITS.myRoleChars, "My role"],
+  ] as const) {
+    test(`${label} over the limit is kept as typed, shows the issue and blocks publishing`, async ({ page }) => {
+      await signInAs(page, `fieldlen${id.toLowerCase()}`, "premium");
+      await startFromScratch(page);
+      const long = "B".repeat(limit + 5);
+      await page.locator(`#${id}`).click();
+      await page.keyboard.type(long);
+      await expect(page.locator(`#${id}`)).toHaveValue(long);
+      await expect(page.locator(`#${id}-issue`)).toContainText(`Keep "${label}" to ${limit} characters.`);
+      await openPublishSheet(page);
+      await page.getByLabel("This is my work, and the numbers are true").check();
+      await page.getByRole("button", { name: "Publish", exact: true }).click();
+      await expect(page.getByText(/^Fix \d+ things? first/)).toBeVisible();
+      await expect(page.getByText("It's live.")).toHaveCount(0);
+    });
+  }
+
   test("the list reorders and deletes", async ({ page }) => {
     await signInAs(page, "rhea", "premium");
     for (const title of ["First project", "Second project"]) {
