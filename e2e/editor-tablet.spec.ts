@@ -54,9 +54,10 @@ const orderWith = (order: string[], id: string, place: number) => {
 };
 
 /**
- * Each section's toolbar as drawn now: shown, with each button 44px. A tile in the gallery's grid
- * (`tiles`: "grip" at rest, "all" with the focus in it) shows only its grip, or every button, and all
- * of it inside the tile's own box; every other section shows its grip, Move up and the rest.
+ * Each section's toolbar as drawn now: shown, with each button 44px. One that lies over its own
+ * section (inside a picture's or a graph's corner, a tile's in the gallery's grid among them, or on a
+ * section's top edge) shows only its grip at rest (`tiles` "grip"); with the focus in it ("all"), every
+ * button, and a tile's all inside the tile's own box. Every other section shows its grip, Move up and the rest.
  */
 const toolbarsNow = (page: Page, tiles: "grip" | "all") =>
   page.evaluate((tiles) => {
@@ -72,8 +73,9 @@ const toolbarsNow = (page: Page, tiles: "grip" | "all") =>
       const buttons = [...tools.querySelectorAll<HTMLElement>("button")].filter((b) => b.getClientRects().length > 0);
       if (!buttons.some((b) => b.hasAttribute("data-grip"))) bad.push(`${id}: no grip`);
       const tile = fr.dataset.as === "tile";
-      if (tile && tiles === "grip" && buttons.length !== 1) bad.push(`${id}: a tile shows ${buttons.map((b) => b.getAttribute("aria-label")).join(", ")}`);
-      if ((!tile || tiles === "all") && !buttons.some((b) => b.getAttribute("data-tool") === "up")) bad.push(`${id}: no move up`);
+      const over = ["image", "graph"].includes(fr.dataset.kind!) || ["inside", "edge"].includes(tools.dataset.place ?? "");
+      if (over && tiles === "grip" && buttons.length !== 1) bad.push(`${id}: over its own section, it shows ${buttons.map((b) => b.getAttribute("aria-label")).join(", ")}`);
+      if ((!over || tiles === "all") && !buttons.some((b) => b.getAttribute("data-tool") === "up")) bad.push(`${id}: no move up`);
       const box = fr.getBoundingClientRect();
       for (const b of buttons) {
         const r = b.getBoundingClientRect();
@@ -85,7 +87,7 @@ const toolbarsNow = (page: Page, tiles: "grip" | "all") =>
   }, tiles);
 
 for (const f of offered()) {
-  test(`${FORMAT_RULES[f].name.toLowerCase()}: every section's toolbar is shown without hovering, each button 44px, a tile's only its grip until it has the focus; none covers another section; no phone bar`, async ({ page }) => {
+  test(`${FORMAT_RULES[f].name.toLowerCase()}: every section's toolbar is shown without hovering, each button 44px, one over its own section only its grip until it has the focus; none covers another section; no phone bar`, async ({ page }) => {
     await openTiming(page, f, { full: true });
     await waitLive(page);
     await expect(page.locator(`${READY} .xe-phonebar`)).toHaveCount(0);
@@ -152,6 +154,35 @@ test("in a finding: its Move up, Move down and Remove, and the formatting button
   });
   expect(small.n).toBeGreaterThanOrEqual(3);
   expect(small.bad).toEqual([]);
+  // And no press lies over the words: a tap at the right end of this finding's first line, or of the one above's last line, is the words'.
+  const taps = await page.evaluate((path) => {
+    // The lines of the words themselves (not a hidden message or a field's own furniture).
+    const lines = (p: string) => {
+      const box = document.querySelector(`[data-editor="page"] [data-path="${p}"]`)!;
+      const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+      const range = document.createRange();
+      const rects: DOMRect[] = [];
+      for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+        if (!t.textContent?.trim() || t.parentElement!.closest(".sr-only, [hidden], .xe-issue, [aria-hidden=true]")) continue;
+        range.selectNodeContents(t);
+        rects.push(...[...range.getClientRects()].filter((r) => r.width > 0));
+      }
+      rects.sort((a, b) => a.top - b.top || a.left - b.left);
+      return { box, rects };
+    };
+    const [at, k] = path.match(/^sections\.(\d+)\.items\.(\d+)$/)!.slice(1).map(Number) as [number, number];
+    const out: string[] = [];
+    for (const [p, which] of [[path, 0], [`sections.${at}.items.${k - 1}`, -1]] as const) {
+      const { box, rects } = lines(p);
+      // The line's right end: of the rects on that line (the first or the last), the one furthest right.
+      const top = which === 0 ? rects[0]!.top : rects[rects.length - 1]!.top;
+      const r = rects.filter((q) => Math.abs(q.top - top) < 2).sort((a, b) => b.right - a.right)[0]!;
+      const hit = document.elementFromPoint(r.right - 2, r.top + r.height / 2);
+      if (!hit || !box.contains(hit)) out.push(`${p} (${which === 0 ? "first" : "last"} line) is under ${hit?.getAttribute("aria-label") ?? hit?.className}`);
+    }
+    return out;
+  }, `sections.${n}.items.1`);
+  expect(taps).toEqual([]);
 });
 
 test("a 260ms press on a tile's grip, in its corner, picks the picture up where it is: the place shown is its own", async ({ page }) => {

@@ -261,6 +261,7 @@
       width: 2.75rem;
       height: 2.75rem;
       transform: translate(0, -50%);
+      color: var(--xp-ink);
     }
     .xe-plus-menu {
       left: 0;

@@ -23,7 +23,8 @@ import { usePhone } from "./usePhone";
  * and not in "See as a visitor". It follows the part the focus is in, or was last in (or was last
  * tapped: a picture takes no focus), names it, and holds its actions at 44px:
  *  - a section: Move up, Move down, the layout's own action, More actions where the AI drafted it,
- *    Remove (not the flowchart where the layout always has one), Reorder. They go through the drag
+ *    Remove (on the flowchart where the layout always has one, there but off: a press shows why in
+ *    the section's name's place), Reorder. They go through the drag
  *    board (`moveBy`, `remove`) and the store, as the section's own toolbar does;
  *  - the title, the context line or the skills: the part's More actions, and Reorder; a tapped skill
  *    is named, with "Remove <skill>" (the pills' own remove buttons are hidden on a phone);

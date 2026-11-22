@@ -446,11 +446,15 @@
       gap: 1rem;
     }
   }
-  /* On a tablet a tile in the gallery's grid shows only its grip, in its corner: five 44px buttons are
-     wider than a tile. The rest show while the focus is in the tile (its caption, its description, or
-     the grip from the keyboard), running in from the grip and wrapping inside the picture. */
+  /* On a tablet the toolbars are always shown, so one that lies over its own section (inside a
+     picture's or a graph's corner, a tile's in the gallery's grid among them, or on a section's top
+     edge) shows only its grip, in its place: five 44px buttons are wider than a tile, and would hide a
+     graph's title all the time. The rest show while the section is touched or the focus is in it (its
+     caption, its description, or the grip from the keyboard), running in from the grip, which stays
+     where it is, and wrapping inside the part. */
   @media (pointer: coarse) and (min-width: 48rem) {
-    .xe-frame[data-as="tile"]:not(:focus-within) > .xe-tools > [data-tool] {
+    .xe-frame:is([data-kind="image"], [data-kind="graph"]):not(:hover):not(:focus-within) > .xe-tools > [data-tool],
+    .xe-frame:not(:hover):not(:focus-within) > .xe-tools:is([data-place="inside"], [data-place="edge"]) > [data-tool] {
       display: none;
     }
     /* Half over the top edge: half of a 44px row. */

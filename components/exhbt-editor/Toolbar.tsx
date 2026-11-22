@@ -18,9 +18,10 @@ import type { Store } from "./store-core";
 /*
  * A section's toolbar (decision 0026, "The chrome"): at its top corner, out of the flow, so it takes no
  * room. The grip (the only thing that drags), move up, move down, the layout's own action where there
- * is one, "More actions" where the AI drafted the part, and Remove (none on the flowchart where the
- * layout always has one). With a mouse it shows on hover and on focus within; on a touch screen wider
- * than 48rem it is always shown, at 44px; on a phone only the grip shows (css/phone.css, L's). Each
+ * is one, "More actions" where the AI drafted the part, and Remove (on the flowchart where the layout
+ * always has one, there but off, saying why). With a mouse it shows on hover and on focus within; on a
+ * touch screen wider than 48rem it is always shown, at 44px (one over its own section shows its grip
+ * until the section is touched or has the focus); on a phone only the grip shows (css/phone.css). Each
  * button has a tooltip. The buttons carry data-grip or data-tool, so other parts' CSS and tests can
  * find them.
  *
@@ -113,10 +114,13 @@ function placeTools() {
       tools.removeAttribute("data-place");
       continue;
     }
-    const shown = [...tools.children].filter((c): c is HTMLElement => c instanceof HTMLElement && c.getClientRects().length > 0);
-    const width = shown.reduce((w, c) => w + c.offsetWidth, 0) + 4 * Math.max(0, shown.length - 1);
-    // A row of buttons is the grip's height ("More actions" wraps its button in parts that may be taller, and never shows them there).
-    const height = (tools.querySelector<HTMLElement>("[data-grip]")?.offsetHeight ?? 0) + bridge;
+    // Its whole width, the buttons a tablet hides until the section is touched counted at the grip's size, so where it goes
+    // doesn't change as they show and hide. A row of buttons is the grip's height ("More actions" wraps its button in parts that may be taller).
+    const grip = tools.querySelector<HTMLElement>("[data-grip]");
+    const unit = grip?.offsetWidth ?? 0;
+    const kids = [...tools.children].filter((c): c is HTMLElement => c instanceof HTMLElement && !c.hidden);
+    const width = kids.reduce((w, c) => w + (c.getClientRects().length > 0 ? c.offsetWidth : unit), 0) + 4 * Math.max(0, kids.length - 1);
+    const height = (grip?.offsetHeight ?? 0) + bridge;
     const f = boxes.get(frame) ?? pageBox(frame);
     const clear = (b: Box) => ![...boxes].some(([el, o]) => el !== frame && o.w > 0 && o.h > 0 && overlap(b, o));
     tools.style.removeProperty("--xe-tools-right");
