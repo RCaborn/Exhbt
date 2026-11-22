@@ -146,3 +146,20 @@ For L: `useBoard()` works outside `DragBoard` (one engine per store); the phone 
 For K: read `FLOW_BOX_STYLE` from `drag/options.ts`; hide box tools while a section is carried (`[data-xe-drag] …`); reuse `MOVE_MS` and `EASE` from `drag/engine.ts` and the `.xe-line` and `.xe-card` styles; don't use `data-grip` or `.xe-grip` on box grips.
 
 Departures and open points: sliding at a pair keeps the sections' widths until the drop (stable, never flickers); grid tiles have half-tile anchors, so pointing over a tile goes before or after it (a change from the prototype Rory tried); a new block's room is a guess. Still to check with a real finger: whether the 150ms press feels deliberate, whether the finger hides the grip or line, edge-scroll speed, grips at the right edge, the on-screen keyboard. Not checked: Safari, Firefox, a screen reader.
+
+## From agent K, the flowchart (merged into phase-2-r3 at b5701c1)
+
+What it built (`components/exhbt-editor/flow/FlowEdit.tsx`, `FlowList.tsx`, `FlowBox.tsx`, `geometry.ts`, `css/flow.css`, `e2e/editor-flow.spec.ts`):
+- Type in each box; a "+" over each arrow and one after the last box (gone at 6); Remove on each box (off at 3, with `aria-disabled` so it can be focused and says "The flowchart needs at least 3 boxes."); drag a box by mouse after 6px, a finger after a 150ms press, or the keyboard from its grip. Line style by default, slide by `FLOW_BOX_STYLE`. Every step is said through `uiApi.say`; dnd-kit's own announcements are off.
+- A box lands where its middle is nearest the pointer, with 10px of stickiness; more than 80px to the side of the flowchart means "not over a place", and letting go puts it back.
+- `MethodFlow.tsx` is unchanged. The `list` slot's wrapper carries `data-path="flow"`, `tabIndex=-1`, `aria-describedby`, the `--xp-error` outline and the count message.
+- An empty flowchart shows a single "Add a box" button in the flow.
+- Tools sit over the box's right edge in a column, along its foot at the right in a row; chips are 28px to the eye with 44px targets. Under touch in a row, a box's tools show only while it has the focus (0026 says always on touch; always-on would sit under the next section's toolbar).
+- "Things to fix" for the count issue lands in box 1 (G's `land()` puts the cursor in the first field).
+
+Hooks for tests and for L: `data-flow-grip`, `data-flow-remove`, `data-flow-add` (with `data-end` on the last), and on the list `data-axis` (row or column), `data-flow-style`, `data-flow-drag` while a box is carried; classes `.xe-flow`, `.xe-flow-tools`, `.xe-flow-chip`. Nothing of K's carries `data-grip` or `data-tool`. On a phone the flowchart is always a column with tools and "+" always shown. The copy and line draw at z-index 40.
+
+Tests (one worker): `editor-flow` whole file, line style, 41 passed (5.9 min); slide style 37 passed + 4 spec assumptions fixed and re-run 4/4; `layout-parity` 24/24; `editor-smooth` 7/7. Not run on K's branch: `editor-inplace`, `edit-slots`, anything with F merged.
+
+For tests: dnd-kit starts listening for arrow keys only after a short delay, so wait until "Picked up box n of N" has been said before pressing an arrow.
+For G: undo of a box action moves the focus a frame or two late; box undo entries have no subject, so the focus never lands back in the flowchart. `EDIT_ONLY_IN_FLOW` has no entry for the empty flowchart's "Add a box" button.
