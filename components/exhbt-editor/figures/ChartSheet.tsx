@@ -23,8 +23,11 @@ import { Sheet } from "../ui/Sheet";
  * issue with no field of its own is about.
  */
 export function ChartSheet(): ReactNode {
+  // Named for the graph it is open on: "Edit figures: Graph 1", "Edit figures: Key figure".
+  const id = useUiState((s) => (s.sheet?.name === "chart" ? (s.sheet.sectionId ?? "") : ""));
+  const label = useDoc((d) => (id && d.sections.some((x) => x.id === id) ? labelOf(d, id) : ""));
   return (
-    <Sheet name="chart" title="Edit figures">
+    <Sheet name="chart" title={label ? `Edit figures: ${label}` : "Edit figures"}>
       <ChartBody />
     </Sheet>
   );
@@ -38,7 +41,6 @@ function ChartBody() {
   const s = useSection(id);
   const index = useDoc((d) => d.sections.findIndex((x) => x.id === id));
   const n = useDoc((d) => d.sections.filter((x) => x.kind === "graph").findIndex((x) => x.id === id));
-  const label = useDoc((d) => labelOf(d, id));
   const root = useRef<HTMLDivElement>(null);
   const chart = s?.kind === "graph" ? s.chart : null;
   const base = `sections.${index}.chart`;
@@ -52,7 +54,6 @@ function ChartBody() {
   if (!chart) return <p className="text-graphite">This graph is no longer on the page.</p>;
   return (
     <div ref={root} className="xe-fig-chart" data-chart-of={id}>
-      <p className="mb-4 text-sm text-graphite">{label} on the page changes as you type.</p>
       <ChartEditor chart={chart} index={at} base={base} bare onChange={(c) => store.patch(id, (x) => (x.kind === "graph" ? { ...x, chart: c } : x))} issues={issues.shown} />
       <div className="mt-6 flex justify-end">
         <Button variant="ink" size="sm" onClick={() => uiApi.close()}>

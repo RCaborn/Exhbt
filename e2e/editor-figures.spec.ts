@@ -87,11 +87,11 @@ function wordBoxes(root: Locator, skip: string) {
   return root.evaluate((el, skipSel) => {
     const out: { text: string; x: number; y: number; w: number; h: number }[] = [];
     for (const e of el.querySelectorAll("*")) {
-      if (e.closest(skipSel)) continue;
+      // What isn't seen: the controls being checked, and the hidden data table (an sr-only wrapper clips it, though its cells keep their size).
+      if (e.closest(skipSel) || e.closest(".sr-only")) continue;
       const own = [...e.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.trim());
       if (!own) continue;
       const r = e.getBoundingClientRect();
-      // The hidden data table and summaries are clipped to a pixel.
       if (r.width <= 1 || r.height <= 1) continue;
       out.push({ text: e.textContent!.trim().slice(0, 40), x: r.x, y: r.y, w: r.width, h: r.height });
     }
@@ -126,7 +126,7 @@ test.describe("a graph's figures", () => {
     expect(await page.evaluate(() => window.__exhbtEditor!.undoLabel())).toBe("add graph 1");
 
     // Another kind: the page follows.
-    await s.getByRole("radio", { name: "Bars" }).check({ force: true });
+    await s.getByRole("radio", { name: "Bars", exact: true }).check({ force: true });
     await expect.poll(async () => ((await docNow(page)).sections.find((x) => x.id === graphId) as SectionOf<"graph">).chart.kind).toBe("bar");
     expect(await scan(page, 'dialog[data-sheet="chart"]')).toEqual([]);
 
@@ -158,7 +158,7 @@ test.describe("a graph's figures", () => {
     const c = rectOf((await chip.boundingBox())!);
     const words = await wordBoxes(card, ".xe-fig-graph");
     expect(words.length).toBeGreaterThan(2);
-    expect(words.filter((w) => overlaps(c, w)).map((w) => w.text)).toEqual([]);
+    expect(words.filter((w) => overlaps(c, w)).map((w) => `${w.text} at ${[w.x, w.y, w.w, w.h].map(Math.round).join(",")}`), `the chip at ${[c.x, c.y, c.w, c.h].map(Math.round).join(",")}`).toEqual([]);
     const tools = rectOf((await frame(page, graphId).locator(".xe-tools").boundingBox())!);
     expect(overlaps(c, tools)).toBe(false);
     await waitSaved(page, id);
@@ -200,19 +200,23 @@ test.describe("a picture's description", () => {
     await expect(publish.getByText(/^(It's live\.|Your changes are live\.)$/)).toBeVisible();
   });
 
-  test("in a gallery's narrow tiles the empty description wraps in its caption's type, and the mark stays inside the tile", async ({ page }) => {
+  test("in a gallery's narrow tiles the empty description wraps in its caption's type, and its mark stays inside the tile, a dot where the words don't fit", async ({ page }) => {
     const pictures: Section[] = Array.from({ length: 5 }, (_, i) => ({ id: `image-${i + 1}`, kind: "image", fileId: `x${i + 1}`, alt: "", caption: text(i % 2 ? "A caption" : ""), w: i % 2 ? 800 : 1200, h: 1000 }));
     const doc: ExhbtDoc = { ...openBankingDoc, format: "gallery", sections: [...openBankingDoc.sections.filter((s) => s.kind !== "graph"), ...pictures] } as ExhbtDoc;
     await openDoc(page, freshName("tiles"), doc);
     await settle(page);
     for (const p of pictures.slice(1)) {
       const tile = frame(page, p.id);
-      const mark = tile.getByText("Needs a description");
+      // The words are there for screen readers whatever the room.
+      await expect(tile.getByText("Needs a description")).toBeAttached();
+      const mark = tile.locator(".xe-fig-needs");
       await expect(mark).toBeVisible();
       const t = (await tile.boundingBox())!;
       const m = (await mark.boundingBox())!;
       expect(m.x).toBeGreaterThanOrEqual(t.x - 0.5);
       expect(m.x + m.width).toBeLessThanOrEqual(t.x + t.width + 0.5);
+      // On the description's own lines: never hanging under the tile into the next row.
+      expect(m.y + m.height).toBeLessThanOrEqual(t.y + t.height + 0.5);
       // In the caption's type: 0.8125rem in a tile.
       expect(await tile.locator('[data-edit-only="image-description"]').evaluate((e) => getComputedStyle(e).fontSize)).toBe("13px");
     }
@@ -244,8 +248,10 @@ test.describe("the figure picked from the report", () => {
     await jump(page, tickPath);
     await expect(tick).toBeFocused();
     const seen = countPicks(page);
-    await tick.check();
+    // Ticked, it leaves the label (so check() can't see it stay ticked): the focus goes to where the figure came from.
+    await tick.click();
     await expect(label.getByRole("checkbox")).toHaveCount(0);
+    await expect(label.getByRole("button", { name: /^From your report, page 3/ })).toBeFocused();
     await expect(label.getByRole("button", { name: /^From your report, page 3/ })).toBeVisible();
     expect(validateForPublish(await docNow(page)).some((i) => i.path === tickPath)).toBe(false);
 
@@ -258,7 +264,8 @@ test.describe("the figure picked from the report", () => {
     await expect(pop.getByRole("checkbox", { name: TICK })).toBeChecked();
     await pop.getByRole("button", { name: "Crop", exact: true }).click();
     const cropper = pop.getByTestId("cropper");
-    await expect(cropper.getByRole("img", { name: "Page 3 of report-with-chart.pdf" })).toBeVisible();
+    // The first page drawn from the PDF on this page loads pdf.js, compiled on first use in development.
+    await expect(cropper.getByRole("img", { name: "Page 3 of report-with-chart.pdf" })).toBeVisible({ timeout: 60_000 });
     await cropper.getByLabel("Bottom edge").fill("40");
     await cropper.getByRole("button", { name: "Use this crop" }).click();
     await expect(pop.getByText("Cropped.")).toBeVisible();

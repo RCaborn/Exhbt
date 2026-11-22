@@ -1,7 +1,7 @@
 "use client";
 
 import "../css/figures.css";
-import { useId, useRef, type ReactNode } from "react";
+import { useId, useLayoutEffect, useRef, type ReactNode } from "react";
 import { FileText } from "lucide-react";
 import { PickedFigure } from "@/components/editor/PickedFigure";
 import type { ExtraSlot } from "@/components/portfolio/page-ctx";
@@ -49,16 +49,44 @@ function Description({ sectionId }: { sectionId: string }) {
   return (
     <span data-edit-only="image-description" className={cx(descriptionClass(frame?.as), "relative")}>
       <InlineText path={`sections.${index}.alt`} value={alt} label={descriptionLabel(n + 1)} placeholder={DESCRIPTION_PLACEHOLDER} id={`image-${n}-alt`} />
-      {!alt.trim() && (
-        // The placeholder's words again, unseen, in the field's own type and width, so the mark lands just after its last word
-        // (or under it, in the figure's padding, when that line is full). Over the field: it takes no room and lets every press through.
-        <span className="xe-fig-needs-line" data-edit-only>
-          <span aria-hidden className="xe-fig-needs-ghost">
-            {alt || DESCRIPTION_PLACEHOLDER}
-          </span>
-          <span className="xe-fig-needs">Needs a description</span>
-        </span>
-      )}
+      {!alt.trim() && <NeedsMark words={alt || DESCRIPTION_PLACEHOLDER} />}
+    </span>
+  );
+}
+
+/**
+ * "Needs a description", just after the placeholder's last word: the placeholder's words again, unseen,
+ * in the field's own type and width, with the mark after them, over the field (it takes no room and
+ * lets every press through). Where the words would not fit on that last line (a narrow gallery tile,
+ * whose rows are 12px apart) the mark is a dot there instead, its words kept for screen readers and
+ * as its tooltip, so it never hangs under the figure into the next row.
+ */
+function NeedsMark({ words }: { words: string }) {
+  const line = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const el = line.current;
+    if (!el) return;
+    const fit = () => {
+      const ghost = el.firstElementChild!;
+      const mark = el.lastElementChild!;
+      el.removeAttribute("data-compact");
+      const lines = ghost.getClientRects();
+      const last = lines[lines.length - 1];
+      if (last && mark.getBoundingClientRect().top >= last.bottom - 1) el.setAttribute("data-compact", "");
+    };
+    fit();
+    const sized = new ResizeObserver(fit);
+    sized.observe(el);
+    return () => sized.disconnect();
+  }, [words]);
+  return (
+    <span ref={line} className="xe-fig-needs-line" data-edit-only>
+      <span aria-hidden className="xe-fig-needs-ghost">
+        {words}
+      </span>
+      <span className="xe-fig-needs" title="Needs a description">
+        <span className="xe-fig-needs-words">Needs a description</span>
+      </span>
     </span>
   );
 }
@@ -101,7 +129,11 @@ function PickedLabelOf({ s }: { s: SectionOf<"image"> & { picked: Picked } }) {
               id={tickId}
               type="checkbox"
               checked={false}
-              onChange={(e) => tick(e.target.checked)}
+              onChange={(e) => {
+                tick(e.target.checked);
+                // Ticked, the tick leaves the label for the popover: the focus goes to the label's button, not to the page.
+                requestAnimationFrame(() => button.current?.focus());
+              }}
               data-path={tickPath}
               aria-label="I may share this figure on my portfolio"
               aria-invalid={issue ? true : undefined}
