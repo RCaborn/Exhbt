@@ -894,8 +894,19 @@ test.describe("the + between sections", () => {
     await expect(page.locator(`${READY} [data-path="sections"] button`)).toBeFocused();
   });
 
-  test.fixme("a new link opens its Web address popover with the cursor in it", async () => {
-    // Waits for G's milestone 2 (the jump opens a popover first) and J's popover. board.add already calls ui.jumpTo on the new link's href.
+  test("a new link opens its Web address popover with the cursor in it", async ({ page }) => {
+    // Research holds three links, and its sample has room for another.
+    await open(page, "research");
+    expect(blockOptions(await docNow(page)).find((o) => o.kind === "link")?.full).toBeUndefined();
+    await page.locator(`${READY} #add-section`).click();
+    await page.locator(`${MENU} [data-block="link"]`).click();
+    const n = (await docNow(page)).sections.map((s) => s.kind).lastIndexOf("link");
+    // board.add jumps to the new link's href: the jump opens its popover (J's LinkExtras) and puts the cursor in the field.
+    const input = page.locator(`${READY} [data-path="sections.${n}.href"]`);
+    await expect(input).toBeFocused();
+    expect(await input.evaluate((el) => el.closest("[popover]")!.matches(":popover-open"))).toBe(true);
+    await page.keyboard.type("https://example.com/the-paper");
+    await expect.poll(async () => ((await docNow(page)).sections[n] as { href?: string }).href).toBe("https://example.com/the-paper");
   });
 
   test("on a gallery with the flowchart off, Flowchart from the + before the last section goes back there", async ({ page }) => {
