@@ -227,17 +227,19 @@ export function useRoving(ref: React.RefObject<HTMLElement | null>) {
       const menus = [...bar.querySelectorAll("[aria-controls]")].map((t) => document.getElementById(t.getAttribute("aria-controls") ?? ""));
       return [...bar.querySelectorAll<HTMLElement>("button")].filter((b) => !b.closest("form") && !menus.some((m) => m?.contains(b)));
     };
-    const usable = (b: HTMLElement) => b.getClientRects().length > 0 && !(b as HTMLButtonElement).disabled;
-    /** The buttons that can take the focus, in the order they are drawn: row by row, left to right. */
+    const enabled = (b: HTMLElement) => !(b as HTMLButtonElement).disabled;
+    /** The buttons that can take the focus, in the order they are drawn: row by row, left to right. Read only on a key press. */
     const drawn = () =>
       all()
-        .filter(usable)
+        .filter((b) => enabled(b) && b.getClientRects().length > 0)
         .map((b) => ({ b, r: b.getBoundingClientRect() }))
         .sort((p, q) => (Math.abs(p.r.top - q.r.top) > 4 ? p.r.top - q.r.top : p.r.left - q.r.left))
         .map(({ b }) => b);
+    // The stop is the button in focus (so drawn), or the first that isn't off: the grip, which is never hidden or off. So this
+    // reads no layout: it runs whenever a button comes, goes or turns off, at a drop for every toolbar on the page.
     const sync = () => {
       const list = all();
-      const stop = current && list.includes(current) && usable(current) ? current : (list.find(usable) ?? null);
+      const stop = current && list.includes(current) && enabled(current) ? current : (list.find(enabled) ?? null);
       for (const b of list) {
         const want = b === stop ? 0 : -1;
         if (b.tabIndex !== want) b.tabIndex = want;
