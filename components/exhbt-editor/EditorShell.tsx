@@ -38,6 +38,7 @@ import { createStore, type Store } from "./store-core";
 import { TopBar } from "./topbar/TopBar";
 import { HEADING_ID } from "./topbar/UndoButton";
 import { Tray } from "./Tray";
+import { Said } from "./ui/Said";
 
 /*
  * The edit-on-page editor (decision 0026): the exhbt page itself, in the person's own look, with every
@@ -232,9 +233,11 @@ function StatusLine() {
       <p role="status" className="xe-status-line">
         {files.status}
       </p>
-      <p role="alert" className="xe-status-error">
-        {error}
-      </p>
+      {error && (
+        <p role="alert" className="xe-status-error">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -243,9 +246,7 @@ function StatusLine() {
 function LiveRegion() {
   const said = useUiState((s) => s.said);
   return (
-    <div aria-live="polite" className="sr-only" data-said={said.n}>
-      {said.text}
-    </div>
+    <Said text={said.text} n={said.n} data-said={said.n} />
   );
 }
 

@@ -336,6 +336,17 @@ test.describe("a link's web address", () => {
 });
 
 test.describe("take a figure from my report", () => {
+  test("closing the figure sheet without taking a figure puts the focus back on the + that was pressed", async ({ page }) => {
+    test.setTimeout(120_000);
+    await draftFromReport(page, "takeback", { failPick: true });
+    await openEndPlus(page);
+    await page.locator(`${MENU} [data-block="figure"]`).click();
+    await expect(sheet(page, "figure")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(sheet(page, "figure")).toBeHidden();
+    await expect(page.locator(`${READY} #add-section`)).toBeFocused();
+  });
+
   test("after a pick that failed: the + offers it; page 3 and a crop put the figure where the layout wants it, unticked, with no AI call; Undo takes it off and its file goes once nothing can bring it back", async ({ page }) => {
     test.setTimeout(180_000);
     const id = await draftFromReport(page, "take", { failPick: true });

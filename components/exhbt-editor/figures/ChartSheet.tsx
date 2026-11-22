@@ -26,8 +26,15 @@ export function ChartSheet(): ReactNode {
   // Named for the graph it is open on: "Edit figures: Graph 1", "Edit figures: Key figure".
   const id = useUiState((s) => (s.sheet?.name === "chart" ? (s.sheet.sectionId ?? "") : ""));
   const label = useDoc((d) => (id && d.sections.some((x) => x.id === id) ? labelOf(d, id) : ""));
+  // The id is gone from the view by the time the sheet has shut, so it is kept for the focus to go back to the graph's chip.
+  const last = useRef("");
+  if (id) last.current = id;
+  const chip = () => {
+    const frame = Array.from(document.querySelectorAll<HTMLElement>("[data-section-id]")).find((f) => f.dataset.sectionId === last.current);
+    return frame?.querySelector<HTMLElement>(".xe-fig-chip") ?? null;
+  };
   return (
-    <Sheet name="chart" title={label ? `Edit figures: ${label}` : "Edit figures"}>
+    <Sheet name="chart" title={label ? `Edit figures: ${label}` : "Edit figures"} returnTo={chip}>
       <ChartBody />
     </Sheet>
   );

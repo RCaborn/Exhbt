@@ -12,6 +12,7 @@ import { useRuntime } from "../context";
 import { EASE, MOVE_MS } from "../drag/engine";
 import { labelOf } from "../labels";
 import { useDoc, useStoreInternal } from "../store";
+import { Said } from "../ui/Said";
 import { Sheet } from "../ui/Sheet";
 
 /*
@@ -156,9 +157,7 @@ function ReorderList() {
     <div className="xe-reorder">
       <p className="text-sm text-graphite">Hold a grip to drag a section, or use the arrows. Each move can be undone.</p>
       <div ref={setRegion}>
-        <div aria-live="polite" className="sr-only" data-said={said.n}>
-          {said.text}
-        </div>
+        <Said text={said.text} n={said.n} data-said={said.n} />
       </div>
       <DndContext
         id="xe-reorder"
