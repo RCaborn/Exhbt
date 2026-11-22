@@ -111,14 +111,22 @@ test("a move draws the shell again and no section's part, and every field's path
   const after = await renders(page);
   const changed = Object.fromEntries(Object.keys({ ...before, ...after }).flatMap((k) => ((after[k] ?? 0) - (before[k] ?? 0) ? [[k, (after[k] ?? 0) - (before[k] ?? 0)]] : [])));
   expect(changed).toEqual({ shell: 1 });
-  // Every field inside a frame carries that frame's stored index now.
+  // Every field inside a frame carries that frame's stored index now, in its path and in its id (a formatted field's editor's too).
   const stale = await page.evaluate(() =>
     [...document.querySelectorAll('[data-editor="page"] article [data-section-id]')].flatMap((f) => {
       const own = f.getAttribute("data-path");
-      return own ? [...f.querySelectorAll("[data-path]")].map((el) => el.getAttribute("data-path")!).filter((p) => p.startsWith("sections.") && !p.startsWith(`${own}.`)).map((p) => `${own}: ${p}`) : [];
+      if (!own) return [];
+      const paths = [...f.querySelectorAll("[data-path]")].map((el) => el.getAttribute("data-path")!).filter((p) => p.startsWith("sections.") && !p.startsWith(`${own}.`));
+      const ids = [...f.querySelectorAll("[id]")].map((el) => el.id).filter((id) => id.startsWith("sections-") && !id.startsWith(`${own.replace(/\./g, "-")}-`));
+      return [...paths, ...ids].map((p) => `${own}: ${p}`);
     }),
   );
   expect(stale).toEqual([]);
+  // And no attribute anywhere (an id, a label's for, an issue's describedby) still carries the parts' stand-in index (Frame.tsx, FRAME_AT).
+  const standIn = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-editor="page"] *')].flatMap((el) => [...el.attributes].filter((a) => /sections[.-]-1(\D|$)/.test(a.value)).map((a) => `${el.tagName.toLowerCase()} ${a.name}="${a.value}"`)),
+  );
+  expect(standIn).toEqual([]);
   expect((await docNow(page)).sections.map((s) => s.id)).toEqual(["link-1", "flow", "quote-1", "reflection-1"]);
   // And typing in a moved field is stored at its new place.
   await typeIn(page, "sections.0.label", "The model code");
