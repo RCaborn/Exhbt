@@ -91,6 +91,37 @@ function NeedsMark({ words }: { words: string }) {
   );
 }
 
+/**
+ * In a narrow tile the label's words would wrap, and its two presses (the button and the tick) would
+ * then sit on top of each other. So the label is measured: if the full words wrap, it shows the short
+ * ones ("Page 3", "Share"; the full words stay for screen readers, as each control's name); if even
+ * those wrap, the two stack as clear rows. Re-measured whenever the label or its tile changes size.
+ */
+function useNarrowLabel(ref: { current: HTMLSpanElement | null }, deps: unknown[]) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const wraps = () => {
+      const open = el.querySelector(".xe-fig-picked-open");
+      const tick = el.querySelector(".xe-fig-picked-tick");
+      return Boolean(open && tick && tick.getBoundingClientRect().top >= open.getBoundingClientRect().bottom - 1);
+    };
+    const fit = () => {
+      el.removeAttribute("data-compact");
+      el.removeAttribute("data-stacked");
+      if (!wraps()) return;
+      el.setAttribute("data-compact", "");
+      if (wraps()) el.setAttribute("data-stacked", "");
+    };
+    fit();
+    const sized = new ResizeObserver(fit);
+    sized.observe(el);
+    if (el.parentElement) sized.observe(el.parentElement);
+    return () => sized.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+}
+
 function PickedLabel({ sectionId }: { sectionId: string }) {
   const s = useSection(sectionId);
   if (s?.kind !== "image" || !s.picked) return null;
@@ -115,14 +146,20 @@ function PickedLabelOf({ s }: { s: SectionOf<"image"> & { picked: Picked } }) {
   const sourceId = p.sourceFileId;
   const sourceUrl = sourceId ? (env.figureSources?.[sourceId] ?? env.reportFiles.find((f) => f.fileId === sourceId)?.url ?? null) : null;
   const tick = (on: boolean) => store.patch(s.id, (x) => (x.kind === "image" && x.picked ? { ...x, picked: { ...x.picked, shareOk: on } } : x));
-  const where = `From your report, ${whereFrom(p)}`;
+  const here = whereFrom(p);
+  const where = `From your report, ${here}`;
+  const label = useRef<HTMLSpanElement>(null);
+  useNarrowLabel(label, [p.shareOk, here]);
   // The lead image's frame clips what overhangs it (it rounds the picture): there the label sits just inside its top edge.
   const inside = useFrame()?.as === "lead";
   return (
-    <span className="xe-fig-picked" data-edit-only data-inside={inside ? "" : undefined} data-ticked={p.shareOk ? "" : undefined} data-invalid={issue ? "" : undefined}>
+    <span ref={label} className="xe-fig-picked" data-edit-only data-inside={inside ? "" : undefined} data-ticked={p.shareOk ? "" : undefined} data-invalid={issue ? "" : undefined}>
       <button ref={button} type="button" className="xe-fig-picked-open" popoverTarget={`${id}-pop`} aria-label={`${where}: crop it, choose another page, or say you may share it`}>
         <FileText aria-hidden size={13} strokeWidth={2.25} />
-        {where}
+        <span className="xe-fig-long">{where}</span>
+        <span aria-hidden className="xe-fig-short">
+          {here.charAt(0).toUpperCase() + here.slice(1)}
+        </span>
       </button>
       {!p.shareOk && (
         <>
@@ -141,7 +178,10 @@ function PickedLabelOf({ s }: { s: SectionOf<"image"> & { picked: Picked } }) {
               aria-invalid={issue ? true : undefined}
               aria-describedby={issue ? issueId(tickId) : undefined}
             />
-            I may share this
+            <span className="xe-fig-long">I may share this</span>
+            <span aria-hidden className="xe-fig-short">
+              Share
+            </span>
           </label>
           <IssueNote id={issueId(tickId)} text={issue} />
         </>

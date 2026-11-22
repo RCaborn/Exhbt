@@ -201,6 +201,21 @@
   .xe-fig-picked-tick input:focus-visible {
     outline: none;
   }
+  /* Where the full words wrap, short ones (the full words stay as each control's name): figures/ImageExtras.tsx. */
+  .xe-fig-short {
+    display: none;
+  }
+  .xe-fig-picked[data-compact] .xe-fig-long {
+    display: none;
+  }
+  .xe-fig-picked[data-compact] .xe-fig-short {
+    display: inline;
+  }
+  /* If even those wrap (a very narrow tile), two rows. */
+  .xe-fig-picked[data-stacked] {
+    flex-direction: column;
+    align-items: flex-start;
+  }
   /* The tick's issue: read out always, shown under the label while the tick has the focus (as a field's, css/core.css). */
   .xe-fig-picked > .xe-issue {
     top: calc(100% + 0.375rem);
@@ -320,7 +335,17 @@
     .xe-fig-picked-tick::after {
       content: "";
       position: absolute;
-      inset: -0.5625rem -0.25rem;
+      inset: auto;
+      top: 50%;
+      left: 50%;
+      /* Exactly 44px tall, 44px wide at least, about its own words. */
+      width: max(calc(100% + 0.5rem), 2.75rem);
+      height: 2.75rem;
+      transform: translate(-50%, -50%);
+    }
+    /* Stacked, the rows are 44px apart (a row is 1.35 x 12px of type), so the presses never overlap. */
+    .xe-fig-picked[data-stacked] {
+      row-gap: calc(2.75rem - 1.35 * 0.75rem);
     }
   }
 }
