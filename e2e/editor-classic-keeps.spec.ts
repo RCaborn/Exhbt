@@ -4,7 +4,7 @@ import { SCHEMA_VERSION, text, type ContentSection, type ExhbtDoc, type Section 
 import type { Format } from "../lib/exhbt/formats";
 import { tileFromDoc } from "../lib/exhbt/headline";
 import { ExhbtTile } from "../components/exhbt/ExhbtTile";
-import { SEL, waitForSave } from "./editor";
+import { SEL, waitForSave } from "./editor-classic-helpers";
 
 // The classic editor keeps what it does not edit (docs/briefs/edit-on-page/r2-e-classic-editor.md): a flowchart
 // that has been moved or removed, a pull quote, a before or after mark, My role, a link with no address and a

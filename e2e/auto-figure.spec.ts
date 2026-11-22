@@ -6,10 +6,8 @@ import { roomFor, sectionLabel, withKeyFigure, withWorkVisual } from "../lib/exh
 import { imageSize } from "../lib/figures/image-size";
 import { FIGURE, boxFromPixels, clampBox, fitCaption, mayHoldFigure, pixelsFromBox, withMargin } from "../lib/figures/rules";
 import { uniqueEmail } from "./helpers";
-import { keepClassic } from "./editor";
-
-// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
-test.beforeEach(({ page }) => keepClassic(page));
+import { card, closeOpenSheet, openLayoutMenu, openPublishSheet, openThingsToFix, publish, removeSection, waitEditor, waitForSaved } from "./editor";
+import { READY } from "./page-editor";
 
 // The figure picked from an upload (decisions 0017 and 0025): the PDF's pages drawn in the browser,
 // the stand-in AI's pick (the first page that draws shapes, with a box that covers the chart in the
@@ -384,12 +382,24 @@ async function addFile(page: Page, path: string) {
 async function draft(page: Page) {
   await page.getByRole("button", { name: "Draft my exhbt" }).click();
   await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/, { timeout: 60_000 });
-  await expect(page.locator("[data-ready=true]")).toBeAttached();
+  await waitEditor(page);
+  // The line the draft leaves is in the layout menu, where the layout is changed: leave the menu open for it.
+  await showLine(page);
 }
 
-const sectionKinds = (page: Page) => page.locator("li[data-section-id]").evaluateAll((els) => els.map((e) => e.getAttribute("data-kind")));
-/** The one line under the layout choice, right after a draft. */
+/** The kinds of the page's sections, in page order, leaving out the flowchart (the classic list had no card for it). */
+const sectionKinds = async (page: Page) => (await page.locator(`${READY} article [data-section-id]`).evaluateAll((els) => els.map((e) => e.getAttribute("data-kind")))).filter((k) => k !== "flow");
+/** The one line the draft leaves, in the layout menu. */
 const draftedLine = (page: Page) => page.locator("[data-drafted]");
+/** Opens the layout menu, so the line can be read. */
+const showLine = (page: Page) => openLayoutMenu(page);
+/** The picked figure's strip (where it came from, Crop, Choose another page, the tick), in the popover from the label over the picture: opens it. */
+async function openPicked(page: Page) {
+  const note = page.locator(`${READY} [data-picked]`).first();
+  if (!(await note.isVisible())) await page.getByRole("button", { name: /^From your report, page \d+/ }).first().click();
+  await expect(note).toBeVisible();
+  return note;
+}
 const countPicks = (page: Page) => {
   const seen = { picks: 0 };
   page.on("request", (r) => {
@@ -425,53 +435,65 @@ test.describe("Draft from a PDF with a chart", () => {
     expect(answer.pick.box.h).toBeCloseTo(0.48, 2);
     expect((await placed).status()).toBe(204);
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
-    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await waitEditor(page);
+    await showLine(page);
 
     // In the editor: the picked figure straight after the findings, and no graph drawn by the AI.
     const kinds = await sectionKinds(page);
     expect(kinds.slice(0, 2)).toEqual(["findings", "image"]);
     expect(kinds).not.toContain("graph");
-    const note = page.locator("[data-picked]");
+    // While it is not ticked the label over the picture holds the tick itself.
+    await expect(page.locator(`${READY} input[data-path$=".picked.shareOk"]`)).not.toBeChecked();
+    const note = await openPicked(page);
     await expect(note.getByText(WARNING)).toBeVisible();
     await expect(note.getByText("From report-with-chart.pdf, page 3.", { exact: false })).toBeVisible();
     await expect(note.getByLabel(TICK)).not.toBeChecked();
     await expect(page.getByLabel("Image 1: describe it for people who can't see it")).toHaveValue(/Development preview/);
 
-    // One quiet line: the layout and why, a way to change it, and where the figure came from.
+    // One quiet line: the layout and why, and where the figure came from. It is in the layout menu, with the cursor on the layout.
+    await showLine(page);
     const line = draftedLine(page);
     await expect(line).toContainText(CASE_STUDY_LINE);
     await expect(line).toContainText("The figure is from page 3 of report-with-chart.pdf. Tick that you may share it before you publish.");
-    await line.getByRole("link", { name: "Change layout" }).click();
     await expect(page.getByRole("radio", { name: /^Case study/ })).toBeFocused();
+    await page.keyboard.press("Escape");
 
-    // In the preview, the figure shares a row with the findings, cut out of the page (wider than tall).
-    const figure = page.getByRole("region", { name: "Preview" }).locator("[data-found] [data-part=image] img");
+    // On the page, the figure shares a row with the findings, cut out of the page (wider than tall).
+    const figure = page.locator(`${READY} [data-found] [data-part=image] img`);
     await expect(figure).toBeVisible();
     const size = await figure.evaluate((img: HTMLImageElement) => ({ w: img.naturalWidth, h: img.naturalHeight }));
     expect(size.w).toBeGreaterThan(1000);
     expect(size.w).toBeGreaterThan(size.h);
 
     // Publishing is blocked until the tick, and the problem links to the card.
+    await openPublishSheet(page);
     await page.getByLabel("This is my work, and the numbers are true").check();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
-    const problem = page.getByRole("link", { name: `Image 1: ${NEEDS_TICK}` });
+    await closeOpenSheet(page);
+    const problem = (await openThingsToFix(page)).getByRole("button", { name: `Image 1: ${NEEDS_TICK}` });
     await expect(problem).toBeVisible();
-    await expect(problem).toHaveAttribute("href", "#card-section-1");
+    await expect(problem).toHaveAttribute("data-issue-path", /^sections\.\d+\.picked\.shareOk$/);
     await expect(page.getByText("It's live.")).toHaveCount(0);
 
-    await note.getByLabel(TICK).check();
+    await page.keyboard.press("Escape");
+    await (await openPicked(page)).getByLabel(TICK).check();
     // Ticked: the line no longer asks for it.
+    await showLine(page);
     await expect(line).toContainText("The figure is from page 3 of report-with-chart.pdf.");
     await expect(line).not.toContainText("Tick that you may share it");
-    await page.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(page.getByText("It's live.")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await publish(page);
     // Publishing saves and renders the page again on the server, with nothing left in the address:
     // the line stays for this visit all the same.
+    await closeOpenSheet(page);
+    await showLine(page);
     await expect(line).toContainText(CASE_STUDY_LINE);
     await expect(line).toContainText("The figure is from page 3 of report-with-chart.pdf.");
+    await page.keyboard.press("Escape");
+    await openPublishSheet(page);
 
     // The live page shows the figure beside the findings, and nothing about where it came from.
-    const href = await page.getByRole("link", { name: new RegExp(`^/p/${username}/`) }).getAttribute("href");
+    const href = await page.getByRole("link", { name: new RegExp(`/p/${username}/`) }).getAttribute("href");
     await page.goto(href!);
     await expect(page.locator("[data-found] [data-part=image] img")).toBeVisible();
     await expect(page.getByText(WARNING)).toHaveCount(0);
@@ -481,10 +503,11 @@ test.describe("Draft from a PDF with a chart", () => {
     await signInPremium(page, `fig${Date.now().toString(36)}b`);
     await addFile(page, CHART_PDF);
     await draft(page);
-    const note = page.locator("[data-picked]");
+    await page.keyboard.press("Escape");
+    const note = await openPicked(page);
     await expect(note.getByText(WARNING)).toBeVisible();
     const seen = countPicks(page);
-    const imageSrc = () => page.locator("li[data-kind=image] img").first().getAttribute("src");
+    const imageSrc = () => page.locator(`${READY} article [data-kind=image] img`).first().getAttribute("src");
     const first = await imageSrc();
 
     // The page picker: every page of the report, the one in use marked.
@@ -501,9 +524,12 @@ test.describe("Draft from a PDF with a chart", () => {
     const swapped = await imageSrc();
     expect(swapped).not.toBe(first);
     // The line follows the figure: it reads the page from the exhbt.
+    await showLine(page);
     await expect(draftedLine(page)).toContainText("The figure is from page 1 of report-with-chart.pdf.");
+    await page.keyboard.press("Escape");
 
     // Crop: the bottom edge moved up to half way.
+    await openPicked(page);
     await note.getByRole("button", { name: "Crop", exact: true }).click();
     const cropper = page.getByTestId("cropper");
     await expect(cropper.getByRole("img", { name: "Page 1 of report-with-chart.pdf" })).toBeVisible();
@@ -511,18 +537,21 @@ test.describe("Draft from a PDF with a chart", () => {
     await cropper.getByRole("button", { name: "Use this crop" }).click();
     await expect(note.getByText("Cropped.")).toBeVisible();
     await expect.poll(imageSrc).not.toBe(swapped);
-    const cropped = page.locator("li[data-kind=image] img").first();
+    const cropped = page.locator(`${READY} article [data-kind=image] img`).first();
     const size = await cropped.evaluate((img: HTMLImageElement) => ({ w: img.naturalWidth, h: img.naturalHeight }));
     expect(size.w).toBeGreaterThan(size.h);
 
     // The saved doc keeps the new page and box. What the draft page passed on is said once, so not after a reload.
-    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    await waitForSaved(page);
     await page.reload();
-    await expect(page.locator("[data-picked]").getByText("page 1.", { exact: false })).toBeVisible();
+    await waitEditor(page);
+    await expect((await openPicked(page)).getByText("page 1.", { exact: false })).toBeVisible();
+    await showLine(page);
     await expect(draftedLine(page)).toHaveCount(0);
+    await page.keyboard.press("Escape");
 
-    // Remove: the card's own button. The drafted graph went when the figure took its place, so no graph comes back.
-    await page.getByRole("button", { name: "Remove image 1" }).click();
+    // Remove: the section's own button. The drafted graph went when the figure took its place, so no graph comes back.
+    await removeSection(page, "Image 1");
     await expect(page.locator("[data-picked]")).toHaveCount(0);
     const kinds = await sectionKinds(page);
     expect(kinds[0]).toBe("findings");
@@ -541,8 +570,9 @@ test.describe("Draft from a PDF with a chart", () => {
     expect(answer.pick.kind).toBe("other");
     expect(answer.pick.alt).toContain("report-with-diagram.pdf, page 2");
     expect((await sectionKinds(page)).slice(0, 3)).toEqual(["findings", "image", "graph"]);
-    await expect(page.locator("[data-picked]").getByText("From report-with-diagram.pdf, page 2.", { exact: false })).toBeVisible();
     await expect(draftedLine(page)).toContainText("The figure is from page 2 of report-with-diagram.pdf. Tick that you may share it before you publish.");
+    await page.keyboard.press("Escape");
+    await expect((await openPicked(page)).getByText("From report-with-diagram.pdf, page 2.", { exact: false })).toBeVisible();
   });
 });
 
@@ -560,13 +590,14 @@ test.describe("Draft a research exhbt from a PDF with a diagram", () => {
     expect(kinds).toContain("image");
     // Research's key figure is its first graph or image: the results graph, with the diagram straight after it.
     expect(kinds.indexOf("image")).toBe(kinds.indexOf("graph") + 1);
-    const keyFigure = page.getByRole("region", { name: "Key figure", exact: true });
+    const keyFigure = card(page, "Key figure");
     await expect(keyFigure).toBeVisible();
     await expect(keyFigure.locator("[data-picked]")).toHaveCount(0);
-    await expect(page.locator("[data-picked]").getByText("From report-with-diagram.pdf, page 2.", { exact: false })).toBeVisible();
     const line = draftedLine(page);
     await expect(line).toContainText("Laid out as Research because your notes name this layout.");
     await expect(line).toContainText("The figure is from page 2 of report-with-diagram.pdf.");
+    await page.keyboard.press("Escape");
+    await expect((await openPicked(page)).getByText("From report-with-diagram.pdf, page 2.", { exact: false })).toBeVisible();
   });
 });
 
@@ -590,7 +621,8 @@ test.describe("Drafts with no figure", () => {
     await page.locator("#notes").fill("stand-in: add a figure to check");
     await draft(page);
     expect(await sectionKinds(page)).toContain("graph");
-    await expect(page.getByRole("list", { name: "Numbers to check" })).toBeVisible();
+    await expect((await openThingsToFix(page)).getByRole("list", { name: "Numbers to check" })).toBeVisible();
+    await showLine(page);
     const line = draftedLine(page);
     await expect(line).toContainText("No figure was found in your files.");
     await expect(line).not.toContainText("so the graph uses numbers");
@@ -610,8 +642,7 @@ test.describe("Drafts with no figure", () => {
     const line = draftedLine(page);
     await expect(line).toContainText(CASE_STUDY_LINE);
     await expect(line).toContainText("No figure was found in your files, so the graph uses numbers from your files and notes.");
-    await expect(line).toHaveClass(/text-graphite/);
-    await expect(page.locator("[role=alert]:not(#__next-route-announcer__)")).toHaveCount(0);
+    await expect(page.locator("[role=alert]:not(#__next-route-announcer__):not(:empty)")).toHaveCount(0);
 
     // A figure placed with a caption and no kind: nothing is taken off, and its numbers get the
     // draft's check. 2.3% isn't in the report, so it is flagged to confirm; 30 is, so it isn't.
@@ -631,12 +662,13 @@ test.describe("Drafts with no figure", () => {
     // Sent again: it is there already, and nothing changes.
     expect((await page.request.post(`/api/exhbts/${exhbtId}/figure`, { data: body })).status()).toBe(204);
     await page.reload();
-    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await waitEditor(page);
     expect((await sectionKinds(page)).slice(0, 3)).toEqual(["findings", "image", "graph"]);
-    const toCheck = page.getByRole("list", { name: "Numbers to check" });
+    const toCheck = (await openThingsToFix(page)).getByRole("list", { name: "Numbers to check" });
     await expect(toCheck.getByText("2.3%", { exact: true })).toBeVisible();
     await expect(toCheck.getByText("30", { exact: true })).toHaveCount(0);
-    await expect(page.locator("[data-picked]").getByText("From report-text-only.pdf, page 2.", { exact: false })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect((await openPicked(page)).getByText("From report-text-only.pdf, page 2.", { exact: false })).toBeVisible();
   });
 
   test("a pick that fails leaves the draft as it is, and the line says it couldn't look", async ({ page }) => {
@@ -652,7 +684,7 @@ test.describe("Drafts with no figure", () => {
     const line = draftedLine(page);
     await expect(line).toContainText("We couldn't look for a figure in your files this time. You can add an image yourself.");
     await expect(line).not.toContainText("No figure was found");
-    await expect(page.locator("[role=alert]:not(#__next-route-announcer__)")).toHaveCount(0);
+    await expect(page.locator("[role=alert]:not(#__next-route-announcer__):not(:empty)")).toHaveCount(0);
   });
 
   test("a text-only PDF printed by a browser: its clipping paths and page background are not figures, so nothing is sent", async ({ page }) => {
@@ -725,7 +757,8 @@ test.describe("A scanned PDF", () => {
     const kinds = await sectionKinds(page);
     expect(kinds.slice(0, 2)).toEqual(["findings", "image"]);
     expect(kinds).not.toContain("graph");
-    await expect(page.locator("[data-picked]").getByText("From scan-report.pdf, page 1.", { exact: false })).toBeVisible();
     await expect(draftedLine(page)).toContainText("The figure is from page 1 of scan-report.pdf. Tick that you may share it before you publish.");
+    await page.keyboard.press("Escape");
+    await expect((await openPicked(page)).getByText("From scan-report.pdf, page 1.", { exact: false })).toBeVisible();
   });
 });

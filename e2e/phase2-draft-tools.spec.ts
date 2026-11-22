@@ -3,10 +3,7 @@ import { expect, test } from "@playwright/test";
 import { ENTITLEMENTS } from "../lib/entitlements";
 import { emptyDoc, text, type ExhbtDoc, type RichText } from "../lib/exhbt/blocks";
 import { aiVersionOf, blockValue, replaceBlock, sameBlock } from "../lib/exhbt/draft-blocks";
-import { backToAiVersion, cardMenuButton, DRAFT_PROJECT as PROJECT, draftAndOpen, findingsField, openCardMenu, rewritesLeft, signInToDraft, startRewrite, keepClassic } from "./editor";
-
-// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
-test.beforeEach(({ page }) => keepClassic(page));
+import { backToAiVersion, cardMenuButton, DRAFT_PROJECT as PROJECT, draftAndOpen, findingsField, openCardMenu, rewritesLeft, signInToDraft, startRewrite } from "./editor";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -49,7 +46,7 @@ test.describe("Draft from a file", () => {
     await expect(page.getByTestId("file-status")).toContainText("uploaded");
     await page.getByRole("button", { name: "Draft my exhbt" }).click();
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Edit exhbt" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Edit exhbt" })).toBeAttached();
     for (const block of ["header", "skills", "gap", "flow", "findings"]) {
       await expect(cardMenuButton(page, block)).toBeVisible();
     }
@@ -63,7 +60,7 @@ test.describe("Draft from a file", () => {
     await page.goto("/exhbts");
     await page.getByRole("button", { name: /start from scratch/i }).click();
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Edit exhbt" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Edit exhbt" })).toBeAttached();
     await expect(page.getByTestId("tools-findings")).toHaveCount(0);
   });
 });

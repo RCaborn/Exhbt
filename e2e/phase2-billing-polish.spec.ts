@@ -2,10 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import Stripe from "stripe";
 import { BILLING_PERIOD, ENTITLEMENTS, PLAN_NAMES, PRICES } from "../lib/entitlements";
-import { signInAs, startFromScratch, keepClassic } from "./editor";
-
-// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
-test.beforeEach(({ page }) => keepClassic(page));
+import { openPublishSheet, signInAs, startFromScratch } from "./editor";
 
 // Billing polish: Stripe events out of order, the upgrade offer where a limit stops something,
 // the pricing page selling for real with Phase 2 on, and files removed with their exhbt.
@@ -68,6 +65,8 @@ test.describe("Upgrade at the point of need", () => {
   test("publishing on Free shows why, with the billing button", async ({ page }) => {
     await signInAs(page, `pubfree${stamp()}`.slice(0, 28), "free");
     await startFromScratch(page, { waitForContext: false });
+    // "Review and publish" says why, in its sheet.
+    await openPublishSheet(page);
     const prompt = page.getByTestId("upgrade-prompt");
     await expect(prompt).toContainText(`Publishing to your own link comes with ${PLAN_NAMES.premium}.`);
     const upgrade = prompt.getByRole("link", { name: `Upgrade to ${PLAN_NAMES.premium} (${PRICES.premium} a ${BILLING_PERIOD})` });
