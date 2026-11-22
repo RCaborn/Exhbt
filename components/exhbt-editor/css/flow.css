@@ -153,17 +153,42 @@
       opacity: 1;
       pointer-events: auto;
     }
-    .xe-flow[data-axis="column"] .xe-flow-tools {
-      gap: 1rem;
-    }
     .xe-flow-chip::before {
       content: "";
       position: absolute;
       inset: -0.5rem;
     }
-    /* On a column's right edge the larger target reaches into the box, never past the page's edge. */
-    .xe-flow[data-axis="column"] .xe-flow-tools .xe-flow-chip::before {
+    /* In a column (a phone), the grip sits on the box's right edge and Remove on its left, each near the
+       box's top: the gap under a column holds the next section's toolbar at the right and its "+" at the
+       left, at 44px, and both reach up into the last box's foot. Each larger target reaches into the box,
+       never past the page's edge. */
+    .xe-flow[data-axis="column"] .xe-flow-tools {
+      inset: 0;
+      display: block;
+      transform: none;
+      pointer-events: none;
+    }
+    .xe-flow[data-axis="column"] .xe-flow-tools > .xe-flow-chip {
+      position: absolute;
+      top: 0.5rem;
+      pointer-events: auto;
+    }
+    /* Each sits 15px out, in the page's 16px gutter, so it covers none of the words (they start 13px in). */
+    .xe-flow[data-axis="column"] .xe-flow-tools > .xe-flow-grip {
+      right: 0;
+      transform: translateX(15px);
+    }
+    /* A little lower on the left: the "+" before a section with no heading above its flowchart (a case study) reaches 11px into its first box. */
+    .xe-flow[data-axis="column"] .xe-flow-tools > [data-flow-remove] {
+      top: 0.75rem;
+      left: 0;
+      transform: translateX(-15px);
+    }
+    .xe-flow[data-axis="column"] .xe-flow-tools > .xe-flow-grip::before {
       inset: -0.5rem 0 -0.5rem -1rem;
+    }
+    .xe-flow[data-axis="column"] .xe-flow-tools > [data-flow-remove]::before {
+      inset: -0.5rem -1rem -0.5rem 0;
     }
   }
 
@@ -174,6 +199,11 @@
   [data-xe-drag] .xe-flow-tools,
   [data-xe-drag] .xe-flow-add {
     opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  /* A chip that takes the pointer itself (a phone's, placed on its own) takes none then either. */
+  .xe-flow[data-flow-drag] .xe-flow-tools > .xe-flow-chip,
+  [data-xe-drag] .xe-flow-tools > .xe-flow-chip {
     pointer-events: none !important;
   }
   /* From the keyboard the grip keeps the focus, and shows it. */
