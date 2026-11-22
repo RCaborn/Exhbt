@@ -16,11 +16,12 @@ import { formatOf } from "@/lib/exhbt/formats";
 import { useAdapter } from "./adapter";
 import { Autosave } from "./Autosave";
 import { BackupOffer } from "./BackupOffer";
-import { createRuntime, RuntimeContext, useEnv, useRuntime, useUiState, type PageEditorProps, type Runtime, type UiApi } from "./context";
+import { createRuntime, RuntimeContext, useEnv, useLive, useRuntime, useUiState, type PageEditorProps, type Runtime, type UiApi } from "./context";
 import { createDraftTools, DraftToolsContext } from "./draft-tools";
 import { DragBoard } from "./drag";
 import { GrowContext } from "./fields/InlineText";
 import { closeEditorQueue, openEditorQueue } from "./fields/idle";
+import { preloadRichEditor } from "./fields/RichField";
 import { labelOf } from "./labels";
 import { createFiles, FilesContext, useFiles, useFilesController, useImageUrls, type FilesController } from "./files";
 import { ChartSheet } from "./figures/ChartSheet";
@@ -89,6 +90,8 @@ export function PageEditor(props: PageEditorProps) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     setReady(true);
+    // Their chunk is fetched now, so a field clicked first only has to make its editor.
+    preloadRichEditor();
     // The formatted fields' editors start, one at a time, in idle moments from now.
     openEditorQueue();
     // Development only: the browser tests read the editor's doc and its undo list (e2e/page-editor.ts).
@@ -208,7 +211,8 @@ function Canvas() {
   const ctx = useMemo<PageCtx>(() => ({ Sub: "h3", imageUrls, format, edit: adapter }), [imageUrls, format, adapter]);
   // Save as PDF, the checked-on line and the team byline, as "See as a visitor" draws them, inert: the page is the visitor's box for box.
   const env = useEnv();
-  const parts = useMemo(() => visitorParts(env), [env]);
+  const { publishedAt } = useLive();
+  const parts = useMemo(() => visitorParts(env, publishedAt), [env, publishedAt]);
   return (
     <PageCtxContext value={ctx}>
       <ProjectView doc={shell} owner={owner} imageUrls={imageUrls} headingLevel="h2" confirmed={confirmed} edit={adapter} {...parts} />
@@ -229,7 +233,8 @@ function Visitor() {
   // A link is drawn only if it is https, as on the public page (lib/portfolio.ts mediaFor).
   const evidenceUrl = doc.evidence?.kind === "link" ? safeHref(doc.evidence.href) : doc.evidence?.kind === "file" ? env.fileEvidenceUrl : null;
   // Save as PDF, the date beside the checks (the publish date, or today's for a draft), the checks link and the team byline, as the public page draws them.
-  const parts = useMemo(() => visitorParts(env), [env]);
+  const { publishedAt } = useLive();
+  const parts = useMemo(() => visitorParts(env, publishedAt), [env, publishedAt]);
   return (
     <>
       <ProjectView doc={doc} owner={owner} imageUrls={imageUrls} evidenceUrl={evidenceUrl} headingLevel="h2" confirmed={confirmed} {...parts} />

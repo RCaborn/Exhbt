@@ -66,7 +66,7 @@ function PublishBody() {
         save.markSaved(sent);
         noteSaved(sent);
         files.markPublished(sent);
-        setLive(env.id, "published", r.slug);
+        setLive(env.id, "published", r.slug, r.publishedAt);
         setResult({ ok: true, slug: r.slug, changed: published });
       } else setResult({ ok: false, lines: r.reasons });
     } catch {

@@ -175,10 +175,15 @@ test.describe("the exhbt editor", () => {
     await startFromScratch(page);
     await fillValid(page, "Would a second till help at lunch?");
     await waitForSave(page);
-    // A draft first: no date yet, so the preview shows the day it would say if it went live now.
+    // A draft first: never published, so never checked. The editing page and the preview both say so, with the empty mark.
+    const checked = (root: ReturnType<typeof visitorRegion>) => root.locator('[data-checks] li:has-text("Check")');
+    const editing = page.locator('[data-editor="page"][data-ready="true"] article[data-exhbt-page]').first();
+    await expect(checked(editing)).toHaveText("Checked when published");
+    await expect(checked(editing)).not.toHaveAttribute("data-done");
     await seeAsVisitor(page, true);
-    const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-    await expect(visitorRegion(page)).toContainText(`Checked by exhbt, ${today}`);
+    await expect(checked(visitorRegion(page))).toHaveText("Checked when published");
+    await expect(checked(visitorRegion(page))).not.toHaveAttribute("data-done");
+    await expect(visitorRegion(page)).not.toContainText("Checked by exhbt");
     await expect(visitorRegion(page).getByRole("button", { name: /Save as PDF/ })).toBeVisible();
     await expect(page.locator("[data-visitor-signoff]").getByLabel("Made with exhbt")).toBeVisible();
     await seeAsVisitor(page, false);
@@ -186,7 +191,11 @@ test.describe("the exhbt editor", () => {
     await publish(page);
     const live = (await publishSheet(page).getByRole("link", { name: /^\/p\/vera\// }).textContent())!.trim();
     await closeSheet(page);
+    // Published now: both views say when, as the public page does.
+    const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/London" });
+    await expect(checked(editing)).toHaveText(`Checked by exhbt, ${today}`);
     await seeAsVisitor(page, true);
+    await expect(checked(visitorRegion(page))).toHaveText(`Checked by exhbt, ${today}`);
     // What each page is made of: the elements and their classes in order (headings sit one level lower in the editor), and the words.
     const read = () =>
       page.locator("article[data-exhbt-page]").evaluate((a) => ({

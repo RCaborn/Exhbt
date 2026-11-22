@@ -163,7 +163,7 @@ export function StandInPage(props: PageEditorProps) {
             confirmed={false}
             edit={edit}
             // Save as PDF, the checked-on line and the team byline, as the editing page draws them.
-            {...visitorParts(props)}
+            {...visitorParts(props, props.publishedAt)}
           />
         </div>
       </div>

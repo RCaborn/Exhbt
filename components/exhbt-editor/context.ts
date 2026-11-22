@@ -69,7 +69,7 @@ export type UiState = {
 export type UiApi = Pick<Ui, "open" | "close" | "jumpTo" | "say" | "setVisitor" | "setConfirmed"> & { setTried(v: boolean): void };
 
 /** Whether the exhbt is live, and at which slug: what the page was opened with, then what publishing and unpublishing say. */
-export type LiveStatus = { status: "draft" | "published"; slug: string | null };
+export type LiveStatus = { status: "draft" | "published"; slug: string | null; publishedAt: string | null };
 
 /** One visit's runtime: made once in EditorShell.tsx. */
 export type Runtime = {
@@ -114,18 +114,24 @@ export function createRuntime(env: PageEditorProps, jumpTo: (path: FieldPath, ui
  * exhbt id, so a visit to another exhbt reads its own page's props until it changes. (I built this in
  * sheets/live.ts, which now re-exports it from here.)
  */
-const live = atom<({ id: string } & LiveStatus) | null>(null);
+const live = atom<({ id: string; publishedAt?: string | null } & Omit<LiveStatus, "publishedAt">) | null>(null);
 
-/** Publishing worked (`"published"`, with the slug publishExhbt answered) or unpublishing did (`"draft"`): everyone that shows the status changes. */
-export function setLive(id: string, status: LiveStatus["status"], slug: string | null): void {
-  live.set({ id, status, slug });
+/**
+ * Publishing worked (`"published"`, with the slug and the publish time publishExhbt answered) or unpublishing
+ * did (`"draft"`): everyone that shows the status changes. Without `publishedAt` the last one known is kept.
+ */
+export function setLive(id: string, status: LiveStatus["status"], slug: string | null, publishedAt?: string | null): void {
+  live.set((cur) => ({ id, status, slug, publishedAt: publishedAt !== undefined ? publishedAt : cur?.id === id ? cur.publishedAt : undefined }));
 }
 
-/** Whether this exhbt is live now, and its slug. */
+/** Whether this exhbt is live now, its slug, and when it was last published (null if never). */
 export function useLive(): LiveStatus {
   const env = useEnv();
   const s = useAtom(live);
-  return useMemo(() => (s && s.id === env.id ? { status: s.status, slug: s.slug } : { status: env.status, slug: env.slug }), [s, env.id, env.status, env.slug]);
+  return useMemo(() => {
+    const opened = env.publishedAt ?? null;
+    return s && s.id === env.id ? { status: s.status, slug: s.slug, publishedAt: s.publishedAt !== undefined ? s.publishedAt : opened } : { status: env.status, slug: env.slug, publishedAt: opened };
+  }, [s, env.id, env.status, env.slug, env.publishedAt]);
 }
 
 /** The live status with the live address (`liveBase` + slug, when there is a username), and `set` for this exhbt. */

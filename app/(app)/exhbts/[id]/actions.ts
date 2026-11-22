@@ -142,7 +142,7 @@ export async function saveDraft(id: string, raw: unknown): Promise<SaveResult> {
   return ok ? { ok: true, savedAt: new Date().toISOString() } : { ok: false, error: "This exhbt isn't yours to edit." };
 }
 
-export type PublishResult = { ok: true; slug: string } | { ok: false; reasons: string[] };
+export type PublishResult = { ok: true; slug: string; publishedAt: string | null } | { ok: false; reasons: string[] };
 
 /**
  * Saves the latest edits, then puts them live if everything passes: the limits, the plan,
@@ -174,7 +174,9 @@ export async function publishExhbt(id: string, raw: unknown, confirmed: boolean)
   revalidatePath("/exhbts");
   revalidatePath(`/exhbts/${id}/edit`);
   revalidatePath(`/p/${profile.username}`, "layout");
-  return { ok: true, slug };
+  // When it went live, as the public page dates its checks: the editor draws the same date (components/exhbt-editor/visitor-parts.tsx).
+  const publishedAt = (await store.getExhbt(id))?.publishedAt ?? null;
+  return { ok: true, slug, publishedAt };
 }
 
 export async function unpublishExhbt(id: string) {

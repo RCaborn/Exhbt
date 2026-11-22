@@ -19,7 +19,7 @@ export const SKILLS_LIST = "flex flex-wrap gap-1 @2xl/main:justify-end";
  * 44px press with a small chip to the eye. It is after the box on the pills' line and takes its width
  * there, but no height: its margins are less than a pill's height and it is centred on the line, so no
  * pill and no line grows. Its press reaches 8px over the line above and below; it is positioned, as the
- * pills are, so it is the one pressed there. On EDIT_ONLY_IN_FLOW (e2e/page-editor.ts) by name; the
+ * pills are, so it is the one pressed there. Part of the "Add a skill" box's entry on EDIT_ONLY_IN_FLOW (e2e/page-editor.ts); the
  * stand-in draws it too.
  */
 export const ADD_SKILL_BUTTON = "relative hidden min-h-11 min-w-11 -my-3 self-center items-center justify-center pointer-coarse:inline-flex";

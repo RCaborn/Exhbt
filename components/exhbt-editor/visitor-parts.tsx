@@ -15,12 +15,15 @@ import type { PageEditorProps } from "./context";
 /** Whether the page is opened on the person's own host (alex.exhbt.co.uk), where the guide is on our site. */
 export const onPortfolioHost = (env: Pick<PageEditorProps, "liveBase">) => Boolean(env.liveBase?.startsWith("https://"));
 
-/** ProjectView's props for those parts. */
-export function visitorParts(env: Pick<PageEditorProps, "liveBase" | "team" | "publishedAt">) {
+/**
+ * ProjectView's props for those parts. `publishedAt` is when the exhbt was last published (useLive, which
+ * follows a publish made on this page), or null: an exhbt never published says "Checked when published",
+ * with the empty mark, as its checks have not run.
+ */
+export function visitorParts(env: Pick<PageEditorProps, "liveBase" | "team">, publishedAt: string | null | undefined) {
   return {
     saveAsPdf: true,
-    // The publish date, or for a draft the day it would say if it went live now.
-    checkedOn: checkedOnLabel(env.publishedAt ?? null) ?? checkedOnLabel(new Date().toISOString()),
+    checkedOn: checkedOnLabel(publishedAt),
     checksHref: onPortfolioHost(env) ? `https://${MARKETING_HOST}${CHECKS_GUIDE}` : undefined,
     team: env.team && env.team.length > 0 ? <TeamByline team={env.team} /> : undefined,
   };
