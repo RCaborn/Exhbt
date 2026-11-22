@@ -838,7 +838,7 @@ test.describe("the + between sections", () => {
       expect(new Set(names).size).toBe(names.length);
       const before = await drawn(page);
       const end = page.locator(`${READY} #add-section`);
-      await expect(page.locator(`${READY} .xe-insert[data-end]`)).toHaveAttribute("data-path", "sections");
+      await expect(page.locator(`${READY} [data-path="sections"] button`)).toHaveId("add-section");
       await end.click();
       await expect(page.locator(MENU)).toBeVisible();
       expect(await drawn(page)).toEqual(before);
@@ -890,6 +890,8 @@ test.describe("the + between sections", () => {
     await expect(page.locator(MENU)).toHaveCount(0);
     await page.evaluate(() => window.__exhbtUi!.jumpTo("sections"));
     await expect(page.locator(MENU)).toBeVisible();
+    // The path is on the "+" alone, so the jump's anchor is one button, with the menu open beside it.
+    await expect(page.locator(`${READY} [data-path="sections"] button`)).toBeFocused();
   });
 
   test.fixme("a new link opens its Web address popover with the cursor in it", async () => {

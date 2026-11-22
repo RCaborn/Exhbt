@@ -44,7 +44,7 @@ export function Insert({ at, end }: InsertSlot) {
   const name = before ? `Add a section before ${before}` : "Add a section";
   const show = () => setOpen(readMenu(store.get(), env.reportFiles));
 
-  // "Things to fix" landing on the end "+" (its wrapper carries the path; the jump lands on the button in it) opens its menu.
+  // "Things to fix" landing on the end "+" (the span round it carries the path; the jump lands on the button in it) opens its menu.
   useEffect(() => {
     const w = wrap.current;
     if (!w || !end) return;
@@ -78,7 +78,6 @@ export function Insert({ at, end }: InsertSlot) {
       data-edit-only
       data-at={at}
       data-end={end || undefined}
-      data-path={end ? "sections" : undefined}
       onKeyDown={(e) => {
         if (e.key !== "Escape" || !open) return;
         e.stopPropagation();
@@ -89,19 +88,22 @@ export function Insert({ at, end }: InsertSlot) {
         if (open && !e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(null);
       }}
     >
-      <button
-        ref={button}
-        type="button"
-        id={end ? "add-section" : undefined}
-        className="xe-plus"
-        aria-label={name}
-        data-tip={name}
-        aria-expanded={open !== null}
-        aria-controls={open ? menuId : undefined}
-        onClick={() => (open ? setOpen(null) : show())}
-      >
-        <Plus aria-hidden size={16} strokeWidth={2.5} />
-      </button>
+      {/* The end one's path is on the "+" alone, not on its menu: "Things to fix" lands on the "+" and opens the menu beside it. */}
+      <span data-path={end ? "sections" : undefined}>
+        <button
+          ref={button}
+          type="button"
+          id={end ? "add-section" : undefined}
+          className="xe-plus"
+          aria-label={name}
+          data-tip={name}
+          aria-expanded={open !== null}
+          aria-controls={open ? menuId : undefined}
+          onClick={() => (open ? setOpen(null) : show())}
+        >
+          <Plus aria-hidden size={16} strokeWidth={2.5} />
+        </button>
+      </span>
       {open && (
         <div id={menuId} role="group" aria-label={name} className="xe-plus-menu" data-xe-menu>
           {open.full && <p className="xe-plus-full">{open.full}</p>}
