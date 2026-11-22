@@ -1,0 +1,256 @@
+/* The editor on a phone and on touch screens (decision 0026, "On a phone"): L's. A phone is a window
+   under 48rem with a coarse pointer, the one test used everywhere (phone/usePhone.ts says it in code).
+   On the page, every colour and corner is one of the page's --xp-* variables; the bar at the foot of
+   the screen and the reorder sheet are app chrome, in the app's own tokens. Nothing here takes room on
+   the page: the grips sit over it, and the room left at the foot is below the exhbt. */
+@layer components {
+  /* On any touch screen the "+" sits at the left of each gap (drag.css), where "Add a finding" sits in
+     the gap below the last finding: the chip moves along beside the "+", so the two never overlap. */
+  @media (pointer: coarse) {
+    [data-editor="page"] .xe-add-finding {
+      left: 3.25rem;
+    }
+  }
+
+  @media (max-width: 47.99rem) and (pointer: coarse) {
+    /* ---------- Quieter sections: only the grip, 44px, always shown ---------- */
+    /* The other buttons are on the bar. Hidden outright (not faded), so nothing can take the focus. */
+    [data-editor="page"] .xe-tools > [data-tool] {
+      display: none;
+    }
+    /* The grip sits over the section's top edge at its right end, half above and half on it: the gaps
+       between sections on a phone are 12 to 60px, too small to hold it above the section without
+       covering the words of the one before. */
+    [data-editor="page"] .xe-frame > .xe-tools {
+      top: -1.375rem;
+      bottom: auto;
+      right: 0;
+      padding: 0;
+    }
+    /* A picture's grip sits on the picture's own corner, clear of the caption above it. */
+    [data-editor="page"] .xe-frame[data-kind="image"] > .xe-tools {
+      top: 0.5rem;
+      right: 0.5rem;
+    }
+    /* A chip over a section's corner (a link's "Web address", a graph's "Edit figures") moves along, clear of the grip. */
+    [data-editor="page"] .xe-frame .xe-over {
+      right: 3.5rem;
+    }
+
+    /* A finding's own small controls, the shell parts' corner toolbars and the formatting buttons over a
+       field are on the bar instead. */
+    [data-editor="page"] .xe-list-tools,
+    [data-editor="page"] .xe-shell-tools,
+    [data-editor="page"] .xe-format {
+      display: none;
+    }
+
+    /* The chips drawn over the page ("Add a finding", aim or hypothesis, a picture's or a link's chips)
+       stay 28px to the eye, and take a 44px press. */
+    [data-editor="page"] article .xe-chip {
+      position: relative;
+    }
+    [data-editor="page"] article .xe-chip::before {
+      content: "";
+      position: absolute;
+      inset: -0.5rem 0;
+    }
+
+    /* ---------- The bar's room ---------- */
+    /* Below the exhbt, in the look's ground, so the last section can scroll clear of the bar. */
+    [data-editor="page"]:has(> .xe-phonebar) > [data-look] {
+      padding-bottom: var(--xe-phonebar-h, 4rem);
+    }
+    /* The upload status line sits just above the bar, so the two never overlap. */
+    [data-editor="page"]:has(> .xe-phonebar) > .xe-status {
+      bottom: calc(var(--xe-phonebar-h, 4rem) + 0.5rem);
+    }
+    /* While a section is carried the bar steps aside: the foot of the screen is where the page scrolls itself. */
+    [data-editor="page"]:has([data-xe-drag]) > .xe-phonebar {
+      visibility: hidden;
+    }
+
+    /* ---------- Sheets fill the screen; their close button takes a thumb ---------- */
+    .xe-sheet-close {
+      width: 2.75rem;
+      height: 2.75rem;
+    }
+  }
+
+  /* A field jumped to or scrolled into view keeps clear of the bar. */
+  :root:has([data-editor="page"] > .xe-phonebar) {
+    scroll-padding-bottom: calc(var(--xe-phonebar-h, 4rem) + 0.5rem);
+  }
+
+  /* ---------- The bar at the foot of the screen (phone/PhoneBar.tsx, drawn only on a phone) ---------- */
+  .xe-phonebar {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 29;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.375rem 0.75rem calc(0.375rem + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--color-line);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font: 400 0.875rem/1.3 var(--font-sans);
+  }
+  /* With the on-screen keyboard open the bar sits on it: the home indicator is under the keyboard. */
+  .xe-phonebar[data-keyboard] {
+    padding-bottom: 0.375rem;
+  }
+  .xe-bar-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+  .xe-bar-name {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .xe-bar-gap {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .xe-phonebar .xe-bar-btn {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    white-space: nowrap;
+  }
+  .xe-phonebar .xe-bar-btn[aria-pressed="true"] {
+    background: var(--color-wash);
+    border-color: var(--color-jade);
+    color: var(--color-ink);
+  }
+  .xe-bar-undo {
+    display: flex;
+    min-width: 0;
+  }
+  .xe-bar-undo .xe-bar-btn {
+    max-width: 100%;
+  }
+  .xe-bar-undo-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* "More actions" (components/editor/BlockTools.tsx, drawn as it is): its trigger in the row at 44px;
+     its menu opens upwards; the rewrite form and the message take a line of their own above the row. */
+  .xe-bar-more,
+  .xe-bar-more > [data-testid] {
+    display: contents;
+  }
+  .xe-bar-more > [data-testid] > .relative {
+    order: 1;
+  }
+  .xe-bar-more [aria-label^="More actions"] {
+    width: 2.75rem !important;
+    height: 2.75rem !important;
+  }
+  .xe-bar-more [aria-label^="More actions"] + [id] {
+    top: auto !important;
+    bottom: 100% !important;
+    margin-top: 0 !important;
+    margin-bottom: 0.25rem;
+    z-index: 2 !important;
+  }
+  .xe-bar-more > [data-testid] > :not(.relative) {
+    flex: 0 0 100%;
+    order: -2;
+  }
+  .xe-bar-more > [data-testid] > [role="status"] {
+    order: -1;
+  }
+  .xe-bar-more > [data-testid] > [role="status"]:empty {
+    display: none;
+  }
+  .xe-bar-row > :not(.xe-bar-more) {
+    order: 1;
+  }
+
+  /* ---------- Reorder sections (phone/ReorderSheet.tsx) ---------- */
+  .xe-reorder-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .xe-reorder-row {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    box-sizing: border-box;
+    height: 3.5rem;
+    padding: 0 0.375rem;
+    border: 1px solid var(--color-line);
+    border-radius: 14px;
+    background: var(--color-surface);
+  }
+  .xe-reorder-row[data-dragging] {
+    position: relative;
+    z-index: 1;
+    border-color: var(--color-jade);
+    box-shadow: var(--shadow-pack);
+  }
+  .xe-reorder-name {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0 0.25rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .xe-reorder-grip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 999px;
+    color: var(--color-ink);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .xe-reorder-grip:hover {
+    background: var(--color-mist);
+  }
+  .xe-reorder-grip:focus-visible {
+    outline: 3px solid var(--color-jade);
+    outline-offset: 2px;
+  }
+  .xe-reorder .xe-bar-btn {
+    flex: none;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+  /* "Done", within a thumb's reach at the foot of the sheet. */
+  .xe-reorder-foot {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    justify-content: flex-end;
+    margin: 1rem -1.25rem -1.25rem;
+    padding: 0.75rem 1.25rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--color-line);
+    background: var(--color-surface);
+  }
+  .xe-reorder-foot .xe-bar-btn {
+    min-height: 2.75rem;
+  }
+}
