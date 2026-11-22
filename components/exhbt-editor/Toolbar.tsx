@@ -26,9 +26,9 @@ type Action = { name: string; tool: "action"; pressed?: boolean; run(): void; ic
 function actionsFor(d: ExhbtDoc, id: string, kind: string, as: string, f: Format, store: ReturnType<typeof useStoreInternal>): Action[] {
   const first = FORMAT_RULES[f].first;
   if (first && (first.kinds as readonly string[]).includes(kind) && as !== first.as) {
-    const items = pageItems(d);
-    const lead = items.findIndex((it) => (first.kinds as readonly string[]).includes(it.kind));
-    return [{ name: first.as === "lead" ? "Make lead image" : "Make key figure", tool: "action", icon: <Star aria-hidden size={15} strokeWidth={2.25} />, run: () => store.move(id, Math.max(0, lead)) }];
+    // The lead's place is read when the button is pressed: working out the page's items for every toolbar each time it draws (every frame's, at a drop) costs more than the press.
+    const lead = () => pageItems(store.get()).findIndex((it) => (first.kinds as readonly string[]).includes(it.kind));
+    return [{ name: first.as === "lead" ? "Make lead image" : "Make key figure", tool: "action", icon: <Star aria-hidden size={15} strokeWidth={2.25} />, run: () => store.move(id, Math.max(0, lead())) }];
   }
   if (f === "before-after" && kind === "image") {
     const s = d.sections.find((x) => x.id === id);
