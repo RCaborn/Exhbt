@@ -1061,6 +1061,47 @@ test.describe("the copy kept in this browser (the review's data-safety-3)", () =
   });
 });
 
+test.describe("deleting takes this browser's copies out (the review's security-2)", () => {
+  /** Keeps a copy of exhbt `id`, and of another one, in this browser, as the editor does when saves fail. */
+  const keepCopies = (page: Page, id: string) =>
+    page.evaluate((mine) => {
+      for (const k of [`exhbt-backup:${mine}`, "exhbt-backup:another-exhbt"]) localStorage.setItem(k, JSON.stringify({ doc: { title: "Unsent words" }, at: Date.now() }));
+      localStorage.setItem("exhbt-guide-hidden", "1");
+    }, id);
+  const keys = (page: Page) => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("exhbt-")).sort());
+
+  test("from the editor's menu: that exhbt's copy goes, another exhbt's stays", async ({ page }) => {
+    const { id } = await openDoc(page, freshName("menudel"), sampleDoc("case-study"));
+    await keepCopies(page, id);
+    await page.getByRole("button", { name: "Menu" }).click();
+    await page.getByRole("button", { name: "Delete this exhbt" }).click();
+    await page.getByRole("button", { name: "Yes, delete" }).click();
+    await page.waitForURL(/\/exhbts$/);
+    expect(await keys(page)).toEqual(["exhbt-backup:another-exhbt", "exhbt-guide-hidden"]);
+  });
+
+  test("from the list of exhbts: that exhbt's copy goes, another exhbt's stays", async ({ page }) => {
+    const { id } = await openDoc(page, freshName("listdel"), sampleDoc("case-study"));
+    await page.goto("/exhbts");
+    await keepCopies(page, id);
+    const row = page.locator(`li:has(a[href="/exhbts/${id}/edit"])`);
+    await row.getByRole("button", { name: /^Delete / }).click();
+    await row.getByRole("button", { name: "Yes, delete" }).click();
+    await expect(page.locator(`a[href="/exhbts/${id}/edit"]`)).toHaveCount(0);
+    await expect.poll(() => keys(page)).toEqual(["exhbt-backup:another-exhbt", "exhbt-guide-hidden"]);
+  });
+
+  test("deleting the account takes every copy and the editor's own keys out of this browser", async ({ page }) => {
+    const { id } = await openDoc(page, freshName("acctdel"), sampleDoc("case-study"));
+    await page.goto("/account");
+    await keepCopies(page, id);
+    await page.getByLabel("I understand this deletes everything.").check();
+    await page.getByRole("button", { name: "Delete my account" }).click();
+    await page.waitForURL(/\/\?deleted=1$/);
+    expect(await keys(page)).toEqual([]);
+  });
+});
+
 test("sections a layout keeps but does not draw are listed under the page; Remove takes one out and Undo puts it back", async ({ page }) => {
   await openDoc(page, freshName("kept"), sampleDoc("research"));
   await expect(page.getByRole("region", { name: "Kept, not shown in this layout" })).toHaveCount(0);

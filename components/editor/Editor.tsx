@@ -18,6 +18,7 @@ import { newImageSection, roomFor } from "@/lib/exhbt/sections";
 import { LayoutPicker, type Drafted } from "./LayoutPicker";
 import { BlockTools, useDraftTools, type DraftToolsInit } from "./BlockTools";
 import { ConfirmAction } from "./ConfirmAction";
+import { DeleteExhbt } from "./DeleteExhbt";
 import { FieldIssues } from "./FieldIssues";
 import { FlowEditor } from "./FlowEditor";
 import { Checklist, isBlank, stepsFor } from "./Checklist";
@@ -815,7 +816,7 @@ export function Editor(props: EditorProps) {
             </section>
 
             <div className="flex justify-end pt-2">
-              <ConfirmAction label="Delete this exhbt" variant="danger" question="Delete it for good?" confirmLabel="Yes, delete" action={() => deleteExhbt(id)} />
+              <DeleteExhbt id={id} action={() => deleteExhbt(id)} />
             </div>
           </div>
 
