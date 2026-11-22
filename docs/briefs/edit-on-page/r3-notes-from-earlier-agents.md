@@ -201,3 +201,13 @@ What it built (`components/exhbt-editor/phone/PhoneBar.tsx`, `ReorderSheet.tsx`,
 - Tests on the merged branch: `editor-flow` + `editor-phone` (touch) 30 passed; the 27 flowchart tests of `editor-inplace` passed; `editor-flow` (both projects) 52 passed; `editor-drag` 47 passed, 2 failed from Chrome crashes when memory ran out.
 - For whoever owns `e2e/editor-drag.spec.ts` now: F's eight-looks contrast test (about line 749) can run past its 90s limit on a busy machine. Split it into one test per look, as K did for the flowchart.
 - G's `RichEditor.tsx` (line 111) took the focus when an editor finished loading, even after the person had moved on; G's 2caae8c addresses it.
+
+## From agent L, follow-up after J and K (merged into phase-2-r3 at 020dfa5)
+
+- J's parts at 390px: the "Edit figures" and "Web address" chips sit mid-foot and cover no grip, "+" or flowchart chip. L's provisional `.xe-frame .xe-over` rule is gone; `.xe-above` stays. When a picture has a picked label, its grip moves down to sit under the label (`.xe-frame[data-kind="image"]:has(.xe-fig-picked) > .xe-tools { top: 2.25rem }`), because the grip had covered the tick. Both popovers open on screen; the address popover sits above the bar. `ChartSheet` and `FigureSheet` fill the screen with a 44px close; on a phone every control in a sheet (the classic `ChartEditor` fields, buttons, graph-type cards, checkbox labels) is at least 44px.
+- F's "+" in a gap on a phone is 32px to look at with a 44px press, in the top 32px of its gap, so it no longer covers research's "Hypothesis". In the gallery the first "+" still sits over the lead picture's top corner (no words).
+- Every button in the top bar's menu, and "Yes, delete" and "Cancel", is 44px on any touch screen.
+- `KNOWN` in `e2e/editor-phone.spec.ts` is `[".xe-pill-remove"]`; empty it once G's 44px press for the skill remove lands.
+- Other owners' selectors L now restyles: `.xe-sheet` controls, `.xe-plus` in gaps, `.xe-menu-items button`, plus the earlier `.xe-above`, `.xe-chip::before`, `.xe-link-ask`, `.xe-add-finding`, `.xe-sheet-close` and `[data-tip]::after` under `(hover: none)`.
+- Tests: `editor-phone` 28/28, `editor-tablet` 5/5, `editor-drag` (touch) 1/1, `editor-flow` (touch) 5/5.
+- Open: in a narrow gallery tile a picked label that wraps still has its two presses (open and tick) overlapping (J's CSS).
