@@ -623,7 +623,10 @@ test.describe("in the looks", () => {
         await gripOf(page, 1).focus();
         await axe(page, `${look} ${f} tools`);
         await page.keyboard.press("Space");
+        // The keyboard sensor listens for the arrows from the next task on: wait for the pick-up to be said.
+        await expect(said(page)).toHaveText(/^Picked up box 2 of/);
         await page.keyboard.press("ArrowDown");
+        await expect(said(page)).toHaveText(/^The box would go to place 3 of/);
         await axe(page, `${look} ${f} lifted`);
         await page.keyboard.press("Escape");
       });
@@ -640,7 +643,16 @@ test.describe("in the looks", () => {
       await page.evaluate((i) => window.__exhbtEditor!.setAt(`flow.${i}.step`, ""), last);
       const ph = field(page, `flow.${last}.step`);
       await expect(ph).toHaveAttribute("data-empty", "");
-      const [placeholder, ground] = await ph.evaluate((el) => [getComputedStyle(el, "::placeholder").color, getComputedStyle(el.closest(".xp-flow-box")!).backgroundColor]);
+      const [placeholder, ground, soft] = await ph.evaluate((el) => {
+        const probe = document.createElement("span");
+        probe.style.color = "var(--xp-flow-end-soft)";
+        el.closest(".xp-flow-box")!.appendChild(probe);
+        const want = getComputedStyle(probe).color;
+        probe.remove();
+        return [getComputedStyle(el, "::placeholder").color, getComputedStyle(el.closest(".xp-flow-box")!).backgroundColor, want];
+      });
+      // It is the box's soft colour (G's rule in core.css), read from the placeholder itself.
+      expect(placeholder, theme.id).toBe(soft);
       expect(contrast(placeholder!, ground!), `${theme.id}: the placeholder on the dark box`).toBeGreaterThanOrEqual(4.5);
       // Each tool is its own chip, on the look's card, in its ink.
       await box(page, last).hover();
@@ -651,6 +663,7 @@ test.describe("in the looks", () => {
       // The line, in the look's link colour, against the page's ground.
       await gripOf(page, 0).focus();
       await page.keyboard.press("Space");
+      await expect(said(page)).toHaveText(/^Picked up box 1 of/);
       await page.keyboard.press("ArrowDown");
       await expect(line(page)).toBeVisible();
       const [link, page0] = await line(page).evaluate((el) => [getComputedStyle(el).backgroundColor, getComputedStyle(document.querySelector('[data-editor="page"] article')!).backgroundColor]);
