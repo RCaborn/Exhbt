@@ -82,6 +82,8 @@ You'll come back to Supabase in step 5 once you know the site's address.
   - `https://terna.yourname.workers.dev/auth/callback`
   - `https://terna.yourname.workers.dev/auth/confirm`
 
+**Google sign-in** (optional). In Google Cloud, create an OAuth client (Web application). Its redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`. In Supabase, under **Authentication > Sign In / Providers**, enable Google and paste the client id and secret. The same email should stay one account: turn on automatic linking if Supabase offers it. The button on `/login` appears once the public Supabase URL and anon key are set. Until Google is enabled, that button says it isn't available and email still works.
+
 ## 6. Try it
 
 1. Open your address in a private window. You should see the **"Private preview" bar**.
@@ -114,7 +116,7 @@ Payments stay off until Phase 2 is switched on. Do all of this in Stripe's **tes
 4. **Developers > API keys**: copy the **Secret key** (starts `sk_test_` in test mode).
 5. **Developers > Webhooks > Add endpoint**:
    - URL: `https://app.exhbt.co.uk/api/stripe/webhook`
-   - Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+   - Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`
    - After saving, reveal the **Signing secret** (starts `whsec_`).
 6. Add both as Worker secrets, either in Cloudflare (Worker > **Settings > Variables and Secrets**, type **Secret**) or from a terminal:
    ```

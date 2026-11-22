@@ -44,6 +44,8 @@ test("rejects a short or mismatched password, then signs in with the email", asy
   await page.context().clearCookies();
   await page.goto("/login?next=/account");
   await expect(page.getByRole("heading", { level: 1, name: "Log in" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Create an account" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google" })).toHaveCount(0);
   await page.getByLabel("Email or username").fill(email);
   await page.getByLabel("Password").fill("wrong-password");
   await page.getByRole("button", { name: "Log in" }).click();
