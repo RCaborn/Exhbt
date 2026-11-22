@@ -187,8 +187,11 @@
     .xe-flow[data-axis="column"] .xe-flow-tools > .xe-flow-grip::before {
       inset: -0.5rem 0 -0.5rem -1rem;
     }
+    /* Remove's larger target reaches down, not up: above a case study's first box is the "+" before the
+       flowchart, whose own press must stay whole; below, the box has room for it (the "+" under the
+       last box starts 6px above its foot). */
     .xe-flow[data-axis="column"] .xe-flow-tools > [data-flow-remove]::before {
-      inset: -0.5rem -1rem -0.5rem 0;
+      inset: 0 -1rem -1rem 0;
     }
   }
 
