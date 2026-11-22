@@ -949,6 +949,7 @@ test.describe("Research's row of headings", () => {
 
 test.describe("A picture the person removed mid-batch is not deleted again by the upload", () => {
   test("only the normal drop deletes it, once; the later pictures still land", async ({ page }) => {
+    test.setTimeout(150_000); // two held-back uploads, then leaving the editor
     await startEditor(page, `del${stamp()}`);
     await chooseLayout(page, "Gallery");
     await page.keyboard.press("Escape");
@@ -982,8 +983,8 @@ test.describe("A picture the person removed mid-batch is not deleted again by th
     // Nothing is deleted while the visit lasts (Undo can bring the picture back, decision 0026), and the upload deletes nothing (no false message).
     expect(deletes.length).toBe(0);
     await expect(page.getByText(/there was no room/)).toHaveCount(0);
-    // One delete, for the removed picture, when the person leaves.
-    await page.goto("/exhbts");
+    // One delete, for the removed picture, when the person leaves (by the way back: the page stays alive to be watched).
+    await page.getByRole("link", { name: "Your exhbts", exact: true }).first().click();
     await expect.poll(() => deletes.length).toBe(1);
     await page.waitForTimeout(1000);
     expect(deletes.length).toBe(1);
