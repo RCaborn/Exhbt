@@ -475,13 +475,6 @@ function createEngine(store: Store, ui: UiApi, files: FilesController) {
     const first = snapshot(l.main);
     const copy = mode === "pointer" ? (l.overlay?.copy?.getBoundingClientRect() ?? null) : null;
     if (copy && !draft) first.set(plan.id, copy);
-    const moved = drop && p !== plan.home && p !== NOWHERE;
-    // On a move, the focus (on the grip pressed to pick the section up) leaves the page now, while its style is worked
-    // out: the move can take that grip's frame out and draw it anew, and taking out the element that has the focus
-    // makes the browser work out the page's style there and then, in the middle of React's changes. From the keyboard
-    // it comes back to the grip after the drop, as before.
-    const had = document.activeElement;
-    if (moved && had instanceof HTMLElement && l.main.contains(had)) had.blur();
     for (const el of Object.values(l.els)) {
       el.style.transform = "";
       el.style.transition = "";
@@ -496,6 +489,7 @@ function createEngine(store: Store, ui: UiApi, files: FilesController) {
     const places = placesOf(l);
     live = null;
     lastDrop = Date.now();
+    const moved = drop && p !== plan.home && p !== NOWHERE;
     let added: string | null = null;
     flushSync(() => {
       view?.set(null);
