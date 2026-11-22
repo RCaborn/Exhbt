@@ -27,13 +27,21 @@
       right: 0;
       padding: 0;
     }
+    /* The flowchart's boxes carry their own tools down their right edges (flow.css): its grip sits to the
+       left of them, and a little higher, over the top of the first box's corner. */
+    [data-editor="page"] .xe-frame[data-kind="flow"] > .xe-tools {
+      top: -1.75rem;
+      right: 2.25rem;
+    }
     /* A picture's grip sits on the picture's own corner, clear of the caption above it. */
     [data-editor="page"] .xe-frame[data-kind="image"] > .xe-tools {
       top: 0.5rem;
       right: 0.5rem;
     }
-    /* A chip over a section's corner (a link's "Web address", a graph's "Edit figures") moves along, clear of the grip. */
-    [data-editor="page"] .xe-frame .xe-over {
+    /* A chip over a section's corner (a link's "Web address", a graph's "Edit figures") or over its top
+       edge (the aim or hypothesis switch) moves along, clear of the grip. */
+    [data-editor="page"] .xe-frame .xe-over,
+    [data-editor="page"] .xe-frame .xe-above {
       right: 3.5rem;
     }
 
@@ -65,7 +73,7 @@
     /* ---------- The bar's room ---------- */
     /* Below the exhbt, in the look's ground, so the last section can scroll clear of the bar. */
     [data-editor="page"]:has(> .xe-phonebar) > [data-look] {
-      padding-bottom: var(--xe-phonebar-h, 4rem);
+      padding-bottom: calc(var(--xe-phonebar-h, 4rem) + 1rem);
     }
     /* The upload status line sits just above the bar, so the two never overlap. */
     [data-editor="page"]:has(> .xe-phonebar) > .xe-status {

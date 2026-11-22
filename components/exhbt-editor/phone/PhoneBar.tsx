@@ -296,7 +296,7 @@ function NothingYet() {
   };
   return (
     <>
-      <span className="xe-bar-name xe-bar-hint">Tap a section for its tools.</span>
+      <span className="xe-bar-name xe-bar-hint">Tap a section</span>
       <Button size="sm" className="xe-bar-btn" label="Add a section at the end" onClick={add}>
         <Plus {...ICON} className="shrink-0" />
         Add

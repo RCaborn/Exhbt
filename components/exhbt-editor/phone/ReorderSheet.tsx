@@ -83,9 +83,20 @@ function ReorderList() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  /** Just picked up: the row is over its own place, which needn't be said over "Picked up". */
+  const justPicked = useRef(false);
   const announcements: Announcements = {
-    onDragStart: ({ active }) => `Picked up ${lowerFirst(nameOf(active.id))}, place ${placeOf(active.id)} of ${n}.`,
-    onDragOver: ({ active, over }) => (over ? `${nameOf(active.id)} would go to place ${placeOf(over.id)} of ${n}.` : `${nameOf(active.id)} isn't over the list.`),
+    onDragStart: ({ active }) => {
+      justPicked.current = true;
+      return `Picked up ${lowerFirst(nameOf(active.id))}, place ${placeOf(active.id)} of ${n}.`;
+    },
+    onDragOver: ({ active, over }) => {
+      const first = justPicked.current;
+      justPicked.current = false;
+      if (!over) return `${nameOf(active.id)} isn't over the list.`;
+      if (over.id === active.id) return first ? undefined : `${nameOf(active.id)} is back where it was, place ${placeOf(over.id)} of ${n}.`;
+      return `${nameOf(active.id)} would go to place ${placeOf(over.id)} of ${n}.`;
+    },
     onDragEnd: ({ active, over }) =>
       !over ? `${nameOf(active.id)} is back where it was.` : over.id === active.id ? `${nameOf(active.id)} dropped where it was.` : `${nameOf(active.id)} dropped in place ${placeOf(over.id)} of ${n}.`,
     onDragCancel: ({ active }) => `Moving ${lowerFirst(nameOf(active.id))} cancelled. It's back where it was.`,

@@ -1,0 +1,660 @@
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { plain, type RichText } from "../lib/exhbt/blocks";
+import { FORMAT_RULES } from "../lib/exhbt/formats";
+import {
+  allowEditOnly,
+  boxes,
+  differences,
+  docNow,
+  field,
+  frame,
+  freshName,
+  full,
+  grip,
+  offered,
+  openDoc,
+  openTiming,
+  pageOrder,
+  png,
+  READY,
+  sampleDoc,
+  seeAsVisitor,
+  settle,
+  typeIn,
+  undoLabel,
+  waitLive,
+  waitSaved,
+} from "./page-editor";
+
+/*
+ * The editor on a phone (decision 0026, "On a phone"; docs/briefs/edit-on-page/r3-l-phone.md), on the
+ * touch project (a Pixel 7: 412 wide, a coarse pointer). Each section shows only its grip; the bar at
+ * the foot of the screen follows the section in focus and holds its actions, the formatting buttons
+ * while a formatted field has the cursor, and "Undo <what>" after a move or a remove; "Reorder
+ * sections" is a sheet of rows; the bar sits on the on-screen keyboard and keeps the line being typed
+ * clear of it; the status line sits above it; nothing scrolls sideways; every control takes a thumb;
+ * the page is the visitor's box for box; axe.
+ *
+ * The on-screen keyboard can't be opened in a browser driven here: its test stands in a smaller visual
+ * viewport. A real phone is still needed for it (the report says what to try).
+ */
+
+test.skip(({ isMobile }) => !isMobile, "on the touch project (a Pixel 7)");
+
+const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
+const BAR = `${READY} .xe-phonebar`;
+const bar = (page: Page) => page.locator(BAR);
+const onBar = (page: Page, name: string | RegExp) => bar(page).getByRole("button", { name, exact: typeof name === "string" });
+const sheet = (page: Page) => page.locator(`${READY} dialog[data-sheet="reorder"]`);
+const scan = async (page: Page) => (await new AxeBuilder({ page }).include('[data-editor="page"]').withTags(WCAG).analyze()).violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(", ")}`);
+
+// The development build's badge sits at the foot of the screen, over the bar's left end.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const s = document.createElement("style");
+      s.textContent = "nextjs-portal { display: none !important; }";
+      document.head.appendChild(s);
+    });
+  });
+});
+
+/** The bar follows a section: a tap on its grip (a quick tap picks nothing up). */
+async function choose(page: Page, id: string) {
+  await grip(page, id).evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await grip(page, id).tap();
+  await expect(bar(page)).toHaveAttribute("aria-label", /: tools$/);
+}
+
+/** Real touch input through the browser, so scrolling and the press delay behave as they do under a finger. */
+async function finger(page: Page) {
+  const cdp = await page.context().newCDPSession(page);
+  const send = (type: "touchStart" | "touchMove" | "touchEnd", x = 0, y = 0) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
+  return {
+    down: (x: number, y: number) => send("touchStart", x, y),
+    move: (x: number, y: number) => send("touchMove", x, y),
+    up: () => send("touchEnd"),
+    async slide(from: { x: number; y: number }, to: { x: number; y: number }, steps = 12) {
+      for (let i = 1; i <= steps; i++) {
+        await send("touchMove", from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
+        await page.waitForTimeout(16);
+      }
+    },
+  };
+}
+
+const middle = async (l: Locator) => {
+  const b = (await l.boundingBox())!;
+  return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+};
+const scrollY = (page: Page) => page.evaluate(() => window.scrollY);
+const rect = (l: Locator) => l.evaluate((el) => el.getBoundingClientRect().toJSON() as DOMRect);
+
+/* ------------------------------------------------------------------------------------------------
+ * Quieter sections, and the bar following the section in focus
+ * ---------------------------------------------------------------------------------------------- */
+
+test.describe("each section shows only its grip", () => {
+  for (const f of offered()) {
+    test(`${FORMAT_RULES[f].name.toLowerCase()}: one 44px grip a section, no other toolbar button, and no grip over another section`, async ({ page }) => {
+      await openTiming(page, f, { full: true });
+      await waitLive(page);
+      const found = await page.evaluate(() => {
+        const shown = (el: Element) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden" && Number(getComputedStyle(el).opacity) > 0;
+        const frames = [...document.querySelectorAll<HTMLElement>('[data-editor="page"] article [data-section-id]')];
+        const bad: string[] = [];
+        for (const fr of frames) {
+          const id = fr.dataset.sectionId!;
+          const tools = fr.querySelector(":scope > .xe-tools");
+          const buttons = tools ? [...tools.querySelectorAll("button")].filter(shown) : [];
+          if (buttons.length !== 1 || !buttons[0]!.hasAttribute("data-grip")) bad.push(`${id}: ${buttons.map((b) => b.getAttribute("aria-label")).join(", ")}`);
+          const g = buttons[0]?.getBoundingClientRect();
+          if (g && (Math.round(g.width) < 44 || Math.round(g.height) < 44)) bad.push(`${id}: grip ${g.width}x${g.height}`);
+          if (!g) continue;
+          const over = (b: DOMRect) => g.right > b.left && g.left < b.right && g.bottom > b.top && g.top < b.bottom;
+          // No grip lies over words outside its own section, nor over another section's pictures or controls, nor over a control of its own section.
+          const article = fr.closest("article")!;
+          const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT);
+          for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+            const parent = n.parentElement!;
+            if (!n.textContent?.trim() || fr.contains(n) || !shown(parent) || parent.closest(".sr-only, .xe-tools")) continue;
+            const range = document.createRange();
+            range.selectNodeContents(n);
+            if ([...range.getClientRects()].some(over)) bad.push(`${id}'s grip is over "${n.textContent.trim().slice(0, 20)}" in ${parent.closest("[data-section-id]")?.getAttribute("data-section-id") ?? "the page"}`);
+          }
+          for (const other of frames) {
+            if (other === fr) continue;
+            for (const el of other.querySelectorAll("img, button, a[href]")) if (shown(el) && over(el.getBoundingClientRect())) bad.push(`${id}'s grip is over a ${el.tagName.toLowerCase()} in ${other.dataset.sectionId}`);
+          }
+          for (const el of fr.querySelectorAll("button:not([data-grip]), a[href]")) if (shown(el) && !el.closest(".xe-tools") && over(el.getBoundingClientRect())) bad.push(`${id}'s grip is over its own ${el.getAttribute("aria-label") ?? el.textContent?.trim()}`);
+        }
+        // What the bar carries is not drawn on the page.
+        for (const sel of ["[data-tool]", ".xe-list-tools", ".xe-shell-tools", ".xe-format"]) {
+          const seen = [...document.querySelectorAll('[data-editor="page"] article ' + sel)].filter(shown);
+          if (seen.length) bad.push(`${sel} shown ${seen.length} times`);
+        }
+        return { bad, frames: frames.length };
+      });
+      expect(found.frames).toBeGreaterThan(3);
+      expect(found.bad).toEqual([]);
+    });
+  }
+
+  test("the bar names the part in focus: a section, the title, the context line, the skills; with none, Add and Reorder", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    await expect(bar(page)).toBeVisible();
+    await expect(bar(page)).toHaveAttribute("aria-label", "Section tools");
+    await expect(onBar(page, "Add a section at the end")).toBeVisible();
+    await expect(onBar(page, "Reorder sections")).toBeVisible();
+
+    await choose(page, "graph-1");
+    await expect(bar(page)).toHaveAttribute("aria-label", "Graph 1: tools");
+    await expect(bar(page).locator(".xe-bar-name")).toHaveText("Graph 1");
+    for (const name of ["Move Graph 1 up", "Move Graph 1 down", "Remove Graph 1", "Reorder sections"]) await expect(onBar(page, name)).toBeVisible();
+
+    // A tap on a part with no field (the graph's drawing) follows it too.
+    await frame(page, "graph-2").locator("svg").first().tap();
+    await expect(bar(page)).toHaveAttribute("aria-label", "Graph 2: tools");
+
+    // The flowchart in a case study has no Remove (the layout always has one).
+    await choose(page, "flow");
+    await expect(bar(page)).toHaveAttribute("aria-label", "Flowchart: tools");
+    await expect(onBar(page, "Remove Flowchart")).toHaveCount(0);
+
+    // A plain field in the title: the bar names the part (its More actions show only where the AI drafted it).
+    await field(page, "title").tap();
+    await expect(bar(page)).toHaveAttribute("aria-label", "Your question and details: tools");
+    await field(page, "skills").getByLabel("Add a skill").tap();
+    await expect(bar(page)).toHaveAttribute("aria-label", "Skills used: tools");
+  });
+
+  test("with no section chosen, Add opens the + at the end of the page, its menu clear of the bar", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    await onBar(page, "Add a section at the end").tap();
+    const menu = page.locator(`${READY} .xe-insert[data-end] [data-xe-menu]`);
+    await expect(menu).toBeVisible();
+    await expect(page.locator("#add-section")).toBeFocused();
+    await expect.poll(async () => (await rect(menu)).bottom <= (await rect(bar(page))).top).toBe(true);
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * The bar's actions, and Undo
+ * ---------------------------------------------------------------------------------------------- */
+
+test.describe("the bar's actions", () => {
+  test("Move up, Move down and Remove act on the section in focus; Undo in the top bar's menu puts a removed one back", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    const order = await pageOrder(page);
+    const at = order.indexOf("graph-2");
+    await choose(page, "graph-2");
+
+    await onBar(page, "Move Graph 2 up").tap();
+    const up = [...order];
+    [up[at - 1], up[at]] = [up[at]!, up[at - 1]!];
+    await expect.poll(() => pageOrder(page)).toEqual(up);
+    // It is the first graph now, so it is "Graph 1"; the bar follows it.
+    await expect(bar(page)).toHaveAttribute("aria-label", "Graph 1: tools");
+    await expect(onBar(page, "Undo: move graph 2")).toBeVisible();
+
+    await onBar(page, "Move Graph 1 down").tap();
+    await expect.poll(() => pageOrder(page)).toEqual(order);
+
+    await onBar(page, "Remove Graph 2").tap();
+    await expect.poll(() => pageOrder(page)).toEqual(order.filter((id) => id !== "graph-2"));
+    await expect(onBar(page, "Undo: remove graph 2")).toBeVisible();
+
+    // Undo in the top bar's menu (on a phone the row has no room for it).
+    await page.getByRole("button", { name: "Menu" }).tap();
+    await page.locator(`${READY} [data-topbar]`).getByRole("button", { name: "Undo: remove graph 2" }).tap();
+    await expect.poll(() => pageOrder(page)).toEqual(order);
+    await expect(onBar(page, /^Undo:/)).toHaveCount(0);
+  });
+
+  test("Remove on the bar, then Undo on the bar, puts graph 1 back where it was", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    const order = await pageOrder(page);
+    const before = await docNow(page);
+    await choose(page, "graph-1");
+    await onBar(page, "Remove Graph 1").tap();
+    await expect.poll(() => pageOrder(page)).toEqual(order.filter((id) => id !== "graph-1"));
+    await onBar(page, "Undo: remove graph 1").tap();
+    await expect.poll(() => pageOrder(page)).toEqual(order);
+    expect((await docNow(page)).sections).toEqual(before.sections);
+    // Undone, the offer goes; it comes back only with the next move or remove.
+    await expect(onBar(page, /^Undo:/)).toHaveCount(0);
+    expect(await undoLabel(page)).toBeNull();
+  });
+
+  test("the Undo offer lasts until the next change: typing takes it away", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    await choose(page, "quote-1");
+    await onBar(page, "Move Quote up").tap();
+    await expect(onBar(page, "Undo: move quote")).toBeVisible();
+    await typeIn(page, "title", " again", { append: true });
+    await expect(onBar(page, /^Undo:/)).toHaveCount(0);
+    // Undo in the menu still has the move.
+    expect(await undoLabel(page)).toBe("move quote");
+  });
+
+  test("a gallery's tile: Make lead image is on the bar and makes it the lead", async ({ page }) => {
+    await openTiming(page, "gallery", { full: true });
+    await waitLive(page);
+    const order = await pageOrder(page);
+    const tile = order.filter((id) => id.startsWith("image-"))[2]!;
+    await choose(page, tile);
+    await onBar(page, "Make lead image").tap();
+    await expect.poll(async () => (await pageOrder(page)).find((id) => id.startsWith("image-"))).toBe(tile);
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * Formatting on the bar
+ * ---------------------------------------------------------------------------------------------- */
+
+test.describe("formatting on the bar", () => {
+  test("in the context line the bar shows Highlight; it highlights the chosen words and the cursor stays in the field", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    const gap = field(page, "gap");
+    await gap.scrollIntoViewIfNeeded();
+    await gap.tap();
+    const pm = gap.locator(".ProseMirror");
+    await expect(pm).toBeFocused();
+    await expect(bar(page)).toHaveAttribute("aria-label", "Formatting");
+    await expect(onBar(page, "Highlight")).toBeVisible();
+    await expect(onBar(page, "Link")).toBeVisible();
+    await expect(onBar(page, "Bold")).toHaveCount(0);
+    // The page's own formatting buttons are not drawn on a phone.
+    await expect(gap.locator(".xe-format")).toBeHidden();
+
+    await page.keyboard.press("ControlOrMeta+a");
+    await onBar(page, "Highlight").tap();
+    await expect(pm).toBeFocused();
+    await expect(onBar(page, "Highlight")).toHaveAttribute("aria-pressed", "true");
+    await expect.poll(async () => (await docNow(page)).gap.every((r) => r.b === true)).toBe(true);
+    await onBar(page, "Highlight").tap();
+    await expect(pm).toBeFocused();
+    await expect.poll(async () => (await docNow(page)).gap.some((r) => r.b)).toBe(false);
+
+    // Done puts the part's own actions back, and lets the field go.
+    await onBar(page, "Done").tap();
+    await expect(pm).not.toBeFocused();
+    await expect(bar(page)).toHaveAttribute("aria-label", "Context: tools");
+  });
+
+  test("in a finding: Bold, Italic, Link, the finding's own move and remove, and Done", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    const findings = (await docNow(page)).sections.findIndex((s) => s.kind === "findings");
+    const words = async () => ((await docNow(page)).sections[findings] as { items: RichText[] }).items.map(plain);
+    const before = await words();
+    const second = field(page, `sections.${findings}.items.1`);
+    await second.scrollIntoViewIfNeeded();
+    await second.tap();
+    await expect(second.locator(".ProseMirror")).toBeFocused();
+    for (const name of ["Bold", "Italic", "Link", "Move finding 2 up", "Move finding 2 down", "Remove finding 2", "Done"]) await expect(onBar(page, name)).toBeVisible();
+    // A finding's own small controls are on the bar, not over its words.
+    await expect(page.locator(`${READY} .xe-list-tools`).first()).toBeHidden();
+
+    await onBar(page, "Move finding 2 up").tap();
+    await expect.poll(words).toEqual([before[1], before[0], ...before.slice(2)]);
+    // The cursor goes with it.
+    await expect(field(page, `sections.${findings}.items.0`).locator(".ProseMirror")).toBeFocused();
+    await expect(onBar(page, "Undo: move finding 2")).toBeVisible();
+
+    await onBar(page, "Done").tap();
+    await expect(bar(page)).toHaveAttribute("aria-label", "Findings: tools");
+    await expect(grip(page, (await docNow(page)).sections[findings]!.id)).toBeFocused();
+  });
+
+  test("Link with words chosen opens the address prompt; a link is made only with an https address", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    const findings = (await docNow(page)).sections.findIndex((s) => s.kind === "findings");
+    const f = field(page, `sections.${findings}.items.2`);
+    await f.scrollIntoViewIfNeeded();
+    await f.tap();
+    await expect(f.locator(".ProseMirror")).toBeFocused();
+    await page.keyboard.press("ControlOrMeta+a");
+    await onBar(page, "Link").tap();
+    const address = f.getByLabel("Link address (starting https://)");
+    await expect(address).toBeFocused();
+    // The prompt is clear of the bar.
+    expect((await rect(address)).bottom).toBeLessThanOrEqual((await rect(bar(page))).top);
+    await address.fill("http://example.com/log");
+    await f.getByRole("button", { name: "Add link" }).tap();
+    await expect(f.getByRole("alert")).toHaveText("Links must start with https://.");
+    expect(JSON.stringify((await docNow(page)).sections[findings])).not.toContain("href");
+    await address.fill("https://example.com/log");
+    await f.getByRole("button", { name: "Add link" }).tap();
+    await expect.poll(async () => ((await docNow(page)).sections[findings] as { items: RichText[] }).items[2]!.every((r) => r.href === "https://example.com/log")).toBe(true);
+    await expect(f.locator(".ProseMirror")).toBeFocused();
+    await expect(onBar(page, "Remove link")).toBeVisible();
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * The on-screen keyboard
+ * ---------------------------------------------------------------------------------------------- */
+
+test("with the keyboard up the bar sits on it, and the line being typed stays clear of the bar", async ({ page }) => {
+  await openTiming(page, "case-study", { full: true });
+  await waitLive(page);
+  const findings = (await docNow(page)).sections.findIndex((s) => s.kind === "findings");
+  const f = field(page, `sections.${findings}.items.3`);
+  await f.scrollIntoViewIfNeeded();
+  await f.tap();
+  const pm = f.locator(".ProseMirror");
+  await expect(pm).toBeFocused();
+  await page.keyboard.press("ControlOrMeta+End");
+  // The field at the foot of what can be seen, then a keyboard 330px tall: a smaller visual viewport, as a phone's keyboard makes it.
+  await page.evaluate(() => {
+    const el = document.activeElement!;
+    window.scrollBy(0, el.getBoundingClientRect().bottom - window.innerHeight + 90);
+  });
+  const keyboard = 330;
+  await page.evaluate((k) => {
+    const vv = window.visualViewport!;
+    const h = vv.height;
+    Object.defineProperty(vv, "height", { configurable: true, get: () => h - k });
+    vv.dispatchEvent(new Event("resize"));
+  }, keyboard);
+  const viewport = page.viewportSize()!;
+  await expect.poll(async () => Math.round((await rect(bar(page))).bottom)).toBe(viewport.height - keyboard);
+  await expect(bar(page)).toHaveAttribute("data-keyboard", "");
+  // The caret is above the bar.
+  const caret = () => page.evaluate(() => getSelection()!.getRangeAt(0).getBoundingClientRect().bottom);
+  await expect.poll(async () => (await caret()) <= (await rect(bar(page))).top).toBe(true);
+  // Typing on: the line stays clear of it.
+  await page.keyboard.type(" and the line keeps going until it wraps onto a new line or two below the old one", { delay: 5 });
+  await expect.poll(async () => (await caret()) <= (await rect(bar(page))).top).toBe(true);
+  // The keyboard goes down: the bar goes back to the foot.
+  await page.evaluate(() => {
+    const vv = window.visualViewport!;
+    delete (vv as unknown as Record<string, unknown>).height;
+    vv.dispatchEvent(new Event("resize"));
+  });
+  await expect.poll(async () => Math.round((await rect(bar(page))).bottom)).toBe(viewport.height);
+  await expect(bar(page)).not.toHaveAttribute("data-keyboard");
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * Reorder sections
+ * ---------------------------------------------------------------------------------------------- */
+
+test.describe("reorder sections", () => {
+  test("Reorder opens the sheet; a row moved by its buttons and a row dragged after a short press move the page; Done returns to that section", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    const order = await pageOrder(page);
+    await onBar(page, "Reorder sections").tap();
+    await expect(sheet(page)).toBeVisible();
+    await expect(sheet(page).getByRole("heading", { name: "Reorder sections" })).toBeVisible();
+    // One row per page item, in order, the flowchart included, all one height.
+    await expect(sheet(page).locator("[data-row]")).toHaveCount(order.length);
+    expect(await sheet(page).locator("[data-row]").evaluateAll((rows) => rows.map((r) => r.getAttribute("data-row")))).toEqual(order);
+    const heights = await sheet(page).locator("[data-row]").evaluateAll((rows) => [...new Set(rows.map((r) => Math.round(r.getBoundingClientRect().height)))]);
+    expect(heights).toHaveLength(1);
+
+    // By its buttons: the quote up one, read out in the sheet, the focus kept on the button.
+    const q = order.indexOf("quote-1");
+    await sheet(page).getByRole("button", { name: "Move Quote up" }).tap();
+    const one = [...order];
+    [one[q - 1], one[q]] = [one[q]!, one[q - 1]!];
+    await expect.poll(() => pageOrder(page)).toEqual(one);
+    await expect(sheet(page).getByRole("button", { name: "Move Quote up" })).toBeFocused();
+    await expect(sheet(page).locator("[aria-live]", { hasText: `Quote moved up, to place ${q} of ${order.length}.` })).toHaveCount(1);
+    expect(await undoLabel(page)).toBe("move quote");
+
+    // Dragged: the link, after a short press, up two rows.
+    const touch = await finger(page);
+    const from = await middle(sheet(page).locator('[data-row="link-1"] .xe-reorder-grip'));
+    const row = (await sheet(page).locator('[data-row="link-1"]').boundingBox())!.height + 8;
+    await touch.down(from.x, from.y);
+    await page.waitForTimeout(260);
+    await touch.move(from.x, from.y - 2);
+    await expect(sheet(page).locator('[data-row="link-1"][data-dragging]')).toHaveCount(1);
+    await touch.slide(from, { x: from.x, y: from.y - row * 2 });
+    await page.waitForTimeout(250);
+    await touch.up();
+    const l = one.indexOf("link-1");
+    const two = one.filter((id) => id !== "link-1");
+    two.splice(l - 2, 0, "link-1");
+    await expect.poll(() => pageOrder(page)).toEqual(two);
+    expect(await undoLabel(page)).toBe("move link");
+    await expect(sheet(page).locator("[aria-live]", { hasText: `Link dropped in place ${l - 1} of ${order.length}.` })).toHaveCount(1);
+
+    // Done: the page at the section last moved, its grip focused, the bar on it.
+    await sheet(page).getByRole("button", { name: "Done" }).tap();
+    await expect(sheet(page)).toBeHidden();
+    await expect(grip(page, "link-1")).toBeFocused();
+    const r = await rect(frame(page, "link-1"));
+    expect(r.top).toBeGreaterThanOrEqual(0);
+    expect(r.bottom).toBeLessThanOrEqual((await rect(bar(page))).top);
+    await expect(bar(page)).toHaveAttribute("aria-label", "Link: tools");
+    await expect(onBar(page, "Undo: move link")).toBeVisible();
+  });
+
+  test("from the keyboard: the grip picks a row up, the arrows move it, each step is read out", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    const order = await pageOrder(page);
+    await onBar(page, "Reorder sections").tap();
+    const g = sheet(page).locator('[data-row="flow"] .xe-reorder-grip');
+    await g.focus();
+    await page.keyboard.press("Space");
+    await expect(sheet(page).locator("[aria-live]", { hasText: /^Picked up flowchart, place 1 of \d+\.$/ })).toHaveCount(1);
+    await page.waitForTimeout(150);
+    await page.keyboard.press("ArrowDown");
+    await expect(sheet(page).locator("[aria-live]", { hasText: "Flowchart would go to place 2" })).toHaveCount(1);
+    await page.keyboard.press("Space");
+    await expect.poll(() => pageOrder(page)).toEqual([order[1], "flow", ...order.slice(2)]);
+    expect(await undoLabel(page)).toBe("move flowchart");
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * Touch on the page
+ * ---------------------------------------------------------------------------------------------- */
+
+test("a swipe on a section's words scrolls and moves nothing; a 260ms press on a grip picks it up and the bar steps aside; the flowchart is carried with a line", async ({ page }) => {
+  await openTiming(page, "case-study", { full: true });
+  await waitLive(page);
+  const touch = await finger(page);
+  const order = await pageOrder(page);
+
+  const words = frame(page, "findings");
+  await words.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  const w = (await words.boundingBox())!;
+  const y0 = await scrollY(page);
+  await touch.down(w.x + 80, w.y + 60);
+  await touch.slide({ x: w.x + 80, y: w.y + 60 }, { x: w.x + 80, y: w.y - 200 });
+  await touch.up();
+  await expect.poll(() => scrollY(page)).toBeGreaterThan(y0 + 120);
+  expect(await pageOrder(page)).toEqual(order);
+  await expect(page.locator(`${READY} [data-xe-drag]`)).toHaveCount(0);
+
+  // The flowchart's grip, held: picked up, carried with a line; the bar steps aside until the drop.
+  await grip(page, "flow").evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await page.waitForTimeout(300);
+  const at = await middle(grip(page, "flow"));
+  await touch.down(at.x, at.y);
+  await page.waitForTimeout(260);
+  await touch.move(at.x, at.y + 2);
+  await expect(page.locator(`${READY} [data-xe-drag]`)).toHaveAttribute("data-xe-drag", "pointer");
+  expect(await page.evaluate(() => window.__exhbtDrag!.state()!.style)).toBe("line");
+  await expect(bar(page)).toBeHidden();
+  await touch.up();
+  await expect(page.locator(`${READY} [data-xe-drag]`)).toHaveCount(0);
+  await expect(bar(page)).toBeVisible();
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * At 390px: no sideways scroll, and every control takes a thumb
+ * ---------------------------------------------------------------------------------------------- */
+
+test.describe("at 390px wide", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  /**
+   * Controls whose press is smaller than 44px today, each owned elsewhere and in L's report:
+   * - a skill's remove button (core.css, 18px over the pill's corner: G);
+   * - the last flowchart box's Remove, whose press the "Add a box at the end" under it trims by a
+   *   pixel or two (flow.css: K).
+   */
+  const KNOWN = [".xe-pill-remove", ".xp-flow-box[data-last] [data-flow-remove]"];
+
+  for (const f of offered()) {
+    test(`${FORMAT_RULES[f].name.toLowerCase()}'s sample: nothing scrolls sideways, and every control takes a 44px press`, async ({ page }) => {
+      await openTiming(page, f, { full: true });
+      await waitLive(page);
+      // With the bar on a section, and with it formatting.
+      const first = (await pageOrder(page))[0]!;
+      await choose(page, first);
+      const sideways = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(await sideways()).toBeLessThanOrEqual(0);
+
+      const small = await page.evaluate((known) => {
+        const shown = (el: Element) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden" && Number(getComputedStyle(el).opacity) > 0 && !el.closest("[inert], [hidden], dialog:not([open])");
+        const controls = [...document.querySelectorAll<HTMLElement>('[data-editor="page"] :is(button, a[href], [role="button"], input[type="checkbox"])')].filter((el) => shown(el) && !el.closest("[contenteditable]") && !known.some((k) => el.matches(k)));
+        const bad: string[] = [];
+        const mine = (el: Element, x: number, y: number) => {
+          const hit = document.elementFromPoint(x, y);
+          return Boolean(hit && (hit === el || el.contains(hit)));
+        };
+        for (const el of controls) {
+          // The press is what the finger hits, which may be larger than the control's box: from its middle,
+          // how far each way the control (or what it holds) is what a finger lands on, with nothing over it.
+          el.scrollIntoView({ block: "center", inline: "center" });
+          const r = el.getBoundingClientRect();
+          const cx = r.left + r.width / 2;
+          const cy = r.top + r.height / 2;
+          const reach = (dx: number, dy: number) => {
+            let s = 0;
+            while (s < 40 && mine(el, cx + dx * (s + 1), cy + dy * (s + 1))) s++;
+            return s;
+          };
+          const w = reach(-1, 0) + reach(1, 0) + 1;
+          const h = reach(0, -1) + reach(0, 1) + 1;
+          // Hit testing is in whole pixels and the middle can fall between two, so a 44px press measures 42 or 43.
+          if (!mine(el, cx, cy) || w < 42 || h < 42) bad.push(`${el.getAttribute("aria-label") ?? el.textContent?.trim().slice(0, 30) ?? el.tagName} (${Math.round(r.width)}x${Math.round(r.height)}, takes ${w}x${h})`);
+        }
+        return bad;
+      }, KNOWN);
+      expect(small).toEqual([]);
+      // Typing in a finding (the bar formatting, with the finding's own controls): still nothing sideways, and the row is one line.
+      const findings = (await docNow(page)).sections.findIndex((s) => s.kind === "findings");
+      const fi = field(page, `sections.${findings}.items.0`);
+      await fi.scrollIntoViewIfNeeded();
+      await fi.tap();
+      await expect(bar(page)).toHaveAttribute("aria-label", "Formatting");
+      await expect(onBar(page, "Remove finding 1")).toBeVisible();
+      expect(await sideways()).toBeLessThanOrEqual(0);
+      expect((await bar(page).locator(".xe-bar-row").boundingBox())!.height).toBeLessThan(50);
+    });
+  }
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * Box for box, the status line, axe
+ * ---------------------------------------------------------------------------------------------- */
+
+test.describe("box for box on a Pixel 7", () => {
+  for (const f of offered()) {
+    test(`a full ${FORMAT_RULES[f].name.toLowerCase()}: the editing page is the visitor's but for the two edit-only fields; the bar and the grips add no box`, async ({ page }) => {
+      // The real edit page, signed in, on the layout's sample with every optional part given words.
+      await openDoc(page, freshName("phonebox"), full(sampleDoc(f)));
+      await waitLive(page);
+      // The bar is up, on a section.
+      await choose(page, (await pageOrder(page))[1]!);
+      expect(await page.locator(`${READY} article .xe-phonebar`).count()).toBe(0);
+      expect(await page.locator(`${READY} article .xe-tools`).evaluateAll((els) => els.every((e) => getComputedStyle(e).position === "absolute"))).toBe(true);
+      await allowEditOnly(page, "always");
+      await settle(page);
+      const editing = await boxes(page);
+      await seeAsVisitor(page, true);
+      await settle(page);
+      expect(differences(await boxes(page), editing)).toEqual([]);
+      // "See as a visitor" has nothing to edit: no bar.
+      await expect(bar(page)).toHaveCount(0);
+    });
+  }
+});
+
+test("three pictures picked at once: the status line sits just above the bar and the two never overlap", async ({ page }) => {
+  const { id } = await openDoc(page, freshName("phonethree"), { ...sampleDoc("gallery"), sections: sampleDoc("gallery").sections.filter((s) => s.kind !== "image") });
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  await page.route("**/api/files/upload-url", async (route) => {
+    if ((route.request().postDataJSON() as { name: string }).name === "a.png") await held;
+    await route.continue();
+  });
+  await expect(bar(page)).toBeVisible();
+  await page.locator(`${READY} input[aria-label='Choose an image']`).setInputFiles([
+    { name: "a.png", mimeType: "image/png", buffer: png(30, 10) },
+    { name: "b.png", mimeType: "image/png", buffer: png(40, 10) },
+    { name: "c.png", mimeType: "image/png", buffer: png(50, 10) },
+  ]);
+  const status = page.locator(`${READY} .xe-status [role=status]`);
+  await expect(status).toHaveText(/^Uploading [123] of 3$/);
+  const clear = async () => {
+    const s = await rect(status);
+    const b = await rect(bar(page));
+    return s.bottom <= b.top && b.top - s.bottom <= 12;
+  };
+  await expect.poll(clear).toBe(true);
+  release();
+  await expect(status).toHaveText("3 images added. Each one needs a description for people who can't see it.");
+  await expect.poll(clear).toBe(true);
+  await waitSaved(page, id);
+});
+
+test("axe: on the page with the bar on a section, with the bar formatting, and with the reorder sheet open", async ({ page }) => {
+  await openTiming(page, "case-study", { full: true });
+  await waitLive(page);
+  await choose(page, "graph-1");
+  expect(await scan(page), "the bar on a section").toEqual([]);
+  await typeIn(page, "gap", " More words.", { append: true });
+  await expect(bar(page)).toHaveAttribute("aria-label", "Formatting");
+  expect(await scan(page), "the bar formatting").toEqual([]);
+  await onBar(page, "Done").tap();
+  await onBar(page, "Reorder sections").tap();
+  await expect(sheet(page)).toBeVisible();
+  expect(await scan(page), "the reorder sheet").toEqual([]);
+});
+
+test("a drafted part: the bar offers its More actions, and the menu opens above the bar within the screen", async ({ page }) => {
+  await page.goto(`/auth/dev?email=${freshName("phonedraft")}@example.com&next=/exhbts/new`);
+  await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
+  const res = await page.request.post("/api/exhbts/draft", {
+    data: { text: "Final-year project on lunch queues. I timed the queue for two weeks, added a second till, and timed it again. Waits fell from 11 to 4 minutes." },
+  });
+  expect(res.status()).toBe(200);
+  const { id } = (await res.json()) as { id: string };
+  await page.goto(`/exhbts/${id}/edit`);
+  await expect(page.locator(READY)).toBeAttached();
+  await waitLive(page);
+
+  await field(page, "title").tap();
+  const more = onBar(page, /^More actions for /);
+  await expect(more).toBeVisible();
+  await more.tap();
+  const menu = bar(page).getByRole("button", { name: "Rewrite this block" });
+  await expect(menu).toBeVisible();
+  // Above its button, within the screen.
+  const m = await rect(menu);
+  expect(m.top).toBeGreaterThanOrEqual(0);
+  expect(m.bottom).toBeLessThanOrEqual((await rect(more)).top);
+
+  // The findings section's More actions too.
+  const findings = (await docNow(page)).sections.find((s) => s.kind === "findings")!.id;
+  await choose(page, findings);
+  await expect(onBar(page, /^More actions for /)).toBeVisible();
+});
