@@ -3,6 +3,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 import Stripe from "stripe";
 import { BILLING_PERIOD, ENTITLEMENTS, PLAN_NAMES, PRICES } from "../lib/entitlements";
 import { openPublishSheet, signInAs, startFromScratch } from "./editor";
+import { uniqueBytes } from "./unique-bytes";
 
 // Billing polish: Stripe events out of order, the upgrade offer where a limit stops something,
 // the pricing page selling for real with Phase 2 on, and files removed with their exhbt.
@@ -140,7 +141,7 @@ test.describe("Clean-up", () => {
     const exhbtId = await startFromScratch(page, { waitForContext: false });
 
     // A tiny PNG, uploaded for this exhbt through the Storage stand-in.
-    const png = Buffer.from("89504e470d0a1a0a0000000d4948445200000001000000010806000000", "hex");
+    const png = uniqueBytes(Buffer.from("89504e470d0a1a0a0000000d4948445200000001000000010806000000", "hex"));
     const ticket = await page.request.post("/api/files/upload-url", {
       data: { name: "chart.png", mime: "image/png", bytes: png.length, kind: "image", exhbtId },
     });

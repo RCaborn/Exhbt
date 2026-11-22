@@ -8,6 +8,7 @@ import { FIGURE, boxFromPixels, clampBox, fitCaption, mayHoldFigure, pixelsFromB
 import { uniqueEmail } from "./helpers";
 import { card, closeOpenSheet, openLayoutMenu, openPublishSheet, openThingsToFix, publish, removeSection, waitEditor, waitForSaved } from "./editor";
 import { READY } from "./page-editor";
+import { uniqueBytes } from "./unique-bytes";
 
 // The figure picked from an upload (decisions 0017 and 0025): the PDF's pages drawn in the browser,
 // the stand-in AI's pick (the first page that draws shapes, with a box that covers the chart in the
@@ -127,7 +128,7 @@ test.describe("Picked figure rules", () => {
   });
 
   test("an image's size is read from the file, not taken on trust", () => {
-    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+    const png = uniqueBytes(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64"));
     expect(imageSize(new Uint8Array(png))).toEqual({ width: 1, height: 1 });
     // A JPEG: start of image, an APP0 segment, then the frame header with the height (768) and the width (543).
     const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x03, 0x00, 0x02, 0x1f, 0x03, 0x01, 0x22, 0x00]);
@@ -647,7 +648,7 @@ test.describe("Drafts with no figure", () => {
     // A figure placed with a caption and no kind: nothing is taken off, and its numbers get the
     // draft's check. 2.3% isn't in the report, so it is flagged to confirm; 30 is, so it isn't.
     const exhbtId = new URL(page.url()).pathname.split("/")[2]!;
-    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+    const png = uniqueBytes(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64"));
     const ticket = (await (await page.request.post("/api/files/upload-url", { data: { name: "figure.png", mime: "image/png", bytes: png.length, kind: "image" } })).json()) as {
       fileId: string;
       uploadUrl: string;

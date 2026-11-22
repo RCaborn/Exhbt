@@ -6,6 +6,7 @@ import { withKeyFigure } from "../lib/exhbt/sections";
 import { applyBlock, blockValue } from "../lib/exhbt/draft-blocks";
 import { addSection, closeSheet, fillPlain, listOrder, menuItem, openAddSectionMenu, pageOrder, publish, seeAsVisitor, visitorRegion, waitEditor } from "./editor";
 import { READY } from "./page-editor";
+import { uniqueBytes } from "./unique-bytes";
 
 // The exhbt page in the layout Rory drew on 16 Nov 2026 (decision 0022): a sidebar with the person,
 // what it is, where and when, the checks, the work and Save as PDF; the title as the question, the
@@ -16,7 +17,7 @@ const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const [GP] = sampleDocs as [ExhbtDoc, ExhbtDoc];
 const PIXEL_7 = { viewport: devices["Pixel 7"].viewport, deviceScaleFactor: devices["Pixel 7"].deviceScaleFactor, isMobile: true, hasTouch: true };
 /** A 1x1 PNG, for an image section. */
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+const PNG = uniqueBytes(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
 const unique = (tag: string) => `${tag}${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`;
 
 async function seed(page: Page, username: string) {
@@ -245,7 +246,7 @@ test.describe("The page in the editor", () => {
     await closeSheet(page);
     await fillPlain(page, page.locator("#whereWhen"), "University of St Andrews, 2026");
     await seeAsVisitor(page);
-    await expect(visitorRegion(page).getByRole("complementary")).toContainText("University of St Andrews, 2026");
+    await expect(visitorRegion(page).getByRole("complementary", { name: /and this work$/ })).toContainText("University of St Andrews, 2026");
     await seeAsVisitor(page, false);
 
     // The context field: its bold is the highlight (drawn as the page's mark), and the button says so once the cursor is in it.
@@ -312,7 +313,7 @@ test.describe("The page in the editor", () => {
     await expect.poll(() => listOrder(page)).toEqual(["findings", "image", "graph", "reflection", "graph"]);
     await onSection(page, "graph-2");
     await page.getByRole("button", { name: "Remove graph 2" }).click();
-    await expect(page.locator(`${READY} [role=status]`, { hasText: /^Saved$/ })).toBeVisible();
+    await expect(page.locator(`${READY} .xe-save`, { hasText: /^Saved$/ })).toBeVisible();
 
     await publish(page, { changes: true });
     await page.goto(`/p/${name}/open-banking`);

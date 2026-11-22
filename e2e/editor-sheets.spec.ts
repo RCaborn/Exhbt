@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import type { ExhbtDoc } from "../lib/exhbt/blocks";
 import { openBankingDoc } from "../lib/exhbt/sample";
 import { docNow, field, freshName, openDoc, openNew, READY, readStored, waitSaved } from "./page-editor";
+import { uniqueBytes } from "./unique-bytes";
 
 /*
  * The edit-on-page editor's sheets (decision 0026, "What the page does not draw"): review and publish,
@@ -11,8 +12,8 @@ import { docNow, field, freshName, openDoc, openNew, READY, readStored, waitSave
  */
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
-const PDF = { name: "report.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n") };
-const PDF2 = { name: "second.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n2 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n") };
+const PDF = { name: "report.pdf", mimeType: "application/pdf", buffer: uniqueBytes(Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n")) };
+const PDF2 = { name: "second.pdf", mimeType: "application/pdf", buffer: uniqueBytes(Buffer.from("%PDF-1.4\n2 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n")) };
 
 const sheet = (page: Page, name: string) => page.locator(`dialog[data-sheet="${name}"]`);
 const openUi = (page: Page, name: string) => page.evaluate((n) => window.__exhbtUi!.open(n as "publish"), name);

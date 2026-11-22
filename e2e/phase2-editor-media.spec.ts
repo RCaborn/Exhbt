@@ -4,14 +4,15 @@ import { LIMITS } from "../lib/exhbt/blocks";
 import { buildRoadmap, unlockProjects, uniqueEmail, waitForResult } from "./helpers";
 import { closeOpenSheet, editorRoot, fieldAt, fillContext, fillPlain, fillTitle, fillValid, openPublishSheet, openThingsToFix, openWorkSheet, pickImages, removeSection, publish, publishSheet, seeAsVisitor, signInAs, startFromScratch, visitorRegion, waitEditor, waitForSaved, workSheet } from "./editor";
 import { docNow, READY } from "./page-editor";
+import { uniqueBytes } from "./unique-bytes";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
 // Editor round two: images and the work as a file, autosave that can't lose work, word guidance,
 // the first-exhbt checklist, roadmap to exhbt, the Free and signed-in screens, the publish moment.
 
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
-const PDF_TEXT = "%PDF-1.4\n% a tiny stand-in report\n";
+const PNG = uniqueBytes(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
+const PDF_TEXT = `%PDF-1.4\n% a tiny stand-in report\n%%EOF\n% ${uniqueBytes(Buffer.alloc(0)).toString("hex")}\n`;
 
 test.describe("images and the work as a file", () => {
   test("add an image, publishing waits for its description, removing deletes the file", async ({ page }) => {

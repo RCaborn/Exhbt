@@ -9,6 +9,7 @@ import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import { labelOf } from "../components/exhbt-editor/labels";
 import { HYSTERESIS, makePlan, orderWith, placeAt, pointFor, rowsInfo, type Box } from "../components/exhbt-editor/drag/plan";
 import { docNow, frame, freshName, grip, offered, openDoc, pageOrder, READY, SAMPLES, waitReady } from "./page-editor";
+import { uniqueBytes } from "./unique-bytes";
 
 /*
  * Dragging on the edit-on-page editor (decision 0026, "Dragging" and "Smoothness"; the prototype's
@@ -972,7 +973,7 @@ test.describe("the + between sections", () => {
 
 const TRAY = `${READY} [data-xe-tray]`;
 const block = (page: Page, kind: string) => page.locator(`${TRAY} [data-block="${kind}"]`);
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+const PNG = uniqueBytes(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
 
 /** Presses the mouse on a block in the tray and moves past the 6px threshold. */
 async function liftBlock(page: Page, kind: string) {
