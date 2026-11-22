@@ -4,10 +4,8 @@ import { exhbtSummary, plain, text, wordCount, LIMITS, validateForPublish, withH
 import { fullDoc, openBankingDoc, sampleDocs } from "../lib/exhbt/sample";
 import { withKeyFigure } from "../lib/exhbt/sections";
 import { applyBlock, blockValue } from "../lib/exhbt/draft-blocks";
-import { keepClassic } from "./editor";
-
-// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
-test.beforeEach(({ page }) => keepClassic(page));
+import { addSection, closeSheet, fillPlain, listOrder, menuItem, openAddSectionMenu, pageOrder, publish, seeAsVisitor, visitorRegion, waitEditor } from "./editor";
+import { READY } from "./page-editor";
 
 // The exhbt page in the layout Rory drew on 16 Nov 2026 (decision 0022): a sidebar with the person,
 // what it is, where and when, the checks, the work and Save as PDF; the title as the question, the
@@ -223,88 +221,100 @@ test.describe("The exhbt page on a phone", () => {
   });
 });
 
+/** A section's tools show while it has the pointer (decision 0026): move onto it first. */
+const onSection = (page: Page, id: string) => page.locator(`${READY} [data-section-id="${id}"]`).hover();
+/** Every item of the page in order, the flowchart included (the places a move counts). */
+const items = (page: Page) => page.locator(`${READY} article [data-section-id]`).evaluateAll((els) => els.map((e) => e.getAttribute("data-section-id")!));
+const said = (page: Page) => page.locator(`${READY} [data-said]`);
+
 test.describe("The page in the editor", () => {
-  test("the new fields, the Highlight button, and arranging sections in the preview", async ({ page }) => {
+  test("the new fields, the Highlight button, and moving sections on the page", async ({ page }) => {
     const name = unique("ed");
     await seed(page, name);
     await page.goto(`/auth/dev?email=${name}@example.com&next=/exhbts`);
     await page.getByRole("link", { name: openBankingDoc.title, exact: true }).click();
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
-    await expect(page.locator("[data-ready=true]").first()).toBeAttached();
+    await waitEditor(page);
 
-    await expect(page.getByLabel("Your question (the title)")).toHaveValue(openBankingDoc.title);
-    await expect(page.getByLabel("What it is")).toHaveValue(openBankingDoc.context);
-    await expect(page.getByLabel("Where and when")).toHaveValue(openBankingDoc.whereWhen!);
-    await expect(page.getByLabel("One-sentence summary")).toHaveValue(openBankingDoc.summary!);
-    await page.getByLabel("Where and when").fill("University of St Andrews, 2026");
-    const preview = page.getByRole("region", { name: "Preview" });
-    await expect(preview.getByRole("complementary")).toContainText("University of St Andrews, 2026");
+    await expect(page.locator("#title")).toHaveValue(openBankingDoc.title);
+    await expect(page.locator("#context")).toHaveValue(openBankingDoc.context);
+    await expect(page.locator("#whereWhen")).toHaveValue(openBankingDoc.whereWhen!);
+    // The one-sentence summary is in the card's sheet.
+    await page.getByRole("button", { name: "Card and link details" }).click();
+    await expect(page.locator("#summary")).toHaveValue(openBankingDoc.summary!);
+    await closeSheet(page);
+    await fillPlain(page, page.locator("#whereWhen"), "University of St Andrews, 2026");
+    await seeAsVisitor(page);
+    await expect(visitorRegion(page).getByRole("complementary")).toContainText("University of St Andrews, 2026");
+    await seeAsVisitor(page, false);
 
-    // The context field: its bold is the highlight, and the button says so.
-    const context = page.getByRole("textbox", { name: "Context", exact: true });
-    await expect(context.locator("strong")).toHaveText("Nobody knows whether banks and fintechs will then cooperate or compete.");
-    await expect(page.locator("#card-gap").locator("xpath=ancestor::section[1]").getByRole("button", { name: "Highlight, on" })).toHaveCount(0);
-    await context.locator("strong").click();
-    await expect(page.locator("#card-gap").locator("xpath=ancestor::section[1]").getByRole("button", { name: "Highlight, on" })).toBeVisible();
+    // The context field: its bold is the highlight (drawn as the page's mark), and the button says so once the cursor is in it.
+    const context = page.locator(`${READY} [data-path="gap"]`);
+    await context.scrollIntoViewIfNeeded();
+    await context.click();
+    await expect(context.locator("mark")).toHaveText("Nobody knows whether banks and fintechs will then cooperate or compete.");
+    const highlight = page.getByRole("button", { name: "Highlight", exact: true });
+    await expect(highlight).toHaveAttribute("aria-pressed", "false");
+    await context.locator("mark").click();
+    await expect(highlight).toHaveAttribute("aria-pressed", "true");
 
-    // Arrange in the preview: move What I'd do next to the top; the cards on the left follow.
-    await page.getByRole("button", { name: "Arrange sections" }).click();
-    const arranged = preview.getByRole("list", { name: "Sections in the preview, in page order" });
-    await expect(arranged.locator(":scope > li")).toHaveCount(3);
-    await arranged.getByRole("button", { name: "Move what I'd do next up" }).click();
-    await arranged.getByRole("button", { name: "Move what I'd do next up" }).click();
-    await expect(arranged.getByRole("button", { name: "Move what I'd do next down" })).toBeFocused();
-    await expect(page.locator('ol[aria-label="Sections, in page order"] > li')).toHaveCount(3);
-    expect(await page.locator('ol[aria-label="Sections, in page order"] > li').evaluateAll((lis) => lis.map((li) => li.getAttribute("data-kind")))).toEqual(["reflection", "findings", "graph"]);
+    // Move What I'd do next to the top of the sections with its buttons.
+    expect(await listOrder(page)).toEqual(["findings", "graph", "reflection"]);
+    await onSection(page, "reflection-1");
+    const up = page.getByRole("button", { name: "Move what I'd do next up" });
+    await up.click();
+    await up.click();
+    await expect(page.getByRole("button", { name: "Move what I'd do next down" })).toBeVisible();
+    expect(await listOrder(page)).toEqual(["reflection", "findings", "graph"]);
 
-    // The grip in the preview, from the keyboard (dnd-kit): Space, an arrow, Space.
-    await arranged.getByRole("button", { name: "Drag findings to move it" }).focus();
+    // The grip, from the keyboard (dnd-kit): Space, an arrow, Space.
+    await onSection(page, "findings");
+    await page.getByRole("button", { name: "Drag findings to move it" }).focus();
+    const order = await items(page);
+    const at = order.indexOf("findings") + 1;
     await page.keyboard.press("Space");
-    await expect(page.getByText("Picked up findings, place 2 of 3.")).toBeAttached();
+    await expect(said(page)).toHaveText(`Picked up findings, place ${at} of ${order.length}.`);
     await page.keyboard.press("ArrowUp");
-    await expect(page.getByText("Findings would go to place 1 of 3.")).toBeAttached();
+    await expect(said(page)).toHaveText(`Findings would go to place ${at - 1} of ${order.length}.`);
     await page.keyboard.press("Space");
-    await expect(page.getByText("Findings dropped in place 1 of 3.")).toBeAttached();
-    await expect.poll(() => page.locator('ol[aria-label="Sections, in page order"] > li').evaluateAll((lis) => lis.map((li) => li.getAttribute("data-kind")))).toEqual(["findings", "reflection", "graph"]);
-    await axe(page, "editor while arranging");
-
-    await page.getByRole("button", { name: "Done arranging" }).click();
-    expect(await preview.locator("article [data-part]").evaluateAll((els) => els.map((e) => e.getAttribute("data-part")))).toEqual(["process", "findings", "reflection", "graph"]);
+    await expect(said(page)).toHaveText(`Findings dropped in place ${at - 1} of ${order.length}.`);
+    await expect.poll(() => listOrder(page)).toEqual(["findings", "reflection", "graph"]);
     await axe(page, "editor with the new fields");
+
+    // The page a visitor sees is in the new order.
+    await seeAsVisitor(page);
+    expect(await pageOrder(visitorRegion(page))).toEqual(["process", "findings", "reflection", "graph"]);
   });
 
-  test("an image moved next to What I found sits beside it on the published page; a new graph can be arranged too", async ({ page }) => {
+  test("an image moved next to What I found sits beside it on the published page; a new graph can be added and removed too", async ({ page }) => {
     const name = unique("img");
     await seed(page, name);
     await page.goto(`/auth/dev?email=${name}@example.com&next=/exhbts`);
     await page.getByRole("link", { name: openBankingDoc.title, exact: true }).click();
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
-    await expect(page.locator("[data-ready=true]").first()).toBeAttached();
+    await waitEditor(page);
 
     // An image (it lands last), with its description.
-    await page.getByRole("button", { name: "Add a section" }).click();
+    await openAddSectionMenu(page);
     const chooser = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: "Add an image" }).click();
+    await menuItem(page, "Add an image").click();
     await (await chooser).setFiles({ name: "phase-diagram.png", mimeType: "image/png", buffer: PNG });
-    await page.getByLabel(/Image 1: describe it/).fill("Arrows towards cooperation and competition");
-    // And a new graph, still blank.
-    await page.getByRole("button", { name: "Add a section" }).click();
-    await page.getByRole("button", { name: "Add a graph", exact: true }).click();
+    await fillPlain(page, page.getByLabel(/Image 1: describe it/), "Arrows towards cooperation and competition");
+    // And a new graph, still blank: it opens its figures sheet.
+    await addSection(page, "Add a graph");
+    await closeSheet(page);
 
-    const preview = page.getByRole("region", { name: "Preview" });
-    await page.getByRole("button", { name: "Arrange sections" }).click();
-    const arranged = preview.getByRole("list", { name: "Sections in the preview, in page order" });
-    await expect(arranged.locator(":scope > li")).toHaveCount(5);
+    expect(await listOrder(page)).toEqual(["findings", "graph", "reflection", "image", "graph"]);
     // Image 1 from place 4 to place 2, straight after What I found.
-    await arranged.getByRole("button", { name: "Move image 1 up" }).click();
-    await arranged.getByRole("button", { name: "Move image 1 up" }).click();
-    await page.getByRole("button", { name: "Done arranging" }).click();
+    await onSection(page, "image-1");
+    await page.getByRole("button", { name: "Move image 1 up" }).click();
+    await page.getByRole("button", { name: "Move image 1 up" }).click();
+    await expect.poll(() => listOrder(page)).toEqual(["findings", "image", "graph", "reflection", "graph"]);
+    await onSection(page, "graph-2");
     await page.getByRole("button", { name: "Remove graph 2" }).click();
-    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    await expect(page.locator(`${READY} [role=status]`, { hasText: /^Saved$/ })).toBeVisible();
 
-    await page.getByLabel("This is my work, and the numbers are true").check();
-    await page.getByRole("button", { name: "Publish changes" }).click();
-    await expect(page.getByText("Your changes are live.")).toBeVisible();
+    await publish(page, { changes: true });
     await page.goto(`/p/${name}/open-banking`);
     const found = page.locator("[data-found]");
     await expect(found.locator('[data-part="image"] img')).toHaveAttribute("alt", "Arrows towards cooperation and competition");
@@ -323,12 +333,15 @@ test.describe("The page in the editor", () => {
     expect(res.status()).toBe(200);
     const { id } = (await res.json()) as { id: string };
     await page.goto(`/exhbts/${id}/edit`);
-    await expect(page.locator("[data-ready=true]").first()).toBeAttached();
-    await expect(page.getByLabel("Your question (the title)")).toHaveValue(/\?$/);
-    await expect(page.getByLabel("What it is")).not.toHaveValue("");
-    await expect(page.getByLabel("Where and when")).not.toHaveValue("");
-    await expect(page.getByLabel("One-sentence summary")).not.toHaveValue("");
-    await expect(page.getByRole("region", { name: "Preview" }).locator("article mark")).toHaveText("this draft is placeholder text");
+    await waitEditor(page);
+    await expect(page.locator("#title")).toHaveValue(/\?$/);
+    await expect(page.locator("#context")).not.toHaveValue("");
+    await expect(page.locator("#whereWhen")).not.toHaveValue("");
+    await page.getByRole("button", { name: "Card and link details" }).click();
+    await expect(page.locator("#summary")).not.toHaveValue("");
+    await closeSheet(page);
+    await seeAsVisitor(page);
+    await expect(visitorRegion(page).locator("article mark")).toHaveText("this draft is placeholder text");
   });
 });
 
