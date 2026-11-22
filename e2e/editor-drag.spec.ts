@@ -746,9 +746,10 @@ test.describe("while carrying", () => {
     expect(await motion()).toBe(0);
   });
 
-  test("the frame, the line, the room made and the lifted copy take the look's colours, and pass contrast in all eight looks", async ({ page }) => {
-    await page.setViewportSize(TALL);
-    for (const theme of PORTFOLIO_THEMES) {
+  // One test per look (all eight), so a busy machine can't run one test out of time.
+  for (const theme of PORTFOLIO_THEMES) {
+    test(`in the ${theme.name || theme.id} look, the frame, the line, the room made and the lifted copy take the look's colours and pass contrast`, async ({ page }) => {
+      await page.setViewportSize(TALL);
       await open(page, "case-study", theme.id);
       const link = await lookColour(page, "var(--xp-link)");
       const ground = await page.locator(`${READY} article`).evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -772,7 +773,7 @@ test.describe("while carrying", () => {
       await page.keyboard.press("ArrowDown");
       expect(await page.locator(`${READY} [data-xe-line]`).evaluate((el) => getComputedStyle(el).backgroundColor), theme.id).toBe(link);
       await page.keyboard.press("Escape");
-      if (theme.id !== "exhbt" && theme.id !== "night") continue;
+      if (theme.id !== "exhbt" && theme.id !== "night") return;
       // With a mouse: the copy's card and the dashed room made.
       const at = await client(page);
       await pickUp(page, "findings");
@@ -786,8 +787,8 @@ test.describe("while carrying", () => {
       expect(await page.locator(`${READY} [data-xe-landing]`).evaluate((el) => getComputedStyle(el).borderTopColor), theme.id).toBe(link);
       await page.keyboard.press("Escape");
       await page.mouse.up();
-    }
-  });
+    });
+  }
 
   for (const f of offered()) {
     test(`${f}: axe finds nothing with a section lifted`, async ({ page }) => {

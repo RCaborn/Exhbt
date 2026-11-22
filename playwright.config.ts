@@ -26,7 +26,7 @@ export default defineConfig({
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } }, testIgnore: /editor-(phone|tablet)\.spec\.ts/ },
     { name: "mobile", use: { ...devices["Pixel 7"] }, testMatch: /responsive\.spec\.ts/ },
-    { name: "touch", use: { ...devices["Pixel 7"] }, testMatch: /editor-(drag|flow|phone)\.spec\.ts/ },
+    { name: "touch", use: { ...devices["Pixel 7"] }, testMatch: /editor-(drag|flow|phone|figures)\.spec\.ts/ },
     { name: "tablet", use: { browserName: "chromium", viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 }, testMatch: /editor-tablet\.spec\.ts/ },
   ],
   webServer: {

@@ -17,6 +17,7 @@ import {
   openDoc,
   openNew,
   READY,
+  sampleDoc,
   readStored,
   seeAsVisitor,
   settle,
@@ -33,6 +34,13 @@ import {
  * once the report's own graph has gone. Drafts use the placeholder AI and e2e/fixtures/report-with-chart.pdf
  * (three pages of text and a bar chart on page 3), as e2e/auto-figure.spec.ts does.
  */
+
+// The touch project runs only the test of its own, at the end of this file.
+const ON_TOUCH = "on a phone";
+test.beforeEach(({}, info) => {
+  test.skip(info.project.name === "touch" && !info.title.includes(ON_TOUCH), "a mouse test");
+  test.skip(info.project.name !== "touch" && info.title.includes(ON_TOUCH), "a touch test");
+});
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const CHART_PDF = "e2e/fixtures/report-with-chart.pdf";
@@ -490,5 +498,81 @@ test.describe("in the Night look", () => {
     await expect(page.locator(`${READY} .xe-fig-picked-tick input[type=checkbox]`)).toBeVisible();
     await settle(page);
     expect(await scan(page, `${READY} article`)).toEqual([]);
+  });
+});
+
+test.describe("the figure picked from the report, in a narrow gallery tile", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test(`${ON_TOUCH} (390px), the label's two presses never overlap, each is 44px, and a tap on each does its own thing`, async ({ page }) => {
+    const gallery = sampleDoc("gallery");
+    const doc = {
+      ...gallery,
+      sections: gallery.sections.map((s) => (s.kind === "image" ? { ...s, picked: { from: "report.pdf", page: 3, box: { x: 0, y: 0, w: 1, h: 1 }, shareOk: false } } : s)),
+    } as ExhbtDoc;
+    await openDoc(page, freshName("tilepick"), doc);
+    await waitLive(page);
+    await settle(page);
+    const labels = page.locator(`${READY} .xe-fig-picked`);
+    expect(await labels.count()).toBeGreaterThanOrEqual(6);
+    // Each press is what a finger lands on: from the middle of the control, how far the control (or its label) is what is hit.
+    // Both are measured in one go, in the same scroll position.
+    const reach = (label: Element) => {
+      label.scrollIntoView({ block: "center", inline: "center" });
+      const one = (el: Element, own: Element) => {
+        const r = el.getBoundingClientRect();
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        const mine = (x: number, y: number) => {
+          const hit = document.elementFromPoint(x, y);
+          return Boolean(hit && (hit === own || own.contains(hit)));
+        };
+        const go = (dx: number, dy: number) => {
+          let n = 0;
+          while (n < 60 && mine(cx + dx * (n + 1), cy + dy * (n + 1))) n++;
+          return n;
+        };
+        return { l: go(-1, 0), r: go(1, 0), t: go(0, -1), b: go(0, 1), cx, cy };
+      };
+      const open = label.querySelector(".xe-fig-picked-open")!;
+      const tick = label.querySelector(".xe-fig-picked-tick")!;
+      return { a: one(open, open), b: one(tick.querySelector("input")!, tick), mode: [label.getAttribute("data-compact"), label.getAttribute("data-stacked"), label.getBoundingClientRect().width] };
+    };
+    for (let i = 0; i < (await labels.count()); i++) {
+      const label = labels.nth(i);
+      const open = label.locator(".xe-fig-picked-open");
+      const tick = label.locator(".xe-fig-picked-tick");
+      const name = await open.getAttribute("aria-label");
+      const { a, b, mode } = await label.evaluate(reach);
+      // Hit testing is in whole pixels and the middle can fall between two, so a 44px press measures 42 or 43.
+      for (const [what, m] of [["the button", a], ["the tick", b]] as const) {
+        expect(m.t + m.b + 1, `${name}: ${what} is 44px tall`).toBeGreaterThanOrEqual(42);
+        expect(m.l + m.r + 1, `${name}: ${what} is 44px wide`).toBeGreaterThanOrEqual(42);
+      }
+      // The two presses' hit areas never overlap: no point is both, which is what a tap on one hitting the other would need.
+      const box = (m: typeof a) => ({ x: m.cx - m.l, y: m.cy - m.t, w: m.l + m.r + 1, h: m.t + m.b + 1 });
+      expect(overlaps(box(a), box(b)), `${name}: the two presses' boxes overlap ${JSON.stringify([a, b, mode])}`).toBe(false);
+      // And what is drawn: the two controls' own boxes are apart too.
+      expect(overlaps(rectOf((await open.boundingBox())!), rectOf((await tick.boundingBox())!)), `${name}: the two controls overlap`).toBe(false);
+      // The whole label stays inside its picture's width, so nothing hangs off the tile.
+      const frameBox = (await label.locator("xpath=ancestor::*[@data-section-id][1]").boundingBox())!;
+      const lb = (await label.boundingBox())!;
+      expect(lb.x).toBeGreaterThanOrEqual(frameBox.x - 0.5);
+      expect(lb.x + lb.width).toBeLessThanOrEqual(frameBox.x + frameBox.width + 0.5);
+    }
+    // A tap on the tick ticks it and opens nothing; a tap on the button opens the strip and ticks nothing.
+    const first = labels.nth(2);
+    const section = (await first.locator("xpath=ancestor::*[@data-section-id][1]").getAttribute("data-section-id"))!;
+    const shared = async () => ((await docNow(page)).sections.find((s) => s.id === section) as SectionOf<"image">).picked?.shareOk;
+    await first.locator(".xe-fig-picked-open").tap();
+    const strip = first.locator("[popover]").first();
+    await expect(strip).toBeVisible();
+    expect(await shared()).toBe(false);
+    await page.keyboard.press("Escape");
+    await expect(strip).toBeHidden();
+    await first.locator(".xe-fig-picked-tick").tap();
+    await expect.poll(shared).toBe(true);
+    await expect(strip).toBeHidden();
+    await expect(first.locator(".xe-fig-picked-tick")).toHaveCount(0);
   });
 });
