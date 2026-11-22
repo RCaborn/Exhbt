@@ -17,6 +17,15 @@
     }
   }
 
+  /* With no hover (a finger), a tooltip is never wanted: after a tap the browser keeps the button
+     "hovered", and the tooltip of a grip at the right edge runs off the page, which widens it and
+     zooms it out under the finger. The buttons keep their names. */
+  @media (hover: none) {
+    [data-editor="page"] [data-tip]::after {
+      content: none;
+    }
+  }
+
   @media (max-width: 47.99rem) and (pointer: coarse) {
     /* ---------- Quieter sections: only the grip, 44px, always shown ---------- */
     /* The other buttons are on the bar. Hidden outright (not faded), so nothing can take the focus. */
@@ -173,12 +182,22 @@
     width: 2.75rem !important;
     height: 2.75rem !important;
   }
+  /* The menu is placed by the bar, not by its button (which may sit mid-row): above the bar, at its right. */
+  .xe-bar-more > [data-testid] > .relative {
+    position: static !important;
+  }
   .xe-bar-more [aria-label^="More actions"] + [id] {
     top: auto !important;
-    bottom: 100% !important;
+    right: 0.75rem !important;
+    bottom: calc(100% + 0.25rem) !important;
     margin-top: 0 !important;
-    margin-bottom: 0.25rem;
     z-index: 2 !important;
+    max-width: calc(100vw - 1.5rem);
+  }
+  .xe-bar-more [aria-label^="More actions"] + [id] button,
+  .xe-bar-more form button,
+  .xe-bar-more form input {
+    min-height: 2.75rem;
   }
   .xe-bar-more > [data-testid] > :not(.relative) {
     flex: 0 0 100%;

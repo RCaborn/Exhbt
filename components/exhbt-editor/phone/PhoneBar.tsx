@@ -58,6 +58,7 @@ function Bar() {
   const undo = useUndoOffer(store);
   useBarHeight(ref);
   useKeyboard(ref);
+  useMenusInView();
 
   const section = where.part && "section" in where.part ? where.part.section : null;
   const info = useSectionInfo(section);
@@ -287,12 +288,29 @@ function ShellTools({ block, name }: { block: ShellBlock; name: string }) {
   );
 }
 
+/** A "+" menu opened low on the screen is brought into view, clear of the bar (the root's scroll-padding-bottom). */
+function menuInView(insert: Element | null | undefined) {
+  requestAnimationFrame(() => requestAnimationFrame(() => insert?.querySelector("[data-xe-menu]")?.scrollIntoView({ block: "nearest" })));
+}
+
+/** Every "+" the person opens: its menu in view. */
+function useMenusInView() {
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const plus = (e.target as Element | null)?.closest?.('[data-editor="page"] .xe-insert .xe-plus');
+      if (plus) menuInView(plus.closest(".xe-insert"));
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
+}
+
 function NothingYet() {
   const { uiApi } = useRuntime();
   const add = () => {
     // The "+" at the end of the page, with its menu open (jump.ts lands on it; Insert.tsx opens on the jump), clear of the bar.
     uiApi.jumpTo("sections");
-    requestAnimationFrame(() => requestAnimationFrame(() => document.querySelector('[data-editor="page"] .xe-insert[data-end] [data-xe-menu]')?.scrollIntoView({ block: "nearest" })));
+    menuInView(document.querySelector('[data-editor="page"] .xe-insert[data-end]'));
   };
   return (
     <>
@@ -455,8 +473,10 @@ function useKeyboard(ref: RefObject<HTMLDivElement | null>) {
     const run = () => {
       frame = 0;
       // Where the bar's foot would be with no lift (the foot of the layout viewport), against the foot of what can be seen.
+      // A keyboard takes height only: a zoom, or a page wider than the screen, changes the width too, and is not one.
       const foot = el.getBoundingClientRect().bottom + lift;
-      const next = Math.abs(vv.scale - 1) > 0.01 ? 0 : Math.max(0, Math.round(foot - (vv.offsetTop + vv.height)));
+      const keyboard = Math.abs(vv.scale - 1) < 0.01 && Math.abs(window.innerWidth - vv.width) < 1;
+      const next = keyboard ? Math.max(0, Math.round(foot - (vv.offsetTop + vv.height))) : 0;
       if (next !== lift) {
         lift = next;
         el.style.transform = lift ? `translateY(${-lift}px)` : "";

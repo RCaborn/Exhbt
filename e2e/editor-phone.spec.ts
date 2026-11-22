@@ -152,6 +152,10 @@ test.describe("each section shows only its grip", () => {
     await choose(page, "graph-1");
     await expect(bar(page)).toHaveAttribute("aria-label", "Graph 1: tools");
     await expect(bar(page).locator(".xe-bar-name")).toHaveText("Graph 1");
+    // The grip a finger just left shows no tooltip (one at the right edge would widen the page and zoom it out).
+    await page.waitForTimeout(300);
+    expect(await grip(page, "graph-1").evaluate((el) => getComputedStyle(el, "::after").content)).toBe("none");
+    expect(await page.evaluate(() => [window.innerWidth, document.documentElement.scrollWidth - document.documentElement.clientWidth])).toEqual([page.viewportSize()!.width, 0]);
     for (const name of ["Move Graph 1 up", "Move Graph 1 down", "Remove Graph 1", "Reorder sections"]) await expect(onBar(page, name)).toBeVisible();
 
     // A tap on a part with no field (the graph's drawing) follows it too.
@@ -178,6 +182,15 @@ test.describe("each section shows only its grip", () => {
     await expect(menu).toBeVisible();
     await expect(page.locator("#add-section")).toBeFocused();
     await expect.poll(async () => (await rect(menu)).bottom <= (await rect(bar(page))).top).toBe(true);
+    await page.keyboard.press("Escape");
+
+    // A "+" in a gap at the foot of the screen: its menu comes up into view, clear of the bar.
+    const gapPlus = page.locator(`${READY} .xe-insert:not([data-end]) .xe-plus`).nth(2);
+    await gapPlus.evaluate((el) => window.scrollBy(0, el.getBoundingClientRect().top - (window.innerHeight - 140)));
+    await gapPlus.tap();
+    const gapMenu = gapPlus.locator("xpath=ancestor::*[contains(@class,'xe-insert')][1]").locator("[data-xe-menu]");
+    await expect(gapMenu).toBeVisible();
+    await expect.poll(async () => (await rect(gapMenu)).bottom <= (await rect(bar(page))).top).toBe(true);
   });
 });
 
@@ -653,8 +666,26 @@ test("a drafted part: the bar offers its More actions, and the menu opens above 
   expect(m.top).toBeGreaterThanOrEqual(0);
   expect(m.bottom).toBeLessThanOrEqual((await rect(more)).top);
 
-  // The findings section's More actions too.
+  // The findings section's More actions too: the menu above the bar, then the rewrite form in a line of its own above the bar's row, all in the screen and every control 44px.
   const findings = (await docNow(page)).sections.find((s) => s.kind === "findings")!.id;
   await choose(page, findings);
-  await expect(onBar(page, /^More actions for /)).toBeVisible();
+  await onBar(page, "More actions for Findings").tap();
+  const item = bar(page).getByRole("button", { name: "Rewrite this block" });
+  await expect(item).toBeVisible();
+  const it = await rect(item);
+  expect(it.left).toBeGreaterThanOrEqual(0);
+  expect(it.right).toBeLessThanOrEqual(page.viewportSize()!.width);
+  expect(Math.round(it.height)).toBeGreaterThanOrEqual(44);
+  await item.tap();
+  const form = bar(page).locator("form");
+  await expect(form).toBeVisible();
+  const fr = await rect(form);
+  const row = await rect(onBar(page, "More actions for Findings"));
+  expect(fr.top).toBeGreaterThanOrEqual(0);
+  expect(fr.bottom).toBeLessThanOrEqual(row.top);
+  expect(fr.right).toBeLessThanOrEqual(page.viewportSize()!.width);
+  const sizes = await form.locator("button, input").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+  expect(sizes.every((h) => h >= 44)).toBe(true);
+  await bar(page).getByRole("button", { name: "Cancel" }).tap();
+  await expect(form).toHaveCount(0);
 });
