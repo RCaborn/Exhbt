@@ -69,9 +69,8 @@
 
     /* The "+" in a gap: 32px to the eye, centred in the top 32px of its gap (the first gap, under the
        context line, is only 32px tall, and a 44px "+" there covered the first letters of the heading
-       under it), with a 44px press. */
+       under it), with a 44px press. (Its place in the gap is any narrow window's: drag.css.) */
     [data-editor="page"] .xe-insert:not([data-end]) .xe-plus {
-      top: 1rem;
       width: 2rem;
       height: 2rem;
     }

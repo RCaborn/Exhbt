@@ -552,6 +552,45 @@ test("a swipe on a section's words scrolls and moves nothing; a 260ms press on a
  * At 390px: no sideways scroll, and every control takes a thumb
  * ---------------------------------------------------------------------------------------------- */
 
+test("an open + menu lies over every chip, grip and toolbar: before the flowchart, a tap anywhere on it is the menu's", async ({ page }) => {
+  await openTiming(page, "case-study", { full: true });
+  await waitLive(page);
+  // The + before the flowchart (the first gap), whose menu opens down over the boxes' always-shown chips and the "+" on each arrow.
+  const at = (await pageOrder(page)).indexOf("flow");
+  const plus = page.locator(`${READY} .xe-insert[data-at="${at}"] .xe-plus`);
+  await plus.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await plus.tap();
+  const menu = page.locator(`${READY} .xe-insert[data-at="${at}"] [data-xe-menu]`);
+  await expect(menu).toBeVisible();
+  await page.waitForTimeout(300);
+  const lost = await menu.evaluate((m) => {
+    const r = m.getBoundingClientRect();
+    // The app's own bars, at the top and foot of the screen, rightly lie over the page and its menus.
+    const top = document.querySelector('[data-editor="page"] [data-topbar]')?.getBoundingClientRect().bottom ?? 0;
+    const foot = document.querySelector('[data-editor="page"] .xe-phonebar')?.getBoundingClientRect().top ?? window.innerHeight;
+    const points: [number, number, string][] = [];
+    // Along its edges, 3px in, every 12px (clear of the rounded corners, which a tap doesn't hit).
+    const round = parseFloat(getComputedStyle(m).borderTopLeftRadius) || 0;
+    for (let x = r.left + round + 3; x <= r.right - round - 3; x += 12) points.push([x, r.top + 3, "top edge"], [x, r.bottom - 3, "foot"]);
+    for (let y = r.top + round + 3; y <= r.bottom - round - 3; y += 12) points.push([r.left + 3, y, "left edge"], [r.right - 3, y, "right edge"]);
+    // Across each item, through its middle.
+    for (const item of m.querySelectorAll(".xe-plus-item")) {
+      const b = item.getBoundingClientRect();
+      for (let x = b.left + 2; x <= b.right - 2; x += 8) points.push([x, b.top + b.height / 2, item.textContent!.trim().slice(0, 20)]);
+    }
+    const seen = points.filter(([x, y]) => y > top && y < foot && x >= 0 && x < window.innerWidth);
+    return {
+      tried: seen.length,
+      lost: seen.flatMap(([x, y, where]) => {
+        const hit = document.elementFromPoint(x, y);
+        return hit && m.contains(hit) ? [] : [`${where} at ${Math.round(x)},${Math.round(y)}: ${hit?.getAttribute("aria-label") ?? hit?.className ?? "nothing"}`];
+      }),
+    };
+  });
+  expect(lost.tried).toBeGreaterThan(60);
+  expect(lost.lost).toEqual([]);
+});
+
 test.describe("at 390px wide", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 

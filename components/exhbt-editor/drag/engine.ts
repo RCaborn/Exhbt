@@ -413,7 +413,7 @@ function createEngine(store: Store, ui: UiApi, files: FilesController) {
     watch(l);
     const box = { x: tile.left - fz.rect.left, y: tile.top - fz.rect.top, w: tile.width, h: tile.height };
     flushSync(() => view!.set({ id, mode: "pointer", style: l.style, box, main, as: "plain", draft: { kind, name: option.name } }));
-    ui.say(`Picked up a new block: ${lowerFirst(option.name)}. Carry it onto the page.`);
+    ui.say(`Picked up a new section: ${lowerFirst(option.name)}. Carry it onto the page.`);
     return true;
   }
 

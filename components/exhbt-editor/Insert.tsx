@@ -78,6 +78,7 @@ export function Insert({ at, end }: InsertSlot) {
       data-edit-only
       data-at={at}
       data-end={end || undefined}
+      data-open={open ? "" : undefined}
       onKeyDown={(e) => {
         if (e.key !== "Escape" || !open) return;
         e.stopPropagation();

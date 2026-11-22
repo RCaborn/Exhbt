@@ -131,8 +131,8 @@
     border: var(--xp-edge-width, 1px) solid var(--xp-outline-edge);
     border-radius: 999px;
     background: var(--xp-card);
-    color: var(--xp-ink);
-    opacity: 0.4;
+    /* Quiet at rest by its colour, not by fading it: the look's muted words, which read at 4.5:1 on its cards, so the plus is always at least 3:1. */
+    color: var(--xp-muted);
     cursor: pointer;
   }
   /* The one after the last row sits in the page's own foot. */
@@ -142,7 +142,7 @@
   .xe-plus:hover,
   .xe-plus:focus-visible,
   .xe-plus[aria-expanded="true"] {
-    opacity: 1;
+    color: var(--xp-ink);
     border-color: var(--xp-link);
   }
   .xe-plus:focus-visible {
@@ -166,6 +166,13 @@
     border-radius: var(--xp-radius-box);
     box-shadow: var(--shadow-pack);
     font: 400 0.875rem/1.35 var(--xp-font, var(--font-sans));
+  }
+  /* Open, its menu lies over the page under it: the flowchart's chips and arrows' "+" (16), the
+     sections' toolbars (20) and a section settling after a move (22). Each "+" is a stacking context of
+     its own (core.css), so the menu's own z-index counts only inside it: the "+" itself rises. It stays
+     under the drag's overlay (25), the tray (26), the phone's bar (29) and the top bar (40). */
+  .xe-insert[data-open] {
+    z-index: 23;
   }
   /* The last "+" opens upwards: below it there is only the foot of the page. */
   .xe-insert[data-end] .xe-plus-menu {
@@ -234,6 +241,19 @@
     font-size: 0.8125rem;
     color: var(--xp-muted);
   }
+  /* In a narrow window, or where the main column is narrow (from 52 to 62rem the sidebar takes room),
+     whatever the pointer, a gap can be small: 12px over a gallery's lead picture. The "+" sits in the
+     top 32px of its gap there, as on a phone (phone.css sizes it for a finger). */
+  @media (max-width: 47.99rem) {
+    .xe-insert:not([data-end]) .xe-plus {
+      top: 1rem;
+    }
+  }
+  @container main (max-width: 41.99rem) {
+    .xe-insert:not([data-end]) .xe-plus {
+      top: 1rem;
+    }
+  }
   /* On a touch screen the "+" is always there, at the left of its gap (the section's toolbar is at the right), and its targets are 44px. */
   @media (pointer: coarse) {
     .xe-plus {
@@ -241,7 +261,6 @@
       width: 2.75rem;
       height: 2.75rem;
       transform: translate(0, -50%);
-      opacity: 1;
     }
     .xe-plus-menu {
       left: 0;
@@ -266,15 +285,20 @@
       display: block;
       box-sizing: border-box;
       width: 6.5rem;
-      max-height: 60vh;
-      overflow-y: auto;
-      padding: 0.5rem;
       translate: 0 -50%;
       background: var(--xp-card);
       color: var(--xp-card-ink);
       border: var(--xp-edge-width, 1px) solid var(--xp-card-edge);
       border-radius: var(--xp-radius-box);
       font-family: var(--xp-font, var(--font-sans));
+    }
+    /* The list scrolls on a short window; why a section can't be added is drawn outside it (below), so nothing clips it. */
+    .xe-tray-scroll {
+      box-sizing: border-box;
+      max-height: 60vh;
+      overflow-y: auto;
+      padding: 0.5rem;
+      border-radius: inherit;
     }
   }
   .xe-tray-title {
@@ -352,10 +376,10 @@
   .xe-tray-block[aria-disabled="true"]:hover {
     border-color: var(--xp-outline-edge);
   }
-  /* Why a block can't be added: beside it, when it is pointed at or has the focus. */
+  /* Why a section can't be added: beside the tray, level with its button, while that is pointed at or
+     has the focus (Tray.tsx places it). Outside the tray's scrolling list, so nothing clips it. */
   .xe-tray-why {
     position: absolute;
-    top: 50%;
     right: calc(100% + 0.75rem);
     z-index: 1;
     width: 11rem;
@@ -370,12 +394,7 @@
     border: var(--xp-edge-width, 1px) solid var(--xp-rule-strong);
     border-radius: max(0px, calc(var(--xp-radius-box) - 4px));
     box-shadow: var(--shadow-pack);
-    opacity: 0;
     pointer-events: none;
-  }
-  .xe-tray-item:hover > .xe-tray-why,
-  .xe-tray-block:focus-visible + .xe-tray-why {
-    opacity: 1;
   }
   /* The block being carried from the tray: its tile, lifted. */
   .xe-tray-lifted {

@@ -5,7 +5,7 @@ import { formatOf, FORMAT_RULES, type Format } from "../lib/exhbt/formats";
 import { blockOptions, pageItems, rowsFor, type Cell, type Row } from "../lib/exhbt/layouts";
 import { openBankingDoc } from "../lib/exhbt/sample";
 import { newImageSection, newSection, roomFor } from "../lib/exhbt/sections";
-import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
+import { ALL_THEMES, PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import { labelOf } from "../components/exhbt-editor/labels";
 import { HYSTERESIS, makePlan, orderWith, placeAt, pointFor, rowsInfo, type Box } from "../components/exhbt-editor/drag/plan";
 import { docNow, frame, freshName, grip, offered, openDoc, openTiming, pageOrder, READY, SAMPLES, toolbarClashes, waitLive, waitReady } from "./page-editor";
@@ -976,6 +976,50 @@ test.describe("the + between sections", () => {
     expect(doc.flowOff).toBeUndefined();
   });
 
+  // At rest the "+" is quiet but whole: drawn at full strength in a quieter colour of the look, its plus at least 3:1 on its own
+  // ground (WCAG 1.4.11; the review's accessibility-4). One test per look, each in every colourway.
+  for (const look of PORTFOLIO_THEMES) {
+    test(`at rest in the ${look.name || look.id} look, every colourway: the + is at full strength and its plus is at least 3:1`, async ({ page }) => {
+      for (const theme of ALL_THEMES.filter((t) => t.id === look.id || t.id.startsWith(`${look.id}-`))) {
+        await openTiming(page, "case-study", { look: theme.id });
+        await page.mouse.move(0, 0);
+        const rest = await page.locator(`${READY} .xe-insert[data-at="1"] .xe-plus`).evaluate((el) => {
+          // Any colour the browser computes (rgb(), color(srgb …), with alpha) as rgb() on what is behind it.
+          const ctx = document.createElement("canvas").getContext("2d", { willReadFrequently: true })!;
+          const rgba = (c: string) => {
+            ctx.clearRect(0, 0, 1, 1);
+            ctx.fillStyle = c;
+            ctx.fillRect(0, 0, 1, 1);
+            const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+            return [r!, g!, b!, a! / 255] as const;
+          };
+          const over = (top: readonly [number, number, number, number], under: readonly [number, number, number, number]) => [0, 1, 2].map((i) => Math.round(top[i]! * top[3] + under[i]! * (1 - top[3]))).concat(1) as unknown as readonly [number, number, number, number];
+          let ground = rgba("#fff");
+          const chain: Element[] = [];
+          for (let n: Element | null = el.parentElement; n; n = n.parentElement) chain.unshift(n);
+          for (const n of chain) ground = over(rgba(getComputedStyle(n).backgroundColor), ground);
+          const fill = over(rgba(getComputedStyle(el).backgroundColor), ground);
+          const plus = over(rgba(getComputedStyle(el).color), fill);
+          let opacity = 1;
+          for (let n: Element | null = el; n; n = n.parentElement) opacity *= Number(getComputedStyle(n).opacity);
+          const css = (c: readonly number[]) => `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+          return { opacity, plus: css(plus), fill: css(fill) };
+        });
+        expect(rest.opacity, theme.id).toBe(1);
+        expect(contrast(rest.plus, rest.fill), `${theme.id}: the plus ${rest.plus} on ${rest.fill}`).toBeGreaterThanOrEqual(3);
+      }
+    });
+  }
+
+  test("in a window under 48rem with a mouse, the + takes the smaller placement in its gap (the top 32px), as on a phone", async ({ page }) => {
+    await page.setViewportSize({ width: 700, height: 900 });
+    await openTiming(page, "gallery");
+    for (const insert of await page.locator(`${READY} .xe-insert:not([data-end])`).all()) {
+      const [i, p] = await Promise.all([insert.boundingBox(), insert.locator(".xe-plus").boundingBox()]);
+      expect(p!.y - i!.y, "its top").toBeGreaterThanOrEqual(0);
+      expect(p!.y + p!.height - i!.y, "its foot").toBeLessThanOrEqual(32);
+    }
+  });
 });
 
 /* ------------------------------------------------------------------------------------------------
@@ -1040,7 +1084,7 @@ test.describe("the tray", () => {
     expect(await place(page)).toBe(-1);
     await expect(lifting(page)).toHaveAttribute("data-xe-style", "slide");
     await expect(page.locator(`${READY} [data-xe-landing]`)).toBeHidden();
-    await expect(said(page)).toHaveText("Picked up a new block: quote. Carry it onto the page.");
+    await expect(said(page)).toHaveText("Picked up a new section: quote. Carry it onto the page.");
     const chip = (await page.locator(`${READY} [data-xe-chip]`).boundingBox())!;
     expect([Math.round(chip.width), Math.round(chip.height)]).toEqual([Math.round(tile.width), Math.round(tile.height)]);
     // Into the gap above the last section: the room is made, by transform.
@@ -1168,8 +1212,38 @@ test.describe("the tray", () => {
     await expect(lifting(page)).toHaveCount(0);
     await page.mouse.up();
     expect(await pageOrder(page)).toEqual(order);
+    // The reason is shown beside the tray, level with the block, wholly in view: nothing round it clips it (the review's visual-fidelity-1).
+    const shownWhy = async () => {
+      const why = page.locator(`${TRAY} [data-xe-why="findings"]`);
+      await expect(why).toBeVisible();
+      await expect(why).toHaveText(reason);
+      const clipped = await why.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const out: string[] = [];
+        if (r.left < 0 || r.top < 0 || r.right > window.innerWidth || r.bottom > window.innerHeight) out.push("off the screen");
+        for (let n = el.parentElement; n; n = n.parentElement) {
+          const s = getComputedStyle(n);
+          if (s.overflowX === "visible" && s.overflowY === "visible") continue;
+          const c = n.getBoundingClientRect();
+          if (r.left < c.left - 0.5 || r.right > c.right + 0.5 || r.top < c.top - 0.5 || r.bottom > c.bottom + 0.5) out.push(`clipped by ${n.tagName.toLowerCase()}.${n.className}`);
+        }
+        return out;
+      });
+      expect(clipped).toEqual([]);
+      const [w, b, t] = await Promise.all([why.boundingBox(), findings.boundingBox(), page.locator(TRAY).boundingBox()]);
+      expect(w!.x + w!.width).toBeLessThanOrEqual(t!.x);
+      expect(Math.abs(w!.y + w!.height / 2 - (b!.y + b!.height / 2))).toBeLessThanOrEqual(1);
+    };
+    await block(page, "quote").focus();
     await findings.hover();
-    await expect(page.locator(`${TRAY} #xe-tray-why-findings`)).toHaveCSS("opacity", "1");
+    await shownWhy();
+    await page.mouse.move(5, 5);
+    await expect(page.locator(`${TRAY} [data-xe-why]`)).toHaveCount(0);
+    // From the keyboard too, and a screen reader hears it as the block's description (above).
+    await findings.focus();
+    await shownWhy();
+    await expect(page.locator(TRAY)).toHaveAccessibleName("Sections to add");
+    await expect(page.locator(`${TRAY} .xe-tray-title`)).toHaveText("Add a section");
   });
 
   test("carrying a block from it near the bottom edge scrolls the page, and stops at its end", async ({ page }) => {
