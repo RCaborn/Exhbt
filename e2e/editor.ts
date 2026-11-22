@@ -314,6 +314,15 @@ export const sectionsArea = (page: Page) => page.locator(`${READY} article[data-
 export const card = (page: Page, name: string) =>
   page.locator(`${READY} [data-section-id]`).filter({ has: page.getByRole("toolbar", { name: `${name}: tools`, exact: true }) });
 
+/** Presses one of a section's toolbar buttons ("Remove Image 1", "Move Quote up"): the toolbar shows when the pointer is over the frame. */
+export async function pressTool(page: Page, label: string, name: string) {
+  await card(page, label).hover();
+  await page.getByRole("button", { name, exact: true }).click();
+}
+
+/** Removes a section by its name on the page ("Image 1"). */
+export const removeSection = (page: Page, label: string) => pressTool(page, label, `Remove ${label}`);
+
 /** Every frame, in page order. */
 export const frames = (page: Page) => page.locator(`${READY} article [data-section-id]`);
 
@@ -468,3 +477,30 @@ export async function startRewrite(page: Page, block: string) {
 
 /** The "Back to the AI version" button inside a block's tools. */
 export const backToAiVersion = (page: Page, block: string) => page.getByTestId(SEL.toolsTestId(block)).getByRole("button", { name: SEL.backToAiVersion });
+
+/* ------------------------------------------------------------------------------------------------
+ * The work, and the things to fix
+ * ---------------------------------------------------------------------------------------------- */
+
+/** The sheet that holds the work (a link or a file). */
+export const workSheet = (page: Page) => page.locator('dialog[data-sheet="work"]');
+
+/** Opens the work sheet from the sidebar's button ("Add the work", or "See the work: <name>"), if it is not open. */
+export async function openWorkSheet(page: Page) {
+  if (await workSheet(page).evaluate((d) => (d as HTMLDialogElement).open)) return;
+  await closeOpenSheet(page);
+  await page.locator(`${READY} [data-path="evidence"] button`).click();
+  await expect(workSheet(page)).toBeVisible();
+}
+
+/** The top bar's "N things to fix" / "N numbers to check" button. */
+export const thingsButton = (page: Page) => page.getByRole("button", { name: /(things? to fix|numbers? to check)$/ });
+
+/** Opens "Things to fix before publishing" and returns the region. */
+export async function openThingsToFix(page: Page) {
+  await closeOpenSheet(page);
+  const region = page.getByRole("region", { name: "Things to fix before publishing" });
+  if (!(await region.isVisible())) await thingsButton(page).click();
+  await expect(region).toBeVisible();
+  return region;
+}
