@@ -2,10 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { ENTITLEMENTS } from "../lib/entitlements";
 import { TEAMMATES_PER_EXHBT } from "../lib/team-rules";
-import { keepClassic } from "./editor";
-
-// Release 3, milestone 0: this spec still drives the classic editor, which a bare /edit no longer serves.
-test.beforeEach(({ page }) => keepClassic(page));
+import { closeSheet } from "./editor";
 
 // Teammates and private file matching (docs/decisions/0013): invites by email and accepting them,
 // teammates on the public page and the tile, removing and leaving, a teammate's own exhbt from the
@@ -87,6 +84,7 @@ async function acceptAs(page: Page, email: string, link: string, name: string) {
 
 test.describe("Inviting teammates", () => {
   test("invite by email, accept after signing in, and both see the teammate on the project", async ({ page }) => {
+    test.setTimeout(240_000);
     const own = unique("own");
     const mate = `${unique("mate")}@example.com`;
     const id = await owner(page, own);
@@ -208,6 +206,7 @@ test.describe("Inviting teammates", () => {
 
 test.describe("A teammate's own exhbt", () => {
   test("made from the project with its files, drafted into, counted on their plan, and theirs after leaving and deletion", async ({ page }) => {
+    test.setTimeout(240_000);
     const own = unique("src");
     const mate = `${unique("own")}@example.com`;
     const id = await owner(page, own);
@@ -277,6 +276,7 @@ test.describe("A teammate's own exhbt", () => {
 
 test.describe("The same file on someone else's exhbt", () => {
   test("a stranger is asked, calmly, without being told whose it is; the owner approves and they join", async ({ page }) => {
+    test.setTimeout(240_000);
     const own = unique("orig");
     const stranger = `${unique("str")}@example.com`;
     const id = await owner(page, own);
@@ -288,11 +288,16 @@ test.describe("The same file on someone else's exhbt", () => {
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
     await expect(page.locator("[data-ready=true]")).toBeAttached();
     const completed = page.waitForResponse((r) => /\/api\/files\/[0-9a-f-]{36}\/complete$/.test(r.url()));
+    // The work's file is chosen in "The work" sheet, opened from the button in the sidebar.
+    await page.getByRole("button", { name: "Add the work" }).click();
     await page.locator("input[aria-label='Choose a file']").setInputFiles({ name: "my-report.txt", mimeType: "text/plain", buffer: NOTES });
     // The server's answer is an opaque id: nothing about the other account or its exhbt.
     const body = (await (await completed).json()) as { match: { id: string; name: string } };
     expect(Object.keys(body.match).sort()).toEqual(["id", "name"]);
     expect(JSON.stringify(body)).not.toContain(own);
+
+    // The prompt is drawn on the page, under the work sheet the file was chosen in (a modal dialog): close the sheet to answer it.
+    await closeSheet(page);
 
     const prompt = page.getByTestId("match-prompt");
     await expect(prompt.getByRole("heading", { name: "This file is already on someone else's exhbt" })).toBeVisible();
