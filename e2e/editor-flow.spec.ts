@@ -314,9 +314,10 @@ for (const f of offered()) {
       const to = along(third, axis, 0.7);
       await page.mouse.move(to.x, to.y, { steps: 15 });
       await expect(said(page)).toHaveText(`The box would go to place 3 of ${n}.`);
-      // No box's layout box has changed; the frames round the flowchart haven't moved.
+      // No box's layout box has changed; nothing round the flowchart has moved (the boxes themselves are checked by style below).
       expect(near(await laidOut(page), layout)).toBe(true);
-      expect(differences(page0, await boxes(page, { frames: true }))).toEqual([]);
+      const outside = (all: Awaited<ReturnType<typeof boxes>>) => all.filter((b) => !b.key.startsWith("flowchart box"));
+      expect(differences(outside(page0), outside(await boxes(page, { frames: true })))).toEqual([]);
       if (style === "line") {
         // Every box is where it was, the line is in the gap after box 3, and the copy the size of the box is under the pointer.
         expect(near(await drawn(page), still)).toBe(true);
@@ -660,7 +661,8 @@ test.describe("in the looks", () => {
         const [ink, chip] = await tool.evaluate((el) => [getComputedStyle(el).color, getComputedStyle(el).backgroundColor]);
         expect(contrast(ink!, chip!), `${theme.id}: a tool's icon on its chip`).toBeGreaterThanOrEqual(3);
       }
-      // The line, in the look's link colour, against the page's ground.
+      // The line (line style only), in the look's link colour, against the page's ground.
+      if ((await list(page).getAttribute("data-flow-style")) !== "line") continue;
       await gripOf(page, 0).focus();
       await page.keyboard.press("Space");
       await expect(said(page)).toHaveText(/^Picked up box 1 of/);
