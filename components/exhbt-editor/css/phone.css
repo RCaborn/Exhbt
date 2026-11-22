@@ -181,6 +181,15 @@
     font-weight: 400;
     color: var(--color-graphite);
   }
+  /* Why a Remove that is off can't remove (the flowchart a layout always has): in the name's place, whole. */
+  .xe-bar-why {
+    font-size: 0.8125rem;
+    line-height: 1.3;
+    white-space: normal;
+  }
+  .xe-phonebar .xe-bar-off {
+    opacity: 0.55;
+  }
   .xe-bar-gap {
     flex: 1 1 0;
     min-width: 0;

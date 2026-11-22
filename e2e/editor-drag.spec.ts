@@ -281,6 +281,80 @@ test.describe("each section's toolbar, at 1440 wide", () => {
     });
   }
 
+  test("a case study's and research's flowchart: Remove is there but off, and says why when focused or pressed; a gallery's takes it off", async ({ page }) => {
+    const WHY = { "case-study": "A case study always has a flowchart. Choose another layout to take it off.", research: "Research always has a flowchart. Choose another layout to take it off." } as const;
+    for (const f of ["case-study", "research"] as const) {
+      await openTiming(page, f, { full: true });
+      const order = await pageOrder(page);
+      const remove = frame(page, "flow").locator('[data-tool="remove"]');
+      await expect(remove).toHaveAttribute("aria-disabled", "true");
+      await expect(remove).toHaveAccessibleName("Remove Flowchart");
+      await expect(remove).toHaveAccessibleDescription(WHY[f]);
+      await expect(remove).toHaveAttribute("data-tip", WHY[f]);
+      await frame(page, "flow").hover();
+      await remove.click();
+      await expect(said(page)).toHaveText(WHY[f]);
+      expect(await pageOrder(page)).toEqual(order);
+      // Shown as well as said: the reason in its tooltip, while the button keeps the focus.
+      expect(await remove.evaluate((el) => getComputedStyle(el, "::after").content)).toBe(`"${WHY[f]}"`);
+    }
+    await openTiming(page, "gallery", { full: true });
+    const remove = frame(page, "flow").locator('[data-tool="remove"]');
+    await expect(remove).not.toHaveAttribute("aria-disabled", "true");
+    await frame(page, "flow").hover();
+    await remove.click();
+    expect(await pageOrder(page)).not.toContain("flow");
+  });
+
+  test("each toolbar is one Tab stop: the arrows, Home and End move along it; the grip's arrows move a section only while it is carried", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    const stops = () =>
+      page.locator(`${READY} article [data-section-id] > .xe-tools`).evaluateAll((bars) =>
+        bars.map((t) => [...t.querySelectorAll("button")].filter((b) => b.tabIndex === 0 && !b.closest("[hidden]")).map((b) => b.getAttribute("aria-label"))),
+      );
+    // One stop each, the grip.
+    for (const s of await stops()) expect(s).toEqual([expect.stringMatching(/^Drag .* to move it$/)]);
+    const id = "quote-1";
+    const tools = frame(page, id).locator(":scope > .xe-tools");
+    const name = await nameOf(page, id);
+    await grip(page, id).focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(tools.locator('[data-tool="up"]')).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    await expect(tools.locator('[data-tool="down"]')).toBeFocused();
+    await page.keyboard.press("ArrowLeft");
+    await expect(tools.locator('[data-tool="up"]')).toBeFocused();
+    await page.keyboard.press("End");
+    await expect(tools.getByRole("button", { name: `Remove ${name}` })).toBeFocused();
+    await page.keyboard.press("Home");
+    await expect(grip(page, id)).toBeFocused();
+    // The stop follows the focus while it is in the toolbar, and Tab leaves the toolbar in one press, from any of its buttons.
+    await page.keyboard.press("End");
+    await page.keyboard.press("Tab");
+    expect(await page.evaluate((i) => Boolean(document.activeElement?.closest(`[data-section-id="${i}"] > .xe-tools`)), id)).toBe(false);
+    // Back with Shift+Tab: the stop went back to the grip when the focus left.
+    await page.keyboard.press("Shift+Tab");
+    await expect(grip(page, id)).toBeFocused();
+    for (const s of await stops()) expect(s).toEqual([expect.stringMatching(/^Drag .* to move it$/)]);
+    // Carried from the keyboard, the arrows move the section, and Home and End do nothing to the focus; dropped, the arrows are the toolbar's again.
+    const order = await pageOrder(page);
+    await page.keyboard.press("Space");
+    await expect(lifting(page)).toHaveAttribute("data-xe-drag", "keys");
+    await page.keyboard.press("ArrowDown");
+    expect(await place(page)).toBe(order.indexOf(id) + 1);
+    await page.keyboard.press("Home");
+    await page.keyboard.press("End");
+    await expect(grip(page, id)).toBeFocused();
+    await expect(lifting(page)).toHaveAttribute("data-xe-drag", "keys");
+    await page.keyboard.press("ArrowUp");
+    expect(await place(page)).toBe(order.indexOf(id));
+    await page.keyboard.press("Escape");
+    await expect(lifting(page)).toHaveCount(0);
+    expect(await pageOrder(page)).toEqual(order);
+    await page.keyboard.press("ArrowRight");
+    await expect(tools.locator('[data-tool="up"]')).toBeFocused();
+  });
+
   test("research with two reference lines: neither toolbar covers the line above, the References heading or a Web address chip", async ({ page }) => {
     await openTiming(page, "research", { full: true });
     await waitLive(page);

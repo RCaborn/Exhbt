@@ -166,10 +166,15 @@ test.describe("each section shows only its grip", () => {
     await expect(chart).toBeHidden();
     await expect(bar(page)).toHaveAttribute("aria-label", "Graph 2: tools");
 
-    // The flowchart in a case study has no Remove (the layout always has one).
+    // The flowchart in a case study can't be removed (the layout always has one): its Remove is there but off, and a tap says why.
     await choose(page, "flow");
     await expect(bar(page)).toHaveAttribute("aria-label", "Flowchart: tools");
-    await expect(onBar(page, "Remove Flowchart")).toHaveCount(0);
+    const why = "A case study always has a flowchart. Choose another layout to take it off.";
+    await expect(onBar(page, "Remove Flowchart")).toHaveAttribute("aria-disabled", "true");
+    await expect(onBar(page, "Remove Flowchart")).toHaveAccessibleDescription(why);
+    await onBar(page, "Remove Flowchart").tap();
+    await expect(bar(page).getByText(why)).toBeVisible();
+    await expect(frame(page, "flow")).toBeVisible();
 
     // A plain field in the title: the bar names the part (its More actions show only where the AI drafted it).
     await field(page, "title").tap();
@@ -551,6 +556,27 @@ test("a swipe on a section's words scrolls and moves nothing; a 260ms press on a
 /* ------------------------------------------------------------------------------------------------
  * At 390px: no sideways scroll, and every control takes a thumb
  * ---------------------------------------------------------------------------------------------- */
+
+test("the bar is one Tab stop: the arrows, Home and End move along it, and the stop goes back to its first button when the focus leaves", async ({ page }) => {
+  await openTiming(page, "case-study", { full: true });
+  await waitLive(page);
+  await choose(page, "quote-1");
+  const stops = () => bar(page).locator("button").evaluateAll((bs) => bs.filter((b) => b.tabIndex === 0 && b.getClientRects().length > 0).map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim()));
+  expect(await stops()).toHaveLength(1);
+  const first = bar(page).locator("button").first();
+  await first.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(onBar(page, "Move Quote down")).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(onBar(page, "Reorder sections")).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(first).toBeFocused();
+  await page.keyboard.press("End");
+  expect(await stops()).toEqual(["Reorder sections"]);
+  await grip(page, "quote-1").focus();
+  expect(await stops()).toHaveLength(1);
+  expect((await stops())[0]).toBe(await first.getAttribute("aria-label"));
+});
 
 test("an open + menu lies over every chip, grip and toolbar: before the flowchart, a tap anywhere on it is the menu's", async ({ page }) => {
   await openTiming(page, "case-study", { full: true });

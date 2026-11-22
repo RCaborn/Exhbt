@@ -1,12 +1,12 @@
 "use client";
 
 import "../css/phone.css";
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Bold, Highlighter, Italic, Link2, Plus, Star, Trash2, Undo2, Unlink, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { formatLimits, type ExhbtDoc } from "@/lib/exhbt/blocks";
 import type { DraftBlock } from "@/lib/exhbt/draft-blocks";
-import { FORMAT_COPY, FORMAT_RULES, formatOf, type Format } from "@/lib/exhbt/formats";
+import { FORMAT_COPY, formatOf, type Format } from "@/lib/exhbt/formats";
 import { pageItems, type PageItem } from "@/lib/exhbt/layouts";
 import { useActiveRich, useRuntime, useUiState, type ActiveRich } from "../context";
 import { MoreActions } from "../draft-tools";
@@ -15,7 +15,7 @@ import { jumpTo } from "../jump";
 import { labelOf } from "../labels";
 import { useStoreInternal } from "../store";
 import type { Store } from "../store-core";
-import { actionsFor } from "../Toolbar";
+import { actionsFor, useRoving, whyFlowStays } from "../Toolbar";
 import { usePhone } from "./usePhone";
 
 /*
@@ -62,6 +62,8 @@ function Bar() {
   useBarHeight(ref);
   useKeyboard(ref);
   useMenusInView();
+  // One Tab stop, the arrows along it (Toolbar.tsx).
+  useRoving(ref);
 
   const section = where.part && "section" in where.part ? where.part.section : null;
   const info = useSectionInfo(section);
@@ -88,7 +90,7 @@ function Bar() {
         {rich ? (
           <Formatting rich={rich} path={where.path} />
         ) : section && info ? (
-          <SectionTools id={section} info={info} />
+          <SectionTools key={section} id={section} info={info} />
         ) : shell ? (
           <ShellTools block={shell} name={name!} skill={skill} />
         ) : (
@@ -235,12 +237,16 @@ function ReorderButton() {
 function SectionTools({ id, info }: { id: string; info: Info }) {
   const store = useStoreInternal();
   const board = useBoard();
+  const { uiApi } = useRuntime();
+  const why = useId();
+  // After a press on a Remove that is off, its reason in place of the section's name, until the bar follows another part.
+  const [told, setTold] = useState(false);
   const { label, place, count, kind, f } = info;
-  const removable = kind !== "flow" || FORMAT_RULES[f].flowRemovable;
+  const stays = kind === "flow" ? whyFlowStays(f) : null;
   const block: DraftBlock | null = kind === "flow" ? "flow" : kind === "findings" ? "findings" : null;
   return (
     <>
-      <span className="xe-bar-name">{label}</span>
+      <span className={told ? "xe-bar-name xe-bar-hint xe-bar-why" : "xe-bar-name"}>{told && stays ? stays : label}</span>
       <Button size="sm" className="xe-bar-btn" label={`Move ${label} up`} disabled={place <= 0} onClick={() => board.moveBy(id, -1)}>
         <ArrowUp {...ICON} />
       </Button>
@@ -258,7 +264,27 @@ function SectionTools({ id, info }: { id: string; info: Info }) {
           <MoreActions block={block} />
         </span>
       )}
-      {removable && (
+      {stays ? (
+        // Where the layout always has a flowchart (the review's vision-3): there but off, and a press says why, and shows it.
+        <>
+          <Button
+            size="sm"
+            className="xe-bar-btn xe-bar-off"
+            label={`Remove ${label}`}
+            aria-disabled="true"
+            aria-describedby={why}
+            onClick={() => {
+              uiApi.say(stays);
+              setTold(true);
+            }}
+          >
+            <Trash2 {...ICON} />
+          </Button>
+          <span id={why} hidden>
+            {stays}
+          </span>
+        </>
+      ) : (
         <Button size="sm" className="xe-bar-btn" label={`Remove ${label}`} onClick={() => board.remove(id)}>
           <Trash2 {...ICON} />
         </Button>

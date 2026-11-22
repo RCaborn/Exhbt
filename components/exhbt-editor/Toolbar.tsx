@@ -1,11 +1,12 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useId, useLayoutEffect, useRef } from "react";
 import { ArrowDown, ArrowUp, GripVertical, Star, Trash2 } from "lucide-react";
 import { FORMAT_RULES, formatOf, type Format } from "@/lib/exhbt/formats";
 import { pageItems } from "@/lib/exhbt/layouts";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
 import type { ItemAs } from "@/lib/exhbt/layouts";
+import { useRuntime } from "./context";
 import { useBoard } from "./drag";
 import { mainColumn } from "./drag/engine";
 import { MoreActions } from "./draft-tools";
@@ -192,20 +193,101 @@ function Tool({ name, tool, onClick, disabled, pressed, children }: { name: stri
   );
 }
 
+const MOVES = new Set(["ArrowLeft", "ArrowRight", "Home", "End"]);
+
+/**
+ * Roving focus for a toolbar (the WAI-ARIA toolbar pattern; the review's accessibility-6), here and on
+ * the phone's bar: the toolbar is one Tab stop, the left and right arrows move along its buttons in
+ * the order they are drawn (a toolbar inside a picture's corner runs leftwards from its grip), and
+ * Home and End go to its ends. The stop is the button last in focus while the focus is in the toolbar,
+ * and its first button (a section's grip) once the focus leaves, so a hidden or disabled button never
+ * holds it. A menu the toolbar opens ("More actions") keeps its own buttons. While anything is carried
+ * the keys are the drag's: the grip's arrows move a section only while it is carried, and move along
+ * the toolbar only while nothing is. Written straight to the buttons' tabindex: nothing draws again.
+ */
+export function useRoving(ref: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const bar = ref.current;
+    if (!bar) return;
+    let current: HTMLElement | null = null;
+    const all = () => {
+      const menus = [...bar.querySelectorAll("[aria-controls]")].map((t) => document.getElementById(t.getAttribute("aria-controls") ?? ""));
+      return [...bar.querySelectorAll<HTMLElement>("button")].filter((b) => !b.closest("form") && !menus.some((m) => m?.contains(b)));
+    };
+    const usable = (b: HTMLElement) => b.getClientRects().length > 0 && !(b as HTMLButtonElement).disabled;
+    /** The buttons that can take the focus, in the order they are drawn: row by row, left to right. */
+    const drawn = () =>
+      all()
+        .filter(usable)
+        .map((b) => ({ b, r: b.getBoundingClientRect() }))
+        .sort((p, q) => (Math.abs(p.r.top - q.r.top) > 4 ? p.r.top - q.r.top : p.r.left - q.r.left))
+        .map(({ b }) => b);
+    const sync = () => {
+      const list = all();
+      const stop = current && list.includes(current) && usable(current) ? current : (list.find(usable) ?? null);
+      for (const b of list) {
+        const want = b === stop ? 0 : -1;
+        if (b.tabIndex !== want) b.tabIndex = want;
+      }
+    };
+    const onFocusIn = (e: FocusEvent) => {
+      if (!all().includes(e.target as HTMLElement)) return;
+      current = e.target as HTMLElement;
+      sync();
+    };
+    const onFocusOut = (e: FocusEvent) => {
+      if (bar.contains(e.relatedTarget as Node | null)) return;
+      current = null;
+      sync();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (!MOVES.has(e.key) || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || document.querySelector("[data-xe-drag]")) return;
+      const list = drawn();
+      const at = list.indexOf(e.target as HTMLElement);
+      if (at < 0) return;
+      e.preventDefault();
+      const to = e.key === "ArrowRight" ? list[at + 1] : e.key === "ArrowLeft" ? list[at - 1] : e.key === "Home" ? list[0] : list[list.length - 1];
+      to?.focus();
+    };
+    // Buttons come and go (an action, More actions, the phone's bar following another part), and Move up or down turns off at an end.
+    const changes = new MutationObserver(sync);
+    changes.observe(bar, { subtree: true, childList: true, attributes: true, attributeFilter: ["disabled", "hidden"] });
+    bar.addEventListener("focusin", onFocusIn);
+    bar.addEventListener("focusout", onFocusOut);
+    bar.addEventListener("keydown", onKey);
+    sync();
+    return () => {
+      changes.disconnect();
+      bar.removeEventListener("focusin", onFocusIn);
+      bar.removeEventListener("focusout", onFocusOut);
+      bar.removeEventListener("keydown", onKey);
+    };
+  }, [ref]);
+}
+
+/** Why the flowchart can't be removed in layout `f` (decision 0026; the review's vision-3), or null where it can. */
+export function whyFlowStays(f: Format): string | null {
+  if (FORMAT_RULES[f].flowRemovable) return null;
+  return f === "case-study" ? "A case study always has a flowchart. Choose another layout to take it off." : `${FORMAT_RULES[f].name} always has a flowchart. Choose another layout to take it off.`;
+}
+
 export function Toolbar() {
   const frame = useFrame();
   const store = useStoreInternal();
   const board = useBoard();
+  const { uiApi } = useRuntime();
   const id = frame?.id ?? "";
   const label = useDoc((d) => labelOf(d, id));
   const f = useDoc((d) => formatOf(d));
   // The layout's action depends on the page's order; read when the frame draws (it draws on every structural change).
   const actions = frame ? actionsFor(store.get(), id, frame.kind, f, store, frame.as) : [];
   const ref = useRef<HTMLDivElement>(null);
+  const why = useId();
   usePlace(ref);
+  useRoving(ref);
   if (!frame) return null;
   const { place, count, kind } = frame;
-  const removable = kind !== "flow" || FORMAT_RULES[f].flowRemovable;
+  const stays = kind === "flow" ? whyFlowStays(f) : null;
   const block = kind === "flow" ? "flow" : kind === "findings" ? "findings" : null;
   return (
     <div ref={ref} className="xe-tools" data-edit-only role="toolbar" aria-label={`${label}: tools`}>
@@ -228,7 +310,31 @@ export function Toolbar() {
           <MoreActions block={block} />
         </span>
       )}
-      {removable && (
+      {stays ? (
+        // Where the layout always has a flowchart, Remove is there but off, as a box's is at three boxes: focused, its reason is its
+        // description and its tooltip; pressed, the reason is said, and shown (a touch screen has no tooltips) until the focus moves on.
+        <>
+          <button
+            type="button"
+            className="xe-tool"
+            data-tool="remove"
+            aria-label={`Remove ${label}`}
+            aria-disabled="true"
+            aria-describedby={why}
+            data-tip={stays}
+            onClick={(e) => {
+              uiApi.say(stays);
+              e.currentTarget.setAttribute("data-explain", "");
+            }}
+            onBlur={(e) => e.currentTarget.removeAttribute("data-explain")}
+          >
+            <Trash2 aria-hidden size={15} strokeWidth={2.25} />
+          </button>
+          <span id={why} hidden>
+            {stays}
+          </span>
+        </>
+      ) : (
         <Tool name={`Remove ${label}`} tool="remove" onClick={() => board.remove(id)}>
           <Trash2 aria-hidden size={15} strokeWidth={2.25} />
         </Tool>

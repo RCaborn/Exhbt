@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { FORMAT_RULES } from "../lib/exhbt/formats";
-import { frame, grip, offered, openTiming, pageOrder, READY, toolbarClashes, undoLabel, waitLive } from "./page-editor";
+import { docNow, field, frame, grip, offered, openTiming, pageOrder, READY, toolbarClashes, undoLabel, waitLive } from "./page-editor";
 
 /*
  * The editor on a tablet (decision 0026, "The chrome"; docs/briefs/edit-on-page/r3-l-phone.md), on the
@@ -112,6 +112,45 @@ test("research with two reference lines, one under the other: no toolbar covers 
   expect(await page.evaluate((at) => window.__exhbtEditor!.insert("link", at), n)).toBeTruthy();
   await expect.poll(async () => (await pageOrder(page)).length).toBe(n + 1);
   expect(await toolbarClashes(page)).toEqual([]);
+});
+
+test("in a finding: its Move up, Move down and Remove, and the formatting buttons, each take a 44px press, and no press overlaps another", async ({ page }) => {
+  await openTiming(page, "case-study", { full: true });
+  await waitLive(page);
+  const n = (await docNow(page)).sections.findIndex((s) => s.kind === "findings");
+  const words = field(page, `sections.${n}.items.1`);
+  await words.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await words.tap();
+  const own = frame(page, "findings").locator("li:focus-within > .xe-list-tools button");
+  await expect(own).toHaveCount(3);
+  await expect(own.first()).toBeVisible();
+  // L's measure (editor-phone): from each control's middle, how far each way a finger still lands on it, with nothing over it.
+  const small = await page.evaluate(() => {
+    const controls = [...document.querySelectorAll<HTMLElement>('[data-editor="page"] li:focus-within > .xe-list-tools button, [data-editor="page"] .xe-format button')].filter(
+      (el) => el.getClientRects().length > 0 && Number(getComputedStyle(el.parentElement!).opacity) > 0,
+    );
+    const mine = (el: Element, x: number, y: number) => {
+      const hit = document.elementFromPoint(x, y);
+      return Boolean(hit && (hit === el || el.contains(hit)));
+    };
+    const bad: string[] = [];
+    for (const el of controls) {
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const reach = (dx: number, dy: number) => {
+        let s = 0;
+        while (s < 40 && mine(el, cx + dx * (s + 1), cy + dy * (s + 1))) s++;
+        return s;
+      };
+      const w = reach(-1, 0) + reach(1, 0) + 1;
+      const h = reach(0, -1) + reach(0, 1) + 1;
+      if (!mine(el, cx, cy) || w < 42 || h < 42) bad.push(`${el.getAttribute("aria-label")} (${Math.round(r.width)}x${Math.round(r.height)}, takes ${w}x${h})`);
+    }
+    return { bad, n: controls.length };
+  });
+  expect(small.n).toBeGreaterThanOrEqual(3);
+  expect(small.bad).toEqual([]);
 });
 
 test("a 260ms press on a tile's grip, in its corner, picks the picture up where it is: the place shown is its own", async ({ page }) => {
