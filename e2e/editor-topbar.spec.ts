@@ -214,7 +214,9 @@ test.describe("the top bar", () => {
     await page.goto(`/exhbts/${id}/edit?save=stale`);
     await waitReady(page);
     await typeIn(page, "title", "Would a second till help?");
-    await expect(bar(page).getByText("The editor was updated. Reload to carry on; your changes are kept in this browser.")).toBeVisible();
+    await expect(bar(page).locator(".xe-save-words")).toHaveText("The editor was updated. Reload to carry on; your changes are kept in this browser.");
+    // The same words are said once in the live region that was there from the start.
+    await expect(bar(page).locator("div[role=status].sr-only")).toHaveText("The editor was updated. Reload to carry on; your changes are kept in this browser.");
     await expect(bar(page).getByRole("button", { name: "Reload" })).toBeVisible();
     await expect(bar(page).getByRole("button", { name: /Not saved/ })).toHaveCount(0);
   });

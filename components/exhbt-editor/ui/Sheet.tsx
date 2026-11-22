@@ -10,7 +10,7 @@ import { useRuntime, useUiState, type SheetName } from "../context";
  * it is open; Escape closes it; the focus goes back to what opened it. Its contents are drawn only
  * while it is open. App chrome, in the app's own style.
  */
-export function Sheet({ name, title, children }: { name: SheetName; title: string; children: ReactNode }) {
+export function Sheet({ name, title, returnTo, children }: { name: SheetName; title: string; /** Where the focus goes on closing, tried before the opener (a graph just added: its "Edit figures"). */ returnTo?: () => HTMLElement | null; children: ReactNode }) {
   const open = useUiState((s) => s.sheet?.name === name);
   const { ui, uiApi } = useRuntime();
   const ref = useRef<HTMLDialogElement>(null);
@@ -37,11 +37,12 @@ export function Sheet({ name, title, children }: { name: SheetName; title: strin
       // back to what opened it only when no sheet is open now.
       onClose={(e) => {
         if (ui.get().sheet?.name === name) uiApi.close();
-        const back = opener.current;
+        const from = opener.current;
+        const back = returnTo?.() ?? from;
         opener.current = null;
         // Nor when the person (or a jump) has put the focus somewhere since the dialog shut.
         const a = document.activeElement;
-        const unmoved = !a || a === document.body || e.currentTarget.contains(a);
+        const unmoved = !a || a === document.body || a === from || e.currentTarget.contains(a);
         if (!ui.get().sheet && unmoved && back?.isConnected) back.focus();
       }}
     >
