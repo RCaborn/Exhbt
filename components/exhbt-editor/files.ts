@@ -79,6 +79,9 @@ export type FilesController = Methods & {
   settle(opts?: { keepalive?: boolean; ending?: boolean }): void;
 };
 
+/** A field being typed in: the cursor is not taken from it. */
+const TYPING = 'textarea, input, select, [contenteditable]:not([contenteditable="false"])';
+
 /** Deletes a stored file. Never throws: a leftover file is harmless, a stuck editor isn't. With `keepalive`, the request outlives the page. */
 function deleteFile(fileId: string, keepalive: boolean) {
   void fetch(`/api/files/${encodeURIComponent(fileId)}`, { method: "DELETE", keepalive }).catch(() => {});
@@ -130,6 +133,8 @@ export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: nu
     const at = from < 0 ? pageItems(store.get()).length : from;
     if (!files.length) return;
     set((s) => ({ error: { ...s.error, image: undefined }, status: "" }));
+    // Where the focus was as the pictures came in: the "+", the tray's button or a menu's, or nowhere.
+    const focusWas = typeof document === "undefined" ? null : document.activeElement;
     const doc = store.get();
     const room = roomFor(doc.sections, "image", formatOf(doc));
     const take = files.slice(0, room);
@@ -203,10 +208,12 @@ export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: nu
     }));
     if (input) input.value = "";
     if (placed > 0) {
-      // The cursor goes to the first new picture's description, unless the person has gone somewhere else meanwhile.
+      // The cursor goes to the first new picture's description, unless the person has gone somewhere else meanwhile:
+      // the focus is still where it was as the pictures came in (and that is not a field being typed in), or nowhere.
       setTimeout(() => {
         const a = document.activeElement;
-        if (a && a !== document.body && a !== input && !a.closest("[data-xe-adds]")) return;
+        const stayed = !a || a === document.body || a === input || (a === focusWas && !a.closest(TYPING));
+        if (!stayed) return;
         const d = store.get();
         const n = d.sections.filter((s) => s.kind === "image").findIndex((s) => s.kind === "image" && s.id === added[0] && !s.alt.trim());
         if (n >= 0) document.getElementById(`image-${n}-alt`)?.focus();

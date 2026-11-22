@@ -705,6 +705,24 @@ test.describe("the status line", () => {
     expect(deleted).toEqual([]);
   });
 
+  test("pictures added with the focus left on the tray's button or on a '+': the cursor goes to the first new picture's description", async ({ page }) => {
+    await openDoc(page, freshName("adds"), { ...sampleDoc("gallery"), sections: sampleDoc("gallery").sections.filter((s) => s.kind !== "image") });
+    // From the tray: the button keeps the focus while the picker is open.
+    const block = page.locator(`${READY} [data-xe-tray] [data-block="image"]`);
+    const chooser = page.waitForEvent("filechooser");
+    await block.click();
+    await expect(block).toBeFocused();
+    await (await chooser).setFiles({ name: "a.png", mimeType: "image/png", buffer: png(30, 10) });
+    await expect(page.locator(`${READY} [data-kind="image"]`)).toHaveCount(1);
+    await expect(page.locator("#image-0-alt")).toBeFocused();
+    // With the focus on the "+" at the end of the page.
+    const plus = page.locator(`${READY} [data-path="sections"] button`).first();
+    await plus.focus();
+    await page.locator(`${READY} input[aria-label='Choose an image']`).setInputFiles({ name: "b.png", mimeType: "image/png", buffer: png(40, 10) });
+    await expect(page.locator(`${READY} [data-kind="image"]`)).toHaveCount(2);
+    await expect(page.locator("#image-1-alt")).toBeFocused();
+  });
+
   test("a picture over the size limit says why in the alert, and adds nothing", async ({ page }) => {
     const id = await openNew(page, freshName("big"), "free");
     // A GIF is never shrunk in the browser, so one over the plan's limit stays over it.
