@@ -3,6 +3,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { text, validateForPublish, type ExhbtDoc, type Section, type SectionOf } from "../lib/exhbt/blocks";
 import { normaliseNumber } from "../lib/exhbt/verify";
 import { fullDoc, openBankingDoc } from "../lib/exhbt/sample";
+import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import {
   allowEditOnly,
   boxes,
@@ -103,7 +104,9 @@ const overlaps = (a: { x: number; y: number; w: number; h: number }, b: { x: num
 
 test.describe("a graph's figures", () => {
   test("a new graph opens its sheet; typing redraws the graph behind it; the kind changes; a chart issue jumps to its field; the chip covers no words", async ({ page }) => {
-    const id = await openNew(page, freshName("graph"));
+    // The first test of a run compiles the editor in development.
+    test.setTimeout(150_000);
+    await openNew(page, freshName("graph"));
     await openEndPlus(page);
     await page.locator(`${MENU} [data-block="graph"]`).click();
     const s = sheet(page, "chart");
@@ -161,7 +164,8 @@ test.describe("a graph's figures", () => {
     expect(words.filter((w) => overlaps(c, w)).map((w) => `${w.text} at ${[w.x, w.y, w.w, w.h].map(Math.round).join(",")}`), `the chip at ${[c.x, c.y, c.w, c.h].map(Math.round).join(",")}`).toEqual([]);
     const tools = rectOf((await frame(page, graphId).locator(".xe-tools").boundingBox())!);
     expect(overlaps(c, tools)).toBe(false);
-    await waitSaved(page, id);
+    // Saved (the stored copy is read into the schema's shape, so it is not compared key for key here).
+    await waitSaved(page);
   });
 });
 
@@ -237,7 +241,7 @@ test.describe("the figure picked from the report", () => {
     const label = fig.locator(".xe-fig-picked");
     await expect(label).toBeVisible();
     await expect(label.getByRole("button", { name: /^From your report, page 3/ })).toBeVisible();
-    const tick = label.getByRole("checkbox", { name: TICK });
+    const tick = label.locator(".xe-fig-picked-tick").getByRole("checkbox", { name: TICK });
     await expect(tick).not.toBeChecked();
     await expect(label).toContainText("I may share this");
 
@@ -250,7 +254,7 @@ test.describe("the figure picked from the report", () => {
     const seen = countPicks(page);
     // Ticked, it leaves the label (so check() can't see it stay ticked): the focus goes to where the figure came from.
     await tick.click();
-    await expect(label.getByRole("checkbox")).toHaveCount(0);
+    await expect(label.locator(".xe-fig-picked-tick")).toHaveCount(0);
     await expect(label.getByRole("button", { name: /^From your report, page 3/ })).toBeFocused();
     await expect(label.getByRole("button", { name: /^From your report, page 3/ })).toBeVisible();
     expect(validateForPublish(await docNow(page)).some((i) => i.path === tickPath)).toBe(false);
@@ -277,7 +281,7 @@ test.describe("the figure picked from the report", () => {
     await pop.getByTestId("page-picker").getByRole("button", { name: "Page 1", exact: true }).click();
     await expect(pop.getByText("Page 1 is in. Crop it to the figure, then describe it.")).toBeVisible();
     await expect(label.getByRole("button", { name: /^From your report, page 1/ })).toBeVisible();
-    await expect(label.getByRole("checkbox", { name: TICK })).not.toBeChecked();
+    await expect(label.locator(".xe-fig-picked-tick").getByRole("checkbox", { name: TICK })).not.toBeChecked();
     expect(seen.picks).toBe(0);
     await waitSaved(page, id);
   });
@@ -457,5 +461,35 @@ test.describe("nothing moves", () => {
     await seeAsVisitor(page, true);
     await settle(page);
     expect(differences(await boxes(page), editing)).toEqual([]);
+  });
+});
+
+test.describe("in the Night look", () => {
+  test("axe on the page with every mark in the look's error colour showing: Needs a description, a Web address with no address, the label's tick, an empty graph", async ({ page }) => {
+    const night = PORTFOLIO_THEMES.find((t) => t.look === "night")!;
+    const user = freshName("night");
+    await page.goto(`/dev/portfolio?username=${user}&plan=max&count=0&with=gallery&look=${night.id}`);
+    await page.goto(`/auth/dev?email=${user}@example.com&next=/exhbts`);
+    await page.goto((await page.locator('a[href$="/edit"]').first().getAttribute("href"))!);
+    await waitReady(page);
+    await page.evaluate(() => {
+      const s = window.__exhbtEditor!;
+      const first = s.get().sections.find((x) => x.kind === "image")!;
+      s.patch(first.id, (x) => (x.kind === "image" ? { ...x, alt: "", picked: { from: "report.pdf", page: 3, box: { x: 0, y: 0, w: 1, h: 1 }, shareOk: false } } : x));
+      // A link with no address: the sample's own (its links may be at the gallery's cap), or a new one.
+      const link = s.get().sections.find((x) => x.kind === "link");
+      if (link) s.patch(link.id, (x) => (x.kind === "link" ? { ...x, href: "" } : x));
+      else s.insert("link", 99);
+      // A graph with no numbers yet: the sample's own, emptied, or a new one.
+      const graph = s.get().sections.find((x) => x.kind === "graph");
+      if (graph) s.patch(graph.id, (x) => (x.kind === "graph" ? { ...x, chart: { kind: "beforeAfter", title: "", beforeLabel: "Before", afterLabel: "After", lowerIsBetter: false, rows: [{ label: "", before: 0, after: 0 }] } } : x));
+      else s.insert("graph", 99);
+    });
+    await expect(page.locator(`${READY} .xe-fig-empty`).first()).toBeVisible();
+    await expect(page.locator(`${READY} .xe-fig-needs`).first()).toBeVisible();
+    await expect(page.locator(`${READY} .xe-fig-chip[data-missing]`).first()).toBeVisible();
+    await expect(page.locator(`${READY} .xe-fig-picked-tick input[type=checkbox]`)).toBeVisible();
+    await settle(page);
+    expect(await scan(page, `${READY} article`)).toEqual([]);
   });
 });
