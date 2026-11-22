@@ -174,7 +174,8 @@ test.describe("each section shows only its grip", () => {
     await expect(onBar(page, "Remove Flowchart")).toHaveAccessibleDescription(why);
     // aria-disabled, so Playwright won't tap it unless told: a person can.
     await onBar(page, "Remove Flowchart").tap({ force: true });
-    await expect(bar(page).getByText(why)).toBeVisible();
+    await expect(bar(page).locator(".xe-bar-why")).toHaveText(why);
+    await expect(bar(page).locator(".xe-bar-why")).toBeVisible();
     await expect(frame(page, "flow")).toBeVisible();
 
     // A plain field in the title: the bar names the part (its More actions show only where the AI drafted it).

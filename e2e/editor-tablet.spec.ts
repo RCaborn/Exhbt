@@ -126,8 +126,9 @@ test("in a finding: its Move up, Move down and Remove, and the formatting button
   await expect(own.first()).toBeVisible();
   // L's measure (editor-phone): from each control's middle, how far each way a finger still lands on it, with nothing over it.
   const small = await page.evaluate(() => {
+    // The focused finding's own controls, and the formatting buttons shown now (the other fields' are there but hidden).
     const controls = [...document.querySelectorAll<HTMLElement>('[data-editor="page"] li:focus-within > .xe-list-tools button, [data-editor="page"] .xe-format button')].filter(
-      (el) => el.getClientRects().length > 0 && Number(getComputedStyle(el.parentElement!).opacity) > 0,
+      (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden" && Number(getComputedStyle(el.parentElement!).opacity) > 0,
     );
     const mine = (el: Element, x: number, y: number) => {
       const hit = document.elementFromPoint(x, y);
