@@ -8,7 +8,8 @@ import type { ExhbtDoc, RichText as RichTextValue } from "@/lib/exhbt/blocks";
 import { FORMAT_COPY, formatOf } from "@/lib/exhbt/formats";
 import { pageItems, rowsFor, type Cell, type ItemAs } from "@/lib/exhbt/layouts";
 import type { PageEditorProps } from "./context";
-import { CANVAS, DESCRIPTION_PLACEHOLDER, descriptionClass, LOOK_GROUND, MUTED, PILL, SKILLS_LIST, TOPBAR_H, workWords } from "./geometry";
+import { ADD_SKILL_BUTTON, ADD_SKILL_CHIP, CANVAS, DESCRIPTION_PLACEHOLDER, descriptionClass, LOOK_GROUND, MUTED, PILL, SKILLS_LIST, TOPBAR_H, workWords } from "./geometry";
+import { visitorParts } from "./visitor-parts";
 
 /*
  * The loading stand-in (decision 0026, "The crash fallback"). The new editor is drawn only in the
@@ -113,6 +114,10 @@ export function standInAdapter(doc: ExhbtDoc, base: Omit<PageCtx, "edit">): Edit
         <li data-edit-only="add-skill" inert className={PILL} style={muted}>
           Add a skill
         </li>
+        {/* On a touch screen the box's Add button, inert, as the editor draws it. */}
+        <li data-edit-only="add-skill-button" inert aria-hidden className={ADD_SKILL_BUTTON}>
+          <span className={ADD_SKILL_CHIP}>Add</span>
+        </li>
       </ul>
     ),
     // The sidebar's button as the page draws it, or "Add the work"; never left out, as on a phone the sidebar sits above the page.
@@ -157,6 +162,8 @@ export function StandInPage(props: PageEditorProps) {
             headingLevel="h2"
             confirmed={false}
             edit={edit}
+            // Save as PDF, the checked-on line and the team byline, as the editing page draws them.
+            {...visitorParts(props)}
           />
         </div>
       </div>

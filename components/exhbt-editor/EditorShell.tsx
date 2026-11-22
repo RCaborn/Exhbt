@@ -3,17 +3,14 @@
 import "./css/core.css";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { flushSync } from "react-dom";
-import { CHECKS_GUIDE } from "@/components/brand/Seal";
 import { MadeWith } from "@/components/brand/MadeWith";
 import { IMAGE_ACCEPT } from "@/components/editor/media";
 import { writeBackup } from "@/components/editor/useAutosave";
-import { checkedOnLabel } from "@/lib/checked-on";
 import { safeHref } from "@/lib/exhbt/blocks";
 import { MARKETING_HOST } from "@/lib/hosts";
 import { drawnFlow, keptItems, pageItems } from "@/lib/exhbt/layouts";
 import type { PageCtx } from "@/components/portfolio/page-ctx";
 import { ProjectView, type Owner } from "@/components/portfolio/ProjectView";
-import { TeamByline } from "@/components/portfolio/TeamByline";
 import { lookAttrs, themeStyle } from "@/components/portfolio/themeFonts";
 import { formatOf } from "@/lib/exhbt/formats";
 import { useAdapter } from "./adapter";
@@ -44,6 +41,7 @@ import { TopBar } from "./topbar/TopBar";
 import { HEADING_ID } from "./topbar/UndoButton";
 import { Tray } from "./Tray";
 import { Said } from "./ui/Said";
+import { onPortfolioHost, visitorParts } from "./visitor-parts";
 
 /*
  * The edit-on-page editor (decision 0026): the exhbt page itself, in the person's own look, with every
@@ -208,9 +206,12 @@ function Canvas() {
   const owner = useOwner();
   const format = formatOf(shell);
   const ctx = useMemo<PageCtx>(() => ({ Sub: "h3", imageUrls, format, edit: adapter }), [imageUrls, format, adapter]);
+  // Save as PDF, the checked-on line and the team byline, as "See as a visitor" draws them, inert: the page is the visitor's box for box.
+  const env = useEnv();
+  const parts = useMemo(() => visitorParts(env), [env]);
   return (
     <PageCtxContext value={ctx}>
-      <ProjectView doc={shell} owner={owner} imageUrls={imageUrls} headingLevel="h2" confirmed={confirmed} edit={adapter} />
+      <ProjectView doc={shell} owner={owner} imageUrls={imageUrls} headingLevel="h2" confirmed={confirmed} edit={adapter} {...parts} />
     </PageCtxContext>
   );
 }
@@ -227,26 +228,13 @@ function Visitor() {
   const env = useEnv();
   // A link is drawn only if it is https, as on the public page (lib/portfolio.ts mediaFor).
   const evidenceUrl = doc.evidence?.kind === "link" ? safeHref(doc.evidence.href) : doc.evidence?.kind === "file" ? env.fileEvidenceUrl : null;
-  // The date the public page draws beside the checks: the publish date, or for a draft the day it would say if it went live now.
-  const checkedOn = checkedOnLabel(env.publishedAt ?? null) ?? checkedOnLabel(new Date().toISOString());
-  // On the person's own host (alex.exhbt.co.uk) the guide is on our site, as the public page does it.
-  const onPortfolioHost = Boolean(env.liveBase?.startsWith("https://"));
+  // Save as PDF, the date beside the checks (the publish date, or today's for a draft), the checks link and the team byline, as the public page draws them.
+  const parts = useMemo(() => visitorParts(env), [env]);
   return (
     <>
-      <ProjectView
-        doc={doc}
-        owner={owner}
-        imageUrls={imageUrls}
-        evidenceUrl={evidenceUrl}
-        checkedOn={checkedOn}
-        team={env.team && env.team.length > 0 ? <TeamByline team={env.team} /> : undefined}
-        saveAsPdf
-        checksHref={onPortfolioHost ? `https://${MARKETING_HOST}${CHECKS_GUIDE}` : undefined}
-        headingLevel="h2"
-        confirmed={confirmed}
-      />
+      <ProjectView doc={doc} owner={owner} imageUrls={imageUrls} evidenceUrl={evidenceUrl} headingLevel="h2" confirmed={confirmed} {...parts} />
       <div data-visitor-signoff>
-        <MadeWith startHref={onPortfolioHost ? `https://${MARKETING_HOST}/start` : "/start"} />
+        <MadeWith startHref={onPortfolioHost(env) ? `https://${MARKETING_HOST}/start` : "/start"} />
       </div>
     </>
   );

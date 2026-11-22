@@ -447,6 +447,9 @@ test.describe("Sections in the editor", () => {
 
     // A full-length quote and a name: over.
     await menuItem(page, "Add a quote").click();
+    // The cursor reaches the new quote two frames after the add (drag/engine.ts afterAdd), with the "+" focused meanwhile:
+    // typing before it lands sends the first word to the "+" (its space presses it), as on a slow runner. Wait, as a person does.
+    await expect(page.getByLabel("The quote, word for word")).toBeFocused();
     await page.keyboard.type(nWords(LIMITS.quote.words));
     await fillPlain(page, page.getByLabel("Who said it"), "Priya Shah");
     const over = total + LIMITS.quote.words + 2 - LIMITS.totalWords;
