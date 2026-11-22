@@ -262,6 +262,7 @@ export const publishSheet = (page: Page) => page.locator('dialog[data-sheet="pub
 
 /** Opens the publish sheet (if it is not open). */
 export async function openPublishSheet(page: Page) {
+  if (!(await publishSheet(page).evaluate((d) => (d as HTMLDialogElement).open))) await closeOpenSheet(page);
   if (!(await publishSheet(page).evaluate((d) => (d as HTMLDialogElement).open))) await reviewButton(page).click();
   await expect(publishSheet(page)).toBeVisible();
 }
@@ -418,6 +419,7 @@ export async function pickGraphKind(g: Locator, kind: string) {
 
 /** Adds a graph through the end "+" (a graph just added opens its figures sheet). */
 export async function addGraphSection(page: Page) {
+  await closeOpenSheet(page);
   await addSection(page, SEL.addGraphButton);
   await expect(chartSheet(page)).toBeVisible();
 }
@@ -429,6 +431,11 @@ export async function addGraph(page: Page, n: number, kind: string, title: strin
   await pickGraphKind(g, kind);
   await g.getByLabel("Title", { exact: true }).fill(title);
   return g;
+}
+
+/** Closes whatever sheet is open (a sheet is modal: the top bar and the "+" can't be pressed behind it); nothing when none is. */
+export async function closeOpenSheet(page: Page) {
+  if (await page.locator("dialog[open]").count()) await closeSheet(page);
 }
 
 /** Closes the open sheet (its "Close" button). */
