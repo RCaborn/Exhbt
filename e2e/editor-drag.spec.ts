@@ -8,7 +8,7 @@ import { newImageSection, newSection, roomFor } from "../lib/exhbt/sections";
 import { ALL_THEMES, PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import { labelOf } from "../components/exhbt-editor/labels";
 import { HYSTERESIS, makePlan, orderWith, placeAt, pointFor, rowsInfo, type Box } from "../components/exhbt-editor/drag/plan";
-import { docNow, frame, freshName, grip, offered, openDoc, openTiming, pageOrder, READY, SAMPLES, toolbarClashes, waitLive, waitReady } from "./page-editor";
+import { docNow, frame, freshName, grip, offered, openDoc, openTiming, pageOrder, plusClashes, READY, SAMPLES, toolbarClashes, waitLive, waitReady } from "./page-editor";
 import { uniqueBytes } from "./unique-bytes";
 
 /*
@@ -1135,21 +1135,25 @@ test.describe("the + between sections", () => {
     });
   }
 
-  test("in a window under 48rem, or a main column under 42rem, with a mouse, the + takes the smaller placement in its gap (the top 32px), as on a phone", async ({ page }) => {
-    // 700px: the window. 912px: a wider window whose main column is under 42rem, the sidebar beside it. 1440px: neither.
+  test("with a mouse, at any width, a + whose gap can't hold the full one takes the small place in the top 32px of its gap, and no + covers words or a control", async ({ page }) => {
+    // The rule follows the gap, not the width (design round 2, item 4): 700px (a narrow window), 912px (a main column under
+    // 42rem beside the sidebar) and 1440px, on each layout.
     for (const width of [700, 912, 1440]) {
       await page.setViewportSize({ width, height: 900 });
-      await openTiming(page, "gallery");
-      const main = await page.locator(`${READY} .xe-insert`).first().evaluate((el) => el.parentElement!.getBoundingClientRect().width);
-      if (width === 912) expect(main, "the main column at 912px").toBeLessThan(42 * 16);
-      for (const insert of await page.locator(`${READY} .xe-insert:not([data-end])`).all()) {
-        const [i, p] = await Promise.all([insert.boundingBox(), insert.locator(".xe-plus").boundingBox()]);
-        const foot = p!.y + p!.height - i!.y;
-        if (width === 1440) expect(foot, "at 1440 its usual place, 36px down").toBeGreaterThan(32);
-        else {
-          expect(p!.y - i!.y, `${width}: its top`).toBeGreaterThanOrEqual(0);
-          expect(foot, `${width}: its foot`).toBeLessThanOrEqual(32);
+      for (const f of offered()) {
+        await openTiming(page, f, { full: true });
+        const gaps = await page.locator(`${READY} .xe-insert:not([data-end])`).evaluateAll((els) =>
+          els.map((el) => {
+            const top = el.getBoundingClientRect().top;
+            const plus = el.querySelector(".xe-plus")!.getBoundingClientRect();
+            return { gap: el.nextElementSibling!.getBoundingClientRect().top - top, small: el.hasAttribute("data-small"), foot: plus.bottom - top };
+          }),
+        );
+        for (const g of gaps) {
+          expect(g.small, `${width}px, ${f}: a ${Math.round(g.gap)}px gap`).toBe(g.gap < 36);
+          if (g.small) expect(g.foot, `${width}px, ${f}: the small one's foot`).toBeLessThanOrEqual(32);
         }
+        expect(await plusClashes(page), `${width}px, ${f}`).toEqual([]);
       }
     }
   });

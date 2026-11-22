@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { FORMAT_RULES } from "../lib/exhbt/formats";
-import { docNow, field, frame, grip, offered, openTiming, pageOrder, READY, toolbarClashes, undoLabel, waitLive } from "./page-editor";
+import { docNow, field, flowChipsNearWords, frame, grip, offered, openTiming, pageOrder, plusClashes, READY, smallPresses, toolbarClashes, undoLabel, waitLive } from "./page-editor";
 
 /*
  * The editor on a tablet (decision 0026, "The chrome"; docs/briefs/edit-on-page/r3-l-phone.md), on the
@@ -96,6 +96,11 @@ for (const f of offered()) {
     expect(found.bad).toEqual([]);
     // Shown all the time on a tablet, so none may lie over another section's words, pictures or controls, nor a chip (the review's vision-1).
     expect(await toolbarClashes(page)).toEqual([]);
+    // Nor may a "+" (design round 2, item 4: research's first gap held a 44px "+" over the H of "Hypothesis").
+    expect(await plusClashes(page)).toEqual([]);
+    // A flowchart box's chips, on its top corners, keep clear of its words, and each takes a 44px press (design round 2, item 5).
+    expect(await flowChipsNearWords(page, 4)).toEqual([]);
+    expect(await smallPresses(page, `${READY} .xp-flow-box .xe-flow-chip`)).toEqual([]);
     if (!found.tiles) return;
     // With the focus in a tile (its grip, from a keyboard), its other buttons show too, inside the tile, still covering nothing of another's.
     const tile = page.locator(`${READY} article [data-as="tile"]`).last();
@@ -106,6 +111,49 @@ for (const f of offered()) {
     expect(await toolbarClashes(page)).toEqual([]);
   });
 }
+
+test("a skill's remove badge is quiet, as a flowchart box's chips are: the look's card ground and ink, its outline edge", async ({ page }) => {
+  await openTiming(page, "research", { full: true });
+  const looks = await page.evaluate(() => {
+    const style = (el: Element) => {
+      const s = getComputedStyle(el);
+      return [s.backgroundColor, s.color, s.borderTopColor].join(" ");
+    };
+    const chip = document.querySelector('[data-editor="page"] .xp-flow-box .xe-flow-chip')!;
+    return { chip: style(chip), badges: [...document.querySelectorAll('[data-editor="page"] .xe-pill-remove')].map(style), shown: [...document.querySelectorAll('[data-editor="page"] .xe-pill-remove')].map((b) => getComputedStyle(b).opacity) };
+  });
+  // Design round 2, item 7: it was a solid black dot on every pill.
+  expect(looks.badges.length).toBeGreaterThan(1);
+  for (const b of looks.badges) expect(b).toBe(looks.chip);
+  for (const o of looks.shown) expect(o).toBe("1");
+});
+
+test("Review and publish is one line, inside its pill, at 820 and at 768 wide; the row never scrolls sideways", async ({ page }) => {
+  for (const width of [820, 768]) {
+    await page.setViewportSize({ width, height: 1024 });
+    for (const f of offered()) {
+      await openTiming(page, f, { full: true });
+      // Design round 2, item 3: at 820 its words ran over the pill, three lines high.
+      const fit = await page.getByRole("button", { name: "Review and publish" }).evaluate((b) => {
+        const r = b.getBoundingClientRect();
+        const range = document.createRange();
+        const lines: DOMRect[] = [];
+        const walker = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
+        for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+          if (!t.textContent?.trim()) continue;
+          range.selectNodeContents(t);
+          lines.push(...[...range.getClientRects()].filter((q) => q.width > 0));
+        }
+        return {
+          inside: lines.length > 0 && lines.every((q) => q.left >= r.left - 0.5 && q.right <= r.right + 0.5 && q.top >= r.top - 0.5 && q.bottom <= r.bottom + 0.5),
+          lines: new Set(lines.map((q) => Math.round(q.top))).size,
+          sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        };
+      });
+      expect(fit, `${width}px, ${f}`).toEqual({ inside: true, lines: 1, sideways: 0 });
+    }
+  }
+});
 
 test("research with two reference lines, one under the other: no toolbar covers the line above, the References heading or a Web address chip", async ({ page }) => {
   await openTiming(page, "research", { full: true });

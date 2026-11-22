@@ -640,10 +640,19 @@
     justify-content: center;
     width: 1.125rem;
     height: 1.125rem;
+    /* Quiet, as a flowchart box's chips are (flow.css): the look's card ground, its ink mark, its outline edge. */
+    border: 1px solid var(--xp-outline-edge);
     border-radius: 999px;
-    background: var(--xp-ink);
-    color: var(--xp-card);
+    background: var(--xp-card);
+    color: var(--xp-ink);
     opacity: 0;
+  }
+  .xe-pill-remove:hover {
+    border-color: var(--xp-link);
+  }
+  .xe-pill-remove:focus-visible {
+    outline: 2px solid var(--xp-link);
+    outline-offset: 2px;
   }
   .xe-pill:hover > .xe-pill-remove,
   .xe-pill:focus-within > .xe-pill-remove {

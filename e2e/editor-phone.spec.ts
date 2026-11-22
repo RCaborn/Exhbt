@@ -8,6 +8,7 @@ import {
   differences,
   docNow,
   field,
+  flowChipsNearWords,
   frame,
   freshName,
   full,
@@ -16,11 +17,13 @@ import {
   openDoc,
   openTiming,
   pageOrder,
+  plusClashes,
   png,
   READY,
   sampleDoc,
   seeAsVisitor,
   settle,
+  smallPresses,
   typeIn,
   undoLabel,
   waitLive,
@@ -603,6 +606,37 @@ test("a swipe on a section's words scrolls and moves nothing; a 260ms press on a
 /* ------------------------------------------------------------------------------------------------
  * At 390px: no sideways scroll, and every control takes a thumb
  * ---------------------------------------------------------------------------------------------- */
+
+test("Review and publish: two lines at most, inside its pill", async ({ page }) => {
+  await openTiming(page, "case-study", { full: true });
+  const fit = await page.getByRole("button", { name: "Review and publish" }).evaluate((b) => {
+    const r = b.getBoundingClientRect();
+    const range = document.createRange();
+    const lines: DOMRect[] = [];
+    const walker = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
+    for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+      if (!t.textContent?.trim()) continue;
+      range.selectNodeContents(t);
+      lines.push(...[...range.getClientRects()].filter((q) => q.width > 0));
+    }
+    return { inside: lines.length > 0 && lines.every((q) => q.left >= r.left - 0.5 && q.right <= r.right + 0.5 && q.top >= r.top - 0.5 && q.bottom <= r.bottom + 0.5), lines: new Set(lines.map((q) => Math.round(q.top))).size };
+  });
+  expect(fit.inside).toBe(true);
+  expect(fit.lines).toBeLessThanOrEqual(2);
+});
+
+for (const f of offered()) {
+  test(`${FORMAT_RULES[f].name.toLowerCase()}: a flowchart box's chips, on its top corners, clear its words by 4px and more and take a 44px press; no + covers them or words`, async ({ page }) => {
+    await openTiming(page, f, { full: true });
+    await waitLive(page);
+    // Design round 2, item 5: Remove touched the first letter of the box's words.
+    expect(await flowChipsNearWords(page, 4)).toEqual([]);
+    expect(await smallPresses(page, `${READY} .xp-flow-box .xe-flow-chip`)).toEqual([]);
+    // The "+" above a case study's first box moves along, clear of that box's Remove and its press.
+    expect(await plusClashes(page)).toEqual([]);
+    expect(await smallPresses(page, `${READY} .xe-insert .xe-plus`)).toEqual([]);
+  });
+}
 
 test("the bar is one Tab stop: the arrows, Home and End move along it, and the stop goes back to its first button when the focus leaves", async ({ page }) => {
   await openTiming(page, "case-study", { full: true });

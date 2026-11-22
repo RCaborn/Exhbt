@@ -201,6 +201,50 @@ function placeTools() {
     prop(p.tools, "--xe-tools-w", null);
     prop(p.tools, "--xe-tools-h", null);
   }
+  placePluses(main, bridge === 0);
+}
+
+/** Where a flowchart box's chip, or another control, sits by the "+" in a gap (its own box, the press round it included). */
+/** What a "+" keeps clear of in its gap: a flowchart box's chips (under a finger, always shown), other chips, and the sections' toolbars. */
+const BY_PLUS = ".xe-flow-chip, .xe-chip, .xe-above, .xe-fig-chip, .xe-tools > *";
+
+/**
+ * The "+" in each gap (Insert.tsx; drawn by drag.css): where the gap can't hold the full one (36px
+ * deep with a mouse, 44px under a finger), the small one in the top 32px of the gap, on every pointer
+ * and at every width (design round 2, item 4: research's first gap on a tablet). Where the "+" would
+ * meet a control in its gap, it moves along, clear of it (and, under a finger, of its press): a case
+ * study's first flowchart box has its Remove on its top left corner, just under the gap; a section on
+ * the left of a pair has its grip at its corner, by the middle of the gap.
+ */
+function placePluses(main: HTMLElement, coarse: boolean) {
+  const inserts = [...main.querySelectorAll<HTMLElement>(":scope > .xe-insert:not([data-end])")];
+  // Each control as a finger finds it: a flowchart chip's press reaches 16px along its box's edge (flow.css); the others, their own box.
+  // With a mouse a flowchart's chips show only while the pointer is on their box, which is never in a gap.
+  const controls = [...main.querySelectorAll<HTMLElement>(BY_PLUS)]
+    .filter((c) => !c.closest(".xe-measure, .xe-drag-overlay") && c.getClientRects().length > 0 && (coarse || !c.matches(".xe-flow-chip")))
+    .map((c) => {
+      const b = pageBox(c);
+      const r = coarse && c.matches(".xe-flow-chip") ? 16 : 0;
+      return { x: b.x - r, y: b.y - r, w: b.w + 2 * r, h: b.h + 2 * r };
+    });
+  const writes = inserts.map((insert) => {
+    const at = pageBox(insert);
+    const next = insert.nextElementSibling;
+    const gap = next ? pageBox(next).y - at.y : Infinity;
+    const small = gap < (coarse ? 44 : 36);
+    // The "+" as drawn: under a finger at the left of its gap, 44px or 32px with 6px of press round it; with a mouse 28px, in its middle.
+    const size = coarse ? (small ? 32 : 44) : 28;
+    const reach = coarse && small ? 6 : 0;
+    const left = coarse ? at.x : at.x + at.w / 2 - size / 2;
+    const plus = { x: left - reach, y: at.y + (small ? 16 : 22) - size / 2 - reach, w: size + 2 * reach, h: size + 2 * reach };
+    const hit = controls.filter((c) => overlap(plus, c));
+    const shift = hit.length ? Math.ceil(Math.max(...hit.map((c) => c.x + c.w)) + reach + (coarse ? 0 : 4) - left) : 0;
+    return () => {
+      attr(insert, "data-small", small ? "" : null);
+      prop(insert, "--xe-plus-shift", shift ? `${shift}px` : null);
+    };
+  });
+  for (const write of writes) write();
 }
 
 /** Writes an attribute only when it changes, so a pass that changes nothing invalidates no style. */

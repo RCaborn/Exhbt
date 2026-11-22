@@ -295,25 +295,24 @@
     color: var(--color-graphite);
   }
 
-  /* "Review and publish". */
+  /* "Review and publish": never narrower than its words. One line from 48rem up; on a phone two lines
+     at most, inside the pill (below). */
   .xe-publish {
     white-space: nowrap;
+  }
+  .xe-topbar .xe-publish,
+  .xe-topbar .xe-publish * {
+    font-size: 0.8125rem;
   }
 
   /* The kept steps, from the widest down. */
   @media (width < 64rem) {
-    .xe-topbar .xe-publish,
-    .xe-topbar .xe-publish * {
-      white-space: normal;
-      line-height: 1.1;
-      text-align: center;
-    }
-    .xe-topbar .xe-publish {
-      padding-inline: 0.625rem;
-      max-width: 6.25rem;
-    }
     .xe-topbar .xe-undo-button .xe-tb-text {
       display: none;
+    }
+    /* On one line, with a little less room round its words, so a 48rem window's row still fits. */
+    .xe-topbar .xe-publish {
+      padding-inline: 0.625rem;
     }
   }
   .xe-back-text,
@@ -391,7 +390,14 @@
     }
     .xe-topbar .xe-publish,
     .xe-topbar .xe-publish * {
-      font-size: 0.8125rem;
+      white-space: normal;
+      line-height: 1.1;
+      text-align: center;
+    }
+    .xe-topbar .xe-publish {
+      height: auto;
+      padding-inline: 0.625rem;
+      max-width: 6.25rem;
     }
     .xe-fix-words {
       display: none;
