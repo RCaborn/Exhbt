@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { uniqueEmail } from "./helpers";
-import { focusedPath, READY, seeAsVisitor as seeAsVisitorDev, textbox, waitSaved as waitSavedNow } from "./page-editor";
+import { focusedPath, READY, textbox, waitSaved as waitSavedNow } from "./page-editor";
 
 export { keepClassic } from "./editor-classic-helpers";
 
@@ -338,8 +338,9 @@ export const keptList = (page: Page) => page.getByRole("region", { name: "Kept, 
  */
 export async function openWebAddress(page: Page, n = 1): Promise<Locator> {
   const frame = framesOf(page, "link").nth(n - 1);
-  await frame.getByRole("button", { name: /^Web address:/ }).click();
   const field = frame.locator('input[data-path$=".href"]');
+  // A link just added already has its popover open: pressing the chip then would close it.
+  if (!(await field.isVisible())) await frame.getByRole("button", { name: /^Web address:/ }).click();
   await expect(field).toBeVisible();
   return field;
 }
@@ -351,7 +352,12 @@ export const frames = (page: Page) => page.locator(`${READY} article [data-secti
 export async function seeAsVisitor(page: Page, on = true) {
   const open = await page.locator(`${READY} section[aria-label="Preview"]`).count();
   if (Boolean(open) === on) return;
-  await seeAsVisitorDev(page, on);
+  // The real button: in the top bar, or on a phone in the editor's own Menu (not the site header's menu, which has the same name).
+  const bar = page.locator(`${READY} [data-topbar]`);
+  const button = bar.getByRole("button", { name: "See as a visitor" });
+  if (!(await button.isVisible())) await bar.getByRole("button", { name: "Menu", exact: true }).click();
+  await button.click();
+  await (on ? expect(page.locator(`${READY} section[aria-label="Preview"]`)).toBeVisible() : expect(page.locator(`${READY} section[aria-label="Preview"]`)).toHaveCount(0));
 }
 
 /**
