@@ -100,6 +100,8 @@ test.describe("Rewrite and back to the AI version", () => {
     await expect(backToAiVersion(page, "findings")).toHaveCount(0);
 
     await findingsField(page).click();
+    // The click starts the field's editor; keys typed before it has the cursor go nowhere (fillRich waits the same way).
+    await expect(findingsField(page).locator(".ProseMirror")).toBeFocused();
     await page.keyboard.press("End");
     await page.keyboard.type(" MY OWN EDIT");
     await expect(findingsField(page)).toContainText("MY OWN EDIT");
@@ -115,6 +117,8 @@ test.describe("Rewrite and back to the AI version", () => {
     await page.getByRole("button", { name: "Rewrite the findings now" }).click();
     await expect(findingsField(page)).toContainText("Preview rewrite 1");
     await findingsField(page).click();
+    // The click starts the field's editor; keys typed before it has the cursor go nowhere (fillRich waits the same way).
+    await expect(findingsField(page).locator(".ProseMirror")).toBeFocused();
     await page.keyboard.press("End");
     await page.keyboard.type(" SECOND EDIT");
     await openCardMenu(page, "findings");
@@ -154,6 +158,8 @@ test.describe("Rewrite and back to the AI version", () => {
     await startRewrite(page, "gap");
     // Make "Back to the AI version" show on the findings card too, so it is scanned, with its menu open.
     await findingsField(page).click();
+    // The click starts the field's editor; keys typed before it has the cursor go nowhere (fillRich waits the same way).
+    await expect(findingsField(page).locator(".ProseMirror")).toBeFocused();
     await page.keyboard.press("End");
     await page.keyboard.type(" extra");
     await openCardMenu(page, "findings");
