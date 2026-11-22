@@ -8,7 +8,7 @@ import { newImageSection, newSection, roomFor } from "../lib/exhbt/sections";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import { labelOf } from "../components/exhbt-editor/labels";
 import { HYSTERESIS, makePlan, orderWith, placeAt, pointFor, rowsInfo, type Box } from "../components/exhbt-editor/drag/plan";
-import { docNow, frame, freshName, grip, offered, openDoc, pageOrder, READY, SAMPLES, waitReady } from "./page-editor";
+import { docNow, frame, freshName, grip, offered, openDoc, openTiming, pageOrder, READY, SAMPLES, toolbarClashes, waitLive, waitReady } from "./page-editor";
 
 /*
  * Dragging on the edit-on-page editor (decision 0026, "Dragging" and "Smoothness"; the prototype's
@@ -237,12 +237,57 @@ test.describe("the drag's plan", () => {
       const plan = makePlan(id, order, boxes, rows, W, tools);
       expect(placeAt(plan, b.x + b.w - 130, b.y - 18, plan.home), id).toBe(plan.home);
     }
+    // A picture's toolbar sits inside its own top right corner (a tile in the grid, and every picture or graph): the grip is in it.
+    for (const id of ["t1", "t2", "t3", "t5"]) {
+      const b = boxes[id]!;
+      const tools = { x: b.x + b.w - 8 - 36, y: b.y + 8, w: 36, h: 36 };
+      const plan = makePlan(id, order, boxes, rows, W, tools);
+      expect(placeAt(plan, tools.x + 18, tools.y + 18, plan.home), id).toBe(plan.home);
+    }
   });
 
   test("places count the page items with the carried one taken out, as store.move does", () => {
     expect(orderWith(["a", "b", "c", "d"], "b", 0)).toEqual(["b", "a", "c", "d"]);
     expect(orderWith(["a", "b", "c", "d"], "b", 3)).toEqual(["a", "c", "d", "b"]);
     expect(orderWith(["a", "b"], "new", 1)).toEqual(["a", "new", "b"]);
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * Where each section's toolbar sits (decision 0026, "The chrome"; the release 3 review's vision-1
+ * and visual-fidelity-3)
+ * ---------------------------------------------------------------------------------------------- */
+
+test.describe("each section's toolbar, at 1440 wide", () => {
+  test.skip(({ isMobile }) => isMobile, "the phone and tablet specs check their own");
+
+  for (const f of offered()) {
+    test(`${f}: no toolbar covers another section's words, pictures or controls, nor a chip; a picture's and a graph's sit inside their own top right corner`, async ({ page }) => {
+      await openTiming(page, f, { full: true });
+      await waitLive(page);
+      expect(await toolbarClashes(page)).toEqual([]);
+      const corners = await page.locator(`${READY} article [data-section-id]:is([data-kind="image"], [data-kind="graph"])`).evaluateAll((els) =>
+        els.flatMap((fr) => {
+          const box = fr.getBoundingClientRect();
+          const grip = fr.querySelector(":scope > .xe-tools [data-grip]")!.getBoundingClientRect();
+          const tools = [...fr.querySelectorAll(":scope > .xe-tools button")].map((b) => b.getBoundingClientRect());
+          const inside = tools.every((r) => r.left >= box.left - 0.5 && r.right <= box.right + 0.5 && r.top >= box.top - 0.5);
+          // The grip is the one in the corner: nearest the frame's right edge, in the top row.
+          const corner = tools.every((r) => r.right <= grip.right + 0.5 && r.top >= grip.top - 0.5);
+          return inside && corner ? [] : [`${fr.getAttribute("data-section-id")}: ${inside ? "grip not in the corner" : "toolbar not inside"}`];
+        }),
+      );
+      expect(corners).toEqual([]);
+    });
+  }
+
+  test("research with two reference lines: neither toolbar covers the line above, the References heading or a Web address chip", async ({ page }) => {
+    await openTiming(page, "research", { full: true });
+    await waitLive(page);
+    const n = (await pageOrder(page)).length;
+    expect(await page.evaluate((at) => window.__exhbtEditor!.insert("link", at), n)).toBeTruthy();
+    await expect.poll(async () => (await pageOrder(page)).length).toBe(n + 1);
+    expect(await toolbarClashes(page)).toEqual([]);
   });
 });
 
@@ -930,6 +975,7 @@ test.describe("the + between sections", () => {
     expect(doc.sections[marker + 1]!.id).toBe(order[at]);
     expect(doc.flowOff).toBeUndefined();
   });
+
 });
 
 /* ------------------------------------------------------------------------------------------------

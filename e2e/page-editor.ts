@@ -417,3 +417,64 @@ export function allowEditOnly(page: Page, which: "always" | "all"): Promise<stri
     return named;
   }, list);
 }
+
+/**
+ * Every section toolbar's button that is drawn now (display, not opacity: on a desktop a toolbar shows
+ * on hover in the place it already has), hit-tested against what it must never cover (decision 0026,
+ * "The chrome"; the release 3 review's vision-1 and visual-fidelity-3): the words of any other part
+ * of the page, the person's own judged by the whole box of each field or element in one that holds
+ * them (so a short last line passing by luck doesn't count, and a placeholder does), a label the
+ * layout draws itself ("References") by its words; the pictures, links and buttons of any
+ * other section; another toolbar's buttons; and the edit-only chips and labels on the page, its own
+ * section's included (the aim's switch, a picked figure's label, "Edit figures", "Web address", a
+ * flowchart box's chips). A toolbar may lie over its own section's words and picture: it sits in that
+ * corner by design. Returns each clash in words; [] when there are none.
+ */
+export function toolbarClashes(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const root = document.querySelector('[data-editor="page"] article[data-exhbt-page]');
+    if (!root) return ["no editing page"];
+    const drawnNow = (el: Element) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+    const over = (a: DOMRect, b: DOMRect) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;
+    const r = (b: DOMRect) => [b.x, b.y, b.width, b.height].map(Math.round).join(",");
+    const frames = [...root.querySelectorAll<HTMLElement>("[data-section-id]")];
+    const toolButtons = (fr: Element) => [...fr.querySelectorAll(":scope > .xe-tools button")].filter(drawnNow);
+    const sectionOf = (el: Element) => el.closest("[data-section-id]")?.getAttribute("data-section-id") ?? "the page";
+    // What holds words, and where they count: the person's own words (a field, or words inside one) by the element's whole box,
+    // so a short last line passing by luck doesn't count; a label the layout draws itself ("References") by its words alone.
+    const worded: { el: Element; boxes: DOMRect[] }[] = [];
+    for (const el of root.querySelectorAll("*")) {
+      if (el.closest(".xe-tools, .sr-only, [hidden]") || !drawnNow(el)) continue;
+      const field = el.matches("textarea, input:not([type=hidden]):not([type=checkbox]):not([type=radio]), [contenteditable]:not([contenteditable=false]), [role=textbox]");
+      const texts = [...el.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.trim());
+      if (field || (texts.length && el.closest("[data-path]"))) worded.push({ el, boxes: [el.getBoundingClientRect()] });
+      else if (texts.length) {
+        const range = document.createRange();
+        worded.push({ el, boxes: texts.flatMap((n) => (range.selectNodeContents(n), [...range.getClientRects()])) });
+      }
+    }
+    const CHIPS = ".xe-chip, .xe-above, .xe-fig-chip, .xe-fig-picked, .xe-over > *, .xe-flow-chip, .xe-add-finding, .xe-list-tools > *";
+    const out: string[] = [];
+    for (const fr of frames) {
+      for (const b of toolButtons(fr)) {
+        const box = b.getBoundingClientRect();
+        const name = `${b.getAttribute("aria-label") ?? "a tool"} (${r(box)})`;
+        for (const { el: w, boxes } of worded) {
+          if (fr.contains(w) || !boxes.some((q) => over(box, q))) continue;
+          out.push(`${name} covers "${(w.matches("textarea, input") ? (w as HTMLTextAreaElement).value : (w.textContent ?? "")).trim().slice(0, 30)}" in ${sectionOf(w)}`);
+        }
+        for (const other of frames) {
+          if (other === fr) continue;
+          for (const el of other.querySelectorAll("img, a[href], button")) {
+            if (drawnNow(el) && over(box, el.getBoundingClientRect())) out.push(`${name} covers a ${el.tagName.toLowerCase()} ${el.getAttribute("aria-label") ?? ""} in ${other.dataset.sectionId}`);
+          }
+        }
+        for (const el of root.querySelectorAll(CHIPS)) {
+          if (el.closest(".xe-tools") || !drawnNow(el) || !over(box, el.getBoundingClientRect())) continue;
+          out.push(`${name} covers ${el.getAttribute("aria-label") ?? el.textContent?.trim().slice(0, 30)} in ${sectionOf(el)}`);
+        }
+      }
+    }
+    return [...new Set(out)];
+  });
+}

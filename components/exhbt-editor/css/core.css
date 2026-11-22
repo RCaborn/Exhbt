@@ -271,6 +271,37 @@
     opacity: 1;
     pointer-events: auto;
   }
+  /* Inside the corner, as in the prototype Rory tried ("Grip thing good"): a picture's and a graph's
+     toolbar sits in its own top right corner, over its card, so in the gallery's grid it never lies
+     over the caption of the picture above; any other section's does too where the gap above it is
+     too small to hold it without covering the words above (Toolbar.tsx measures: data-place). The
+     grip is in the corner itself and the other buttons run in from it, wrapping inside a narrow part,
+     so the grip never moves as the rest show or hide. A phone places its grips itself (phone.css). */
+  @media not all and (max-width: 47.99rem) and (pointer: coarse) {
+    .xe-frame:is([data-kind="image"], [data-kind="graph"]) > .xe-tools,
+    .xe-frame > .xe-tools[data-place="inside"] {
+      /* Toolbar.tsx moves it along, clear of the section's own chips in that corner, where it must. */
+      --xe-inset: var(--xe-tools-right, 0.5rem);
+      top: 0.5rem;
+      right: var(--xe-inset);
+      bottom: auto;
+      flex-direction: row-reverse;
+      flex-wrap: wrap;
+      max-width: calc(100% - var(--xe-inset) - 0.5rem);
+      padding-bottom: 0;
+    }
+    /* A flowchart's boxes carry their own grip and Remove on their right edges (flow.css): the section's toolbar keeps clear of them. */
+    .xe-frame[data-kind="flow"] > .xe-tools[data-place="inside"] {
+      --xe-inset: var(--xe-tools-right, 2rem);
+    }
+    /* A figure picked from the report has its label along the picture's top edge (figures.css): the toolbar sits under it. */
+    .xe-frame[data-kind="image"]:has(.xe-fig-picked) > .xe-tools {
+      top: 2.25rem;
+    }
+    .xe-frame[data-kind="image"]:has(.xe-fig-picked[data-stacked]) > .xe-tools {
+      top: 3.5rem;
+    }
+  }
   .xe-tool {
     position: relative;
     display: inline-flex;
@@ -373,6 +404,8 @@
   /* On a touch screen the toolbar is always shown and its buttons are 44px (a phone shows only the grip: L's phone.css). */
   @media (pointer: coarse) {
     .xe-tools {
+      /* With no hover there is nothing to bridge: the toolbar sits on the section's top edge, and fits the 44px gap between sections. */
+      padding-bottom: 0;
       opacity: 1;
       pointer-events: auto;
     }
@@ -380,6 +413,14 @@
     .xe-tool:not(.xe-tool-sm) {
       min-width: 2.75rem;
       height: 2.75rem;
+    }
+  }
+  /* On a tablet a tile in the gallery's grid shows only its grip, in its corner: five 44px buttons are
+     wider than a tile. The rest show while the focus is in the tile (its caption, its description, or
+     the grip from the keyboard), running in from the grip and wrapping inside the picture. */
+  @media (pointer: coarse) and (min-width: 48rem) {
+    .xe-frame[data-as="tile"]:not(:focus-within) > .xe-tools > [data-tool] {
+      display: none;
     }
   }
 
@@ -451,6 +492,20 @@
     display: flex;
     gap: 0.25rem;
     padding-bottom: 0.25rem;
+  }
+  /* Over the part's top left: its top right is the section's toolbar's. On a touch screen it moves
+     along beside the "+", which sits at the left of the gap there (as "Add a finding" does, phone.css).
+     A phone places it itself (phone.css). */
+  @media not all and (max-width: 47.99rem) and (pointer: coarse) {
+    .xe-frame .xe-above {
+      right: auto;
+      left: 0;
+    }
+  }
+  @media (pointer: coarse) and (min-width: 48rem) {
+    .xe-frame .xe-above {
+      left: 3.25rem;
+    }
   }
   .xe-chip {
     display: inline-flex;

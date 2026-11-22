@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { FORMAT_RULES } from "../lib/exhbt/formats";
-import { frame, grip, offered, openTiming, pageOrder, READY, undoLabel, waitLive } from "./page-editor";
+import { frame, grip, offered, openTiming, pageOrder, READY, toolbarClashes, undoLabel, waitLive } from "./page-editor";
 
 /*
  * The editor on a tablet (decision 0026, "The chrome"; docs/briefs/edit-on-page/r3-l-phone.md), on the
@@ -53,34 +53,95 @@ const orderWith = (order: string[], id: string, place: number) => {
   return rest;
 };
 
+/**
+ * Each section's toolbar as drawn now: shown, with each button 44px. A tile in the gallery's grid
+ * (`tiles`: "grip" at rest, "all" with the focus in it) shows only its grip, or every button, and all
+ * of it inside the tile's own box; every other section shows its grip, Move up and the rest.
+ */
+const toolbarsNow = (page: Page, tiles: "grip" | "all") =>
+  page.evaluate((tiles) => {
+    const bad: string[] = [];
+    const frames = [...document.querySelectorAll<HTMLElement>('[data-editor="page"] article [data-section-id]')];
+    for (const fr of frames) {
+      const id = fr.dataset.sectionId!;
+      const tools = fr.querySelector<HTMLElement>(":scope > .xe-tools");
+      if (!tools || getComputedStyle(tools).opacity !== "1" || getComputedStyle(tools).pointerEvents === "none") {
+        bad.push(`${id}: toolbar not shown`);
+        continue;
+      }
+      const buttons = [...tools.querySelectorAll<HTMLElement>("button")].filter((b) => b.getClientRects().length > 0);
+      if (!buttons.some((b) => b.hasAttribute("data-grip"))) bad.push(`${id}: no grip`);
+      const tile = fr.dataset.as === "tile";
+      if (tile && tiles === "grip" && buttons.length !== 1) bad.push(`${id}: a tile shows ${buttons.map((b) => b.getAttribute("aria-label")).join(", ")}`);
+      if ((!tile || tiles === "all") && !buttons.some((b) => b.getAttribute("data-tool") === "up")) bad.push(`${id}: no move up`);
+      const box = fr.getBoundingClientRect();
+      for (const b of buttons) {
+        const r = b.getBoundingClientRect();
+        if (Math.round(r.width) < 44 || Math.round(r.height) < 44) bad.push(`${id}: ${b.getAttribute("aria-label")} is ${r.width}x${r.height}`);
+        if (tile && (r.left < box.left - 0.5 || r.right > box.right + 0.5 || r.top < box.top - 0.5)) bad.push(`${id}: ${b.getAttribute("aria-label")} is outside its tile`);
+      }
+    }
+    return { bad, frames: frames.length, tiles: frames.filter((fr) => fr.dataset.as === "tile").length };
+  }, tiles);
+
 for (const f of offered()) {
-  test(`${FORMAT_RULES[f].name.toLowerCase()}: every section's toolbar is shown without hovering, each button 44px, and there is no phone bar`, async ({ page }) => {
+  test(`${FORMAT_RULES[f].name.toLowerCase()}: every section's toolbar is shown without hovering, each button 44px, a tile's only its grip until it has the focus; none covers another section; no phone bar`, async ({ page }) => {
     await openTiming(page, f, { full: true });
     await waitLive(page);
     await expect(page.locator(`${READY} .xe-phonebar`)).toHaveCount(0);
-    const found = await page.evaluate(() => {
-      const bad: string[] = [];
-      const frames = [...document.querySelectorAll<HTMLElement>('[data-editor="page"] article [data-section-id]')];
-      for (const fr of frames) {
-        const tools = fr.querySelector<HTMLElement>(":scope > .xe-tools");
-        if (!tools || getComputedStyle(tools).opacity !== "1" || getComputedStyle(tools).pointerEvents === "none") {
-          bad.push(`${fr.dataset.sectionId}: toolbar not shown`);
-          continue;
-        }
-        const buttons = [...tools.querySelectorAll<HTMLElement>("button")].filter((b) => b.getClientRects().length > 0);
-        if (!buttons.some((b) => b.hasAttribute("data-grip"))) bad.push(`${fr.dataset.sectionId}: no grip`);
-        if (!buttons.some((b) => b.getAttribute("data-tool") === "up")) bad.push(`${fr.dataset.sectionId}: no move up`);
-        for (const b of buttons) {
-          const r = b.getBoundingClientRect();
-          if (Math.round(r.width) < 44 || Math.round(r.height) < 44) bad.push(`${fr.dataset.sectionId}: ${b.getAttribute("aria-label")} is ${r.width}x${r.height}`);
-        }
-      }
-      return { bad, frames: frames.length };
-    });
+    const found = await toolbarsNow(page, "grip");
     expect(found.frames).toBeGreaterThan(3);
     expect(found.bad).toEqual([]);
+    // Shown all the time on a tablet, so none may lie over another section's words, pictures or controls, nor a chip (the review's vision-1).
+    expect(await toolbarClashes(page)).toEqual([]);
+    if (!found.tiles) return;
+    // With the focus in a tile (its grip, from a keyboard), its other buttons show too, inside the tile, still covering nothing of another's.
+    const tile = page.locator(`${READY} article [data-as="tile"]`).last();
+    const id = await tile.getAttribute("data-section-id");
+    await tile.locator("[data-grip]").focus();
+    const focused = await toolbarsNow(page, "all");
+    expect(focused.bad.filter((b) => b.startsWith(`${id}:`))).toEqual([]);
+    expect(await toolbarClashes(page)).toEqual([]);
   });
 }
+
+test("research with two reference lines, one under the other: no toolbar covers the line above, the References heading or a Web address chip", async ({ page }) => {
+  await openTiming(page, "research", { full: true });
+  await waitLive(page);
+  const n = (await pageOrder(page)).length;
+  expect(await page.evaluate((at) => window.__exhbtEditor!.insert("link", at), n)).toBeTruthy();
+  await expect.poll(async () => (await pageOrder(page)).length).toBe(n + 1);
+  expect(await toolbarClashes(page)).toEqual([]);
+});
+
+test("a 260ms press on a tile's grip, in its corner, picks the picture up where it is: the place shown is its own", async ({ page }) => {
+  await openTiming(page, "gallery", { full: true });
+  await waitLive(page);
+  const order = await pageOrder(page);
+  const tiles = await page.locator(`${READY} article [data-as="tile"]`).evaluateAll((els) => els.map((e) => e.getAttribute("data-section-id")!));
+  const touch = await finger(page);
+  for (const id of [tiles[0]!, tiles[tiles.length - 1]!]) {
+    await grip(page, id).evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await page.waitForTimeout(300);
+    // The grip is in the tile's own top right corner.
+    const g = (await grip(page, id).boundingBox())!;
+    const t = (await frame(page, id).boundingBox())!;
+    expect(g.y).toBeGreaterThanOrEqual(t.y);
+    expect(g.x + g.width).toBeLessThanOrEqual(t.x + t.width);
+    const at = await middle(grip(page, id));
+    await touch.down(at.x, at.y);
+    await page.waitForTimeout(260);
+    await touch.move(at.x, at.y + 2);
+    await expect(page.locator(`${READY} [data-xe-drag]`)).toHaveAttribute("data-xe-drag", "pointer");
+    expect(await page.evaluate(() => window.__exhbtDrag?.state()?.place ?? null), id).toBe(order.indexOf(id));
+    await touch.move(at.x + 3, at.y + 5);
+    await page.waitForTimeout(100);
+    expect(await page.evaluate(() => window.__exhbtDrag?.state()?.place ?? null), id).toBe(order.indexOf(id));
+    await touch.up();
+    await expect(page.locator(`${READY} [data-xe-drag]`)).toHaveCount(0);
+    expect(await pageOrder(page)).toEqual(order);
+  }
+});
 
 test("a 260ms press on a grip picks the section up, and a drag moves it", async ({ page }) => {
   await openTiming(page, "case-study", { full: true });
