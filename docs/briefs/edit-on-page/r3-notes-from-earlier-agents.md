@@ -122,3 +122,27 @@ Not verified by G: Safari, Firefox, a real phone, a screen reader, the Worker bu
 - Counts, one worker, every test passing: phase2-editor 10, auto-figure 32, phase2-draft 11, phase2-formats 81, phase2-editor-media 15, phase2-graphs 16, phase2-draft-tools 11, phase2-sections 15, phase2-polish-2 13, phase2-teammates 7, phase2-billing-polish 7, exhbt-page 16, file-ownership 1, phase2-saved-ideas 7 (`docs/briefs/edit-on-page/r3-n-milestone-0-counts.md`).
 - Flaky from sandbox memory or cold compile, not the switch: phase2-sections "stand-in AI drafts a quote" passes alone in about 54 s but once hit the 90 s timeout on a cold compile.
 - The baseline run on `phase-2-r2` was not done (no memory for a second server).
+
+## From agent F, drag, the "+" and the tray (merged into phase-2-r3 at 97222cf)
+
+What it built (`components/exhbt-editor/drag/`, `Insert.tsx`, `Tray.tsx`, `scripts/editor-timing.mjs`):
+- Pick-up freezes the page. The place is worked out from the frozen boxes and the pointer, using the layout's own rows, with 10px of stickiness. Sections slide by transform, with a dashed box showing the room made. The flowchart section is carried over a still page with a line. The drop moves everything into place in 180ms, transforms only; nothing animates under reduced motion.
+- The lifted copy is drawn with `ItemView` and no adapter, on a card in the look's link colour, never scaled, and clipped so it can't make the page longer.
+- dnd-kit is used only for its sensors: a mouse picks up after 6px, a finger after a 150ms press with 8px of give. The engine scrolls the page near the edges itself (there is no `DndContext`).
+- Keyboard: pick up, move one place at a time, drop, cancel; Tab drops. Move up and Move down use the same motion and keep the focus. Every step is read out.
+- The hidden measuring copy lays out the rows as empty boxes in the real main column; it matches every sample to within 1px.
+- The "+" lists every kind from `blockOptions` with an icon and the words left, a full kind dimmed with its reason. "Take a figure from my report" calls J's `canTakeFigure`, which returns false until J builds it. A new graph opens its figures sheet, a link jumps to its address, an image opens the picker. On touch the "+" sits at the left of the gap.
+- The tray shows from a 77rem window with a mouse, fixed beside the page. Blocks drag in (the flowchart's included); Enter adds after the section last in focus, or at the end. Its words-left id is `tray-words-left`.
+- Markup that differs from G's stub: the end "+"'s `data-path="sections"` is on a span round the button; menu items and tray blocks carry `data-block`, not `data-kind`. G's `.xe-insert-button` and `.xe-insert-menu` rules in `core.css` are now unused.
+
+Tests (local merge with e3a70dd, one worker): `editor-drag` 48 desktop + 1 touch; `editor-smooth` 7/7; `editor-inplace` 93/93 after F's fix. One `fixme` in `editor-drag`: a new link opening its "Web address" popover, waiting on J.
+
+Timing (production build, 4x slower processor, gallery sample, 3 runs): drag median frame 16.7ms, 95th 16.8 to 33.3ms; key to paint median 34 to 43ms. **The drop's longest frame is 183 to 267ms** (the prototype's was 67 to 117ms). F traced it to re-rendering, not to its own code (about 4ms):
+- every frame whose stored index shifts draws again, about 10ms each, because its fields' paths are built from `at` (G's `Frame.tsx`, C's parts);
+- `LayoutMain.tsx` keys each row by its first item, so 9 frames remount on a big move.
+Being fixed next (G).
+
+For L: `useBoard()` works outside `DragBoard` (one engine per store); the phone bar and reorder sheet should use `moveBy`, `remove` and `add` for the same motion, read-outs and focus. `[data-xe-drag]` sits on the main column during a drag (hide the phone bar with it). `window.__exhbtDrag.state()` exists in development for tests. On narrow grid tiles a tile's toolbar overlaps its neighbour's.
+For K: read `FLOW_BOX_STYLE` from `drag/options.ts`; hide box tools while a section is carried (`[data-xe-drag] …`); reuse `MOVE_MS` and `EASE` from `drag/engine.ts` and the `.xe-line` and `.xe-card` styles; don't use `data-grip` or `.xe-grip` on box grips.
+
+Departures and open points: sliding at a pair keeps the sections' widths until the drop (stable, never flickers); grid tiles have half-tile anchors, so pointing over a tile goes before or after it (a change from the prototype Rory tried); a new block's room is a guess. Still to check with a real finger: whether the 150ms press feels deliberate, whether the finger hides the grip or line, edge-scroll speed, grips at the right edge, the on-screen keyboard. Not checked: Safari, Firefox, a screen reader.
