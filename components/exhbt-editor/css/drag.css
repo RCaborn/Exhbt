@@ -80,7 +80,13 @@
     opacity: 0;
     pointer-events: none;
   }
-  [data-xe-drag="pointer"] {
+  /* The grabbing cursor while a mouse carries something (drag/engine.ts, grabbing): a layer over the
+     window of its own, which takes the pointer, so nothing under it offers itself. On the column the
+     cursor, which is inherited, restyled every element in it at the pick-up and again at the drop. */
+  .xe-drag-cursor {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483000;
     cursor: grabbing;
   }
   /* Lifted from the keyboard, and while a dropped section settles, the section itself is the card. */
