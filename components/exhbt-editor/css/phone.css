@@ -15,6 +15,10 @@
       width: 2.75rem;
       height: 2.75rem;
     }
+    /* So does everything in the top bar's menu ("Delete this exhbt" and its question among them). */
+    [data-editor="page"] .xe-menu-items button {
+      min-height: 2.75rem;
+    }
   }
 
   /* With no hover (a finger), a tooltip is never wanted: after a tap the browser keeps the button
@@ -52,11 +56,44 @@
       top: 0.5rem;
       right: 0.5rem;
     }
-    /* A chip over a section's corner (a link's "Web address", a graph's "Edit figures") or over its top
-       edge (the aim or hypothesis switch) moves along, clear of the grip. */
-    [data-editor="page"] .xe-frame .xe-over,
+    /* The aim or hypothesis switch over the aim's top edge moves along, clear of the grip. (A graph's
+       "Edit figures" and a link's "Web address" sit in the middle of the part's foot on touch: figures.css.) */
     [data-editor="page"] .xe-frame .xe-above {
       right: 3.5rem;
+    }
+    /* A picked figure's label runs along the picture's top edge (figures.css): the grip sits just under
+       it. (Narrowing the label instead wraps it, and then its two 44px presses overlap.) */
+    [data-editor="page"] .xe-frame[data-kind="image"]:has(.xe-fig-picked) > .xe-tools {
+      top: 2.25rem;
+    }
+
+    /* The "+" in a gap: 32px to the eye, centred in the top 32px of its gap (the first gap, under the
+       context line, is only 32px tall, and a 44px "+" there covered the first letters of the heading
+       under it), with a 44px press. */
+    [data-editor="page"] .xe-insert:not([data-end]) .xe-plus {
+      top: 1rem;
+      width: 2rem;
+      height: 2rem;
+    }
+    [data-editor="page"] .xe-insert:not([data-end]) .xe-plus::before {
+      content: "";
+      position: absolute;
+      inset: -0.375rem;
+    }
+
+    /* Every control in a sheet takes a thumb: the figures' fields and buttons (the classic ChartEditor,
+       drawn bare), the page picker and the crop, the card's and the work's fields. */
+    .xe-sheet :is(button, select, input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"])) {
+      min-height: 2.75rem;
+    }
+    .xe-sheet label:has(> input[type="checkbox"]) {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2.75rem;
+    }
+    /* A choice drawn as a card round a hidden radio (the kind of graph). */
+    .xe-sheet label:has(input[type="radio"]) {
+      min-height: 2.75rem;
     }
 
     /* A finding's own small controls, the shell parts' corner toolbars and the formatting buttons over a
