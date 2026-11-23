@@ -64,6 +64,8 @@ const AnswerSchema = z.object({
   caption: z.string(),
 });
 export type Answer = z.infer<typeof AnswerSchema>;
+/** What the figure-pick call sends as output_config (also checked by scripts/probe-ai-shapes.ts). */
+export const FIGURE_PICK_OUTPUT_CONFIG = { effort: "low" as const, format: zodOutputFormat(AnswerSchema) };
 
 /**
  * The answer made safe: an image that was sent, a kind from the fixed list, a box on the page (in
@@ -78,6 +80,24 @@ export function toPick(a: Answer, sizes: PixelSize[]): FigurePick | null {
   return { image: a.image, kind, box: boxFromPixels(a.box, sizes[a.image - 1]!), alt, caption: fitCaption(a.caption) };
 }
 
+/** The figure-pick request the app sends, so a script can send exactly the same. */
+export function figurePickRequest(images: PageImage[]) {
+  const content: Anthropic.ContentBlockParam[] = images.flatMap((im, i): Anthropic.ContentBlockParam[] => [
+    { type: "text", text: `Image ${i + 1}: ${im.label}. ${im.width} by ${im.height} pixels.` },
+    { type: "image", source: { type: "base64", media_type: im.mediaType, data: Buffer.from(im.data).toString("base64") } },
+  ]);
+  content.push({ type: "text", text: "Choose the visual, or say there is none." });
+
+  return {
+    model: AI_MODEL,
+    // Room for the model's thinking as well as the short answer, as the draft has.
+    max_tokens: 4000,
+    output_config: FIGURE_PICK_OUTPUT_CONFIG,
+    system: SYSTEM,
+    messages: [{ role: "user" as const, content }],
+  };
+}
+
 export async function pickFigure(images: PageImage[]): Promise<FigurePickResult> {
   if (!images.length) return { pick: null, model: "none", inputTokens: 0, outputTokens: 0, costUsd: 0, raw: null };
   const apiKey = anthropicApiKey();
@@ -87,21 +107,8 @@ export async function pickFigure(images: PageImage[]): Promise<FigurePickResult>
     return mockPick(images);
   }
 
-  const content: Anthropic.ContentBlockParam[] = images.flatMap((im, i): Anthropic.ContentBlockParam[] => [
-    { type: "text", text: `Image ${i + 1}: ${im.label}. ${im.width} by ${im.height} pixels.` },
-    { type: "image", source: { type: "base64", media_type: im.mediaType, data: Buffer.from(im.data).toString("base64") } },
-  ]);
-  content.push({ type: "text", text: "Choose the visual, or say there is none." });
-
   const client = new Anthropic({ apiKey });
-  const response = await client.messages.parse({
-    model: AI_MODEL,
-    // Room for the model's thinking as well as the short answer, as the draft has.
-    max_tokens: 4000,
-    output_config: { effort: "low", format: zodOutputFormat(AnswerSchema) },
-    system: SYSTEM,
-    messages: [{ role: "user", content }],
-  });
+  const response = await client.messages.parse(figurePickRequest(images));
 
   if (response.stop_reason !== "end_turn" || !response.parsed_output) {
     // The route logs the reason and answers with an error; the draft page then says it couldn't look.
