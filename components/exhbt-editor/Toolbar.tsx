@@ -33,7 +33,7 @@ import type { Store } from "./store-core";
  * compact pair, the grip and "More actions", half over its top edge, with Move up, Move down, the
  * layout's action and Remove in that menu. Only a picture's sits inside its own corner, over the
  * picture, as in the prototype Rory tried; where a tile is too narrow for the row, one column down its
- * right edge. In a row it is drawn
+ * right edge, going on at the foot of a second where the picture is too short. In a row it is drawn
  * Remove first and the grip last, and a column runs down from the grip, so the grip is at the
  * section's corner wherever it sits (the markup keeps the grip first: it is the first Tab stop).
  */
@@ -116,7 +116,8 @@ const drawnWidth = new WeakMap<HTMLElement, number>();
  * The shape of a picture's toolbar, inside its corner (design round 2, item 6): a row, from the grip in
  * the corner, where the part is wide enough; else one column down the part's right edge from the grip
  * (grip, move up, move down, the action, more, remove); and only where the picture is too short for
- * that, the column wraps into another to its left. Returns the writes, so all the reads come first.
+ * that, the column goes on in another to its left, at its foot (css/core.css), so Remove is still the
+ * button farthest from the grip. Returns the writes, so all the reads come first.
  */
 function shapeOf(tools: HTMLElement, frame: HTMLElement, f: Box, kids: HTMLElement[], unit: number, width: number): () => void {
   const s = getComputedStyle(tools);

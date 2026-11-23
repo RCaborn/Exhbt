@@ -341,10 +341,12 @@
     .xe-frame > .xe-tools:is([data-shape="column"], [data-shape="wrap"], [data-place="side"], [data-place="rcol"]) > * {
       order: 0;
     }
-    /* Too short for one column: it goes on in another to its left, the grip still in the corner. */
+    /* A picture too short for one column: it goes on in a second to its left, at the foot, so Remove is
+       still the button farthest from the grip (design round 2, the narrow tile). */
     .xe-frame > .xe-tools[data-shape="wrap"] {
       flex-wrap: wrap-reverse;
       align-content: flex-start;
+      justify-content: flex-end;
       width: var(--xe-tools-w);
       max-height: var(--xe-tools-h);
     }

@@ -291,7 +291,7 @@ test.describe("each section's toolbar, at 1440 wide", () => {
     });
   }
 
-  test("a tile too narrow for the row takes a column down its right edge from the grip (grip, up, down, the action, remove), inside its picture", async ({ page }) => {
+  test("a tile too narrow for the row takes a column down its right edge from the grip (grip, up, down, the action, remove), inside its picture; where it goes on in a second, Remove is at its foot, farthest from the grip", async ({ page }) => {
     await openTiming(page, "gallery", { full: true });
     await waitLive(page);
     const tiles = await page.locator(`${READY} article [data-as="tile"]`).evaluateAll((els) =>
@@ -302,12 +302,16 @@ test.describe("each section's toolbar, at 1440 wide", () => {
         const grip = buttons.find((b) => b.tool === "grip")!.r;
         // The first column: the buttons under the grip, at its right edge, top to bottom.
         const column = buttons.filter((b) => Math.abs(b.r.right - grip.right) < 1).sort((a, b) => a.r.top - b.r.top).map((b) => b.tool);
+        const far = (r: DOMRect) => Math.hypot(r.left + r.width / 2 - (grip.left + grip.width / 2), r.top + r.height / 2 - (grip.top + grip.height / 2));
+        const remove = buttons.find((b) => b.tool === "remove")!.r;
         return {
           id: fr.getAttribute("data-section-id"),
           shape: tools.dataset.shape ?? "row",
           column,
           inside: buttons.every((b) => b.r.left >= pic.left - 0.5 && b.r.right <= pic.right + 0.5 && b.r.top >= pic.top - 0.5 && b.r.bottom <= pic.bottom + 0.5),
-          n: buttons.length,
+          farthest: buttons.reduce((a, b) => (far(b.r) > far(a.r) ? b : a)).tool,
+          // Where the column goes on in a second, Remove is at the foot of it, level with the first's last button.
+          atFoot: Math.abs(remove.bottom - Math.max(...buttons.filter((b) => Math.abs(b.r.right - grip.right) < 1).map((b) => b.r.bottom))) < 1,
         };
       }),
     );
@@ -316,10 +320,13 @@ test.describe("each section's toolbar, at 1440 wide", () => {
     expect(tiles.some((t) => t.shape !== "row")).toBe(true);
     for (const t of tiles) {
       expect(t.inside, `${t.id}: inside its picture`).toBe(true);
+      // Remove is the farthest from the grip, in a row or down a column (23 Nov: it had wrapped to the top of a second column, beside the grip).
+      expect(t.farthest, `${t.id} (${t.shape})`).toBe("remove");
       if (t.shape === "row") continue;
       // From the top: grip, move up, move down, the action (Make lead image), then Remove, which goes on in a second column only where the picture is too short.
       expect(t.column.slice(0, 4), `${t.id} (${t.shape})`).toEqual(["grip", "up", "down", "action"]);
       if (t.shape === "column") expect(t.column, t.id!).toEqual(["grip", "up", "down", "action", "remove"]);
+      if (t.shape === "wrap") expect(t.atFoot, `${t.id}: Remove at the foot of the second column`).toBe(true);
     }
   });
 
