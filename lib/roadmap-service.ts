@@ -42,7 +42,12 @@ export async function ensureRoadmap(record: RoadmapRecord, userId: string | null
         throw new GenerationError((e as Error).message);
       }
     }
-    await store.saveRoadmapOutput(record.id, roadmap);
+    if (!(await store.saveRoadmapOutput(record.id, roadmap))) {
+      // Another generation of this roadmap (a reload, a second tab) saved first. Its result stands,
+      // and that call sends the email and starts the ideas: this one only hands back what was saved.
+      const stored = (await store.getRoadmap(record.id))?.output;
+      if (stored) return stored;
+    }
     await store.logEvent("roadmap_completed", userId, { cached: fromCache });
   }
   // Start the project ideas now, in the background, so they're ready by the time the person

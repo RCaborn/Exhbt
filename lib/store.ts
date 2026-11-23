@@ -335,7 +335,11 @@ export interface Store {
   getRoadmap(id: string): Promise<RoadmapRecord | null>;
   latestRoadmapFor(userId: string): Promise<RoadmapRecord | null>;
   findCachedOutput(inputHash: string): Promise<Roadmap | null>;
-  saveRoadmapOutput(id: string, output: Roadmap): Promise<void>;
+  /**
+   * Saves a roadmap's output if it has none yet. Returns false, and changes nothing, when another
+   * generation saved one first (a reload or a second tab): the first result saved wins.
+   */
+  saveRoadmapOutput(id: string, output: Roadmap): Promise<boolean>;
   /** Atomically marks the roadmap email as sent. Returns false if it was already sent. */
   markEmailSent(id: string): Promise<boolean>;
   setMarketingOptIn(email: string, optIn: boolean): Promise<void>;
@@ -784,7 +788,9 @@ function supabaseStore(): Store {
       return (check(res) as { output_json: Roadmap } | null)?.output_json ?? null;
     },
     async saveRoadmapOutput(id, output) {
-      check(await db.from("roadmaps").update({ output_json: output }).eq("id", id));
+      // Conditional update: only the first generation to finish saves its output.
+      const rows = check(await db.from("roadmaps").update({ output_json: output }).eq("id", id).is("output_json", null).select("id")) as { id: string }[];
+      return rows.length === 1;
     },
     async markEmailSent(id) {
       // Conditional update: only one caller wins, so the email is sent once.
@@ -2090,7 +2096,9 @@ function memoryStore(): Store {
     },
     async saveRoadmapOutput(id, output) {
       const r = m.roadmaps.get(id);
-      if (r) r.output = output;
+      if (!r || r.output) return false;
+      r.output = output;
+      return true;
     },
     async markEmailSent(id) {
       const r = m.roadmaps.get(id);

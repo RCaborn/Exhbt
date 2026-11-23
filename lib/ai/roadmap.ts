@@ -79,7 +79,7 @@ export async function generateRoadmap(input: RoadmapInput, job: JobProfile | nul
   if (!apiKey) {
     // Never hand real visitors a placeholder roadmap.
     if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
-    return mockRoadmap(input, job);
+    return mockRoadmapRun(input, job);
   }
 
   const { value, model, inputTokens, outputTokens } = await structuredCall({
@@ -90,6 +90,26 @@ export async function generateRoadmap(input: RoadmapInput, job: JobProfile | nul
     repair: repairRoadmap,
   });
   return { roadmap: { ...value, projects: [] }, model, inputTokens, outputTokens, costUsd: costUsd(inputTokens, outputTokens) };
+}
+
+/**
+ * The stand-in's setting for a slow roadmap, so a test can run two generations at once: with
+ * "[roadmap-delay=ms]" in the skills box, the first generation of that input waits that long and
+ * later ones don't, and each run's summary names its run, so a test can see which one was kept.
+ * Development and tests only.
+ */
+const mockRuns = new Map<string, number>();
+let mockRunCount = 0;
+async function mockRoadmapRun(input: RoadmapInput, job: JobProfile | null): Promise<RoadmapResult> {
+  const delay = /\[roadmap-delay=(\d{1,6})\]/.exec(input.skills);
+  const result = mockRoadmap(input, job);
+  if (!delay) return result;
+  const key = JSON.stringify(input);
+  const seen = mockRuns.get(key) ?? 0;
+  mockRuns.set(key, seen + 1);
+  const run = ++mockRunCount;
+  if (seen === 0) await new Promise((r) => setTimeout(r, Number(delay[1])));
+  return { ...result, roadmap: { ...result.roadmap, summary: `${result.roadmap.summary} Stand-in run ${run}.` } };
 }
 
 /** Local development without an API key. Clearly labelled; never used when a key is set. */
