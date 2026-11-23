@@ -53,7 +53,10 @@ export function transcribeRequest(data: Uint8Array, mediaType: MediaType, materi
       : { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } };
   return {
     model: AI_MODEL,
-    max_tokens: material === "cv" ? 8000 : 16000,
+    // A ceiling, not a cost (npm run measure:ai, 23 Nov 2026): a 6-page scanned CV used 6,891 tokens, 86% of
+    // the old 8,000, so the CV cap is as high as a non-streaming call allows (SDK_NONSTREAMING_MAX_TOKENS).
+    // A 12-page scanned report used up to 4,240 of 16,000; a longer scan is cut off and the page says so.
+    max_tokens: material === "cv" ? 21_000 : 16_000,
     output_config: { effort: "low" as const },
     system: system(material),
     messages: [{ role: "user" as const, content: [file, { type: "text" as const, text: WHAT[material].ask }] }],
