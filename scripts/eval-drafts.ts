@@ -706,6 +706,8 @@ async function main() {
             (a.judge ? (a.judge.status === "ok" ? `, AI-judged ${judgeTotal(a.judge)}/16` : `, judge failed: ${a.judge.error}`) : "")
           : `failed (${a.errorClass}): ${a.error}`;
       console.log(`  ${f.fixture}${args.reps > 1 ? ` #${rep}` : ""}: ${line}`);
+      // Each graph as stored, one JSON line, so the log shows which value sits with which label and unit.
+      if (a.status === "ok") for (const c of chartsOf(a.doc)) console.log(`    graph: ${JSON.stringify(c)}`);
     }
     const run: FixtureRun = {
       fixture: f.fixture,

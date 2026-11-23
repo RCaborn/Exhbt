@@ -1,0 +1,21 @@
+{
+  "fixture": "09-usability-table",
+  "shape": "HCI coursework in markdown: a five-person think-aloud test with a small table of text results (task, what happened, main problem).",
+  "tests": "A table graph from text results: the headings come first, each row keeps its own task, and no figures are invented to make a bar chart.",
+  "files": ["09-usability-table.md"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":false,"chart":true,"noNumbers":false},
+  "keyFacts": [
+    {"id":"aim","fact":"Find which steps of the library's room booking page people get stuck on.","match":["booking","book"]},
+    {"id":"method","fact":"Five students who had never booked a room did three tasks while thinking aloud.","match":[["five","think"],["5","think"],"think-aloud","think aloud","thinking aloud"]},
+    {"id":"length","fact":"Three of five booked one hour by mistake because the length defaults to one hour.","match":["one hour","1 hour","default"]},
+    {"id":"cancel","fact":"Two of five gave up cancelling: Cancel is under My account.","match":["gave up","My account","cancel"]},
+    {"id":"recommend","fact":"Recommended moving the room list above the map, a required length choice and a Cancel button on each booking.","match":["above the map","Cancel button","required"]}
+  ],
+  "forbidden": [
+    {"id":"timing","why":"Nothing was timed.","match":["seconds","minutes to","faster","time on task"]},
+    {"id":"fixed","why":"The material doesn't say the library made the changes.","match":["the library fixed","now fixed","was changed","rolled out","implemented"]}
+  ],
+  "sourceNumbers": ["2","2026"]
+}

@@ -43,23 +43,16 @@ export type RoadmapResult = {
   costUsd: number;
 };
 
-export async function generateRoadmap(input: RoadmapInput, job: JobProfile | null = null): Promise<RoadmapResult> {
-  const apiKey = anthropicApiKey();
-  if (!apiKey) {
-    // Never hand real visitors a placeholder roadmap.
-    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
-    return mockRoadmap(input, job);
-  }
-
-  const client = new Anthropic({ apiKey });
-  const response = await client.messages.parse({
+/** The roadmap request the app sends, so a script can send exactly the same. */
+export function roadmapRequest(input: RoadmapInput, job: JobProfile | null = null) {
+  return {
     model: AI_MODEL,
     max_tokens: 3000,
     output_config: ROADMAP_OUTPUT_CONFIG,
     system: SYSTEM,
     messages: [
       {
-        role: "user",
+        role: "user" as const,
         content: [
           `The job they want: ${input.targetRole}`,
           job
@@ -72,7 +65,19 @@ export async function generateRoadmap(input: RoadmapInput, job: JobProfile | nul
         ].join("\n"),
       },
     ],
-  });
+  };
+}
+
+export async function generateRoadmap(input: RoadmapInput, job: JobProfile | null = null): Promise<RoadmapResult> {
+  const apiKey = anthropicApiKey();
+  if (!apiKey) {
+    // Never hand real visitors a placeholder roadmap.
+    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
+    return mockRoadmap(input, job);
+  }
+
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.parse(roadmapRequest(input, job));
 
   if (response.stop_reason === "refusal" || !response.parsed_output) {
     throw new Error(`Roadmap generation failed (stop_reason: ${response.stop_reason})`);

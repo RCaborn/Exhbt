@@ -86,24 +86,17 @@ export function docAsText(d: ExhbtDoc): string {
   ].join("\n");
 }
 
-export async function rewriteBlock(input: RewriteInput): Promise<RewriteResult> {
-  const apiKey = anthropicApiKey();
-  if (!apiKey) {
-    // Never hand real people placeholder text.
-    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
-    return mockRewrite(input);
-  }
+/** The rewrite request the app sends, so a script can send exactly the same. */
+export function rewriteRequest(input: RewriteInput) {
   const note = input.note?.trim().slice(0, MAX_NOTE_CHARS);
-  const client = new Anthropic({ apiKey });
-  const schema = SCHEMAS[input.block];
-  const response = await client.messages.parse({
+  return {
     model: AI_MODEL,
     max_tokens: 2000,
     output_config: rewriteOutputConfig(input.block),
     system: systemFor(formatOf(input.doc)),
     messages: [
       {
-        role: "user",
+        role: "user" as const,
         content: [
           `<material>\n${input.source.trim().slice(0, MAX_MATERIAL_CHARS)}\n</material>`,
           `<exhbt_now>\n${docAsText(input.doc)}\n</exhbt_now>`,
@@ -112,7 +105,19 @@ export async function rewriteBlock(input: RewriteInput): Promise<RewriteResult> 
         ].join("\n\n"),
       },
     ],
-  });
+  };
+}
+
+export async function rewriteBlock(input: RewriteInput): Promise<RewriteResult> {
+  const apiKey = anthropicApiKey();
+  if (!apiKey) {
+    // Never hand real people placeholder text.
+    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
+    return mockRewrite(input);
+  }
+  const schema = SCHEMAS[input.block];
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.parse(rewriteRequest(input));
   if (response.stop_reason === "refusal" || !response.parsed_output) {
     throw new Error(`Exhbt rewrite failed (stop_reason: ${response.stop_reason})`);
   }

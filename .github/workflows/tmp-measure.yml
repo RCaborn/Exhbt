@@ -1,0 +1,39 @@
+# TEMPORARY (hotfix-ai-token-room only): token room of every AI call, and the graph encodings. Removed before merge.
+name: TEMP measure AI room
+
+on:
+  push:
+    branches: [hotfix-ai-token-room]
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Token room of every AI call
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npm run -s measure:ai
+  encodings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: The three graph-encoding fixtures, three drafts each
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npm run -s eval:drafts -- --only 09,10,11 --reps 3

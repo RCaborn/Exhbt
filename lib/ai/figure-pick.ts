@@ -52,6 +52,24 @@ export function toPick(a: Answer, count: number): FigurePick | null {
   return { image: a.image, box: clampBox(a.box), alt, caption: fitCaption(a.caption) };
 }
 
+/** The figure-pick request the app sends, so a script can send exactly the same. */
+export function figurePickRequest(images: PageImage[]) {
+  const content: Anthropic.ContentBlockParam[] = images.flatMap((im, i): Anthropic.ContentBlockParam[] => [
+    { type: "text", text: `Image ${i + 1}: ${im.label}` },
+    { type: "image", source: { type: "base64", media_type: im.mediaType, data: Buffer.from(im.data).toString("base64") } },
+  ]);
+  content.push({ type: "text", text: "Choose the figure." });
+
+  return {
+    model: AI_MODEL,
+    // Room for the model's thinking as well as the short answer, as the draft has.
+    max_tokens: 4000,
+    output_config: FIGURE_PICK_OUTPUT_CONFIG,
+    system: SYSTEM,
+    messages: [{ role: "user" as const, content }],
+  };
+}
+
 export async function pickFigure(images: PageImage[]): Promise<FigurePickResult> {
   if (!images.length) return { pick: null, model: "none", inputTokens: 0, outputTokens: 0, costUsd: 0 };
   const apiKey = anthropicApiKey();
@@ -61,21 +79,8 @@ export async function pickFigure(images: PageImage[]): Promise<FigurePickResult>
     return mockPick(images);
   }
 
-  const content: Anthropic.ContentBlockParam[] = images.flatMap((im, i): Anthropic.ContentBlockParam[] => [
-    { type: "text", text: `Image ${i + 1}: ${im.label}` },
-    { type: "image", source: { type: "base64", media_type: im.mediaType, data: Buffer.from(im.data).toString("base64") } },
-  ]);
-  content.push({ type: "text", text: "Choose the figure." });
-
   const client = new Anthropic({ apiKey });
-  const response = await client.messages.parse({
-    model: AI_MODEL,
-    // Room for the model's thinking as well as the short answer, as the draft has.
-    max_tokens: 4000,
-    output_config: FIGURE_PICK_OUTPUT_CONFIG,
-    system: SYSTEM,
-    messages: [{ role: "user", content }],
-  });
+  const response = await client.messages.parse(figurePickRequest(images));
 
   if (response.stop_reason !== "end_turn" || !response.parsed_output) {
     // Every failure looks like "no figure" to the person, so the reason is logged by the route.

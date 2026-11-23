@@ -1,0 +1,20 @@
+{
+  "fixture": "11-sleep-reaction",
+  "shape": "A first-year research methods project as plain text: eight paired measurements (hours of sleep, mean reaction time in ms).",
+  "tests": "A scatter graph: each point is [hours of sleep, reaction time], the right way round with the axis titles to match, and no correlation coefficient is invented.",
+  "files": ["11-sleep-reaction.txt"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":false,"chart":true,"noNumbers":false},
+  "keyFacts": [
+    {"id":"aim","fact":"Whether students who slept less have slower reaction times.","match":["sleep"]},
+    {"id":"method","fact":"Eight volunteers, self-reported sleep, five ruler-drop tests each, mean taken.","match":["ruler","eight","8 volunteers","five"]},
+    {"id":"result","fact":"Under six hours everyone was above 280 ms; seven hours or more everyone was below 265 ms.","match":["280","265"]},
+    {"id":"caution","fact":"With eight people and self-reported sleep, can't say sleep caused it.","match":["cause","caused","causal"]}
+  ],
+  "forbidden": [
+    {"id":"stats","why":"No correlation or significance test is in the material.","match":["r =","r=","correlation of","significant","p-value","p <"]},
+    {"id":"cause","why":"The material says it can't show cause.","match":["sleep causes","causes slower","proves"]}
+  ],
+  "sourceNumbers": ["1","2026","4.5","312","5.0","298","6.0","281","6.5","276","7.0","262","7.5","259","8.0","251","9.0","248","280","265"]
+}
