@@ -438,6 +438,18 @@ test.describe("each section's toolbar, at 1440 wide", () => {
     await expect.poll(() => toolbarClashes(page)).toEqual([]);
   });
 
+  test("typing a long first box into a case study's flowchart: its toolbar, on the flowchart's top edge, moves off the words as they reach it", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    const tools = frame(page, "flow").locator(":scope > .xe-tools");
+    await expect(tools).toHaveAttribute("data-place", "edge");
+    // Eight long words, the step's most: they run under the row on the edge, so the toolbar is placed again as they are typed (23 Nov).
+    await typeIn(page, "flow.0.step", "Characterise bank and fintech equilibrium strategies under heterogeneous payoffs");
+    await expect(tools).toHaveAttribute("data-place", "compact");
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await expect.poll(() => toolbarClashes(page)).toEqual([]);
+  });
+
   test("a graph with a long title: its toolbar covers none of it, in research and a case study", async ({ page }) => {
     for (const f of ["research", "case-study"] as const) {
       await openTiming(page, f, { full: true });
