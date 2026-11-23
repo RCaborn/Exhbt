@@ -152,7 +152,9 @@ export function materialText({ text, notes, link }: DraftInput): string {
 export function draftRequest(input: DraftInput) {
   return {
     model: AI_MODEL,
-    max_tokens: 4000,
+    // The model thinks before it answers: roughly 1,400 to 4,900 tokens on the eval fixtures,
+    // and up to 5,800 tokens in all. At 4,000 most drafts were cut off mid-answer (decision 0025).
+    max_tokens: 16000,
     output_config: DRAFT_OUTPUT_CONFIG,
     system: SYSTEM,
     messages: [

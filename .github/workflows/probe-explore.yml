@@ -23,8 +23,3 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: npm run -s probe:ai -- --explore
-      - name: Where the draft's output tokens go (temporary)
-        if: always()
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: npx tsx --conditions=react-server scripts/diag-draft-tokens.ts
