@@ -1,5 +1,5 @@
 /**
- * Checks every structured answer the app asks the AI for against the real API (decision 0026).
+ * Checks every structured answer the app asks the AI for against the real API (decision 0025).
  *
  * The API compiles each answer's JSON schema into a grammar before the model writes a word, and
  * refuses a schema whose grammar is too large ("The compiled grammar is too large..."). Only the
@@ -47,8 +47,9 @@ const APP_SHAPES: Shape[] = [
 
 /**
  * The draft as it will be once the work already built has landed, so a release can't take the
- * schema over the limit unseen: release 2's formatReason (8 values), and release 4's 7 layouts,
- * a pull quote, a "my role" line and a before/after mark on each image.
+ * schema over the limit unseen: release 2's formatReason (its 8 values, as on phase-2-r2), and
+ * release 4's 7 layouts, a pull quote, a "my role" line and a before/after mark on each image
+ * (modelled: release 4's own schema isn't on a branch yet, so its names here are stand-ins).
  */
 const PlannedGrowth = (DraftSchema as unknown as z.ZodObject<z.ZodRawShape>).extend({
   format: z.enum(["case-study", "gallery", "research", "r4-a", "r4-b", "r4-c", "r4-d"]),
@@ -78,23 +79,6 @@ function walk(s: unknown, fn: (node: Json, path: string) => void, path = ""): vo
   for (const def of Object.values((node.$defs as Json) ?? {})) walk(def, fn, `$def`);
 }
 
-/** Makes nullable sub-schemas non-null at the given paths (all paths when `only` is omitted). */
-function denull(schema: Json, only?: (path: string) => boolean): Json {
-  const out = clone(schema);
-  walk(out, (node, path) => {
-    if (!isNullable(node) || (only && !only(path))) return;
-    if (Array.isArray(node.type)) {
-      const rest = node.type.filter((t) => t !== "null");
-      node.type = rest.length === 1 ? rest[0] : rest;
-      return;
-    }
-    const keep = (node.anyOf as Json[]).find((a) => !isNullType(a))!;
-    delete node.anyOf;
-    Object.assign(node, keep);
-  });
-  return out;
-}
-
 /**
  * The SDK (1.6) moves an enum into the description ("{enum: [...]}"), so no enum reaches the
  * grammar. This puts them back as real enums, to see what they would cost if a later SDK sent them.
@@ -106,17 +90,6 @@ function realEnums(schema: Json): Json {
     if (!m) return;
     node.enum = JSON.parse(m[1]!) as string[];
     delete node.description;
-  });
-  return out;
-}
-
-/** The object at `path` without the named properties. */
-function without(schema: Json, names: string[], path = ""): Json {
-  const out = clone(schema);
-  walk(out, (node, p) => {
-    if (p !== path || node.type !== "object" || !node.properties) return;
-    for (const n of names) delete (node.properties as Json)[n];
-    node.required = ((node.required as string[]) ?? []).filter((r) => !names.includes(r));
   });
   return out;
 }
@@ -138,76 +111,18 @@ const STR = { type: "string" };
 const NSTR = { type: ["string", "null"] };
 
 /**
- * A candidate answer shape under test: no nullable anywhere (empty string, empty list or false
- * instead), the quote a flat object of empty strings, and one row type for every chart kind
- * (scatter points and number tiles become rows: values [x, y] or [value, from], with a unit).
+ * Measurements, not checks: how many more fields fit on top of the draft and of the planned
+ * growth (decision 0025 has the numbers). A rung that flips from accepted to refused places the limit.
  */
-const CandChart = z.object({
-  kind: z.enum(["beforeAfter", "bar", "groupedBar", "stackedBar", "line", "scatter", "numbers", "table"]),
-  title: z.string(),
-  xTitle: z.string(),
-  yTitle: z.string(),
-  unit: z.string(),
-  lowerIsBetter: z.boolean(),
-  series: z.array(z.string()),
-  rows: z.array(z.object({ label: z.string(), values: z.array(z.number()), unit: z.string() })),
-  columns: z.array(z.string()),
-  cells: z.array(z.array(z.string())),
-});
-const Cand = (DraftSchema as unknown as z.ZodObject<z.ZodRawShape>).extend({
-  flow: z.array(z.object({ step: z.string(), detail: z.string() })),
-  charts: z.array(CandChart),
-  quote: z.object({ text: z.string(), name: z.string(), role: z.string() }),
-});
-const CandGrowth = Cand.extend(PlannedGrowth.shape).extend({ flow: Cand.shape.flow, charts: Cand.shape.charts, quote: Cand.shape.quote });
-
 function exploreShapes(): Shape[] {
   const draft = DRAFT_OUTPUT_CONFIG.format.schema as Json;
-  const cand = zodOutputFormat(Cand).schema as Json;
-  const candGrowth = zodOutputFormat(CandGrowth).schema as Json;
+  const growth = GROWTH.config.format.schema;
   const v = (name: string, schema: Json): Shape => ({ name: `explore: ${name}`, config: { effort: "low", format: { type: "json_schema", schema } }, kind: "explore" });
-  const added17Nov = ["format", "aim", "aimIsHypothesis", "conclusion", "references"];
-  const nov16 = without(draft, added17Nov);
-  const LADDER = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64];
-  const PAIR = { type: "array", items: { type: "object", properties: { a: STR, b: STR }, additionalProperties: false, required: ["a", "b"] } };
-  const NEST = (n: number) => ({ type: "object", properties: Object.fromEntries(Array.from({ length: n }, (_, i) => [`s${i}`, STR])), additionalProperties: false, required: Array.from({ length: n }, (_, i) => `s${i}`) });
-  const addObj = (schema: Json, name: string, obj: Json) => {
-    const out = clone(schema);
-    (out.properties as Json)[name] = obj;
-    (out.required as string[]).push(name);
-    return out;
-  };
-  // Research-only fields grouped in one object: does the width of one object drive the cost?
-  const research = ["aim", "aimIsHypothesis", "conclusion", "references"];
-  const grouped = (schema: Json) => {
-    const props = schema.properties as Json;
-    const inner = { type: "object", properties: Object.fromEntries(research.map((k) => [k, props[k]])), additionalProperties: false, required: research };
-    return addObj(without(schema, research), "research", inner);
-  };
-  const flatQuote = (schema: Json) => plus(without(schema, ["quote"]), 3, STR, "quote");
-  const noCells = (schema: Json) => without(schema, ["cells"], "charts[]");
-  // Every plain string in the schema as a $ref to one shared definition: does reuse shrink the grammar?
-  const refStrings = (schema: Json) => {
-    const out = clone(schema);
-    walk(out, (node) => {
-      if (node.type === "string" && Object.keys(node).length === 1) {
-        delete node.type;
-        node.$ref = "#/$defs/str";
-      }
-    });
-    out.$defs = { ...((out.$defs as Json) ?? {}), str: { type: "string" } };
-    return out;
-  };
-  const REF = { $ref: "#/$defs/str" };
-  const withStrDef = (schema: Json) => ({ ...clone(schema), $defs: { str: { type: "string" } } });
-  const lean = (schema: Json) => without(without(schema, ["columns"], "charts[]"), ["unit"], "charts[].rows[]");
-  const L2 = [4, 8, 12, 16, 24, 32];
   return [
-    ...[4, 8, 12].map((n) => v(`candidate + ${n} numbers`, plus(cand, n, { type: "number" }, "x"))),
-    ...[4, 8, 12, 16].map((n) => v(`candidate + ${n} booleans`, plus(cand, n, { type: "boolean" }, "b"))),
-    ...[8, 16, 32, 64].map((n) => v(`candidate + ${n} strings as one shared $ref`, plus(withStrDef(cand), n, REF, "s"))),
-    ...[0, 8, 16, 32].map((n) => v(`candidate, every string a shared $ref, + ${n} more`, plus(refStrings(cand), n, REF, "s"))),
-    ...L2.map((n) => v(`lean growth (no columns, no row unit) + ${n} strings`, plus(lean(candGrowth), n, STR, "s"))),
+    ...[4, 8, 12, 16, 20, 24].map((n) => v(`draft + ${n} strings`, plus(draft, n, STR, "s"))),
+    ...[1, 2, 4, 8].map((n) => v(`draft + ${n} nullable strings`, plus(draft, n, NSTR, "n"))),
+    ...[2, 4, 6, 8, 10, 12, 16].map((n) => v(`draft with planned growth + ${n} strings`, plus(growth, n, STR, "s"))),
+    v("draft with planned growth, enums sent as real enums", realEnums(growth)),
   ];
 }
 
@@ -234,7 +149,8 @@ function size(schema: Json) {
 
 // ---------------------------------------------------------------------------------------------
 
-type Outcome = { shape: Shape; ok: boolean; message: string };
+/** "refused": the API turned the request down (a 400). "unchecked": no answer either way (auth, rate limit, server, network). */
+type Outcome = { shape: Shape; ok: boolean; status: "accepted" | "refused" | "unchecked"; message: string };
 
 async function probe(client: Anthropic, shape: Shape): Promise<Outcome> {
   try {
@@ -244,13 +160,13 @@ async function probe(client: Anthropic, shape: Shape): Promise<Outcome> {
       output_config: shape.config,
       messages: [{ role: "user", content: "Answer with any valid value." }],
     });
-    return { shape, ok: true, message: `stop_reason ${r.stop_reason}` };
+    return { shape, ok: true, status: "accepted", message: `stop_reason ${r.stop_reason}` };
   } catch (e) {
     if (e instanceof Anthropic.APIError) {
       const body = e.error as { error?: { message?: string } } | undefined;
-      return { shape, ok: false, message: `${e.status}: ${body?.error?.message ?? e.message}` };
+      return { shape, ok: false, status: e.status === 400 ? "refused" : "unchecked", message: `${e.status}: ${body?.error?.message ?? e.message}` };
     }
-    return { shape, ok: false, message: `not sent: ${e instanceof Error ? e.message : String(e)}` };
+    return { shape, ok: false, status: "unchecked", message: `not sent: ${e instanceof Error ? e.message : String(e)}` };
   }
 }
 
@@ -281,10 +197,14 @@ async function main() {
   results.sort((a, b) => shapes.indexOf(a.shape) - shapes.indexOf(b.shape));
   for (const r of results) {
     const sz = size(r.shape.config.format.schema);
-    console.log(`${r.ok ? "ACCEPTED" : "REFUSED "}  ${r.shape.name}  [${sz.chars} chars, ${sz.fields} fields, ${sz.nullable} nullable, ${sz.enums} enums]  ${r.ok ? r.message : `\n          ${r.message}`}`);
+    console.log(`${r.status.toUpperCase().padEnd(9)} ${r.shape.name}  [${sz.chars} chars, ${sz.fields} fields, ${sz.nullable} nullable, ${sz.enums} enums]  ${r.ok ? r.message : `\n          ${r.message}`}`);
   }
   const failed = results.filter((r) => !r.ok && r.shape.kind !== "explore");
-  console.log(failed.length ? `\n${failed.length} shape(s) refused: ${failed.map((r) => r.shape.name).join(", ")}` : "\nEvery shape the app sends was accepted.");
+  const refused = failed.filter((r) => r.status === "refused");
+  const unchecked = failed.filter((r) => r.status === "unchecked");
+  if (refused.length) console.log(`\n${refused.length} shape(s) refused by the API: ${refused.map((r) => r.shape.name).join(", ")}`);
+  if (unchecked.length) console.log(`\n${unchecked.length} shape(s) could not be checked (not a refusal; run again): ${unchecked.map((r) => r.shape.name).join(", ")}`);
+  if (!failed.length) console.log("\nEvery shape the app sends was accepted, and the planned growth fits.");
   if (failed.length) process.exit(1);
 }
 
