@@ -52,6 +52,7 @@ export function swapRequest(ctx: SwapContext) {
 
   return {
     model: AI_MODEL,
+    // A ceiling, not a cost (npm run measure:ai, 23 Nov 2026): a swap used up to 799 tokens, 80% of the old 1,000.
     max_tokens: 3000,
     output_config: SWAP_OUTPUT_CONFIG,
     system: SYSTEM,

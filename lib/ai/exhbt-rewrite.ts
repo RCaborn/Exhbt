@@ -91,6 +91,8 @@ export function rewriteRequest(input: RewriteInput) {
   const note = input.note?.trim().slice(0, MAX_NOTE_CHARS);
   return {
     model: AI_MODEL,
+    // A ceiling, not a cost (npm run measure:ai, 23 Nov 2026): a rewrite used up to 1,571 tokens, most of it
+    // thinking; a header rewrite reached 71% of the old 2,000.
     max_tokens: 5000,
     output_config: rewriteOutputConfig(input.block),
     system: systemFor(formatOf(input.doc)),

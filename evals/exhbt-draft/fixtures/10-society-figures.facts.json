@@ -1,9 +1,9 @@
 {
   "fixture": "10-society-figures",
-  "shape": "A society president's year, as plain text: four headline figures with different units, one of them with a starting value (91%, up from 64%).",
+  "shape": "A society president's year, as plain text: four headline figures with different units, one of them with a starting value (91%, up from 64%). The notes ask for the four figures together.",
   "tests": "A big-numbers graph: each unit sits beside its own figure (members, £, teachers, %), and only the satisfaction figure has a starting value.",
   "files": ["10-society-figures.txt"],
-  "notesFile": null,
+  "notesFile": "10-society-figures.notes.txt",
   "link": null,
   "expect": {"headlineNumber":false,"chart":true,"noNumbers":false},
   "keyFacts": [

@@ -47,6 +47,8 @@ export type RoadmapResult = {
 export function roadmapRequest(input: RoadmapInput, job: JobProfile | null = null) {
   return {
     model: AI_MODEL,
+    // A ceiling, not a cost (npm run measure:ai, 23 Nov 2026): the model thinks first, and a heavy roadmap (a
+    // 20,000-character CV, a 15-skill job) used up to 2,809 tokens and was cut off once at the old 3,000.
     max_tokens: 12000,
     output_config: ROADMAP_OUTPUT_CONFIG,
     system: SYSTEM,

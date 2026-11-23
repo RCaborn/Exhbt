@@ -13,7 +13,8 @@
  * Inputs: the draft eval's fixtures (evals/exhbt-draft/fixtures) read the way the browser reads
  * them, page thumbnails of those PDFs (evals/ai-room/pages, made like the browser's: 768 px long
  * edge, JPEG quality 0.72), and the CVs, jobs and portfolios below. Each heavy case is the most the
- * app lets in. About 10p a full run. Never prints the key or the environment.
+ * app lets in. Exits non-zero if any run is cut off at max_tokens or fails. Never prints the
+ * key or the environment.
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -26,7 +27,7 @@ import { introRequest, type IntroFacts } from "@/lib/ai/portfolio-intro";
 import { ideasRequest, swapRequest } from "@/lib/ai/projects";
 import { roadmapRequest } from "@/lib/ai/roadmap";
 import type { Project, Roadmap, RoadmapInput } from "@/lib/ai/schemas";
-import { anthropicApiKey } from "@/lib/ai/model";
+import { anthropicApiKey, costUsd } from "@/lib/ai/model";
 import { extractTextInBrowser } from "@/lib/doc-readers";
 import { ENTITLEMENTS, EXHBTS_PER_JOB_LINK } from "@/lib/entitlements";
 import { fullDoc, openBankingDoc } from "@/lib/exhbt/sample";
@@ -300,7 +301,7 @@ async function cases(): Promise<Case[]> {
   return out;
 }
 
-type Run = { stop: string; out: number; thinking: number | null; error?: string };
+type Run = { stop: string; out: number; inTokens: number; thinking: number | null; error?: string };
 
 async function runOnce(client: Anthropic, c: Case): Promise<Run> {
   try {
@@ -308,9 +309,9 @@ async function runOnce(client: Anthropic, c: Case): Promise<Run> {
     const usage = r.usage as unknown as Record<string, unknown>;
     const details = (usage.output_tokens_details ?? usage.output_details) as Record<string, number> | undefined;
     const thinking = typeof details?.thinking_tokens === "number" ? details.thinking_tokens : typeof usage.thinking_tokens === "number" ? (usage.thinking_tokens as number) : null;
-    return { stop: r.stop_reason ?? "?", out: r.usage.output_tokens, thinking };
+    return { stop: r.stop_reason ?? "?", out: r.usage.output_tokens, inTokens: r.usage.input_tokens, thinking };
   } catch (e) {
-    return { stop: "error", out: 0, thinking: null, error: e instanceof Anthropic.APIError ? `${e.status}` : (e as Error).message };
+    return { stop: "error", out: 0, inTokens: 0, thinking: null, error: e instanceof Anthropic.APIError ? `${e.status}` : (e as Error).message };
   }
 }
 
@@ -357,6 +358,14 @@ async function main() {
     console.log(`| ${c.feature} | ${c.size} | ${cap} | ${rs.map((r) => (r.error ? `error ${r.error}` : r.stop)).join(", ")} | ${rs.map((r) => r.out).join(", ")} | ${thinking} | ${((100 * largest) / cap).toFixed(0)}%${flag} |`);
   }
   console.log(cut ? `\n${cut} run(s) stopped at max_tokens: those answers were cut off.` : "\nNo run stopped at max_tokens.");
+  const every = [...results.values()].flat();
+  const tin = every.reduce((n, r) => n + r.inTokens, 0);
+  const tout = every.reduce((n, r) => n + r.out, 0);
+  console.log(`This run: ${every.length} calls, ${tin} tokens in, ${tout} out, $${costUsd(tin, tout).toFixed(4)}.`);
+  const errors = every.filter((r) => r.error).length;
+  if (errors) console.log(`${errors} call(s) failed before an answer (see "error" above).`);
+  // A cut-off answer fails for the person; a call that couldn't be made says nothing either way.
+  if (cut || errors) process.exit(1);
 }
 
 void main();
