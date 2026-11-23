@@ -386,6 +386,10 @@
     .xe-frame > .xe-tools[data-place="compact"]:not([data-open]) > [data-tool]:not([data-tool="menu"]) {
       display: none;
     }
+    /* Its section is raised with it: the card runs down over the sections after it, which paint later (their chips over it). */
+    .xe-frame:has(> .xe-tools[data-place="compact"][data-open]) {
+      z-index: 30;
+    }
     .xe-frame > .xe-tools[data-place="compact"][data-open] {
       z-index: 30;
       display: grid;
@@ -417,7 +421,7 @@
       display: inline;
       white-space: nowrap;
     }
-    .xe-frame > .xe-tools[data-place="compact"][data-open] > [data-tool]:not([data-tool="menu"]):not([data-explain]):is(:hover, :focus-visible)::after {
+    .xe-frame > .xe-tools[data-place="compact"][data-open] > :is([data-tool], [data-grip]):not([data-explain]):is(:hover, :focus-visible)::after {
       content: none;
     }
     /* A figure picked from the report has its label along the picture's top edge (figures.css): the toolbar sits under it. */
