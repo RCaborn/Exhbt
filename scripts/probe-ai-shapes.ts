@@ -178,7 +178,11 @@ async function probe(client: Anthropic, shape: Shape): Promise<Outcome> {
   } catch (e) {
     if (e instanceof Anthropic.APIError) {
       const body = e.error as { error?: { message?: string } } | undefined;
-      return { shape, ok: false, status: e.status === 400 ? "refused" : "unchecked", message: `${e.status}: ${body?.error?.message ?? e.message}` };
+      const message = body?.error?.message ?? e.message;
+      // Only a 400 about the schema is a refusal of the shape. Any other 400 (no credit, a bad key setting) says
+      // nothing about the shape, so it is "unchecked", which warns rather than blocking CI or a deploy.
+      const aboutShape = e.status === 400 && /grammar|schema|union|output_config|output format/i.test(message);
+      return { shape, ok: false, status: aboutShape ? "refused" : "unchecked", message: `${e.status}: ${message}` };
     }
     return { shape, ok: false, status: "unchecked", message: `not sent: ${e instanceof Error ? e.message : String(e)}` };
   }

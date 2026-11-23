@@ -69,7 +69,8 @@ export async function POST(req: Request) {
     const text = cleanCvText(result.text, MAX_DOC_CHARS);
     if (text.length < 20) return fail("We couldn't find any text in that file. Type what matters into your notes instead.", 422);
     // A read cut off at max_tokens is still worth having; the page tells the person only the first part was read.
-    if (result.truncated) await store.logEvent("file_read_failed", user.id, { feature: "file_read", reason: "cut_off", inputTokens: result.inputTokens, outputTokens: result.outputTokens, ipHash: user.id, kept: true });
+    // Its tokens are already in the call log above, so the event carries none (the admin panel would count them twice).
+    if (result.truncated) await store.logEvent("file_read_failed", user.id, { feature: "file_read", reason: "cut_off", inputTokens: 0, outputTokens: 0, ipHash: user.id, kept: true });
     return NextResponse.json({ text, truncated: result.truncated });
   } catch (e) {
     // Already bounded: reads are counted before the call (file_read_ai above).

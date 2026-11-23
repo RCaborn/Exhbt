@@ -147,6 +147,11 @@ test.describe("Tables: the headings and the data", () => {
     expect(c).toEqual({ kind: "table", title: "T", columns: ["Week", "Score"], rows: [["Week 1", "12"], ["Week 2", "15"]] });
   });
 
+  test("years as headings in series are headings, not a data row", () => {
+    const c = toChart(chart({ kind: "table", series: ["Measure", "2024", "2025"], cells: [["Members", "140", "236"]] }));
+    expect(c && c.kind === "table" ? c.columns : []).toEqual(["Measure", "2024", "2025"]);
+  });
+
   test("no series: the first row of cells is the headings", () => {
     const c = toChart(chart({ kind: "table", cells: [["Task", "What happened"], ["Find a room", "All five found one"]] }));
     expect(c).toEqual({ kind: "table", title: "T", columns: ["Task", "What happened"], rows: [["Find a room", "All five found one"]] });

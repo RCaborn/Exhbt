@@ -1,5 +1,5 @@
 import "server-only";
-import { failureProps, type AIFeature } from "@/lib/ai/failure";
+import { AIFailure, failureProps, type AIFeature } from "@/lib/ai/failure";
 import { getStore, type EventName } from "@/lib/store";
 
 /**
@@ -39,6 +39,9 @@ export async function recordAIFailure(feature: AIFeature, who: Who, e: unknown, 
   const props = failureProps(e, feature);
   // The console line carries the same fields: an AIFailure's message has no text from the person or the model.
   console.error(`${feature} failed`, JSON.stringify(props));
+  // Not an AIFailure: our own code or setup failed (a missing key, a bug), so the cause goes to the
+  // Worker log. It isn't stored in the event, which keeps to the fixed fields.
+  if (!(e instanceof AIFailure)) console.error(`${feature} failed: ${(e as Error)?.name ?? "Error"}: ${(e as Error)?.message ?? String(e)}`);
   const key = who.key ?? who.userId;
   await getStore()
     .logEvent(event ?? FAILURE_EVENT[feature], who.userId, { ...props, ...extra, ...(key ? { ipHash: key } : {}) })

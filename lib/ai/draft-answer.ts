@@ -1,7 +1,10 @@
 import { z } from "zod/v4";
 import { LIMITS } from "@/lib/exhbt/blocks";
-import { FORMATS, isFormat } from "@/lib/exhbt/formats";
+import { FORMATS } from "@/lib/exhbt/formats";
 import { CHART_KINDS, type Chart } from "@/lib/exhbt/charts";
+
+/** The layouts the draft may choose: the schema's enum and repairDraft read this one list. */
+const DRAFT_LAYOUTS: readonly string[] = FORMATS;
 
 /**
  * The draft's answer shape and the code that reads it. Pure (no server-only), so the tests in
@@ -69,7 +72,7 @@ const KINDS: readonly string[] = CHART_KINDS;
 export function repairDraft(raw: unknown): unknown {
   if (!isObject(raw)) return raw;
   const out: Record<string, unknown> = { ...raw };
-  if (!isFormat(out.format)) out.format = "case-study";
+  if (!DRAFT_LAYOUTS.includes(String(out.format))) out.format = "case-study";
   if (Array.isArray(out.charts)) out.charts = out.charts.filter((c) => !isObject(c) || KINDS.includes(String(c.kind)));
   return out;
 }
@@ -150,12 +153,12 @@ export function toChart(g: DraftChart): Chart | null {
     }
     case "table": {
       // Headings: series when it is filled (then every row of cells is data), else the first row
-      // of cells. A table whose headings are bare figures has a data row where its headings
-      // should be, so it is dropped rather than shown with a row missing.
+      // of cells. When the headings come from cells and are bare figures, a data row is where
+      // they should be, so the table is dropped rather than shown with a row missing.
       const fromSeries = g.series.some((s) => t(s));
       const head = fromSeries ? g.series : (g.cells[0] ?? []);
       const columns = head.map((c) => t(c)).slice(0, C.table.columns.max);
-      if (columns.some(bareNumber)) return null;
+      if (!fromSeries && columns.some(bareNumber)) return null;
       const cells = g.cells
         .slice(fromSeries ? 0 : 1)
         .slice(0, C.table.rows.max)
