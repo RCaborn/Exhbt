@@ -473,7 +473,7 @@ export function toolbarClashes(page: Page): Promise<string[]> {
     const px = (v: string) => parseFloat(v) || 0;
     /** A text box's words: on one line, as wide as they are (its placeholder's where it is empty); on more, the whole box. */
     const boxWords = (el: HTMLTextAreaElement | HTMLInputElement): DOMRect[] => {
-      const text = el.value || el.placeholder;
+      const text = (el.value || el.placeholder).trimEnd();
       if (!text.trim()) return [];
       const s = getComputedStyle(el);
       const b = el.getBoundingClientRect();
@@ -485,14 +485,21 @@ export function toolbarClashes(page: Page): Promise<string[]> {
       const x = px(s.paddingLeft) + (s.textAlign === "center" ? (inner - w) / 2 : s.textAlign === "right" || s.textAlign === "end" ? inner - w : 0);
       return [new DOMRect(b.x + x, b.y, w, b.height)];
     };
+    // A text node's words, each by itself: a space at the end of a wrapped line hangs past the edge of its box, and is no word.
+    const range = document.createRange();
+    const wordsOf = (n: Node) =>
+      [...n.textContent!.matchAll(/\S+/g)].flatMap((w) => {
+        range.setStart(n, w.index);
+        range.setEnd(n, w.index + w[0].length);
+        return [...range.getClientRects()];
+      });
     for (const el of root.querySelectorAll("*")) {
       if (el.closest(".xe-tools, .sr-only, [hidden]") || !drawnNow(el)) continue;
       const field = el.matches("textarea, input:not([type=hidden]):not([type=checkbox]):not([type=radio]), [contenteditable]:not([contenteditable=false]), [role=textbox]");
       const texts = [...el.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.trim());
-      const range = document.createRange();
-      const glyphs = el.matches("textarea, input") ? boxWords(el as HTMLTextAreaElement) : texts.flatMap((n) => (range.selectNodeContents(n), [...range.getClientRects()]));
+      const glyphs = el.matches("textarea, input") ? boxWords(el as HTMLTextAreaElement) : texts.flatMap(wordsOf);
       if (field || (texts.length && el.closest("[data-path]"))) worded.push({ el, boxes: [el.getBoundingClientRect()], glyphs });
-      else if (texts.length) worded.push({ el, boxes: glyphs, glyphs });
+      else if (texts.length) worded.push({ el, boxes: texts.flatMap((n) => (range.selectNodeContents(n), [...range.getClientRects()])), glyphs });
     }
     const CHIPS = ".xe-chip, .xe-above, .xe-fig-chip, .xe-fig-picked, .xe-over > *, .xe-flow-chip, .xe-add-finding, .xe-list-tools > *";
     const out: string[] = [];

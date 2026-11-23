@@ -59,15 +59,23 @@ function wordsBox(el: HTMLElement): Box | null {
 
 const overlap = (a: Box, b: Box) => Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 0.5 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 0.5;
 
-/** A section's own words (a graph's title, legend, labels and values among them), where they are drawn: its toolbar never lies over them. */
+/**
+ * A section's own words (a graph's title, legend, labels and values among them), where they are drawn: its toolbar never lies
+ * over them. Word by word: a space at the end of a wrapped line hangs past the edge of its box (the fields keep their spaces),
+ * and is no word; with other fonts it reached into the gutter beside a section (the runner's, 23 Nov).
+ */
 function ownWords(frame: HTMLElement): Box[] {
   const out: Box[] = [];
   const walker = document.createTreeWalker(frame, NodeFilter.SHOW_TEXT);
   const range = document.createRange();
   for (let t = walker.nextNode(); t; t = walker.nextNode()) {
-    if (!t.textContent?.trim() || t.parentElement?.closest(".xe-tools, .sr-only, [hidden], [data-edit-only]")) continue;
-    range.selectNodeContents(t);
-    for (const r of range.getClientRects()) if (r.width > 0 && r.height > 0) out.push({ x: r.left + window.scrollX, y: r.top + window.scrollY, w: r.width, h: r.height });
+    const text = t.textContent ?? "";
+    if (!text.trim() || t.parentElement?.closest(".xe-tools, .sr-only, [hidden], [data-edit-only]")) continue;
+    for (const word of text.matchAll(/\S+/g)) {
+      range.setStart(t, word.index);
+      range.setEnd(t, word.index + word[0].length);
+      for (const r of range.getClientRects()) if (r.width > 0 && r.height > 0) out.push({ x: r.left + window.scrollX, y: r.top + window.scrollY, w: r.width, h: r.height });
+    }
   }
   // A text box keeps its words out of the page's text (a flowchart box's step, a link's description).
   for (const el of frame.querySelectorAll<HTMLTextAreaElement | HTMLInputElement>(TEXT_BOXES)) {
@@ -82,7 +90,7 @@ const TEXT_BOXES = 'textarea, input:not([type="checkbox"], [type="radio"], [type
 let pen: CanvasRenderingContext2D | null = null;
 /** Where a text box's words are: on one line, as wide as they are (its placeholder's where it is empty); on more, the whole box. */
 function boxWords(el: HTMLTextAreaElement | HTMLInputElement): Box | null {
-  const text = el.value || el.placeholder;
+  const text = (el.value || el.placeholder).trimEnd();
   if (!text.trim()) return null;
   const s = getComputedStyle(el);
   const b = pageBox(el);
@@ -145,6 +153,7 @@ function shapeOf(tools: HTMLElement, frame: HTMLElement, f: Box, kids: HTMLEleme
 const toolbars = new Set<HTMLElement>();
 const watched = new WeakSet<Element>();
 let sizes: ResizeObserver | null = null;
+let fontsWatched = false;
 let queued = 0;
 
 /**
@@ -163,8 +172,14 @@ function placeTools() {
     watched.add(main);
     sizes ??= new ResizeObserver(() => queuePlace());
     sizes.observe(main);
-    main.addEventListener("input", recheck);
   }
+  // The words move when the page's fonts arrive (the first lines are drawn in a fallback until then): placed again each time.
+  if (!fontsWatched) {
+    fontsWatched = true;
+    document.fonts.addEventListener("loadingdone", () => queuePlace());
+    void document.fonts.ready.then(() => queuePlace());
+  }
+  counts.placed++;
   // While something is carried, or a drop or a move settles, the page is drawn by transforms: wait for it (a drop draws the toolbars again).
   if (main.hasAttribute("data-xe-drag")) return;
   const moving = main.getAnimations({ subtree: true }).filter((a) => a.id === "xe-settle" && a.playState === "running");
@@ -277,24 +292,47 @@ function placeTools() {
   placePluses(main, bridge === 0);
 }
 
+/** Development only: how often the toolbars were placed, and a section's words checked against its toolbar (e2e/editor-drag.spec.ts). */
+const counts = { placed: 0, checked: 0 };
+if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") (window as Window & { __exhbtPlace?: typeof counts }).__exhbtPlace = counts;
+
 /**
- * Typing makes a section's words longer: where they now reach under its toolbar (one on its top edge or
- * its right edge), every toolbar is placed again, before the next paint. Only the section typed in is
- * read, and only when its toolbar lies over it.
+ * A section's words changed, by any route (typing, Undo, an AI rewrite or "Back to the AI version", a
+ * sheet): where its toolbar lies over the section (on its top edge or its right edge) and the words now
+ * reach under it, every toolbar is placed again, before the next paint. Once a frame, however many
+ * changes came in it; only the changed sections are read, and nothing draws again. A change that did
+ * not come from the keyboard is checked once more a frame later: what the page draws for it (a rich
+ * field's words put back by Undo) may land after that first frame.
  */
-let rechecking = false;
-function recheck(e: Event) {
-  const frame = e.target instanceof Element ? e.target.closest<HTMLElement>("[data-section-id]") : null;
-  const tools = frame?.querySelector<HTMLElement>(":scope > .xe-tools");
-  if (!frame || !tools || rechecking || INSIDE_KINDS.has(frame.dataset.kind ?? "")) return;
+const pending = new Map<HTMLElement, number>();
+function recheckSoon(tools: HTMLElement, typed: boolean) {
   if (!["edge", "rcol", "compact"].includes(tools.dataset.place ?? "")) return;
-  rechecking = true;
-  requestAnimationFrame(() => {
-    rechecking = false;
-    const words = ownWords(frame);
-    const under = [...tools.children].filter((c) => c.getClientRects().length > 0).map(pageBox);
-    if (under.some((b) => words.some((w) => overlap(b, w)))) queuePlace();
-  });
+  const frames = typed ? 1 : 2;
+  if ((pending.get(tools) ?? 0) >= frames) return;
+  const first = pending.size === 0;
+  pending.set(tools, frames);
+  if (first) requestAnimationFrame(recheckPending);
+}
+function recheckPending() {
+  let again = false;
+  for (const [tools, frames] of pending) {
+    const frame = tools.parentElement;
+    if (frame?.isConnected && tools.isConnected) {
+      counts.checked++;
+      const words = ownWords(frame);
+      const under = [...tools.children].filter((c) => c.getClientRects().length > 0).map(pageBox);
+      if (under.some((b) => words.some((w) => overlap(b, w)))) {
+        pending.delete(tools);
+        queuePlace();
+        continue;
+      }
+    }
+    if (frames > 1) {
+      pending.set(tools, frames - 1);
+      again = true;
+    } else pending.delete(tools);
+  }
+  if (again) requestAnimationFrame(recheckPending);
 }
 
 /** Where a flowchart box's chip, or another control, sits by the "+" in a gap (its own box, the press round it included). */
@@ -511,17 +549,52 @@ export function Toolbar() {
   const menu = useRef<HTMLButtonElement>(null);
   const why = useId();
   // The compact form's "More actions" (css/core.css: data-place="compact"): open, it shows the toolbar's other buttons under the
-  // pair, by name, and its first takes the focus; Escape, the focus leaving, or one of them pressed closes it.
+  // pair, by name, and its first takes the focus; Escape, the focus going to something else, a press outside it, or one of them
+  // pressed closes it.
   const [open, setOpen] = useState(false);
+  const openNow = useRef(open);
+  useEffect(() => {
+    openNow.current = open;
+  }, [open]);
   usePlace(ref);
   useRoving(ref);
   useEffect(() => {
     if (!open) return;
     const items = [...(ref.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])];
     items.find((b) => b !== menu.current && !b.hasAttribute("data-grip") && !b.disabled && b.getClientRects().length > 0)?.focus();
+    // A press anywhere else closes it (the focus leaving to nowhere does not: an AI draft's own menu, inside it, hides the button
+    // that had the focus when it opens its rewrite form).
+    const away = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", away, true);
+    return () => document.removeEventListener("pointerdown", away, true);
   }, [open]);
+  // Its section's words changed (typed, or by Undo, an AI rewrite, "Back to the AI version" or a sheet): they may now run under it.
+  // Nothing draws again; only this section is read, once a frame, and only where it lies over its section (`recheckSoon`).
+  const kind = frame?.kind;
+  useEffect(() => {
+    if (!id) return;
+    const words = (d: ExhbtDoc) => (kind === "flow" ? d.flow : d.sections.find((s) => s.id === id));
+    let was = words(store.get());
+    return store.subscribe(() => {
+      const now = words(store.get());
+      if (now === was) return;
+      const before = was;
+      was = now;
+      const tools = ref.current;
+      if (!tools) return;
+      recheckSoon(tools, Boolean(tools.parentElement?.contains(document.activeElement)));
+      // An action from the open menu changed the section's words (an AI draft's rewrite or "Back to the AI version" among them):
+      // it closes. Not for the same words in a new object (a save that hands the doc back).
+      if (openNow.current && JSON.stringify(now) !== JSON.stringify(before)) {
+        setOpen(false);
+        if (!document.activeElement || document.activeElement === document.body || tools.contains(document.activeElement)) requestAnimationFrame(() => menu.current?.focus());
+      }
+    });
+  }, [store, id, kind]);
   if (!frame) return null;
-  const { place, count, kind } = frame;
+  const { place, count } = frame;
   const stays = kind === "flow" ? whyFlowStays(f) : null;
   const block = kind === "flow" ? "flow" : kind === "findings" ? "findings" : null;
   return (
@@ -533,14 +606,15 @@ export function Toolbar() {
       aria-label={`${label}: tools`}
       data-open={open ? "" : undefined}
       onKeyDown={(e) => {
-        if (!open || e.key !== "Escape") return;
+        // An AI draft's own menu, open inside this one, takes its Escape first (BlockTools).
+        if (!open || e.key !== "Escape" || ref.current?.querySelector('[data-tool="more"] [aria-expanded="true"]')) return;
         e.preventDefault();
         e.stopPropagation();
         setOpen(false);
         menu.current?.focus();
       }}
       onBlur={(e) => {
-        if (open && !e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
+        if (open && e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false);
       }}
       onClick={(e) => {
         const b = (e.target as HTMLElement).closest("button");

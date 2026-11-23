@@ -227,3 +227,43 @@ What it built (`components/exhbt-editor/phone/PhoneBar.tsx`, `ReorderSheet.tsx`,
 - The drop is the editor's motion (`settle` in `flow/FlowList.tsx`): every box still on its way goes from where it was drawn to its place, the dropped one from where it was let go, transforms only, none under reduced motion. A drop with no place, and Escape, settle back the same way.
 - The keyboard moves the box by the distance between the two places, measured at pick-up, so an arrow pressed at once is never lost.
 - `e2e/editor-flow.spec.ts` expects slide by default, and the drop-motion check runs in slide; line's own checks (the copy, the line, its contrast) run only when the page says `data-flow-style="line"`.
+
+## From agent Y: where a section's toolbar sits (23 Nov 2026; `components/exhbt-editor/Toolbar.tsx`, `css/core.css`)
+
+- The rule (Rory, 23 Nov): a toolbar never sits on any words, its own section's included, nor on another section or a chip, and its grip is at the section's top right corner wherever it sits. Only a picture's toolbar lies over its own section, inside its corner, over the picture.
+- `placeTools()` reads first, then writes `data-place` (above is no attribute) and, on the top edge, `--xe-tools-dx`/`-dy`. The places, in order:
+  1. a row above the corner;
+  2. `edge`: a row half over the top edge, up to 8px right and a little lower where the gap is short, never inside;
+  3. `side`: a column in the gutter to the right, from the corner down, touching the section, inside the page's column;
+  4. `rcol`: that column half over the right edge;
+  5. `compact`: the grip and "More actions", half over the top edge. A flowchart's row and pair sit 2rem in, clear of its first box's grip.
+- What counts:
+  - every other section, by its frame;
+  - the page's parts between sections: a field by its whole box, a layout label by its letters;
+  - the chips that reach out of a section (`CHIPS`: a picked figure's label, "Edit figures", "Web address", the aim's switch);
+  - the section's own words, word by word. A space hanging at a wrapped line's end is no word: on the CI runner's fonts it reached into the hypothesis's gutter (23 Nov). A `textarea` or `input` counts by its words on one line (`measureText`), and by its box where they wrap.
+  - `toolbarClashes` in `e2e/page-editor.ts` checks the same way.
+- The compact menu:
+  - "More actions" (`data-tool="menu"`, `aria-expanded`) opens a card listing Move up, Move down, the layout's action, an AI draft's More actions and Remove, by name. Its first button takes the focus.
+  - Escape, a press outside, the focus moving elsewhere, an item pressed, or an action that changes the section's words (an AI rewrite) closes it. Placement leaves it alone while it is open.
+  - An AI draft's own menu opens inside it and takes its own Escape first.
+  - `e2e/editor.ts` (`pressTool`, `openCardMenu`, `revealCardMenu`) opens it first where a toolbar is compact.
+- The pair's two fallbacks, accepted:
+  - just under another section's chip on its edge (research's second reference line, under the first's "Web address": dy 20px at 1440), over none of the section's words;
+  - where nothing is clear, on the corner.
+  - A new exhbt's flowchart, and a flowchart of three boxes in one row at 1440, are compact.
+- Research's hypothesis: the gutter column at 1440 (a 36px gutter, 36px buttons); the compact pair on a tablet (44px buttons).
+- A picture's toolbar (`shapeOf`): a row in its corner, or a column down its right edge on a narrow tile (grip, up, down, action, more, remove). Where the picture is too short, the column goes on at the foot of a second (`justify-content: flex-end`), so Remove is farthest from the grip.
+- Tablet (coarse, 48rem and up): a toolbar above its section shows in full; any other, and every picture's, shows only its grip in its place until the section is touched or focused. Phones place their grips in `phone.css`.
+- Placement runs again on:
+  - a structural change (each toolbar's layout effect);
+  - the main column resizing (`ResizeObserver`);
+  - the end of a drop's settle;
+  - fonts finishing loading (`document.fonts`: `loadingdone`, `ready`);
+  - a section's words changing by any route (typing, Undo, an AI rewrite, a sheet). Each toolbar subscribes to its own section in the store (`doc.flow` for the flowchart). Where it lies over the section (`edge`, `rcol`, `compact`), `recheckSoon` checks those words once a frame (once more a frame later when not typed), and places again only on an overlap.
+  - `window.__exhbtPlace` (development only) counts placements and checks.
+- Keyboard: one Tab stop; the arrows follow the drawn order; a column (`aria-orientation="vertical"`) and an open menu take up and down too; the grip still carries a section.
+- Left as it is: flowchart box chips (`.xe-flow-chip`) and "Add a box at the end" aren't obstacles, since with a mouse they show only on their box.
+  - So Graph 1's toolbar covers box 3's chips on the "figure before findings" fixture.
+  - On a drafted research page, the hypothesis's gutter column passes box 1's grip, and the results' toolbar covers box 3's Remove.
+  - Next step: add them to `CHIPS`, then check every layout's placement again.

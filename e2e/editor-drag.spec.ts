@@ -129,6 +129,8 @@ const grid = (rows: Row[]) =>
 
 /** "Graph 1", as the words read out name it. */
 const nameOf = async (page: Page, id: string) => labelOf(await docNow(page), id);
+/** A flowchart box of eight long words, the step's most: in a case study at 1440 it runs under the toolbar's row on the flowchart's edge. */
+const LONG_STEP = "Characterise bank and fintech equilibrium strategies under heterogeneous payoffs";
 /** An aim of long words, within its 20: its first line runs to the section's right edge. */
 const LONG_AIM = "Undergraduates walking briskly beforehand remember considerably more vocabulary afterwards than comparable undergraduates remaining seated";
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
@@ -444,10 +446,48 @@ test.describe("each section's toolbar, at 1440 wide", () => {
     const tools = frame(page, "flow").locator(":scope > .xe-tools");
     await expect(tools).toHaveAttribute("data-place", "edge");
     // Eight long words, the step's most: they run under the row on the edge, so the toolbar is placed again as they are typed (23 Nov).
-    await typeIn(page, "flow.0.step", "Characterise bank and fintech equilibrium strategies under heterogeneous payoffs");
+    await typeIn(page, "flow.0.step", LONG_STEP);
     await expect(tools).toHaveAttribute("data-place", "compact");
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await expect.poll(() => toolbarClashes(page)).toEqual([]);
+  });
+
+  test("words put back by Undo, without a keystroke, under the flowchart's toolbar on its edge: the toolbar moves off them", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await waitLive(page);
+    const tools = frame(page, "flow").locator(":scope > .xe-tools");
+    await expect(tools).toHaveAttribute("data-place", "edge");
+    const firstBox = (step: string, name: string) =>
+      page.evaluate(([s, n]) => window.__exhbtEditor!.patchDoc((d) => ({ ...d, flow: d.flow.map((b, i) => (i === 0 ? { ...b, step: s } : b)) }), n), [step, name] as const);
+    // A long first box from outside the keyboard, as a rewrite gives one: the toolbar moves to the compact pair (decision 0026).
+    await firstBox(LONG_STEP, "a long first box");
+    await expect(tools).toHaveAttribute("data-place", "compact");
+    // Short again, and the page laid out again (a window narrow enough to change the column's width, and back): the row is back on the edge.
+    await firstBox("Define the strategies", "a short first box");
+    await page.setViewportSize({ width: 800, height: 900 });
+    await page.waitForTimeout(300);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(tools).toHaveAttribute("data-place", "edge");
+    // Undo puts the long words back under the row: the toolbar moves off them.
+    await page.locator(`${READY} h1`).focus();
+    await page.keyboard.press("ControlOrMeta+z");
+    await expect.poll(async () => (await docNow(page)).flow[0]!.step).toBe(LONG_STEP);
+    await expect(tools).toHaveAttribute("data-place", "compact");
+    expect(await toolbarClashes(page)).toEqual([]);
+  });
+
+  test("research's hypothesis: its gutter column clears its words whatever the font, and every toolbar is placed again when fonts finish loading", async ({ page }) => {
+    await openTiming(page, "research", { full: true });
+    await waitLive(page);
+    const placed = () => page.evaluate(() => (window as unknown as { __exhbtPlace: { placed: number } }).__exhbtPlace.placed);
+    // Narrower and wider letters move where each line ends, and the space hanging at its end with it (the runner's fonts, 23 Nov).
+    for (const spacing of ["-0.4px", "0.3px", "0.6px", "1px"]) {
+      await page.addStyleTag({ content: `[data-section-id="aim-1"] [data-path$=".text"] { letter-spacing: ${spacing} !important; }` });
+      const before = await placed();
+      await page.evaluate(() => document.fonts.dispatchEvent(new Event("loadingdone")));
+      await expect.poll(placed, { message: spacing }).toBeGreaterThan(before);
+      await expect.poll(() => toolbarClashes(page), { message: spacing }).toEqual([]);
+    }
   });
 
   test("a graph with a long title: its toolbar covers none of it, in research and a case study", async ({ page }) => {

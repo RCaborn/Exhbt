@@ -31,6 +31,7 @@ import {
   textbox,
   seeAsVisitor,
   settle,
+  toolbarClashes,
   typeIn,
   undoLabel,
   waitLive,
@@ -77,11 +78,11 @@ function fieldsOf(doc: ExhbtDoc): string[] {
 const scan = async (page: Page) => (await new AxeBuilder({ page }).include('[data-editor="page"]').withTags(WCAG).analyze()).violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(", ")}`);
 
 /** Drafts an exhbt with the placeholder AI (so the parts it drafted have "More actions"), opens its editor, and returns its id. */
-async function openDrafted(page: Page, tag: string): Promise<string> {
+async function openDrafted(page: Page, tag: string, notes?: string): Promise<string> {
   await page.goto(`/auth/dev?email=${freshName(tag)}@example.com&next=/exhbts/new`);
   await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
   const res = await page.request.post("/api/exhbts/draft", {
-    data: { text: "Final-year project on lunch queues. I timed the queue for two weeks, added a second till, and timed it again. Waits fell from 11 to 4 minutes." },
+    data: { text: "Final-year project on lunch queues. I timed the queue for two weeks, added a second till, and timed it again. Waits fell from 11 to 4 minutes.", notes },
   });
   expect(res.status()).toBe(200);
   const { id } = (await res.json()) as { id: string };
@@ -523,6 +524,26 @@ test.describe("undo", () => {
     await waitSaved(page, id);
     const back = (await readStored(page, id)).working;
     expect([formatOf(back), hasMarker(back), back.sections.map((s) => s.id)]).toEqual(["case-study", false, doc.sections.map((s) => s.id)]);
+  });
+
+  test("the stand-in AI rewrites the method, without a keystroke: the flowchart's toolbar checks the new words against itself, and covers none of them", async ({ page }) => {
+    // Research, so the flowchart's boxes run down its column and its toolbar has a clear place for any words the stand-in writes.
+    await openDrafted(page, "rewrite", "stand-in: layout research");
+    const tools = frame(page, "flow").locator(":scope > .xe-tools");
+    // The flowchart's toolbar lies over its section (its row on its edge, or the compact pair), so its words are checked whenever they change.
+    expect(["edge", "compact"]).toContain(await tools.getAttribute("data-place"));
+    const checked = () => page.evaluate(() => (window as unknown as { __exhbtPlace: { checked: number } }).__exhbtPlace.checked);
+    const before = await checked();
+    // The AI's own More actions for the flowchart ("Method" in research), from the toolbar's More actions where it is the compact pair.
+    await (await toolOf(page, "flow", "More actions for Method")).click();
+    await frame(page, "flow").getByRole("button", { name: "Rewrite this block" }).click();
+    await frame(page, "flow").getByRole("button", { name: "Rewrite the method now" }).click();
+    await expect.poll(async () => (await docNow(page)).flow[0]?.step ?? "").toMatch(/^Preview rewrite/);
+    await expect.poll(checked).toBeGreaterThan(before);
+    // A press outside closes the menus; the flowchart's toolbar, where it is drawn now, covers none of the new words, nor anything else.
+    await page.mouse.click(4, 400);
+    await expect(tools).not.toHaveAttribute("data-open", "");
+    expect((await toolbarClashes(page)).filter((c) => /^(Drag Flowchart|Move Flowchart|Remove Flowchart|More actions for Flowchart)/.test(c))).toEqual([]);
   });
 
   test("undo keeps typing and the numbers to check: back to the AI version, type in the title, Undo", async ({ page }) => {

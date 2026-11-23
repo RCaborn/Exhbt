@@ -314,10 +314,20 @@ export const sectionsArea = (page: Page) => page.locator(`${READY} article[data-
 export const card = (page: Page, name: string) =>
   page.locator(`${READY} [data-section-id]`).filter({ has: page.getByRole("toolbar", { name: `${name}: tools`, exact: true }) });
 
+/**
+ * Where a section's toolbar is the compact pair, the grip and "More actions" (decision 0026: a new exhbt's flowchart, a
+ * flowchart of three boxes in one row), its other buttons and an AI draft's own More actions are in that menu: opens it.
+ */
+export async function openCompactTools(toolbar: Locator) {
+  if ((await toolbar.getAttribute("data-place")) === "compact" && (await toolbar.getAttribute("data-open")) === null) await toolbar.locator('[data-tool="menu"]').click();
+}
+
 /** Presses one of a section's toolbar buttons ("Remove Image 1", "Move Quote up"): the toolbar shows when the pointer is over the frame. */
 export async function pressTool(page: Page, label: string, name: string) {
   await card(page, label).hover();
-  await page.getByRole("toolbar", { name: `${label}: tools`, exact: true }).getByRole("button", { name, exact: true }).click();
+  const toolbar = page.getByRole("toolbar", { name: `${label}: tools`, exact: true });
+  await openCompactTools(toolbar);
+  await toolbar.getByRole("button", { name, exact: true }).click();
 }
 
 /** Removes a section by its name on the page ("Image 1"). */
@@ -508,9 +518,15 @@ const HOVER_FOR: Record<string, string> = {
   findings: '[data-kind="findings"]',
 };
 
-/** Opens a block's "More actions" menu. */
-export async function openCardMenu(page: Page, block: string) {
+/** Puts the pointer on a block, so its tools show, and opens its toolbar's own More actions where that is the compact pair. */
+export async function revealCardMenu(page: Page, block: string) {
   await page.locator(`${READY} ${HOVER_FOR[block]!}`).first().hover();
+  if (block === "flow" || block === "findings") await openCompactTools(page.locator(`${READY} [data-kind="${block}"] > .xe-tools`).first());
+}
+
+/** Opens a block's "More actions" menu (a section's, from its toolbar's own More actions where that is the compact pair). */
+export async function openCardMenu(page: Page, block: string) {
+  await revealCardMenu(page, block);
   await cardMenuButton(page, block).click();
 }
 
