@@ -1,0 +1,63 @@
+# Checks every structured answer the app asks the AI for against the real API (decision 0025):
+# scripts/probe-ai-shapes.ts sends each schema with a tiny max_tokens and fails if one is refused,
+# including the draft with the growth already planned. The tests' stand-in AI can't see this.
+# Runs when the code that shapes a request changes, and weekly in case the API's limit moves.
+# A fraction of a penny a run.
+name: AI request shapes
+
+on:
+  push:
+    paths:
+      - "lib/ai/**"
+      - "lib/exhbt/formats.ts"
+      - "lib/exhbt/charts.ts"
+      - "scripts/probe-ai-shapes.ts"
+      - "package-lock.json"
+      - ".github/workflows/ai-shapes.yml"
+  pull_request:
+    paths:
+      - "lib/ai/**"
+      - "lib/exhbt/formats.ts"
+      - "lib/exhbt/charts.ts"
+      - "scripts/probe-ai-shapes.ts"
+      - "package-lock.json"
+      - ".github/workflows/ai-shapes.yml"
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    # Pull requests from forks get no secrets, so they skip this job.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check the API key secret is set
+        id: key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::notice::ANTHROPIC_API_KEY is not set for this run, so the request shapes were not checked."
+            echo "set=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "set=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.key.outputs.set == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.key.outputs.set == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        if: steps.key.outputs.set == 'true'
+      - name: Probe every request shape against the real API
+        if: steps.key.outputs.set == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npm run -s probe:ai

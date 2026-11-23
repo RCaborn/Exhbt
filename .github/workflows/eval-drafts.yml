@@ -70,6 +70,7 @@ jobs:
         run: |
           if [ -f "$RUN_DIR/SUMMARY.md" ]; then
             cat "$RUN_DIR/SUMMARY.md" >> "$GITHUB_STEP_SUMMARY"
+            cat "$RUN_DIR/SUMMARY.md"
           else
             echo "The eval stopped before writing SUMMARY.md; see the run log and the uploaded files." >> "$GITHUB_STEP_SUMMARY"
           fi
