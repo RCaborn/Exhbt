@@ -17,11 +17,25 @@ export function anthropicApiKey(): string | undefined {
   return key || undefined;
 }
 
-/** USD per million tokens for AI_MODEL (prompts under 100K tokens), for the cost log. */
+/**
+ * The highest max_tokens a non-streaming call can ask for with SDK 1.6.0: above about 21,333 the SDK
+ * refuses with "Streaming is required" (it expects such a call to take over 10 minutes). Every AI
+ * call here is non-streaming, so no cap may go past this. The caps beside each call (decision 0025)
+ * are at least three times the largest answer measured, up to this ceiling; the draft's 16,000 is
+ * about twice its largest, because three times would pass it.
+ */
+export const SDK_NONSTREAMING_MAX_TOKENS = 21_333;
+
+/** USD per million tokens for AI_MODEL (prompts up to 100K tokens), for the cost log. */
 export const AI_PRICE_IN = 0.1;
 export const AI_PRICE_OUT = 0.5;
+/** A prompt over this many input tokens is priced higher, input and output: $0.50 / $2.50 per million for Haiku 5.5. */
+export const AI_LONG_PROMPT_TOKENS = 100_000;
+export const AI_PRICE_IN_LONG = 0.5;
+export const AI_PRICE_OUT_LONG = 2.5;
 
-/** What a call cost, from the token counts the API reports. */
+/** What a call cost, from the token counts the API reports (thinking is inside the output tokens). */
 export function costUsd(inputTokens: number, outputTokens: number): number {
-  return (inputTokens * AI_PRICE_IN + outputTokens * AI_PRICE_OUT) / 1_000_000;
+  const long = inputTokens > AI_LONG_PROMPT_TOKENS;
+  return (inputTokens * (long ? AI_PRICE_IN_LONG : AI_PRICE_IN) + outputTokens * (long ? AI_PRICE_OUT_LONG : AI_PRICE_OUT)) / 1_000_000;
 }

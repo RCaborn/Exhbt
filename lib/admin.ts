@@ -229,12 +229,13 @@ export async function adminOverview(range: Range, now = Date.now()): Promise<Ove
         reasons: [...reasons.entries()].map(([r, k]) => `${FAILURE_WORDS[r as AIFailureReason] ?? r} ${k}`).join(", "),
         inputTokens,
         outputTokens,
-        costUsd: costUsd(inputTokens, outputTokens),
+        // Priced call by call: a long prompt is priced higher (lib/ai/model.ts).
+        costUsd: fs.reduce((n, f) => n + costUsd(f.inputTokens ?? 0, f.outputTokens ?? 0), 0),
       };
     });
     const inputTokens = features.reduce((n, f) => n + f.inputTokens, 0);
     const outputTokens = features.reduce((n, f) => n + f.outputTokens, 0);
-    return { total: features.reduce((n, f) => n + f.failures, 0), inputTokens, outputTokens, costUsd: costUsd(inputTokens, outputTokens), features };
+    return { total: features.reduce((n, f) => n + f.failures, 0), inputTokens, outputTokens, costUsd: features.reduce((n, f) => n + f.costUsd, 0), features };
   });
 
   const exhbtSection = build([exhbts, events], () => {

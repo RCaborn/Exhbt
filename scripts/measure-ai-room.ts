@@ -1,9 +1,11 @@
 /**
- * How much of its max_tokens each AI call uses (decision 0025 has why this matters). Sends the
- * app's own request for every feature, built by the request builder beside each call, with a
- * typical and a heavy input, three times each, and prints one table: the cap, the stop reason of
- * each run and the output tokens it used (thinking included). A call that stops at max_tokens is a
- * cut-off answer, which fails for the person.
+ * How much of its max_tokens each AI call uses, and whether the app can read the answer (decision
+ * 0025 has why this matters). Sends the app's own request for every feature, built by the request
+ * builder beside each call, with a typical and a heavy input, three times each, and reads each
+ * answer the way the app does: structured answers through structuredCall (stop reason, then JSON,
+ * the repair and the strict schema), transcriptions through readTranscript. Prints one table: the
+ * cap, the stop reasons, how the reading went, the output tokens (thinking included), the thinking
+ * tokens and the seconds each call took.
  *
  *   npm run measure:ai                 # everything, 3 runs per case
  *   npm run measure:ai -- --runs 1     # quicker
@@ -11,30 +13,47 @@
  *   npm run measure:ai -- --dry        # no API calls: each request's cap and size
  *
  * Inputs: the draft eval's fixtures (evals/exhbt-draft/fixtures) read the way the browser reads
- * them, page thumbnails of those PDFs (evals/ai-room/pages, made like the browser's: 768 px long
- * edge, JPEG quality 0.72), and the CVs, jobs and portfolios below. Each heavy case is the most the
- * app lets in. Exits non-zero if any run is cut off at max_tokens or fails. Never prints the
- * key or the environment.
+ * them; page thumbnails of those PDFs (evals/ai-room/pages, made like the browser's: 768 px long
+ * edge, JPEG quality 0.72); scans with no text layer (evals/ai-room/scans); and the CVs, jobs and
+ * portfolios below. What "heavy" means, truthfully:
+ * - at the app's maximum: the roadmap's every field (ROADMAP_INPUT_MAX), the draft's and the
+ *   rewrite's material (MAX_MATERIAL_CHARS), the listing (MAX_LISTING_CHARS), 10 candidates
+ *   (the Max plan's exhbts) each with LIMITS' most findings and skills, 30 page images
+ *   (FIGURE.maxImages) and the intro's CV (MAX_CV_CHARS);
+ * - not at the maximum: the 30 page images are 8 distinct pages used in turn; the heavy scans are
+ *   a 6-page CV and a 12-page report, not the largest file a plan allows; and the intro's "heavy"
+ *   case is every fact filled in, which the model answers quickly; its sparse case thinks longest.
+ * Exits non-zero if any answer couldn't be read as the app reads it (cut off, wrong shape, refused,
+ * a service error). A transcription cut off is not a failure: the page tells the person only the
+ * first part was read. Never prints the key or the environment.
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
+import type { z } from "zod/v4";
+import { AIFailure, structuredCall, type AIFeature } from "@/lib/ai/call";
 import { draftRequest, materialText, MAX_MATERIAL_CHARS, type DraftInput } from "@/lib/ai/exhbt-draft";
-import { rewriteRequest } from "@/lib/ai/exhbt-rewrite";
-import { figurePickRequest, type PageImage } from "@/lib/ai/figure-pick";
-import { jobMatchRequest } from "@/lib/ai/job-match";
-import { introRequest, type IntroFacts } from "@/lib/ai/portfolio-intro";
-import { ideasRequest, swapRequest } from "@/lib/ai/projects";
+import { DraftSchema, repairDraft } from "@/lib/ai/draft-answer";
+import { rewriteRequest, SCHEMAS } from "@/lib/ai/exhbt-rewrite";
+import { AnswerSchema, figurePickRequest, type PageImage } from "@/lib/ai/figure-pick";
+import { jobMatchRequest, MatchSchema } from "@/lib/ai/job-match";
+import { IntroSchema, introRequest, MAX_CV_CHARS, type IntroFacts } from "@/lib/ai/portfolio-intro";
+import { ideasRequest, IdeasSchema, swapRequest, SwapSchema } from "@/lib/ai/projects";
+import { repairIdeas, repairRoadmap, repairSwap } from "@/lib/ai/repair";
 import { roadmapRequest } from "@/lib/ai/roadmap";
-import type { Project, Roadmap, RoadmapInput } from "@/lib/ai/schemas";
+import { ROADMAP_INPUT_MAX, RoadmapModelSchema, type Project, type Roadmap, type RoadmapInput } from "@/lib/ai/schemas";
+import { readTranscript, transcribeRequest } from "@/lib/ai/transcribe";
 import { anthropicApiKey, costUsd } from "@/lib/ai/model";
 import { extractTextInBrowser } from "@/lib/doc-readers";
 import { ENTITLEMENTS, EXHBTS_PER_JOB_LINK } from "@/lib/entitlements";
+import { LIMITS } from "@/lib/exhbt/blocks";
+import { DRAFT_BLOCKS } from "@/lib/exhbt/draft-blocks";
 import { fullDoc, openBankingDoc } from "@/lib/exhbt/sample";
 import type { JobProfile } from "@/lib/jobs";
 import type { MatchCandidate } from "@/lib/jobs/rank";
 import { MAX_LISTING_CHARS } from "@/lib/jobs/listing-text";
 import { FIGURE } from "@/lib/figures/rules";
+import { PLAN_SIZE } from "@/lib/store";
 
 const ROOT = process.cwd();
 const FIXTURES = join(ROOT, "evals/exhbt-draft/fixtures");
@@ -157,6 +176,13 @@ function longCv(): string {
   return parts.join("\n\n").slice(0, 20_000);
 }
 
+/** Real text cut to a field's maximum: the sentences in turn, as many times as it takes. */
+function fill(sentences: string[], max: number): string {
+  let s = "";
+  for (let i = 0; s.length < max; i++) s += `${s ? " " : ""}${sentences[i % sentences.length]}`;
+  return s.slice(0, max).trim();
+}
+
 const typicalRoadmapInput: RoadmapInput = {
   targetRole: "Graduate data analyst",
   cvText: TYPICAL_CV,
@@ -165,13 +191,28 @@ const typicalRoadmapInput: RoadmapInput = {
   education: "BSc Economics, University of Leeds",
   skills: "R, Excel, some Python, SQL basics",
 };
+/** Every field of the builder filled to its maximum (ROADMAP_INPUT_MAX). */
 const heavyRoadmapInput: RoadmapInput = {
-  targetRole: "Graduate policy and data analyst in the civil service or a think tank, working on education and labour market data",
-  cvText: longCv(),
+  targetRole: fill(["Graduate policy and data analyst in the civil service or a think tank, working on education and labour market data,", "ideally in a team that links administrative records and writes briefings for ministers and senior officials,", "with a route into the Government Statistical Service"], ROADMAP_INPUT_MAX.targetRole),
+  cvText: longCv().slice(0, ROADMAP_INPUT_MAX.cvText),
   situation: "at_university",
-  situationDetail: "Final year BSc Economics, graduating in July 2026, open to London or Leeds",
-  education: "BSc Economics, University of Leeds, predicted First. A levels: Mathematics A*, Economics A, Geography A. Modules include Econometrics 1 and 2, Public Policy Evaluation, Labour Economics, Data Analysis in R, Health Economics.",
-  skills: "R (tidyverse, fixest, Shiny), Python (pandas, scikit-learn), SQL, Stata, Excel and Power Query, Git, policy writing, presenting",
+  situationDetail: fill(["Final year BSc Economics, graduating in July 2026.", "Open to London, Leeds or Sheffield.", "Can start in September and work a hybrid pattern."], ROADMAP_INPUT_MAX.situationDetail),
+  education: fill([
+    "BSc Economics, University of Leeds, 2023 to 2026, predicted First.",
+    "A levels: Mathematics A*, Economics A, Geography A.",
+    "Modules: Econometrics 1 and 2, Public Policy Evaluation, Labour Economics, Data Analysis in R, Health Economics, Development Economics, Environmental Economics.",
+    "Dissertation: distance to the nearest campus and entry to higher education, 4,812 pupils, local authority fixed effects.",
+    "Leeds City College, 2021 to 2023.",
+  ], ROADMAP_INPUT_MAX.education),
+  skills: fill([
+    "R (tidyverse, fixest, Shiny, R Markdown).",
+    "Python (pandas, scikit-learn, LightGBM, matplotlib).",
+    "SQL (joins, window functions, CTEs in PostgreSQL).",
+    "Stata (panel regressions, esttab).",
+    "Excel (pivot tables, Power Query, XLOOKUP).",
+    "Git and GitHub.",
+    "Policy writing and presenting to non-specialists.",
+  ], ROADMAP_INPUT_MAX.skills),
 };
 const typicalJob: JobProfile = { id: "data-analyst", title: "Data analyst", altTitles: [], skills: ["SQL", "Excel", "Data visualisation", "Statistics", "Communication"], source: "measure" };
 const heavyJob: JobProfile = {
@@ -182,7 +223,7 @@ const heavyJob: JobProfile = {
   source: "measure",
 };
 
-function roadmapFor(input: RoadmapInput, job: JobProfile, heavy: boolean): Roadmap {
+function roadmapFor(job: JobProfile, heavy: boolean): Roadmap {
   const names = job.skills.slice(0, 6);
   return {
     targetRole: job.title,
@@ -195,7 +236,8 @@ function roadmapFor(input: RoadmapInput, job: JobProfile, heavy: boolean): Roadm
 }
 const project = (title: string, gap: string): Project => ({ title, brief: `A short study that uses ${gap.toLowerCase()} on open UK data, written up for a policy reader.`, closesGaps: [gap], deliverable: "A four-page report and the code", weeks: 4 });
 
-function candidates(n: number): MatchCandidate[] {
+/** The person's published exhbts as the job match sees them. `full`: each with as many findings and skills as an exhbt holds (LIMITS). */
+function candidates(n: number, full: boolean): MatchCandidate[] {
   const pool: MatchCandidate[] = [
     { id: "e1", title: "Does living further from a campus lower entry to higher education?", context: "BSc Economics dissertation", skills: ["Regression analysis", "R", "Panel data"], findings: ["An extra 10 km is linked to 3.1 points lower entry.", "The effect is larger for pupils on free school meals."] },
     { id: "e2", title: "Can a model predict which grocery orders arrive late?", context: "MSc Data Science project", skills: ["Python", "LightGBM", "SHAP"], findings: ["Recall for late orders rose from 0.62 to 0.79.", "Long runs were late 27% of the time."] },
@@ -208,7 +250,11 @@ function candidates(n: number): MatchCandidate[] {
     { id: "e9", title: "Where do Leeds buses run late?", context: "Personal project, Shiny app", skills: ["R", "Shiny", "Open data"], findings: ["Three routes account for half the late running.", "Lateness peaks between 4pm and 6pm."] },
     { id: "e10", title: "What would a £1 rise in the minimum wage do to hours?", context: "Policy brief", skills: ["Policy writing", "ASHE data", "Excel"], findings: ["Hospitality hours would fall slightly.", "Retail hours would hardly change."] },
   ];
-  return pool.slice(0, n);
+  const moreSkills = ["Data cleaning", "Writing for non-specialists", "Version control"];
+  const moreFindings = ["The method is written up so another student could repeat it.", "The limits of the data are stated plainly."];
+  return pool.slice(0, n).map((c) =>
+    full ? { ...c, skills: [...c.skills, ...moreSkills].slice(0, LIMITS.skills.max), findings: [...c.findings, ...moreFindings].slice(0, LIMITS.findings.max) } : c,
+  );
 }
 const LISTING = `Graduate Policy Analyst, Department for Education (Analysis Directorate)
 
@@ -242,22 +288,28 @@ function heavyListing(): string {
   return s.slice(0, MAX_LISTING_CHARS);
 }
 
-function introFacts(heavy: boolean): IntroFacts {
-  const projects = candidates(heavy ? ENTITLEMENTS.max.exhbts : 2).map((c) => ({ title: c.title, context: c.context, skills: c.skills }));
+/**
+ * The intro's facts. "sparse" is a person with a name, a target role and two exhbts: the case
+ * where the model thinks longest (it was the one cut off at the old 400). "full" is every fact at
+ * its longest (the CV to MAX_CV_CHARS, the 8 exhbts the app sends), which the model answers quickly.
+ */
+function introFacts(full: boolean): IntroFacts {
+  const projects = candidates(full ? 8 : 2, false).map((c) => ({ title: c.title, context: c.context, skills: c.skills }));
   return {
     name: "Priya Shah",
-    headline: heavy ? "Economics graduate who checks every number" : "",
-    location: heavy ? "Leeds" : "",
-    lookingFor: heavy ? "A graduate data or policy analyst role, in Leeds or London, from September 2026" : "",
+    headline: full ? "Economics graduate who checks every number" : "",
+    location: full ? "Leeds" : "",
+    lookingFor: full ? "A graduate data or policy analyst role, in Leeds or London, from September 2026" : "",
     targetRole: "Graduate data analyst",
     situation: "At university",
-    education: heavy ? heavyRoadmapInput.education : "BSc Economics, University of Leeds",
-    skills: heavy ? heavyRoadmapInput.skills : "R, Excel",
-    cv: heavy ? longCv() : "",
+    education: full ? heavyRoadmapInput.education : "BSc Economics, University of Leeds",
+    skills: full ? heavyRoadmapInput.skills : "R, Excel",
+    cv: full ? longCv().slice(0, MAX_CV_CHARS) : "",
     projects,
   };
 }
 
+/** n page thumbnails. The 8 distinct pages of the eval PDFs are used in turn: 30 images are the app's maximum, not 30 different pages. */
 function pageImages(n: number): PageImage[] {
   const files = readdirSync(PAGES).filter((f) => f.endsWith(".jpg")).sort();
   return Array.from({ length: n }, (_, i) => {
@@ -266,53 +318,81 @@ function pageImages(n: number): PageImage[] {
   });
 }
 
+const scan = (name: string) => new Uint8Array(readFileSync(join(ROOT, "evals/ai-room/scans", name)));
+
 // ---------------------------------------------------------------------------------------------
 
 type Req = { max_tokens: number } & Record<string, unknown>;
-type Case = { feature: string; size: "typical" | "heavy"; request: () => Req };
+/** How the app reads the answer: a structured call through structuredCall, or a transcription. */
+type Read = { kind: "structured"; feature: AIFeature; schema: z.ZodType<unknown>; repair?: (raw: unknown) => unknown } | { kind: "transcript" };
+type Case = { feature: string; size: "typical" | "heavy"; request: () => Req; read: Read };
+
+const structured = (feature: AIFeature, schema: z.ZodType<unknown>, repair?: (raw: unknown) => unknown): Read => ({ kind: "structured", feature, schema, repair });
 
 async function cases(): Promise<Case[]> {
   const f01 = await fixtureInput("01-econ-dissertation");
   const heavyText = await heaviestMaterial();
   const heavyDraft: DraftInput = { text: heavyText };
-  const tRoad = roadmapFor(typicalRoadmapInput, typicalJob, false);
-  const hRoad = roadmapFor(heavyRoadmapInput, heavyJob, true);
+  const tRoad = roadmapFor(typicalJob, false);
+  const hRoad = roadmapFor(heavyJob, true);
   const keeping = (r: Roadmap) => [project("Linking pupil and campus data", r.gaps[0]!.skill), project("A briefing on campus distance", r.gaps[1]?.skill ?? r.gaps[0]!.skill)];
+  const draft = structured("exhbt_draft", DraftSchema, repairDraft);
+  const ideas = structured("project_ideas", IdeasSchema, (raw) => repairIdeas(raw, PLAN_SIZE));
+  const swap = structured("project_swap", SwapSchema, repairSwap);
   const out: Case[] = [
-    { feature: "draft (control)", size: "typical", request: () => draftRequest(f01) },
-    { feature: "draft (control)", size: "heavy", request: () => draftRequest(heavyDraft) },
-    { feature: "roadmap", size: "typical", request: () => roadmapRequest(typicalRoadmapInput, typicalJob) },
-    { feature: "roadmap", size: "heavy", request: () => roadmapRequest(heavyRoadmapInput, heavyJob) },
-    { feature: "project ideas", size: "typical", request: () => ideasRequest({ input: typicalRoadmapInput, roadmap: tRoad, attempt: 1 }) },
-    { feature: "project ideas", size: "heavy", request: () => ideasRequest({ input: heavyRoadmapInput, roadmap: hRoad, attempt: 1 }) },
-    { feature: "project swap", size: "typical", request: () => swapRequest({ input: typicalRoadmapInput, roadmap: tRoad, replacing: project("A dashboard", tRoad.gaps[0]!.skill), keeping: keeping(tRoad), note: "", round: 1 }) },
-    { feature: "project swap", size: "heavy", request: () => swapRequest({ input: heavyRoadmapInput, roadmap: hRoad, replacing: project("A dashboard of school data", hRoad.gaps[2]!.skill), keeping: keeping(hRoad), note: "Use real government data, and something I can finish in my final term alongside exams.", round: 3 }) },
-    { feature: "job match", size: "typical", request: () => jobMatchRequest({ company: "Department for Education", roleTitle: "Graduate Policy Analyst", description: LISTING, candidates: candidates(EXHBTS_PER_JOB_LINK) }) },
-    { feature: "job match", size: "heavy", request: () => jobMatchRequest({ company: "Department for Education", roleTitle: "Graduate Policy Analyst", description: heavyListing(), candidates: candidates(ENTITLEMENTS.max.exhbts) }) },
-    { feature: "portfolio intro", size: "typical", request: () => introRequest(introFacts(false)) },
-    { feature: "portfolio intro", size: "heavy", request: () => introRequest(introFacts(true)) },
-    { feature: "figure pick", size: "typical", request: () => figurePickRequest(pageImages(3)) },
-    { feature: "figure pick", size: "heavy", request: () => figurePickRequest(pageImages(FIGURE.maxImages)) },
+    { feature: "draft (control)", size: "typical", request: () => draftRequest(f01), read: draft },
+    { feature: "draft (control)", size: "heavy", request: () => draftRequest(heavyDraft), read: draft },
+    { feature: "roadmap", size: "typical", request: () => roadmapRequest(typicalRoadmapInput, typicalJob), read: structured("roadmap", RoadmapModelSchema, repairRoadmap) },
+    { feature: "roadmap", size: "heavy", request: () => roadmapRequest(heavyRoadmapInput, heavyJob), read: structured("roadmap", RoadmapModelSchema, repairRoadmap) },
+    { feature: "project ideas", size: "typical", request: () => ideasRequest({ input: typicalRoadmapInput, roadmap: tRoad, attempt: 1 }), read: ideas },
+    { feature: "project ideas", size: "heavy", request: () => ideasRequest({ input: heavyRoadmapInput, roadmap: hRoad, attempt: 1 }), read: ideas },
+    { feature: "project swap", size: "typical", request: () => swapRequest({ input: typicalRoadmapInput, roadmap: tRoad, replacing: project("A dashboard", tRoad.gaps[0]!.skill), keeping: keeping(tRoad), note: "", round: 1 }), read: swap },
+    { feature: "project swap", size: "heavy", request: () => swapRequest({ input: heavyRoadmapInput, roadmap: hRoad, replacing: project("A dashboard of school data", hRoad.gaps[2]!.skill), keeping: keeping(hRoad), note: "Use real government data, and something I can finish in my final term alongside exams.", round: 3 }), read: swap },
+    { feature: "job match", size: "typical", request: () => jobMatchRequest({ company: "Department for Education", roleTitle: "Graduate Policy Analyst", description: LISTING, candidates: candidates(EXHBTS_PER_JOB_LINK, false) }), read: structured("job_match", MatchSchema) },
+    { feature: "job match", size: "heavy", request: () => jobMatchRequest({ company: "Department for Education", roleTitle: "Graduate Policy Analyst", description: heavyListing(), candidates: candidates(ENTITLEMENTS.max.exhbts, true) }), read: structured("job_match", MatchSchema) },
+    { feature: "portfolio intro", size: "typical", request: () => introRequest(introFacts(false)), read: structured("portfolio_intro", IntroSchema) },
+    { feature: "portfolio intro", size: "heavy", request: () => introRequest(introFacts(true)), read: structured("portfolio_intro", IntroSchema) },
+    { feature: "figure pick", size: "typical", request: () => figurePickRequest(pageImages(3)), read: structured("figure_pick", AnswerSchema) },
+    { feature: "figure pick", size: "heavy", request: () => figurePickRequest(pageImages(FIGURE.maxImages)), read: structured("figure_pick", AnswerSchema) },
+    { feature: "file read: cv", size: "typical", request: () => transcribeRequest(scan("cv-typical.jpg"), "image/jpeg", "cv"), read: { kind: "transcript" } },
+    { feature: "file read: cv", size: "heavy", request: () => transcribeRequest(scan("cv-long.pdf"), "application/pdf", "cv"), read: { kind: "transcript" } },
+    { feature: "file read: project", size: "typical", request: () => transcribeRequest(scan("project-page.jpg"), "image/jpeg", "project"), read: { kind: "transcript" } },
+    { feature: "file read: project", size: "heavy", request: () => transcribeRequest(scan("project-12-pages.pdf"), "application/pdf", "project"), read: { kind: "transcript" } },
   ];
-  for (const block of ["header", "gap", "flow", "findings", "skills"] as const) {
-    out.push({ feature: `rewrite: ${block}`, size: "typical", request: () => rewriteRequest({ block, source: materialText(f01), doc: openBankingDoc, attempt: 1 }) });
-    out.push({ feature: `rewrite: ${block}`, size: "heavy", request: () => rewriteRequest({ block, source: heavyText, doc: fullDoc, note: "Shorter, and lead with the main result.", attempt: 2 }) });
+  for (const block of DRAFT_BLOCKS) {
+    const read = structured("exhbt_rewrite", SCHEMAS[block] as z.ZodType<unknown>);
+    out.push({ feature: `rewrite: ${block}`, size: "typical", request: () => rewriteRequest({ block, source: materialText(f01), doc: openBankingDoc, attempt: 1 }), read });
+    out.push({ feature: `rewrite: ${block}`, size: "heavy", request: () => rewriteRequest({ block, source: heavyText, doc: fullDoc, note: "Shorter, and lead with the main result.", attempt: 2 }), read });
   }
   return out;
 }
 
-type Run = { stop: string; out: number; inTokens: number; thinking: number | null; error?: string };
+/** One run: why it stopped, the tokens, how long it took, and how the app's own reading of the answer went. */
+type Run = { stop: string; out: number; inTokens: number; thinking: number | null; ms: number; outcome: string };
+
+const thinkingOf = (r: Anthropic.Message): number | null => {
+  const usage = r.usage as unknown as Record<string, unknown>;
+  const details = (usage.output_tokens_details ?? usage.output_details) as Record<string, number> | undefined;
+  return typeof details?.thinking_tokens === "number" ? details.thinking_tokens : typeof usage.thinking_tokens === "number" ? (usage.thinking_tokens as number) : null;
+};
 
 async function runOnce(client: Anthropic, c: Case): Promise<Run> {
+  const t0 = Date.now();
+  let seen: Anthropic.Message | null = null;
+  let outcome = "ok";
   try {
-    const r = await client.messages.create(c.request() as unknown as Anthropic.MessageCreateParamsNonStreaming);
-    const usage = r.usage as unknown as Record<string, unknown>;
-    const details = (usage.output_tokens_details ?? usage.output_details) as Record<string, number> | undefined;
-    const thinking = typeof details?.thinking_tokens === "number" ? details.thinking_tokens : typeof usage.thinking_tokens === "number" ? (usage.thinking_tokens as number) : null;
-    return { stop: r.stop_reason ?? "?", out: r.usage.output_tokens, inTokens: r.usage.input_tokens, thinking };
+    if (c.read.kind === "structured") {
+      // The same reading as the app: stop reason first, then JSON, the repair and the strict schema.
+      await structuredCall({ feature: c.read.feature, client, request: c.request() as never, schema: c.read.schema, repair: c.read.repair, onResponse: (r) => (seen = r) });
+    } else {
+      seen = await client.messages.create(c.request() as unknown as Anthropic.MessageCreateParamsNonStreaming);
+      if (readTranscript(seen).truncated) outcome = "truncated (the page says so)";
+    }
   } catch (e) {
-    return { stop: "error", out: 0, inTokens: 0, thinking: null, error: e instanceof Anthropic.APIError ? `${e.status}` : (e as Error).message };
+    outcome = e instanceof AIFailure ? e.reason + (e.status ? ` ${e.status}` : "") : `error: ${(e as Error).message.slice(0, 80)}`;
   }
+  const r = seen as Anthropic.Message | null;
+  return { stop: r?.stop_reason ?? "none", out: r?.usage.output_tokens ?? 0, inTokens: r?.usage.input_tokens ?? 0, thinking: r ? thinkingOf(r) : null, ms: Date.now() - t0, outcome };
 }
 
 async function main() {
@@ -345,27 +425,28 @@ async function main() {
     }),
   );
 
-  console.log("| Feature | Input | Cap | Stop reasons | Output tokens (each run) | Thinking tokens | Largest / cap |");
-  console.log("|---|---|---|---|---|---|---|");
-  let cut = 0;
+  console.log("| Feature | Input | Cap | Stop reasons | Read as the app reads it | Output tokens (each run) | Thinking tokens | Seconds | Largest / cap |");
+  console.log("|---|---|---|---|---|---|---|---|---|");
+  let failed = 0;
   for (const c of all) {
     const rs = results.get(c) ?? [];
     const cap = c.request().max_tokens;
     const largest = Math.max(0, ...rs.map((r) => r.out));
-    cut += rs.filter((r) => r.stop === "max_tokens").length;
+    // A transcription cut off is handled (the page says only the first part was read); anything else that isn't ok fails.
+    failed += rs.filter((r) => r.outcome !== "ok" && !r.outcome.startsWith("truncated")).length;
     const thinking = rs.some((r) => r.thinking !== null) ? rs.map((r) => r.thinking ?? "?").join(", ") : "not reported";
-    const flag = rs.some((r) => r.stop === "max_tokens") ? " CUT OFF" : largest > cap / 2 ? " over half" : "";
-    console.log(`| ${c.feature} | ${c.size} | ${cap} | ${rs.map((r) => (r.error ? `error ${r.error}` : r.stop)).join(", ")} | ${rs.map((r) => r.out).join(", ")} | ${thinking} | ${((100 * largest) / cap).toFixed(0)}%${flag} |`);
+    const flag = rs.some((r) => r.stop === "max_tokens") ? " CUT OFF" : largest > cap / 3 ? " over a third" : "";
+    console.log(
+      `| ${c.feature} | ${c.size} | ${cap} | ${rs.map((r) => r.stop).join(", ")} | ${rs.map((r) => r.outcome).join(", ")} | ${rs.map((r) => r.out).join(", ")} | ${thinking} | ${rs.map((r) => (r.ms / 1000).toFixed(1)).join(", ")} | ${((100 * largest) / cap).toFixed(0)}%${flag} |`,
+    );
   }
-  console.log(cut ? `\n${cut} run(s) stopped at max_tokens: those answers were cut off.` : "\nNo run stopped at max_tokens.");
+  console.log(failed ? `\n${failed} run(s) failed as the app would read them (see the "Read" column).` : "\nEvery answer was read as the app reads it.");
   const every = [...results.values()].flat();
   const tin = every.reduce((n, r) => n + r.inTokens, 0);
   const tout = every.reduce((n, r) => n + r.out, 0);
-  console.log(`This run: ${every.length} calls, ${tin} tokens in, ${tout} out, $${costUsd(tin, tout).toFixed(4)}.`);
-  const errors = every.filter((r) => r.error).length;
-  if (errors) console.log(`${errors} call(s) failed before an answer (see "error" above).`);
-  // A cut-off answer fails for the person; a call that couldn't be made says nothing either way.
-  if (cut || errors) process.exit(1);
+  const cost = every.reduce((n, r) => n + costUsd(r.inTokens, r.out), 0);
+  console.log(`This run: ${every.length} calls, ${tin} tokens in, ${tout} out, $${cost.toFixed(4)}.`);
+  if (failed) process.exit(1);
 }
 
 void main();

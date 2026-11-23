@@ -16,6 +16,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Every AI request shape against the real API (decision 0025), on every push and pull request.
+      # A refused shape fails; no key (a fork's pull request) or an unreachable API only warns.
+      - name: Check the API accepts every AI request shape
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npm run -s probe:ai -- --warn-unchecked
       - run: npm run check:docs
       - run: npm run check:theme
       - run: npm run typecheck

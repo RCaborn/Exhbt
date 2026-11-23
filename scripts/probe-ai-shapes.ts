@@ -11,9 +11,13 @@
  *   npm run probe:ai               # every shape the app sends, plus "draft with planned growth"
  *   npm run probe:ai -- --dry      # no API calls: the size of each schema only (no key needed)
  *   npm run probe:ai -- --explore  # also the measuring variants (what each construct costs)
+ *   npm run probe:ai -- --warn-unchecked  # CI and deploy: only a definite refusal fails
  *
- * Exits non-zero if any shape the app sends, or the planned-growth check, is refused. Explore
- * variants are measurements and never fail the run. Never prints the key or the environment.
+ * Exits non-zero if any shape the app sends, or the planned-growth check, is refused. A shape that
+ * couldn't be checked (no key, the service unreachable, a rate limit) also fails, unless
+ * --warn-unchecked is given: then it prints a GitHub warning and passes, so a missing key or an API
+ * outage doesn't block CI or a deploy, while a refused shape always does. Explore variants are
+ * measurements and never fail the run. Never prints the key or the environment.
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -26,6 +30,7 @@ import { INTRO_OUTPUT_CONFIG } from "@/lib/ai/portfolio-intro";
 import { IDEAS_OUTPUT_CONFIG, SWAP_OUTPUT_CONFIG } from "@/lib/ai/projects";
 import { ROADMAP_OUTPUT_CONFIG } from "@/lib/ai/roadmap";
 import { AI_MODEL, anthropicApiKey } from "@/lib/ai/model";
+import { DRAFT_BLOCKS } from "@/lib/exhbt/draft-blocks";
 
 type Json = Record<string, unknown>;
 type OutputConfig = { effort: "low" | "medium" | "high"; format: { type: "json_schema"; schema: Json } };
@@ -36,7 +41,7 @@ const cfg = (c: { effort: "low"; format: { type: "json_schema"; schema: Json } }
 /** Every structured answer the app asks for, as the app sends it. */
 const APP_SHAPES: Shape[] = [
   { name: "draft", config: cfg(DRAFT_OUTPUT_CONFIG), kind: "app" },
-  ...(["header", "gap", "flow", "findings", "skills"] as const).map((b) => ({ name: `rewrite: ${b}`, config: cfg(rewriteOutputConfig(b)), kind: "app" as const })),
+  ...DRAFT_BLOCKS.map((b) => ({ name: `rewrite: ${b}`, config: cfg(rewriteOutputConfig(b)), kind: "app" as const })),
   { name: "figure pick", config: cfg(FIGURE_PICK_OUTPUT_CONFIG), kind: "app" },
   { name: "job match", config: cfg(JOB_MATCH_OUTPUT_CONFIG), kind: "app" },
   { name: "portfolio intro", config: cfg(INTRO_OUTPUT_CONFIG), kind: "app" },
@@ -46,17 +51,26 @@ const APP_SHAPES: Shape[] = [
 ];
 
 /**
- * The draft as it will be once the work already built has landed, so a release can't take the
- * schema over the limit unseen: release 2's formatReason (its 8 values, as on phase-2-r2), and
- * release 4's 7 layouts, a pull quote, a "my role" line and a before/after mark on each image
- * (modelled: release 4's own schema isn't on a branch yet, so its names here are stand-ins).
+ * The draft as it will be once the work already built or decided has landed, so a release can't
+ * take the schema over the limit unseen.
+ * - Release 2: formatReason, a fixed signal for the layout (8 values, as on phase-2-r2).
+ * - Release 4 (decision 0028): 7 layouts; a fixed reason for each new layout, so about 12 reasons;
+ *   a pull quote and a "my role" line; an essay's sources, each a citation with an optional
+ *   address (kept apart from research's references here, the larger case); and the demo and code
+ *   links of a build, each with a label, an address and a short description. Before and After
+ *   marks on images are never drafted (0028), so they are not here.
+ * Release 4's own schema isn't on a branch yet, so its field names here are stand-ins.
  */
 const PlannedGrowth = (DraftSchema as unknown as z.ZodObject<z.ZodRawShape>).extend({
-  format: z.enum(["case-study", "gallery", "research", "r4-a", "r4-b", "r4-c", "r4-d"]),
-  formatReason: z.enum(["notes", "aim-results", "hypothesis-results", "study", "visual-work", "mostly-pictures", "question-findings", "default"]),
+  format: z.enum(["case-study", "gallery", "research", "build", "essay", "before-after", "event"]),
+  formatReason: z.enum([
+    "notes", "aim-results", "hypothesis-results", "study", "visual-work", "mostly-pictures", "question-findings", "default",
+    "built-thing", "argument-sources", "before-and-after", "event-role",
+  ]),
   pullQuote: z.string(),
   myRole: z.string(),
-  imageMarks: z.array(z.object({ file: z.string(), mark: z.enum(["none", "before", "after"]) })),
+  sources: z.array(z.object({ label: z.string(), url: z.string() })),
+  links: z.array(z.object({ label: z.string(), url: z.string(), description: z.string() })),
 });
 const GROWTH: Shape = { name: "draft with planned growth", config: cfg({ effort: "low", format: zodOutputFormat(PlannedGrowth) }), kind: "growth" };
 
@@ -180,8 +194,13 @@ async function main() {
     for (const s of shapes) console.log(`${s.name.padEnd(80)} ${JSON.stringify(size(s.config.format.schema))}`);
     return;
   }
+  const warnUnchecked = argv.includes("--warn-unchecked");
   const apiKey = anthropicApiKey();
   if (!apiKey) {
+    if (warnUnchecked) {
+      console.log("::warning::No API key here, so the AI request shapes were not checked.");
+      return;
+    }
     console.error("No API key: set ANTHROPIC_API_KEYS or ANTHROPIC_API_KEY, or run with --dry.");
     process.exit(2);
   }
@@ -205,7 +224,11 @@ async function main() {
   if (refused.length) console.log(`\n${refused.length} shape(s) refused by the API: ${refused.map((r) => r.shape.name).join(", ")}`);
   if (unchecked.length) console.log(`\n${unchecked.length} shape(s) could not be checked (not a refusal; run again): ${unchecked.map((r) => r.shape.name).join(", ")}`);
   if (!failed.length) console.log("\nEvery shape the app sends was accepted, and the planned growth fits.");
-  if (failed.length) process.exit(1);
+  if (refused.length) process.exit(1);
+  if (unchecked.length) {
+    if (warnUnchecked) console.log(`::warning::${unchecked.length} AI request shape(s) could not be checked (not a refusal).`);
+    else process.exit(1);
+  }
 }
 
 void main();

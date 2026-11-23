@@ -32,14 +32,17 @@ export async function structuredCall<T>(opts: {
   request: StructuredRequest;
   schema: z.ZodType<T>;
   repair?: (raw: unknown) => unknown;
+  /** For scripts/measure-ai-room.ts only: sees the raw response (stop reason, usage) before it is read. */
+  onResponse?: (response: Anthropic.Message) => void;
 }): Promise<StructuredResult<T>> {
-  const { feature, client, request, schema, repair } = opts;
+  const { feature, client, request, schema, repair, onResponse } = opts;
   let response: Anthropic.Message;
   try {
     response = await client.messages.create(request as unknown as Anthropic.MessageCreateParamsNonStreaming);
   } catch (e) {
     throw new AIFailure(feature, "service", { status: e instanceof Anthropic.APIError ? e.status : undefined });
   }
+  onResponse?.(response);
   const tokens = { inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens };
   if (response.stop_reason === "refusal") throw new AIFailure(feature, "refused", tokens);
   if (response.stop_reason === "max_tokens") throw new AIFailure(feature, "cut_off", tokens);

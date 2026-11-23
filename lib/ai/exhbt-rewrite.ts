@@ -43,7 +43,7 @@ Limits for the part:
 
 const Numbers = z.array(z.object({ value: z.string(), sourceQuote: z.string() }));
 
-const SCHEMAS = {
+export const SCHEMAS = {
   header: z.object({ title: z.string(), summary: z.string(), context: z.string(), whereWhen: z.string(), numbers: Numbers }),
   gap: z.object({ gap: z.string(), gapHighlight: z.string(), numbers: Numbers }),
   flow: z.object({ flow: z.array(z.object({ step: z.string(), detail: z.string().nullable() })), numbers: Numbers }),

@@ -15,7 +15,7 @@ import { repairIdeas, repairSwap } from "./repair";
  * roadmap's projects; the note steers the idea but never adds facts about the person.
  */
 
-const SwapSchema = z.object({ project: ProjectSchema });
+export const SwapSchema = z.object({ project: ProjectSchema });
 /** What the swap call sends as output_config (also checked by scripts/probe-ai-shapes.ts). */
 export const SWAP_OUTPUT_CONFIG = { effort: "low" as const, format: zodOutputFormat(SwapSchema) };
 
@@ -117,7 +117,7 @@ function mockSwap(ctx: SwapContext): SwapResult {
  * the moment the roadmap is saved, so they're usually ready by the time the person has passed the
  * gate. Same facts-only rule as the roadmap and the swap.
  */
-const IdeasSchema = z.object({ projects: z.array(ProjectSchema).max(PLAN_SIZE) });
+export const IdeasSchema = z.object({ projects: z.array(ProjectSchema).max(PLAN_SIZE) });
 /** What the ideas call sends as output_config (also checked by scripts/probe-ai-shapes.ts). */
 export const IDEAS_OUTPUT_CONFIG = { effort: "low" as const, format: zodOutputFormat(IdeasSchema) };
 
