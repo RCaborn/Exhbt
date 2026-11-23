@@ -8,6 +8,7 @@ import {
   differences,
   docNow,
   field,
+  flowChipsNearWords,
   frame,
   freshName,
   full,
@@ -17,11 +18,13 @@ import {
   openDoc,
   openTiming,
   pageOrder,
+  plusClashes,
   png,
   READY,
   sampleDoc,
   seeAsVisitor,
   settle,
+  smallPresses,
   typeIn,
   undoLabel,
   waitLive,
@@ -167,10 +170,17 @@ test.describe("each section shows only its grip", () => {
     await expect(chart).toBeHidden();
     await expect(bar(page)).toHaveAttribute("aria-label", "Graph 2: tools");
 
-    // The flowchart in a case study has no Remove (the layout always has one).
+    // The flowchart in a case study can't be removed (the layout always has one): its Remove is there but off, and a tap says why.
     await choose(page, "flow");
     await expect(bar(page)).toHaveAttribute("aria-label", "Flowchart: tools");
-    await expect(onBar(page, "Remove Flowchart")).toHaveCount(0);
+    const why = "A case study always has a flowchart. Choose another layout to take it off.";
+    await expect(onBar(page, "Remove Flowchart")).toHaveAttribute("aria-disabled", "true");
+    await expect(onBar(page, "Remove Flowchart")).toHaveAccessibleDescription(why);
+    // aria-disabled, so Playwright won't tap it unless told: a person can.
+    await onBar(page, "Remove Flowchart").tap({ force: true });
+    await expect(bar(page).locator(".xe-bar-why")).toHaveText(why);
+    await expect(bar(page).locator(".xe-bar-why")).toBeVisible();
+    await expect(frame(page, "flow")).toBeVisible();
 
     // A plain field in the title: the bar names the part (its More actions show only where the AI drafted it).
     await field(page, "title").tap();
@@ -621,6 +631,104 @@ test("a swipe on a section's words scrolls and moves nothing; a 260ms press on a
 /* ------------------------------------------------------------------------------------------------
  * At 390px: no sideways scroll, and every control takes a thumb
  * ---------------------------------------------------------------------------------------------- */
+
+test("Review and publish: two lines at most, inside its pill", async ({ page }) => {
+  await openTiming(page, "case-study", { full: true });
+  const fit = await page.getByRole("button", { name: "Review and publish" }).evaluate((b) => {
+    const r = b.getBoundingClientRect();
+    const range = document.createRange();
+    const lines: DOMRect[] = [];
+    const walker = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
+    for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+      if (!t.textContent?.trim()) continue;
+      range.selectNodeContents(t);
+      lines.push(...[...range.getClientRects()].filter((q) => q.width > 0));
+    }
+    return { inside: lines.length > 0 && lines.every((q) => q.left >= r.left - 0.5 && q.right <= r.right + 0.5 && q.top >= r.top - 0.5 && q.bottom <= r.bottom + 0.5), lines: new Set(lines.map((q) => Math.round(q.top))).size };
+  });
+  expect(fit.inside).toBe(true);
+  expect(fit.lines).toBeLessThanOrEqual(2);
+});
+
+for (const f of offered()) {
+  test(`${FORMAT_RULES[f].name.toLowerCase()}: a flowchart box's chips, on its top corners, clear its words by 4px and more and take a 44px press; no + covers them or words`, async ({ page }) => {
+    await openTiming(page, f, { full: true });
+    await waitLive(page);
+    // Design round 2, item 5: Remove touched the first letter of the box's words.
+    expect(await flowChipsNearWords(page, 4)).toEqual([]);
+    expect(await smallPresses(page, `${READY} .xp-flow-box .xe-flow-chip`)).toEqual([]);
+    // The "+" above a case study's first box moves along, clear of that box's Remove and its press.
+    expect(await plusClashes(page)).toEqual([]);
+    expect(await smallPresses(page, `${READY} .xe-insert .xe-plus`)).toEqual([]);
+  });
+}
+
+test("the bar is one Tab stop: the arrows, Home and End move along it, and the stop goes back to its first button when the focus leaves", async ({ page }) => {
+  await openTiming(page, "case-study", { full: true });
+  await waitLive(page);
+  await choose(page, "quote-1");
+  const stops = () => bar(page).locator("button").evaluateAll((bs) => bs.filter((b) => b.tabIndex === 0 && b.getClientRects().length > 0).map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim()));
+  expect(await stops()).toHaveLength(1);
+  // Drawn in the toolbars' order (design round 2, item 2): Remove after the name, the moves and Reorder at the right end.
+  const drawn = await bar(page)
+    .locator(".xe-bar-row button")
+    .evaluateAll((bs) => bs.filter((b) => b.getClientRects().length > 0).sort((p, q) => p.getBoundingClientRect().left - q.getBoundingClientRect().left).map((b) => b.getAttribute("aria-label")));
+  expect(drawn).toEqual(["Remove Quote", "Move Quote up", "Move Quote down", "Reorder sections"]);
+  // The stop is the first in the reading order, Move up; the arrows go as drawn.
+  const first = bar(page).locator("button").first();
+  await expect(first).toHaveAccessibleName("Move Quote up");
+  await first.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(onBar(page, "Move Quote down")).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(onBar(page, "Reorder sections")).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(onBar(page, "Remove Quote")).toBeFocused();
+  await page.keyboard.press("End");
+  expect(await stops()).toEqual(["Reorder sections"]);
+  await grip(page, "quote-1").focus();
+  expect(await stops()).toHaveLength(1);
+  expect((await stops())[0]).toBe(await first.getAttribute("aria-label"));
+});
+
+test("an open + menu lies over every chip, grip and toolbar: before the flowchart, a tap anywhere on it is the menu's", async ({ page }) => {
+  await openTiming(page, "case-study", { full: true });
+  await waitLive(page);
+  // The + before the flowchart (the first gap), whose menu opens down over the boxes' always-shown chips and the "+" on each arrow.
+  const at = (await pageOrder(page)).indexOf("flow");
+  const plus = page.locator(`${READY} .xe-insert[data-at="${at}"] .xe-plus`);
+  await plus.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await plus.tap();
+  const menu = page.locator(`${READY} .xe-insert[data-at="${at}"] [data-xe-menu]`);
+  await expect(menu).toBeVisible();
+  await page.waitForTimeout(300);
+  const lost = await menu.evaluate((m) => {
+    const r = m.getBoundingClientRect();
+    // The app's own bars, at the top and foot of the screen, rightly lie over the page and its menus.
+    const top = document.querySelector('[data-editor="page"] [data-topbar]')?.getBoundingClientRect().bottom ?? 0;
+    const foot = document.querySelector('[data-editor="page"] .xe-phonebar')?.getBoundingClientRect().top ?? window.innerHeight;
+    const points: [number, number, string][] = [];
+    // Along its edges, 3px in, every 12px (clear of the rounded corners, which a tap doesn't hit).
+    const round = parseFloat(getComputedStyle(m).borderTopLeftRadius) || 0;
+    for (let x = r.left + round + 3; x <= r.right - round - 3; x += 12) points.push([x, r.top + 3, "top edge"], [x, r.bottom - 3, "foot"]);
+    for (let y = r.top + round + 3; y <= r.bottom - round - 3; y += 12) points.push([r.left + 3, y, "left edge"], [r.right - 3, y, "right edge"]);
+    // Across each item, through its middle.
+    for (const item of m.querySelectorAll(".xe-plus-item")) {
+      const b = item.getBoundingClientRect();
+      for (let x = b.left + 2; x <= b.right - 2; x += 8) points.push([x, b.top + b.height / 2, item.textContent!.trim().slice(0, 20)]);
+    }
+    const seen = points.filter(([x, y]) => y > top && y < foot && x >= 0 && x < window.innerWidth);
+    return {
+      tried: seen.length,
+      lost: seen.flatMap(([x, y, where]) => {
+        const hit = document.elementFromPoint(x, y);
+        return hit && m.contains(hit) ? [] : [`${where} at ${Math.round(x)},${Math.round(y)}: ${hit?.getAttribute("aria-label") ?? hit?.className ?? "nothing"}`];
+      }),
+    };
+  });
+  expect(lost.tried).toBeGreaterThan(60);
+  expect(lost.lost).toEqual([]);
+});
 
 test.describe("at 390px wide", () => {
   test.use({ viewport: { width: 390, height: 844 } });

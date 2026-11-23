@@ -1,7 +1,8 @@
 /*
  * How things are carried when dragged (decision 0026, "Dragging"), as Rory decided on 18 Nov 2026:
- * "Flowchart on b works better, rest on a is better!" Each is one line to change. F's file; K reads
- * FLOW_BOX_STYLE and never edits it.
+ * "Flowchart on b works better, rest on a is better!", and for a box inside the flowchart on 22 Nov
+ * 2026: "Boxes sliding is better". Each constant holds his choice and is one line to change; the
+ * other path (the line for a box) is kept, and tested, until release 5.
  *  - "slide": the other sections move aside, by transform, to show where it will land.
  *  - "line": it is carried over a still page, and a line shows where it will land.
  */

@@ -7,8 +7,8 @@ import { asFile, Cropper, PagePicker, sourceBytes } from "@/components/editor/Pi
 import { Button } from "@/components/ui/Button";
 import type { ExhbtDoc, FigureBox } from "@/lib/exhbt/blocks";
 import { formatOf } from "@/lib/exhbt/formats";
-import { blockOptions } from "@/lib/exhbt/layouts";
-import { roomFor, withKeyFigure } from "@/lib/exhbt/sections";
+import { blockOptions, insertImage, pageItems } from "@/lib/exhbt/layouts";
+import { roomFor } from "@/lib/exhbt/sections";
 import { useEnv, useRuntime, useUiState } from "../context";
 import { useFilesController } from "../files";
 import { useDoc, useStoreInternal } from "../store";
@@ -19,9 +19,10 @@ import { Sheet } from "../ui/Sheet";
  * (the pick found none, failed, or was removed): the page chooser PickedFigure already has, drawn in
  * the browser from the stored PDF, with no AI call. Choose the report if there are several, then a
  * page (its first 30, as thumbnails), which comes in whole; then crop it. On "Use this crop" the
- * picture is cut out here and uploaded, and one undo entry, "take a figure", puts it where the layout
- * wants its key figure (withKeyFigure) as a figure from the report, not yet ticked as shareable. It
- * removes no graph: the person chose it by hand. The cursor then goes to its description.
+ * picture is cut out here and uploaded, and one undo entry, "take a figure", puts it where the "+"
+ * that opened the sheet was, as every item in that menu goes (decision 0026), as a figure from the
+ * report, not yet ticked as shareable. It removes no graph: the person chose it by hand. The cursor
+ * then goes to its description.
  */
 export function FigureSheet(): ReactNode {
   return (
@@ -40,6 +41,8 @@ function TakeFigure() {
   const files = useFilesController();
   const { uiApi } = useRuntime();
   const open = useUiState((s) => s.sheet?.name === "figure");
+  // The section the figure goes before, as the "+" that opened the sheet named it (Insert.tsx); none: the "+" at the end.
+  const goesBefore = useUiState((s) => (s.sheet?.name === "figure" ? s.sheet.sectionId : undefined));
   const reports = env.reportFiles;
   const [fileId, setFileId] = useState(reports[0]?.fileId ?? "");
   const [page, setPage] = useState<number | null>(null);
@@ -74,11 +77,14 @@ function TakeFigure() {
       const size = await readSize(file);
       const placed = { id: "" };
       store.patchDoc((d) => {
-        const next = withKeyFigure(d, { fileId: fileIdNow, alt: "", picked: { from: report.name, sourceFileId: report.fileId, page, box, shareOk: false } });
-        const s = next.sections.find((x) => x.kind === "image" && x.fileId === fileIdNow);
-        if (next === d || !s) return d;
-        placed.id = s.id;
-        return size ? { ...next, sections: next.sections.map((x) => (x.id === s.id ? { ...x, ...size } : x)) } : next;
+        // Where its "+" was (decision 0026: whatever is chosen from a "+" goes there; the review's vision-7): before the section it named, or at the end.
+        const items = pageItems(d);
+        const before = items.findIndex((it) => it.id === goesBefore);
+        const r = insertImage(d, { fileId: fileIdNow, ...size }, before >= 0 ? before : items.length);
+        if (!r) return d;
+        placed.id = r.id;
+        const picked = { from: report.name, sourceFileId: report.fileId, page, box, shareOk: false };
+        return { ...r.doc, sections: r.doc.sections.map((x) => (x.id === r.id && x.kind === "image" ? { ...x, picked } : x)) };
       }, "take a figure");
       if (!placed.id) throw new UploadError("There's no room for another image in this layout.");
       onPage = true;

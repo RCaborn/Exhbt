@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { FORMAT_RULES } from "../lib/exhbt/formats";
-import { frame, grip, offered, openTiming, pageOrder, READY, undoLabel, waitLive } from "./page-editor";
+import { docNow, field, flowChipsNearWords, frame, grip, offered, openTiming, pageOrder, plusClashes, READY, smallPresses, toolbarClashes, undoLabel, waitLive } from "./page-editor";
 
 /*
  * The editor on a tablet (decision 0026, "The chrome"; docs/briefs/edit-on-page/r3-l-phone.md), on the
@@ -53,34 +53,214 @@ const orderWith = (order: string[], id: string, place: number) => {
   return rest;
 };
 
+/**
+ * Each section's toolbar as drawn now: shown, with each button 44px. One that lies over its own
+ * section (inside a picture's or a graph's corner, a tile's in the gallery's grid among them, or on a
+ * section's top edge) shows only its grip at rest (`tiles` "grip"); with the focus in it ("all"), every
+ * button, and a tile's all inside the tile's own box. Every other section shows its grip, Move up and the rest.
+ */
+const toolbarsNow = (page: Page, tiles: "grip" | "all") =>
+  page.evaluate((tiles) => {
+    const bad: string[] = [];
+    const frames = [...document.querySelectorAll<HTMLElement>('[data-editor="page"] article [data-section-id]')];
+    for (const fr of frames) {
+      const id = fr.dataset.sectionId!;
+      const tools = fr.querySelector<HTMLElement>(":scope > .xe-tools");
+      if (!tools || getComputedStyle(tools).opacity !== "1" || getComputedStyle(tools).pointerEvents === "none") {
+        bad.push(`${id}: toolbar not shown`);
+        continue;
+      }
+      const buttons = [...tools.querySelectorAll<HTMLElement>("button")].filter((b) => b.getClientRects().length > 0);
+      if (!buttons.some((b) => b.hasAttribute("data-grip"))) bad.push(`${id}: no grip`);
+      const tile = fr.dataset.as === "tile";
+      const over = fr.dataset.kind === "image" || ["inside", "edge"].includes(tools.dataset.place ?? "");
+      if (over && tiles === "grip" && buttons.length !== 1) bad.push(`${id}: over its own section, it shows ${buttons.map((b) => b.getAttribute("aria-label")).join(", ")}`);
+      if ((!over || tiles === "all") && !buttons.some((b) => b.getAttribute("data-tool") === "up")) bad.push(`${id}: no move up`);
+      const box = fr.getBoundingClientRect();
+      for (const b of buttons) {
+        const r = b.getBoundingClientRect();
+        if (Math.round(r.width) < 44 || Math.round(r.height) < 44) bad.push(`${id}: ${b.getAttribute("aria-label")} is ${r.width}x${r.height}`);
+        if (tile && (r.left < box.left - 0.5 || r.right > box.right + 0.5 || r.top < box.top - 0.5)) bad.push(`${id}: ${b.getAttribute("aria-label")} is outside its tile`);
+      }
+    }
+    return { bad, frames: frames.length, tiles: frames.filter((fr) => fr.dataset.as === "tile").length };
+  }, tiles);
+
 for (const f of offered()) {
-  test(`${FORMAT_RULES[f].name.toLowerCase()}: every section's toolbar is shown without hovering, each button 44px, and there is no phone bar`, async ({ page }) => {
+  test(`${FORMAT_RULES[f].name.toLowerCase()}: every section's toolbar is shown without hovering, each button 44px, one over its own section only its grip until it has the focus; none covers another section; no phone bar`, async ({ page }) => {
     await openTiming(page, f, { full: true });
     await waitLive(page);
     await expect(page.locator(`${READY} .xe-phonebar`)).toHaveCount(0);
-    const found = await page.evaluate(() => {
-      const bad: string[] = [];
-      const frames = [...document.querySelectorAll<HTMLElement>('[data-editor="page"] article [data-section-id]')];
-      for (const fr of frames) {
-        const tools = fr.querySelector<HTMLElement>(":scope > .xe-tools");
-        if (!tools || getComputedStyle(tools).opacity !== "1" || getComputedStyle(tools).pointerEvents === "none") {
-          bad.push(`${fr.dataset.sectionId}: toolbar not shown`);
-          continue;
-        }
-        const buttons = [...tools.querySelectorAll<HTMLElement>("button")].filter((b) => b.getClientRects().length > 0);
-        if (!buttons.some((b) => b.hasAttribute("data-grip"))) bad.push(`${fr.dataset.sectionId}: no grip`);
-        if (!buttons.some((b) => b.getAttribute("data-tool") === "up")) bad.push(`${fr.dataset.sectionId}: no move up`);
-        for (const b of buttons) {
-          const r = b.getBoundingClientRect();
-          if (Math.round(r.width) < 44 || Math.round(r.height) < 44) bad.push(`${fr.dataset.sectionId}: ${b.getAttribute("aria-label")} is ${r.width}x${r.height}`);
-        }
-      }
-      return { bad, frames: frames.length };
-    });
+    const found = await toolbarsNow(page, "grip");
     expect(found.frames).toBeGreaterThan(3);
     expect(found.bad).toEqual([]);
+    // Shown all the time on a tablet, so none may lie over another section's words, pictures or controls, nor a chip (the review's vision-1).
+    expect(await toolbarClashes(page)).toEqual([]);
+    // Nor may a "+" (design round 2, item 4: research's first gap held a 44px "+" over the H of "Hypothesis").
+    expect(await plusClashes(page)).toEqual([]);
+    // A flowchart box's chips, on its top corners, keep clear of its words, and each takes a 44px press (design round 2, item 5).
+    expect(await flowChipsNearWords(page, 4)).toEqual([]);
+    expect(await smallPresses(page, `${READY} .xp-flow-box .xe-flow-chip`)).toEqual([]);
+    if (!found.tiles) return;
+    // With the focus in a tile (its grip, from a keyboard), its other buttons show too, inside the tile, still covering nothing of another's.
+    const tile = page.locator(`${READY} article [data-as="tile"]`).last();
+    const id = await tile.getAttribute("data-section-id");
+    await tile.locator("[data-grip]").focus();
+    const focused = await toolbarsNow(page, "all");
+    expect(focused.bad.filter((b) => b.startsWith(`${id}:`))).toEqual([]);
+    expect(await toolbarClashes(page)).toEqual([]);
   });
 }
+
+test("a skill's remove badge is quiet, as a flowchart box's chips are: the look's card ground and ink, its outline edge", async ({ page }) => {
+  await openTiming(page, "research", { full: true });
+  const looks = await page.evaluate(() => {
+    const style = (el: Element) => {
+      const s = getComputedStyle(el);
+      return [s.backgroundColor, s.color, s.borderTopColor].join(" ");
+    };
+    const chip = document.querySelector('[data-editor="page"] .xp-flow-box .xe-flow-chip')!;
+    return { chip: style(chip), badges: [...document.querySelectorAll('[data-editor="page"] .xe-pill-remove')].map(style), shown: [...document.querySelectorAll('[data-editor="page"] .xe-pill-remove')].map((b) => getComputedStyle(b).opacity) };
+  });
+  // Design round 2, item 7: it was a solid black dot on every pill.
+  expect(looks.badges.length).toBeGreaterThan(1);
+  for (const b of looks.badges) expect(b).toBe(looks.chip);
+  for (const o of looks.shown) expect(o).toBe("1");
+});
+
+test("Review and publish is one line, inside its pill, at 820 and at 768 wide; the row never scrolls sideways", async ({ page }) => {
+  for (const width of [820, 768]) {
+    await page.setViewportSize({ width, height: 1024 });
+    for (const f of offered()) {
+      await openTiming(page, f, { full: true });
+      // Design round 2, item 3: at 820 its words ran over the pill, three lines high.
+      const fit = await page.getByRole("button", { name: "Review and publish" }).evaluate((b) => {
+        const r = b.getBoundingClientRect();
+        const range = document.createRange();
+        const lines: DOMRect[] = [];
+        const walker = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
+        for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+          if (!t.textContent?.trim()) continue;
+          range.selectNodeContents(t);
+          lines.push(...[...range.getClientRects()].filter((q) => q.width > 0));
+        }
+        return {
+          inside: lines.length > 0 && lines.every((q) => q.left >= r.left - 0.5 && q.right <= r.right + 0.5 && q.top >= r.top - 0.5 && q.bottom <= r.bottom + 0.5),
+          lines: new Set(lines.map((q) => Math.round(q.top))).size,
+          sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        };
+      });
+      expect(fit, `${width}px, ${f}`).toEqual({ inside: true, lines: 1, sideways: 0 });
+    }
+  }
+});
+
+test("research with two reference lines, one under the other: no toolbar covers the line above, the References heading or a Web address chip", async ({ page }) => {
+  await openTiming(page, "research", { full: true });
+  await waitLive(page);
+  const n = (await pageOrder(page)).length;
+  expect(await page.evaluate((at) => window.__exhbtEditor!.insert("link", at), n)).toBeTruthy();
+  await expect.poll(async () => (await pageOrder(page)).length).toBe(n + 1);
+  expect(await toolbarClashes(page)).toEqual([]);
+});
+
+test("in a finding: its Move up, Move down and Remove, and the formatting buttons, each take a 44px press, and no press overlaps another", async ({ page }) => {
+  await openTiming(page, "case-study", { full: true });
+  await waitLive(page);
+  const n = (await docNow(page)).sections.findIndex((s) => s.kind === "findings");
+  const words = field(page, `sections.${n}.items.1`);
+  await words.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await words.tap();
+  const own = frame(page, "findings").locator("li:focus-within > .xe-list-tools button");
+  await expect(own).toHaveCount(3);
+  await expect(own.first()).toBeVisible();
+  // L's measure (editor-phone): from each control's middle, how far each way a finger still lands on it, with nothing over it.
+  const small = await page.evaluate(() => {
+    // The focused finding's own controls, and the formatting buttons shown now (the other fields' are there but hidden).
+    const controls = [...document.querySelectorAll<HTMLElement>('[data-editor="page"] li:focus-within > .xe-list-tools button, [data-editor="page"] .xe-format button')].filter(
+      (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden" && Number(getComputedStyle(el.parentElement!).opacity) > 0,
+    );
+    const mine = (el: Element, x: number, y: number) => {
+      const hit = document.elementFromPoint(x, y);
+      return Boolean(hit && (hit === el || el.contains(hit)));
+    };
+    const bad: string[] = [];
+    for (const el of controls) {
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const reach = (dx: number, dy: number) => {
+        let s = 0;
+        while (s < 40 && mine(el, cx + dx * (s + 1), cy + dy * (s + 1))) s++;
+        return s;
+      };
+      const w = reach(-1, 0) + reach(1, 0) + 1;
+      const h = reach(0, -1) + reach(0, 1) + 1;
+      if (!mine(el, cx, cy) || w < 42 || h < 42) bad.push(`${el.getAttribute("aria-label")} (${Math.round(r.width)}x${Math.round(r.height)}, takes ${w}x${h})`);
+    }
+    return { bad, n: controls.length };
+  });
+  expect(small.n).toBeGreaterThanOrEqual(3);
+  expect(small.bad).toEqual([]);
+  // And no press lies over the words: a tap at the right end of this finding's first line, or of the one above's last line, is the words'.
+  const taps = await page.evaluate((path) => {
+    // The lines of the words themselves (not a hidden message or a field's own furniture).
+    const lines = (p: string) => {
+      const box = document.querySelector(`[data-editor="page"] [data-path="${p}"]`)!;
+      const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+      const range = document.createRange();
+      const rects: DOMRect[] = [];
+      for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+        if (!t.textContent?.trim() || t.parentElement!.closest(".sr-only, [hidden], .xe-issue, [aria-hidden=true]")) continue;
+        range.selectNodeContents(t);
+        rects.push(...[...range.getClientRects()].filter((r) => r.width > 0));
+      }
+      rects.sort((a, b) => a.top - b.top || a.left - b.left);
+      return { box, rects };
+    };
+    const [at, k] = path.match(/^sections\.(\d+)\.items\.(\d+)$/)!.slice(1).map(Number) as [number, number];
+    const out: string[] = [];
+    for (const [p, which] of [[path, 0], [`sections.${at}.items.${k - 1}`, -1]] as const) {
+      const { box, rects } = lines(p);
+      // The line's right end: of the rects on that line (the first or the last), the one furthest right.
+      const top = which === 0 ? rects[0]!.top : rects[rects.length - 1]!.top;
+      const r = rects.filter((q) => Math.abs(q.top - top) < 2).sort((a, b) => b.right - a.right)[0]!;
+      const hit = document.elementFromPoint(r.right - 2, r.top + r.height / 2);
+      if (!hit || !box.contains(hit)) out.push(`${p} (${which === 0 ? "first" : "last"} line) is under ${hit?.getAttribute("aria-label") ?? hit?.className}`);
+    }
+    return out;
+  }, `sections.${n}.items.1`);
+  expect(taps).toEqual([]);
+});
+
+test("a 260ms press on a tile's grip, in its corner, picks the picture up where it is: the place shown is its own", async ({ page }) => {
+  await openTiming(page, "gallery", { full: true });
+  await waitLive(page);
+  const order = await pageOrder(page);
+  const tiles = await page.locator(`${READY} article [data-as="tile"]`).evaluateAll((els) => els.map((e) => e.getAttribute("data-section-id")!));
+  const touch = await finger(page);
+  for (const id of [tiles[0]!, tiles[tiles.length - 1]!]) {
+    await grip(page, id).evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await page.waitForTimeout(300);
+    // The grip is in the tile's own top right corner.
+    const g = (await grip(page, id).boundingBox())!;
+    const t = (await frame(page, id).boundingBox())!;
+    expect(g.y).toBeGreaterThanOrEqual(t.y);
+    expect(g.x + g.width).toBeLessThanOrEqual(t.x + t.width);
+    const at = await middle(grip(page, id));
+    await touch.down(at.x, at.y);
+    await page.waitForTimeout(260);
+    await touch.move(at.x, at.y + 2);
+    await expect(page.locator(`${READY} [data-xe-drag]`)).toHaveAttribute("data-xe-drag", "pointer");
+    expect(await page.evaluate(() => window.__exhbtDrag?.state()?.place ?? null), id).toBe(order.indexOf(id));
+    await touch.move(at.x + 3, at.y + 5);
+    await page.waitForTimeout(100);
+    expect(await page.evaluate(() => window.__exhbtDrag?.state()?.place ?? null), id).toBe(order.indexOf(id));
+    await touch.up();
+    await expect(page.locator(`${READY} [data-xe-drag]`)).toHaveCount(0);
+    expect(await pageOrder(page)).toEqual(order);
+  }
+});
 
 test("a 260ms press on a grip picks the section up, and a drag moves it", async ({ page }) => {
   await openTiming(page, "case-study", { full: true });

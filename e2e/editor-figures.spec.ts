@@ -16,6 +16,7 @@ import {
   jump,
   openDoc,
   openNew,
+  pageOrder,
   READY,
   sampleDoc,
   readStored,
@@ -347,7 +348,7 @@ test.describe("take a figure from my report", () => {
     await expect(page.locator(`${READY} #add-section`)).toBeFocused();
   });
 
-  test("after a pick that failed: the + offers it; page 3 and a crop put the figure where the layout wants it, unticked, with no AI call; Undo takes it off and its file goes once nothing can bring it back", async ({ page }) => {
+  test("after a pick that failed: the + offers it; page 3 and a crop put the figure where that + was, unticked, with no AI call; Undo takes it off and its file goes once nothing can bring it back", async ({ page }) => {
     test.setTimeout(180_000);
     const id = await draftFromReport(page, "take", { failPick: true });
     const before = await docNow(page);
@@ -355,7 +356,10 @@ test.describe("take a figure from my report", () => {
     expect(before.sections.some((s) => s.kind === "graph")).toBe(true);
     const seen = countPicks(page);
 
-    await openEndPlus(page);
+    // The "+" before the last section (decision 0026: whatever is chosen from a "+" goes where it is; the review's vision-7).
+    const order = await pageOrder(page);
+    const place = order.length - 1;
+    await page.locator(`${READY} .xe-insert[data-at="${place}"] .xe-plus`).click();
     const item = page.locator(`${MENU} [data-block="figure"]`);
     await expect(item).toBeEnabled();
     await expect(item).toContainText("Take a figure from my report");
@@ -372,11 +376,11 @@ test.describe("take a figure from my report", () => {
     await cropper.getByRole("button", { name: "Use this crop" }).click();
     await expect(s).toBeHidden();
 
-    // Straight after the findings (a case study), from the report, not ticked, and the cursor in its description.
+    // Where its "+" was, before the last section; from the report, not ticked, and the cursor in its description.
     const doc = await docNow(page);
     const at = doc.sections.findIndex((x) => x.kind === "image");
-    expect(doc.sections[at - 1]!.kind).toBe("findings");
     const image = doc.sections[at] as SectionOf<"image">;
+    expect(await pageOrder(page)).toEqual([...order.slice(0, place), image.id, ...order.slice(place)]);
     expect(image.picked).toMatchObject({ from: "report-with-chart.pdf", page: 3, shareOk: false });
     expect(image.picked?.kind).toBeUndefined();
     expect(image.picked?.box?.h).toBeCloseTo(0.55, 2);

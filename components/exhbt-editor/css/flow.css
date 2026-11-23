@@ -158,10 +158,13 @@
       position: absolute;
       inset: -0.5rem;
     }
-    /* In a column (a phone), the grip sits on the box's right edge and Remove on its left, each near the
-       box's top: the gap under a column holds the next section's toolbar at the right and its "+" at the
-       left, at 44px, and both reach up into the last box's foot. Each larger target reaches into the box,
-       never past the page's edge. */
+    /* In a column (a phone, or a tablet's column), Remove sits on the box's top left corner and the grip
+       on its top right, each centred on the corner, straddling both edges: so each clears the box's
+       words by 6px and more (the words start 13px in and below the top: design round 2, item 5), and
+       each fits in the page's 16px gutter. The gap under a column holds the next section's toolbar at
+       the right and its "+" at the left, and both stay clear of the last box's chips, at its top. Each
+       larger press reaches up and along the top edge, into the box's corner but never down to its words
+       and never past the page's edge. The "+" above a box keeps clear of it (Toolbar.tsx moves it). */
     .xe-flow[data-axis="column"] .xe-flow-tools {
       inset: 0;
       display: block;
@@ -170,28 +173,22 @@
     }
     .xe-flow[data-axis="column"] .xe-flow-tools > .xe-flow-chip {
       position: absolute;
-      top: 0.5rem;
+      top: 0;
       pointer-events: auto;
     }
-    /* Each sits 15px out, in the page's 16px gutter, so it covers none of the words (they start 13px in). */
     .xe-flow[data-axis="column"] .xe-flow-tools > .xe-flow-grip {
       right: 0;
-      transform: translateX(15px);
+      transform: translate(50%, -50%);
     }
-    /* A little lower on the left: the "+" before a section with no heading above its flowchart (a case study) reaches 11px into its first box. */
     .xe-flow[data-axis="column"] .xe-flow-tools > [data-flow-remove] {
-      top: 0.75rem;
       left: 0;
-      transform: translateX(-15px);
+      transform: translate(-50%, -50%);
     }
     .xe-flow[data-axis="column"] .xe-flow-tools > .xe-flow-grip::before {
-      inset: -0.5rem 0 -0.5rem -1rem;
+      inset: -1rem 0 0 -1rem;
     }
-    /* Remove's larger target reaches down, not up: above a case study's first box is the "+" before the
-       flowchart, whose own press must stay whole; below, the box has room for it (the "+" under the
-       last box starts 6px above its foot). */
     .xe-flow[data-axis="column"] .xe-flow-tools > [data-flow-remove]::before {
-      inset: 0 -1rem -1rem 0;
+      inset: -1rem -1rem 0 0;
     }
   }
 

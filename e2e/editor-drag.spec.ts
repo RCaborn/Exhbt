@@ -5,10 +5,10 @@ import { formatOf, FORMAT_RULES, type Format } from "../lib/exhbt/formats";
 import { blockOptions, pageItems, rowsFor, type Cell, type Row } from "../lib/exhbt/layouts";
 import { openBankingDoc } from "../lib/exhbt/sample";
 import { newImageSection, newSection, roomFor } from "../lib/exhbt/sections";
-import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
+import { ALL_THEMES, PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import { labelOf } from "../components/exhbt-editor/labels";
 import { HYSTERESIS, makePlan, orderWith, placeAt, pointFor, rowsInfo, type Box } from "../components/exhbt-editor/drag/plan";
-import { docNow, frame, freshName, grip, offered, openDoc, pageOrder, READY, SAMPLES, waitReady } from "./page-editor";
+import { docNow, frame, freshName, grip, offered, openDoc, openTiming, pageOrder, plusClashes, READY, SAMPLES, toolbarClashes, waitLive, waitReady } from "./page-editor";
 import { uniqueBytes } from "./unique-bytes";
 
 /*
@@ -238,12 +238,178 @@ test.describe("the drag's plan", () => {
       const plan = makePlan(id, order, boxes, rows, W, tools);
       expect(placeAt(plan, b.x + b.w - 130, b.y - 18, plan.home), id).toBe(plan.home);
     }
+    // A picture's toolbar sits inside its own top right corner (a tile in the grid, and every picture or graph): the grip is in it.
+    for (const id of ["t1", "t2", "t3", "t5"]) {
+      const b = boxes[id]!;
+      const tools = { x: b.x + b.w - 8 - 36, y: b.y + 8, w: 36, h: 36 };
+      const plan = makePlan(id, order, boxes, rows, W, tools);
+      expect(placeAt(plan, tools.x + 18, tools.y + 18, plan.home), id).toBe(plan.home);
+    }
   });
 
   test("places count the page items with the carried one taken out, as store.move does", () => {
     expect(orderWith(["a", "b", "c", "d"], "b", 0)).toEqual(["b", "a", "c", "d"]);
     expect(orderWith(["a", "b", "c", "d"], "b", 3)).toEqual(["a", "c", "d", "b"]);
     expect(orderWith(["a", "b"], "new", 1)).toEqual(["a", "new", "b"]);
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * Where each section's toolbar sits (decision 0026, "The chrome"; the release 3 review's vision-1
+ * and visual-fidelity-3)
+ * ---------------------------------------------------------------------------------------------- */
+
+test.describe("each section's toolbar, at 1440 wide", () => {
+  test.skip(({ isMobile }) => isMobile, "the phone and tablet specs check their own");
+
+  for (const f of offered()) {
+    test(`${f}: no toolbar covers another section's words, pictures or controls, a chip, or a graph's own words; the grip is always at the corner, and a picture's toolbar inside its own`, async ({ page }) => {
+      await openTiming(page, f, { full: true });
+      await waitLive(page);
+      expect(await toolbarClashes(page)).toEqual([]);
+      const corners = await page.locator(`${READY} article [data-section-id]`).evaluateAll((els) =>
+        els.flatMap((fr) => {
+          const id = fr.getAttribute("data-section-id");
+          const box = fr.getBoundingClientRect();
+          const grip = fr.querySelector(":scope > .xe-tools [data-grip]")!.getBoundingClientRect();
+          const tools = [...fr.querySelectorAll(":scope > .xe-tools button")].filter((b) => b.getClientRects().length > 0).map((b) => b.getBoundingClientRect());
+          const bad: string[] = [];
+          // The grip is at the corner, wherever the toolbar sits: no button to its right, none above it (design round 2, item 2).
+          if (!tools.every((r) => r.right <= grip.right + 0.5 && r.top >= grip.top - 0.5)) bad.push(`${id}: the grip is not at the corner`);
+          // A picture's toolbar is inside its own top right corner, over the picture (design round 2, item 1: only pictures).
+          if (fr.getAttribute("data-kind") === "image" && !tools.every((r) => r.left >= box.left - 0.5 && r.right <= box.right + 0.5 && r.top >= box.top - 0.5)) bad.push(`${id}: not inside`);
+          return bad;
+        }),
+      );
+      expect(corners).toEqual([]);
+    });
+  }
+
+  test("a tile too narrow for the row takes a column down its right edge from the grip (grip, up, down, the action, remove), inside its picture", async ({ page }) => {
+    await openTiming(page, "gallery", { full: true });
+    await waitLive(page);
+    const tiles = await page.locator(`${READY} article [data-as="tile"]`).evaluateAll((els) =>
+      els.map((fr) => {
+        const tools = fr.querySelector<HTMLElement>(":scope > .xe-tools")!;
+        const pic = fr.querySelector("img")!.getBoundingClientRect();
+        const buttons = [...tools.querySelectorAll("button")].filter((b) => b.getClientRects().length > 0).map((b) => ({ tool: b.getAttribute("data-tool") ?? "grip", r: b.getBoundingClientRect() }));
+        const grip = buttons.find((b) => b.tool === "grip")!.r;
+        // The first column: the buttons under the grip, at its right edge, top to bottom.
+        const column = buttons.filter((b) => Math.abs(b.r.right - grip.right) < 1).sort((a, b) => a.r.top - b.r.top).map((b) => b.tool);
+        return {
+          id: fr.getAttribute("data-section-id"),
+          shape: tools.dataset.shape ?? "row",
+          column,
+          inside: buttons.every((b) => b.r.left >= pic.left - 0.5 && b.r.right <= pic.right + 0.5 && b.r.top >= pic.top - 0.5 && b.r.bottom <= pic.bottom + 0.5),
+          n: buttons.length,
+        };
+      }),
+    );
+    // The sample has both: narrow tiles at 1440 (design round 2, item 6), and wide ones keeping the row.
+    expect(tiles.some((t) => t.shape === "row")).toBe(true);
+    expect(tiles.some((t) => t.shape !== "row")).toBe(true);
+    for (const t of tiles) {
+      expect(t.inside, `${t.id}: inside its picture`).toBe(true);
+      if (t.shape === "row") continue;
+      // From the top: grip, move up, move down, the action (Make lead image), then Remove, which goes on in a second column only where the picture is too short.
+      expect(t.column.slice(0, 4), `${t.id} (${t.shape})`).toEqual(["grip", "up", "down", "action"]);
+      if (t.shape === "column") expect(t.column, t.id!).toEqual(["grip", "up", "down", "action", "remove"]);
+    }
+  });
+
+  test("a case study's and research's flowchart: Remove is there but off, and says why when focused or pressed; a gallery's takes it off", async ({ page }) => {
+    const WHY = { "case-study": "A case study always has a flowchart. Choose another layout to take it off.", research: "Research always has a flowchart. Choose another layout to take it off." } as const;
+    for (const f of ["case-study", "research"] as const) {
+      await openTiming(page, f, { full: true });
+      const order = await pageOrder(page);
+      const remove = frame(page, "flow").locator('[data-tool="remove"]');
+      await expect(remove).toHaveAttribute("aria-disabled", "true");
+      await expect(remove).toHaveAccessibleName("Remove Flowchart");
+      await expect(remove).toHaveAccessibleDescription(WHY[f]);
+      await expect(remove).toHaveAttribute("data-tip", WHY[f]);
+      await frame(page, "flow").hover();
+      // aria-disabled, so Playwright won't press it unless told: a person can.
+      await remove.click({ force: true });
+      await expect(said(page)).toHaveText(WHY[f]);
+      expect(await pageOrder(page)).toEqual(order);
+      // Shown as well as said: the reason in its tooltip, while the button keeps the focus.
+      expect(await remove.evaluate((el) => getComputedStyle(el, "::after").content)).toBe(`"${WHY[f]}"`);
+    }
+    await openTiming(page, "gallery", { full: true });
+    const remove = frame(page, "flow").locator('[data-tool="remove"]');
+    await expect(remove).not.toHaveAttribute("aria-disabled", "true");
+    await frame(page, "flow").hover();
+    await remove.click();
+    expect(await pageOrder(page)).not.toContain("flow");
+  });
+
+  test("each toolbar is one Tab stop: the arrows, Home and End move along it; the grip's arrows move a section only while it is carried", async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    const stops = () =>
+      page.locator(`${READY} article [data-section-id] > .xe-tools`).evaluateAll((bars) =>
+        bars.map((t) => [...t.querySelectorAll("button")].filter((b) => b.tabIndex === 0 && !b.closest("[hidden]")).map((b) => b.getAttribute("aria-label"))),
+      );
+    // One stop each, the grip.
+    for (const s of await stops()) expect(s).toEqual([expect.stringMatching(/^Drag .* to move it$/)]);
+    // Every toolbar is drawn in one order, Remove farthest from the grip and the grip at the corner (design round 2, item 2):
+    // from the grip, the left arrow goes along it, button by button as drawn, and Home and End go to its ends.
+    const id = "reflection-1";
+    const tools = frame(page, id).locator(":scope > .xe-tools");
+    const name = await nameOf(page, id);
+    const drawn = await tools.locator("button").evaluateAll((bs) =>
+      bs
+        .filter((b) => b.getClientRects().length > 0)
+        .map((b) => ({ name: b.getAttribute("aria-label")!, r: b.getBoundingClientRect() }))
+        .sort((p, q) => (Math.abs(p.r.top - q.r.top) > 4 ? p.r.top - q.r.top : p.r.left - q.r.left))
+        .map((b) => b.name),
+    );
+    expect(drawn).toEqual([`Remove ${name}`, `Move ${name} up`, `Move ${name} down`, `Drag ${name} to move it`]);
+    const focused = () => page.evaluate(() => document.activeElement?.getAttribute("aria-label"));
+    await grip(page, id).focus();
+    await page.keyboard.press("ArrowLeft");
+    expect(await focused()).toBe(`Move ${name} down`);
+    await page.keyboard.press("ArrowLeft");
+    expect(await focused()).toBe(`Move ${name} up`);
+    await page.keyboard.press("ArrowRight");
+    expect(await focused()).toBe(`Move ${name} down`);
+    await page.keyboard.press("Home");
+    expect(await focused()).toBe(`Remove ${name}`);
+    await page.keyboard.press("End");
+    await expect(grip(page, id)).toBeFocused();
+    // The stop follows the focus while it is in the toolbar, and Tab leaves the toolbar in one press, from any of its buttons.
+    await page.keyboard.press("Home");
+    await page.keyboard.press("Tab");
+    expect(await page.evaluate((i) => Boolean(document.activeElement?.closest(`[data-section-id="${i}"] > .xe-tools`)), id)).toBe(false);
+    // Back with Shift+Tab: the stop went back to the grip when the focus left.
+    await page.keyboard.press("Shift+Tab");
+    await expect(grip(page, id)).toBeFocused();
+    for (const s of await stops()) expect(s).toEqual([expect.stringMatching(/^Drag .* to move it$/)]);
+    // Carried from the keyboard, the arrows move the section, and Home and End do nothing to the focus; dropped, the arrows are the toolbar's again.
+    const order = await pageOrder(page);
+    await page.keyboard.press("Space");
+    await expect(lifting(page)).toHaveAttribute("data-xe-drag", "keys");
+    await page.keyboard.press("ArrowDown");
+    expect(await place(page)).toBe(order.indexOf(id) + 1);
+    await page.keyboard.press("Home");
+    await page.keyboard.press("End");
+    await expect(grip(page, id)).toBeFocused();
+    await expect(lifting(page)).toHaveAttribute("data-xe-drag", "keys");
+    await page.keyboard.press("ArrowUp");
+    expect(await place(page)).toBe(order.indexOf(id));
+    await page.keyboard.press("Escape");
+    await expect(lifting(page)).toHaveCount(0);
+    expect(await pageOrder(page)).toEqual(order);
+    await page.keyboard.press("ArrowLeft");
+    expect(await focused()).toBe(`Move ${name} down`);
+  });
+
+  test("research with two reference lines: neither toolbar covers the line above, the References heading or a Web address chip", async ({ page }) => {
+    await openTiming(page, "research", { full: true });
+    await waitLive(page);
+    const n = (await pageOrder(page)).length;
+    expect(await page.evaluate((at) => window.__exhbtEditor!.insert("link", at), n)).toBeTruthy();
+    await expect.poll(async () => (await pageOrder(page)).length).toBe(n + 1);
+    expect(await toolbarClashes(page)).toEqual([]);
   });
 });
 
@@ -965,6 +1131,64 @@ test.describe("the + between sections", () => {
     expect(doc.sections[marker + 1]!.id).toBe(order[at]);
     expect(doc.flowOff).toBeUndefined();
   });
+
+  // At rest the "+" is quiet but whole: drawn at full strength in a quieter colour of the look, its plus at least 3:1 on its own
+  // ground (WCAG 1.4.11; the review's accessibility-4). One test per look, each in every colourway.
+  for (const look of PORTFOLIO_THEMES) {
+    test(`at rest in the ${look.name || look.id} look, every colourway: the + is at full strength and its plus is at least 3:1`, async ({ page }) => {
+      for (const theme of ALL_THEMES.filter((t) => t.id === look.id || t.id.startsWith(`${look.id}-`))) {
+        await openTiming(page, "case-study", { look: theme.id });
+        await page.mouse.move(0, 0);
+        const rest = await page.locator(`${READY} .xe-insert[data-at="1"] .xe-plus`).evaluate((el) => {
+          // Any colour the browser computes (rgb(), color(srgb …), with alpha) as rgb() on what is behind it.
+          const ctx = document.createElement("canvas").getContext("2d", { willReadFrequently: true })!;
+          const rgba = (c: string) => {
+            ctx.clearRect(0, 0, 1, 1);
+            ctx.fillStyle = c;
+            ctx.fillRect(0, 0, 1, 1);
+            const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+            return [r!, g!, b!, a! / 255] as const;
+          };
+          const over = (top: readonly [number, number, number, number], under: readonly [number, number, number, number]) => [0, 1, 2].map((i) => Math.round(top[i]! * top[3] + under[i]! * (1 - top[3]))).concat(1) as unknown as readonly [number, number, number, number];
+          let ground = rgba("#fff");
+          const chain: Element[] = [];
+          for (let n: Element | null = el.parentElement; n; n = n.parentElement) chain.unshift(n);
+          for (const n of chain) ground = over(rgba(getComputedStyle(n).backgroundColor), ground);
+          const fill = over(rgba(getComputedStyle(el).backgroundColor), ground);
+          const plus = over(rgba(getComputedStyle(el).color), fill);
+          let opacity = 1;
+          for (let n: Element | null = el; n; n = n.parentElement) opacity *= Number(getComputedStyle(n).opacity);
+          const css = (c: readonly number[]) => `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+          return { opacity, plus: css(plus), fill: css(fill) };
+        });
+        expect(rest.opacity, theme.id).toBe(1);
+        expect(contrast(rest.plus, rest.fill), `${theme.id}: the plus ${rest.plus} on ${rest.fill}`).toBeGreaterThanOrEqual(3);
+      }
+    });
+  }
+
+  test("with a mouse, at any width, a + whose gap can't hold the full one takes the small place in the top 32px of its gap, and no + covers words or a control", async ({ page }) => {
+    // The rule follows the gap, not the width (design round 2, item 4): 700px (a narrow window), 912px (a main column under
+    // 42rem beside the sidebar) and 1440px, on each layout.
+    for (const width of [700, 912, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const f of offered()) {
+        await openTiming(page, f, { full: true });
+        const gaps = await page.locator(`${READY} .xe-insert:not([data-end])`).evaluateAll((els) =>
+          els.map((el) => {
+            const top = el.getBoundingClientRect().top;
+            const plus = el.querySelector(".xe-plus")!.getBoundingClientRect();
+            return { gap: el.nextElementSibling!.getBoundingClientRect().top - top, small: el.hasAttribute("data-small"), foot: plus.bottom - top };
+          }),
+        );
+        for (const g of gaps) {
+          expect(g.small, `${width}px, ${f}: a ${Math.round(g.gap)}px gap`).toBe(g.gap < 36);
+          if (g.small) expect(g.foot, `${width}px, ${f}: the small one's foot`).toBeLessThanOrEqual(32);
+        }
+        expect(await plusClashes(page), `${width}px, ${f}`).toEqual([]);
+      }
+    }
+  });
 });
 
 /* ------------------------------------------------------------------------------------------------
@@ -1029,7 +1253,7 @@ test.describe("the tray", () => {
     expect(await place(page)).toBe(-1);
     await expect(lifting(page)).toHaveAttribute("data-xe-style", "slide");
     await expect(page.locator(`${READY} [data-xe-landing]`)).toBeHidden();
-    await expect(said(page)).toHaveText("Picked up a new block: quote. Carry it onto the page.");
+    await expect(said(page)).toHaveText("Picked up a new section: quote. Carry it onto the page.");
     const chip = (await page.locator(`${READY} [data-xe-chip]`).boundingBox())!;
     expect([Math.round(chip.width), Math.round(chip.height)]).toEqual([Math.round(tile.width), Math.round(tile.height)]);
     // Into the gap above the last section: the room is made, by transform.
@@ -1157,8 +1381,38 @@ test.describe("the tray", () => {
     await expect(lifting(page)).toHaveCount(0);
     await page.mouse.up();
     expect(await pageOrder(page)).toEqual(order);
+    // The reason is shown beside the tray, level with the block, wholly in view: nothing round it clips it (the review's visual-fidelity-1).
+    const shownWhy = async () => {
+      const why = page.locator(`${TRAY} [data-xe-why="findings"]`);
+      await expect(why).toBeVisible();
+      await expect(why).toHaveText(reason);
+      const clipped = await why.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const out: string[] = [];
+        if (r.left < 0 || r.top < 0 || r.right > window.innerWidth || r.bottom > window.innerHeight) out.push("off the screen");
+        for (let n = el.parentElement; n; n = n.parentElement) {
+          const s = getComputedStyle(n);
+          if (s.overflowX === "visible" && s.overflowY === "visible") continue;
+          const c = n.getBoundingClientRect();
+          if (r.left < c.left - 0.5 || r.right > c.right + 0.5 || r.top < c.top - 0.5 || r.bottom > c.bottom + 0.5) out.push(`clipped by ${n.tagName.toLowerCase()}.${n.className}`);
+        }
+        return out;
+      });
+      expect(clipped).toEqual([]);
+      const [w, b, t] = await Promise.all([why.boundingBox(), findings.boundingBox(), page.locator(TRAY).boundingBox()]);
+      expect(w!.x + w!.width).toBeLessThanOrEqual(t!.x);
+      expect(Math.abs(w!.y + w!.height / 2 - (b!.y + b!.height / 2))).toBeLessThanOrEqual(1);
+    };
+    await block(page, "quote").focus();
     await findings.hover();
-    await expect(page.locator(`${TRAY} #xe-tray-why-findings`)).toHaveCSS("opacity", "1");
+    await shownWhy();
+    await page.mouse.move(5, 5);
+    await expect(page.locator(`${TRAY} [data-xe-why]`)).toHaveCount(0);
+    // From the keyboard too, and a screen reader hears it as the block's description (above).
+    await findings.focus();
+    await shownWhy();
+    await expect(page.locator(TRAY)).toHaveAccessibleName("Sections to add");
+    await expect(page.locator(`${TRAY} .xe-tray-title`)).toHaveText("Add a section");
   });
 
   test("carrying a block from it near the bottom edge scrolls the page, and stops at its end", async ({ page }) => {

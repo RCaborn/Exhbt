@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { FileText, Plus } from "lucide-react";
 import type { InsertSlot } from "@/components/portfolio/page-ctx";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
-import { blockOptions, type BlockOption } from "@/lib/exhbt/layouts";
+import { blockOptions, pageItems, type BlockOption } from "@/lib/exhbt/layouts";
 import { useRuntime, useEnv } from "./context";
 import { useBoard } from "./drag";
 import { BlockIcon, fullLine, wordsLeft } from "./drag/blocks";
@@ -80,6 +80,7 @@ export function Insert({ at, end }: InsertSlot) {
       data-edit-only
       data-at={at}
       data-end={end || undefined}
+      data-open={open ? "" : undefined}
       onKeyDown={(e) => {
         if (e.key !== "Escape" || !open) return;
         e.stopPropagation();
@@ -130,7 +131,8 @@ export function Insert({ at, end }: InsertSlot) {
             ))}
             {open.figure && (
               <li>
-                <button type="button" className="xe-plus-item" data-block="figure" disabled={Boolean(open.figure.full)} aria-describedby={open.figure.full ? `${menuId}-figure` : undefined} onClick={() => choose(() => uiApi.open("figure"))}>
+                {/* Like every item here, it goes where this "+" is: the sheet is told the section it goes before (none: the end). */}
+                <button type="button" className="xe-plus-item" data-block="figure" disabled={Boolean(open.figure.full)} aria-describedby={open.figure.full ? `${menuId}-figure` : undefined} onClick={() => choose(() => uiApi.open("figure", end ? undefined : pageItems(store.get())[at]?.id))}>
                   <FileText aria-hidden size={16} strokeWidth={2.25} className="xe-block-icon" />
                   <span className="min-w-0">
                     <span className="xe-plus-name">Take a figure from my report</span>

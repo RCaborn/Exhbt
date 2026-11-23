@@ -67,11 +67,10 @@
       top: 2.25rem;
     }
 
-    /* The "+" in a gap: 32px to the eye, centred in the top 32px of its gap (the first gap, under the
-       context line, is only 32px tall, and a 44px "+" there covered the first letters of the heading
-       under it), with a 44px press. */
+    /* The "+" in a gap: 32px to the eye, with a 44px press. Where its gap is too small for a full one
+       it sits in the gap's top 32px (drag.css): the first gap, under the context line, is only 32px
+       tall, and a 44px "+" there covered the first letters of the heading under it. */
     [data-editor="page"] .xe-insert:not([data-end]) .xe-plus {
-      top: 1rem;
       width: 2rem;
       height: 2rem;
     }
@@ -182,6 +181,15 @@
     font-weight: 400;
     color: var(--color-graphite);
   }
+  /* Why a Remove that is off can't remove (the flowchart a layout always has): in the name's place, whole. */
+  .xe-bar-why {
+    font-size: 0.8125rem;
+    line-height: 1.3;
+    white-space: normal;
+  }
+  .xe-phonebar .xe-bar-off {
+    opacity: 0.55;
+  }
   .xe-bar-gap {
     flex: 1 1 0;
     min-width: 0;
@@ -250,6 +258,27 @@
   }
   .xe-bar-row > :not(.xe-bar-more) {
     order: 1;
+  }
+  /* A section's actions in the order its toolbar draws them (design round 2, item 2): after its name,
+     Remove, More actions, the layout's action, Move up, Move down, and Reorder at the right end, where
+     the toolbar has its grip. The reading and Tab order stay the markup's. */
+  .xe-bar-row > [data-tool="remove"] {
+    order: 2;
+  }
+  .xe-bar-more > [data-testid] > .relative {
+    order: 3;
+  }
+  .xe-bar-row > [data-tool="action"] {
+    order: 4;
+  }
+  .xe-bar-row > [data-tool="up"] {
+    order: 5;
+  }
+  .xe-bar-row > [data-tool="down"] {
+    order: 6;
+  }
+  .xe-bar-row > [data-tool="reorder"] {
+    order: 7;
   }
 
   /* ---------- Reorder sections (phone/ReorderSheet.tsx) ---------- */

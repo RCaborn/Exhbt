@@ -440,3 +440,183 @@ export function allowEditOnly(page: Page, which: "always" | "all"): Promise<stri
     return named;
   }, list);
 }
+
+/**
+ * Every section toolbar's button that is drawn now (display, not opacity: on a desktop a toolbar shows
+ * on hover in the place it already has), hit-tested against what it must never cover (decision 0026,
+ * "The chrome"; the release 3 review's vision-1 and visual-fidelity-3): the words of any other part
+ * of the page, the person's own judged by the whole box of each field or element in one that holds
+ * them (so a short last line passing by luck doesn't count, and a placeholder does), a label the
+ * layout draws itself ("References") by its words; the pictures, links and buttons of any
+ * other section; another toolbar's buttons; and the edit-only chips and labels on the page, its own
+ * section's included (the aim's switch, a picked figure's label, "Edit figures", "Web address", a
+ * flowchart box's chips). A toolbar may lie over its own section's words and picture, where it sits in
+ * that corner by design, but never over a graph's own title, legend or labels. Returns each clash in
+ * words; [] when there are none.
+ */
+export function toolbarClashes(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const root = document.querySelector('[data-editor="page"] article[data-exhbt-page]');
+    if (!root) return ["no editing page"];
+    const drawnNow = (el: Element) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+    const over = (a: DOMRect, b: DOMRect) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;
+    const r = (b: DOMRect) => [b.x, b.y, b.width, b.height].map(Math.round).join(",");
+    const frames = [...root.querySelectorAll<HTMLElement>("[data-section-id]")];
+    const toolButtons = (fr: Element) => [...fr.querySelectorAll(":scope > .xe-tools button")].filter(drawnNow);
+    const sectionOf = (el: Element) => el.closest("[data-section-id]")?.getAttribute("data-section-id") ?? "the page";
+    // What holds words, and where they count: the person's own words (a field, or words inside one) by the element's whole box,
+    // so a short last line passing by luck doesn't count; a label the layout draws itself ("References") by its words alone.
+    const worded: { el: Element; boxes: DOMRect[] }[] = [];
+    for (const el of root.querySelectorAll("*")) {
+      if (el.closest(".xe-tools, .sr-only, [hidden]") || !drawnNow(el)) continue;
+      const field = el.matches("textarea, input:not([type=hidden]):not([type=checkbox]):not([type=radio]), [contenteditable]:not([contenteditable=false]), [role=textbox]");
+      const texts = [...el.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.trim());
+      if (field || (texts.length && el.closest("[data-path]"))) worded.push({ el, boxes: [el.getBoundingClientRect()] });
+      else if (texts.length) {
+        const range = document.createRange();
+        worded.push({ el, boxes: texts.flatMap((n) => (range.selectNodeContents(n), [...range.getClientRects()])) });
+      }
+    }
+    const CHIPS = ".xe-chip, .xe-above, .xe-fig-chip, .xe-fig-picked, .xe-over > *, .xe-flow-chip, .xe-add-finding, .xe-list-tools > *";
+    const out: string[] = [];
+    for (const fr of frames) {
+      for (const b of toolButtons(fr)) {
+        const box = b.getBoundingClientRect();
+        const name = `${b.getAttribute("aria-label") ?? "a tool"} (${r(box)})`;
+        for (const { el: w, boxes } of worded) {
+          // A graph's own words count as well: its title and legend are never under its toolbar (design round 2, item 1).
+          if ((fr.contains(w) && fr.dataset.kind !== "graph") || !boxes.some((q) => over(box, q))) continue;
+          out.push(`${name} covers "${(w.matches("textarea, input") ? (w as HTMLTextAreaElement).value : (w.textContent ?? "")).trim().slice(0, 30)}" in ${sectionOf(w)}`);
+        }
+        for (const other of frames) {
+          if (other === fr) continue;
+          for (const el of other.querySelectorAll("img, a[href], button")) {
+            if (drawnNow(el) && over(box, el.getBoundingClientRect())) out.push(`${name} covers a ${el.tagName.toLowerCase()} ${el.getAttribute("aria-label") ?? ""} in ${other.dataset.sectionId}`);
+          }
+        }
+        for (const el of root.querySelectorAll(CHIPS)) {
+          if (el.closest(".xe-tools") || !drawnNow(el) || !over(box, el.getBoundingClientRect())) continue;
+          out.push(`${name} covers ${el.getAttribute("aria-label") ?? el.textContent?.trim().slice(0, 30)} in ${sectionOf(el)}`);
+        }
+      }
+    }
+    return [...new Set(out)];
+  });
+}
+
+/**
+ * Every "+" between sections, as drawn now, hit-tested the same way (design round 2, item 4): it lies
+ * in its own gap, wherever the gap is at least as deep as the small "+" (32px); and it covers no words
+ * (a field or words in one by the element's whole box, a label by its words), and no link, button or
+ * chip. Returns each clash in words; [] when there are none.
+ */
+export function plusClashes(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const root = document.querySelector('[data-editor="page"] article[data-exhbt-page]');
+    if (!root) return ["no editing page"];
+    const drawnNow = (el: Element) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+    const over = (a: DOMRect, b: DOMRect) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;
+    const sectionOf = (el: Element) => el.closest("[data-section-id]")?.getAttribute("data-section-id") ?? "the page";
+    const out: string[] = [];
+    const worded: { el: Element; boxes: DOMRect[] }[] = [];
+    for (const el of root.querySelectorAll("*")) {
+      if (el.closest(".xe-insert, .sr-only, [hidden]") || !drawnNow(el)) continue;
+      const field = el.matches("textarea, input:not([type=hidden]):not([type=checkbox]):not([type=radio]), [contenteditable]:not([contenteditable=false]), [role=textbox]");
+      const texts = [...el.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.trim());
+      if (field || (texts.length && el.closest("[data-path]"))) worded.push({ el, boxes: [el.getBoundingClientRect()] });
+      else if (texts.length) {
+        const range = document.createRange();
+        worded.push({ el, boxes: texts.flatMap((n) => (range.selectNodeContents(n), [...range.getClientRects()])) });
+      }
+    }
+    // Controls, not pictures: under a gap too small even for the small "+" (12px over a gallery's lead picture on a phone), it sits over the picture's top edge, where there are no words.
+    const controls = [...root.querySelectorAll("a[href], button, .xe-chip, .xe-above, .xe-fig-picked")].filter((el) => !el.closest(".xe-insert") && drawnNow(el));
+    for (const insert of root.querySelectorAll<HTMLElement>(".xe-insert")) {
+      const plus = insert.querySelector(".xe-plus");
+      if (!plus || !drawnNow(plus)) continue;
+      const box = plus.getBoundingClientRect();
+      const name = `${plus.getAttribute("aria-label")} (${[box.x, box.y, box.width, box.height].map(Math.round).join(",")})`;
+      const next = insert.nextElementSibling;
+      if (next && !insert.hasAttribute("data-end")) {
+        const top = insert.getBoundingClientRect().top;
+        const foot = next.getBoundingClientRect().top;
+        if (foot - top >= 32 && (box.top < top - 0.5 || box.bottom > foot + 0.5)) out.push(`${name} is out of its ${Math.round(foot - top)}px gap`);
+      }
+      for (const { el: w, boxes } of worded) {
+        if (boxes.some((q) => over(box, q))) out.push(`${name} covers "${(w.matches("textarea, input") ? (w as HTMLTextAreaElement).value : (w.textContent ?? "")).trim().slice(0, 30)}" in ${sectionOf(w)}`);
+      }
+      for (const el of controls) {
+        if (over(box, el.getBoundingClientRect())) out.push(`${name} covers a ${el.tagName.toLowerCase()} ${el.getAttribute("aria-label") ?? el.textContent?.trim().slice(0, 30) ?? ""} in ${sectionOf(el)}`);
+      }
+    }
+    return [...new Set(out)];
+  });
+}
+
+/**
+ * Each flowchart chip shown now (a box's grip and Remove) that comes within `clear` px of a letter in
+ * its own box (design round 2, item 5): the chip's drawn circle against where the box's words are
+ * drawn, the first line of each of its fields (its step, its detail), measured in the field's own type.
+ * Returns each offender in words; [] when there are none.
+ */
+export function flowChipsNearWords(page: Page, clear = 4): Promise<string[]> {
+  return page.evaluate((clear) => {
+    const out: string[] = [];
+    const ctx = document.createElement("canvas").getContext("2d")!;
+    for (const chip of document.querySelectorAll<HTMLElement>('[data-editor="page"] .xp-flow-box .xe-flow-chip')) {
+      if (!chip.getClientRects().length || Number(getComputedStyle(chip.closest(".xe-flow-tools")!).opacity) === 0) continue;
+      const c = chip.getBoundingClientRect();
+      const cx = c.left + c.width / 2;
+      const cy = c.top + c.height / 2;
+      const radius = c.width / 2;
+      for (const field of chip.closest(".xp-flow-box")!.querySelectorAll<HTMLTextAreaElement>("textarea")) {
+        if (!field.value.trim()) continue;
+        const s = getComputedStyle(field);
+        const size = parseFloat(s.fontSize);
+        const line = s.lineHeight === "normal" ? size * 1.2 : parseFloat(s.lineHeight);
+        ctx.font = `${s.fontStyle} ${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
+        const f = field.getBoundingClientRect();
+        const left = f.left + parseFloat(s.paddingLeft) + parseFloat(s.borderLeftWidth);
+        const width = Math.min(f.width - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight), ctx.measureText(field.value.trim()).width);
+        const top = f.top + parseFloat(s.paddingTop) + parseFloat(s.borderTopWidth) + (line - size) / 2;
+        // The nearest point of the first line's letters to the chip's centre.
+        const nx = Math.max(left, Math.min(cx, left + width));
+        const ny = Math.max(top, Math.min(cy, top + size));
+        const gap = Math.hypot(cx - nx, cy - ny) - radius;
+        if (gap < clear) out.push(`${chip.getAttribute("aria-label")}: ${gap.toFixed(1)}px from "${field.value.trim().slice(0, 20)}"`);
+      }
+    }
+    return out;
+  }, clear);
+}
+
+/**
+ * The controls matching `selector` whose press is under 44px either way: from each one's middle, how
+ * far a finger still lands on it, with nothing over it (L's measure in editor-phone). Hit testing is in
+ * whole pixels, so a 44px press measures 42 or 43.
+ */
+export function smallPresses(page: Page, selector: string): Promise<string[]> {
+  return page.evaluate((sel) => {
+    const mine = (el: Element, x: number, y: number) => {
+      const hit = document.elementFromPoint(x, y);
+      return Boolean(hit && (hit === el || el.contains(hit)));
+    };
+    const bad: string[] = [];
+    for (const el of document.querySelectorAll<HTMLElement>(sel)) {
+      if (!el.getClientRects().length || getComputedStyle(el).visibility === "hidden") continue;
+      el.scrollIntoView({ block: "center", inline: "center" });
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const reach = (dx: number, dy: number) => {
+        let s = 0;
+        while (s < 40 && mine(el, cx + dx * (s + 1), cy + dy * (s + 1))) s++;
+        return s;
+      };
+      const w = reach(-1, 0) + reach(1, 0) + 1;
+      const h = reach(0, -1) + reach(0, 1) + 1;
+      if (!mine(el, cx, cy) || w < 42 || h < 42) bad.push(`${el.getAttribute("aria-label") ?? el.textContent?.trim().slice(0, 30)} (${Math.round(r.width)}x${Math.round(r.height)}, takes ${w}x${h})`);
+    }
+    return bad;
+  }, selector);
+}

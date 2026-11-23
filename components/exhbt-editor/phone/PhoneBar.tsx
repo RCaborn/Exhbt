@@ -1,12 +1,12 @@
 "use client";
 
 import "../css/phone.css";
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Bold, Highlighter, Italic, Link2, Plus, Star, Trash2, Undo2, Unlink, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { formatLimits, type ExhbtDoc } from "@/lib/exhbt/blocks";
 import type { DraftBlock } from "@/lib/exhbt/draft-blocks";
-import { FORMAT_COPY, FORMAT_RULES, formatOf, type Format } from "@/lib/exhbt/formats";
+import { FORMAT_COPY, formatOf, type Format } from "@/lib/exhbt/formats";
 import { pageItems, type PageItem } from "@/lib/exhbt/layouts";
 import { useActiveRich, useRuntime, useUiState, type ActiveRich } from "../context";
 import { MoreActions } from "../draft-tools";
@@ -15,7 +15,7 @@ import { jumpTo } from "../jump";
 import { labelOf } from "../labels";
 import { useStoreInternal } from "../store";
 import type { Store } from "../store-core";
-import { actionsFor } from "../Toolbar";
+import { actionsFor, useRoving, whyFlowStays } from "../Toolbar";
 import { usePhone } from "./usePhone";
 
 /*
@@ -23,7 +23,8 @@ import { usePhone } from "./usePhone";
  * and not in "See as a visitor". It follows the part the focus is in, or was last in (or was last
  * tapped: a picture takes no focus), names it, and holds its actions at 44px:
  *  - a section: Move up, Move down, the layout's own action, More actions where the AI drafted it,
- *    Remove (not the flowchart where the layout always has one), Reorder. They go through the drag
+ *    Remove (on the flowchart where the layout always has one, there but off: a press shows why in
+ *    the section's name's place), Reorder. They go through the drag
  *    board (`moveBy`, `remove`) and the store, as the section's own toolbar does;
  *  - the title, the context line or the skills: the part's More actions, and Reorder; a tapped skill
  *    is named, with "Remove <skill>" (the pills' own remove buttons are hidden on a phone);
@@ -62,6 +63,8 @@ function Bar() {
   useBarHeight(ref);
   useKeyboard(ref);
   useMenusInView();
+  // One Tab stop, the arrows along it (Toolbar.tsx).
+  useRoving(ref);
 
   const section = where.part && "section" in where.part ? where.part.section : null;
   const info = useSectionInfo(section);
@@ -88,7 +91,7 @@ function Bar() {
         {rich ? (
           <Formatting rich={rich} path={where.path} />
         ) : section && info ? (
-          <SectionTools id={section} info={info} />
+          <SectionTools key={section} id={section} info={info} />
         ) : shell ? (
           <ShellTools block={shell} name={name!} skill={skill} />
         ) : (
@@ -223,7 +226,7 @@ function UndoOffer({ label, store }: { label: string; store: Store }) {
 function ReorderButton() {
   const { uiApi } = useRuntime();
   return (
-    <Button size="sm" className="xe-bar-btn" label="Reorder sections" onClick={() => uiApi.open("reorder")}>
+    <Button size="sm" className="xe-bar-btn" data-tool="reorder" label="Reorder sections" onClick={() => uiApi.open("reorder")}>
       <ArrowUpDown {...ICON} className="shrink-0" />
       Reorder
     </Button>
@@ -233,21 +236,25 @@ function ReorderButton() {
 function SectionTools({ id, info }: { id: string; info: Info }) {
   const store = useStoreInternal();
   const board = useBoard();
+  const { uiApi } = useRuntime();
+  const why = useId();
+  // After a press on a Remove that is off, its reason in place of the section's name, until the bar follows another part.
+  const [told, setTold] = useState(false);
   const { label, place, count, kind, f } = info;
-  const removable = kind !== "flow" || FORMAT_RULES[f].flowRemovable;
+  const stays = kind === "flow" ? whyFlowStays(f) : null;
   const block: DraftBlock | null = kind === "flow" ? "flow" : kind === "findings" ? "findings" : null;
   return (
     <>
-      <span className="xe-bar-name">{label}</span>
-      <Button size="sm" className="xe-bar-btn" label={`Move ${label} up`} disabled={place <= 0} onClick={() => board.moveBy(id, -1)}>
+      <span className={told ? "xe-bar-name xe-bar-hint xe-bar-why" : "xe-bar-name"}>{told && stays ? stays : label}</span>
+      <Button size="sm" className="xe-bar-btn" data-tool="up" label={`Move ${label} up`} disabled={place <= 0} onClick={() => board.moveBy(id, -1)}>
         <ArrowUp {...ICON} />
       </Button>
-      <Button size="sm" className="xe-bar-btn" label={`Move ${label} down`} disabled={place >= count - 1} onClick={() => board.moveBy(id, 1)}>
+      <Button size="sm" className="xe-bar-btn" data-tool="down" label={`Move ${label} down`} disabled={place >= count - 1} onClick={() => board.moveBy(id, 1)}>
         <ArrowDown {...ICON} />
       </Button>
       {/* The layout's own actions, as the section's toolbar has them (Toolbar.tsx); the lead's star at the bar's size. */}
       {actionsFor(store.get(), id, kind, f, store).map((a) => (
-        <Button key={a.name} size="sm" className="xe-bar-btn" label={a.name} aria-pressed={a.pressed} onClick={a.run}>
+        <Button key={a.name} size="sm" className="xe-bar-btn" data-tool="action" label={a.name} aria-pressed={a.pressed} onClick={a.run}>
           {a.icon ? <Star {...ICON} /> : a.name}
         </Button>
       ))}
@@ -256,8 +263,29 @@ function SectionTools({ id, info }: { id: string; info: Info }) {
           <MoreActions block={block} />
         </span>
       )}
-      {removable && (
-        <Button size="sm" className="xe-bar-btn" label={`Remove ${label}`} onClick={() => board.remove(id)}>
+      {stays ? (
+        // Where the layout always has a flowchart (the review's vision-3): there but off, and a press says why, and shows it.
+        <>
+          <Button
+            size="sm"
+            className="xe-bar-btn xe-bar-off"
+            data-tool="remove"
+            label={`Remove ${label}`}
+            aria-disabled="true"
+            aria-describedby={why}
+            onClick={() => {
+              uiApi.say(stays);
+              setTold(true);
+            }}
+          >
+            <Trash2 {...ICON} />
+          </Button>
+          <span id={why} hidden>
+            {stays}
+          </span>
+        </>
+      ) : (
+        <Button size="sm" className="xe-bar-btn" data-tool="remove" label={`Remove ${label}`} onClick={() => board.remove(id)}>
           <Trash2 {...ICON} />
         </Button>
       )}
@@ -277,6 +305,7 @@ function ShellTools({ block, name, skill }: { block: ShellBlock; name: string; s
         <Button
           size="sm"
           className="xe-bar-btn"
+          data-tool="remove"
           label={`Remove ${skill}`}
           onClick={() => {
             store.patchDoc((d) => ({ ...d, skills: d.skills.filter((x) => x !== skill) }));
