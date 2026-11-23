@@ -10,6 +10,7 @@ import { formatOf } from "@/lib/exhbt/formats";
 import { normaliseNumber, unverifiedNumbers } from "@/lib/exhbt/verify";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
+import { recordAIFailure, tooManyFailures, TOO_MANY_FAILURES } from "@/lib/ai-failures";
 import { canDraftInto } from "@/lib/team";
 
 /**
@@ -58,12 +59,14 @@ export async function POST(req: Request) {
   const verdict = await draftVerdict(user.id, undefined, into);
   if (!verdict.ok) return fail(verdict.reason, verdict.status, { upgradeTo: verdict.upgradeTo ?? null });
 
+  if (await tooManyFailures("exhbt_draft", { userId: user.id })) return fail(TOO_MANY_FAILURES, 429);
   let result;
   try {
     result = await draftExhbt({ text, notes, link, signals: parsed.data.signals });
   } catch (e) {
-    console.error("exhbt draft failed", (e as Error).message);
-    return fail("We couldn't draft your exhbt just now. Your files are saved: try again in a moment.", 502);
+    // Recorded with its reason and tokens; it doesn't use up a draft.
+    await recordAIFailure("exhbt_draft", { userId: user.id }, e);
+    return fail("We couldn't draft your exhbt just now. Your files are saved and it didn't use up a draft: try again in a moment.", 502);
   }
   await store.logAICall({
     userId: user.id,

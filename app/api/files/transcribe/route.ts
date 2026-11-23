@@ -6,6 +6,7 @@ import { MAX_DOC_CHARS, cleanCvText } from "@/lib/cv-quality";
 import { getPlan, limitsFor } from "@/lib/plan";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
+import { recordAIFailure } from "@/lib/ai-failures";
 
 /**
  * Reads project material the browser couldn't (a scanned PDF, a photo of notes or a
@@ -69,7 +70,8 @@ export async function POST(req: Request) {
     if (text.length < 20) return fail("We couldn't find any text in that file. Type what matters into your notes instead.", 422);
     return NextResponse.json({ text });
   } catch (e) {
-    console.error("file read failed", (e as Error).message);
+    // Already bounded: reads are counted before the call (file_read_ai above).
+    await recordAIFailure("file_read", { userId: user.id }, e, { mediaType });
     return fail("We couldn't read that file just now. Try again in a moment, or type the text into your notes.", 502);
   }
 }

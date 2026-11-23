@@ -117,11 +117,18 @@ async function read(db: SupabaseClient, table: AdminTable, since: string | null)
       };
     }
     case "events": {
-      type R = { name: string; user_id: string | null; created_at: string; cached: string | null };
+      type R = { name: string; user_id: string | null; created_at: string; cached: string | null; reason: string | null; tin: string | null; tout: string | null };
       const r = await readAll<R>((a, b) =>
-        ranged(db.from("events").select("name, user_id, created_at, cached:props->>cached").neq("name", "page_view")).order("created_at", { ascending: false }).order("id").range(a, b),
+        ranged(db.from("events").select("name, user_id, created_at, cached:props->>cached, reason:props->>reason, tin:props->>inputTokens, tout:props->>outputTokens").neq("name", "page_view"))
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(a, b),
       );
-      return { truncated: r.truncated, rows: r.rows.map((e) => ({ name: e.name, userId: e.user_id, at: e.created_at, cached: e.cached === null ? null : e.cached === "true" })) };
+      const n = (v: string | null) => (v === null || !Number.isFinite(Number(v)) ? null : Number(v));
+      return {
+        truncated: r.truncated,
+        rows: r.rows.map((e) => ({ name: e.name, userId: e.user_id, at: e.created_at, cached: e.cached === null ? null : e.cached === "true", reason: e.reason, inputTokens: n(e.tin), outputTokens: n(e.tout) })),
+      };
     }
     case "pageViews": {
       type R = { created_at: string; path: string | null; referrer: string | null; portfolio: string | null };

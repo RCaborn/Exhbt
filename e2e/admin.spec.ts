@@ -194,6 +194,26 @@ test.describe("Admin panel", () => {
     await expect.poll(async () => (await stat(page, "views-total")) - before).toBeGreaterThanOrEqual(1);
   });
 
+  test("a failed AI draft shows in Failed AI calls, with its reason and the tokens it spent", async ({ page }) => {
+    await signIn(page, { admin: true });
+    await expect(page.getByRole("heading", { level: 2, name: "Failed AI calls" })).toBeVisible();
+    const row = () => page.getByRole("table", { name: "Failed AI calls by feature" }).getByRole("row", { name: /^Exhbt drafts/ });
+    const failedBefore = await stat(page, "ai-failures-total");
+    const outBefore = await stat(page, "ai-failures-out");
+
+    // The stand-in fails the way a real draft does when it runs out of room ("stand-in: fail" in the notes).
+    const res = await page.request.post("/api/exhbts/draft", {
+      data: { text: "We timed lunchtime queues at the union cafe for two weeks, then opened a second till at the busiest hour, and the queue fell.", notes: "stand-in: fail" },
+    });
+    expect(res.status()).toBe(502);
+    expect(((await res.json()) as { error: string }).error).toContain("didn't use up a draft");
+
+    await page.reload();
+    expect(await stat(page, "ai-failures-total")).toBe(failedBefore + 1);
+    expect(await stat(page, "ai-failures-out")).toBe(outBefore + 16000);
+    await expect(row()).toContainText("ran out of room");
+  });
+
   test("no accessibility violations on the overview, accounts and an account", async ({ page }) => {
     await signIn(page, { admin: true });
     await page.request.get(`/dev/admin?seed=${stamp()}`);

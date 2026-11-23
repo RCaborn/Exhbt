@@ -51,6 +51,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
         <Ideas o={o} />
         <Exhbts o={o} />
         <Ai o={o} />
+        <AiFailures o={o} />
         <Subscriptions o={o} />
         <Referrals o={o} />
         <Leads o={o} />
@@ -224,6 +225,33 @@ function Ai({ o }: { o: Overview }) {
                 </div>
               </details>
             )}
+          </>
+        )}
+      </Part>
+    </Panel>
+  );
+}
+
+function AiFailures({ o }: { o: Overview }) {
+  return (
+    <Panel id="ai-failures" title="Failed AI calls" note="From the failure events: each failed call, why it failed and the tokens it still spent. Never any text from the person or the model." wide>
+      <Part s={o.aiFailures}>
+        {(f) => (
+          <>
+            <Stats
+              items={[
+                { id: "ai-failures-total", label: "Failed calls", value: num(f.total) },
+                { id: "ai-failures-cost", label: "Their cost", value: usd(f.costUsd) },
+                { id: "ai-failures-in", label: "Input tokens", value: num(f.inputTokens) },
+                { id: "ai-failures-out", label: "Output tokens", value: num(f.outputTokens) },
+              ]}
+            />
+            <DataTable
+              caption="Failed AI calls by feature"
+              head={["Feature", "Failed", "Why", "Input tokens", "Output tokens", "Cost"]}
+              numeric={[1, 3, 4, 5]}
+              rows={f.features.map((r) => [r.label, num(r.failures), r.reasons || "none", num(r.inputTokens), num(r.outputTokens), usd(r.costUsd)])}
+            />
           </>
         )}
       </Part>

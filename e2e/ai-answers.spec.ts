@@ -10,7 +10,7 @@ import { ProjectSchema, RoadmapModelSchema } from "../lib/ai/schemas";
  * functions, no browser and no AI.
  */
 
-const chart = (over: Partial<DraftChart> & { kind: string }): DraftChart =>
+const chart = (over: Omit<Partial<DraftChart>, "kind"> & { kind: string }): DraftChart =>
   ({ title: "T", xTitle: "", yTitle: "", unit: "", lowerIsBetter: false, series: [], rows: [], cells: [], ...over }) as DraftChart;
 
 const draft = (over: Record<string, unknown> = {}) => ({

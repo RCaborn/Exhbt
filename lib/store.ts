@@ -244,7 +244,15 @@ export type EventName =
   | "intro_suggested"
   | "referral_recorded"
   | "referral_credited"
-  | "page_view";
+  | "page_view"
+  // Failed AI calls (lib/ai-failures.ts, decision 0025): feature, reason, status and tokens, never any text.
+  | "exhbt_draft_failed"
+  | "exhbt_rewrite_failed"
+  | "figure_pick_failed"
+  | "job_match_failed"
+  | "intro_failed"
+  | "swap_failed"
+  | "file_read_failed";
 
 /** A Stripe subscription as we keep it (the `subscriptions` table). No amounts or card details. */
 export type SubscriptionRecord = {
@@ -2763,7 +2771,15 @@ function memAdminRows(m: Mem, table: AdminTable, since: string | null): AdminRow
       case "events":
         return m.events
           .filter((e) => e.name !== "page_view" && after(e.at))
-          .map((e) => ({ name: e.name, userId: e.userId, at: e.at, cached: typeof e.props.cached === "boolean" ? e.props.cached : null }));
+          .map((e) => ({
+            name: e.name,
+            userId: e.userId,
+            at: e.at,
+            cached: typeof e.props.cached === "boolean" ? e.props.cached : null,
+            reason: typeof e.props.reason === "string" ? e.props.reason : null,
+            inputTokens: typeof e.props.inputTokens === "number" ? e.props.inputTokens : null,
+            outputTokens: typeof e.props.outputTokens === "number" ? e.props.outputTokens : null,
+          }));
       case "pageViews":
         return m.events
           .filter((e) => e.name === "page_view" && after(e.at))

@@ -1,4 +1,5 @@
 import "server-only";
+import { recordAIFailure } from "@/lib/ai-failures";
 import { generateRoadmap } from "./ai/roadmap";
 import { findJobProfile } from "./jobs";
 import { getStore, type RoadmapRecord } from "./store";
@@ -37,7 +38,7 @@ export async function ensureRoadmap(record: RoadmapRecord, userId: string | null
           costUsd: result.costUsd,
         });
       } catch (e) {
-        await store.logEvent("roadmap_failed", userId, { message: (e as Error).message.slice(0, 200) });
+        await recordAIFailure("roadmap", { userId }, e, { roadmapId: record.id });
         throw new GenerationError((e as Error).message);
       }
     }

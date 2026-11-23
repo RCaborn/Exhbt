@@ -7,6 +7,7 @@ import { FIGURE } from "@/lib/figures/rules";
 import { getPlan, limitsFor } from "@/lib/plan";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
+import { recordAIFailure } from "@/lib/ai-failures";
 
 /**
  * Picks the figure for an exhbt being drafted (decision 0017). The draft page sends it, beside
@@ -62,7 +63,8 @@ export async function POST(req: Request) {
   try {
     result = await pickFigure(images);
   } catch (err) {
-    console.error("figure pick failed", (err as Error).message);
+    // Already bounded: picks are counted before the call (figure_picked above).
+    await recordAIFailure("figure_pick", { userId: user.id }, err);
     return fail("We couldn't pick a figure just now.", 502);
   }
   // Its own step, so picking figures is costed apart from drafting. ai_call_logs only accepts

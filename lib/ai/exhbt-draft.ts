@@ -8,7 +8,7 @@ import { DraftSchema, repairDraft, toChart, type Draft, type DraftChart } from "
 import { referencesFrom, squash } from "@/lib/exhbt/references";
 import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
-import { structuredCall } from "./call";
+import { AIFailure, structuredCall } from "./call";
 
 /**
  * Drafts an exhbt from the person's own material (docs/phase-2.md section 6, decision 0007):
@@ -251,6 +251,9 @@ export function toDoc(d: Draft, source: string): ExhbtDoc {
  * quote; a sentence starting "Next time" or "If I did this again" becomes what I'd do next.
  */
 function mockDraft(input: DraftInput): DraftResult {
+  // "stand-in: fail" in the notes: the failure a real draft has when it runs out of room, so the
+  // failure path (the event, the admin panel, the message) can be seen without an API key.
+  if (/stand-in: fail/i.test(input.notes ?? "")) throw new AIFailure("exhbt_draft", "cut_off", { inputTokens: 5000, outputTokens: 16000 });
   const source = materialText(input).replace(/^File: .*$/gm, "");
   // The stand-in's layout: named in the notes, else research when the material says "hypothesis", else a case study.
   // It ignores the upload signals, and never keys on "method", "results", "aim" or "abstract": other specs upload such files.
