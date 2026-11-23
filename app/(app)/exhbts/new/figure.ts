@@ -19,10 +19,7 @@ export type FigureSource = { name: string; file: File; fileId?: string; pages: P
 
 /** One image a figure could be cut from, whatever it came from. */
 export type Candidate = {
-  /**
-   * What the AI is told it is: "File 1, page 3". Neutral on purpose: a file's name can hold a person's
-   * name, so the AI never gets it. The editor's "from page 3 of report.pdf" is read from the exhbt (`from`).
-   */
+  /** What the AI is told it is: "report.pdf, page 3". */
   label: string;
   /** The small image sent to the AI: a JPEG or PNG of at most FIGURE.maxImageBytes. */
   image: Blob;
@@ -61,11 +58,11 @@ export type AskResult =
 const stem = (name: string) => name.replace(/\.[^.]+$/, "").replace(/[^\w-]+/g, "-").slice(0, 60) || "report";
 
 /** A PDF's pages that draw shapes or pictures, in page order: each one a candidate. A page of plain text is never one. */
-export function pdfCandidates(source: FigureSource, fileNo: number): Candidate[] {
+export function pdfCandidates(source: FigureSource): Candidate[] {
   return source.pages.pages
     .filter((t) => mayHoldFigure(t.marks))
     .map((thumb) => ({
-      label: `File ${fileNo}, page ${thumb.page}`,
+      label: `${source.name}, page ${thumb.page}`,
       image: thumb.jpeg,
       from: source.name,
       ...(source.fileId ? { sourceFileId: source.fileId } : {}),
@@ -97,7 +94,7 @@ export function withinCaps(all: Candidate[]): Candidate[] {
 }
 
 /** The pages worth sending from a set of PDFs, in file and page order, within the caps. */
-export const candidatesOf = (sources: FigureSource[]): Candidate[] => withinCaps(sources.flatMap((s, i) => pdfCandidates(s, i + 1)));
+export const candidatesOf = (sources: FigureSource[]): Candidate[] => withinCaps(sources.flatMap(pdfCandidates));
 
 /**
  * Asks /api/exhbts/figure-pick which candidate holds the figure. An answer of no figure and a
@@ -108,8 +105,6 @@ export async function askForPick(candidates: Candidate[], signal?: AbortSignal):
   const body = new FormData();
   for (const [i, c] of candidates.entries()) {
     body.append("label", c.label);
-    // Development and tests only: the stand-in AI reads the file's name to pick a kind. The route never sends it on to the model, and a production build doesn't send it.
-    if (process.env.NODE_ENV !== "production") body.append("hint", `${c.from}, ${c.label}`);
     body.append("image", c.image, `image-${i + 1}.${c.image.type === "image/png" ? "png" : "jpg"}`);
   }
   let res: Response;

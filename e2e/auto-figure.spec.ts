@@ -414,8 +414,7 @@ test.describe("Draft from a PDF with a chart", () => {
     const answer = (await pick.json()) as { pick: { image: number; kind: string; alt: string; box: { x: number; y: number; w: number; h: number } } };
     expect(answer.pick.image).toBe(1);
     expect(answer.pick.kind).toBe("graph");
-    expect(answer.pick.alt).toContain("File 1, page 3");
-    expect(answer.pick.alt).not.toContain("report-with-chart");
+    expect(answer.pick.alt).toContain("report-with-chart.pdf, page 3");
     // The stand-in's box went out in pixels of the page image and came back as fractions of it.
     expect(answer.pick.box.x).toBeCloseTo(0.06, 2);
     expect(answer.pick.box.w).toBeCloseTo(0.88, 2);
@@ -536,7 +535,7 @@ test.describe("Draft from a PDF with a chart", () => {
     // The stand-in reads "diagram" in the file's name as a visual that isn't a graph.
     const answer = (await (await pickedResponse).json()) as { pick: { kind: string; alt: string } };
     expect(answer.pick.kind).toBe("other");
-    expect(answer.pick.alt).toContain("File 1, page 2");
+    expect(answer.pick.alt).toContain("report-with-diagram.pdf, page 2");
     expect((await sectionKinds(page)).slice(0, 3)).toEqual(["findings", "image", "graph"]);
     await expect(page.locator("[data-picked]").getByText("From report-with-diagram.pdf, page 2.", { exact: false })).toBeVisible();
     await expect(draftedLine(page)).toContainText("The figure is from page 2 of report-with-diagram.pdf. Tick that you may share it before you publish.");
@@ -718,8 +717,7 @@ test.describe("A scanned PDF", () => {
     expect(seen.picks).toBe(1);
     expect(answer.debug.sizes).toHaveLength(2);
     expect(Math.max(answer.debug.sizes[0]!.width, answer.debug.sizes[0]!.height)).toBe(FIGURE.thumbEdge);
-    expect(answer.pick.alt).toContain("File 1, page 1");
-    expect(answer.pick.alt).not.toContain("scan-report");
+    expect(answer.pick.alt).toContain("scan-report.pdf, page 1");
     const kinds = await sectionKinds(page);
     expect(kinds.slice(0, 2)).toEqual(["findings", "image"]);
     expect(kinds).not.toContain("graph");

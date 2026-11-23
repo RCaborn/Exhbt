@@ -10,7 +10,7 @@ import { uniqueEmail } from "./helpers";
 
 // The fixes from the release 2 review: the server holds the layout line (model-1), the figure route is
 // safe to call at any time (figure-1), the alt text's numbers are checked (figure-2), a failed pick
-// isn't counted (figure-3), the scan wording and the neutral label (figure-5), captions are cut at a
+// isn't counted (figure-3), the scan wording (figure-5), captions are cut at a
 // clause (job 1, item 6) and the findings go after the flowchart's marker (model-2).
 
 const unique = (tag: string) => `${tag}-${Date.now().toString(36)}${Math.floor(Math.random() * 1e3)}`;
@@ -189,19 +189,16 @@ test.describe("The figure route is safe to call at any time", () => {
 test.describe("A pick that fails isn't counted", () => {
   const ask = (page: Page, name: string) =>
     page.request.post("/api/exhbts/figure-pick", {
-      multipart: { label: "File 1, page 3", hint: name, image: { name: "image-1.png", mimeType: "image/png", buffer: PNG } },
+      multipart: { label: name, image: { name: "image-1.png", mimeType: "image/png", buffer: PNG } },
     });
 
-  test("failures leave the allowance alone, and the label is neutral", async ({ page }) => {
+  test("failures leave the allowance alone", async ({ page }) => {
     await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail("pickfail"))}&next=/exhbts/new`);
     // A free plan has one draft and two spare picks. Five failures would have used them all, and more.
-    for (let i = 0; i < 5; i++) expect((await ask(page, "report-pick-fails.pdf, File 1, page 3")).status()).toBe(502);
-    const ok = await ask(page, "report-with-chart.pdf, File 1, page 3");
+    for (let i = 0; i < 5; i++) expect((await ask(page, "report-pick-fails.pdf, page 3")).status()).toBe(502);
+    const ok = await ask(page, "report-with-chart.pdf, page 3");
     expect(ok.status()).toBe(200);
-    // The stand-in's description names only the neutral label it was given, never the file.
-    const answer = (await ok.json()) as { pick: { alt: string } };
-    expect(answer.pick.alt).toContain("File 1, page 3");
-    expect(answer.pick.alt).not.toContain("report-with-chart");
+    expect(((await ok.json()) as { pick: { alt: string } }).pick.alt).toContain("report-with-chart.pdf, page 3");
     // Successes are counted: this was the first of three.
     expect((await ask(page, "x")).status()).toBe(200);
     expect((await ask(page, "x")).status()).toBe(200);

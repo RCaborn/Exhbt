@@ -248,7 +248,7 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
           }
           // A PDF whose pages couldn't be drawn wasn't looked at: that isn't "no figure".
           if (!sources.length) return { status: "failed" };
-          const all = sources.flatMap((s, i) => pdfCandidates(s, i + 1));
+          const all = sources.flatMap(pdfCandidates);
           const candidates = withinCaps(all);
           leftOut = sources.length < drawn.length || candidates.length < all.length || sources.some((s) => s.pages.pageCount > s.pages.pages.length);
           return prepareFigure(candidates, stop.signal);
