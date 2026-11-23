@@ -14,7 +14,7 @@ The draft's schema was already close to the limit on 16 Nov. On 17 Nov the galle
 
 The first real eval runs then showed a second fault behind the first. With the schema fixed, five of the eight eval drafts still failed: the model thinks before it answers, and with `max_tokens` at 4,000 the answer was cut off half-written. Thinking took roughly 1,400 to 4,900 tokens per draft, and a whole draft up to 5,825.
 
-No other request shape was refused: the rewrites, the figure pick, the job match, the portfolio intro, the project ideas and swap, and the roadmap were all accepted. Whether their answers fit their own `max_tokens` (400 to 3,000) once the model has thought has not been measured.
+No other request shape was refused: the rewrites, the figure pick, the job match, the portfolio intro, the project ideas and swap, and the roadmap were all accepted. But two of them had the second fault too (below, "Token room").
 
 ## What the limit is
 
@@ -37,8 +37,20 @@ On `main`, making every nullable field non-null was enough to be accepted, but l
 
 The draft has 38 fields with none nullable. The API takes 16 more fields on top of it, but not 20. With the growth already planned, it has 44 fields and room for 10 more, but not 12. That growth is release 2's `formatReason` (8 values) and, for release 4, 7 layouts, a pull quote, a "my role" line and a before/after mark on each image. Release 4's fields are modelled, because its schema isn't on a branch yet.
 
+## Token room
+
+`max_tokens` has to hold the model's thinking as well as its answer, and the thinking is most of it. `scripts/measure-ai-room.ts` (`npm run measure:ai`) sends each call's own request, with a typical and a heavy input, three times, and records how many tokens each used. Measured on 23 Nov:
+
+- **The portfolio intro was cut off every time with sparse facts.** All three typical runs spent the whole 400 on thinking, so no intro came back. With few facts it thinks longer: up to 1,828 tokens since.
+- **The roadmap was cut off once in three with a heavy input** (a 20,000-character CV and a 15-skill job) at its 3,000; the others used up to 2,913.
+- **The project swap used 80% of its 1,000, and a header rewrite 71% of its 2,000.**
+- The rest fit with room: the figure pick at most 21% of its cap, the job match 15%, the project ideas 48%, and the draft 48% of its 16,000.
+
+Each cap is now at least three times the largest total measured: the intro 6,000, the roadmap 12,000, the swap 3,000 and the rewrites 5,000. A cap is a ceiling, not a cost: a call is billed for the tokens it uses.
+
 ## How it is kept that way
 
 - `npm run probe:ai` sends every structured answer the app asks for, using each module's own `output_config`, with a one-line prompt and a tiny `max_tokens`. It fails if one is refused. It also checks "draft with planned growth", so a release can't take the draft over the limit unseen. `--explore` adds the measuring ladders above.
 - `.github/workflows/ai-shapes.yml` runs it whenever `lib/ai/`, the layout or graph lists, the probe or the lockfile change. It also runs weekly, in case the API's limit moves. The draft eval runs it first.
+- The same workflow runs `npm run measure:ai` weekly and by hand (72 calls, about 12 US cents). It fails if any answer was cut off at `max_tokens`.
 - When you add a field to an AI answer, make it non-null and run the probe. If the draft has to grow past its room, cut fields before reaching for a second call or for unconstrained JSON.
