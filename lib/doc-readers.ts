@@ -30,12 +30,13 @@ export type ServerReadable = (typeof SERVER_READABLE)[number];
 
 /** What the project-material picker offers. Extensions first, so the picker shows them on every platform. */
 export const DOC_ACCEPT =
-  ".pdf,.docx,.doc,.odt,.rtf,.txt,.md,.csv,.xlsx,.png,.jpg,.jpeg,.webp,.gif,application/pdf," +
+  ".pdf,.docx,.pptx,.doc,.odt,.rtf,.txt,.md,.csv,.xlsx,.png,.jpg,.jpeg,.webp,.gif,application/pdf," +
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword," +
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation," +
   "application/vnd.oasis.opendocument.text,application/rtf,text/plain,text/markdown,text/csv," +
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/*";
 
-export type Kind = "pdf" | "docx" | "odt" | "doc" | "rtf" | "text" | "csv" | "xlsx" | "image" | "heic" | "pages" | "unknown";
+export type Kind = "pdf" | "docx" | "pptx" | "odt" | "doc" | "rtf" | "text" | "csv" | "xlsx" | "image" | "heic" | "pages" | "unknown";
 
 /** Tables are read into a small text table: enough for the AI to see the figures, not the whole sheet. */
 export const TABLE_LIMITS = { rows: 25, cols: 8, cellChars: 24 } as const;
@@ -57,6 +58,7 @@ export function detectKind(bytes: Uint8Array, name: string, type: string): Kind 
     // Zip: Word, Excel, OpenDocument or Pages. The name tells them apart; the readers check the contents.
     if (ext === "odt") return "odt";
     if (ext === "pages") return "pages";
+    if (ext === "pptx" || type === "application/vnd.openxmlformats-officedocument.presentationml.presentation") return "pptx";
     if (ext === "xlsx" || type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") return "xlsx";
     return "docx";
   }
@@ -220,6 +222,41 @@ async function readDocx(buf: ArrayBuffer): Promise<string[]> {
   const xml = await Promise.all(parts.map((p) => zip.file(p)!.async("string")));
   out.push(xml.map(wordXmlToText).join("\n"));
   return out;
+}
+
+/** PowerPoint's own XML: the text of each slide, one line per paragraph, "Slide 3" over each, and the speaker notes under their slide. */
+export function slideXmlToText(xml: string): string {
+  const marked = xml.replace(/<a:br\/>|<\/a:p>/g, "<a:t>\n</a:t>");
+  return xmlText([...marked.matchAll(/<a:t(?:\s[^>]*)?>([^<]*)<\/a:t>/g)].map((m) => m[1]).join(""))
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+}
+
+/** The text of a .pptx, slide by slide. Read as a hostile zip: the entries are counted first and each slide's XML is capped (lib/figures/office.ts). */
+async function readPptx(buf: ArrayBuffer): Promise<string[]> {
+  const { OFFICE, readCapped, zipEntryCount } = await import("./figures/office");
+  const bytes = new Uint8Array(buf);
+  const count = zipEntryCount(bytes);
+  if (count === null || count > OFFICE.maxEntries) return [];
+  const JSZip = (await import("jszip")).default;
+  const zip = await JSZip.loadAsync(bytes);
+  const numbered = (re: RegExp) =>
+    Object.keys(zip.files)
+      .map((n) => ({ n, i: Number(re.exec(n)?.[1]) }))
+      .filter((x) => Number.isFinite(x.i))
+      .sort((a, b) => a.i - b.i);
+  const notes = new Map(numbered(/^ppt\/notesSlides\/notesSlide(\d+)\.xml$/).map((x) => [x.i, x.n]));
+  const parts: string[] = [];
+  for (const { n, i } of numbered(/^ppt\/slides\/slide(\d+)\.xml$/)) {
+    const read = async (name: string) => {
+      const data = await readCapped(zip.file(name)!, OFFICE.maxXmlBytes);
+      return data ? slideXmlToText(new TextDecoder("utf-8").decode(data)) : "";
+    };
+    const body = await read(n);
+    const note = notes.has(i) ? await read(notes.get(i)!) : "";
+    if (body || note) parts.push(`Slide ${i}\n${body}${note ? `\nNotes: ${note}` : ""}`);
+  }
+  return [parts.join("\n\n")];
 }
 
 async function readOdt(buf: ArrayBuffer): Promise<string[]> {
@@ -391,6 +428,7 @@ export async function extractTextInBrowser(file: File, opts: ReadOptions = {}): 
   try {
     if (kind === "pdf") candidates = await readPdf(bytes);
     else if (kind === "docx") candidates = await readDocx(buf);
+    else if (kind === "pptx") candidates = await readPptx(buf);
     else if (kind === "odt") candidates = await readOdt(buf);
     else if (kind === "rtf") candidates = [rtfToText(decodeText(bytes))];
     else if (kind === "doc") candidates = [scrapeBinaryDoc(bytes)];

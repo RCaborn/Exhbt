@@ -134,11 +134,16 @@ const DOCS: Record<string, Doc> = {
           <li>transcribing a scan or photo of project material, only if you choose to send it;</li>
           <li>drafting an exhbt from your project material, and rewriting a block when you ask;</li>
           <li>
-            choosing a figure for an exhbt: when you draft one from a PDF, images of the pages with charts, diagrams or
-            pictures on them (from the first 30) are sent to pick the one that best shows your result. If your browser
-            can&rsquo;t read any text in a PDF, as with most scans, its page images are sent only if you choose to send it
-            to be read. A scan that already has text in it is treated like any other PDF: each of its pages is a picture,
-            so its page images are sent when you draft. We keep the figure cut out of the page, not the page images.
+            choosing a figure for an exhbt: when you draft one, small images from your files are sent to pick the one
+            that best shows your result. They are images of the pages of a PDF that have charts, diagrams or pictures
+            on them (from the first 30); the pictures inside a Word or PowerPoint file, leaving out logos and tiny
+            ones; and pictures (PNG or JPEG) you upload with your work, if you choose to send them to be read. We label
+            each image &ldquo;File 1, page 3&rdquo; or the like and never send the file&rsquo;s name. What comes back is
+            which image, where the figure is on it, and a short description and caption. If your browser can&rsquo;t
+            read any text in a PDF, as with most scans, its page images are sent only if you choose to send it to be
+            read. A scan that already has text in it is treated like any other PDF: each of its pages is a picture, so
+            its page images are sent when you draft. We keep the figure cut out of the page or picture, not the images
+            we sent. A chart drawn inside Word or PowerPoint is not a picture, so nothing is sent for it.
           </li>
         </ul>
         <p>

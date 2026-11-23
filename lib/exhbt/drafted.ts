@@ -103,10 +103,11 @@ export function layoutSentence(f: Format, reason: LayoutReason | undefined): str
  *  - "partial": the same, but some pages were left out: a PDF longer than FIGURE.maxPages, pages
  *    past the caps on what one pick may send, or a PDF whose pages couldn't be drawn;
  *  - "failed": it couldn't look, the pick ran late, or the figure couldn't be put on;
- *  - "unread": files were uploaded but none was a PDF whose pages could be looked at.
+ *  - "unread": files were uploaded but none was a kind we can take a figure from (a PDF, a Word or PowerPoint file, a PNG or JPEG);
+ *  - "chart": nothing was picked, and a Word or PowerPoint file has a chart drawn in it, which is not a picture and can't be lifted.
  * A figure that did go on is read from the doc, not from this.
  */
-export const FIGURE_NEWS = ["none", "partial", "failed", "unread"] as const;
+export const FIGURE_NEWS = ["none", "partial", "failed", "unread", "chart"] as const;
 export type FigureNews = (typeof FIGURE_NEWS)[number];
 export const isFigureNews = (v: unknown): v is FigureNews => typeof v === "string" && (FIGURE_NEWS as readonly string[]).includes(v);
 
@@ -117,7 +118,7 @@ export const isFigureNews = (v: unknown): v is FigureNews => typeof v === "strin
 export function figureSentence(doc: ExhbtDoc, news: FigureNews | undefined): string | null {
   const picked = imagesOf(doc).find((im) => im.picked)?.picked;
   if (picked) {
-    const where = picked.page ? `page ${picked.page} of ${picked.from}` : picked.from;
+    const where = picked.page ? `page ${picked.page} of ${picked.from}` : picked.media ? `a picture in ${picked.from}` : picked.from;
     return `The figure is from ${where}.${picked.shareOk ? "" : " Tick that you may share it before you publish."}`;
   }
   switch (news) {
@@ -132,7 +133,9 @@ export function figureSentence(doc: ExhbtDoc, news: FigureNews | undefined): str
     case "failed":
       return "We couldn't look for a figure in your files this time. You can add an image yourself.";
     case "unread":
-      return "A figure can only be taken from a PDF for now.";
+      return "We take a figure from a PDF, a Word or PowerPoint file, or a PNG or JPEG picture, and none of your files was one.";
+    case "chart":
+      return "We couldn't lift the chart from this file. Save it as a PDF and we'll take it from that.";
     default:
       return null;
   }

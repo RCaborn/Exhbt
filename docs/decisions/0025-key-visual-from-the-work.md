@@ -50,7 +50,7 @@ The third value is `none`: nothing is looked for and nothing is placed. No layou
 
 The pick itself can't always be avoided for such a layout. The draft chooses the layout, and the pick runs beside the draft to save the person twenty seconds, so the pages may already have been sent when the layout is known. The page drops the pick as soon as the draft answers. If the layout is ever chosen before drafting (0024 lists that as not done), the same rule can stop the pick being sent at all. In practice an essay rarely gets that far: a page of plain text is never sent, and the prompt tells the model that an essay has no figure.
 
-`pictures` behaves as `figure` does today: one visual, placed as the lead. It is a separate value because a gallery will take several once pictures from Word, PowerPoint and the upload itself can be picked.
+`pictures` places the lead as `figure` does. It is a separate value because a gallery takes several: the person's own uploaded pictures follow the lead (see "Pictures from Word, PowerPoint and uploads").
 
 ## The pick: what it is asked
 
@@ -78,7 +78,34 @@ A scan that already has text in it (a scanner app or a copier that adds it) is r
 
 ## A seam for Word, PowerPoint and pictures
 
-Those are a separate job. To leave room for it, the code that gathers the images a figure could be on no longer assumes a PDF page. A `Candidate` (`app/(app)/exhbts/new/figure.ts`) is a label, a small image to send, where it came from, and a function that cuts a box out at full size. `pdfCandidates` makes them from a PDF's pages. Nothing after that (the caps, the request, the cut, the upload, the placement) knows what a candidate came from. A picture inside a Word or PowerPoint file, or a picture uploaded with the work, needs its own function that returns Candidates and nothing else.
+Those are a separate job. To leave room for it, the code that gathers the images a figure could be on no longer assumes a PDF page. A `Candidate` (`app/(app)/exhbts/new/figure.ts`) is a label, a small image to send, where it came from, and a function that cuts a box out at full size. `pdfCandidates` makes them from a PDF's pages. Nothing after that (the caps, the request, the cut, the upload, the placement) knows what a candidate came from. A picture inside a Word or PowerPoint file, or a picture uploaded with the work, needs its own function that returns Candidates and nothing else. That job is done: see the next section.
+
+## Pictures from Word, PowerPoint and uploads
+
+Built 23 Nov 2026. Three functions in `app/(app)/exhbts/new/figure.ts` return Candidates and nothing else: `pdfCandidates`, `officeCandidates` and `pictureCandidates`. Everything after them (the caps, the request, the cut, the upload, the placement) is as it was.
+
+**Word (.docx) and PowerPoint (.pptx).** The draft page reads the file on the device as it reads a PDF. A .pptx is now accepted as material to draft from: its slides' text is read in slide order, with the speaker notes under each slide (`lib/doc-readers.ts`), and it is stored like a Word file (`lib/uploads.ts`). The pictures in `word/media/` or `ppt/media/` are offered as candidates (`lib/figures/office.ts`). A picture is left out if it is a logo or tiny (short side under 100 pixels, under 60,000 pixels in all, under 3 KB, or a banner more than six times as long as it is high), if only a header, footer, slide master or slide layout points at it, if it is on more than two slides, or if it repeats a picture already offered. Each is labelled "File 2, slide 3" or "File 1, picture 2", never with the file's name. The cut is taken from the picture itself at full size, a PNG or a JPEG.
+
+**Pictures uploaded with the work (PNG or JPEG).** They go on to the exhbt as images, up to the layout's cap, and the AI chooses which leads.
+- A **gallery** gets the lead first, then the others in the order they were uploaded. The lead has the description the AI wrote from what is printed on it. The others have none: the person writes them, and publishing already asks for one. With no pick (the person kept the pictures without sending them), the first uploaded leads and all the descriptions are empty.
+- A **case study or research** gets one figure: the picture the AI chose.
+- A picture the person uploaded themselves is placed like an image they added by hand: no "I may share this figure" tick, nothing marked as picked. A picture cut out of a Word or PowerPoint file carries the tick, as one from a PDF does, because it may not be theirs to share. **Decided in the build, for Rory to confirm.**
+- An uploaded picture is sent to the AI only if the person chooses "Read it for me" on its card, which now says it is also looked at for the picture to lead the exhbt. "Keep it as a picture" sends nothing, and the picture still goes on a gallery. **Decided in the build, for Rory to confirm.**
+- Even when the AI calls an uploaded picture a graph or a table, it takes no drafted graph off: the work's own graph rule (above) is for figures cut from the work's files, and a picture the person uploaded carries no kind. The drafted graph stays beside it. **Decided in the build, for Rory to confirm.**
+
+**The honest limit.** A chart drawn natively in Word or PowerPoint is not a picture and can't be lifted. Its parts (`word/charts/`, `ppt/charts/`) are noticed, and when nothing was picked the editor says: "We couldn't lift the chart from this file. Save it as a PDF and we'll take it from that." The old line, "A figure can only be taken from a PDF for now.", is gone: when none of the files is one we can take a figure from (a PDF, a Word or PowerPoint file, a PNG or JPEG) it now says "We take a figure from a PDF, a Word or PowerPoint file, or a PNG or JPEG picture, and none of your files was one."
+
+**Hostile files.** A .docx or .pptx is a zip read in the person's browser, so it is read as hostile (`OFFICE` in `lib/figures/office.ts`, with tests in `e2e/office-pictures.spec.ts`):
+- the number of entries is read from the zip's end record before anything opens, and a file over 2,000 entries is not read;
+- a picture is taken only from a plain file name directly under `word/media/` or `ppt/media/`: no "..", no slash, no nested folder;
+- each entry is inflated through a counter that stops at 8 MB, so a header that understates its size does not help a zip bomb, and the pictures from one file are capped at 40 MB together and 30 pictures;
+- the type is decided from the bytes, and only PNG and JPEG are taken: no SVG, EMF, WMF, GIF or anything else, whatever the name says;
+- the pixels are capped at 36 million from the image header (`lib/figures/image-size.ts`) before anything decodes the picture.
+A file that breaks a cap is skipped, and the draft goes ahead without it. The server keeps checking what it is given: a picture is uploaded through the same signed upload as any image (images only, by type; SVG refused), the pick route reads the type and size from the bytes it is sent and takes only PNG and JPEG, and the place route takes only the person's own image files.
+
+**What is sent.** Only candidates worth sending, under the same caps as PDF pages (30 images, 1.5 MB each, 6 MB in all). The privacy policy says so (`app/(marketing)/legal/[doc]/page.tsx`).
+
+**Release 3's editor.** Its "Take a figure from my report" sheet draws a PDF's pages from the stored file and cuts a crop; it does not call `/api/exhbts/[id]/figure` and was not changed. To offer these candidates it would need a list of the pictures in a stored Word or PowerPoint file (`readOfficePictures` on the stored bytes), a picker over them in place of the page picker (a picture is chosen whole, then optionally cropped, with `pictureCut`), the file's `media` path stored in `picked` instead of a page, and its `reportFiles` list to include .docx and .pptx files. Its `canTakeFigure` needs no change.
 
 ## Two limits of the share tick and of removing a figure
 
@@ -102,7 +129,8 @@ When the editor opens after a draft it says one quiet line under the layout choi
 - none found: "No figure was found in your files, so the graph uses numbers from your files and notes." The second half is only said when none of the draft's numbers is flagged as not found in the material; otherwise it is just "No figure was found in your files."
 - none found, but not every page was looked at (a PDF longer than 30 pages, pages past the caps on one pick, or a PDF that couldn't be drawn): "No figure was found in the pages we looked at. We look at up to 30 pages of your files." Nothing is claimed about pages nobody saw.
 - it couldn't look (the request failed, ran past the 20-second wait, or the figure couldn't be put on): "We couldn't look for a figure in your files this time. You can add an image yourself."
-- there was no PDF to look in: "A figure can only be taken from a PDF for now."
+- none of the files is one a figure can be taken from: "We take a figure from a PDF, a Word or PowerPoint file, or a PNG or JPEG picture, and none of your files was one.";
+- a Word or PowerPoint file has a chart drawn in it and nothing was picked: "We couldn't lift the chart from this file. Save it as a PDF and we'll take it from that."
 
 None of these is styled as an error. A pick that didn't run is never reported as "none found".
 
@@ -134,14 +162,13 @@ It runs in the existing workflow, `.github/workflows/eval-drafts.yml`, with the 
 - **Research ordering.** In a research layout, a drafted graph stays first as the key figure and a picked diagram or photo follows it. This was decided in the build on 19 Nov 2026 and Rory has not confirmed it.
 - **Putting the drafted graph back.** When someone removes a picked graph they can't share, should the graph the draft drew come back? It would need the removed graph to be kept with the exhbt and its numbers checked again. It isn't built, because the brief asked for no new editor controls and a graph parked out of sight would escape the number check.
 - **A results table from the work.** It is treated like a graph: the picture of the table goes on and the drafted graph comes off. If the table is long, the drafted graph may read better at a glance than a picture of twelve rows. The kind is recorded, so this can be changed for tables alone.
-- **"A figure can only be taken from a PDF for now."** Said when the upload has no PDF. It goes when Word, PowerPoint and pictures can be picked from.
 
 ## Not done yet
 
-- Word, PowerPoint and pictures uploaded with the work (the seam above is for them).
-- Several pictures for a gallery, not one.
+- A chart drawn natively in Word or PowerPoint can't be lifted. Turning it into a picture would need rendering the file, which the browser can't do.
+- The release 3 editor's "Take a figure from my report" for Word and PowerPoint files (see above).
 - The essay layout that takes nothing.
 - Stopping the pick before it is sent when the layout is known first.
 - Marking the alt text and caption in the eval, and running each report more than once.
 
-Code: `lib/exhbt/sections.ts` (`withWorkVisual`), `lib/exhbt/formats.ts` (`fromWork`), `lib/exhbt/blocks.ts` (`FIGURE_KINDS`, `picked.kind`), `lib/exhbt/drafted.ts`, `lib/ai/figure-pick.ts`, `lib/ai/exhbt-draft.ts` (`formatReason`), `lib/figures/rules.ts` (`boxFromPixels`), `lib/figures/image-size.ts`, `lib/figures/pdf.ts` (`marksOf`), `app/api/exhbts/[id]/figure/route.ts`, `app/api/exhbts/figure-pick/route.ts`, `app/(app)/exhbts/new/DraftForm.tsx` and `figure.ts`, `components/editor/LayoutPicker.tsx`, `app/dev/figure-eval/`. Tests: `e2e/auto-figure.spec.ts`, `e2e/phase2-formats.spec.ts`. Eval: `evals/figure-pick/`, `scripts/eval-figures.ts`.
+Code: `lib/exhbt/sections.ts` (`withWorkVisual`), `lib/exhbt/formats.ts` (`fromWork`), `lib/exhbt/blocks.ts` (`FIGURE_KINDS`, `picked.kind`), `lib/exhbt/drafted.ts`, `lib/ai/figure-pick.ts`, `lib/ai/exhbt-draft.ts` (`formatReason`), `lib/figures/rules.ts` (`boxFromPixels`), `lib/figures/image-size.ts`, `lib/figures/pdf.ts` (`marksOf`), `app/api/exhbts/[id]/figure/route.ts`, `app/api/exhbts/figure-pick/route.ts`, `app/(app)/exhbts/new/DraftForm.tsx` and `figure.ts`, `lib/figures/office.ts` and `pictures.ts`, `lib/doc-readers.ts` (`readPptx`), `components/editor/LayoutPicker.tsx`, `app/dev/figure-eval/`. Tests: `e2e/auto-figure.spec.ts`, `e2e/phase2-formats.spec.ts`, `e2e/office-pictures.spec.ts`, `e2e/work-pictures.spec.ts`. Eval: `evals/figure-pick/`, `scripts/eval-figures.ts`.

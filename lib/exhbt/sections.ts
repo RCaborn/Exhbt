@@ -180,6 +180,24 @@ export function withKeyFigure(
   return { ...doc, sections: [...ss.slice(0, at), section, ...ss.slice(at)] };
 }
 
+/**
+ * The person's own uploaded pictures, put on the exhbt as images in the order given, each straight after the last image
+ * already there (the lead), so they sit together. No description (publishing asks for one), no "I may share this" mark: a
+ * picture they uploaded themselves is placed like one they added by hand (decision 0025). Stops when the layout has no room.
+ */
+export function withMoreImages(doc: ExhbtDoc, fileIds: string[]): ExhbtDoc {
+  const f = formatOf(doc);
+  let sections = doc.sections;
+  for (const fileId of fileIds) {
+    if (roomFor(sections, "image", f) === 0) break;
+    if (sections.some((s) => s.kind === "image" && s.fileId === fileId)) continue;
+    const last = sections.reduce((at, s, i) => (s.kind === "image" ? i : at), -1);
+    const section = newImageSection(fileId, sections);
+    sections = last < 0 ? [...sections, section] : [...sections.slice(0, last + 1), section, ...sections.slice(last + 1)];
+  }
+  return sections === doc.sections ? doc : { ...doc, sections };
+}
+
 /** A visual picked from the person's work, ready to go on the exhbt (decisions 0017 and 0025). */
 export type WorkVisual = { fileId: string; alt: string; caption?: string; picked?: Picked; kind: FigureKind };
 

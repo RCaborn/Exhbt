@@ -102,6 +102,8 @@ export async function POST(req: Request) {
             costUsd: result.costUsd,
             raw: result.raw,
             sizes: images.map((im) => ({ width: im.width, height: im.height })),
+            // What the model was told each image was: "File 1, page 3", never the file's name.
+            labels: images.map((im) => im.label),
           },
         };
   return NextResponse.json({ pick: result.pick, ...debug });

@@ -4,7 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 import type { EvalPick, Outline } from "../../app/dev/figure-eval/FigureEval";
 import { AI_MODEL } from "../../lib/ai/model";
 import type { FigureBox } from "../../lib/exhbt/blocks";
-import { grade, type Answer, type EvalCase, type Verdict } from "./grade";
+import { grade, gradeOffice, type Answer, type EvalCase, type OfficeAnswer, type OfficeCase, type Verdict } from "./grade";
 
 /**
  * The figure eval, run in a real browser against the app in development
@@ -30,6 +30,11 @@ const ONLY = (process.env.FIGURE_EVAL_ONLY ?? "").split(",").map((s) => s.trim()
 const all = JSON.parse(readFileSync(join(FIXTURES, "cases.json"), "utf8")) as EvalCase[];
 const cases = ONLY.length ? all.filter((c) => ONLY.some((o) => c.id === o || c.id.startsWith(`${o}-`))) : all;
 const pdfOf = (c: { file: string }) => readFileSync(join(FIXTURES, c.file)).toString("base64");
+// The Word, PowerPoint and picture cases (fixtures/cases-office.json, build-office.mjs).
+const allOffice = JSON.parse(readFileSync(join(FIXTURES, "cases-office.json"), "utf8")) as OfficeCase[];
+const officeCases = ONLY.length ? allOffice.filter((c) => ONLY.some((o) => c.id === o || c.id.startsWith(`${o}-`))) : allOffice;
+const MIME: Record<string, string> = { docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg" };
+const filesOf = (c: OfficeCase) => c.files.map((name) => ({ name, type: MIME[name.split(".").pop()!.toLowerCase()] ?? "application/octet-stream", base64: readFileSync(join(FIXTURES, name)).toString("base64") }));
 
 mkdirSync(RUN_DIR, { recursive: true });
 const record = (file: string, line: unknown) => appendFileSync(join(RUN_DIR, file), `${JSON.stringify(line)}\n`);
@@ -112,6 +117,60 @@ if (MODE === "real" || MODE === "mock") {
       });
 
       // A real run fails on anything but a pass. The stand-in doesn't look at the pages, so only a broken path fails it.
+      if (MODE === "real") expect(verdict.result, verdict.why.join("; ")).toBe("pass");
+      else expect(verdict.result, verdict.why.join("; ")).not.toBe("error");
+    });
+  }
+}
+
+if (MODE === "real" || MODE === "mock") {
+  const stamp = Date.now().toString(36);
+  for (const c of officeCases) {
+    test(`${c.id}: ${c.what}`, async ({ page }) => {
+      await open(page, `figure-eval-${c.id}-${stamp}@example.com`);
+      const run = await page.evaluate((files) => window.figureEval!.pickFiles(files), filesOf(c));
+      const debug = (run.debug ?? {}) as Debug;
+      const answer: OfficeAnswer =
+        run.status === "picked" && run.pick && run.picture
+          ? { status: "picked", picture: run.picture, kind: run.pick.kind, box: run.pick.box }
+          : run.status === "failed" || run.status === "picked"
+            ? { status: "failed", error: `${run.http === null ? "no response" : `HTTP ${run.http}`}: ${run.error ?? "the answer was incomplete"}` }
+            : { status: run.status };
+      let verdict: Verdict = gradeOffice(c, answer, run.nativeChart);
+      const asked = run.status === "picked" || run.status === "none";
+      const wanted = MODE === "real" ? AI_MODEL : "mock";
+      if (asked && !(debug.model ?? "").startsWith(wanted)) verdict = { ...verdict, result: "error", why: [`answered by "${debug.model ?? "unknown"}"; this run is for "${wanted}"`] };
+      const pictures: string[] = [];
+      if (run.crop) pictures.push(savePicture(`${c.id}-cut`, run.crop));
+      record("results.jsonl", {
+        eval: "figure-pick",
+        case: c.id,
+        files: c.files,
+        mode: MODE,
+        model: debug.model ?? null,
+        result: verdict.result,
+        why: verdict.why,
+        expected: c.expect,
+        sent: run.sent.map((s) => `${s.label} = ${s.picture}`),
+        http: run.http,
+        status: run.status,
+        picture: run.picture ?? null,
+        kind: run.pick?.kind ?? null,
+        box: run.pick?.box ?? null,
+        rawBox: debug.raw?.box ?? null,
+        cut: run.cut ?? null,
+        contains: verdict.contains ?? null,
+        areaRatio: verdict.areaRatio ?? null,
+        nativeChart: run.nativeChart,
+        alt: run.pick?.alt ?? null,
+        caption: run.pick?.caption ?? null,
+        error: run.error ?? null,
+        tokensIn: debug.inputTokens ?? null,
+        tokensOut: debug.outputTokens ?? null,
+        costUsd: debug.costUsd ?? null,
+        ms: run.ms,
+        pictures,
+      });
       if (MODE === "real") expect(verdict.result, verdict.why.join("; ")).toBe("pass");
       else expect(verdict.result, verdict.why.join("; ")).not.toBe("error");
     });
