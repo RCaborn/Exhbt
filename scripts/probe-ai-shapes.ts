@@ -121,62 +121,75 @@ function without(schema: Json, names: string[], path = ""): Json {
   return out;
 }
 
-/** The object at `path` with only the named properties. */
-function only(schema: Json, names: string[], path = ""): Json {
+/** Adds n extra fields of the given JSON schema to the object at `path`, to measure what one more field costs. */
+function plus(schema: Json, n: number, field: Json, tag: string, path = ""): Json {
   const out = clone(schema);
   walk(out, (node, p) => {
     if (p !== path || node.type !== "object" || !node.properties) return;
-    const props = node.properties as Json;
-    for (const n of Object.keys(props)) if (!names.includes(n)) delete props[n];
-    node.required = ((node.required as string[]) ?? []).filter((r) => names.includes(r));
+    for (let i = 0; i < n; i++) {
+      (node.properties as Json)[`${tag}${i}`] = clone(field);
+      (node.required as string[]).push(`${tag}${i}`);
+    }
   });
-  return out;
-}
-
-/** Adds n extra top-level fields of the given JSON schema, to measure what one more field costs. */
-function plus(schema: Json, n: number, field: Json, tag: string): Json {
-  const out = clone(schema);
-  const props = out.properties as Json;
-  for (let i = 0; i < n; i++) {
-    props[`${tag}${i}`] = clone(field);
-    (out.required as string[]).push(`${tag}${i}`);
-  }
   return out;
 }
 
 const STR = { type: "string" };
 const NSTR = { type: ["string", "null"] };
 
+/**
+ * A candidate answer shape under test: no nullable anywhere (empty string, empty list or false
+ * instead), the quote a flat object of empty strings, and one row type for every chart kind
+ * (scatter points and number tiles become rows: values [x, y] or [value, from], with a unit).
+ */
+const CandChart = z.object({
+  kind: z.enum(["beforeAfter", "bar", "groupedBar", "stackedBar", "line", "scatter", "numbers", "table"]),
+  title: z.string(),
+  xTitle: z.string(),
+  yTitle: z.string(),
+  unit: z.string(),
+  lowerIsBetter: z.boolean(),
+  series: z.array(z.string()),
+  rows: z.array(z.object({ label: z.string(), values: z.array(z.number()), unit: z.string() })),
+  columns: z.array(z.string()),
+  cells: z.array(z.array(z.string())),
+});
+const Cand = (DraftSchema as unknown as z.ZodObject<z.ZodRawShape>).extend({
+  flow: z.array(z.object({ step: z.string(), detail: z.string() })),
+  charts: z.array(CandChart),
+  quote: z.object({ text: z.string(), name: z.string(), role: z.string() }),
+});
+const CandGrowth = Cand.extend(PlannedGrowth.shape).extend({ flow: Cand.shape.flow, charts: Cand.shape.charts, quote: Cand.shape.quote });
+
 function exploreShapes(): Shape[] {
   const draft = DRAFT_OUTPUT_CONFIG.format.schema as Json;
-  const growth = GROWTH.config.format.schema;
+  const cand = zodOutputFormat(Cand).schema as Json;
+  const candGrowth = zodOutputFormat(CandGrowth).schema as Json;
   const v = (name: string, schema: Json): Shape => ({ name: `explore: ${name}`, config: { effort: "low", format: { type: "json_schema", schema } }, kind: "explore" });
-  const nullablePaths: string[] = [];
-  walk(draft, (node, path) => {
-    if (isNullable(node)) nullablePaths.push(path);
-  });
   const added17Nov = ["format", "aim", "aimIsHypothesis", "conclusion", "references"];
+  const nov16 = without(draft, added17Nov);
+  const LADDER = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64];
+  const PAIR = { type: "array", items: { type: "object", properties: { a: STR, b: STR }, additionalProperties: false, required: ["a", "b"] } };
   return [
-    v("draft as on 16 Nov (no format, aim, aimIsHypothesis, conclusion, references)", without(draft, added17Nov)),
-    ...added17Nov.map((f) => v(`16 Nov draft + ${f}`, without(draft, added17Nov.filter((x) => x !== f)))),
-    v("draft, every nullable made non-null", denull(draft)),
-    v("draft, nullables outside charts made non-null", denull(draft, (p) => !p.startsWith("charts"))),
-    v("draft, nullables inside charts made non-null", denull(draft, (p) => p.startsWith("charts"))),
-    ...nullablePaths.map((p) => v(`draft, only ${p} made non-null`, denull(draft, (q) => q === p))),
-    v("draft without charts", without(draft, ["charts"])),
-    v("charts alone", only(draft, ["charts"])),
-    v("charts alone, non-null", denull(only(draft, ["charts"]))),
-    v("draft with its enums sent as real enums", realEnums(draft)),
-    v("non-null draft with real enums", realEnums(denull(draft))),
-    v("non-null planned growth with real enums", realEnums(denull(growth))),
-    v("draft without charts.points, charts.tiles", without(draft, ["points", "tiles"], "charts[]")),
-    v("draft without charts.cells", without(draft, ["cells"], "charts[]")),
-    // Ladders: how many more fields of a kind fit on top of a schema, to place the limit.
-    ...[4, 8, 16].map((n) => v(`16 Nov draft + ${n} strings`, plus(without(draft, added17Nov), n, STR, "s"))),
-    ...[1, 2, 4, 8].map((n) => v(`16 Nov draft + ${n} nullable strings`, plus(without(draft, added17Nov), n, NSTR, "n"))),
-    ...[4, 8, 16, 32].map((n) => v(`non-null draft + ${n} strings`, plus(denull(draft), n, STR, "s"))),
-    ...[2, 4, 8].map((n) => v(`non-null draft + ${n} nullable strings`, plus(denull(draft), n, NSTR, "n"))),
-    ...[4, 8, 16, 32].map((n) => v(`non-null planned growth + ${n} strings`, plus(denull(growth), n, STR, "s"))),
+    // Repeats from the first run: is the limit the same every time?
+    v("repeat: 16 Nov draft + 1 nullable string", plus(nov16, 1, NSTR, "n")),
+    v("repeat: 16 Nov draft + 2 nullable strings", plus(nov16, 2, NSTR, "n")),
+    v("repeat: non-null draft", denull(draft)),
+    v("candidate", cand),
+    v("candidate with planned growth", candGrowth),
+    v("candidate with planned growth, real enums", realEnums(candGrowth)),
+    // Ladders: how many more top-level strings fit on each base.
+    ...LADDER.map((n) => v(`non-null draft + ${n} strings`, plus(denull(draft), n, STR, "s"))),
+    ...LADDER.map((n) => v(`candidate + ${n} strings`, plus(cand, n, STR, "s"))),
+    ...LADDER.map((n) => v(`candidate with planned growth + ${n} strings`, plus(candGrowth, n, STR, "s"))),
+    // What other constructs cost, on the candidate.
+    ...[1, 2, 4, 8].map((n) => v(`candidate + ${n} nullable strings`, plus(cand, n, NSTR, "n"))),
+    ...[1, 2, 4, 8].map((n) => v(`candidate + ${n} arrays of {a, b}`, plus(cand, n, PAIR, "p"))),
+    ...[1, 2, 4, 8].map((n) => v(`candidate + ${n} strings in each chart`, plus(cand, n, STR, "c", "charts[]"))),
+    ...[1, 2, 4, 8].map((n) => v(`candidate + ${n} strings in each chart row`, plus(cand, n, STR, "r", "charts[].rows[]"))),
+    v("candidate without charts", without(cand, ["charts"])),
+    v("candidate without charts.cells", without(cand, ["cells"], "charts[]")),
+    v("candidate with the quote as 3 top-level strings", plus(without(cand, ["quote"]), 3, STR, "q")),
   ];
 }
 
