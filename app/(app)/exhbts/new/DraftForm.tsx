@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Circle, FileText, Loader2, Upload, X } from "lucide-react";
-import { DOC_ACCEPT, DocError, DocNeedsServer, countWords, extractTextInBrowser, readOnServer } from "@/lib/doc-readers";
+import { DOC_ACCEPT, DocError, DocNeedsServer, countWords, extractTextInBrowser, readOnServerFull } from "@/lib/doc-readers";
 import { removeFile } from "@/components/editor/media";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { finishUpload } from "@/components/team/finish-upload";
@@ -40,6 +40,8 @@ type Item = {
   fileId?: string;
   /** A team project's file, already in this person's storage: taking it off the list doesn't delete it. */
   kept?: boolean;
+  /** The AI reader stopped before the end of a long scan: only the first part was read (decision 0025). */
+  truncated?: boolean;
 };
 
 /** A file from a team project to draft from (decision 0013), read in the browser like any other. */
@@ -194,7 +196,8 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
   async function readOnServerFor(it: Item) {
     patch(it.key, { status: "transcribing", error: undefined });
     try {
-      patch(it.key, { status: "ready", text: await readOnServer(it.file, "/api/files/transcribe") });
+      const { text, truncated } = await readOnServerFull(it.file, "/api/files/transcribe");
+      patch(it.key, { status: "ready", text, truncated });
     } catch (e) {
       patch(it.key, { status: "consent", error: e instanceof DocError ? e.message : "We couldn't read that file." });
     }
@@ -335,6 +338,11 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
                   <p className="mt-0.5 text-sm" data-testid="file-status">
                     {statusText(it)}
                   </p>
+                  {it.truncated && (
+                    <p className="mt-0.5 text-sm text-error" data-testid="file-truncated">
+                      This file is too long for the AI reader: only the first part was read. Anything after that won&apos;t be in your draft, so add what matters to your notes.
+                    </p>
+                  )}
                   {it.error && <p className="mt-0.5 text-sm text-error">{it.error}</p>}
                 </div>
                 <button

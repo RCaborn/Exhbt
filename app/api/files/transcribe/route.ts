@@ -54,7 +54,7 @@ export async function POST(req: Request) {
   await store.logEvent("file_read_ai", user.id, { ipHash, mediaType, bytes: file.size });
 
   try {
-    const result = await transcribe(bytes, mediaType, "project");
+    const result = await transcribe(bytes, mediaType, "project", file.name);
     // Its own step, so reading files is costed apart from drafting. ai_call_logs only accepts
     // 'file_transcribe' once supabase/migrations/20261115000000_billing_and_files.sql is applied:
     // apply that migration before this code reaches a Supabase database.
@@ -68,7 +68,9 @@ export async function POST(req: Request) {
     });
     const text = cleanCvText(result.text, MAX_DOC_CHARS);
     if (text.length < 20) return fail("We couldn't find any text in that file. Type what matters into your notes instead.", 422);
-    return NextResponse.json({ text });
+    // A read cut off at max_tokens is still worth having; the page tells the person only the first part was read.
+    if (result.truncated) await store.logEvent("file_read_failed", user.id, { feature: "file_read", reason: "cut_off", inputTokens: result.inputTokens, outputTokens: result.outputTokens, ipHash: user.id, kept: true });
+    return NextResponse.json({ text, truncated: result.truncated });
   } catch (e) {
     // Already bounded: reads are counted before the call (file_read_ai above).
     await recordAIFailure("file_read", { userId: user.id }, e, { mediaType });
