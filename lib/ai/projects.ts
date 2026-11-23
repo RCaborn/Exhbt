@@ -44,26 +44,21 @@ export type SwapContext = {
   round: number;
 };
 
-export async function generateSwap(ctx: SwapContext): Promise<SwapResult> {
-  const apiKey = anthropicApiKey();
-  if (!apiKey) {
-    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
-    return mockSwap(ctx);
-  }
-
+/** The project-swap request the app sends, so a script can send exactly the same. */
+export function swapRequest(ctx: SwapContext) {
   const { input, roadmap } = ctx;
   const skills = (roadmap.skillMap ?? []).map((s) => `${s.skill} (needed ${s.needed}, current ${s.current})`);
   const describe = (p: Project) => `- ${p.title}: ${p.brief} (closes: ${p.closesGaps.join(", ") || "none"})`;
 
-  const client = new Anthropic({ apiKey });
-  const response = await client.messages.parse({
+  return {
     model: AI_MODEL,
-    max_tokens: 1000,
+    // A ceiling, not a cost (npm run measure:ai, 23 Nov 2026): a swap used up to 799 tokens, 80% of the old 1,000.
+    max_tokens: 3000,
     output_config: SWAP_OUTPUT_CONFIG,
     system: SYSTEM,
     messages: [
       {
-        role: "user",
+        role: "user" as const,
         content: [
           `The job they want: ${input.targetRole}`,
           `Skills to close (0-4 scale): ${skills.length ? skills.join("; ") : roadmap.gaps.map((g) => g.skill).join("; ")}`,
@@ -77,7 +72,18 @@ export async function generateSwap(ctx: SwapContext): Promise<SwapResult> {
         ].join("\n"),
       },
     ],
-  });
+  };
+}
+
+export async function generateSwap(ctx: SwapContext): Promise<SwapResult> {
+  const apiKey = anthropicApiKey();
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
+    return mockSwap(ctx);
+  }
+
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.parse(swapRequest(ctx));
 
   if (response.stop_reason === "refusal" || !response.parsed_output) {
     throw new Error(`Project swap failed (stop_reason: ${response.stop_reason})`);
@@ -138,24 +144,18 @@ export type IdeasContext = {
   attempt: number;
 };
 
-export async function generateIdeas(ctx: IdeasContext): Promise<IdeasResult> {
-  const apiKey = anthropicApiKey();
-  if (!apiKey) {
-    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
-    return mockIdeas(ctx);
-  }
-
+/** The project-ideas request the app sends, so a script can send exactly the same. */
+export function ideasRequest(ctx: IdeasContext) {
   const { input, roadmap } = ctx;
   const skills = (roadmap.skillMap ?? []).map((s) => `${s.skill} (needed ${s.needed}, current ${s.current})`);
-  const client = new Anthropic({ apiKey });
-  const response = await client.messages.parse({
+  return {
     model: AI_MODEL,
     max_tokens: 1500,
     output_config: IDEAS_OUTPUT_CONFIG,
     system: IDEAS_SYSTEM,
     messages: [
       {
-        role: "user",
+        role: "user" as const,
         content: [
           `The job they want: ${input.targetRole}`,
           `Skills to close (0-4 scale): ${skills.length ? skills.join("; ") : roadmap.gaps.map((g) => g.skill).join("; ")}`,
@@ -167,7 +167,18 @@ export async function generateIdeas(ctx: IdeasContext): Promise<IdeasResult> {
         ].join("\n"),
       },
     ],
-  });
+  };
+}
+
+export async function generateIdeas(ctx: IdeasContext): Promise<IdeasResult> {
+  const apiKey = anthropicApiKey();
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
+    return mockIdeas(ctx);
+  }
+
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.parse(ideasRequest(ctx));
 
   if (response.stop_reason === "refusal" || !response.parsed_output) {
     throw new Error(`Project ideas failed (stop_reason: ${response.stop_reason})`);

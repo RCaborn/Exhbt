@@ -1,0 +1,21 @@
+{
+  "fixture": "10-society-figures",
+  "shape": "A society president's year, as plain text: four headline figures with different units, one of them with a starting value (91%, up from 64%). The notes ask for the four figures together.",
+  "tests": "A big-numbers graph: each unit sits beside its own figure (members, £, teachers, %), and only the satisfaction figure has a starting value.",
+  "files": ["10-society-figures.txt"],
+  "notesFile": "10-society-figures.notes.txt",
+  "link": null,
+  "expect": {"headlineNumber":false,"chart":true,"noNumbers":false},
+  "keyFacts": [
+    {"id":"members","fact":"186 paid members, the most the society has had.","match":["186"]},
+    {"id":"money","fact":"Sponsorship and two fundraising swims raised £2,450, paying for spring pool hire.","match":["2,450","2450"]},
+    {"id":"coaches","fact":"Six members qualified as Level 1 swimming teachers.","match":["Level 1","six","6"]},
+    {"id":"satisfaction","fact":"91% happy with sessions, up from 64% the year before.","match":[["91","64"],"91%"]},
+    {"id":"how","fact":"Split the committee into three small teams with weekly to-do lists and Monday check-ins.","match":["three","teams"]}
+  ],
+  "forbidden": [
+    {"id":"growth","why":"The material gives no earlier membership figure, so no rise in members can be stated.","match":["members, up","up from 1","increase in members","grew membership by"]},
+    {"id":"derived","why":"No change in points or percentage rise is stated for satisfaction.","match":["27 points","27-point","42%"]}
+  ],
+  "sourceNumbers": ["2025","2026","186","£2,450","1","91%","64%"]
+}

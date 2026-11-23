@@ -51,6 +51,28 @@ function exhbtBlock(c: MatchCandidate, ref: string): string {
     .join("\n");
 }
 
+/** The job-match request the app sends, so a script can send exactly the same. Refs are E1, E2... in the candidates' order. */
+export function jobMatchRequest(input: JobMatchInput) {
+  const description = input.description.slice(0, MAX_LISTING_CHARS);
+  const refs = input.candidates.map((_, i) => `E${i + 1}`);
+  return {
+    model: AI_MODEL,
+    max_tokens: 2000,
+    output_config: JOB_MATCH_OUTPUT_CONFIG,
+    system: SYSTEM,
+    messages: [
+      {
+        role: "user" as const,
+        content: [
+          `Company: ${input.company}\nRole: ${input.roleTitle}`,
+          `<job_description>\n${description}\n</job_description>`,
+          input.candidates.map((c, i) => exhbtBlock(c, refs[i]!)).join("\n\n"),
+        ].join("\n\n"),
+      },
+    ],
+  };
+}
+
 export async function matchExhbtsToJob(input: JobMatchInput): Promise<JobMatchResult> {
   const description = input.description.slice(0, MAX_LISTING_CHARS);
   if (input.candidates.length === 0) return { picks: [], intro: "", model: "none", inputTokens: 0, outputTokens: 0, costUsd: 0 };
@@ -64,22 +86,7 @@ export async function matchExhbtsToJob(input: JobMatchInput): Promise<JobMatchRe
 
   const refs = input.candidates.map((_, i) => `E${i + 1}`);
   const client = new Anthropic({ apiKey });
-  const response = await client.messages.parse({
-    model: AI_MODEL,
-    max_tokens: 2000,
-    output_config: JOB_MATCH_OUTPUT_CONFIG,
-    system: SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: [
-          `Company: ${input.company}\nRole: ${input.roleTitle}`,
-          `<job_description>\n${description}\n</job_description>`,
-          input.candidates.map((c, i) => exhbtBlock(c, refs[i]!)).join("\n\n"),
-        ].join("\n\n"),
-      },
-    ],
-  });
+  const response = await client.messages.parse(jobMatchRequest(input));
 
   if (response.stop_reason === "refusal" || !response.parsed_output) {
     throw new Error(`Job match failed (stop_reason: ${response.stop_reason})`);

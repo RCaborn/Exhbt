@@ -1,12 +1,12 @@
 # Exhbt draft eval
 
-This measures the AI exhbt draft (`lib/ai/exhbt-draft.ts`) on eight fictional student projects, so changes to the prompt can be judged by numbers rather than by reading one or two drafts. It measures only: it doesn't change the prompt or anything the app does.
+This measures the AI exhbt draft (`lib/ai/exhbt-draft.ts`) on eleven fictional student projects, so changes to the prompt can be judged by numbers rather than by reading one or two drafts. It measures only: it doesn't change the prompt or anything the app does.
 
 Each run reads every fixture the way the upload page does, calls the app's real `draftExhbt`, checks the draft with the same code the editor and the publish button use, and writes the results to `runs/<timestamp>/`.
 
 ## What's here
 
-- `fixtures/`: the eight projects, each with an answer key (`<name>.facts.json`).
+- `fixtures/`: the eleven projects, each with an answer key (`<name>.facts.json`). 09 to 11 call for a table, big numbers and a scatter graph, so the eval shows how the model writes those kinds (it prints each graph as a JSON line).
   - `01-econ-dissertation.pdf`: economics dissertation extract (question, data, regression, results table, conclusion).
   - `02-ds-notebook.md`: data-science write-up exported from a notebook, with code and printed outputs.
   - `03-finance-dcf.docx`: finance coursework, a DCF valuation full of figures.
