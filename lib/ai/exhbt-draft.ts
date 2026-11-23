@@ -148,23 +148,16 @@ export function materialText({ text, notes, link }: DraftInput): string {
     .slice(0, MAX_MATERIAL_CHARS);
 }
 
-export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
-  const apiKey = anthropicApiKey();
-  if (!apiKey) {
-    // Never hand real people a placeholder draft.
-    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
-    return mockDraft(input);
-  }
-
-  const client = new Anthropic({ apiKey });
-  const response = await client.messages.parse({
+/** The whole draft request, so scripts (the eval, the probe) send exactly what the app sends. */
+export function draftRequest(input: DraftInput) {
+  return {
     model: AI_MODEL,
     max_tokens: 4000,
     output_config: DRAFT_OUTPUT_CONFIG,
     system: SYSTEM,
     messages: [
       {
-        role: "user",
+        role: "user" as const,
         content: [
           `<material>\n${input.text.trim().slice(0, MAX_MATERIAL_CHARS) || "(no files)"}\n</material>`,
           input.notes?.trim() ? `<notes>\n${input.notes.trim()}\n</notes>` : "No notes.",
@@ -175,7 +168,19 @@ export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
         ].join("\n\n"),
       },
     ],
-  });
+  };
+}
+
+export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
+  const apiKey = anthropicApiKey();
+  if (!apiKey) {
+    // Never hand real people a placeholder draft.
+    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
+    return mockDraft(input);
+  }
+
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.parse(draftRequest(input));
 
   if (response.stop_reason === "refusal" || !response.parsed_output) {
     throw new Error(`Exhbt draft failed (stop_reason: ${response.stop_reason})`);
