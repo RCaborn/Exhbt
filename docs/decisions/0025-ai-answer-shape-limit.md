@@ -14,13 +14,13 @@ The draft's schema was already close to the limit on 16 Nov. On 17 Nov the galle
 
 The first real eval runs then showed a second fault behind the first. With the schema fixed, five of the eight eval drafts still failed: the model thinks before it answers, and with `max_tokens` at 4,000 the answer was cut off half-written. Thinking took roughly 1,400 to 4,900 tokens per draft, and a whole draft up to 5,825.
 
-No other AI feature was affected. The rewrites, the figure pick, the job match, the portfolio intro, the project ideas and swap, and the roadmap were all accepted.
+No other request shape was refused: the rewrites, the figure pick, the job match, the portfolio intro, the project ideas and swap, and the roadmap were all accepted. Whether their answers fit their own `max_tokens` (400 to 3,000) once the model has thought has not been measured.
 
 ## What the limit is
 
 Measured with `scripts/probe-ai-shapes.ts` on 23 Nov, by adding fields to a schema until the API refused it. The results were the same on every repeat.
 
-- **What counts is the number of fields.** The limit is about 52 to 55 fields in all, counting every property at every depth. A string, a number and a boolean each cost the same. A field inside a graph's rows costs the same as one at the top. Sharing one definition through `$ref` doesn't help.
+- **What counts is mostly the number of fields.** The limit is about 52 to 56 fields in all, counting every property at every depth. A string, a number and a boolean each cost the same. A field inside a graph's rows costs the same as one at the top. Sharing one definition through `$ref` doesn't help. An array of objects costs a little more than its fields: four extra lists of two-field objects were refused at a size where twelve extra strings were accepted.
 - **A nullable field costs about two.** Each is a union in the grammar. The 16 Nov draft (41 fields, 9 of them nullable) took one more nullable field, but not two.
 - **There is a second, hard limit: 16 nullable or union-typed fields.** Past it the API refuses with its own message ("too many parameters with union types").
 - **Enums cost nothing today**, because the SDK (1.6) moves an enum into the field's description instead of sending it. A later SDK might send real enums. The planned growth still fits with them sent.

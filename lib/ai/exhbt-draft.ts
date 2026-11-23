@@ -74,13 +74,14 @@ Layout (the "format" field):
 - Fields that belong to another layout stay empty.`;
 
 /**
- * A graph as the model writes it: one flat shape for every kind (structured outputs keep enums
- * but not constant discriminators), turned into the stored kind by toChart. Unused fields are
- * empty strings, empty lists or false.
+ * A graph as the model writes it: one flat shape for every kind, turned into the stored kind by
+ * toChart. Unused fields are empty strings, empty lists or false. (The SDK sends an enum such as
+ * `kind` only as a description, so a value outside it fails the parse rather than the grammar.)
  *
  * The answer shape is kept small on purpose (decision 0025): the API compiles it into a grammar
- * and refuses one that is too large, at roughly 52 fields in all, with a nullable field costing
- * about two. So nothing here is nullable (empty means "none"), and every kind shares one row
+ * and refuses one that is too large, at about 52 to 56 fields in all, with a nullable field
+ * costing about two and an array of objects a little more than its fields. So nothing here is
+ * nullable (empty means "none"), and every kind shares one row
  * type: a scatter point is a row with values [x, y], a number tile a row with values [value] or
  * [value, from] and its unit in `series`, a table's headings the first row of `cells`.
  * `npm run probe:ai` checks the shape against the real API, with the growth already planned.
@@ -148,7 +149,7 @@ export function materialText({ text, notes, link }: DraftInput): string {
     .slice(0, MAX_MATERIAL_CHARS);
 }
 
-/** The whole draft request, so scripts (the eval, the probe) send exactly what the app sends. */
+/** The whole draft request, so a script can send exactly what the app sends. */
 export function draftRequest(input: DraftInput) {
   return {
     model: AI_MODEL,
