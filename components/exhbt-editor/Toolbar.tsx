@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef } from "react";
-import { ArrowDown, ArrowUp, GripVertical, Star, Trash2 } from "lucide-react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, Ellipsis, GripVertical, Star, Trash2 } from "lucide-react";
 import { FORMAT_RULES, formatOf, type Format } from "@/lib/exhbt/formats";
 import { pageItems } from "@/lib/exhbt/layouts";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
@@ -25,13 +25,17 @@ import type { Store } from "./store-core";
  * button has a tooltip. The buttons carry data-grip or data-tool, so other parts' CSS and tests can
  * find them.
  *
- * Where it sits (css/core.css): above the section's top right corner, in the gap over it, where the
- * gap holds it; half over the section's top edge where the gap holds half of it; inside that corner
- * where even that would cover the words above it, a graph's own words included (`placeTools`). A
- * picture's toolbar is always inside its corner, as in the prototype Rory tried, so in the gallery's
- * grid it never lies over the caption of the picture above; where a tile is too narrow for the row,
- * one column down its right edge. Wherever it sits it is drawn in one order, Remove first and the grip
- * last, so the grip is always at the section's corner (css/core.css; the markup keeps the grip first).
+ * Where it sits (`placeTools`, css/core.css): never over any words, its own section's included, nor
+ * over another section or a chip. Tried in this order: a row above the section's top right corner, in
+ * the gap over it; a row half over its top edge (a little lower where the gap is short of half of it,
+ * a little to the right where the section's own chips reach the corner); a column in the gutter to its
+ * right, from the corner down (between a pair's columns); that column half over its right edge; and the
+ * compact pair, the grip and "More actions", half over its top edge, with Move up, Move down, the
+ * layout's action and Remove in that menu. Only a picture's sits inside its own corner, over the
+ * picture, as in the prototype Rory tried; where a tile is too narrow for the row, one column down its
+ * right edge. In a row it is drawn
+ * Remove first and the grip last, and a column runs down from the grip, so the grip is at the
+ * section's corner wherever it sits (the markup keeps the grip first: it is the first Tab stop).
  */
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -55,8 +59,8 @@ function wordsBox(el: HTMLElement): Box | null {
 
 const overlap = (a: Box, b: Box) => Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 0.5 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 0.5;
 
-/** A graph's own words (its title, legend, labels and values), where they are drawn: a toolbar on its edge never lies over them. */
-function graphWords(frame: HTMLElement): Box[] {
+/** A section's own words (a graph's title, legend, labels and values among them), where they are drawn: its toolbar never lies over them. */
+function ownWords(frame: HTMLElement): Box[] {
   const out: Box[] = [];
   const walker = document.createTreeWalker(frame, NodeFilter.SHOW_TEXT);
   const range = document.createRange();
@@ -65,7 +69,33 @@ function graphWords(frame: HTMLElement): Box[] {
     range.selectNodeContents(t);
     for (const r of range.getClientRects()) if (r.width > 0 && r.height > 0) out.push({ x: r.left + window.scrollX, y: r.top + window.scrollY, w: r.width, h: r.height });
   }
+  // A text box keeps its words out of the page's text (a flowchart box's step, a link's description).
+  for (const el of frame.querySelectorAll<HTMLTextAreaElement | HTMLInputElement>(TEXT_BOXES)) {
+    if (el.closest(".xe-tools, [hidden], [data-edit-only]") || !el.getClientRects().length) continue;
+    const b = boxWords(el);
+    if (b) out.push(b);
+  }
   return out;
+}
+
+const TEXT_BOXES = 'textarea, input:not([type="checkbox"], [type="radio"], [type="hidden"], [type="file"])';
+let pen: CanvasRenderingContext2D | null = null;
+/** Where a text box's words are: on one line, as wide as they are (its placeholder's where it is empty); on more, the whole box. */
+function boxWords(el: HTMLTextAreaElement | HTMLInputElement): Box | null {
+  const text = el.value || el.placeholder;
+  if (!text.trim()) return null;
+  const s = getComputedStyle(el);
+  const b = pageBox(el);
+  const px = (v: string) => parseFloat(v) || 0;
+  const line = px(s.lineHeight) || px(s.fontSize) * 1.2;
+  if (el.clientHeight - px(s.paddingTop) - px(s.paddingBottom) > line * 1.5) return b;
+  pen ??= document.createElement("canvas").getContext("2d");
+  if (!pen) return b;
+  pen.font = `${s.fontStyle} ${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
+  const inner = el.clientWidth - px(s.paddingLeft) - px(s.paddingRight);
+  const w = Math.min(pen.measureText(text).width + px(s.letterSpacing) * text.length, inner);
+  const x = px(s.paddingLeft) + (s.textAlign === "center" ? (inner - w) / 2 : s.textAlign === "right" || s.textAlign === "end" ? inner - w : 0);
+  return { x: b.x + x, y: b.y, w, h: b.h };
 }
 
 const OUT_OF_PAGE = ".xe-insert, .xe-measure, .xe-drag-overlay, [data-edit-only]";
@@ -75,10 +105,16 @@ const CHIPS = ".xe-fig-chip, .xe-fig-picked, .xe-chip, .xe-above";
 const INSIDE_KINDS = new Set(["image"]);
 /** The gap between a toolbar's buttons (css/core.css). */
 const GAP = 4;
+/** How far a toolbar on the top edge may go to the right of the corner to keep clear (css/core.css reads --xe-tools-dx and -dy). */
+const SLIDE_X = [0, 4, 8];
+/** Where a toolbar sits, for css/core.css; above the corner is no attribute. */
+type Place = "edge" | "side" | "rcol" | "compact" | null;
+/** The width a button was last drawn at: a tablet hides some until the section is touched, and the compact form most. */
+const drawnWidth = new WeakMap<HTMLElement, number>();
 
 /**
- * The shape of a toolbar inside a part's corner (design round 2, item 6): a row, from the grip in the
- * corner, where the part is wide enough; else one column down the part's right edge from the grip
+ * The shape of a picture's toolbar, inside its corner (design round 2, item 6): a row, from the grip in
+ * the corner, where the part is wide enough; else one column down the part's right edge from the grip
  * (grip, move up, move down, the action, more, remove); and only where the picture is too short for
  * that, the column wraps into another to its left. Returns the writes, so all the reads come first.
  */
@@ -99,6 +135,7 @@ function shapeOf(tools: HTMLElement, frame: HTMLElement, f: Box, kids: HTMLEleme
   // Read above, written here: every toolbar's reads come before any of these writes.
   return () => {
     attr(tools, "data-shape", shape);
+    attr(tools, "aria-orientation", shape ? "vertical" : null);
     prop(tools, "--xe-tools-h", shape === "wrap" ? `${each * unit + (each - 1) * GAP}px` : null);
     prop(tools, "--xe-tools-w", shape === "wrap" ? `${columns * wide + (columns - 1) * GAP}px` : null);
   };
@@ -110,11 +147,12 @@ let sizes: ResizeObserver | null = null;
 let queued = 0;
 
 /**
- * For every toolbar not inside by its kind: would it, above its section's corner, lie over any other
- * section or the words above the first row (the skills, the title, the context line)? Then it goes
- * half over the section's top edge (data-place="edge"), or where that would too, inside the corner
- * (data-place="inside"). Written straight to the toolbar, so nothing draws again; it changes only when
- * the page's rows or width do.
+ * Every toolbar but a picture's, in the first of its places (see the top of this file) where it lies
+ * over no other section, none of the words over the first row (the skills, the title, the context
+ * line), no chip and none of its own section's words: data-place, and on the top edge how far it moved
+ * along (--xe-tools-dx, -dy). Where even the compact pair would cover something, it is still the pair:
+ * only a picture's goes inside. Written straight to the toolbar, so nothing draws again; it changes
+ * only when the page's rows or width do, or typing brings words under a toolbar (`recheck`).
  */
 function placeTools() {
   queued = 0;
@@ -124,6 +162,7 @@ function placeTools() {
     watched.add(main);
     sizes ??= new ResizeObserver(() => queuePlace());
     sizes.observe(main);
+    main.addEventListener("input", recheck);
   }
   // While something is carried, or a drop or a move settles, the page is drawn by transforms: wait for it (a drop draws the toolbars again).
   if (main.hasAttribute("data-xe-drag")) return;
@@ -150,60 +189,111 @@ function placeTools() {
     }
   };
   collect(main);
+  const page = pageBox(main);
   // The gap a toolbar above needs: its buttons, and on a mouse the strip under them that keeps the pointer on the section.
   const bridge = window.matchMedia("(pointer: coarse)").matches ? 0 : 6;
   // First every read, then every write: a pass reads the page's layout once, and one that changes nothing invalidates nothing.
-  type Plan = { tools: HTMLElement; frame: HTMLElement; f: Box; kids: HTMLElement[]; unit: number; width: number; place: "edge" | "inside" | null; shift: string | null };
+  type Plan = { tools: HTMLElement; frame: HTMLElement; f: Box; kids: HTMLElement[]; unit: number; width: number; place: Place; dx: number; dy: number };
   const plans: Plan[] = [];
   for (const tools of toolbars) {
     const frame = tools.parentElement;
     if (!frame || !tools.isConnected || !main.contains(tools)) continue;
-    // Its whole width, the buttons a tablet hides until the section is touched counted at the grip's size, so where it goes
-    // doesn't change as they show and hide. A row of buttons is the grip's height ("More actions" wraps its button in parts that may be taller).
+    // An open "More actions" keeps its place until it closes.
+    if (tools.hasAttribute("data-open")) continue;
+    // Its buttons ("More actions" of the compact form stands in for them), each at the width it was last drawn, the grip's
+    // where it never was, so where it goes doesn't change as a tablet or the compact form shows and hides them. A button is
+    // the grip's size ("More actions" for an AI draft wraps its button in parts that may be taller).
     const grip = tools.querySelector<HTMLElement>("[data-grip]");
     const unit = grip?.offsetWidth ?? 0;
-    const kids = [...tools.children].filter((c): c is HTMLElement => c instanceof HTMLElement && !c.hidden);
-    const width = kids.reduce((w, c) => w + (c.getClientRects().length > 0 ? c.offsetWidth : unit), 0) + GAP * Math.max(0, kids.length - 1);
-    const height = (grip?.offsetHeight ?? 0) + bridge;
+    const buttons = grip?.offsetHeight ?? 0;
+    const kids = [...tools.children].filter((c): c is HTMLElement => c instanceof HTMLElement && !c.hidden && c.dataset.tool !== "menu");
+    const widths = kids.map((c) => {
+      if (c.getClientRects().length > 0) drawnWidth.set(c, c.offsetWidth);
+      return drawnWidth.get(c) ?? unit;
+    });
+    const width = widths.reduce((w, x) => w + x, 0) + GAP * Math.max(0, kids.length - 1);
     const f = boxes.get(frame) ?? pageBox(frame);
-    const plan: Plan = { tools, frame, f, kids, unit, width, place: null, shift: null };
+    const plan: Plan = { tools, frame, f, kids, unit, width, place: null, dx: 0, dy: 0 };
     plans.push(plan);
     // A picture's is always inside its corner (css/core.css).
     if (INSIDE_KINDS.has(frame.dataset.kind ?? "")) continue;
-    // A graph's own words count too: its toolbar sits on its card's edge only where the card's top padding takes the lower half.
-    const own = frame.dataset.kind === "graph" ? graphWords(frame) : [];
-    const clear = (b: Box) => ![...boxes].some(([el, o]) => el !== frame && o.w > 0 && o.h > 0 && overlap(b, o)) && !own.some((o) => overlap(b, o));
-    if (clear({ x: f.x + f.w - width, y: f.y - height, w: width, h: height })) continue;
-    // A flowchart's toolbar keeps clear of its first box's own grip on that box's top right corner (flow.css).
+    // What it must not lie over: every other section and the page's own words and chips (`boxes`), and its own section's words.
+    let own: Box[] | null = null;
+    const clear = (b: Box) =>
+      ![...boxes].some(([el, o]) => el !== frame && o.w > 0 && o.h > 0 && overlap(b, o)) && !(overlap(b, f) && (own ??= ownWords(frame)).some((o) => overlap(b, o)));
+    // 1. A row above the corner.
+    if (clear({ x: f.x + f.w - width, y: f.y - buttons - bridge, w: width, h: buttons + bridge })) continue;
+    // 2. A row half over the top edge; a little lower where the gap above is short of half of it, a little to the right where its
+    // own chips reach the corner (the aim's switch), never inside. A flowchart's keeps clear of its first box's grip, on that box's corner.
     const right = frame.dataset.kind === "flow" ? 32 : 0;
-    const buttons = height - bridge;
-    // Half over the section's top edge, where the gap holds that half (a stack's second part, the first row under the context
-    // line): it covers no more of the section's own top than its first line's right end, and none of a graph's words.
-    if (clear({ x: f.x + f.w - right - width, y: f.y - buttons / 2, w: width, h: buttons })) {
-      plan.place = "edge";
+    const onEdge = (w: number, lowest: number) => {
+      for (let dy = 0; dy <= lowest; dy += 4) {
+        for (const dx of SLIDE_X) if (clear({ x: f.x + f.w - right - w + dx, y: f.y - buttons / 2 + dy, w, h: buttons })) return { dx, dy };
+      }
+      return null;
+    };
+    const edge = onEdge(width, buttons / 2 - 6);
+    if (edge) {
+      Object.assign(plan, { place: "edge", ...edge });
       continue;
     }
-    plan.place = "inside";
-    // Inside the corner, it keeps clear of the chips there (a reference line's "Web address" sits on the rule under it, and the one above's on the rule over it).
-    const box = { x: f.x + f.w - Math.max(right, 8) - width, y: f.y + 8, w: width, h: buttons };
-    const chips = [...boxes].filter(([el, b]) => el.matches(CHIPS) && b.w > 0 && overlap(box, b)).map(([, b]) => b);
-    if (chips.length) plan.shift = `${Math.ceil(f.x + f.w - Math.min(...chips.map((b) => b.x)) + 4)}px`;
+    // 3. A column in the gutter to its right, from the corner down: grip, move up, move down, the action, more, remove. Only in a
+    // gutter on the page (between a pair's columns), touching the section, so the pointer never leaves it on the way.
+    const tall = kids.length * buttons + GAP * Math.max(0, kids.length - 1);
+    const wide = Math.max(unit, ...widths);
+    const side = { x: f.x + f.w, y: f.y, w: wide, h: tall };
+    if (side.x + side.w <= page.x + page.w + 0.5 && clear(side)) {
+      plan.place = "side";
+      continue;
+    }
+    // 4. That column half over its right edge.
+    const rcol = { x: f.x + f.w - wide / 2, y: f.y, w: wide, h: tall };
+    if (rcol.x + rcol.w <= page.x + page.w + 0.5 && clear(rcol)) {
+      plan.place = "rcol";
+      continue;
+    }
+    // 5. The compact pair, the grip and "More actions", half over the top edge; the rest are in that menu. Where another section's
+    // chip sits on that edge at the corner (a reference line's "Web address", on the rule over the next line), just under it,
+    // still over none of the section's words.
+    Object.assign(plan, { place: "compact", ...(onEdge(2 * unit + GAP, buttons + 16) ?? {}) });
   }
   for (const p of plans) {
     attr(p.tools, "data-place", p.place);
-    prop(p.tools, "--xe-tools-right", p.shift);
+    attr(p.tools, "aria-orientation", p.place === "side" || p.place === "rcol" ? "vertical" : null);
+    prop(p.tools, "--xe-tools-dx", p.dx ? `${p.dx}px` : null);
+    prop(p.tools, "--xe-tools-dy", p.dy ? `${p.dy}px` : null);
   }
-  // Each toolbar inside a corner takes its shape from where it is now drawn (one more read of the page for them all).
-  const inCorner = plans.filter((p) => p.place === "inside" || INSIDE_KINDS.has(p.frame.dataset.kind ?? ""));
-  const shapes = inCorner.map((p) => shapeOf(p.tools, p.frame, p.f, p.kids, p.unit, p.width));
+  // A picture's toolbar takes its shape from where it is now drawn (one more read of the page for them all).
+  const pictures = plans.filter((p) => INSIDE_KINDS.has(p.frame.dataset.kind ?? ""));
+  const shapes = pictures.map((p) => shapeOf(p.tools, p.frame, p.f, p.kids, p.unit, p.width));
   for (const write of shapes) write();
   for (const p of plans) {
-    if (inCorner.includes(p)) continue;
+    if (pictures.includes(p)) continue;
     attr(p.tools, "data-shape", null);
     prop(p.tools, "--xe-tools-w", null);
     prop(p.tools, "--xe-tools-h", null);
   }
   placePluses(main, bridge === 0);
+}
+
+/**
+ * Typing makes a section's words longer: where they now reach under its toolbar (one on its top edge or
+ * its right edge), every toolbar is placed again, before the next paint. Only the section typed in is
+ * read, and only when its toolbar lies over it.
+ */
+let rechecking = false;
+function recheck(e: Event) {
+  const frame = e.target instanceof Element ? e.target.closest<HTMLElement>("[data-section-id]") : null;
+  const tools = frame?.querySelector<HTMLElement>(":scope > .xe-tools");
+  if (!frame || !tools || rechecking || INSIDE_KINDS.has(frame.dataset.kind ?? "")) return;
+  if (!["edge", "rcol", "compact"].includes(tools.dataset.place ?? "")) return;
+  rechecking = true;
+  requestAnimationFrame(() => {
+    rechecking = false;
+    const words = ownWords(frame);
+    const under = [...tools.children].filter((c) => c.getClientRects().length > 0).map(pageBox);
+    if (under.some((b) => words.some((w) => overlap(b, w)))) queuePlace();
+  });
 }
 
 /** Where a flowchart box's chip, or another control, sits by the "+" in a gap (its own box, the press round it included). */
@@ -318,17 +408,19 @@ function Tool({ name, tool, onClick, disabled, pressed, children }: { name: stri
   return (
     <button type="button" className="xe-tool" data-tool={tool} aria-label={name} data-tip={name} aria-pressed={pressed} disabled={disabled} onClick={onClick}>
       {children}
+      {/* Its name in words, shown in the compact form's "More actions" (css/core.css). */}
+      <span className="xe-tool-name">{name}</span>
     </button>
   );
 }
 
-const MOVES = new Set(["ArrowLeft", "ArrowRight", "Home", "End"]);
+const MOVES = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"]);
 
 /**
  * Roving focus for a toolbar (the WAI-ARIA toolbar pattern; the review's accessibility-6), here and on
  * the phone's bar: the toolbar is one Tab stop, the left and right arrows move along its buttons in
- * the order they are drawn (a toolbar inside a picture's corner runs leftwards from its grip), and
- * Home and End go to its ends. The stop is the button last in focus while the focus is in the toolbar,
+ * the order they are drawn (row by row, left to right), the up and down arrows too where it is drawn as
+ * a column (aria-orientation) or its "More actions" is open, and Home and End go to its ends. The stop is the button last in focus while the focus is in the toolbar,
  * and its first button (a section's grip) once the focus leaves, so a hidden or disabled button never
  * holds it. A menu the toolbar opens ("More actions") keeps its own buttons. While anything is carried
  * the keys are the drag's: the grip's arrows move a section only while it is carried, and move along
@@ -373,11 +465,13 @@ export function useRoving(ref: React.RefObject<HTMLElement | null>) {
     };
     const onKey = (e: KeyboardEvent) => {
       if (!MOVES.has(e.key) || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || document.querySelector("[data-xe-drag]")) return;
+      if ((e.key === "ArrowUp" || e.key === "ArrowDown") && bar.getAttribute("aria-orientation") !== "vertical" && !bar.hasAttribute("data-open")) return;
       const list = drawn();
       const at = list.indexOf(e.target as HTMLElement);
       if (at < 0) return;
       e.preventDefault();
-      const to = e.key === "ArrowRight" ? list[at + 1] : e.key === "ArrowLeft" ? list[at - 1] : e.key === "Home" ? list[0] : list[list.length - 1];
+      const next = e.key === "ArrowRight" || e.key === "ArrowDown";
+      const to = next ? list[at + 1] : e.key === "ArrowLeft" || e.key === "ArrowUp" ? list[at - 1] : e.key === "Home" ? list[0] : list[list.length - 1];
       to?.focus();
     };
     // Buttons come and go (an action, More actions, the phone's bar following another part), and Move up or down turns off at an end.
@@ -413,17 +507,53 @@ export function Toolbar() {
   // The layout's action depends on the page's order; read when the frame draws (it draws on every structural change).
   const actions = frame ? actionsFor(store.get(), id, frame.kind, f, store, frame.as) : [];
   const ref = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLButtonElement>(null);
   const why = useId();
+  // The compact form's "More actions" (css/core.css: data-place="compact"): open, it shows the toolbar's other buttons under the
+  // pair, by name, and its first takes the focus; Escape, the focus leaving, or one of them pressed closes it.
+  const [open, setOpen] = useState(false);
   usePlace(ref);
   useRoving(ref);
+  useEffect(() => {
+    if (!open) return;
+    const items = [...(ref.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])];
+    items.find((b) => b !== menu.current && !b.hasAttribute("data-grip") && !b.disabled && b.getClientRects().length > 0)?.focus();
+  }, [open]);
   if (!frame) return null;
   const { place, count, kind } = frame;
   const stays = kind === "flow" ? whyFlowStays(f) : null;
   const block = kind === "flow" ? "flow" : kind === "findings" ? "findings" : null;
   return (
-    <div ref={ref} className="xe-tools" data-edit-only role="toolbar" aria-label={`${label}: tools`}>
+    <div
+      ref={ref}
+      className="xe-tools"
+      data-edit-only
+      role="toolbar"
+      aria-label={`${label}: tools`}
+      data-open={open ? "" : undefined}
+      onKeyDown={(e) => {
+        if (!open || e.key !== "Escape") return;
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(false);
+        menu.current?.focus();
+      }}
+      onBlur={(e) => {
+        if (open && !e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
+      }}
+      onClick={(e) => {
+        const b = (e.target as HTMLElement).closest("button");
+        // A button in the menu, pressed, closes it; not one that is off (it says why) nor an AI draft's "More actions" (it opens its own).
+        if (!open || !b || b === menu.current || b.hasAttribute("data-grip") || b.getAttribute("aria-disabled") === "true" || b.closest('[data-tool="more"]')) return;
+        setOpen(false);
+        if (b.dataset.tool !== "remove") requestAnimationFrame(() => menu.current?.focus());
+      }}
+    >
       <button type="button" className="xe-tool xe-grip" data-grip aria-label={`Drag ${label} to move it`} data-tip={`Drag ${label} to move it`} {...board.grip(id)}>
         <GripVertical aria-hidden size={16} strokeWidth={2.25} />
+      </button>
+      <button ref={menu} type="button" className="xe-tool" data-tool="menu" aria-label={`More actions for ${label}`} aria-expanded={open} data-tip="More actions" onClick={() => setOpen((o) => !o)}>
+        <Ellipsis aria-hidden size={16} strokeWidth={2.25} />
       </button>
       <Tool name={`Move ${label} up`} tool="up" disabled={place <= 0} onClick={() => board.moveBy(id, -1)}>
         <ArrowUp aria-hidden size={15} strokeWidth={2.25} />
@@ -460,6 +590,7 @@ export function Toolbar() {
             onBlur={(e) => e.currentTarget.removeAttribute("data-explain")}
           >
             <Trash2 aria-hidden size={15} strokeWidth={2.25} />
+            <span className="xe-tool-name">{`Remove ${label}`}</span>
           </button>
           <span id={why} hidden>
             {stays}

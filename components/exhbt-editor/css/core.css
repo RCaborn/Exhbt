@@ -310,29 +310,35 @@
   .xe-tools > [data-tool="remove"] {
     order: 1;
   }
-  /* Inside the corner, as in the prototype Rory tried ("Grip thing good"): a picture's toolbar sits in
-     its own top right corner, over the picture, so in the gallery's grid it never lies over the caption
-     of the picture above; any other section's does too where the gap above it is too small to hold it,
-     on its top edge or above it, without covering words (Toolbar.tsx measures: data-place). Where a
-     narrow part can't hold the row, it is one column down its right edge from the grip, and only where
-     the picture is too short for that, the column wraps (data-shape). A phone places its grips itself
-     (phone.css). */
+  /* The compact form's "More actions", and each button's name in words: shown only in that form (below). */
+  .xe-tools > [data-tool="menu"],
+  .xe-tool-name {
+    display: none;
+  }
+  /* Where a section's toolbar sits (Toolbar.tsx measures, all its reads before its writes: data-place).
+     Never over any words, its own section's included, nor over another section or a chip; in this
+     order: a row above the section's top right corner; a row half over its top edge (a little lower
+     where the gap above is short of half of it, a little to the right where its own chips reach the
+     corner: --xe-tools-dy, -dx); a column in the gutter to its right, from the corner down; that column
+     half over its right edge; the compact pair, the grip and "More actions", half over its top edge.
+     Only a picture's sits inside its own top right corner, over the picture, as in the prototype Rory
+     tried ("Grip thing good"), so in the gallery's grid it never lies over the caption of the picture
+     above; where a tile can't hold the row, it is one column down its right edge from the grip, and
+     only where the picture is too short for that, the column goes on in a second (data-shape). The
+     grip is at the section's corner in every one. A phone places its grips itself (phone.css). */
   @media not all and (max-width: 47.99rem) and (pointer: coarse) {
-    .xe-frame[data-kind="image"] > .xe-tools,
-    .xe-frame > .xe-tools[data-place="inside"] {
-      /* Toolbar.tsx moves it along, clear of the section's own chips in that corner, where it must. */
-      --xe-inset: var(--xe-tools-right, 0.5rem);
+    .xe-frame[data-kind="image"] > .xe-tools {
       top: 0.5rem;
-      right: var(--xe-inset);
+      right: 0.5rem;
       bottom: auto;
       padding-bottom: 0;
     }
-    /* Down the right edge from the grip: grip, move up, move down, the action, more, remove. */
-    .xe-frame > .xe-tools:is([data-shape="column"], [data-shape="wrap"]) {
+    /* Down from the grip: grip, move up, move down, the action, more, remove. */
+    .xe-frame > .xe-tools:is([data-shape="column"], [data-shape="wrap"], [data-place="side"], [data-place="rcol"]) {
       flex-direction: column;
       align-items: flex-end;
     }
-    .xe-frame > .xe-tools:is([data-shape="column"], [data-shape="wrap"]) > * {
+    .xe-frame > .xe-tools:is([data-shape="column"], [data-shape="wrap"], [data-place="side"], [data-place="rcol"]) > * {
       order: 0;
     }
     /* Too short for one column: it goes on in another to its left, the grip still in the corner. */
@@ -342,18 +348,75 @@
       width: var(--xe-tools-w);
       max-height: var(--xe-tools-h);
     }
-    /* Half over the section's top edge, where the gap above holds that half (Toolbar.tsx measures): a row of buttons is 36px, 44px on a touch screen. */
-    .xe-frame > .xe-tools[data-place="edge"] {
-      top: -1.125rem;
+    /* Half over the section's top edge: a row of buttons is 36px, 44px on a touch screen. */
+    .xe-frame > .xe-tools:is([data-place="edge"], [data-place="compact"]) {
+      top: calc(-1.125rem + var(--xe-tools-dy, 0px));
+      right: calc(0px - var(--xe-tools-dx, 0px));
       bottom: auto;
       padding-bottom: 0;
     }
-    /* A flowchart's boxes carry their own grip and Remove on their right edges (flow.css): the section's toolbar keeps clear of them. */
-    .xe-frame[data-kind="flow"] > .xe-tools[data-place="inside"] {
-      --xe-inset: var(--xe-tools-right, 2rem);
+    /* A flowchart's boxes carry their own grip and Remove on their corners (flow.css): the section's toolbar keeps clear of them. */
+    .xe-frame[data-kind="flow"] > .xe-tools:is([data-place="edge"], [data-place="compact"]) {
+      right: calc(2rem - var(--xe-tools-dx, 0px));
     }
-    .xe-frame[data-kind="flow"] > .xe-tools[data-place="edge"] {
-      right: 2rem;
+    /* In the gutter to its right, touching it, so the pointer never leaves the section on its way to the buttons. */
+    .xe-frame > .xe-tools[data-place="side"] {
+      top: 0;
+      right: auto;
+      bottom: auto;
+      left: 100%;
+      padding-bottom: 0;
+      align-items: flex-start;
+    }
+    .xe-frame > .xe-tools[data-place="rcol"] {
+      top: 0;
+      right: -1.125rem;
+      bottom: auto;
+      padding-bottom: 0;
+      align-items: center;
+    }
+    /* The compact pair: "More actions" beside the grip. Open, it is a card over the page, the pair in its
+       top right corner where they were, and under them the toolbar's other buttons, one to a line, each
+       with its name, Move up first and Remove last. */
+    .xe-frame > .xe-tools[data-place="compact"] > [data-tool="menu"] {
+      display: inline-flex;
+    }
+    .xe-frame > .xe-tools[data-place="compact"]:not([data-open]) > [data-tool]:not([data-tool="menu"]) {
+      display: none;
+    }
+    .xe-frame > .xe-tools[data-place="compact"][data-open] {
+      z-index: 30;
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      margin: -0.375rem -0.375rem 0 0;
+      padding: 0.375rem;
+      border: 1px solid var(--xp-outline-edge);
+      border-radius: 1.5rem;
+      background: var(--xp-card);
+      box-shadow: var(--shadow-pack);
+    }
+    .xe-frame > .xe-tools[data-place="compact"][data-open] > * {
+      order: 0;
+    }
+    .xe-frame > .xe-tools[data-place="compact"][data-open] > [data-tool="menu"] {
+      grid-area: 1 / 2;
+    }
+    .xe-frame > .xe-tools[data-place="compact"][data-open] > [data-grip] {
+      grid-area: 1 / 3;
+    }
+    .xe-frame > .xe-tools[data-place="compact"][data-open] > [data-tool]:not([data-tool="menu"]) {
+      grid-column: 1 / -1;
+      justify-content: flex-start;
+      gap: 0.5rem;
+      padding-inline: 0.75rem;
+      border-color: transparent;
+    }
+    .xe-frame > .xe-tools[data-place="compact"][data-open] .xe-tool-name {
+      display: inline;
+      white-space: nowrap;
+    }
+    .xe-frame > .xe-tools[data-place="compact"][data-open] > [data-tool]:not([data-tool="menu"]):not([data-explain]):is(:hover, :focus-visible)::after {
+      content: none;
     }
     /* A figure picked from the report has its label along the picture's top edge (figures.css): the toolbar sits under it. */
     .xe-frame[data-kind="image"]:has(.xe-fig-picked) > .xe-tools {
@@ -482,7 +545,7 @@
     left: auto;
     transform: none;
   }
-  .xe-tools:is([data-shape="column"], [data-shape="wrap"]) [data-tip]:is(:hover, :focus-visible)::after {
+  .xe-tools:is([data-shape="column"], [data-shape="wrap"], [data-place="side"], [data-place="rcol"]) [data-tip]:is(:hover, :focus-visible)::after {
     top: 50%;
     right: calc(100% + 0.375rem);
     transform: translateY(-50%);
@@ -511,19 +574,23 @@
       gap: 1rem;
     }
   }
-  /* On a tablet the toolbars are always shown, so one that lies over its own section (inside a
-     picture's corner, a tile's in the gallery's grid among them, or inside or on the top edge of any
-     other) shows only its grip, in its place: five 44px buttons are wider than a tile. The rest show
-     while the section is touched or the focus is in it (its caption, its description, or the grip from
-     the keyboard), running in from the grip, which stays where it is. */
+  /* On a tablet the toolbars are always shown, so one that is not in the gap above its section (inside a
+     picture's corner, a tile's in the gallery's grid among them, or on any other's top edge, in the
+     gutter beside it or on its right edge) shows only its grip at rest, in its place, at the corner and
+     clear of words, as the whole toolbar is: five 44px buttons are wider than a tile. The rest show while
+     the section is touched or the focus is in it (its caption, its description, or the grip from the
+     keyboard), running from the grip, which stays where it is. */
   @media (pointer: coarse) and (min-width: 48rem) {
     .xe-frame[data-kind="image"]:not(:hover):not(:focus-within) > .xe-tools > [data-tool],
-    .xe-frame:not(:hover):not(:focus-within) > .xe-tools:is([data-place="inside"], [data-place="edge"]) > [data-tool] {
+    .xe-frame:not(:hover):not(:focus-within) > .xe-tools[data-place] > [data-tool] {
       display: none;
     }
-    /* Half over the top edge: half of a 44px row. */
-    .xe-frame > .xe-tools[data-place="edge"] {
-      top: -1.375rem;
+    /* Half over the top edge: half of a 44px row; half over the right edge, half of a 44px column. */
+    .xe-frame > .xe-tools:is([data-place="edge"], [data-place="compact"]) {
+      top: calc(-1.375rem + var(--xe-tools-dy, 0px));
+    }
+    .xe-frame > .xe-tools[data-place="rcol"] {
+      right: -1.375rem;
     }
   }
 

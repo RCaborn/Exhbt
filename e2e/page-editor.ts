@@ -450,9 +450,10 @@ export function allowEditOnly(page: Page, which: "always" | "all"): Promise<stri
  * layout draws itself ("References") by its words; the pictures, links and buttons of any
  * other section; another toolbar's buttons; and the edit-only chips and labels on the page, its own
  * section's included (the aim's switch, a picked figure's label, "Edit figures", "Web address", a
- * flowchart box's chips). A toolbar may lie over its own section's words and picture, where it sits in
- * that corner by design, but never over a graph's own title, legend or labels. Returns each clash in
- * words; [] when there are none.
+ * flowchart box's chips). Its own section's words count too, every kind's (23 Nov: a toolbar never
+ * sits on its own section's words), by where the words are: a text box's by its words where they are
+ * on one line, as the toolbar measures them (Toolbar.tsx). Only a picture's toolbar lies over its own
+ * section, over the picture. Returns each clash in words; [] when there are none.
  */
 export function toolbarClashes(page: Page): Promise<string[]> {
   return page.evaluate(() => {
@@ -466,16 +467,32 @@ export function toolbarClashes(page: Page): Promise<string[]> {
     const sectionOf = (el: Element) => el.closest("[data-section-id]")?.getAttribute("data-section-id") ?? "the page";
     // What holds words, and where they count: the person's own words (a field, or words inside one) by the element's whole box,
     // so a short last line passing by luck doesn't count; a label the layout draws itself ("References") by its words alone.
-    const worded: { el: Element; boxes: DOMRect[] }[] = [];
+    // In a toolbar's own section, every one by its words (`glyphs`): it sits by them, never on them.
+    const worded: { el: Element; boxes: DOMRect[]; glyphs: DOMRect[] }[] = [];
+    const pen = document.createElement("canvas").getContext("2d")!;
+    const px = (v: string) => parseFloat(v) || 0;
+    /** A text box's words: on one line, as wide as they are (its placeholder's where it is empty); on more, the whole box. */
+    const boxWords = (el: HTMLTextAreaElement | HTMLInputElement): DOMRect[] => {
+      const text = el.value || el.placeholder;
+      if (!text.trim()) return [];
+      const s = getComputedStyle(el);
+      const b = el.getBoundingClientRect();
+      const line = px(s.lineHeight) || px(s.fontSize) * 1.2;
+      if (el.clientHeight - px(s.paddingTop) - px(s.paddingBottom) > line * 1.5) return [b];
+      pen.font = `${s.fontStyle} ${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
+      const inner = el.clientWidth - px(s.paddingLeft) - px(s.paddingRight);
+      const w = Math.min(pen.measureText(text).width + px(s.letterSpacing) * text.length, inner);
+      const x = px(s.paddingLeft) + (s.textAlign === "center" ? (inner - w) / 2 : s.textAlign === "right" || s.textAlign === "end" ? inner - w : 0);
+      return [new DOMRect(b.x + x, b.y, w, b.height)];
+    };
     for (const el of root.querySelectorAll("*")) {
       if (el.closest(".xe-tools, .sr-only, [hidden]") || !drawnNow(el)) continue;
       const field = el.matches("textarea, input:not([type=hidden]):not([type=checkbox]):not([type=radio]), [contenteditable]:not([contenteditable=false]), [role=textbox]");
       const texts = [...el.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.trim());
-      if (field || (texts.length && el.closest("[data-path]"))) worded.push({ el, boxes: [el.getBoundingClientRect()] });
-      else if (texts.length) {
-        const range = document.createRange();
-        worded.push({ el, boxes: texts.flatMap((n) => (range.selectNodeContents(n), [...range.getClientRects()])) });
-      }
+      const range = document.createRange();
+      const glyphs = el.matches("textarea, input") ? boxWords(el as HTMLTextAreaElement) : texts.flatMap((n) => (range.selectNodeContents(n), [...range.getClientRects()]));
+      if (field || (texts.length && el.closest("[data-path]"))) worded.push({ el, boxes: [el.getBoundingClientRect()], glyphs });
+      else if (texts.length) worded.push({ el, boxes: glyphs, glyphs });
     }
     const CHIPS = ".xe-chip, .xe-above, .xe-fig-chip, .xe-fig-picked, .xe-over > *, .xe-flow-chip, .xe-add-finding, .xe-list-tools > *";
     const out: string[] = [];
@@ -483,9 +500,8 @@ export function toolbarClashes(page: Page): Promise<string[]> {
       for (const b of toolButtons(fr)) {
         const box = b.getBoundingClientRect();
         const name = `${b.getAttribute("aria-label") ?? "a tool"} (${r(box)})`;
-        for (const { el: w, boxes } of worded) {
-          // A graph's own words count as well: its title and legend are never under its toolbar (design round 2, item 1).
-          if ((fr.contains(w) && fr.dataset.kind !== "graph") || !boxes.some((q) => over(box, q))) continue;
+        for (const { el: w, boxes, glyphs } of worded) {
+          if (!(fr.contains(w) ? glyphs : boxes).some((q) => over(box, q))) continue;
           out.push(`${name} covers "${(w.matches("textarea, input") ? (w as HTMLTextAreaElement).value : (w.textContent ?? "")).trim().slice(0, 30)}" in ${sectionOf(w)}`);
         }
         for (const other of frames) {

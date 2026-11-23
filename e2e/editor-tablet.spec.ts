@@ -1,7 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { FORMAT_RULES } from "../lib/exhbt/formats";
-import { docNow, field, flowChipsNearWords, frame, grip, offered, openTiming, pageOrder, plusClashes, READY, smallPresses, toolbarClashes, undoLabel, waitLive } from "./page-editor";
+import { labelOf } from "../components/exhbt-editor/labels";
+import { docNow, field, flowChipsNearWords, frame, grip, offered, openTiming, pageOrder, plusClashes, READY, smallPresses, toolbarClashes, typeIn, undoLabel, waitLive } from "./page-editor";
 
 /*
  * The editor on a tablet (decision 0026, "The chrome"; docs/briefs/edit-on-page/r3-l-phone.md), on the
@@ -54,10 +55,11 @@ const orderWith = (order: string[], id: string, place: number) => {
 };
 
 /**
- * Each section's toolbar as drawn now: shown, with each button 44px. One that lies over its own
- * section (inside a picture's or a graph's corner, a tile's in the gallery's grid among them, or on a
- * section's top edge) shows only its grip at rest (`tiles` "grip"); with the focus in it ("all"), every
- * button, and a tile's all inside the tile's own box. Every other section shows its grip, Move up and the rest.
+ * Each section's toolbar as drawn now: shown, with each button 44px. One that is not in the gap above
+ * its section (inside a picture's corner, a tile's in the gallery's grid among them; on a section's top
+ * edge, in the gutter beside it or on its right edge) shows only its grip at rest (`tiles` "grip");
+ * with the focus in it ("all"), every button, and a tile's all inside the tile's own box. Every other
+ * section shows its grip, Move up and the rest.
  */
 const toolbarsNow = (page: Page, tiles: "grip" | "all") =>
   page.evaluate((tiles) => {
@@ -73,7 +75,7 @@ const toolbarsNow = (page: Page, tiles: "grip" | "all") =>
       const buttons = [...tools.querySelectorAll<HTMLElement>("button")].filter((b) => b.getClientRects().length > 0);
       if (!buttons.some((b) => b.hasAttribute("data-grip"))) bad.push(`${id}: no grip`);
       const tile = fr.dataset.as === "tile";
-      const over = fr.dataset.kind === "image" || ["inside", "edge"].includes(tools.dataset.place ?? "");
+      const over = fr.dataset.kind === "image" || tools.hasAttribute("data-place");
       if (over && tiles === "grip" && buttons.length !== 1) bad.push(`${id}: over its own section, it shows ${buttons.map((b) => b.getAttribute("aria-label")).join(", ")}`);
       if ((!over || tiles === "all") && !buttons.some((b) => b.getAttribute("data-tool") === "up")) bad.push(`${id}: no move up`);
       const box = fr.getBoundingClientRect();
@@ -101,6 +103,11 @@ for (const f of offered()) {
     // A flowchart box's chips, on its top corners, keep clear of its words, and each takes a 44px press (design round 2, item 5).
     expect(await flowChipsNearWords(page, 4)).toEqual([]);
     expect(await smallPresses(page, `${READY} .xp-flow-box .xe-flow-chip`)).toEqual([]);
+    // Touched, each toolbar that shows its grip alone at rest opens where it is, still clear of every word, its own section's included (23 Nov).
+    for (const id of await page.locator(`${READY} article [data-section-id]:not([data-kind="image"]) > .xe-tools[data-place]`).evaluateAll((ts) => ts.map((t) => t.parentElement!.dataset.sectionId!))) {
+      await grip(page, id).focus();
+      expect(await toolbarClashes(page), `${id} opened`).toEqual([]);
+    }
     if (!found.tiles) return;
     // With the focus in a tile (its grip, from a keyboard), its other buttons show too, inside the tile, still covering nothing of another's.
     const tile = page.locator(`${READY} article [data-as="tile"]`).last();
@@ -111,6 +118,78 @@ for (const f of offered()) {
     expect(await toolbarClashes(page)).toEqual([]);
   });
 }
+
+test("research's hypothesis: the compact pair, its grip and More actions, on its top edge clear of its words; More actions holds the rest, from the keyboard and by touch, and the grip still carries it", async ({ page }) => {
+  await openTiming(page, "research", { full: true });
+  await waitLive(page);
+  const id = "aim-1";
+  const tools = frame(page, id).locator(":scope > .xe-tools");
+  const more = tools.locator('[data-tool="menu"]');
+  const name = labelOf(await docNow(page), id);
+  const drawn = () =>
+    tools.locator("button").evaluateAll((bs) =>
+      bs
+        .filter((b) => b.getClientRects().length > 0)
+        .map((b) => ({ name: b.getAttribute("aria-label")!, r: b.getBoundingClientRect() }))
+        .sort((p, q) => (Math.abs(p.r.top - q.r.top) > 4 ? p.r.top - q.r.top : p.r.left - q.r.left))
+        .map((b) => b.name),
+    );
+  const focused = () => page.evaluate(() => document.activeElement?.getAttribute("aria-label"));
+  // Beside the graph, too narrow for its row beside the switch and its gutter too narrow for a 44px column (23 Nov).
+  await expect(tools).toHaveAttribute("data-place", "compact");
+  // At rest, the grip alone, at the corner, clear of words; touched, the pair.
+  expect(await drawn()).toEqual([`Drag ${name} to move it`]);
+  expect(await toolbarClashes(page)).toEqual([]);
+  await grip(page, id).focus();
+  expect(await drawn()).toEqual([`More actions for ${name}`, `Drag ${name} to move it`]);
+  expect(await toolbarClashes(page)).toEqual([]);
+  // From the keyboard: along to More actions; Enter opens it and its first button (Move up is off: the first section) takes the focus.
+  await page.keyboard.press("ArrowLeft");
+  expect(await focused()).toBe(`More actions for ${name}`);
+  await page.keyboard.press("Enter");
+  await expect(more).toHaveAttribute("aria-expanded", "true");
+  expect(await focused()).toBe(`Move ${name} down`);
+  await expect(tools.getByText(`Remove ${name}`, { exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  expect(await focused()).toBe(`Remove ${name}`);
+  await page.keyboard.press("Escape");
+  await expect(more).toHaveAttribute("aria-expanded", "false");
+  expect(await focused()).toBe(`More actions for ${name}`);
+  // The grip carries the section from the keyboard, as everywhere; Escape puts it back.
+  const order = await pageOrder(page);
+  await grip(page, id).focus();
+  await page.keyboard.press("Space");
+  await expect(page.locator(`${READY} [data-xe-drag]`)).toHaveAttribute("data-xe-drag", "keys");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(`${READY} [data-xe-drag]`)).toHaveCount(0);
+  expect(await pageOrder(page)).toEqual(order);
+  // By touch: More actions, then Move down: the section moves, and the menu closes.
+  await grip(page, id).focus();
+  await more.tap();
+  await expect(more).toHaveAttribute("aria-expanded", "true");
+  await tools.locator('[data-tool="down"]').tap();
+  await expect.poll(() => pageOrder(page)).not.toEqual(order);
+  await expect(more).toHaveAttribute("aria-expanded", "false");
+});
+
+test("a long first line in the aim and a long graph title: no toolbar covers either, at rest or touched", async ({ page }) => {
+  await openTiming(page, "research", { full: true });
+  await waitLive(page);
+  const at = (await docNow(page)).sections.findIndex((s) => s.id === "aim-1");
+  // Long words, within the aim's 20, so its first line runs to its right edge.
+  await typeIn(page, `sections.${at}.text`, "Undergraduates walking briskly beforehand remember considerably more vocabulary afterwards than comparable undergraduates remaining seated");
+  await page.evaluate(() =>
+    window.__exhbtEditor!.patch("graph-1", (s) => (s.kind === "graph" ? { ...s, chart: { ...s.chart, title: "Words recalled out of forty, a mean for each group, after the walk" } } : s)),
+  );
+  await expect(frame(page, "graph-1")).toContainText("a mean for each group, after the walk");
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await expect.poll(() => toolbarClashes(page)).toEqual([]);
+  for (const id of ["aim-1", "graph-1"]) {
+    await grip(page, id).focus();
+    expect(await toolbarClashes(page), `${id} touched`).toEqual([]);
+  }
+});
 
 test("a skill's remove badge is quiet, as a flowchart box's chips are: the look's card ground and ink, its outline edge", async ({ page }) => {
   await openTiming(page, "research", { full: true });

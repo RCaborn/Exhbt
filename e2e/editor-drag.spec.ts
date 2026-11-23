@@ -8,7 +8,7 @@ import { newImageSection, newSection, roomFor } from "../lib/exhbt/sections";
 import { ALL_THEMES, PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import { labelOf } from "../components/exhbt-editor/labels";
 import { HYSTERESIS, makePlan, orderWith, placeAt, pointFor, rowsInfo, type Box } from "../components/exhbt-editor/drag/plan";
-import { docNow, frame, freshName, grip, offered, openDoc, openTiming, pageOrder, plusClashes, READY, SAMPLES, toolbarClashes, waitLive, waitReady } from "./page-editor";
+import { docNow, frame, freshName, grip, offered, openDoc, openTiming, pageOrder, plusClashes, READY, SAMPLES, toolbarClashes, typeIn, waitLive, waitReady } from "./page-editor";
 import { uniqueBytes } from "./unique-bytes";
 
 /*
@@ -129,6 +129,8 @@ const grid = (rows: Row[]) =>
 
 /** "Graph 1", as the words read out name it. */
 const nameOf = async (page: Page, id: string) => labelOf(await docNow(page), id);
+/** An aim of long words, within its 20: its first line runs to the section's right edge. */
+const LONG_AIM = "Undergraduates walking briskly beforehand remember considerably more vocabulary afterwards than comparable undergraduates remaining seated";
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 /**
@@ -263,21 +265,25 @@ test.describe("each section's toolbar, at 1440 wide", () => {
   test.skip(({ isMobile }) => isMobile, "the phone and tablet specs check their own");
 
   for (const f of offered()) {
-    test(`${f}: no toolbar covers another section's words, pictures or controls, a chip, or a graph's own words; the grip is always at the corner, and a picture's toolbar inside its own`, async ({ page }) => {
+    test(`${f}: no toolbar covers any words, its own section's included, another section's pictures or controls, or a chip; the grip is at its section's top right corner; only a picture's lies over its own section`, async ({ page }) => {
       await openTiming(page, f, { full: true });
       await waitLive(page);
       expect(await toolbarClashes(page)).toEqual([]);
       const corners = await page.locator(`${READY} article [data-section-id]`).evaluateAll((els) =>
         els.flatMap((fr) => {
           const id = fr.getAttribute("data-section-id");
+          const kind = fr.getAttribute("data-kind");
           const box = fr.getBoundingClientRect();
           const grip = fr.querySelector(":scope > .xe-tools [data-grip]")!.getBoundingClientRect();
           const tools = [...fr.querySelectorAll(":scope > .xe-tools button")].filter((b) => b.getClientRects().length > 0).map((b) => b.getBoundingClientRect());
           const bad: string[] = [];
-          // The grip is at the corner, wherever the toolbar sits: no button to its right, none above it (design round 2, item 2).
+          // The grip is at the corner, wherever the toolbar sits: no button to its right, none above it (design round 2, item 2)...
           if (!tools.every((r) => r.right <= grip.right + 0.5 && r.top >= grip.top - 0.5)) bad.push(`${id}: the grip is not at the corner`);
+          // ...the section's own top right corner: above it, on it, or beside it (a flowchart's 2rem in, clear of its first box's grip; 23 Nov).
+          const corner = { x: box.right - (kind === "flow" ? 32 : 0), y: box.top };
+          if (kind !== "image" && (Math.abs(grip.left + grip.width / 2 - corner.x) > grip.width || Math.abs(grip.top + grip.height / 2 - corner.y) > grip.height)) bad.push(`${id}: the grip is not at the section's corner`);
           // A picture's toolbar is inside its own top right corner, over the picture (design round 2, item 1: only pictures).
-          if (fr.getAttribute("data-kind") === "image" && !tools.every((r) => r.left >= box.left - 0.5 && r.right <= box.right + 0.5 && r.top >= box.top - 0.5)) bad.push(`${id}: not inside`);
+          if (kind === "image" && !tools.every((r) => r.left >= box.left - 0.5 && r.right <= box.right + 0.5 && r.top >= box.top - 0.5)) bad.push(`${id}: not inside`);
           return bad;
         }),
       );
@@ -410,6 +416,68 @@ test.describe("each section's toolbar, at 1440 wide", () => {
     expect(await page.evaluate((at) => window.__exhbtEditor!.insert("link", at), n)).toBeTruthy();
     await expect.poll(async () => (await pageOrder(page)).length).toBe(n + 1);
     expect(await toolbarClashes(page)).toEqual([]);
+  });
+
+  test("research's hypothesis, beside the graph: its toolbar runs down the gutter from its corner, clear of its words, and stays clear of a long first line", async ({ page }) => {
+    await openTiming(page, "research", { full: true });
+    await waitLive(page);
+    // Above, the switch and the context line; on its top edge, the switch: a column in the gap between the pair's two columns (23 Nov).
+    await expect(frame(page, "aim-1").locator(":scope > .xe-tools")).toHaveAttribute("data-place", "side");
+    expect(await toolbarClashes(page)).toEqual([]);
+    // Long words, within the aim's 20, so its first line runs to its right edge; typed, then left (the formatting buttons go).
+    const at = (await docNow(page)).sections.findIndex((s) => s.id === "aim-1");
+    await typeIn(page, `sections.${at}.text`, LONG_AIM);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await expect.poll(() => toolbarClashes(page)).toEqual([]);
+  });
+
+  test("a graph with a long title: its toolbar covers none of it, in research and a case study", async ({ page }) => {
+    for (const f of ["research", "case-study"] as const) {
+      await openTiming(page, f, { full: true });
+      await waitLive(page);
+      await page.evaluate(() =>
+        window.__exhbtEditor!.patch("graph-1", (s) => (s.kind === "graph" ? { ...s, chart: { ...s.chart, title: "Words recalled out of forty, a mean for each group, after the walk" } } : s)),
+      );
+      await expect(frame(page, "graph-1")).toContainText("a mean for each group, after the walk");
+      await expect.poll(() => toolbarClashes(page), { message: f }).toEqual([]);
+    }
+  });
+
+  test("a toolbar drawn as a column: the up and down arrows move along it from the grip, and the grip still carries the section from the keyboard", async ({ page }) => {
+    await openTiming(page, "research", { full: true });
+    await waitLive(page);
+    const id = "aim-1";
+    const tools = frame(page, id).locator(":scope > .xe-tools");
+    await expect(tools).toHaveAttribute("data-place", "side");
+    await expect(tools).toHaveAttribute("aria-orientation", "vertical");
+    const name = await nameOf(page, id);
+    const focused = () => page.evaluate(() => document.activeElement?.getAttribute("aria-label"));
+    const order = await pageOrder(page);
+    expect(order[0]).toBe(id);
+    // The first section: Move up is off, so the arrows pass it.
+    await grip(page, id).focus();
+    await page.keyboard.press("ArrowDown");
+    expect(await focused()).toBe(`Move ${name} down`);
+    await page.keyboard.press("ArrowDown");
+    expect(await focused()).toBe(`Remove ${name}`);
+    await page.keyboard.press("ArrowUp");
+    expect(await focused()).toBe(`Move ${name} down`);
+    await page.keyboard.press("Home");
+    await expect(grip(page, id)).toBeFocused();
+    await page.keyboard.press("End");
+    expect(await focused()).toBe(`Remove ${name}`);
+    await page.keyboard.press("ArrowLeft");
+    expect(await focused()).toBe(`Move ${name} down`);
+    // Carried from the keyboard, the down arrow moves the section, not the focus; Escape puts it back.
+    await grip(page, id).focus();
+    await page.keyboard.press("Space");
+    await expect(lifting(page)).toHaveAttribute("data-xe-drag", "keys");
+    await page.keyboard.press("ArrowDown");
+    expect(await place(page)).toBe(1);
+    await expect(grip(page, id)).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(lifting(page)).toHaveCount(0);
+    expect(await pageOrder(page)).toEqual(order);
   });
 });
 
