@@ -39,6 +39,23 @@ export async function openNew(page: Page, username: string, plan: Plan = "premiu
 }
 
 /**
+ * Drafts an exhbt with the stand-in AI (no API key), from a few sentences and `notes` ("stand-in: layout research" picks the
+ * layout), and opens its editor; returns its id. A drafted page has the AI's tools and a flowchart of three boxes.
+ */
+export async function openStandInDraft(page: Page, tag: string, notes?: string): Promise<string> {
+  await page.goto(`/auth/dev?email=${freshName(tag)}@example.com&next=/exhbts/new`);
+  await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
+  const res = await page.request.post("/api/exhbts/draft", {
+    data: { text: "Final-year project on lunch queues. I timed the queue for two weeks, added a second till, and timed it again. Waits fell from 11 to 4 minutes. The hypothesis was that a second till helps.", notes },
+  });
+  expect(res.status()).toBe(200);
+  const { id } = (await res.json()) as { id: string };
+  await page.goto(`/exhbts/${id}/edit`);
+  await waitReady(page);
+  return id;
+}
+
+/**
  * Opens the editor on a sample published by /dev/portfolio (`withParam`, e.g. "gallery"), found on the
  * list by its slug's title; returns its id. The user is cleared and made again on the max plan.
  */
@@ -524,6 +541,28 @@ export function toolbarClashes(page: Page): Promise<string[]> {
       }
     }
     return [...new Set(out)];
+  });
+}
+
+/**
+ * Every section toolbar's button drawn now, hit-tested against the chips and small controls a touch screen shows all the time
+ * (a flowchart box's grip, Remove and "Add a box", a finding's own controls, "Add a finding") and the edit-only chips over the
+ * page, any section's, its own included. Returns each clash in words; [] when there are none.
+ */
+export function chipClashes(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const root = document.querySelector('[data-editor="page"] article[data-exhbt-page]');
+    if (!root) return ["no editing page"];
+    const drawnNow = (el: Element) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+    const over = (a: DOMRect, b: DOMRect) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;
+    const out: string[] = [];
+    const chips = [...root.querySelectorAll(".xe-flow-chip, .xe-list-tools > *, .xe-add-finding, .xe-chip, .xe-above, .xe-fig-chip, .xe-fig-picked")].filter((c) => !c.closest(".xe-tools") && drawnNow(c));
+    for (const b of root.querySelectorAll("[data-section-id] > .xe-tools button")) {
+      if (!drawnNow(b)) continue;
+      const box = b.getBoundingClientRect();
+      for (const c of chips) if (over(box, c.getBoundingClientRect())) out.push(`${b.getAttribute("aria-label")} covers ${c.getAttribute("aria-label") ?? c.textContent?.trim()} in ${c.closest("[data-section-id]")?.getAttribute("data-section-id") ?? "the page"}`);
+    }
+    return out;
   });
 }
 

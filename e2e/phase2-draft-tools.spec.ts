@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { ENTITLEMENTS } from "../lib/entitlements";
 import { emptyDoc, text, type ExhbtDoc, type RichText } from "../lib/exhbt/blocks";
 import { aiVersionOf, blockValue, replaceBlock, sameBlock } from "../lib/exhbt/draft-blocks";
-import { backToAiVersion, cardMenuButton, DRAFT_PROJECT as PROJECT, draftAndOpen, findingsField, openCardMenu, revealCardMenu, rewritesLeft, signInToDraft, startRewrite, waitForSaved } from "./editor";
+import { backToAiVersion, cardMenuButton, cardMenuEntry, DRAFT_PROJECT as PROJECT, draftAndOpen, findingsField, openCardMenu, revealCardMenu, rewritesLeft, signInToDraft, startRewrite, waitForSaved } from "./editor";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -47,10 +47,10 @@ test.describe("Draft from a file", () => {
     await page.getByRole("button", { name: "Draft my exhbt" }).click();
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
     await expect(page.getByRole("heading", { level: 1, name: "Edit exhbt" })).toBeAttached();
-    // Each block's More actions, on a section from its toolbar's own More actions where that is the compact pair (decision 0026).
+    // Each block's AI tools: its More actions, or where a section's toolbar is the compact pair, its items listed first in the pair's More actions (decision 0026).
     for (const block of ["header", "skills", "gap", "flow", "findings"]) {
       await revealCardMenu(page, block);
-      await expect(cardMenuButton(page, block)).toBeVisible();
+      await expect(cardMenuEntry(page, block)).toBeVisible();
     }
     await openCardMenu(page, "findings");
     await expect(rewritesLeft(page, "findings")).toBeVisible();

@@ -109,6 +109,8 @@ function boxWords(el: HTMLTextAreaElement | HTMLInputElement): Box | null {
 const OUT_OF_PAGE = ".xe-insert, .xe-measure, .xe-drag-overlay, [data-edit-only]";
 /** Edit-only chips and labels that may reach out of their section. */
 const CHIPS = ".xe-fig-chip, .xe-fig-picked, .xe-chip, .xe-above";
+/** The controls a touch screen shows all the time and a mouse only while the pointer is on them: a flowchart box's, a finding's. */
+const TOUCH_CHIPS = ".xe-flow-chip, .xe-list-tools > *, .xe-add-finding";
 /** Kinds whose toolbar is always inside the corner (css/core.css): a picture, which has no words there. */
 const INSIDE_KINDS = new Set(["image"]);
 /** The gap between a toolbar's buttons (css/core.css). */
@@ -191,11 +193,15 @@ function placeTools() {
   // between them that is no section's (the skills, the title and the context line over the first row,
   // research's "References" over its lines); and the chips that reach out of a section ("Edit figures"
   // on a graph's foot, "Web address" on the rule between reference lines, a picked figure's label).
+  // Under a finger a flowchart box's chips (its grip, Remove, "Add a box at the end") and a finding's own controls are always
+  // shown, so they count too; with a mouse they show only while the pointer is on their box or finding (23 Nov).
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  const chips = coarse ? `${CHIPS}, ${TOUCH_CHIPS}` : CHIPS;
   const boxes = new Map<HTMLElement, Box>();
   const collect = (el: Element) => {
     for (const c of el.children) {
       if (!(c instanceof HTMLElement) || c.matches(OUT_OF_PAGE)) continue;
-      if (c.matches("[data-section-id]")) for (const o of [c, ...c.querySelectorAll<HTMLElement>(CHIPS)]) boxes.set(o, pageBox(o));
+      if (c.matches("[data-section-id]")) for (const o of [c, ...c.querySelectorAll<HTMLElement>(chips)]) boxes.set(o, pageBox(o));
       else if (c.querySelector("[data-section-id]")) collect(c);
       else {
         // The person's own words (a field) count by their whole box, however short the line; a label the layout draws ("References") by its words alone.
@@ -207,7 +213,7 @@ function placeTools() {
   collect(main);
   const page = pageBox(main);
   // The gap a toolbar above needs: its buttons, and on a mouse the strip under them that keeps the pointer on the section.
-  const bridge = window.matchMedia("(pointer: coarse)").matches ? 0 : 6;
+  const bridge = coarse ? 0 : 6;
   // First every read, then every write: a pass reads the page's layout once, and one that changes nothing invalidates nothing.
   type Plan = { tools: HTMLElement; frame: HTMLElement; f: Box; kids: HTMLElement[]; unit: number; width: number; place: Place; dx: number; dy: number };
   const plans: Plan[] = [];
@@ -558,10 +564,26 @@ export function Toolbar() {
   }, [open]);
   usePlace(ref);
   useRoving(ref);
+  // Whether it is the compact pair now (placeTools writes data-place): an AI draft's More actions then lists its items in this
+  // menu, first, instead of opening a second menu from a button of its own (23 Nov).
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const read = () => setCompact(el.dataset.place === "compact");
+    read();
+    const watch = new MutationObserver(read);
+    watch.observe(el, { attributes: true, attributeFilter: ["data-place"] });
+    return () => watch.disconnect();
+  }, []);
   useEffect(() => {
     if (!open) return;
-    const items = [...(ref.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])];
-    items.find((b) => b !== menu.current && !b.hasAttribute("data-grip") && !b.disabled && b.getClientRects().length > 0)?.focus();
+    // The first button the menu draws (an AI draft's Rewrite where there is one), not the first in the markup.
+    const items = [...(ref.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])]
+      .filter((b) => b !== menu.current && !b.hasAttribute("data-grip") && !b.disabled && !b.closest("form") && b.getClientRects().length > 0)
+      .map((b) => ({ b, r: b.getBoundingClientRect() }))
+      .sort((p, q) => (Math.abs(p.r.top - q.r.top) > 4 ? p.r.top - q.r.top : p.r.left - q.r.left));
+    items[0]?.b.focus();
     // A press anywhere else closes it (the focus leaving to nowhere does not: an AI draft's own menu, inside it, hides the button
     // that had the focus when it opens its rewrite form).
     const away = (e: PointerEvent) => {
@@ -643,7 +665,7 @@ export function Toolbar() {
       ))}
       {block && (
         <span className="xe-more" data-tool="more">
-          <MoreActions block={block} />
+          <MoreActions block={block} flat={compact} />
         </span>
       )}
       {stays ? (

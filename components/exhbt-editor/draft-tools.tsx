@@ -65,8 +65,11 @@ export const DraftToolsContext = createContext<DraftToolsRuntime | null>(null);
 const sliceOf = (d: ExhbtDoc, block: DraftBlock): unknown =>
   block === "header" ? JSON.stringify(blockValue(d, "header")) : block === "findings" ? d.sections.find((s) => s.kind === "findings") : blockValue(d, block);
 
-/** "More actions" for one block the AI drafted, or nothing when the exhbt has no AI version. A leaf: it reads its own block's slice. */
-export function MoreActions({ block }: { block: DraftBlock }) {
+/**
+ * "More actions" for one block the AI drafted, or nothing when the exhbt has no AI version. A leaf: it reads its own block's
+ * slice. `flat`: its items alone, listed in the menu it sits in (a compact toolbar's More actions), with no menu of its own.
+ */
+export function MoreActions({ block, flat = false }: { block: DraftBlock; flat?: boolean }) {
   const rt = useContext(DraftToolsContext);
   const store = useStoreInternal();
   // Drawn again when this block's words change, so "Back to the AI version" shows only once they differ.
@@ -83,7 +86,7 @@ export function MoreActions({ block }: { block: DraftBlock }) {
     [rt, shared, store, store.get()],
   );
   if (!dt?.enabled) return null;
-  return <BlockTools dt={dt} block={block} />;
+  return <BlockTools dt={dt} block={block} flat={flat} />;
 }
 
 const EMPTY = atom<Shared>({ ai: { blocks: {}, unverified: {} }, left: 0, busy: null, message: null });

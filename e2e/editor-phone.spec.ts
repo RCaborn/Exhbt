@@ -16,6 +16,7 @@ import {
   holdRichEditor,
   offered,
   openDoc,
+  openStandInDraft,
   openTiming,
   pageOrder,
   plusClashes,
@@ -25,6 +26,7 @@ import {
   seeAsVisitor,
   settle,
   smallPresses,
+  chipClashes,
   typeIn,
   undoLabel,
   waitLive,
@@ -811,6 +813,11 @@ test.describe("box for box on a Pixel 7", () => {
       await expect(bar(page)).toHaveCount(0);
     });
   }
+});
+
+test("a drafted research page: no section's grip sits on the flowchart boxes' chips, which a phone always shows", async ({ page }) => {
+  await openStandInDraft(page, "chips", "stand-in: layout research");
+  await expect.poll(() => chipClashes(page)).toEqual([]);
 });
 
 test("three pictures picked at once: the status line sits just above the bar and the two never overlap", async ({ page }) => {

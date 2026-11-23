@@ -86,7 +86,11 @@ const cardNames = (f: Format): Record<DraftBlock, string> => ({ header: FORMAT_C
 
 const ITEM = "flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 text-left text-[0.95rem] font-medium text-ink hover:bg-mist disabled:opacity-50";
 
-export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock }) {
+/**
+ * `flat`: no menu of its own. Its items ("Rewrite this block", "Back to the AI version", the rewrites left) are listed where it
+ * is drawn, in another menu: the edit-on-page editor's compact toolbar lists them first in its own "More actions" (decision 0026).
+ */
+export function BlockTools({ dt, block, flat = false }: { dt: DraftTools; block: DraftBlock; flat?: boolean }) {
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState(false);
   const [note, setNote] = useState("");
@@ -125,50 +129,60 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
   const noneLeft = dt.left <= 0;
   const noteId = `rewrite-note-${block}`;
 
-  return (
-    <div className="mb-3" data-testid={`tools-${block}`}>
-      <div ref={wrap} className="relative flex justify-end">
+  const items = (
+    <>
+      <button
+        type="button"
+        className={ITEM}
+        disabled={anyBusy}
+        onClick={() => {
+          setMenu(false);
+          setOpen(true);
+        }}
+      >
+        <Wand2 aria-hidden size={14} strokeWidth={2.25} /> Rewrite this block
+      </button>
+      {edited && (
         <button
-          ref={trigger}
           type="button"
-          aria-label={`More actions for ${cardNames(formatOf(dt.doc))[block]}`}
-          aria-expanded={menu}
-          aria-controls={menuId}
-          onClick={() => setMenu((m) => !m)}
-          className="inline-flex size-9 items-center justify-center rounded-full border border-line bg-surface text-ink hover:border-ink"
+          className={ITEM}
+          disabled={anyBusy}
+          onClick={() => {
+            setMenu(false);
+            dt.restore(block);
+          }}
         >
-          <MoreHorizontal aria-hidden size={18} strokeWidth={2.25} />
+          <RotateCcw aria-hidden size={14} strokeWidth={2.25} /> Back to the AI version
         </button>
-        <div id={menuId} hidden={!menu} className="absolute top-full right-0 z-10 mt-1 w-64 rounded-[12px] border border-line bg-surface p-1.5 shadow-pack">
+      )}
+      <p className="px-2.5 pt-1.5 pb-1 text-sm text-graphite" data-testid="rewrites-left">
+        {dt.left} of {dt.limit} {dt.limit === 1 ? "rewrite" : "rewrites"} left
+      </p>
+    </>
+  );
+
+  return (
+    <div className={flat ? "xe-ai-flat" : "mb-3"} data-testid={`tools-${block}`}>
+      {flat ? (
+        items
+      ) : (
+        <div ref={wrap} className="relative flex justify-end">
           <button
+            ref={trigger}
             type="button"
-            className={ITEM}
-            disabled={anyBusy}
-            onClick={() => {
-              setMenu(false);
-              setOpen(true);
-            }}
+            aria-label={`More actions for ${cardNames(formatOf(dt.doc))[block]}`}
+            aria-expanded={menu}
+            aria-controls={menuId}
+            onClick={() => setMenu((m) => !m)}
+            className="inline-flex size-9 items-center justify-center rounded-full border border-line bg-surface text-ink hover:border-ink"
           >
-            <Wand2 aria-hidden size={14} strokeWidth={2.25} /> Rewrite this block
+            <MoreHorizontal aria-hidden size={18} strokeWidth={2.25} />
           </button>
-          {edited && (
-            <button
-              type="button"
-              className={ITEM}
-              disabled={anyBusy}
-              onClick={() => {
-                setMenu(false);
-                dt.restore(block);
-              }}
-            >
-              <RotateCcw aria-hidden size={14} strokeWidth={2.25} /> Back to the AI version
-            </button>
-          )}
-          <p className="px-2.5 pt-1.5 pb-1 text-sm text-graphite" data-testid="rewrites-left">
-            {dt.left} of {dt.limit} {dt.limit === 1 ? "rewrite" : "rewrites"} left
-          </p>
+          <div id={menuId} hidden={!menu} className="absolute top-full right-0 z-10 mt-1 w-64 rounded-[12px] border border-line bg-surface p-1.5 shadow-pack">
+            {items}
+          </div>
         </div>
-      </div>
+      )}
 
       {open && (
         <div className="mt-2 rounded-[12px] border border-line px-3 py-2">

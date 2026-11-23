@@ -518,16 +518,27 @@ const HOVER_FOR: Record<string, string> = {
   findings: '[data-kind="findings"]',
 };
 
-/** Puts the pointer on a block, so its tools show, and opens its toolbar's own More actions where that is the compact pair. */
+/** A section block's toolbar (the flowchart's, the findings'); none for the parts over the first row. */
+const blockToolbar = (page: Page, block: string) => page.locator(`${READY} [data-kind="${block}"] > .xe-tools`).first();
+const isCompact = async (page: Page, block: string) => (block === "flow" || block === "findings") && (await blockToolbar(page, block).getAttribute("data-place")) === "compact";
+
+/**
+ * Puts the pointer on a block, so its tools show. Where its toolbar is the compact pair, opens the pair's More actions, which
+ * lists the AI's own items first, with no menu button of their own (decision 0026).
+ */
 export async function revealCardMenu(page: Page, block: string) {
   await page.locator(`${READY} ${HOVER_FOR[block]!}`).first().hover();
-  if (block === "flow" || block === "findings") await openCompactTools(page.locator(`${READY} [data-kind="${block}"] > .xe-tools`).first());
+  if (await isCompact(page, block)) await openCompactTools(blockToolbar(page, block));
 }
+
+/** What opens or shows a block's AI items: its "More actions" button, or in a compact toolbar's open menu, "Rewrite this block". */
+export const cardMenuEntry = (page: Page, block: string) =>
+  page.getByTestId(SEL.toolsTestId(block)).getByRole("button", { name: /^More actions for|^Rewrite this block$/ }).first();
 
 /** Opens a block's "More actions" menu (a section's, from its toolbar's own More actions where that is the compact pair). */
 export async function openCardMenu(page: Page, block: string) {
   await revealCardMenu(page, block);
-  await cardMenuButton(page, block).click();
+  if (!(await isCompact(page, block))) await cardMenuButton(page, block).click();
 }
 
 /** Opens the block's menu and presses "Rewrite this block". */

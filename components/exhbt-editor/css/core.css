@@ -421,6 +421,37 @@
       display: inline;
       white-space: nowrap;
     }
+    /* An AI draft's own items come first, in this menu, with no menu of their own (BlockTools `flat`): Rewrite this block, Back
+       to the AI version, the rewrites left, and the rewrite's form when it opens. A rule under them, then the section's own. */
+    .xe-frame > .xe-tools[data-place="compact"][data-open] > .xe-more {
+      order: -1;
+      display: block;
+      padding: 0 0 0.25rem;
+      border-bottom: 1px solid var(--xp-outline-edge);
+    }
+    .xe-tools .xe-ai-flat {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .xe-tools .xe-ai-flat > button {
+      min-height: 2.25rem;
+      padding: 0 0.75rem;
+      border-radius: 999px;
+      color: var(--xp-ink);
+      font: 600 0.8125rem/1 var(--xp-font, var(--font-sans));
+    }
+    .xe-tools .xe-ai-flat > button:hover {
+      background: transparent;
+      box-shadow: inset 0 0 0 1px var(--xp-link);
+    }
+    .xe-tools .xe-ai-flat > button:focus-visible {
+      outline: 2px solid var(--xp-link);
+      outline-offset: 2px;
+    }
+    .xe-tools .xe-ai-flat > [data-testid="rewrites-left"] {
+      color: var(--xp-muted);
+    }
     .xe-frame > .xe-tools[data-place="compact"][data-open] > :is([data-tool], [data-grip]):not([data-explain]):is(:hover, :focus-visible)::after {
       content: none;
     }
@@ -565,8 +596,10 @@
       pointer-events: auto;
     }
     /* A finding's own small controls keep their size: at 44px they would cover its words (L's bar carries them on a phone). */
-    .xe-tool:not(.xe-tool-sm) {
+    .xe-tool:not(.xe-tool-sm),
+    .xe-tools .xe-ai-flat > button {
       min-width: 2.75rem;
+      min-height: 2.75rem;
       height: 2.75rem;
     }
     /* ...but each takes a 44px press (a tablet: the review's vision-2), and so do the formatting buttons over a field; spaced so

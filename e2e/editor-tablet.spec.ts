@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { FORMAT_RULES } from "../lib/exhbt/formats";
 import { labelOf } from "../components/exhbt-editor/labels";
-import { docNow, field, flowChipsNearWords, frame, grip, offered, openTiming, pageOrder, plusClashes, READY, smallPresses, toolbarClashes, typeIn, undoLabel, waitLive } from "./page-editor";
+import { docNow, field, flowChipsNearWords, frame, grip, offered, openStandInDraft, openTiming, pageOrder, plusClashes, READY, smallPresses, toolbarClashes, typeIn, undoLabel, waitLive } from "./page-editor";
 
 /*
  * The editor on a tablet (decision 0026, "The chrome"; docs/briefs/edit-on-page/r3-l-phone.md), on the
@@ -171,6 +171,55 @@ test("research's hypothesis: the compact pair, its grip and More actions, on its
   await tools.locator('[data-tool="down"]').tap();
   await expect.poll(() => pageOrder(page)).not.toEqual(order);
   await expect(more).toHaveAttribute("aria-expanded", "false");
+});
+
+test("a drafted research page: no grip at rest, nor any toolbar opened, sits on the flowchart boxes' chips, shown all the time under a finger", async ({ page }) => {
+  await openStandInDraft(page, "chips", "stand-in: layout research");
+  await expect.poll(() => toolbarClashes(page)).toEqual([]);
+  // Touched, each toolbar opens where it is, clear of them too (the hypothesis's beside box 1's grip, the results' beside box 3's Remove).
+  for (const id of await page.locator(`${READY} article [data-section-id]:not([data-kind="image"])`).evaluateAll((els) => els.map((e) => e.getAttribute("data-section-id")!))) {
+    await grip(page, id).focus();
+    expect(await toolbarClashes(page), `${id} opened`).toEqual([]);
+  }
+});
+
+test("a drafted flowchart's compact pair: its More actions lists the AI's own items first, in one menu, by keyboard and by touch", async ({ page }) => {
+  await openStandInDraft(page, "flat");
+  const tools = frame(page, "flow").locator(":scope > .xe-tools");
+  // A drafted case study's three boxes sit in one row: the toolbar's row would cover their words (23 Nov).
+  await expect(tools).toHaveAttribute("data-place", "compact");
+  const more = tools.locator('[data-tool="menu"]');
+  const drawn = () =>
+    tools.locator("button").evaluateAll((bs) =>
+      bs
+        .filter((b) => b.getClientRects().length > 0 && !b.closest("form"))
+        .map((b) => ({ name: b.getAttribute("aria-label") ?? b.textContent!.trim(), r: b.getBoundingClientRect() }))
+        .sort((p, q) => (Math.abs(p.r.top - q.r.top) > 4 ? p.r.top - q.r.top : p.r.left - q.r.left))
+        .map((b) => b.name),
+    );
+  const focused = () => page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? document.activeElement?.textContent?.trim());
+  await grip(page, "flow").focus();
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Enter");
+  await expect(more).toHaveAttribute("aria-expanded", "true");
+  // One menu: the AI's items first, then the section's own, with no second More actions in it.
+  const names = await drawn();
+  expect(names.slice(2, 3)).toEqual(["Rewrite this block"]);
+  expect(names.filter((n) => /^More actions for /.test(n))).toEqual(["More actions for Flowchart"]);
+  expect(names.slice(-3)).toEqual(["Move Flowchart up", "Move Flowchart down", "Remove Flowchart"]);
+  // Its first item takes the focus; the arrows go down through all of them; Escape closes the one menu.
+  expect(await focused()).toBe("Rewrite this block");
+  // From the AI's items on into the section's own (a drafted case study's flowchart comes after its findings: Move up is on).
+  await page.keyboard.press("ArrowDown");
+  expect(await focused()).toBe("Move Flowchart up");
+  await page.keyboard.press("Escape");
+  await expect(more).toHaveAttribute("aria-expanded", "false");
+  await expect(more).toBeFocused();
+  // By touch: More actions, then Rewrite this block: the rewrite's form opens in the same menu.
+  await more.tap();
+  await page.getByTestId("tools-flow").getByRole("button", { name: "Rewrite this block" }).tap();
+  await expect(page.getByTestId("tools-flow").getByRole("button", { name: "Rewrite the process now" })).toBeVisible();
+  await expect(more).toHaveAttribute("aria-expanded", "true");
 });
 
 test("a long first line in the aim and a long graph title: no toolbar covers either, at rest or touched", async ({ page }) => {

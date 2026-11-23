@@ -6,7 +6,7 @@
 //   node scripts/editor-timing.mjs http://localhost:3213 4 3 research '[data-section-id="aim-1"] [data-path$=".text"]' typing
 //
 // The sample (gallery by default), the field to type into (a selector inside the page; by default the
-// findings' first line) and "typing" (time the typing only) are optional.
+// findings' first line) and "typing" or "drag" (time only that) are optional.
 //
 // It opens G's sign-in-free harness, /dev/editor-timing?sample=gallery (the longest sample), which is
 // served in production only by a build run with EXHBT_LAB=1. Run it against a production build:
@@ -28,6 +28,7 @@ const runs = Number(process.argv[4] || 3);
 const SAMPLE = process.argv[5] || "gallery";
 const FIELD = process.argv[6] || '[data-kind="findings"] [data-path$=".items.0"]';
 const TYPING_ONLY = process.argv[7] === "typing";
+const DRAG_ONLY = process.argv[7] === "drag";
 const READY = '[data-editor="page"][data-ready="true"]';
 
 const quantile = (sorted, q) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
@@ -159,7 +160,7 @@ async function typing() {
 
 const out = { base, cpuSlowdown: rate, sample: SAMPLE, field: FIELD, browser: browser.version(), drags: [], typing: [] };
 if (!TYPING_ONLY) for (let i = 0; i < runs; i++) out.drags.push(await drag());
-for (let i = 0; i < runs; i++) out.typing.push(await typing());
+if (!DRAG_ONLY) for (let i = 0; i < runs; i++) out.typing.push(await typing());
 await browser.close();
 
 console.log(JSON.stringify(out, null, 2));
@@ -172,5 +173,6 @@ for (let i = 0; i < runs; i++) {
   const d = out.drags[i];
   const t = out.typing[i];
   const drag = d ? `${d.drag.median}ms | ${d.drag.p95}ms | ${d.drag.max}ms | ${d.drag.over50ms} | ${d.drop.max}ms` : "– | – | – | – | –";
-  console.log(`| ${i + 1} | ${drag} | ${t.keystrokeToPaint.median}ms | ${t.keystrokeToPaint.p95}ms | ${t.keystrokeToPaint.max}ms | ${t.othersDrawn.length ? t.othersDrawn.join(", ") : "none"} |`);
+  const typed = t ? `${t.keystrokeToPaint.median}ms | ${t.keystrokeToPaint.p95}ms | ${t.keystrokeToPaint.max}ms | ${t.othersDrawn.length ? t.othersDrawn.join(", ") : "none"}` : "– | – | – | –";
+  console.log(`| ${i + 1} | ${drag} | ${typed} |`);
 }
