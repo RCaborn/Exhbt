@@ -6,6 +6,7 @@ import type { FigureBox } from "@/lib/exhbt/blocks";
 import { LIMITS } from "@/lib/exhbt/blocks";
 import { clampBox, fitAlt, fitCaption } from "@/lib/figures/rules";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
+import { structuredCall } from "./call";
 
 /**
  * Picks the one figure in a person's report that best shows its result (decision 0017): the
@@ -79,20 +80,19 @@ export async function pickFigure(images: PageImage[]): Promise<FigurePickResult>
     return mockPick(images);
   }
 
-  const client = new Anthropic({ apiKey });
-  const response = await client.messages.parse(figurePickRequest(images));
-
-  if (response.stop_reason !== "end_turn" || !response.parsed_output) {
-    // Every failure looks like "no figure" to the person, so the reason is logged by the route.
-    throw new Error(`Figure pick failed (stop_reason: ${response.stop_reason})`);
-  }
-  const { input_tokens, output_tokens } = response.usage;
+  // Every failure looks like "no figure" to the person, so the route logs the reason.
+  const { value, model, inputTokens, outputTokens } = await structuredCall({
+    feature: "figure_pick",
+    client: new Anthropic({ apiKey }),
+    request: figurePickRequest(images),
+    schema: AnswerSchema,
+  });
   return {
-    pick: toPick(AnswerSchema.parse(response.parsed_output), images.length),
-    model: response.model,
-    inputTokens: input_tokens,
-    outputTokens: output_tokens,
-    costUsd: costUsd(input_tokens, output_tokens),
+    pick: toPick(value, images.length),
+    model,
+    inputTokens,
+    outputTokens,
+    costUsd: costUsd(inputTokens, outputTokens),
   };
 }
 

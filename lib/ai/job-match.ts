@@ -6,6 +6,7 @@ import { EXHBTS_PER_JOB_LINK } from "@/lib/entitlements";
 import { INTRO_WORDS, REASON_WORDS, mockRank, tidyMatch, type MatchCandidate, type MatchResult } from "@/lib/jobs/rank";
 import { MAX_LISTING_CHARS } from "@/lib/jobs/listing-text";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
+import { structuredCall } from "./call";
 
 /**
  * Picks the person's best-fitting published exhbts for one job (docs/phase-2.md section 8):
@@ -85,22 +86,20 @@ export async function matchExhbtsToJob(input: JobMatchInput): Promise<JobMatchRe
   }
 
   const refs = input.candidates.map((_, i) => `E${i + 1}`);
-  const client = new Anthropic({ apiKey });
-  const response = await client.messages.parse(jobMatchRequest(input));
-
-  if (response.stop_reason === "refusal" || !response.parsed_output) {
-    throw new Error(`Job match failed (stop_reason: ${response.stop_reason})`);
-  }
-  const parsed = MatchSchema.parse(response.parsed_output);
+  const { value: parsed, model, inputTokens: input_tokens, outputTokens: output_tokens } = await structuredCall({
+    feature: "job_match",
+    client: new Anthropic({ apiKey }),
+    request: jobMatchRequest(input),
+    schema: MatchSchema,
+  });
   const byRef = new Map(refs.map((r, i) => [r, input.candidates[i]!.id]));
   const raw: MatchResult = {
     picks: parsed.picks.map((p) => ({ exhbtId: byRef.get(p.ref.trim().toUpperCase()) ?? "", reason: p.reason })),
     intro: parsed.intro,
   };
-  const { input_tokens, output_tokens } = response.usage;
   return {
     ...tidyMatch(raw, description, input.candidates),
-    model: response.model,
+    model,
     inputTokens: input_tokens,
     outputTokens: output_tokens,
     costUsd: costUsd(input_tokens, output_tokens),

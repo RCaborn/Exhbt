@@ -5,6 +5,8 @@ import { z } from "zod/v4";
 import { ProjectSchema, SITUATIONS, type Project, type Roadmap, type RoadmapInput } from "./schemas";
 import { PLAN_SIZE } from "@/lib/store";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
+import { AIFailure, structuredCall } from "./call";
+import { repairIdeas, repairSwap } from "./repair";
 
 /**
  * Swapping one idea in the plan (docs/decisions/0004): a single new project that replaces the
@@ -82,20 +84,14 @@ export async function generateSwap(ctx: SwapContext): Promise<SwapResult> {
     return mockSwap(ctx);
   }
 
-  const client = new Anthropic({ apiKey });
-  const response = await client.messages.parse(swapRequest(ctx));
-
-  if (response.stop_reason === "refusal" || !response.parsed_output) {
-    throw new Error(`Project swap failed (stop_reason: ${response.stop_reason})`);
-  }
-  const { input_tokens, output_tokens } = response.usage;
-  return {
-    project: SwapSchema.parse(response.parsed_output).project,
-    model: response.model,
-    inputTokens: input_tokens,
-    outputTokens: output_tokens,
-    costUsd: costUsd(input_tokens, output_tokens),
-  };
+  const { value, model, inputTokens, outputTokens } = await structuredCall({
+    feature: "project_swap",
+    client: new Anthropic({ apiKey }),
+    request: swapRequest(ctx),
+    schema: SwapSchema,
+    repair: repairSwap,
+  });
+  return { project: value.project, model, inputTokens, outputTokens, costUsd: costUsd(inputTokens, outputTokens) };
 }
 
 /** Local development and tests without an API key: the round and note show in the title, so a test can see them. */
@@ -150,7 +146,9 @@ export function ideasRequest(ctx: IdeasContext) {
   const skills = (roadmap.skillMap ?? []).map((s) => `${s.skill} (needed ${s.needed}, current ${s.current})`);
   return {
     model: AI_MODEL,
-    max_tokens: 1500,
+    // A ceiling, not a cost (npm run measure:ai, 23 Nov 2026): one heavy run thought for 575 tokens
+    // and used 1,173 in all, 78% of the old 1,500.
+    max_tokens: 4000,
     output_config: IDEAS_OUTPUT_CONFIG,
     system: IDEAS_SYSTEM,
     messages: [
@@ -177,22 +175,15 @@ export async function generateIdeas(ctx: IdeasContext): Promise<IdeasResult> {
     return mockIdeas(ctx);
   }
 
-  const client = new Anthropic({ apiKey });
-  const response = await client.messages.parse(ideasRequest(ctx));
-
-  if (response.stop_reason === "refusal" || !response.parsed_output) {
-    throw new Error(`Project ideas failed (stop_reason: ${response.stop_reason})`);
-  }
-  const projects = IdeasSchema.parse(response.parsed_output).projects;
-  if (projects.length === 0) throw new Error("Project ideas failed (the model returned none)");
-  const { input_tokens, output_tokens } = response.usage;
-  return {
-    projects,
-    model: response.model,
-    inputTokens: input_tokens,
-    outputTokens: output_tokens,
-    costUsd: costUsd(input_tokens, output_tokens),
-  };
+  const { value, model, inputTokens, outputTokens } = await structuredCall({
+    feature: "project_ideas",
+    client: new Anthropic({ apiKey }),
+    request: ideasRequest(ctx),
+    schema: IdeasSchema,
+    repair: (raw) => repairIdeas(raw, PLAN_SIZE),
+  });
+  if (value.projects.length === 0) throw new AIFailure("project_ideas", "empty", { inputTokens, outputTokens });
+  return { projects: value.projects, model, inputTokens, outputTokens, costUsd: costUsd(inputTokens, outputTokens) };
 }
 
 /**

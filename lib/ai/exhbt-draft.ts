@@ -1,13 +1,14 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { z } from "zod/v4";
 import { formatLimits, LIMITS, SCHEMA_VERSION, text, withHighlight, words, type ExhbtDoc, type Section } from "@/lib/exhbt/blocks";
-import { FORMATS, isFormat } from "@/lib/exhbt/formats";
-import { CHART_KINDS, hasData, type Chart } from "@/lib/exhbt/charts";
+import { isFormat } from "@/lib/exhbt/formats";
+import { hasData, type Chart } from "@/lib/exhbt/charts";
+import { DraftSchema, repairDraft, toChart, type Draft, type DraftChart } from "./draft-answer";
 import { referencesFrom, squash } from "@/lib/exhbt/references";
 import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
+import { structuredCall } from "./call";
 
 /**
  * Drafts an exhbt from the person's own material (docs/phase-2.md section 6, decision 0007):
@@ -73,54 +74,7 @@ Layout (the "format" field):
 - For research: gap is the background and the gap, at most ${R.gapWords} words; findings are the results, ${R.findings.min} to ${R.findings.max} bullets, each at most ${R.findings.wordsEach} words; next holds the limitations the material itself states and what the person would do next, at most ${R.reflection.words} words. Never invent a limitation: leave it empty if the material states none.
 - Fields that belong to another layout stay empty.`;
 
-/**
- * A graph as the model writes it: one flat shape for every kind, turned into the stored kind by
- * toChart. Unused fields are empty strings, empty lists or false. (The SDK sends an enum such as
- * `kind` only as a description, so a value outside it fails the parse rather than the grammar.)
- *
- * The answer shape is kept small on purpose (decision 0025): the API compiles it into a grammar
- * and refuses one that is too large, at about 52 to 56 fields in all, with a nullable field
- * costing about two and an array of objects a little more than its fields. So nothing here is
- * nullable (empty means "none"), and every kind shares one row
- * type: a scatter point is a row with values [x, y], a number tile a row with values [value] or
- * [value, from] and its unit in `series`, a table's headings the first row of `cells`.
- * `npm run probe:ai` checks the shape against the real API, with the growth already planned.
- */
-const DraftChartSchema = z.object({
-  kind: z.enum(CHART_KINDS),
-  title: z.string(),
-  xTitle: z.string(),
-  yTitle: z.string(),
-  unit: z.string(),
-  lowerIsBetter: z.boolean(),
-  series: z.array(z.string()),
-  rows: z.array(z.object({ label: z.string(), values: z.array(z.number()) })),
-  cells: z.array(z.array(z.string())),
-});
-export type DraftChart = z.infer<typeof DraftChartSchema>;
-
-export const DraftSchema = z.object({
-  format: z.enum(FORMATS),
-  title: z.string(),
-  summary: z.string(),
-  context: z.string(),
-  whereWhen: z.string(),
-  skills: z.array(z.string()),
-  gap: z.string(),
-  gapHighlight: z.string(),
-  flow: z.array(z.object({ step: z.string(), detail: z.string() })),
-  findings: z.array(z.string()),
-  charts: z.array(DraftChartSchema),
-  // All three empty when there is no quote.
-  quote: z.object({ text: z.string(), name: z.string(), role: z.string() }),
-  next: z.string(),
-  aim: z.string(),
-  aimIsHypothesis: z.boolean(),
-  conclusion: z.string(),
-  references: z.array(z.object({ label: z.string(), url: z.string() })),
-  numbers: z.array(z.object({ value: z.string(), sourceQuote: z.string() })),
-});
-type Draft = z.infer<typeof DraftSchema>;
+export { DraftSchema, toChart, type DraftChart } from "./draft-answer";
 /** What the draft call sends as output_config. Exported so scripts/probe-ai-shapes.ts checks the very shape the app sends. */
 export const DRAFT_OUTPUT_CONFIG = { effort: "low" as const, format: zodOutputFormat(DraftSchema) };
 
@@ -182,21 +136,20 @@ export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
     return mockDraft(input);
   }
 
-  const client = new Anthropic({ apiKey });
-  const response = await client.messages.parse(draftRequest(input));
-
-  if (response.stop_reason === "refusal" || !response.parsed_output) {
-    throw new Error(`Exhbt draft failed (stop_reason: ${response.stop_reason})`);
-  }
-  const { input_tokens, output_tokens } = response.usage;
-  const draft = DraftSchema.parse(response.parsed_output);
+  const { value: draft, model, inputTokens, outputTokens } = await structuredCall({
+    feature: "exhbt_draft",
+    client: new Anthropic({ apiKey }),
+    request: draftRequest(input),
+    schema: DraftSchema,
+    repair: repairDraft,
+  });
   return {
     doc: toDoc(draft, materialText(input)),
     numbers: draft.numbers,
-    model: response.model,
-    inputTokens: input_tokens,
-    outputTokens: output_tokens,
-    costUsd: costUsd(input_tokens, output_tokens),
+    model,
+    inputTokens,
+    outputTokens,
+    costUsd: costUsd(inputTokens, outputTokens),
   };
 }
 
@@ -285,78 +238,6 @@ export function toDoc(d: Draft, source: string): ExhbtDoc {
   };
 }
 
-/**
- * One of the model's graphs as a stored graph of its kind, trimmed to the kind's caps. Rows
- * without the values the kind needs are dropped, never filled in. Null when nothing is left.
- */
-export function toChart(g: DraftChart): Chart | null {
-  const C = L.charts;
-  const t = (s: string | undefined) => (s ?? "").trim();
-  // false stores nothing, as null did before (decision 0025), so the graph's default holds.
-  const better = g.lowerIsBetter ? true : undefined;
-  const some = (o: Record<string, string | boolean | undefined>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== ""));
-  const axes = some({ xTitle: t(g.xTitle), yTitle: t(g.yTitle), unit: t(g.unit) });
-  const title = t(g.title);
-  const rows = g.rows.map((r) => ({ label: t(r.label), values: r.values }));
-  switch (g.kind) {
-    case "beforeAfter": {
-      const kept = rows.filter((r) => r.values.length >= 2).slice(0, C.beforeAfter.rows.max);
-      if (!kept.length) return null;
-      return {
-        kind: "beforeAfter",
-        title,
-        beforeLabel: t(g.series[0]) || "Before",
-        afterLabel: t(g.series[1]) || "After",
-        lowerIsBetter: g.lowerIsBetter,
-        ...some({ unit: t(g.unit) }),
-        rows: kept.map((r) => ({ label: r.label, before: r.values[0]!, after: r.values[1]! })),
-      };
-    }
-    case "bar": {
-      const kept = rows.filter((r) => r.values.length >= 1).slice(0, C.bar.rows.max);
-      return kept.length ? { kind: "bar", title, ...axes, ...some({ lowerIsBetter: better }), rows: kept.map((r) => ({ label: r.label, value: r.values[0]! })) } : null;
-    }
-    case "groupedBar":
-    case "stackedBar":
-    case "line": {
-      const lim = C[g.kind];
-      const series = g.series.map(t).slice(0, lim.series.max);
-      const kept = rows
-        .filter((r) => r.values.length >= series.length && (g.kind !== "stackedBar" || r.values.every((v) => v >= 0)))
-        .slice(0, lim.rows.max)
-        .map((r) => ({ label: r.label, values: r.values.slice(0, series.length) }));
-      if (!series.length || !kept.length) return null;
-      const lower = g.kind === "stackedBar" ? {} : some({ lowerIsBetter: better });
-      return { kind: g.kind, title, ...axes, ...lower, series, rows: kept } as Chart;
-    }
-    case "scatter": {
-      // A point is a row with values [x, y]; a row without both is dropped.
-      const points = rows
-        .filter((r) => r.values.length >= 2)
-        .slice(0, C.scatter.points.max)
-        .map((r) => ({ x: r.values[0]!, y: r.values[1]!, ...some({ label: r.label }) }));
-      return points.length ? { kind: "scatter", title, xTitle: t(g.xTitle), yTitle: t(g.yTitle), ...some({ unit: t(g.unit) }), points } : null;
-    }
-    case "numbers": {
-      // A tile is a row with values [value] or [value, from]; its unit is at the same place in series.
-      const tiles = rows
-        .map((r, i) => ({ ...r, unit: t(g.series[i]) }))
-        .filter((r) => r.label && r.values.length >= 1)
-        .slice(0, C.numbers.tiles.max)
-        .map((r) => ({ value: r.values[0]!, label: r.label, ...some({ unit: r.unit }), ...(r.values.length >= 2 ? { from: r.values[1]! } : {}) }));
-      return tiles.length ? { kind: "numbers", title, tiles } : null;
-    }
-    case "table": {
-      // The first row of cells is the headings.
-      const columns = (g.cells[0] ?? []).map((c) => t(c)).slice(0, C.table.columns.max);
-      const cells = g.cells
-        .slice(1, C.table.rows.max + 1)
-        .map((r) => Array.from({ length: columns.length }, (_, k) => t(r[k])))
-        .filter((r) => r.some(Boolean));
-      return columns.length && cells.length ? { kind: "table", title, columns, rows: cells } : null;
-    }
-  }
-}
 
 /**
  * Local development without an API key: a clearly labelled placeholder built from the

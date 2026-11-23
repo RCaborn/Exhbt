@@ -7,6 +7,7 @@ import { formatOf, type Format } from "@/lib/exhbt/formats";
 import { BLOCK_NAMES, type BlockValue, type BlockValues, type DraftBlock } from "@/lib/exhbt/draft-blocks";
 import { MAX_MATERIAL_CHARS } from "./exhbt-draft";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
+import { structuredCall } from "./call";
 
 /**
  * Rewrites one block of an exhbt from the person's own material (docs/phase-2.md section 6).
@@ -117,21 +118,20 @@ export async function rewriteBlock(input: RewriteInput): Promise<RewriteResult> 
     if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
     return mockRewrite(input);
   }
-  const schema = SCHEMAS[input.block];
-  const client = new Anthropic({ apiKey });
-  const response = await client.messages.parse(rewriteRequest(input));
-  if (response.stop_reason === "refusal" || !response.parsed_output) {
-    throw new Error(`Exhbt rewrite failed (stop_reason: ${response.stop_reason})`);
-  }
-  const { input_tokens, output_tokens } = response.usage;
-  const parsed = schema.parse(response.parsed_output);
+  const schema = SCHEMAS[input.block] as z.ZodType<{ numbers: RewriteNumber[] }>;
+  const { value: parsed, model, inputTokens, outputTokens } = await structuredCall({
+    feature: "exhbt_rewrite",
+    client: new Anthropic({ apiKey }),
+    request: rewriteRequest(input),
+    schema,
+  });
   return {
     value: toBlockValue(input.block, parsed as never, formatLimits(formatOf(input.doc))),
     numbers: parsed.numbers,
-    model: response.model,
-    inputTokens: input_tokens,
-    outputTokens: output_tokens,
-    costUsd: costUsd(input_tokens, output_tokens),
+    model,
+    inputTokens,
+    outputTokens,
+    costUsd: costUsd(inputTokens, outputTokens),
   };
 }
 

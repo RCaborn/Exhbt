@@ -11,6 +11,8 @@ import {
 } from "./schemas";
 import type { JobProfile } from "@/lib/jobs";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
+import { structuredCall } from "./call";
+import { repairRoadmap, ROADMAP_LIST_MAX } from "./repair";
 
 /** What the roadmap call sends as output_config (also checked by scripts/probe-ai-shapes.ts). */
 export const ROADMAP_OUTPUT_CONFIG = { effort: "low" as const, format: zodOutputFormat(RoadmapModelSchema) };
@@ -20,6 +22,7 @@ const SYSTEM = `You write skills-gap roadmaps for UK graduates.
 Rules:
 - Use only facts present in what the graduate told you (the job they want, their situation, education, skills and optional CV). Never invent experience, grades, employers or results.
 - If the input does not support a field, leave it empty (empty string or empty list). Do not guess.
+- List at most ${ROADMAP_LIST_MAX} strengths and at most ${ROADMAP_LIST_MAX} gaps, the most important first.
 - Strengths must point to where they appear in what the graduate told you.
 - Gaps are skills the target job needs that the graduate does not show, or shows only weakly. When a job profile from the UK jobs dataset is given, treat its skills list as the authoritative requirements; otherwise use what the job commonly needs.
 - skillMap lists the ${SKILL_MAP_MIN}-${SKILL_MAP_MAX} skills this job asks for most, most important first. Use short names (one to four words). When a job profile is given, take them from its skills list.
@@ -78,20 +81,14 @@ export async function generateRoadmap(input: RoadmapInput, job: JobProfile | nul
     return mockRoadmap(input, job);
   }
 
-  const client = new Anthropic({ apiKey });
-  const response = await client.messages.parse(roadmapRequest(input, job));
-
-  if (response.stop_reason === "refusal" || !response.parsed_output) {
-    throw new Error(`Roadmap generation failed (stop_reason: ${response.stop_reason})`);
-  }
-  const { input_tokens, output_tokens } = response.usage;
-  return {
-    roadmap: { ...RoadmapModelSchema.parse(response.parsed_output), projects: [] },
-    model: response.model,
-    inputTokens: input_tokens,
-    outputTokens: output_tokens,
-    costUsd: costUsd(input_tokens, output_tokens),
-  };
+  const { value, model, inputTokens, outputTokens } = await structuredCall({
+    feature: "roadmap",
+    client: new Anthropic({ apiKey }),
+    request: roadmapRequest(input, job),
+    schema: RoadmapModelSchema,
+    repair: repairRoadmap,
+  });
+  return { roadmap: { ...value, projects: [] }, model, inputTokens, outputTokens, costUsd: costUsd(inputTokens, outputTokens) };
 }
 
 /** Local development without an API key. Clearly labelled; never used when a key is set. */
