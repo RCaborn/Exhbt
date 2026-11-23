@@ -186,17 +186,28 @@ function exploreShapes(): Shape[] {
   };
   const flatQuote = (schema: Json) => plus(without(schema, ["quote"]), 3, STR, "quote");
   const noCells = (schema: Json) => without(schema, ["cells"], "charts[]");
+  // Every plain string in the schema as a $ref to one shared definition: does reuse shrink the grammar?
+  const refStrings = (schema: Json) => {
+    const out = clone(schema);
+    walk(out, (node) => {
+      if (node.type === "string" && Object.keys(node).length === 1) {
+        delete node.type;
+        node.$ref = "#/$defs/str";
+      }
+    });
+    out.$defs = { ...((out.$defs as Json) ?? {}), str: { type: "string" } };
+    return out;
+  };
+  const REF = { $ref: "#/$defs/str" };
+  const withStrDef = (schema: Json) => ({ ...clone(schema), $defs: { str: { type: "string" } } });
+  const lean = (schema: Json) => without(without(schema, ["columns"], "charts[]"), ["unit"], "charts[].rows[]");
   const L2 = [4, 8, 12, 16, 24, 32];
   return [
-    v("repeat: candidate + 12 strings", plus(cand, 12, STR, "s")),
-    v("repeat: candidate + 16 strings", plus(cand, 16, STR, "s")),
-    ...[4, 8, 16, 32, 64].map((n) => v(`candidate + one object of ${n} strings`, addObj(cand, "extra", NEST(n)))),
-    ...[16, 32, 64].map((n) => v(`candidate + ${n} strings in each chart`, plus(cand, n, STR, "c", "charts[]"))),
-    ...[16, 32, 64].map((n) => v(`candidate + ${n} strings in each chart row`, plus(cand, n, STR, "r", "charts[].rows[]"))),
-    ...L2.map((n) => v(`growth, research grouped + ${n} strings`, plus(grouped(candGrowth), n, STR, "s"))),
-    ...L2.map((n) => v(`growth, quote flat + ${n} strings`, plus(flatQuote(candGrowth), n, STR, "s"))),
-    ...L2.map((n) => v(`growth, no cells + ${n} strings`, plus(noCells(candGrowth), n, STR, "s"))),
-    ...L2.map((n) => v(`growth + one object of ${n} strings`, addObj(candGrowth, "extra", NEST(n)))),
+    ...[4, 8, 12].map((n) => v(`candidate + ${n} numbers`, plus(cand, n, { type: "number" }, "x"))),
+    ...[4, 8, 12, 16].map((n) => v(`candidate + ${n} booleans`, plus(cand, n, { type: "boolean" }, "b"))),
+    ...[8, 16, 32, 64].map((n) => v(`candidate + ${n} strings as one shared $ref`, plus(withStrDef(cand), n, REF, "s"))),
+    ...[0, 8, 16, 32].map((n) => v(`candidate, every string a shared $ref, + ${n} more`, plus(refStrings(cand), n, REF, "s"))),
+    ...L2.map((n) => v(`lean growth (no columns, no row unit) + ${n} strings`, plus(lean(candGrowth), n, STR, "s"))),
   ];
 }
 
