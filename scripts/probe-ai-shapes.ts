@@ -170,26 +170,33 @@ function exploreShapes(): Shape[] {
   const nov16 = without(draft, added17Nov);
   const LADDER = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64];
   const PAIR = { type: "array", items: { type: "object", properties: { a: STR, b: STR }, additionalProperties: false, required: ["a", "b"] } };
+  const NEST = (n: number) => ({ type: "object", properties: Object.fromEntries(Array.from({ length: n }, (_, i) => [`s${i}`, STR])), additionalProperties: false, required: Array.from({ length: n }, (_, i) => `s${i}`) });
+  const addObj = (schema: Json, name: string, obj: Json) => {
+    const out = clone(schema);
+    (out.properties as Json)[name] = obj;
+    (out.required as string[]).push(name);
+    return out;
+  };
+  // Research-only fields grouped in one object: does the width of one object drive the cost?
+  const research = ["aim", "aimIsHypothesis", "conclusion", "references"];
+  const grouped = (schema: Json) => {
+    const props = schema.properties as Json;
+    const inner = { type: "object", properties: Object.fromEntries(research.map((k) => [k, props[k]])), additionalProperties: false, required: research };
+    return addObj(without(schema, research), "research", inner);
+  };
+  const flatQuote = (schema: Json) => plus(without(schema, ["quote"]), 3, STR, "quote");
+  const noCells = (schema: Json) => without(schema, ["cells"], "charts[]");
+  const L2 = [4, 8, 12, 16, 24, 32];
   return [
-    // Repeats from the first run: is the limit the same every time?
-    v("repeat: 16 Nov draft + 1 nullable string", plus(nov16, 1, NSTR, "n")),
-    v("repeat: 16 Nov draft + 2 nullable strings", plus(nov16, 2, NSTR, "n")),
-    v("repeat: non-null draft", denull(draft)),
-    v("candidate", cand),
-    v("candidate with planned growth", candGrowth),
-    v("candidate with planned growth, real enums", realEnums(candGrowth)),
-    // Ladders: how many more top-level strings fit on each base.
-    ...LADDER.map((n) => v(`non-null draft + ${n} strings`, plus(denull(draft), n, STR, "s"))),
-    ...LADDER.map((n) => v(`candidate + ${n} strings`, plus(cand, n, STR, "s"))),
-    ...LADDER.map((n) => v(`candidate with planned growth + ${n} strings`, plus(candGrowth, n, STR, "s"))),
-    // What other constructs cost, on the candidate.
-    ...[1, 2, 4, 8].map((n) => v(`candidate + ${n} nullable strings`, plus(cand, n, NSTR, "n"))),
-    ...[1, 2, 4, 8].map((n) => v(`candidate + ${n} arrays of {a, b}`, plus(cand, n, PAIR, "p"))),
-    ...[1, 2, 4, 8].map((n) => v(`candidate + ${n} strings in each chart`, plus(cand, n, STR, "c", "charts[]"))),
-    ...[1, 2, 4, 8].map((n) => v(`candidate + ${n} strings in each chart row`, plus(cand, n, STR, "r", "charts[].rows[]"))),
-    v("candidate without charts", without(cand, ["charts"])),
-    v("candidate without charts.cells", without(cand, ["cells"], "charts[]")),
-    v("candidate with the quote as 3 top-level strings", plus(without(cand, ["quote"]), 3, STR, "q")),
+    v("repeat: candidate + 12 strings", plus(cand, 12, STR, "s")),
+    v("repeat: candidate + 16 strings", plus(cand, 16, STR, "s")),
+    ...[4, 8, 16, 32, 64].map((n) => v(`candidate + one object of ${n} strings`, addObj(cand, "extra", NEST(n)))),
+    ...[16, 32, 64].map((n) => v(`candidate + ${n} strings in each chart`, plus(cand, n, STR, "c", "charts[]"))),
+    ...[16, 32, 64].map((n) => v(`candidate + ${n} strings in each chart row`, plus(cand, n, STR, "r", "charts[].rows[]"))),
+    ...L2.map((n) => v(`growth, research grouped + ${n} strings`, plus(grouped(candGrowth), n, STR, "s"))),
+    ...L2.map((n) => v(`growth, quote flat + ${n} strings`, plus(flatQuote(candGrowth), n, STR, "s"))),
+    ...L2.map((n) => v(`growth, no cells + ${n} strings`, plus(noCells(candGrowth), n, STR, "s"))),
+    ...L2.map((n) => v(`growth + one object of ${n} strings`, addObj(candGrowth, "extra", NEST(n)))),
   ];
 }
 
