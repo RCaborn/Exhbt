@@ -89,9 +89,9 @@ export function fitIntro(text: string): string {
 export function introRequest(facts: IntroFacts) {
   return {
     model: AI_MODEL,
-    // A ceiling, not a cost (npm run measure:ai, 23 Nov 2026): with few facts the model thinks for longer, and
-    // the old 400 was used up by thinking in 3 of 3 runs, so no intro came back. Up to 813 tokens since.
-    max_tokens: 3000,
+    // A ceiling, not a cost (npm run measure:ai, 23 Nov 2026): with few facts the model thinks for longer.
+    // The old 400 was used up by thinking in 3 of 3 runs, so no intro came back; since then up to 1,828.
+    max_tokens: 6000,
     output_config: INTRO_OUTPUT_CONFIG,
     system: SYSTEM,
     messages: [{ role: "user" as const, content: `<facts>\n${factsAsText(facts)}\n</facts>\n\nWrite the intro.` }],

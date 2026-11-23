@@ -702,7 +702,7 @@ async function main() {
       attempts.push(a);
       const line =
         a.status === "ok"
-          ? `${a.checks.wordCount} words, ${a.checks.publishIssues.length} publish issues, ${a.checks.unverified.length + a.checks.badQuotes.length} unverified, key facts ${a.checks.coverage.covered.length}/${f.keyFacts.length}` +
+          ? `${a.checks.wordCount} words, ${a.checks.publishIssues.length} publish issues, ${a.checks.unverified.length + a.checks.badQuotes.length} unverified${a.checks.unverified.length + a.checks.badQuotes.length ? ` (${[...a.checks.unverified.map((n) => `${n} not in the material`), ...a.checks.badQuotes.map((n) => `${n}: its quote isn't`)].join("; ")})` : ""}, key facts ${a.checks.coverage.covered.length}/${f.keyFacts.length}` +
             (a.judge ? (a.judge.status === "ok" ? `, AI-judged ${judgeTotal(a.judge)}/16` : `, judge failed: ${a.judge.error}`) : "")
           : `failed (${a.errorClass}): ${a.error}`;
       console.log(`  ${f.fixture}${args.reps > 1 ? ` #${rep}` : ""}: ${line}`);
