@@ -96,9 +96,14 @@ const pressUndo = async (page: Page) => {
   await page.keyboard.press("ControlOrMeta+z");
 };
 const fileExists = async (page: Page, fileId: string) => (await page.request.get(`/dev/files/${fileId}`)).status() === 200;
-const removeVia = async (page: Page, id: string, label: string) => {
+/** A section's toolbar button, by name, with the pointer on the section; where the toolbar is the compact pair (23 Nov), from its More actions. */
+const toolOf = async (page: Page, id: string, name: string) => {
   await frame(page, id).hover();
-  await frame(page, id).getByRole("button", { name: `Remove ${label}` }).click();
+  if ((await frame(page, id).locator(":scope > .xe-tools").getAttribute("data-place")) === "compact") await frame(page, id).getByRole("button", { name: /^More actions for / }).click();
+  return frame(page, id).getByRole("button", { name });
+};
+const removeVia = async (page: Page, id: string, label: string) => {
+  await (await toolOf(page, id, `Remove ${label}`)).click();
 };
 
 test.describe("a new exhbt in the new editor", () => {
@@ -135,8 +140,7 @@ test.describe("a new exhbt in the new editor", () => {
     const before = await docNow(page);
     expect(await pageOrder(page)).toEqual(["flow", "findings"]);
 
-    await frame(page, "flow").hover();
-    await frame(page, "flow").getByRole("button", { name: "Move Flowchart down" }).click();
+    await (await toolOf(page, "flow", "Move Flowchart down")).click();
     expect(await pageOrder(page)).toEqual(["findings", "flow"]);
     await waitSaved(page, id);
     const moved = (await readStored(page, id)).working;
@@ -552,6 +556,9 @@ test.describe("undo", () => {
     const before = await boxes(page);
     const stored = (await readStored(page, id)).working;
     await frame(page, "flow").hover();
+    // Its three boxes in one row: the toolbar's row would cover the last box's words, so it is the compact pair (23 Nov), and Move down is in More actions.
+    await expect(frame(page, "flow").locator(":scope > .xe-tools")).toHaveAttribute("data-place", "compact");
+    await frame(page, "flow").getByRole("button", { name: "More actions for Flowchart" }).click();
     await frame(page, "flow").getByRole("button", { name: "Move Flowchart down" }).click();
     await waitSaved(page, id);
     expect(hasMarker((await readStored(page, id)).working)).toBe(true);
