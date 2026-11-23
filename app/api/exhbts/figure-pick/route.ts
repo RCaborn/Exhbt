@@ -42,8 +42,6 @@ export async function POST(req: Request) {
     return fail("That request wasn't complete.", 400);
   }
   const labels = form.getAll("label").map((l) => String(l).slice(0, 120));
-  // Outside production the page also sends a hint (the file's name) for the stand-in AI. It is only ever given to the stand-in.
-  const hints = process.env.NODE_ENV === "production" ? [] : form.getAll("hint").map((h) => String(h).slice(0, 200));
   const files = form.getAll("image").filter((f): f is File => f instanceof File);
   if (!files.length || files.length > FIGURE.maxImages || labels.length !== files.length) return fail("Send between 1 and 30 page images.", 400);
   if (files.some((f) => f.size === 0 || f.size > FIGURE.maxImageBytes)) return fail("A page image is empty or too big.", 413);
@@ -57,7 +55,7 @@ export async function POST(req: Request) {
     // The model gives its box in pixels of the image, so the size is read here, from the file itself.
     const size = imageSize(data);
     if (!size) return fail("A page image couldn't be read.", 415);
-    images.push({ label: labels[i]!, data, mediaType, ...size, ...(hints[i] ? { hint: hints[i] } : {}) });
+    images.push({ label: labels[i]!, data, mediaType, ...size });
   }
 
   const store = getStore();

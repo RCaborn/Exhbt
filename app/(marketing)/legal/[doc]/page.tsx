@@ -137,8 +137,9 @@ const DOCS: Record<string, Doc> = {
             choosing a figure for an exhbt: when you draft one, small images from your files are sent to pick the one
             that best shows your result. They are images of the pages of a PDF that have charts, diagrams or pictures
             on them (from the first 30); the pictures inside a Word or PowerPoint file, leaving out logos and tiny
-            ones; and pictures (PNG or JPEG) you upload with your work, if you choose to send them to be read. We label
-            each image &ldquo;File 1, page 3&rdquo; or the like and never send the file&rsquo;s name. What comes back is
+            ones; and pictures (PNG or JPEG) you upload with your work, if you choose to send them to be read. Each
+            image goes with a short label: the file&rsquo;s name and the page for a PDF, and &ldquo;File 1, picture
+            2&rdquo; for a picture from a Word or PowerPoint file or one you uploaded. What comes back is
             which image, where the figure is on it, and a short description and caption. If your browser can&rsquo;t
             read any text in a PDF, as with most scans, its page images are sent only if you choose to send it to be
             read. A scan that already has text in it is treated like any other PDF: each of its pages is a picture, so

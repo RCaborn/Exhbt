@@ -282,9 +282,9 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
             const p = await pages.current.get(it.key);
             if (p) sources.push({ name: it.file.name, file: it.file, fileId: it.upload === "done" ? it.fileId : undefined, pages: p });
           }
-          // Each file is numbered in the order its candidates are made: the AI is told "File 2, slide 3", never the name.
+          // A PDF's pages are labelled with its name; a picture from a Word or PowerPoint file, or one uploaded, with a number: "File 2, slide 3".
           let no = sources.length;
-          const all: Candidate[] = sources.flatMap((s, i) => pdfCandidates(s, i + 1));
+          const all: Candidate[] = sources.flatMap(pdfCandidates);
           let unread = drawn.length - sources.length;
           let capped = false;
           let readable = sources.length > 0;
