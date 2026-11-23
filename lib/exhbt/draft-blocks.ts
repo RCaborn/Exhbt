@@ -38,6 +38,12 @@ export type AiVersion = {
   unverified: { [K in DraftBlock]?: string[] };
   /** The graphs the draft drew that a figure from the work took the place of (decision 0025), kept so the editor can offer them back (decision 0026). */
   graphs?: Chart[];
+  /**
+   * The graphs the draft drew, as it drew them, written once when the exhbt is drafted. The figure route
+   * (/api/exhbts/[id]/figure) removes graphs only while every graph on the exhbt is one of these, that is,
+   * while it is still the fresh draft. Missing from AI versions kept before this: then nothing is removed.
+   */
+  drafted?: Chart[];
 };
 
 export const emptyAiVersion = (): AiVersion => ({ blocks: {}, unverified: {} });
@@ -52,7 +58,8 @@ export function readAiVersion(raw: string | null): AiVersion {
   try {
     const v = JSON.parse(raw) as Partial<AiVersion> & { graphs?: unknown };
     const graphs = z.array(ChartSchema).safeParse(v.graphs);
-    return { blocks: v.blocks ?? {}, unverified: v.unverified ?? {}, ...(graphs.success ? { graphs: graphs.data } : {}) };
+    const drafted = z.array(ChartSchema).safeParse((v as { drafted?: unknown }).drafted);
+    return { blocks: v.blocks ?? {}, unverified: v.unverified ?? {}, ...(graphs.success ? { graphs: graphs.data } : {}), ...(drafted.success ? { drafted: drafted.data } : {}) };
   } catch {
     return emptyAiVersion();
   }
@@ -80,13 +87,17 @@ export function blockValue(doc: ExhbtDoc, key: DraftBlock): BlockValue {
   }
 }
 
-/** The doc with the findings section's bullets replaced; one is added straight after the flowchart if there's none. */
+/**
+ * The doc with the findings section's bullets replaced; one is added if there's none: straight after the
+ * flowchart's marker when the doc has one, otherwise first (the flowchart is then drawn before every section).
+ */
 function withFindings(doc: ExhbtDoc, items: RichText[]): ExhbtDoc {
   if (doc.sections.some((s) => s.kind === "findings")) {
     return { ...doc, sections: doc.sections.map((s) => (s.kind === "findings" ? { ...s, items } : s)) };
   }
   const id = doc.sections.some((s) => s.id === "findings") ? `findings-${doc.sections.length + 1}` : "findings";
-  return { ...doc, sections: [{ id, kind: "findings", items }, ...doc.sections] };
+  const at = doc.sections.findIndex((s) => s.kind === "flow") + 1;
+  return { ...doc, sections: [...doc.sections.slice(0, at), { id, kind: "findings", items }, ...doc.sections.slice(at)] };
 }
 
 export function applyBlock<K extends DraftBlock>(doc: ExhbtDoc, key: K, value: BlockValues[K]): ExhbtDoc;
@@ -128,6 +139,7 @@ export function aiVersionOf(doc: ExhbtDoc, source: string, extraUnverified: stri
     (out.blocks as Record<string, unknown>)[key] = structuredClone(blockValue(doc, key));
     out.unverified[key] = flagsForBlock(doc, key, source, extraUnverified);
   }
+  out.drafted = doc.sections.flatMap((s) => (s.kind === "graph" ? [structuredClone(s.chart)] : []));
   return out;
 }
 

@@ -248,7 +248,7 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
           }
           // A PDF whose pages couldn't be drawn wasn't looked at: that isn't "no figure".
           if (!sources.length) return { status: "failed" };
-          const all = sources.flatMap(pdfCandidates);
+          const all = sources.flatMap((s, i) => pdfCandidates(s, i + 1));
           const candidates = withinCaps(all);
           leftOut = sources.length < drawn.length || candidates.length < all.length || sources.some((s) => s.pages.pageCount > s.pages.pages.length);
           return prepareFigure(candidates, stop.signal);
@@ -396,7 +396,7 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
                   <p className="mt-1 text-sm text-graphite">
                     {it.needs === "image"
                       ? "We can send it to our AI reader to turn it into text. Only the text comes back, and the file stays private to you."
-                      : "We can send it to our AI reader to turn it into text and to look for a figure, such as a graph, for your exhbt. Only the text and where the figure is come back, and the file stays private to you."}
+                      : "We can send it to our AI reader to turn it into text and to look for a figure, such as a graph, for your exhbt. Only the text, where the figure is, and a short description and caption of it come back, and the file stays private to you."}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-3">
                     <Button variant="primary" size="sm" onClick={() => void readOnServerFor(it)}>

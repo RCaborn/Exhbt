@@ -17,7 +17,15 @@ import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./mo
  */
 
 /** One image the figure could be on, with its size in pixels (read from the file by the route, not sent by the browser). */
-export type PageImage = { label: string; data: Uint8Array; mediaType: "image/jpeg" | "image/png"; width: number; height: number };
+export type PageImage = {
+  label: string;
+  data: Uint8Array;
+  mediaType: "image/jpeg" | "image/png";
+  width: number;
+  height: number;
+  /** For the stand-in only, outside production (the file's name). Never part of the request to the model. */
+  hint?: string;
+};
 export type FigurePick = { image: number; kind: FigureKind; box: FigureBox; alt: string; caption: string };
 export type FigurePickResult = {
   pick: FigurePick | null;
@@ -140,10 +148,12 @@ const mockKind = (label: string): FigureKind => {
  */
 function mockPick(images: PageImage[]): FigurePickResult {
   const first = images[0]!;
+  // A file named "...pick-fails..." makes the stand-in fail, so the tests can see a failed pick isn't counted.
+  if (/pick-fails/i.test(first.hint ?? "")) throw new Error("The stand-in was asked to fail.");
   const raw: Answer = {
     found: true,
     image: 1,
-    kind: mockKind(first.label),
+    kind: mockKind(first.hint ?? first.label),
     box: pixelsFromBox({ x: 0.06, y: 0.05, w: 0.88, h: 0.48 }, first),
     alt: `Development preview: no API key is configured, so this description of ${first.label} is a placeholder. Describe the figure here.`,
     caption: "Placeholder caption for the figure picked from your report",

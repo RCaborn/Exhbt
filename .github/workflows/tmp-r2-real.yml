@@ -3,7 +3,7 @@ name: TEMP release 2 real-API runs
 
 on:
   push:
-    branches: [phase-2-r2-main]
+    branches: [phase-2-r2-main, phase-2-r2-fixes, phase-2-r2-work-pictures]
 
 permissions:
   contents: read
