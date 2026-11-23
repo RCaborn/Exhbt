@@ -52,6 +52,8 @@ Each cap is now at least three times the largest total measured: the intro 6,000
 ## How it is kept that way
 
 - `npm run probe:ai` sends every structured answer the app asks for, using each module's own `output_config`, with a one-line prompt and a tiny `max_tokens`. It fails if one is refused. It also checks "draft with planned growth", so a release can't take the draft over the limit unseen. `--explore` adds the measuring ladders above.
-- `.github/workflows/ai-shapes.yml` runs it whenever `lib/ai/`, the layout or graph lists, the probe or the lockfile change. It also runs weekly, in case the API's limit moves. The draft eval runs it first.
-- The same workflow runs `npm run measure:ai` weekly and by hand (72 calls, about 12 US cents). It fails if any answer was cut off at `max_tokens`.
-- When you add a field to an AI answer, make it non-null and run the probe. If the draft has to grow past its room, cut fields before reaching for a second call or for unconstrained JSON.
+- `.github/workflows/ai-shapes.yml` runs it, and only when a person starts that workflow by hand (Actions tab > "AI request shapes" > Run workflow). The draft eval, also started by hand, runs it first.
+- A second job in the same run does `npm run measure:ai` (72 calls, about 12 US cents). It fails if any answer was cut off at `max_tokens`.
+- Nothing runs either check automatically. Automatic runs were switched off on 23 Nov 2026 at the owner's request (Rory), after test runs used up the key's monthly allowance. Before that the workflow was set to run the probe on every push or pull request that changed `lib/ai/`, the layout or graph lists, the probe or the lockfile, and both checks weekly, in case the API's limit moved. Nothing now watches for the API's limit moving between runs.
+- Run the workflow before a release that changes anything under `lib/ai/` or a schema it uses, such as the layout and graph lists, and only with Rory's say-so, having told him the cost first: about 12 US cents a run, nearly all of it the second job.
+- When you add a field to an AI answer, make it non-null and check the count `npm run probe:ai -- --dry` prints against the limit above; that makes no API call, and the probe itself runs before the release. If the draft has to grow past its room, cut fields before reaching for a second call or for unconstrained JSON.
