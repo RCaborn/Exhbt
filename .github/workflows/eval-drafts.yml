@@ -4,9 +4,6 @@
 name: Exhbt draft eval
 
 on:
-  # TEMPORARY: the hotfix branch runs the full eval on push. Removed before merge.
-  push:
-    branches: [hotfix-draft-schema]
   workflow_dispatch:
     inputs:
       judge:
@@ -48,7 +45,7 @@ jobs:
       - name: Run the eval
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          JUDGE: ${{ github.event_name == 'push' || inputs.judge }}
+          JUDGE: ${{ inputs.judge }}
         run: |
           if [ "$JUDGE" = "true" ]; then
             npm run eval:drafts -- --model-judge
