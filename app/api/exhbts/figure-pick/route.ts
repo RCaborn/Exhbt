@@ -71,7 +71,8 @@ export async function POST(req: Request) {
     result = await pickFigure(images);
   } catch (err) {
     console.error("figure pick failed", (err as Error).message);
-    return fail("We couldn't pick a figure just now.", 502);
+    // Outside production the reason is on the answer too, so the eval can say why a real call failed (never shown to people).
+    return fail(process.env.NODE_ENV === "production" ? "We couldn't pick a figure just now." : `We couldn't pick a figure just now. (${(err as Error).message.slice(0, 300)})`, 502);
   }
   // Counted once the AI answered, so a pick that failed doesn't spend the person's allowance.
   await store.logEvent("figure_picked", user.id, { pages: images.length });
