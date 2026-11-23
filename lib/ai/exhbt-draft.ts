@@ -45,7 +45,7 @@ Fields:
 - skills: up to ${L.skills.max} skills the material shows being used, each at most ${L.skills.wordsEach} words (e.g. "Python", "Regression analysis").
 - gap: the line of context under the question: why it matters, at most ${L.gapWords} words, at most 2 short sentences, e.g. "Open banking makes banks share customer data. Nobody knows whether banks and fintechs will then cooperate or compete."
 - gapHighlight: the words in gap that name the gap (what nobody knew or had done), copied exactly from gap, e.g. "Nobody knows whether banks and fintechs will then cooperate or compete." Empty if gap has no such words.
-- flow: ${L.flow.min} to ${L.flow.max} steps of the process, in order, each at most ${L.flow.stepWords} words. "detail" is an optional note of at most ${L.flow.detailWords} words (e.g. "14,200 rows"), or null.
+- flow: ${L.flow.min} to ${L.flow.max} steps of the process, in order, each at most ${L.flow.stepWords} words. "detail" is an optional note of at most ${L.flow.detailWords} words (e.g. "14,200 rows"), or empty.
 - findings: ${L.findings.min} to ${L.findings.max} short bullets of what was found or achieved, each at most ${L.findings.wordsEach} words.
 - charts: usually one graph, a second only when the material has a separate set of figures worth one (never more than ${L.charts.max}), only from figures stated in the material, each value copied as written there (no totals, averages or changes you work out). An empty list when the material has no figures worth a graph. Choose the kind that fits the figures:
   - "beforeAfter": one measure before and after a change. series: [what "before" is called, what "after" is called]; rows: ${L.charts.beforeAfter.rows.min} to ${L.charts.beforeAfter.rows.max}, each with values [before, after]. Set lowerIsBetter.
@@ -53,11 +53,11 @@ Fields:
   - "groupedBar": ${L.charts.groupedBar.series.min} to ${L.charts.groupedBar.series.max} series compared across up to ${L.charts.groupedBar.rows.max} groups. series: their names; rows: each with one value per series.
   - "stackedBar": parts that add up to a whole: up to ${L.charts.stackedBar.rows.max} bars of ${L.charts.stackedBar.series.min} to ${L.charts.stackedBar.series.max} parts, none below 0. series: the parts' names.
   - "line": up to ${L.charts.line.series.max} series over an ordered axis such as weeks or months, ${L.charts.line.rows.min} to ${L.charts.line.rows.max} points in order. rows: each point's label and one value per series.
-  - "scatter": ${L.charts.scatter.points.min} to ${L.charts.scatter.points.max} pairs of figures, in points; xTitle and yTitle say what each axis measures.
-  - "numbers": ${L.charts.numbers.tiles.min} to ${L.charts.numbers.tiles.max} headline figures, in tiles, each with its label, unit and "from" (the starting value, only if the material states one).
-  - "table": a small table, up to ${L.charts.table.columns.max} columns and ${L.charts.table.rows.max} rows: columns are the headings, cells the rows of text.
-  Fill only the fields the kind uses; leave the rest as empty lists or null. Labels at most ${L.charts.labelChars} characters.
-- quote: feedback someone gave on the work (a supervisor, a client, a user), only if the material contains it: "text" copied word for word from the material, at most ${L.quote.words} words; "name" as the material gives it; "role" as the material gives it, or empty. Never write, shorten, join or reword a quote; if the only one is longer than ${L.quote.words} words, or nobody is named, null.
+  - "scatter": ${L.charts.scatter.points.min} to ${L.charts.scatter.points.max} pairs of figures. rows: one per point, each with values [x, y] and its label, or an empty label; xTitle and yTitle say what each axis measures.
+  - "numbers": ${L.charts.numbers.tiles.min} to ${L.charts.numbers.tiles.max} headline figures. rows: one per figure, each with its label and values [value], or [value, from] where "from" is the starting value, only if the material states one. series: each figure's unit, in the same order as rows, or an empty string for none.
+  - "table": a small table, up to ${L.charts.table.columns.max} columns and ${L.charts.table.rows.max} rows of text. cells: the first row is the headings, then one row per table row.
+  Fill only the fields the kind uses; leave the rest as empty strings, empty lists or false. Labels at most ${L.charts.labelChars} characters.
+- quote: feedback someone gave on the work (a supervisor, a client, a user), only if the material contains it: "text" copied word for word from the material, at most ${L.quote.words} words; "name" as the material gives it; "role" as the material gives it, or empty. Never write, shorten, join or reword a quote; if the only one is longer than ${L.quote.words} words, or nobody is named, or there is none, leave text, name and role all empty.
 - next: what the person says they would do next or do differently, at most ${L.reflection.words} words, only if the material says so. Empty otherwise.
 - aim: research only. The aim or hypothesis as the material states it, at most ${R.aim.words} words, empty if the material states none. aimIsHypothesis is true only if the material itself calls it a hypothesis.
 - conclusion: research only. What the material itself concludes, at most ${R.conclusion.words} words. Never a conclusion the material doesn't draw. Empty otherwise.
@@ -74,27 +74,32 @@ Layout (the "format" field):
 - Fields that belong to another layout stay empty.`;
 
 /**
- * A graph as the model writes it: one flat shape for every kind (structured outputs keep enums
- * but not constant discriminators), turned into the stored kind by toChart. Unused fields are
- * empty lists or null.
+ * A graph as the model writes it: one flat shape for every kind, turned into the stored kind by
+ * toChart. Unused fields are empty strings, empty lists or false. (The SDK sends an enum such as
+ * `kind` only as a description, so a value outside it fails the parse rather than the grammar.)
+ *
+ * The answer shape is kept small on purpose (decision 0025): the API compiles it into a grammar
+ * and refuses one that is too large, at about 52 to 56 fields in all, with a nullable field
+ * costing about two and an array of objects a little more than its fields. So nothing here is
+ * nullable (empty means "none"), and every kind shares one row
+ * type: a scatter point is a row with values [x, y], a number tile a row with values [value] or
+ * [value, from] and its unit in `series`, a table's headings the first row of `cells`.
+ * `npm run probe:ai` checks the shape against the real API, with the growth already planned.
  */
 const DraftChartSchema = z.object({
   kind: z.enum(CHART_KINDS),
   title: z.string(),
-  xTitle: z.string().nullable(),
-  yTitle: z.string().nullable(),
-  unit: z.string().nullable(),
-  lowerIsBetter: z.boolean().nullable(),
+  xTitle: z.string(),
+  yTitle: z.string(),
+  unit: z.string(),
+  lowerIsBetter: z.boolean(),
   series: z.array(z.string()),
   rows: z.array(z.object({ label: z.string(), values: z.array(z.number()) })),
-  points: z.array(z.object({ x: z.number(), y: z.number(), label: z.string().nullable() })),
-  tiles: z.array(z.object({ value: z.number(), label: z.string(), unit: z.string().nullable(), from: z.number().nullable() })),
-  columns: z.array(z.string()),
   cells: z.array(z.array(z.string())),
 });
 export type DraftChart = z.infer<typeof DraftChartSchema>;
 
-const DraftSchema = z.object({
+export const DraftSchema = z.object({
   format: z.enum(FORMATS),
   title: z.string(),
   summary: z.string(),
@@ -103,10 +108,11 @@ const DraftSchema = z.object({
   skills: z.array(z.string()),
   gap: z.string(),
   gapHighlight: z.string(),
-  flow: z.array(z.object({ step: z.string(), detail: z.string().nullable() })),
+  flow: z.array(z.object({ step: z.string(), detail: z.string() })),
   findings: z.array(z.string()),
   charts: z.array(DraftChartSchema),
-  quote: z.object({ text: z.string(), name: z.string(), role: z.string() }).nullable(),
+  // All three empty when there is no quote.
+  quote: z.object({ text: z.string(), name: z.string(), role: z.string() }),
   next: z.string(),
   aim: z.string(),
   aimIsHypothesis: z.boolean(),
@@ -115,6 +121,8 @@ const DraftSchema = z.object({
   numbers: z.array(z.object({ value: z.string(), sourceQuote: z.string() })),
 });
 type Draft = z.infer<typeof DraftSchema>;
+/** What the draft call sends as output_config. Exported so scripts/probe-ai-shapes.ts checks the very shape the app sends. */
+export const DRAFT_OUTPUT_CONFIG = { effort: "low" as const, format: zodOutputFormat(DraftSchema) };
 
 export type DraftInput = {
   text: string;
@@ -141,23 +149,18 @@ export function materialText({ text, notes, link }: DraftInput): string {
     .slice(0, MAX_MATERIAL_CHARS);
 }
 
-export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
-  const apiKey = anthropicApiKey();
-  if (!apiKey) {
-    // Never hand real people a placeholder draft.
-    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
-    return mockDraft(input);
-  }
-
-  const client = new Anthropic({ apiKey });
-  const response = await client.messages.parse({
+/** The whole draft request, so a script can send exactly what the app sends. */
+export function draftRequest(input: DraftInput) {
+  return {
     model: AI_MODEL,
-    max_tokens: 4000,
-    output_config: { effort: "low", format: zodOutputFormat(DraftSchema) },
+    // The model thinks before it answers: roughly 1,400 to 4,900 tokens on the eval fixtures,
+    // and up to 5,800 tokens in all. At 4,000 most drafts were cut off mid-answer (decision 0025).
+    max_tokens: 16000,
+    output_config: DRAFT_OUTPUT_CONFIG,
     system: SYSTEM,
     messages: [
       {
-        role: "user",
+        role: "user" as const,
         content: [
           `<material>\n${input.text.trim().slice(0, MAX_MATERIAL_CHARS) || "(no files)"}\n</material>`,
           input.notes?.trim() ? `<notes>\n${input.notes.trim()}\n</notes>` : "No notes.",
@@ -168,7 +171,19 @@ export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
         ].join("\n\n"),
       },
     ],
-  });
+  };
+}
+
+export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
+  const apiKey = anthropicApiKey();
+  if (!apiKey) {
+    // Never hand real people a placeholder draft.
+    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
+    return mockDraft(input);
+  }
+
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.parse(draftRequest(input));
 
   if (response.stop_reason === "refusal" || !response.parsed_output) {
     throw new Error(`Exhbt draft failed (stop_reason: ${response.stop_reason})`);
@@ -192,7 +207,7 @@ export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
  * the name too. Anything else is dropped rather than flagged: a quote can't be checked like a
  * number, and an invented one would put words in someone's mouth.
  */
-export function quoteFrom(q: Draft["quote"], source: string): { text: string; name: string; role: string } | null {
+export function quoteFrom(q: Draft["quote"] | null, source: string): { text: string; name: string; role: string } | null {
   if (!q) return null;
   const text = q.text.trim().replace(/^["“‘']+|["”’']+$/g, "").trim();
   const name = q.name.trim();
@@ -265,7 +280,7 @@ export function toDoc(d: Draft, source: string): ExhbtDoc {
     flow: d.flow
       .filter((s) => nonEmpty(s.step))
       .slice(0, L.flow.max)
-      .map((s) => (s.detail?.trim() ? { step: s.step.trim(), detail: s.detail.trim() } : { step: s.step.trim() })),
+      .map((s) => (s.detail.trim() ? { step: s.step.trim(), detail: s.detail.trim() } : { step: s.step.trim() })),
     sections,
   };
 }
@@ -276,7 +291,9 @@ export function toDoc(d: Draft, source: string): ExhbtDoc {
  */
 export function toChart(g: DraftChart): Chart | null {
   const C = L.charts;
-  const t = (s: string | null | undefined) => (s ?? "").trim();
+  const t = (s: string | undefined) => (s ?? "").trim();
+  // false stores nothing, as null did before (decision 0025), so the graph's default holds.
+  const better = g.lowerIsBetter ? true : undefined;
   const some = (o: Record<string, string | boolean | undefined>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== ""));
   const axes = some({ xTitle: t(g.xTitle), yTitle: t(g.yTitle), unit: t(g.unit) });
   const title = t(g.title);
@@ -290,14 +307,14 @@ export function toChart(g: DraftChart): Chart | null {
         title,
         beforeLabel: t(g.series[0]) || "Before",
         afterLabel: t(g.series[1]) || "After",
-        lowerIsBetter: g.lowerIsBetter ?? false,
+        lowerIsBetter: g.lowerIsBetter,
         ...some({ unit: t(g.unit) }),
         rows: kept.map((r) => ({ label: r.label, before: r.values[0]!, after: r.values[1]! })),
       };
     }
     case "bar": {
       const kept = rows.filter((r) => r.values.length >= 1).slice(0, C.bar.rows.max);
-      return kept.length ? { kind: "bar", title, ...axes, ...some({ lowerIsBetter: g.lowerIsBetter ?? undefined }), rows: kept.map((r) => ({ label: r.label, value: r.values[0]! })) } : null;
+      return kept.length ? { kind: "bar", title, ...axes, ...some({ lowerIsBetter: better }), rows: kept.map((r) => ({ label: r.label, value: r.values[0]! })) } : null;
     }
     case "groupedBar":
     case "stackedBar":
@@ -309,24 +326,31 @@ export function toChart(g: DraftChart): Chart | null {
         .slice(0, lim.rows.max)
         .map((r) => ({ label: r.label, values: r.values.slice(0, series.length) }));
       if (!series.length || !kept.length) return null;
-      const better = g.kind === "stackedBar" ? {} : some({ lowerIsBetter: g.lowerIsBetter ?? undefined });
-      return { kind: g.kind, title, ...axes, ...better, series, rows: kept } as Chart;
+      const lower = g.kind === "stackedBar" ? {} : some({ lowerIsBetter: better });
+      return { kind: g.kind, title, ...axes, ...lower, series, rows: kept } as Chart;
     }
     case "scatter": {
-      const points = g.points.slice(0, C.scatter.points.max).map((p) => ({ x: p.x, y: p.y, ...some({ label: t(p.label) }) }));
+      // A point is a row with values [x, y]; a row without both is dropped.
+      const points = rows
+        .filter((r) => r.values.length >= 2)
+        .slice(0, C.scatter.points.max)
+        .map((r) => ({ x: r.values[0]!, y: r.values[1]!, ...some({ label: r.label }) }));
       return points.length ? { kind: "scatter", title, xTitle: t(g.xTitle), yTitle: t(g.yTitle), ...some({ unit: t(g.unit) }), points } : null;
     }
     case "numbers": {
-      const tiles = g.tiles
-        .filter((x) => t(x.label))
+      // A tile is a row with values [value] or [value, from]; its unit is at the same place in series.
+      const tiles = rows
+        .map((r, i) => ({ ...r, unit: t(g.series[i]) }))
+        .filter((r) => r.label && r.values.length >= 1)
         .slice(0, C.numbers.tiles.max)
-        .map((x) => ({ value: x.value, label: t(x.label), ...some({ unit: t(x.unit) }), ...(x.from === null ? {} : { from: x.from }) }));
+        .map((r) => ({ value: r.values[0]!, label: r.label, ...some({ unit: r.unit }), ...(r.values.length >= 2 ? { from: r.values[1]! } : {}) }));
       return tiles.length ? { kind: "numbers", title, tiles } : null;
     }
     case "table": {
-      const columns = g.columns.map(t).slice(0, C.table.columns.max);
+      // The first row of cells is the headings.
+      const columns = (g.cells[0] ?? []).map((c) => t(c)).slice(0, C.table.columns.max);
       const cells = g.cells
-        .slice(0, C.table.rows.max)
+        .slice(1, C.table.rows.max + 1)
         .map((r) => Array.from({ length: columns.length }, (_, k) => t(r[k])))
         .filter((r) => r.some(Boolean));
       return columns.length && cells.length ? { kind: "table", title, columns, rows: cells } : null;
@@ -370,15 +394,12 @@ function mockDraft(input: DraftInput): DraftResult {
           {
             kind: "bar",
             title: "Placeholder graph: figures from your files",
-            xTitle: null,
-            yTitle: null,
-            unit: null,
-            lowerIsBetter: null,
+            xTitle: "",
+            yTitle: "",
+            unit: "",
+            lowerIsBetter: false,
             series: [],
             rows,
-            points: [],
-            tiles: [],
-            columns: [],
             cells: [],
           },
         ]
@@ -403,13 +424,13 @@ function mockDraft(input: DraftInput): DraftResult {
       gap: `No API key is configured, so this draft is placeholder text. Set ${ANTHROPIC_API_KEYS_ENV} to draft from your files.`,
       gapHighlight: "this draft is placeholder text",
       flow: [
-        { step: "Read the material", detail: null },
-        { step: "Drafted the blocks", detail: null },
-        { step: "Checked every number", detail: null },
+        { step: "Read the material", detail: "" },
+        { step: "Drafted the blocks", detail: "" },
+        { step: "Checked every number", detail: "" },
       ],
       findings: format === "gallery" ? [quote] : [quote, "This finding is a placeholder."],
       charts,
-      quote: feedback,
+      quote: feedback ?? { text: "", name: "", role: "" },
       next,
       numbers,
     }, materialText(input)),

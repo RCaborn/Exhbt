@@ -1,0 +1,211 @@
+/**
+ * Checks every structured answer the app asks the AI for against the real API (decision 0025).
+ *
+ * The API compiles each answer's JSON schema into a grammar before the model writes a word, and
+ * refuses a schema whose grammar is too large ("The compiled grammar is too large..."). Only the
+ * real API can say whether a schema fits: the stand-in AI used by the tests never compiles one.
+ * So this sends each schema exactly as the app does (each module exports its output_config), with
+ * a one-line prompt and a tiny max_tokens, and reports accepted or refused with the API's message.
+ * A few pence a year: the answers are cut off after a handful of tokens.
+ *
+ *   npm run probe:ai               # every shape the app sends, plus "draft with planned growth"
+ *   npm run probe:ai -- --dry      # no API calls: the size of each schema only (no key needed)
+ *   npm run probe:ai -- --explore  # also the measuring variants (what each construct costs)
+ *
+ * Exits non-zero if any shape the app sends, or the planned-growth check, is refused. Explore
+ * variants are measurements and never fail the run. Never prints the key or the environment.
+ */
+import Anthropic from "@anthropic-ai/sdk";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { z } from "zod/v4";
+import { DRAFT_OUTPUT_CONFIG, DraftSchema } from "@/lib/ai/exhbt-draft";
+import { rewriteOutputConfig } from "@/lib/ai/exhbt-rewrite";
+import { FIGURE_PICK_OUTPUT_CONFIG } from "@/lib/ai/figure-pick";
+import { JOB_MATCH_OUTPUT_CONFIG } from "@/lib/ai/job-match";
+import { INTRO_OUTPUT_CONFIG } from "@/lib/ai/portfolio-intro";
+import { IDEAS_OUTPUT_CONFIG, SWAP_OUTPUT_CONFIG } from "@/lib/ai/projects";
+import { ROADMAP_OUTPUT_CONFIG } from "@/lib/ai/roadmap";
+import { AI_MODEL, anthropicApiKey } from "@/lib/ai/model";
+
+type Json = Record<string, unknown>;
+type OutputConfig = { effort: "low" | "medium" | "high"; format: { type: "json_schema"; schema: Json } };
+type Shape = { name: string; config: OutputConfig; kind: "app" | "growth" | "explore" };
+
+const cfg = (c: { effort: "low"; format: { type: "json_schema"; schema: Json } }): OutputConfig => ({ effort: c.effort, format: { type: "json_schema", schema: c.format.schema } });
+
+/** Every structured answer the app asks for, as the app sends it. */
+const APP_SHAPES: Shape[] = [
+  { name: "draft", config: cfg(DRAFT_OUTPUT_CONFIG), kind: "app" },
+  ...(["header", "gap", "flow", "findings", "skills"] as const).map((b) => ({ name: `rewrite: ${b}`, config: cfg(rewriteOutputConfig(b)), kind: "app" as const })),
+  { name: "figure pick", config: cfg(FIGURE_PICK_OUTPUT_CONFIG), kind: "app" },
+  { name: "job match", config: cfg(JOB_MATCH_OUTPUT_CONFIG), kind: "app" },
+  { name: "portfolio intro", config: cfg(INTRO_OUTPUT_CONFIG), kind: "app" },
+  { name: "project ideas", config: cfg(IDEAS_OUTPUT_CONFIG), kind: "app" },
+  { name: "project swap", config: cfg(SWAP_OUTPUT_CONFIG), kind: "app" },
+  { name: "roadmap", config: cfg(ROADMAP_OUTPUT_CONFIG), kind: "app" },
+];
+
+/**
+ * The draft as it will be once the work already built has landed, so a release can't take the
+ * schema over the limit unseen: release 2's formatReason (its 8 values, as on phase-2-r2), and
+ * release 4's 7 layouts, a pull quote, a "my role" line and a before/after mark on each image
+ * (modelled: release 4's own schema isn't on a branch yet, so its names here are stand-ins).
+ */
+const PlannedGrowth = (DraftSchema as unknown as z.ZodObject<z.ZodRawShape>).extend({
+  format: z.enum(["case-study", "gallery", "research", "r4-a", "r4-b", "r4-c", "r4-d"]),
+  formatReason: z.enum(["notes", "aim-results", "hypothesis-results", "study", "visual-work", "mostly-pictures", "question-findings", "default"]),
+  pullQuote: z.string(),
+  myRole: z.string(),
+  imageMarks: z.array(z.object({ file: z.string(), mark: z.enum(["none", "before", "after"]) })),
+});
+const GROWTH: Shape = { name: "draft with planned growth", config: cfg({ effort: "low", format: zodOutputFormat(PlannedGrowth) }), kind: "growth" };
+
+// ---------------------------------------------------------------------------------------------
+// Schema surgery for the explore variants. They work on the JSON schema the app sends.
+
+const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+const isNullType = (s: unknown) => typeof s === "object" && s !== null && (s as Json).type === "null";
+/** Nullable as the SDK sends it: `type: [X, "null"]`, or `anyOf: [X, {type: "null"}]` for an object. */
+const isNullable = (node: Json) => (Array.isArray(node.type) && node.type.includes("null")) || Boolean((node.anyOf as Json[] | undefined)?.some(isNullType));
+
+/** Walks every sub-schema, parents first. `path` names object properties as a.b[].c */
+function walk(s: unknown, fn: (node: Json, path: string) => void, path = ""): void {
+  if (typeof s !== "object" || s === null) return;
+  const node = s as Json;
+  fn(node, path);
+  for (const [k, v] of Object.entries((node.properties as Json) ?? {})) walk(v, fn, path ? `${path}.${k}` : k);
+  if (node.items) walk(node.items, fn, `${path}[]`);
+  for (const alt of (node.anyOf as unknown[]) ?? []) walk(alt, fn, path);
+  for (const def of Object.values((node.$defs as Json) ?? {})) walk(def, fn, `$def`);
+}
+
+/**
+ * The SDK (1.6) moves an enum into the description ("{enum: [...]}"), so no enum reaches the
+ * grammar. This puts them back as real enums, to see what they would cost if a later SDK sent them.
+ */
+function realEnums(schema: Json): Json {
+  const out = clone(schema);
+  walk(out, (node) => {
+    const m = typeof node.description === "string" ? /^\{enum: (\[.*\])\}$/.exec(node.description) : null;
+    if (!m) return;
+    node.enum = JSON.parse(m[1]!) as string[];
+    delete node.description;
+  });
+  return out;
+}
+
+/** Adds n extra fields of the given JSON schema to the object at `path`, to measure what one more field costs. */
+function plus(schema: Json, n: number, field: Json, tag: string, path = ""): Json {
+  const out = clone(schema);
+  walk(out, (node, p) => {
+    if (p !== path || node.type !== "object" || !node.properties) return;
+    for (let i = 0; i < n; i++) {
+      (node.properties as Json)[`${tag}${i}`] = clone(field);
+      (node.required as string[]).push(`${tag}${i}`);
+    }
+  });
+  return out;
+}
+
+const STR = { type: "string" };
+const NSTR = { type: ["string", "null"] };
+
+/**
+ * Measurements, not checks: how many more fields fit on top of the draft and of the planned
+ * growth (decision 0025 has the numbers). A rung that flips from accepted to refused places the limit.
+ */
+function exploreShapes(): Shape[] {
+  const draft = DRAFT_OUTPUT_CONFIG.format.schema as Json;
+  const growth = GROWTH.config.format.schema;
+  const v = (name: string, schema: Json): Shape => ({ name: `explore: ${name}`, config: { effort: "low", format: { type: "json_schema", schema } }, kind: "explore" });
+  return [
+    ...[4, 8, 12, 16, 20, 24].map((n) => v(`draft + ${n} strings`, plus(draft, n, STR, "s"))),
+    ...[1, 2, 4, 8].map((n) => v(`draft + ${n} nullable strings`, plus(draft, n, NSTR, "n"))),
+    ...[2, 4, 6, 8, 10, 12, 16].map((n) => v(`draft with planned growth + ${n} strings`, plus(growth, n, STR, "s"))),
+    v("draft with planned growth, enums sent as real enums", realEnums(growth)),
+  ];
+}
+
+// ---------------------------------------------------------------------------------------------
+// Sizes, so a refusal can be read against what grew.
+
+function size(schema: Json) {
+  let nullable = 0;
+  let enums = 0;
+  let objects = 0;
+  let arrays = 0;
+  let fields = 0;
+  walk(schema, (node) => {
+    if (isNullable(node)) nullable++;
+    if (Array.isArray(node.enum) || (typeof node.description === "string" && node.description.startsWith("{enum:"))) enums++;
+    if (node.type === "object") {
+      objects++;
+      fields += Object.keys((node.properties as Json) ?? {}).length;
+    }
+    if (node.type === "array") arrays++;
+  });
+  return { chars: JSON.stringify(schema).length, fields, objects, arrays, nullable, enums };
+}
+
+// ---------------------------------------------------------------------------------------------
+
+/** "refused": the API turned the request down (a 400). "unchecked": no answer either way (auth, rate limit, server, network). */
+type Outcome = { shape: Shape; ok: boolean; status: "accepted" | "refused" | "unchecked"; message: string };
+
+async function probe(client: Anthropic, shape: Shape): Promise<Outcome> {
+  try {
+    const r = await client.messages.create({
+      model: AI_MODEL,
+      max_tokens: 64,
+      output_config: shape.config,
+      messages: [{ role: "user", content: "Answer with any valid value." }],
+    });
+    return { shape, ok: true, status: "accepted", message: `stop_reason ${r.stop_reason}` };
+  } catch (e) {
+    if (e instanceof Anthropic.APIError) {
+      const body = e.error as { error?: { message?: string } } | undefined;
+      return { shape, ok: false, status: e.status === 400 ? "refused" : "unchecked", message: `${e.status}: ${body?.error?.message ?? e.message}` };
+    }
+    return { shape, ok: false, status: "unchecked", message: `not sent: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+async function main() {
+  const argv = process.argv.slice(2);
+  const dry = argv.includes("--dry");
+  const explore = argv.includes("--explore");
+  const shapes = [...APP_SHAPES, GROWTH, ...(explore ? exploreShapes() : [])];
+
+  if (dry) {
+    for (const s of shapes) console.log(`${s.name.padEnd(80)} ${JSON.stringify(size(s.config.format.schema))}`);
+    return;
+  }
+  const apiKey = anthropicApiKey();
+  if (!apiKey) {
+    console.error("No API key: set ANTHROPIC_API_KEYS or ANTHROPIC_API_KEY, or run with --dry.");
+    process.exit(2);
+  }
+  // Retries only for rate limits and server errors; a 400 is the answer we are here for.
+  const client = new Anthropic({ apiKey, maxRetries: 3 });
+  const results: Outcome[] = [];
+  const queue = [...shapes];
+  await Promise.all(
+    Array.from({ length: 4 }, async () => {
+      for (let s = queue.shift(); s; s = queue.shift()) results.push(await probe(client, s));
+    }),
+  );
+  results.sort((a, b) => shapes.indexOf(a.shape) - shapes.indexOf(b.shape));
+  for (const r of results) {
+    const sz = size(r.shape.config.format.schema);
+    console.log(`${r.status.toUpperCase().padEnd(9)} ${r.shape.name}  [${sz.chars} chars, ${sz.fields} fields, ${sz.nullable} nullable, ${sz.enums} enums]  ${r.ok ? r.message : `\n          ${r.message}`}`);
+  }
+  const failed = results.filter((r) => !r.ok && r.shape.kind !== "explore");
+  const refused = failed.filter((r) => r.status === "refused");
+  const unchecked = failed.filter((r) => r.status === "unchecked");
+  if (refused.length) console.log(`\n${refused.length} shape(s) refused by the API: ${refused.map((r) => r.shape.name).join(", ")}`);
+  if (unchecked.length) console.log(`\n${unchecked.length} shape(s) could not be checked (not a refusal; run again): ${unchecked.map((r) => r.shape.name).join(", ")}`);
+  if (!failed.length) console.log("\nEvery shape the app sends was accepted, and the planned growth fits.");
+  if (failed.length) process.exit(1);
+}
+
+void main();

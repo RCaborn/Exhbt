@@ -182,6 +182,8 @@ To run the suite beside another one (a second worktree, or a dev server on the d
 E2E_PORT=3236 npx playwright test --workers=1
 ```
 
+**AI request shapes are checked against the real API, not by these tests.** Every AI call asks for a structured answer: the API compiles its JSON schema into a grammar first, and refuses a schema that is too large with a 400. The tests use the stand-in AI, which never sends a request, so they can't see a refusal; that is how the draft failed for every user from 17 Nov (decision 0025). `scripts/probe-ai-shapes.ts` (`npm run probe:ai`) sends each module's own `output_config` with a one-line prompt and a tiny `max_tokens`, and fails if any is refused. It also checks "draft with planned growth", the draft with the fields already built for later releases, so a release can't take the draft over the limit unseen. `.github/workflows/ai-shapes.yml` runs it when `lib/ai/`, the layout or graph lists, the probe or the lockfile change, and weekly; the draft eval runs it first. It needs the `ANTHROPIC_API_KEY` secret and costs a fraction of a penny. `npm run probe:ai -- --dry` prints each schema's size with no key; `--explore` adds the measuring ladders. When you add a field to an AI answer, keep it non-null (empty string, empty list or false) and run the probe.
+
 On a machine with Chromium already installed (Claude Code cloud), add `PW_CHROMIUM_PATH=<path to chrome>`. The full suite takes about six minutes. If the dev server adds a `.next-*/types` line to `tsconfig.json` while it runs, don't commit it.
 
 ## What comes next

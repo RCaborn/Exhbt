@@ -31,6 +31,8 @@ const MatchSchema = z.object({
   picks: z.array(z.object({ ref: z.string(), reason: z.string() })),
   intro: z.string(),
 });
+/** What the job-match call sends as output_config (also checked by scripts/probe-ai-shapes.ts). */
+export const JOB_MATCH_OUTPUT_CONFIG = { effort: "low" as const, format: zodOutputFormat(MatchSchema) };
 
 export type JobMatchInput = { company: string; roleTitle: string; description: string; candidates: MatchCandidate[] };
 export type JobMatchResult = MatchResult & { model: string; inputTokens: number; outputTokens: number; costUsd: number };
@@ -65,7 +67,7 @@ export async function matchExhbtsToJob(input: JobMatchInput): Promise<JobMatchRe
   const response = await client.messages.parse({
     model: AI_MODEL,
     max_tokens: 2000,
-    output_config: { effort: "low", format: zodOutputFormat(MatchSchema) },
+    output_config: JOB_MATCH_OUTPUT_CONFIG,
     system: SYSTEM,
     messages: [
       {
