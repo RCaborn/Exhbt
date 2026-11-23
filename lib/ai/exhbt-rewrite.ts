@@ -91,7 +91,7 @@ export function rewriteRequest(input: RewriteInput) {
   const note = input.note?.trim().slice(0, MAX_NOTE_CHARS);
   return {
     model: AI_MODEL,
-    max_tokens: 2000,
+    max_tokens: 5000,
     output_config: rewriteOutputConfig(input.block),
     system: systemFor(formatOf(input.doc)),
     messages: [

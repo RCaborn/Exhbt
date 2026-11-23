@@ -47,7 +47,7 @@ export type RoadmapResult = {
 export function roadmapRequest(input: RoadmapInput, job: JobProfile | null = null) {
   return {
     model: AI_MODEL,
-    max_tokens: 3000,
+    max_tokens: 12000,
     output_config: ROADMAP_OUTPUT_CONFIG,
     system: SYSTEM,
     messages: [

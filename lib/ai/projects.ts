@@ -52,7 +52,7 @@ export function swapRequest(ctx: SwapContext) {
 
   return {
     model: AI_MODEL,
-    max_tokens: 1000,
+    max_tokens: 3000,
     output_config: SWAP_OUTPUT_CONFIG,
     system: SYSTEM,
     messages: [

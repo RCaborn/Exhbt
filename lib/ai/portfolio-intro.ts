@@ -89,7 +89,7 @@ export function fitIntro(text: string): string {
 export function introRequest(facts: IntroFacts) {
   return {
     model: AI_MODEL,
-    max_tokens: 400,
+    max_tokens: 4000,
     output_config: INTRO_OUTPUT_CONFIG,
     system: SYSTEM,
     messages: [{ role: "user" as const, content: `<facts>\n${factsAsText(facts)}\n</facts>\n\nWrite the intro.` }],
