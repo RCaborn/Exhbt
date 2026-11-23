@@ -49,6 +49,9 @@ const SCHEMAS = {
   skills: z.object({ skills: z.array(z.string()), numbers: Numbers }),
 } as const;
 
+/** What a rewrite of one block sends as output_config (also checked by scripts/probe-ai-shapes.ts). */
+export const rewriteOutputConfig = <K extends DraftBlock>(block: K) => ({ effort: "low" as const, format: zodOutputFormat(SCHEMAS[block]) });
+
 export type RewriteInput = {
   block: DraftBlock;
   /** The person's source material, as stored with the exhbt. */
@@ -96,7 +99,7 @@ export async function rewriteBlock(input: RewriteInput): Promise<RewriteResult> 
   const response = await client.messages.parse({
     model: AI_MODEL,
     max_tokens: 2000,
-    output_config: { effort: "low", format: zodOutputFormat(schema) },
+    output_config: rewriteOutputConfig(input.block),
     system: systemFor(formatOf(input.doc)),
     messages: [
       {

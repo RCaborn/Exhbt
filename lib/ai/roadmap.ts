@@ -12,6 +12,9 @@ import {
 import type { JobProfile } from "@/lib/jobs";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
 
+/** What the roadmap call sends as output_config (also checked by scripts/probe-ai-shapes.ts). */
+export const ROADMAP_OUTPUT_CONFIG = { effort: "low" as const, format: zodOutputFormat(RoadmapModelSchema) };
+
 const SYSTEM = `You write skills-gap roadmaps for UK graduates.
 
 Rules:
@@ -52,7 +55,7 @@ export async function generateRoadmap(input: RoadmapInput, job: JobProfile | nul
   const response = await client.messages.parse({
     model: AI_MODEL,
     max_tokens: 3000,
-    output_config: { effort: "low", format: zodOutputFormat(RoadmapModelSchema) },
+    output_config: ROADMAP_OUTPUT_CONFIG,
     system: SYSTEM,
     messages: [
       {

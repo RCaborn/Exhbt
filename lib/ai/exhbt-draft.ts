@@ -94,7 +94,7 @@ const DraftChartSchema = z.object({
 });
 export type DraftChart = z.infer<typeof DraftChartSchema>;
 
-const DraftSchema = z.object({
+export const DraftSchema = z.object({
   format: z.enum(FORMATS),
   title: z.string(),
   summary: z.string(),
@@ -115,6 +115,8 @@ const DraftSchema = z.object({
   numbers: z.array(z.object({ value: z.string(), sourceQuote: z.string() })),
 });
 type Draft = z.infer<typeof DraftSchema>;
+/** What the draft call sends as output_config. Exported so scripts/probe-ai-shapes.ts checks the very shape the app sends. */
+export const DRAFT_OUTPUT_CONFIG = { effort: "low" as const, format: zodOutputFormat(DraftSchema) };
 
 export type DraftInput = {
   text: string;
@@ -153,7 +155,7 @@ export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
   const response = await client.messages.parse({
     model: AI_MODEL,
     max_tokens: 4000,
-    output_config: { effort: "low", format: zodOutputFormat(DraftSchema) },
+    output_config: DRAFT_OUTPUT_CONFIG,
     system: SYSTEM,
     messages: [
       {

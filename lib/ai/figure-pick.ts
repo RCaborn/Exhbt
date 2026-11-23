@@ -41,6 +41,8 @@ const AnswerSchema = z.object({
   caption: z.string(),
 });
 type Answer = z.infer<typeof AnswerSchema>;
+/** What the figure-pick call sends as output_config (also checked by scripts/probe-ai-shapes.ts). */
+export const FIGURE_PICK_OUTPUT_CONFIG = { effort: "low" as const, format: zodOutputFormat(AnswerSchema) };
 
 /** The answer made safe: an image that was sent, a box on the page, text within its limits. */
 export function toPick(a: Answer, count: number): FigurePick | null {
@@ -70,7 +72,7 @@ export async function pickFigure(images: PageImage[]): Promise<FigurePickResult>
     model: AI_MODEL,
     // Room for the model's thinking as well as the short answer, as the draft has.
     max_tokens: 4000,
-    output_config: { effort: "low", format: zodOutputFormat(AnswerSchema) },
+    output_config: FIGURE_PICK_OUTPUT_CONFIG,
     system: SYSTEM,
     messages: [{ role: "user", content }],
   });

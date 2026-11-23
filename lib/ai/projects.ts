@@ -14,6 +14,8 @@ import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./mo
  */
 
 const SwapSchema = z.object({ project: ProjectSchema });
+/** What the swap call sends as output_config (also checked by scripts/probe-ai-shapes.ts). */
+export const SWAP_OUTPUT_CONFIG = { effort: "low" as const, format: zodOutputFormat(SwapSchema) };
 
 const SYSTEM = `You suggest one project that helps a UK graduate close the skills gaps for the job they want. It replaces a project they didn't want in their plan of three.
 
@@ -57,7 +59,7 @@ export async function generateSwap(ctx: SwapContext): Promise<SwapResult> {
   const response = await client.messages.parse({
     model: AI_MODEL,
     max_tokens: 1000,
-    output_config: { effort: "low", format: zodOutputFormat(SwapSchema) },
+    output_config: SWAP_OUTPUT_CONFIG,
     system: SYSTEM,
     messages: [
       {
@@ -113,6 +115,8 @@ function mockSwap(ctx: SwapContext): SwapResult {
  * gate. Same facts-only rule as the roadmap and the swap.
  */
 const IdeasSchema = z.object({ projects: z.array(ProjectSchema).max(PLAN_SIZE) });
+/** What the ideas call sends as output_config (also checked by scripts/probe-ai-shapes.ts). */
+export const IDEAS_OUTPUT_CONFIG = { effort: "low" as const, format: zodOutputFormat(IdeasSchema) };
 
 const IDEAS_SYSTEM = `You suggest the three projects that make up a UK graduate's plan to close the skills gaps for the job they want.
 
@@ -147,7 +151,7 @@ export async function generateIdeas(ctx: IdeasContext): Promise<IdeasResult> {
   const response = await client.messages.parse({
     model: AI_MODEL,
     max_tokens: 1500,
-    output_config: { effort: "low", format: zodOutputFormat(IdeasSchema) },
+    output_config: IDEAS_OUTPUT_CONFIG,
     system: IDEAS_SYSTEM,
     messages: [
       {
