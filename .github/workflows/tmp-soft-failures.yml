@@ -1,0 +1,47 @@
+# TEMPORARY (hotfix-ai-soft-failures only): the real-API checks for this hotfix. Removed before merge.
+name: TEMP soft failures real-API runs
+
+on:
+  push:
+    branches: [hotfix-ai-soft-failures]
+
+permissions:
+  contents: read
+
+jobs:
+  probe-and-room:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Probe
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npm run -s probe:ai
+      - name: Token room
+        if: always()
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npm run -s measure:ai
+  drafts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Every draft fixture, judged
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npm run -s eval:drafts -- --model-judge
+      - name: Summary
+        if: always()
+        run: cat "$(ls -1d evals/exhbt-draft/runs/*/ | sort | tail -n 1)SUMMARY.md" || true

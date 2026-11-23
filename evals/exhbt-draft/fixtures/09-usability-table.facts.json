@@ -5,7 +5,7 @@
   "files": ["09-usability-table.md"],
   "notesFile": null,
   "link": null,
-  "expect": {"headlineNumber":false,"chart":true,"noNumbers":false},
+  "expect": {"headlineNumber":false,"chart":true,"noNumbers":false,"graph":{"kind":"table","headings":["Task","What happened","Main problem"]}},
   "keyFacts": [
     {"id":"aim","fact":"Find which steps of the library's room booking page people get stuck on.","match":["booking","book"]},
     {"id":"method","fact":"Five students who had never booked a room did three tasks while thinking aloud.","match":[["five","think"],["5","think"],"think-aloud","think aloud","thinking aloud"]},
