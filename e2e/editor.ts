@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { uniqueEmail } from "./helpers";
-import { focusedPath, READY, textbox, waitSaved as waitSavedNow } from "./page-editor";
+import { chooseAll, focusedPath, READY, textbox, waitSaved as waitSavedNow } from "./page-editor";
 
 export { keepClassic } from "./editor-classic-helpers";
 
@@ -154,7 +154,7 @@ export async function fillRich(page: Page, f: Locator, words: string) {
   await f.click();
   const editor = f.locator(".ProseMirror");
   await expect(editor).toBeFocused();
-  await page.keyboard.press("ControlOrMeta+A");
+  await chooseAll(page);
   await page.keyboard.press("Backspace");
   if (words) await page.keyboard.type(words);
 }
@@ -163,7 +163,7 @@ export async function fillRich(page: Page, f: Locator, words: string) {
 export async function fillPlain(page: Page, f: Locator, words: string) {
   await f.scrollIntoViewIfNeeded();
   await f.click();
-  await page.keyboard.press("ControlOrMeta+A");
+  await chooseAll(page);
   await page.keyboard.press("Backspace");
   if (words) await page.keyboard.type(words);
 }

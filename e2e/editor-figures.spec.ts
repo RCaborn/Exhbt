@@ -7,6 +7,7 @@ import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import {
   allowEditOnly,
   boxes,
+  chooseAll,
   differences,
   docNow,
   focusedPath,
@@ -322,7 +323,7 @@ test.describe("a link's web address", () => {
     await expect(button).not.toHaveAttribute("data-missing");
     await button.click();
     await expect(input).toBeFocused();
-    await page.keyboard.press("ControlOrMeta+A");
+    await chooseAll(page);
     await page.keyboard.press("Backspace");
     await expect(button).toHaveAttribute("data-missing", "");
     // A bad address: its issue, in the popover.

@@ -5,6 +5,7 @@ import { FORMAT_RULES } from "../lib/exhbt/formats";
 import {
   allowEditOnly,
   boxes,
+  chooseAll,
   differences,
   docNow,
   field,
@@ -363,7 +364,7 @@ test.describe("formatting on the bar", () => {
     // The page's own formatting buttons are not drawn on a phone.
     await expect(gap.locator(".xe-format")).toBeHidden();
 
-    await page.keyboard.press("ControlOrMeta+a");
+    await chooseAll(page);
     await onBar(page, "Highlight").tap();
     await expect(pm).toBeFocused();
     await expect(onBar(page, "Highlight")).toHaveAttribute("aria-pressed", "true");
@@ -411,7 +412,7 @@ test.describe("formatting on the bar", () => {
     await f.scrollIntoViewIfNeeded();
     await f.tap();
     await expect(f.locator(".ProseMirror")).toBeFocused();
-    await page.keyboard.press("ControlOrMeta+a");
+    await chooseAll(page);
     await onBar(page, "Link").tap();
     const address = f.getByLabel("Link address (starting https://)");
     await expect(address).toBeFocused();

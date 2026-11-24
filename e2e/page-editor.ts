@@ -32,9 +32,16 @@ const heard = new WeakSet<Page>();
 function hear(page: Page) {
   if (!process.env.E2E_WEBKIT || heard.has(page)) return;
   heard.add(page);
-  page.on("pageerror", (e) => console.log(`[page error] ${e.message}`));
+  // Each thing a page says, once.
+  const said = new Set<string>();
+  const say = (line: string) => {
+    if (said.has(line)) return;
+    said.add(line);
+    console.log(line);
+  };
+  page.on("pageerror", (e) => say(`[page error] ${e.message}`));
   page.on("console", (m) => {
-    if (m.type() === "error") console.log(`[console error] ${m.text().slice(0, 400)}`);
+    if (m.type() === "error") say(`[console error] ${m.text().slice(0, 400)}`);
   });
 }
 
@@ -128,6 +135,25 @@ export const frame = (page: Page, id: string): Locator => page.locator(`${READY}
 export const grip = (page: Page, id: string): Locator => frame(page, id).locator("[data-grip]");
 
 /**
+ * Chooses every word of the field that has the cursor. With a keyboard that is Control+A, or Command+A on
+ * a Mac. The editor reads an iPhone's browser, and a Mac's, as one where Control+A goes to the start of
+ * the line and Command+A chooses everything (Tiptap's keymap goes by the user agent, ProseMirror's by the
+ * platform). Driven from a machine that is not a Mac, a page that says it is an iPhone or a Mac has no key
+ * that does it, so there the words are chosen as a finger chooses them: through the page's own selection.
+ */
+export async function chooseAll(page: Page) {
+  const apple = await page.evaluate(() => /Mac|iP(hone|ad|od)/.test(navigator.platform) || (navigator.userAgent.includes("Mac") && "ontouchend" in document));
+  if (!apple || process.platform === "darwin") return page.keyboard.press("ControlOrMeta+A");
+  await page.evaluate(async () => {
+    const el = document.activeElement;
+    if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) el.select();
+    else if (el) getSelection()?.selectAllChildren(el);
+    // The editor hears of a selection a moment after it is made.
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+  });
+}
+
+/**
  * Puts the cursor in a field and types `words`, replacing what is there (`append` keeps it). A
  * formatted field becomes its editor when it takes the focus; this waits for that before typing.
  */
@@ -138,7 +164,7 @@ export async function typeIn(page: Page, path: string, words: string, opts: { ap
   await f.click();
   const box = rich ? f.locator(".ProseMirror") : f;
   if (rich) await expect(box).toBeFocused();
-  if (!opts.append) await page.keyboard.press("ControlOrMeta+A");
+  if (!opts.append) await chooseAll(page);
   if (!opts.append) await page.keyboard.press("Backspace");
   else await page.keyboard.press("End");
   await page.keyboard.type(words);
