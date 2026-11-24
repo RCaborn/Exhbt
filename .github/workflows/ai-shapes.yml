@@ -1,0 +1,82 @@
+# Checks the app's AI calls against the real API (decision 0029). It calls the API with the
+# repository secret ANTHROPIC_API_KEY, so every run is paid for.
+#
+# It runs only when a person starts it by hand: Actions tab > "AI request shapes" > Run workflow.
+# No push, pull request or schedule starts it. Automatic runs were switched off on 23 Nov 2026 at
+# the owner's request (Rory), after test runs used up the key's monthly allowance.
+#
+# Start a run only with the owner's say-so, after saying what it costs, and only before a release
+# that changes anything under lib/ai/ or a schema it uses, such as the layout and graph lists
+# (lib/exhbt/formats.ts, lib/exhbt/charts.ts).
+#
+# One run starts both jobs and costs about 12 US cents in all:
+#   - probe, a fraction of a penny: scripts/probe-ai-shapes.ts sends every structured answer the
+#     app asks for with a tiny max_tokens and fails if the API refuses one, including the draft
+#     with the growth already planned. The tests' stand-in AI can't see this.
+#   - token-room, about 12 US cents: scripts/measure-ai-room.ts makes about 72 calls and fails if
+#     any answer was cut off at max_tokens.
+name: AI request shapes
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    # Pull requests from forks get no secrets, so they skip this job.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check the API key secret is set
+        id: key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            # A pull request may run without secrets; anywhere else a missing key must not pass unseen.
+            if [ "$EVENT" != "pull_request" ]; then
+              echo "::error::The repository secret ANTHROPIC_API_KEY is not set, so the request shapes can't be checked."
+              exit 1
+            fi
+            echo "::notice::ANTHROPIC_API_KEY is not set for this run, so the request shapes were not checked."
+            echo "set=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "set=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.key.outputs.set == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.key.outputs.set == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        if: steps.key.outputs.set == 'true'
+      - name: Probe every request shape against the real API
+        if: steps.key.outputs.set == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npm run -s probe:ai
+
+  # By hand only: whether each AI call's answer fits its max_tokens once the model has thought
+  # (scripts/measure-ai-room.ts). About 72 calls and 12 US cents a run.
+  # Fails if any answer was cut off at max_tokens.
+  token-room:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Measure each AI call's token room
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npm run -s measure:ai

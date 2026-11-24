@@ -17,6 +17,8 @@
     "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs",
     "theme": "npm run astryx -- theme build themes/exhbt/exhbtTheme.ts",
     "check:theme": "npm run astryx -- theme build themes/exhbt/exhbtTheme.ts --check",
+    "probe:ai": "tsx --conditions=react-server scripts/probe-ai-shapes.ts",
+    "measure:ai": "tsx --conditions=react-server scripts/measure-ai-room.ts",
     "eval:drafts": "tsx --conditions=react-server scripts/eval-drafts.ts",
     "eval:fixtures": "tsx evals/exhbt-draft/fixtures/build.ts",
     "eval:figures": "tsx scripts/eval-figures.ts",

@@ -1,0 +1,24 @@
+Does a short night's sleep slow reaction time?
+
+Sport and Exercise Science, Year 1 research methods project. Westbrook University, March 2026.
+
+Aim: to see whether students who slept less the night before have slower reaction times.
+
+Method: eight volunteers from my seminar group wrote down how many hours they slept the night before the test. In the morning each did the online ruler-drop reaction test five times, and I took the mean of the five. I plotted hours of sleep against mean reaction time.
+
+Results, one row per volunteer (hours of sleep, then mean reaction time in milliseconds):
+
+Volunteer A: 4.5 hours, 312 ms
+Volunteer B: 5.0 hours, 298 ms
+Volunteer C: 6.0 hours, 281 ms
+Volunteer D: 6.5 hours, 276 ms
+Volunteer E: 7.0 hours, 262 ms
+Volunteer F: 7.5 hours, 259 ms
+Volunteer G: 8.0 hours, 251 ms
+Volunteer H: 9.0 hours, 248 ms
+
+The volunteers who slept least had the slowest reactions: everyone under six hours was above 280 ms, and everyone on seven hours or more was below 265 ms.
+
+Conclusion: in this small group, less sleep went with slower reactions. With eight people and self-reported sleep I can't say sleep caused the difference.
+
+Limitations: the sleep hours are what people remembered, and the test was done at different times of the morning. Next time I would use a sleep tracker and test everyone at the same time.

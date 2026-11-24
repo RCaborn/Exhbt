@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { safeNext } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/store";
+import { Button } from "@/components/ui/Button";
+import { GoogleOrEmail } from "../GoogleOrEmail";
 import { SignupForm } from "./SignupForm";
 
-export const metadata: Metadata = { title: "Create an account" };
+export const metadata: Metadata = { title: "Create an account", robots: { index: false } };
 
 export default async function SignupPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next: rawNext } = await searchParams;
@@ -18,12 +19,15 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
           ? "Choose a password. We'll email you once to confirm the address, and after that you log in with the password."
           : "Choose a password. On this development server you're signed in straight away."}
       </p>
+      <GoogleOrEmail next={next} />
       <div className="mt-8">
         <SignupForm next={next} />
       </div>
-      <p className="hint mt-8">
-        Already have an account? <Link href={loginHref} className="link">Log in</Link>.
-      </p>
+      <div className="mt-6">
+        <Button href={loginHref} variant="secondary" className="w-full">
+          Log in
+        </Button>
+      </div>
     </div>
   );
 }

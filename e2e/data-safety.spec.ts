@@ -79,7 +79,8 @@ test("a graph from the work that replaces the drafted one leaves the drafted gra
       doc: { ...core, sections: [findings] },
       working: { ...core, sections: [findings, { id: "graph-1", kind: "graph", chart }] },
       extraFiles: ["report-graph"],
-      aiVersion: { blocks, unverified: {} },
+      // The draft drew this graph (the figure route only takes a graph off while every graph is one the draft drew).
+      aiVersion: { blocks, unverified: {}, drafted: [chart] },
     },
   });
   expect(seeded.status(), await seeded.text()).toBe(200);

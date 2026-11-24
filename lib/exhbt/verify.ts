@@ -46,7 +46,7 @@ function docTexts(d: ExhbtDoc): string[] {
     ...d.skills,
     plain(d.gap),
     ...d.flow.flatMap((s) => [s.step, s.detail ?? ""]),
-    ...d.sections.flatMap((s) => (s.kind === "graph" ? [...chartTexts(s.chart), ...chartValues(s.chart).map(String)] : sectionTexts(s))),
+    ...d.sections.flatMap((s) => (s.kind === "graph" ? [...chartTexts(s.chart), ...chartValues(s.chart).map(String)] : s.kind === "image" ? [...sectionTexts(s), s.alt] : sectionTexts(s))),
   ];
 }
 
@@ -78,7 +78,11 @@ function sectionFields(s: ContentSection, p: string): [string, string[]][] {
     case "graph":
       return [[`${p}.chart`, [...chartTexts(s.chart), ...chartValues(s.chart).map(String)]]];
     case "image":
-      return [[`${p}.caption`, [plain(s.caption)]]];
+      // The alt text is the AI's words too when a figure is picked from the work, and it is published as the image's alt.
+      return [
+        [`${p}.caption`, [plain(s.caption)]],
+        [`${p}.alt`, [s.alt]],
+      ];
     case "quote":
       return [
         [`${p}.text`, [s.text]],
