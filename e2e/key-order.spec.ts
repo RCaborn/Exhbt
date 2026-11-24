@@ -5,6 +5,7 @@ import { aiVersionOf, blockValue, DRAFT_BLOCKS, graphsAsDrafted, readAiVersion, 
 import { structureKey } from "../lib/exhbt/layouts";
 import { sameRuns } from "../lib/exhbt/richtext-tiptap";
 import { sameJson, stableJson } from "../lib/json";
+import { keepClassic } from "./editor-classic-helpers";
 import { jsonbOrder, throughRealJsonb } from "./jsonb";
 
 // The live database keeps each exhbt in a jsonb column, which hands an object's keys back in its own
@@ -275,8 +276,12 @@ test.describe("The figure route, with the exhbt stored as the live database stor
   });
 });
 
+// Each editor has its own copy of the offer (components/exhbt-editor/BackupOffer.tsx, components/editor/Editor.tsx), so
+// the test runs in both: the edit-on-page editor, which this suite's server serves, and the classic editor, which is
+// what everyone gets until the new one is switched on (keepClassic sets the development cookie that serves it).
 test.describe("The editor, with the exhbt stored as the live database stores it", () => {
-  test("a copy kept in the browser that holds the same data is not offered back; one that differs is", async ({ page }) => {
+  for (const editor of ["page", "classic"] as const) test(`the ${editor === "page" ? "new" : "classic"} editor: a copy kept in the browser that holds the same data is not offered back; one that differs is`, async ({ page }) => {
+    if (editor === "classic") await keepClassic(page);
     const chart = CHARTS[1]!;
     const { id } = await seedFromDatabase(page, [chart], []);
     const offer = page.getByText(/that never reached the server/);
@@ -286,6 +291,7 @@ test.describe("The editor, with the exhbt stored as the live database stores it"
     const keep = (doc: ExhbtDoc) => page.evaluate(([key, d]) => localStorage.setItem(key, JSON.stringify({ doc: d, at: Date.now() + 60_000 })), [backupKey, doc] as const);
     await page.goto(`/exhbts/${id}/edit`);
     await ready();
+    await expect(page.locator(`[data-editor="${editor}"]`)).toBeAttached();
     await expect(offer).toHaveCount(0);
 
     // The same exhbt as the server holds, with its keys in the order they were written.

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode 
 import { clearBackup, readBackup, type Backup } from "@/components/editor/useAutosave";
 import { Button } from "@/components/ui/Button";
 import { normaliseDoc } from "@/lib/exhbt/blocks";
+import { sameJson } from "@/lib/json";
 import { useEnv, useLive, useSave } from "./context";
 import { useStoreInternal } from "./store";
 
@@ -31,7 +32,9 @@ export function BackupOffer(): ReactNode {
   const [offer, setOffer] = useState<Backup | null>(() => {
     const b = readBackup(env.id);
     if (!b) return null;
-    if (b.at > Date.parse(env.updatedAt) && JSON.stringify(b.doc) !== JSON.stringify(env.initialDoc)) return b;
+    // Compared by what the two hold, not as JSON text: the server's copy comes out of the database with its keys in
+    // another order, so a copy holding the same exhbt read as different there and was offered back (lib/json.ts).
+    if (b.at > Date.parse(env.updatedAt) && !sameJson(b.doc, env.initialDoc)) return b;
     clearBackup(env.id);
     return null;
   });
