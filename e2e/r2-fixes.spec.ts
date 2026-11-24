@@ -75,6 +75,12 @@ test.describe("A caption is cut to its limit without changing what it says", () 
       "(Left to right: the first prototype, the second prototype and…",
       "(Left to right: the first prototype, the second prototype and the final build shown at…",
     ],
+    // The same bracket, closed after both limits: its closing mark is past the cut, so it is left open in the same way.
+    [
+      "(Left to right: the first prototype, the second prototype and the final build of the sensor housing)",
+      "(Left to right: the first prototype, the second prototype and…",
+      "(Left to right: the first prototype, the second prototype and the final build of the…",
+    ],
     [
       "Results (mean and standard deviation across all twelve participants in each of the three conditions tested) by week",
       "Results (mean and standard deviation across all twelve participants in…",
@@ -123,6 +129,25 @@ test.describe("A caption is cut to its limit without changing what it says", () 
     expect(fitCaption("Missed appointments, by month:", 15)).toBe("Missed appointments, by month:");
     expect(fitCaption("", 15)).toBe("");
     expect(fitCaption("   ", 15)).toBe("");
+  });
+
+  test("exactly the limit, one word and nothing at all, at 10 and at 15 words", () => {
+    const ten = "Missed appointments at the two practices before and after reminders";
+    const fifteen = "Mean number of words recalled out of 40 by each group in the spring term";
+    expect(words(ten)).toBe(10);
+    expect(words(fifteen)).toBe(15);
+    // Exactly the limit: nothing is cut, so nothing is tidied away and no ellipsis is added.
+    expect(fitCaption(ten, 10)).toBe(ten);
+    expect(fitCaption(ten, 15)).toBe(ten);
+    expect(fitCaption(fifteen, 15)).toBe(fifteen);
+    expect(fitCaption("one two three four five six seven eight nine ten,", 10)).toBe("one two three four five six seven eight nine ten,");
+    // The same fifteen words at ten: no end of a clause to go back to, so the cut at the limit.
+    expect(fitCaption(fifteen, 10)).toBe("Mean number of words recalled out of 40 by each…");
+    for (const max of [10, 15]) {
+      expect(fitCaption("Sales", max)).toBe("Sales");
+      expect(fitCaption("", max)).toBe("");
+      expect(fitCaption(" \n ", max)).toBe("");
+    }
   });
 
   test("an earlier end is taken only when it keeps two thirds of the limit: 10 words of 15, 7 of 10", () => {
@@ -202,6 +227,9 @@ test.describe("A caption is cut to its limit without changing what it says", () 
     expect(cut).toBe("a b c d e f g h i j k l m n o…");
     expect(words(cut)).toBe(15);
     expect(fitCaption("Sales rose", 1)).toBe("Sales…");
+    // A limit under one word is read as one word: a caption that had words never comes back empty.
+    expect(fitCaption("Sales rose", 0)).toBe("Sales…");
+    expect(fitCaption("Sales", 0)).toBe("Sales");
     // A caption that already trails off where it is cut gets no second ellipsis.
     expect(fitCaption("one two three four five six seven eight nine ten… eleven", 10)).toBe("one two three four five six seven eight nine ten…");
     expect(fitCaption("one two three four five six seven eight nine ten... eleven", 10)).toBe("one two three four five six seven eight nine ten...");

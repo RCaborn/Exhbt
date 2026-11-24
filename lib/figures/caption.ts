@@ -145,18 +145,19 @@ function tidy(text: string): string {
 /** A caption cut to `max` words by the rule at the top of this file. One that fits is left alone. */
 export function cutCaption(s: string, max: number): string {
   const words = s.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
-  if (words.length <= max) return words.join(" ");
-  if (max < 1) return "";
-  const least = leastWords(max);
+  // A limit under one word is read as one word, so a caption that had words never comes back empty.
+  const limit = max >= 1 ? Math.floor(max) : 1;
+  if (words.length <= limit) return words.join(" ");
+  const least = leastWords(limit);
   // The last end of a sentence or a clause that keeps enough, with every bracket and quote closed.
   let n = 0;
-  for (let k = max; k >= least && !n; k--) {
+  for (let k = limit; k >= least && !n; k--) {
     if ((endsSentence(words, k - 1) || endsClause(words, k - 1)) && firstLeftOpen(words, k) < 0) n = k;
   }
   if (!n) {
     // None: the cut at the limit, or back to before a bracket or quote left open when that keeps enough.
-    const open = firstLeftOpen(words, max);
-    n = open >= least ? open : max;
+    const open = firstLeftOpen(words, limit);
+    n = open >= least ? open : limit;
   }
   const kept = words.slice(0, n).join(" ");
   const text = tidy(kept) || kept;
