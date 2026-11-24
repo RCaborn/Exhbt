@@ -3,6 +3,7 @@ import { z } from "zod/v4";
 import { getCurrentUser } from "@/lib/auth";
 import { loadAiVersion, loadDraftSource, saveAiVersion } from "@/lib/draft-tools";
 import { FIGURE_KINDS, FigureBoxSchema, formatLimits, normaliseDoc, type Section } from "@/lib/exhbt/blocks";
+import { graphsAsDrafted } from "@/lib/exhbt/draft-blocks";
 import { formatOf } from "@/lib/exhbt/formats";
 import { withWorkVisual } from "@/lib/exhbt/sections";
 import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
@@ -79,9 +80,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     doc = { ...doc, sections: doc.sections.filter((s) => !isPicked(s)) };
   }
   // Fresh draft: no figure picked yet (just made sure) and every graph is one the draft drew. Otherwise any graph may be the person's.
+  // Compared as graphs, not as JSON text: the database hands the exhbt back with its keys in another order (graphsAsDrafted).
   const ai = await loadAiVersion(user.id, id).catch(() => null);
-  const drewIt = (c: unknown) => (ai?.drafted ?? []).some((d) => JSON.stringify(d) === JSON.stringify(c));
-  const fresh = !replaces && doc.sections.every((s) => s.kind !== "graph" || drewIt(s.chart));
+  const fresh = !replaces && graphsAsDrafted(doc, ai?.drafted);
   // The caption is cut to the layout's cap; withWorkVisual applies the rule and puts the picture where the layout wants it.
   const shown = fitCaption(caption, formatLimits(formatOf(doc)).images.captionWords);
   const result = withWorkVisual(doc, {
