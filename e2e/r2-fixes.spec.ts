@@ -526,8 +526,8 @@ test.describe("A pick is counted before the AI call, and given back when the ser
     await signIn(page, "pickoverlap");
     // The dev server builds the route on its first request. This one is refused before anything is counted.
     expect((await page.request.post("/api/exhbts/figure-pick", { multipart: { label: "report-pick-slow.pdf, page 3" } })).status()).toBe(400);
-    // Eight requests a tenth of a second apart, each held open for two seconds by the slow stand-in, so all eight are
-    // being answered at once. Counted after the call, as picks were, every one of them passed the check.
+    // Eight requests a tenth of a second apart, against a stand-in that takes two seconds to answer, so the last is
+    // sent while the first is still being answered. Counted after the call, as picks were, all eight passed the check.
     const sent: number[] = [];
     const calls: Promise<{ status: number; back: number }>[] = [];
     for (let i = 0; i < 8; i++) {
