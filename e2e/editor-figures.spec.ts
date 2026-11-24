@@ -36,11 +36,11 @@ import {
  * (three pages of text and a bar chart on page 3), as e2e/auto-figure.spec.ts does.
  */
 
-// The touch project runs only the test of its own, at the end of this file.
+// A phone's project (touch, and WebKit's iphone) runs only the test of its own, at the end of this file.
 const ON_TOUCH = "on a phone";
-test.beforeEach(({}, info) => {
-  test.skip(info.project.name === "touch" && !info.title.includes(ON_TOUCH), "a mouse test");
-  test.skip(info.project.name !== "touch" && info.title.includes(ON_TOUCH), "a touch test");
+test.beforeEach(({ isMobile }, info) => {
+  test.skip(isMobile && !info.title.includes(ON_TOUCH), "a mouse test");
+  test.skip(!isMobile && info.title.includes(ON_TOUCH), "a touch test");
 });
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];

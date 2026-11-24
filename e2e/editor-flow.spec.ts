@@ -4,7 +4,7 @@ import { lineAt, moved, placeAt, within } from "../components/exhbt-editor/flow/
 import type { ExhbtDoc, FlowStep } from "../lib/exhbt/blocks";
 import { FORMAT_RULES, type Format } from "../lib/exhbt/formats";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
-import { allowEditOnly, boxes, differences, docNow, field, focusedPath, freshName, full, offered, openDoc, openTiming, READY, renders, sampleDoc, SAMPLES, seeAsVisitor, settle, undoLabel, waitLive, waitReady } from "./page-editor";
+import { allowEditOnly, boxes, differences, docNow, field, finger, focusedPath, freshName, full, offered, openDoc, openTiming, READY, renders, sampleDoc, SAMPLES, seeAsVisitor, settle, undoLabel, waitLive, waitReady } from "./page-editor";
 
 /*
  * The flowchart edited where it sits (decision 0026; docs/briefs/edit-on-page/r3-k-flowchart.md): type
@@ -794,22 +794,6 @@ test.describe("in the looks", () => {
 test.describe("by touch", () => {
   test.skip(({ isMobile }) => !isMobile, "runs in the touch project");
 
-  /** Real touch input through the browser, so scrolling and the press delay behave as they do under a finger. */
-  async function finger(page: Page) {
-    const cdp = await page.context().newCDPSession(page);
-    const send = (type: "touchStart" | "touchMove" | "touchEnd", x = 0, y = 0) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
-    return {
-      down: (x: number, y: number) => send("touchStart", x, y),
-      move: (x: number, y: number) => send("touchMove", x, y),
-      up: () => send("touchEnd"),
-      async slide(from: { x: number; y: number }, to: { x: number; y: number }, steps = 12) {
-        for (let i = 1; i <= steps; i++) {
-          await send("touchMove", from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
-          await page.waitForTimeout(16);
-        }
-      },
-    };
-  }
   const scrollY = (page: Page) => page.evaluate(() => window.scrollY);
 
   for (const f of offered()) {
@@ -839,7 +823,8 @@ test.describe("by touch", () => {
       await touch.down(w.x + 40, w.y + w.height / 2);
       await touch.slide({ x: w.x + 40, y: w.y + w.height / 2 }, { x: w.x + 40, y: w.y + w.height / 2 - 220 });
       await touch.up();
-      await expect.poll(() => scrollY(page)).toBeGreaterThan(y0 + 100);
+      // Touches made in the page (WebKit: finger, page-editor.ts) can't scroll it, so the scroll is checked only under real ones.
+      if (touch.native) await expect.poll(() => scrollY(page)).toBeGreaterThan(y0 + 100);
       expect(await keysNow(page)).toEqual(keys);
       await expect(list(page)).not.toHaveAttribute("data-flow-drag", /./);
 

@@ -3,6 +3,31 @@ import { defineConfig, devices } from "@playwright/test";
 // E2E_PORT lets several suites run side by side (parallel agents, worktrees).
 const PORT = Number(process.env.E2E_PORT) || 3200;
 
+/*
+ * Safari's engine (WebKit), for the edit-on-page editor's own specs and nothing else. The two projects are
+ * listed only when E2E_WEBKIT is set, so a plain `playwright test`, and CI's ten e2e groups, are the four
+ * projects below and nothing more. .github/workflows/webkit.yml sets E2E_WEBKIT=1 on a runner that installs
+ * WebKit. E2E_WEBKIT=chromium runs the same two projects (their sizes, pixel ratios and user agents) on
+ * Chromium, for a machine with no WebKit: a test that fails there too fails on the size, not on the engine.
+ *  - `safari`: Playwright's "Desktop Safari" at the desktop project's 1440 by 900, on the desktop project's editor specs.
+ *  - `iphone`: Playwright's "iPhone 14" (390 by 664, a touch screen), on the touch project's specs.
+ * Each test is its own shard unit there (fullyParallel, still one worker), so a long spec splits across shards.
+ * WebKit on Linux is not Safari on an iPhone: docs/briefs/edit-on-page/r3-notes-from-earlier-agents.md says
+ * what it can and cannot show.
+ */
+const WEBKIT = process.env.E2E_WEBKIT;
+// A Chromium path (PW_CHROMIUM_PATH, below) is never handed to WebKit.
+const engine = WEBKIT === "chromium" ? { browserName: "chromium" as const } : { launchOptions: {} };
+/**
+ * The tests the WebKit projects leave out, by name, each with its reason; nothing else is skipped there.
+ * (editor-tablet.spec.ts is in neither project: it needs a tablet's 820px touch screen, and there is no WebKit tablet project.)
+ */
+const NOT_ON_WEBKIT: [name: RegExp, why: string][] = [];
+const webkitProjects = [
+  { name: "safari", fullyParallel: true, use: { ...devices["Desktop Safari"], viewport: { width: 1440, height: 900 }, ...engine }, testMatch: /[\\/]editor-[a-z-]+\.spec\.ts$/, testIgnore: /editor-(phone|tablet)\.spec\.ts/, grepInvert: NOT_ON_WEBKIT.map(([name]) => name) },
+  { name: "iphone", fullyParallel: true, use: { ...devices["iPhone 14"], ...engine }, testMatch: /editor-(drag|flow|phone|figures)\.spec\.ts/, grepInvert: NOT_ON_WEBKIT.map(([name]) => name) },
+];
+
 /**
  * End-to-end tests run against the dev server with no external services:
  * in-memory store, placeholder AI roadmap, and the dev email outbox.
@@ -28,6 +53,7 @@ export default defineConfig({
     { name: "mobile", use: { ...devices["Pixel 7"] }, testMatch: /responsive\.spec\.ts/ },
     { name: "touch", use: { ...devices["Pixel 7"] }, testMatch: /editor-(drag|flow|phone|figures)\.spec\.ts/ },
     { name: "tablet", use: { browserName: "chromium", viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 }, testMatch: /editor-tablet\.spec\.ts/ },
+    ...(WEBKIT ? webkitProjects : []),
   ],
   webServer: {
     command: `npx next dev -p ${PORT}`,

@@ -8,6 +8,7 @@ import {
   differences,
   docNow,
   field,
+  finger,
   flowChipsNearWords,
   frame,
   freshName,
@@ -71,22 +72,6 @@ async function choose(page: Page, id: string) {
   await expect(bar(page)).toHaveAttribute("aria-label", /: tools$/);
 }
 
-/** Real touch input through the browser, so scrolling and the press delay behave as they do under a finger. */
-async function finger(page: Page) {
-  const cdp = await page.context().newCDPSession(page);
-  const send = (type: "touchStart" | "touchMove" | "touchEnd", x = 0, y = 0) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
-  return {
-    down: (x: number, y: number) => send("touchStart", x, y),
-    move: (x: number, y: number) => send("touchMove", x, y),
-    up: () => send("touchEnd"),
-    async slide(from: { x: number; y: number }, to: { x: number; y: number }, steps = 12) {
-      for (let i = 1; i <= steps; i++) {
-        await send("touchMove", from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
-        await page.waitForTimeout(16);
-      }
-    },
-  };
-}
 
 const middle = async (l: Locator) => {
   const b = (await l.boundingBox())!;
@@ -609,7 +594,8 @@ test("a swipe on a section's words scrolls and moves nothing; a 260ms press on a
   await touch.down(w.x + 80, w.y + 60);
   await touch.slide({ x: w.x + 80, y: w.y + 60 }, { x: w.x + 80, y: w.y - 200 });
   await touch.up();
-  await expect.poll(() => scrollY(page)).toBeGreaterThan(y0 + 120);
+  // Touches made in the page (WebKit: finger, page-editor.ts) can't scroll it, so the scroll is checked only under real ones.
+  if (touch.native) await expect.poll(() => scrollY(page)).toBeGreaterThan(y0 + 120);
   expect(await pageOrder(page)).toEqual(order);
   await expect(page.locator(`${READY} [data-xe-drag]`)).toHaveCount(0);
 

@@ -1,5 +1,5 @@
 import { deflateSync } from "node:zlib";
-import { expect, type Locator, type Page } from "@playwright/test";
+import { expect, type ElementHandle, type Locator, type Page } from "@playwright/test";
 import { text, type ExhbtDoc, type Section } from "../lib/exhbt/blocks";
 import { OFFERED_FORMATS, type Format } from "../lib/exhbt/formats";
 import { BEFORE_AFTER_IMAGES, beforeAfterDoc, BUILD_IMAGES, buildDoc, essayDoc, EVENT_IMAGES, eventDoc, fullDoc, GALLERY_IMAGES, galleryDoc, researchDoc } from "../lib/exhbt/sample";
@@ -23,13 +23,30 @@ export type Plan = "free" | "premium" | "max";
 /** A fresh username for a test (letters and digits, as usernames are). */
 export const freshName = (tag: string) => `${tag.replace(/[^a-z0-9]/gi, "").toLowerCase()}${Math.random().toString(36).slice(2, 8)}`;
 
+/**
+ * In the WebKit job (E2E_WEBKIT) a page's uncaught errors and its console errors go to the test's output,
+ * which the job's summary prints (scripts/e2e-summary.mjs): the job's log is all a machine without WebKit
+ * sees of a WebKit run.
+ */
+const heard = new WeakSet<Page>();
+function hear(page: Page) {
+  if (!process.env.E2E_WEBKIT || heard.has(page)) return;
+  heard.add(page);
+  page.on("pageerror", (e) => console.log(`[page error] ${e.message}`));
+  page.on("console", (m) => {
+    if (m.type() === "error") console.log(`[console error] ${m.text().slice(0, 400)}`);
+  });
+}
+
 /** Waits for the editor to be up. */
 export async function waitReady(page: Page) {
+  hear(page);
   await expect(page.locator(READY)).toBeAttached();
 }
 
 /** Signs in as a development user with no exhbts, presses "Start from scratch" and waits for the editor; returns the new exhbt's id. */
 export async function openNew(page: Page, username: string, plan: Plan = "premium"): Promise<string> {
+  hear(page);
   await page.goto(`/dev/portfolio?username=${username}&plan=${plan}&count=0`);
   await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
   await page.getByRole("button", { name: "Start from scratch" }).click();
@@ -43,6 +60,7 @@ export async function openNew(page: Page, username: string, plan: Plan = "premiu
  * list by its slug's title; returns its id. The user is cleared and made again on the max plan.
  */
 export async function openSeeded(page: Page, username: string, withParam: string, slug: string): Promise<string> {
+  hear(page);
   await page.goto(`/dev/portfolio?username=${username}&plan=max&count=0&with=${withParam}`);
   await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
   const title = SAMPLE_TITLES[slug];
@@ -59,6 +77,7 @@ export async function openSeeded(page: Page, username: string, withParam: string
  * /dev/portfolio after seeding: both clear that user's exhbts. `files` maps each image section's id to its file.
  */
 export async function openDoc(page: Page, username: string, doc: ExhbtDoc, opts: { slug?: string; working?: ExhbtDoc; plan?: Plan; aiVersion?: unknown; query?: string } = {}): Promise<{ id: string; url: string; files: Record<string, string> }> {
+  hear(page);
   const res = await page.request.post("/dev/parity", { data: { username, slug: opts.slug ?? "page-editor", doc, working: opts.working, plan: opts.plan, aiVersion: opts.aiVersion } });
   expect(res.status(), await res.text()).toBe(200);
   const out = (await res.json()) as { id: string; url: string; files: Record<string, string> };
@@ -123,6 +142,64 @@ export async function typeIn(page: Page, path: string, words: string, opts: { ap
   if (!opts.append) await page.keyboard.press("Backspace");
   else await page.keyboard.press("End");
   await page.keyboard.type(words);
+}
+
+/** A finger on the screen: `native` says whether the browser itself takes the touches. */
+export type Finger = {
+  native: boolean;
+  down(x: number, y: number): Promise<void>;
+  move(x: number, y: number): Promise<void>;
+  up(): Promise<void>;
+  slide(from: { x: number; y: number }, to: { x: number; y: number }, steps?: number): Promise<void>;
+};
+
+/**
+ * A finger. On Chromium the touches are real ones, sent through the browser, so scrolling and the press
+ * delay behave as they do under a finger (`native`). Playwright's WebKit takes a tap and nothing more, so
+ * there the touches are events made in the page, sent to the element under the first touch as a real
+ * finger's are: they reach the editor's sensors, but the browser does not scroll for them. A test checks
+ * that a swipe scrolls only where `native` is true. E2E_TOUCH=page makes Chromium use the made events too,
+ * to check them against the real ones.
+ */
+export async function finger(page: Page): Promise<Finger> {
+  const slider = (move: Finger["move"]): Finger["slide"] => async (from, to, steps = 12) => {
+    for (let i = 1; i <= steps; i++) {
+      await move(from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
+      await page.waitForTimeout(16);
+    }
+  };
+  if (page.context().browser()?.browserType().name() === "chromium" && process.env.E2E_TOUCH !== "page") {
+    const cdp = await page.context().newCDPSession(page);
+    const send = async (type: "touchStart" | "touchMove" | "touchEnd", x = 0, y = 0) => {
+      await cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
+    };
+    const move = (x: number, y: number) => send("touchMove", x, y);
+    return { native: true, down: (x, y) => send("touchStart", x, y), move, up: () => send("touchEnd"), slide: slider(move) };
+  }
+  let under: ElementHandle<Element> | null = null;
+  let last = { x: 0, y: 0 };
+  const send = async (type: "touchstart" | "touchmove" | "touchend", x: number, y: number) => {
+    const touch = [{ identifier: 1, clientX: x, clientY: y }];
+    const on = type === "touchend" ? [] : touch;
+    await under!.dispatchEvent(type, { touches: on, targetTouches: on, changedTouches: touch });
+    last = { x, y };
+  };
+  const move = (x: number, y: number) => send("touchmove", x, y);
+  return {
+    native: false,
+    async down(x, y) {
+      under = (await page.evaluateHandle(([px, py]) => document.elementFromPoint(px!, py!), [x, y])).asElement();
+      expect(under, `something is drawn at ${x}, ${y}`).not.toBeNull();
+      await send("touchstart", x, y);
+    },
+    move,
+    async up() {
+      await send("touchend", last.x, last.y);
+      await under?.dispose();
+      under = null;
+    },
+    slide: slider(move),
+  };
 }
 
 /** The editor's doc as it is now, in the page (development only). */
@@ -293,6 +370,7 @@ export function sampleDoc(f: Format): ExhbtDoc {
  */
 export async function openTiming(page: Page, f: Format | "new", opts: { full?: boolean; look?: string; grow?: "mirror" } = {}) {
   const q = new URLSearchParams({ sample: f, ...(opts.full ? { full: "1" } : {}), ...(opts.look ? { look: opts.look } : {}), ...(opts.grow ? { grow: opts.grow } : {}) });
+  hear(page);
   await page.goto(`/dev/editor-timing?${q}`);
   await waitReady(page);
 }
