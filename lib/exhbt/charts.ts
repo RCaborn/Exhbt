@@ -216,6 +216,14 @@ export function newChart(kind: ChartKind = "beforeAfter"): Chart {
   }
 }
 
+/**
+ * A graph with nothing filled in but perhaps its title: it holds what a new graph of its kind holds.
+ * The editor then starts another kind afresh rather than carrying empty rows over. Compared by what
+ * it holds, not as JSON text: once saved, the graph comes back from the database with its keys in
+ * another order than newChart writes them.
+ */
+export const untouchedChart = (c: Chart): boolean => sameJson({ ...c, title: "" }, { ...newChart(c.kind), title: "" });
+
 /** False for a graph with no rows, points or tiles yet (the preview leaves it out). */
 export function hasData(raw: Chart): boolean {
   const c = asChart(raw);

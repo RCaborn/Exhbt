@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emptyDoc, normaliseDoc, SCHEMA_VERSION, type Chart, type ExhbtDoc, type Section } from "../lib/exhbt/blocks";
-import { aiVersionOf, graphsAsDrafted, readAiVersion } from "../lib/exhbt/draft-blocks";
+import { emptyDoc, normaliseDoc, SCHEMA_VERSION, withHighlight, type Chart, type ExhbtDoc, type Section } from "../lib/exhbt/blocks";
+import { CHART_KINDS, newChart, untouchedChart } from "../lib/exhbt/charts";
+import { aiVersionOf, blockValue, DRAFT_BLOCKS, graphsAsDrafted, readAiVersion, sameBlock } from "../lib/exhbt/draft-blocks";
+import { structureKey } from "../lib/exhbt/layouts";
+import { sameRuns } from "../lib/exhbt/richtext-tiptap";
+import { sameJson, stableJson } from "../lib/json";
 import { jsonbOrder, throughRealJsonb } from "./jsonb";
 
 // The live database keeps each exhbt in a jsonb column, which hands an object's keys back in its own
@@ -121,6 +125,72 @@ test.describe("A graph the draft drew is recognised whatever order its keys come
   });
 });
 
+/* ---------------- The same mistake elsewhere ---------------- */
+
+test.describe("Other comparisons of a stored doc with one kept another way", () => {
+  test("sameJson: the same data in any key order; lists keep their order; undefined is the same as absent", () => {
+    const a = { title: "x", rows: [{ label: "A", value: 1 }, { label: "B", value: 2 }], unit: undefined };
+    const b = { rows: [{ value: 1, label: "A" }, { value: 2, label: "B" }], title: "x" };
+    expect(JSON.stringify(a)).not.toBe(JSON.stringify(b));
+    expect(sameJson(a, b)).toBe(true);
+    expect(stableJson(jsonbOrder(a))).toBe(stableJson(a));
+    expect(sameJson(a, { ...b, rows: [...b.rows].reverse() })).toBe(false);
+    expect(sameJson(a, { ...b, title: "y" })).toBe(false);
+    expect(sameJson(a, { ...b, unit: null })).toBe(false);
+    expect(sameJson([1, 2], [2, 1])).toBe(false);
+    expect(sameJson(undefined, undefined)).toBe(true);
+    expect(sameJson(null, undefined)).toBe(false);
+    expect(sameJson("a", "a")).toBe(true);
+  });
+
+  test("an unedited block is the same as its AI version once the database has reordered its keys", () => {
+    // What a draft writes: a highlighted phrase in the context line (a bold run), a headline number, a step with a detail, formatted findings.
+    const doc: ExhbtDoc = {
+      ...core,
+      gap: withHighlight("Missed appointments cost the practice time, and nobody had tested the reminder.", "nobody had tested the reminder"),
+      headline: { value: "6.5%", label: "missed appointments, down from 7.9%" },
+      whereWhen: "University of Leeds, 2026",
+      summary: "A later reminder cut missed appointments.",
+      sections: [
+        { id: "findings", kind: "findings", items: [[{ t: "Missed appointments fell from " }, { t: "7.9% to 6.5%", b: true }, { t: "." }], [{ t: "The full method", i: true, href: "https://example.com/method" }]] },
+      ],
+    };
+    const ai = readAiVersion(JSON.stringify(aiVersionOf(doc, "the source text")));
+    const stored = fromDatabase(doc);
+    // The reordering is real: a bold run comes back as b, t where the file has t, b.
+    expect(JSON.stringify(blockValue(stored, "gap"))).not.toBe(JSON.stringify(ai.blocks.gap));
+    expect(JSON.stringify(blockValue(stored, "header"))).not.toBe(JSON.stringify(ai.blocks.header));
+    for (const key of DRAFT_BLOCKS) expect(sameBlock(blockValue(stored, key), ai.blocks[key]), key).toBe(true);
+    // An edit is still an edit: other words, the highlight taken off, a step's detail removed.
+    expect(sameBlock(blockValue({ ...stored, gap: [{ t: "Missed appointments cost the practice time." }] }, "gap"), ai.blocks.gap)).toBe(false);
+    expect(sameBlock(blockValue({ ...stored, gap: stored.gap.map((r) => ({ t: r.t })) }, "gap"), ai.blocks.gap)).toBe(false);
+    expect(sameBlock(blockValue({ ...stored, flow: stored.flow.map((s) => ({ step: s.step })) }, "flow"), ai.blocks.flow)).toBe(false);
+    expect(sameBlock(blockValue({ ...stored, skills: ["Excel", "Python"] }, "skills"), ai.blocks.skills)).toBe(false);
+  });
+
+  test("the two comparisons that were already safe: formatted text and the page's structure", () => {
+    // sameRuns rebuilds both sides the same way before comparing, so the order the keys arrive in never mattered.
+    const runs = [{ t: "Missed appointments fell from " }, { t: "7.9% to 6.5%", b: true, i: true, href: "https://example.com/method" }, { t: "." }];
+    expect(JSON.stringify(jsonbOrder(runs))).not.toBe(JSON.stringify(runs));
+    expect(sameRuns(jsonbOrder(runs), runs)).toBe(true);
+    expect(sameRuns(jsonbOrder(runs), [{ t: "Missed appointments fell from 7.9% to 6.5%." }])).toBe(false);
+    // structureKey is built from lists of ids and kinds, with no object in it.
+    const doc: ExhbtDoc = { ...draftedDoc([CHARTS[1]!]), format: "research", sections: [{ id: "flow", kind: "flow" }, findings, graph("graph-1", CHARTS[1]!)] };
+    expect(structureKey(fromDatabase(doc))).toBe(structureKey(doc));
+  });
+
+  test("a new graph nobody has filled in is still untouched when it comes back from the database", () => {
+    for (const kind of CHART_KINDS) {
+      const fresh = { ...newChart(kind), title: "A title typed before choosing the kind" } as Chart;
+      expect(untouchedChart(fresh), kind).toBe(true);
+      expect(untouchedChart(jsonbOrder(fresh)), kind).toBe(true);
+      // One value typed in: it is no longer untouched, in either order.
+      expect(untouchedChart(withANumberChanged(fresh)), kind).toBe(false);
+      expect(untouchedChart(jsonbOrder(withANumberChanged(fresh))), kind).toBe(false);
+    }
+  });
+});
+
 /* ---------------- A real jsonb column ---------------- */
 
 test.describe("Through a real jsonb column", () => {
@@ -202,5 +272,34 @@ test.describe("The figure route, with the exhbt stored as the live database stor
     const kept = await stored(page, edited.id);
     expect(kept.working.sections.map((s) => s.kind).sort()).toEqual(["findings", "graph", "graph", "image"]);
     expect(kept.aiVersion.graphs).toBeUndefined();
+  });
+});
+
+test.describe("The editor, with the exhbt stored as the live database stores it", () => {
+  test("a copy kept in the browser that holds the same data is not offered back; one that differs is", async ({ page }) => {
+    const chart = CHARTS[1]!;
+    const { id } = await seedFromDatabase(page, [chart], []);
+    const offer = page.getByText(/that never reached the server/);
+    const ready = () => expect(page.locator("[data-ready=true]")).toBeAttached();
+    const backupKey = `exhbt-backup:${id}`;
+    /** Keeps a copy in this browser as the editor does, dated after the server's copy (a device whose clock runs ahead). */
+    const keep = (doc: ExhbtDoc) => page.evaluate(([key, d]) => localStorage.setItem(key, JSON.stringify({ doc: d, at: Date.now() + 60_000 })), [backupKey, doc] as const);
+    await page.goto(`/exhbts/${id}/edit`);
+    await ready();
+    await expect(offer).toHaveCount(0);
+
+    // The same exhbt as the server holds, with its keys in the order they were written.
+    await keep(draftedDoc([chart]));
+    await page.reload();
+    await ready();
+    await expect(page.locator("#title")).toHaveValue(core.title);
+    await expect(offer).toHaveCount(0);
+    expect(await page.evaluate((key) => localStorage.getItem(key), backupKey)).toBeNull();
+
+    // A copy that does differ is still offered.
+    await keep({ ...draftedDoc([chart]), title: "A title only this browser has" });
+    await page.reload();
+    await ready();
+    await expect(offer).toBeVisible();
   });
 });

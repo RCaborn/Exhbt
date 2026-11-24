@@ -1,4 +1,5 @@
 import { z } from "zod/v4";
+import { sameJson } from "../json";
 import { ChartSchema, emptyDoc, findingsOf, plain, type Chart, type ExhbtDoc, type FlowStep, type RichText } from "./blocks";
 import { sameChart } from "./charts";
 import { normaliseNumber, numbersIn, numbersInDoc, unverifiedNumbers } from "./verify";
@@ -130,8 +131,13 @@ export function applyBlock(doc: ExhbtDoc, key: DraftBlock, value: BlockValue): E
   }
 }
 
-/** Same words, same order, same formatting. */
-export const sameBlock = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+/**
+ * Same words, same order, same formatting. Compared by what the two hold, not as JSON text: the
+ * editor compares a block of the stored exhbt (out of jsonb, keys reordered) with the AI version's
+ * (out of a file, keys as written), and a bold run or a headline number reads `b, t` in one and
+ * `t, b` in the other.
+ */
+export const sameBlock = (a: unknown, b: unknown): boolean => sameJson(a, b);
 
 /**
  * Whether every graph on the exhbt is one the draft drew (`drafted`, from the AI version): the figure
