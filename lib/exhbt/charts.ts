@@ -1,4 +1,5 @@
 import { z } from "zod/v4";
+import { sameJson } from "../json";
 
 /**
  * Graphs on an exhbt (decision 0011). Flexible within a fixed set of kinds: every value is typed
@@ -173,6 +174,19 @@ export type BeforeAfter = ChartOf<"beforeAfter">;
 /** The graph with its kind, for data read without parsing (the store returns jsonb as it is). */
 export const asChart = (c: Chart): Chart => withKind(c) as Chart;
 
+/**
+ * Whether two graphs are the same graph: the same kind, words and values, with rows and points in the
+ * same order. Both are read as a graph first (ChartSchema), then compared whatever order their keys
+ * are in, because a graph read from the database (jsonb) comes back with its keys in another order
+ * than the same graph kept in a file or built in code. Never compare two graphs as JSON text.
+ * Something that doesn't read as a graph is the same as nothing, itself included.
+ */
+export function sameChart(a: unknown, b: unknown): boolean {
+  const x = ChartSchema.safeParse(a);
+  const y = ChartSchema.safeParse(b);
+  return x.success && y.success && sameJson(x.data, y.data);
+}
+
 /** Which ways a kind can protect its numbers. Scatter, tables and big numbers can't (type them as percentages instead). */
 export function protectModes(kind: ChartKind): Protect[] {
   if (kind === "stackedBar") return ["index"];
@@ -201,6 +215,14 @@ export function newChart(kind: ChartKind = "beforeAfter"): Chart {
       return { kind, title: "", columns: ["", ""], rows: [["", ""]] };
   }
 }
+
+/**
+ * A graph with nothing filled in but perhaps its title: it holds what a new graph of its kind holds.
+ * The editor then starts another kind afresh rather than carrying empty rows over. Compared by what
+ * it holds, not as JSON text: once saved, the graph comes back from the database with its keys in
+ * another order than newChart writes them.
+ */
+export const untouchedChart = (c: Chart): boolean => sameJson({ ...c, title: "" }, { ...newChart(c.kind), title: "" });
 
 /** False for a graph with no rows, points or tiles yet (the preview leaves it out). */
 export function hasData(raw: Chart): boolean {

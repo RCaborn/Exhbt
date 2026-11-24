@@ -1,5 +1,7 @@
 import { z } from "zod/v4";
+import { sameJson } from "../json";
 import { ChartSchema, emptyDoc, findingsOf, plain, type Chart, type ExhbtDoc, type FlowStep, type RichText } from "./blocks";
+import { sameChart } from "./charts";
 import { normaliseNumber, numbersIn, numbersInDoc, unverifiedNumbers } from "./verify";
 
 /**
@@ -129,8 +131,28 @@ export function applyBlock(doc: ExhbtDoc, key: DraftBlock, value: BlockValue): E
   }
 }
 
-/** Same words, same order, same formatting. */
-export const sameBlock = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+/**
+ * Same words, same order, same formatting. Compared by what the two hold, not as JSON text: the
+ * editor compares a block of the stored exhbt (out of jsonb, keys reordered) with the AI version's
+ * (out of a file, keys as written), and a bold run or a headline number reads `b, t` in one and
+ * `t, b` in the other.
+ */
+export const sameBlock = (a: unknown, b: unknown): boolean => sameJson(a, b);
+
+/**
+ * Whether every graph on the exhbt is one the draft drew (`drafted`, from the AI version): the figure
+ * route's test for an exhbt that is still the fresh draft. A graph the person made or changed is not
+ * among them, so it answers false; so does any graph when the draft's graphs were never recorded.
+ * With no graph on the exhbt there is nothing to ask, and the answer is true.
+ *
+ * Graphs are compared as graphs (sameChart), never as JSON text: the exhbt comes out of a jsonb column
+ * with its keys reordered, and `drafted` out of a file with them as written, so on the live site their
+ * text never matched and no drafted graph was ever taken off (release 2 review, figure-fresh-key-order).
+ */
+export function graphsAsDrafted(doc: Pick<ExhbtDoc, "sections">, drafted: Chart[] | undefined): boolean {
+  const drewIt = (chart: unknown) => (drafted ?? []).some((d) => sameChart(d, chart));
+  return doc.sections.every((s) => s.kind !== "graph" || drewIt(s.chart));
+}
 
 /** Every block's AI version from a freshly drafted doc. */
 export function aiVersionOf(doc: ExhbtDoc, source: string, extraUnverified: string[] = []): AiVersion {
