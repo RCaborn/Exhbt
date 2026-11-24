@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { pickFigure, type PageImage } from "@/lib/ai/figure-pick";
+import { FigurePickUnanswered, pickFigure, type PageImage } from "@/lib/ai/figure-pick";
 import { mediaTypeOf } from "@/lib/ai/transcribe";
 import { getCurrentUser } from "@/lib/auth";
 import { DRAFT_WINDOW_HOURS } from "@/lib/drafting";
@@ -19,7 +19,10 @@ import { getStore } from "@/lib/store";
  *
  * Part of the draft, so it uses none of the person's drafts or rewrites. One pick per draft: a
  * person can ask for as many as their plan has drafts in the window, plus a couple for drafts
- * that fail and are tried again. A pick is counted only when the AI call succeeded.
+ * that fail and are tried again. A pick is counted before the AI call, so requests that overlap
+ * can't all pass the check while it runs. It is given back when the call failed before the
+ * service answered (FigurePickUnanswered), so a failure the person didn't cause doesn't spend a
+ * pick. A call the service answered stays counted, even when nothing in the answer could be used.
  *
  * Outside production the answer also carries `debug`: the model that answered, its token counts
  * and its answer before the checks, which the figure eval reads (evals/figure-pick/README.md).
@@ -63,17 +66,23 @@ export async function POST(req: Request) {
   if (!e.drafting) return fail("AI drafting isn't part of your plan.", 403);
   const used = await store.countRecentEventsForUser("figure_picked", user.id, DRAFT_WINDOW_HOURS);
   if (used >= e.draftsPer30Days + SPARE_PICKS) return fail("No more figure picks until a draft frees up.", 429);
+  // Counted before the call: counted after it, every request that overlapped passed the check above while the call ran.
+  // The claim marks this request's own event, so that one, and never another request's, is what a failure gives back.
+  const claim = crypto.randomUUID();
+  await store.logEvent("figure_picked", user.id, { pages: images.length, claim });
 
   let result;
   try {
     result = await pickFigure(images);
   } catch (err) {
     console.error("figure pick failed", (err as Error).message);
+    // The service never answered: the person didn't cause that, so their pick is given back. Any other failure stays counted.
+    if (err instanceof FigurePickUnanswered) {
+      await store.returnEvent("figure_picked", user.id, claim).catch((problem: unknown) => console.error("figure pick give-back failed", (problem as Error).message));
+    }
     // Outside production the reason is on the answer too, so the eval can say why a real call failed (never shown to people).
     return fail(process.env.NODE_ENV === "production" ? "We couldn't pick a figure just now." : `We couldn't pick a figure just now. (${(err as Error).message.slice(0, 300)})`, 502);
   }
-  // Counted once the AI answered, so a pick that failed doesn't spend the person's allowance.
-  await store.logEvent("figure_picked", user.id, { pages: images.length });
   // Its own step, so picking figures is costed apart from drafting. ai_call_logs only accepts
   // 'figure_pick' once supabase/migrations/20261124000000_figure_pick.sql is applied; until then
   // the log fails and is reported, and the person still gets their figure.

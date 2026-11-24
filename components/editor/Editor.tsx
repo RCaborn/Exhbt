@@ -15,6 +15,7 @@ import { flowShown, FORMAT_COPY, formatOf } from "@/lib/exhbt/formats";
 import { drawnFlow, isArranged, restoreFlow } from "@/lib/exhbt/layouts";
 import { hasData } from "@/lib/exhbt/charts";
 import { newImageSection, roomFor } from "@/lib/exhbt/sections";
+import { sameJson } from "@/lib/json";
 import { LayoutPicker, type Drafted } from "./LayoutPicker";
 import { BlockTools, useDraftTools, type DraftToolsInit } from "./BlockTools";
 import { ConfirmAction } from "./ConfirmAction";
@@ -156,10 +157,11 @@ export function Editor(props: EditorProps) {
     } catch {
       // Storage blocked: the checklist just shows.
     }
-    // A copy kept in this browser that is newer than the server's: offer it back.
+    // A copy kept in this browser that is newer than the server's: offer it back. Compared by what the two
+    // hold, not as JSON text: the server's copy comes out of the database with its keys in another order.
     const b = readBackup(id);
     if (b) {
-      if (b.at > Date.parse(props.updatedAt) && JSON.stringify(b.doc) !== JSON.stringify(props.initialDoc)) {
+      if (b.at > Date.parse(props.updatedAt) && !sameJson(b.doc, props.initialDoc)) {
         offeredOn.current = docRef.current;
         setOffer(b);
       }
