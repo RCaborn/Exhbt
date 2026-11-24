@@ -28,6 +28,7 @@ import {
   card,
   chooseLayout,
   closeOpenSheet,
+  closeRewrite,
   fillPlain,
   fillRich,
   framesOf,
@@ -1019,6 +1020,8 @@ test.describe("The rewrite names read right in every layout", () => {
         expect(names.length, `${layout ?? "case"} ${block}`).toBe(1);
         expect(names[0], `${layout ?? "case"} ${block}`).not.toMatch(/\bthe (the|your|my|a)\b/i);
         if (block === "header") expect(names[0]).toBe(`Rewrite the ${header} now`);
+        // An open form stays until it is cancelled or used, over whatever is under it: closed, so the next part can be reached.
+        await closeRewrite(page, block);
       }
     }
   });

@@ -536,8 +536,22 @@ export async function startRewrite(page: Page, block: string) {
   await page.getByTestId(SEL.toolsTestId(block)).getByRole("button", { name: SEL.rewriteThisBlock }).click();
 }
 
+/**
+ * Closes a block's open rewrite form (its Cancel), and its toolbar's own More actions where that is the compact pair. An open form
+ * stays until it is cancelled or used, over whatever is under it (css/core.css), so a test closes it before it goes on to a part
+ * the form lies over, as a person would.
+ */
+export async function closeRewrite(page: Page, block: string) {
+  const tools = page.getByTestId(SEL.toolsTestId(block));
+  await tools.getByRole("button", { name: "Cancel" }).click();
+  await expect(tools.getByRole("button", { name: /^Rewrite the .+ now$/ })).toHaveCount(0);
+  const menu = page.locator(`${READY} .xe-tools[data-open] > [data-tool="menu"]`);
+  if (await menu.count()) await menu.click();
+  await expect(page.locator(`${READY} .xe-tools[data-open]`)).toHaveCount(0);
+}
+
 /** The "Back to the AI version" button inside a block's tools. */
-export const backToAiVersion = (page: Page, block: string) => page.getByTestId(SEL.toolsTestId(block)).getByRole("button", { name: SEL.backToAiVersion });
+export const backToAiVersion =(page: Page, block: string) => page.getByTestId(SEL.toolsTestId(block)).getByRole("button", { name: SEL.backToAiVersion });
 
 /* ------------------------------------------------------------------------------------------------
  * The work, and the things to fix

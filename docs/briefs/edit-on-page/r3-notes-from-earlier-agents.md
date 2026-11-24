@@ -362,7 +362,8 @@ What was red in CI, and why:
   - Whether the press landed was a race between the browser working the hover out again and Playwright's check. Here it passes with the processor up to 8 times slower and fails at 16 times. So a slow runner failed it and a quick one passed it. No merged commit caused it.
   - It was never the stacking. The form was see-through and took no presses; nothing lay over it. 5d308fa's raise did not fix it.
   - Fixed in `css/core.css`: a toolbar with a menu open stays, wherever the pointer and the focus are. `BlockTools` sets `data-open` on itself while its menu or its panel is open, and the CSS reads it. The same for the shell parts' corner toolbar and for the tablet's rule.
-  - The section with the open menu is raised in every place, to 29. At 30 it was drawn over the editor's top bar once the page scrolled it there.
+  - The section with the open menu is raised in every place, to 29. At 30 it was drawn over the editor's top bar once the page scrolled it there (seen in a screenshot). The test for it passes without the fix too, since the toolbar took no presses then; it was not run with 30 put back.
+  - Five tests under "An open rewrite form stays up and takes the press". Four fail without the fix.
 - `e2e/phase2-editor-media.spec.ts:316` ("File attached:" not seen in 20 seconds) did not fail here in three runs, one of them straight after the build folder was deleted, as CI's always starts. It is left as it was.
   - That cold run took 43 seconds and the next one 11: the dev server builds each page and route the first time a test uses it. On a slower runner one step could pass its 20 seconds that way. Not proven.
 
@@ -376,6 +377,7 @@ For tests of the toolbars and menus:
 - Playwright counts an element with `opacity: 0` as visible. `toBeVisible` passes on a toolbar nobody can see. Use an unforced click, or `click({ trial: true })`, which checks where the press would land.
 - A click scrolls its target into view and leaves the pointer where it was. Anything that shows on hover can go at that moment.
 - To try a part without the pointer or the focus: `page.mouse.move(2, 2)`, then blur the active element. The tests under "An open rewrite form stays up and takes the press" do this.
+- A test that opens a rewrite form closes it (`closeRewrite`) before it goes on to a part the form lies over.
 - To see a failure that comes and goes with the runner's speed: `Emulation.setCPUThrottlingRate` through `page.context().newCDPSession(page)`.
 - To try each place a toolbar can be in, hold `data-place` with a `MutationObserver` that puts it back. `placeTools` writes it again whenever any toolbar draws.
 - A size container (`@container`) makes no stacking context in Chromium now. Where it still does, research's method stack is one, so whatever holds a raised section is raised with it. Not tried on Safari.
@@ -384,7 +386,10 @@ Still open:
 - Outside the compact card, the rewrite form has no ground of its own. It is drawn straight over the page's words, squeezed to the width of its button's column, and the toolbar's other buttons move to its middle. Seen on the case study's findings, the gallery's flowchart and research's flowchart; the findings in the gallery and in research have their toolbars in the same places (above, and on the edge). It takes its press, but it is hard to read. The context line's form, in its corner toolbar, is drawn over the title in the same way; the title's and the skills' forms use the same toolbar.
   - Above its section, the toolbar grows upwards when the form opens, so "More actions" moves up, and can go under the top bar.
   - Next step: draw the form and its status line as a card under "More actions", as the compact form does.
-  - An open form now stays until it is cancelled or used. Before, it went when the pointer left, which hid this.
+- An open rewrite form now stays until it is cancelled or used, and takes the presses over whatever it lies on. Before, it went whenever the pointer left its section, which hid the point above. This is a change in what the editor does, and it is Rory's to decide.
+  - The compact card closes at a press anywhere else, as before. A form in a row, in a column or in a corner toolbar closes only by Cancel or by a rewrite.
+  - `phase2-formats`, "The rewrite names read right in every layout", opened four forms and walked on, and the flowchart's card then lay over the findings. It now closes each form (`closeRewrite` in `e2e/editor.ts`). No assertion changed.
+  - A choice that would keep less on the page: close an open form at a press anywhere else, in the new editor only.
 - The top bar cuts the reason for a failed save at 22rem with an ellipsis. "This couldn't be saved. Reload the page and try again." loses its second half. The whole of it is said to a screen reader. Under 64rem the words are not drawn at all.
 - `store.setAt` still compares a stored value with what a field built as JSON text (`sameValue` in `store-core.ts`). On the live site a formatted field typed in and put back as it was may then count as a change, and be saved once more. Not tested with a doc in the database's key order. The editor's other comparisons of JSON text (the undo list, a layout switch, the toolbar's check of its own words) each set the store's doc against one made from it. Reading them, the database's order should not mislead them; none is tested for it.
 - Not run here: `editor-drag` and `editor-flow`, and nothing on WebKit.

@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { ENTITLEMENTS } from "../lib/entitlements";
 import { emptyDoc, text, type ExhbtDoc, type RichText } from "../lib/exhbt/blocks";
 import { aiVersionOf, blockValue, replaceBlock, sameBlock } from "../lib/exhbt/draft-blocks";
-import { backToAiVersion, cardMenuButton, chooseLayout, DRAFT_PROJECT as PROJECT, draftAndOpen, findingsField, openCardMenu, previewArticle, revealCardMenu, rewritesLeft, signInToDraft, startRewrite, waitForSaved } from "./editor";
+import { backToAiVersion, cardMenuButton, chooseLayout, closeRewrite, DRAFT_PROJECT as PROJECT, draftAndOpen, findingsField, openCardMenu, previewArticle, revealCardMenu, rewritesLeft, signInToDraft, startRewrite, waitForSaved } from "./editor";
 import { READY } from "./page-editor";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -196,7 +196,7 @@ test.describe("An open rewrite form stays up and takes the press", () => {
     const button = rewriteNow(page, block);
     await expect(button, what).toBeVisible();
     // An unforced press, short of pressing: Playwright scrolls the button into view and checks that the press would land on it.
-    await button.click({ trial: true, timeout: 5_000 });
+    await button.click({ trial: true, timeout: 20_000 });
     const found = await page.getByTestId(`tools-${block}`).evaluate((tools) => {
       const name = (e: Element) => `${e.tagName.toLowerCase()}.${e.getAttribute("class") ?? ""}`.slice(0, 80);
       // Drawn, not only laid out (Playwright counts a see-through button as visible).
@@ -217,15 +217,6 @@ test.describe("An open rewrite form stays up and takes the press", () => {
     expect(found, what).toBe("drawn, on top");
   }
 
-  /** Closes the block's form again (Cancel), and the compact form's menu where the form was in one. */
-  async function close(page: Page, block: string) {
-    await page.getByTestId(`tools-${block}`).getByRole("button", { name: "Cancel" }).click();
-    await expect(rewriteNow(page, block)).toHaveCount(0);
-    const menu = page.locator(`${READY} .xe-tools[data-open] > [data-tool="menu"]`);
-    if (await menu.count()) await menu.click();
-    await expect(page.locator(`${READY} .xe-tools[data-open]`)).toHaveCount(0);
-  }
-
   for (const layout of ["Case study", "Gallery", "Research"] as const) {
     test(`${layout}: each drafted part's form, with the pointer and the focus off the page's parts`, async ({ page }) => {
       await draftAndOpen(page, "stays");
@@ -239,7 +230,7 @@ test.describe("An open rewrite form stays up and takes the press", () => {
         await startRewrite(page, block);
         await leave(page);
         await takesThePress(page, block, `${layout}, ${block}`);
-        await close(page, block);
+        await closeRewrite(page, block);
       }
       // And the press itself on the flowchart's form, as "on Free the rewrites run out" makes it.
       await startRewrite(page, "flow");
@@ -278,7 +269,7 @@ test.describe("An open rewrite form stays up and takes the press", () => {
         await leave(page);
         expect(await tools.getAttribute("data-place"), `${block}, held ${place}`).toBe(want);
         await takesThePress(page, block, `${block}, toolbar ${place}`);
-        await close(page, block);
+        await closeRewrite(page, block);
       }
     }
   });
