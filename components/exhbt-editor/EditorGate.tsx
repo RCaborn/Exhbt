@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Component, createContext, useContext, type ErrorInfo, type ReactNode } from "react";
+import { again } from "./again";
 import type { PageEditorProps } from "./context";
 import { flushPending } from "./pending";
 import { StandInPage } from "./StandIn";
@@ -13,9 +14,9 @@ import { StandInPage } from "./StandIn";
  * the page. Until the chunk has loaded (and on the server) the gate draws the loading view, which is
  * exactly what the editor's first view draws (StandIn.tsx), so the fields come alive in place.
  *
- * If the editor throws while it draws, or its chunk fails to load, the boundary logs the error, says
- * so, waits for flushPending() (three seconds at most; the browser copy was already written) and
- * reloads the page with ?editor=classic. It reloads rather than swapping editors in place: the
+ * If the editor throws while it draws, or its chunk fails to load (asked for three times: again.ts),
+ * the boundary logs the error, says so, waits for flushPending() (three seconds at most; the browser
+ * copy was already written) and reloads the page with ?editor=classic. It reloads rather than swapping editors in place: the
  * page's props are from when it was opened, and an editor mounted on them could save over newer work.
  */
 
@@ -32,7 +33,7 @@ function Loading() {
   ) : null;
 }
 
-const PageEditor = dynamic(() => import("./EditorShell").then((m) => m.PageEditor), { ssr: false, loading: Loading });
+const PageEditor = dynamic(() => again(() => import("./EditorShell")).then((m) => m.PageEditor), { ssr: false, loading: Loading });
 
 /** The longest the fallback waits for the newest doc to reach the server before it reloads. */
 const FLUSH_MS = 3000;

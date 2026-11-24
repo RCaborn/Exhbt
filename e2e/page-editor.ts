@@ -1,5 +1,5 @@
 import { deflateSync } from "node:zlib";
-import { expect, type Locator, type Page } from "@playwright/test";
+import { expect, type ElementHandle, type Locator, type Page } from "@playwright/test";
 import { text, type ExhbtDoc, type Section } from "../lib/exhbt/blocks";
 import { OFFERED_FORMATS, type Format } from "../lib/exhbt/formats";
 import { BEFORE_AFTER_IMAGES, beforeAfterDoc, BUILD_IMAGES, buildDoc, essayDoc, EVENT_IMAGES, eventDoc, fullDoc, GALLERY_IMAGES, galleryDoc, researchDoc } from "../lib/exhbt/sample";
@@ -109,6 +109,25 @@ export const frame = (page: Page, id: string): Locator => page.locator(`${READY}
 export const grip = (page: Page, id: string): Locator => frame(page, id).locator("[data-grip]");
 
 /**
+ * Chooses every word of the field that has the cursor. With a keyboard that is Control+A, or Command+A on
+ * a Mac. The editor reads an iPhone's browser, and a Mac's, as one where Control+A goes to the start of
+ * the line and Command+A chooses everything (Tiptap's keymap goes by the user agent, ProseMirror's by the
+ * platform). Driven from a machine that is not a Mac, a page that says it is an iPhone or a Mac has no key
+ * that does it, so there the words are chosen as a finger chooses them: through the page's own selection.
+ */
+export async function chooseAll(page: Page) {
+  const apple = await page.evaluate(() => /Mac|iP(hone|ad|od)/.test(navigator.platform) || (navigator.userAgent.includes("Mac") && "ontouchend" in document));
+  if (!apple || process.platform === "darwin") return page.keyboard.press("ControlOrMeta+A");
+  await page.evaluate(async () => {
+    const el = document.activeElement;
+    if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) el.select();
+    else if (el) getSelection()?.selectAllChildren(el);
+    // The editor hears of a selection a moment after it is made.
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+  });
+}
+
+/**
  * Puts the cursor in a field and types `words`, replacing what is there (`append` keeps it). A
  * formatted field becomes its editor when it takes the focus; this waits for that before typing.
  */
@@ -119,10 +138,68 @@ export async function typeIn(page: Page, path: string, words: string, opts: { ap
   await f.click();
   const box = rich ? f.locator(".ProseMirror") : f;
   if (rich) await expect(box).toBeFocused();
-  if (!opts.append) await page.keyboard.press("ControlOrMeta+A");
+  if (!opts.append) await chooseAll(page);
   if (!opts.append) await page.keyboard.press("Backspace");
   else await page.keyboard.press("End");
   await page.keyboard.type(words);
+}
+
+/** A finger on the screen: `native` says whether the browser itself takes the touches. */
+export type Finger = {
+  native: boolean;
+  down(x: number, y: number): Promise<void>;
+  move(x: number, y: number): Promise<void>;
+  up(): Promise<void>;
+  slide(from: { x: number; y: number }, to: { x: number; y: number }, steps?: number): Promise<void>;
+};
+
+/**
+ * A finger. On Chromium the touches are real ones, sent through the browser, so scrolling and the press
+ * delay behave as they do under a finger (`native`). Playwright's WebKit takes a tap and nothing more, so
+ * there the touches are events made in the page, sent to the element under the first touch as a real
+ * finger's are: they reach the editor's sensors, but the browser does not scroll for them. A test checks
+ * that a swipe scrolls only where `native` is true. E2E_TOUCH=page makes Chromium use the made events too,
+ * to check them against the real ones.
+ */
+export async function finger(page: Page): Promise<Finger> {
+  const slider = (move: Finger["move"]): Finger["slide"] => async (from, to, steps = 12) => {
+    for (let i = 1; i <= steps; i++) {
+      await move(from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
+      await page.waitForTimeout(16);
+    }
+  };
+  if (page.context().browser()?.browserType().name() === "chromium" && process.env.E2E_TOUCH !== "page") {
+    const cdp = await page.context().newCDPSession(page);
+    const send = async (type: "touchStart" | "touchMove" | "touchEnd", x = 0, y = 0) => {
+      await cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
+    };
+    const move = (x: number, y: number) => send("touchMove", x, y);
+    return { native: true, down: (x, y) => send("touchStart", x, y), move, up: () => send("touchEnd"), slide: slider(move) };
+  }
+  let under: ElementHandle<Element> | null = null;
+  let last = { x: 0, y: 0 };
+  const send = async (type: "touchstart" | "touchmove" | "touchend", x: number, y: number) => {
+    const touch = [{ identifier: 1, clientX: x, clientY: y }];
+    const on = type === "touchend" ? [] : touch;
+    await under!.dispatchEvent(type, { touches: on, targetTouches: on, changedTouches: touch });
+    last = { x, y };
+  };
+  const move = (x: number, y: number) => send("touchmove", x, y);
+  return {
+    native: false,
+    async down(x, y) {
+      under = (await page.evaluateHandle(([px, py]) => document.elementFromPoint(px!, py!), [x, y])).asElement();
+      expect(under, `something is drawn at ${x}, ${y}`).not.toBeNull();
+      await send("touchstart", x, y);
+    },
+    move,
+    async up() {
+      await send("touchend", last.x, last.y);
+      await under?.dispose();
+      under = null;
+    },
+    slide: slider(move),
+  };
 }
 
 /** The editor's doc as it is now, in the page (development only). */

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./editor-test";
 import { emptyDoc, text, type ExhbtDoc } from "../lib/exhbt/blocks";
 import { FORMAT_RULES } from "../lib/exhbt/formats";
 import { flowShown, pageItems } from "../lib/exhbt/layouts";

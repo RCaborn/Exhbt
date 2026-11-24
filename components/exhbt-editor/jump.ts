@@ -3,6 +3,7 @@
 import type { FieldPath } from "@/components/portfolio/page-ctx";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
 import type { SheetName, UiApi } from "./context";
+import { openPanel } from "./figures/pop";
 import { sheetOf } from "./sheets/paths";
 
 /*
@@ -15,7 +16,7 @@ import { sheetOf } from "./sheets/paths";
  *    own: `""` the word bar (H's), `sections` the "+" at the end (F's), `flow` the flowchart's list
  *    (K's), `skills` the skills block, `sections.N.items` a findings list's "Add a finding", and
  *    `sections.N` the section's frame;
- *  - a field inside a closed native popover (a link's address) opens the popover first;
+ *  - a field inside a chip's closed panel (a link's address) opens the panel first;
  *  - when what it lands on is not a field, the cursor goes in the first field inside it, or the
  *    element itself takes the focus;
  *  - it then dispatches `xe-jump` (bubbling, with the path) on what it landed on: F's end "+" opens its
@@ -53,8 +54,9 @@ function land(el: HTMLElement, path: FieldPath) {
   const field = isField(el) ? el : el.querySelector<HTMLElement>(FIELD);
   // An anchor with no field (the "+" at the end, "Add a finding") is its button.
   const target = field ?? (el.matches("button, a[href]") ? el : el.querySelector<HTMLElement>("button:not([disabled]), a[href]")) ?? el;
-  const pop = target.closest<HTMLElement>("[popover]");
-  if (pop && !pop.matches(":popover-open")) pop.showPopover();
+  // A chip's panel: a popover, or a dialog where the browser has none (figures/pop.ts).
+  const pop = target.closest<HTMLElement>(".xe-fig-pop");
+  if (pop) openPanel(pop);
   if (!field && !target.hasAttribute("tabindex") && !target.matches("a[href], button, input, select, textarea")) target.tabIndex = -1;
   target.scrollIntoView({ block: "center" });
   target.focus({ preventScroll: true });

@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "./editor-test";
 import { text, validateForPublish, type ExhbtDoc, type Section, type SectionOf } from "../lib/exhbt/blocks";
 import { normaliseNumber } from "../lib/exhbt/verify";
 import { fullDoc, openBankingDoc } from "../lib/exhbt/sample";
@@ -7,6 +7,7 @@ import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import {
   allowEditOnly,
   boxes,
+  chooseAll,
   differences,
   docNow,
   focusedPath,
@@ -36,11 +37,11 @@ import {
  * (three pages of text and a bar chart on page 3), as e2e/auto-figure.spec.ts does.
  */
 
-// The touch project runs only the test of its own, at the end of this file.
+// A phone's project (touch, and WebKit's iphone) runs only the test of its own, at the end of this file.
 const ON_TOUCH = "on a phone";
-test.beforeEach(({}, info) => {
-  test.skip(info.project.name === "touch" && !info.title.includes(ON_TOUCH), "a mouse test");
-  test.skip(info.project.name !== "touch" && info.title.includes(ON_TOUCH), "a touch test");
+test.beforeEach(({ isMobile }, info) => {
+  test.skip(isMobile && !info.title.includes(ON_TOUCH), "a mouse test");
+  test.skip(!isMobile && info.title.includes(ON_TOUCH), "a touch test");
 });
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -225,10 +226,17 @@ test.describe("a picture's description", () => {
       await expect(mark).toBeVisible();
       const t = (await tile.boundingBox())!;
       const m = (await mark.boundingBox())!;
-      expect(m.x).toBeGreaterThanOrEqual(t.x - 0.5);
-      expect(m.x + m.width).toBeLessThanOrEqual(t.x + t.width + 0.5);
+      // For a failure's message: how the mark is drawn (words, a dot, or the dot on the line's end), and the lines of the placeholder and of the field.
+      const how = await tile.locator(".xe-fig-needs-line").evaluate((el) => {
+        const at = (r: DOMRect) => [r.left, r.top, r.width, r.height].map((v) => Math.round(v * 10) / 10).join(",");
+        const drawn = el.hasAttribute("data-tight") ? "the dot on the line's end" : el.hasAttribute("data-compact") ? "a dot" : "words";
+        const lines = [...el.firstElementChild!.getClientRects()].map(at).join(" | ");
+        return `${drawn}; the placeholder's lines ${lines}; the field ${at(el.parentElement!.querySelector("textarea")!.getBoundingClientRect())}`;
+      });
+      expect(m.x, how).toBeGreaterThanOrEqual(t.x - 0.5);
+      expect(m.x + m.width, how).toBeLessThanOrEqual(t.x + t.width + 0.5);
       // On the description's own lines: never hanging under the tile into the next row.
-      expect(m.y + m.height).toBeLessThanOrEqual(t.y + t.height + 0.5);
+      expect(m.y + m.height, how).toBeLessThanOrEqual(t.y + t.height + 0.5);
       // In the caption's type: 0.8125rem in a tile.
       expect(await tile.locator('[data-edit-only="image-description"]').evaluate((e) => getComputedStyle(e).fontSize)).toBe("13px");
     }
@@ -322,7 +330,7 @@ test.describe("a link's web address", () => {
     await expect(button).not.toHaveAttribute("data-missing");
     await button.click();
     await expect(input).toBeFocused();
-    await page.keyboard.press("ControlOrMeta+A");
+    await chooseAll(page);
     await page.keyboard.press("Backspace");
     await expect(button).toHaveAttribute("data-missing", "");
     // A bad address: its issue, in the popover.

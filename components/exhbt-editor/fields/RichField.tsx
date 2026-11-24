@@ -7,6 +7,7 @@ import { RichText } from "@/components/exhbt/RichText";
 import type { RichSlot } from "@/components/portfolio/page-ctx";
 import type { RichText as RichTextValue, Run } from "@/lib/exhbt/blocks";
 import { docToRuns, runsToDoc, sameRuns, type TiptapNode } from "@/lib/exhbt/richtext-tiptap";
+import { again } from "../again";
 import { useFieldPath } from "../Frame";
 import { MUTED } from "../geometry";
 import { useStore } from "../store";
@@ -35,7 +36,7 @@ import { IssueNote, issueId, useFieldIssue } from "./issues";
  * No key can come in between, so none is lost, and nothing moves.
  */
 
-const loadEditor = () => import("./RichEditor");
+const loadEditor = () => again(() => import("./RichEditor"));
 const RichEditor = lazy(loadEditor);
 
 /** Starts fetching the editor's chunk, so a click only has to make the editor (EditorShell.tsx, when the page is up). */
@@ -148,22 +149,38 @@ export const RichField = memo(function RichField(given: RichSlot) {
     );
   }, [start]);
 
-  /** The hand-over, in one step: the words and the selection on the screen go to the editor, then it takes the resting field's place, and the caret. */
-  const onReady = (editor: Editor, name: () => void) => {
-    const el = rest.current;
-    const words = el ? runsFromDom(el) : null;
-    const sel = el ? selectionIn(el) : null;
-    const hadFocus = Boolean(el && el.contains(document.activeElement));
-    if (words && !sameRuns(words, docToRuns(editor.getJSON() as TiptapNode))) editor.commands.setContent(runsToDoc(words), { emitUpdate: false });
-    flushSync(() => setReady(true));
-    name();
-    if (hadFocus) {
-      const size = editor.state.doc.content.size;
-      const clamp = (n: number) => Math.max(1, Math.min(size - 1, n + 1));
-      editor.chain().setTextSelection({ from: clamp(sel?.from ?? Number.MAX_SAFE_INTEGER), to: clamp(sel?.to ?? Number.MAX_SAFE_INTEGER) }).focus(null, { scrollIntoView: false }).run();
-    }
-    for (const done of readyWaiters.current.splice(0)) done();
-  };
+  /**
+   * The hand-over, in one step: the words and the selection on the screen go to the editor, then it takes the
+   * resting field's place, and the caret.
+   *
+   * It runs from a microtask. The editor says it is made from an effect, and there React refuses `flushSync`: the
+   * swap was drawn later, after the editor had been asked to take the focus while still inert, so the focus was
+   * on nothing until the next frame and a key typed then was lost (seen on WebKit, 24 Nov). A microtask runs
+   * once React has finished, before anything else can happen on the page.
+   */
+  const onReady = (editor: Editor, name: () => void) =>
+    queueMicrotask(() => {
+      const el = rest.current;
+      // The field or its editor went meanwhile (its section was removed): nothing to hand over.
+      if (editor.isDestroyed || !editor.view.dom.isConnected) {
+        for (const done of readyWaiters.current.splice(0)) done();
+        return;
+      }
+      const words = el ? runsFromDom(el) : null;
+      const sel = el ? selectionIn(el) : null;
+      const hadFocus = Boolean(el && el.contains(document.activeElement));
+      if (words && !sameRuns(words, docToRuns(editor.getJSON() as TiptapNode))) editor.commands.setContent(runsToDoc(words), { emitUpdate: false });
+      flushSync(() => setReady(true));
+      name();
+      if (hadFocus) {
+        const size = editor.state.doc.content.size;
+        const clamp = (n: number) => Math.max(1, Math.min(size - 1, n + 1));
+        editor.chain().setTextSelection({ from: clamp(sel?.from ?? Number.MAX_SAFE_INTEGER), to: clamp(sel?.to ?? Number.MAX_SAFE_INTEGER) }).focus(null, { scrollIntoView: false }).run();
+        // Tiptap takes the focus a frame later; taken now too, the focus goes straight from the one field to the other.
+        editor.view.focus();
+      }
+      for (const done of readyWaiters.current.splice(0)) done();
+    });
 
   // Each change typed in the resting field goes to the store, as the editor's would.
   const onInput = () => {

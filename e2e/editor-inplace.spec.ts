@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { devices, expect, test, type Page } from "@playwright/test";
+import { devices, expect, pressFocuses, test, type Page } from "./editor-test";
 import { emptyDoc, plain, text, type ExhbtDoc, type RichText, type Section } from "../lib/exhbt/blocks";
 import { FORMAT_RULES, formatOf } from "../lib/exhbt/formats";
 import { flowShown, hasMarker, pageItems } from "../lib/exhbt/layouts";
@@ -501,6 +501,8 @@ test.describe("undo", () => {
     await pressUndo(page);
     await expect(frame(page, "image-1")).toBeVisible();
     await removeVia(page, "image-1", "Image");
+    // The press took it off the page: what follows is about its file, not about whether Remove worked.
+    await expect(frame(page, "image-1")).toHaveCount(0);
     // Thirty more steps push the removal off the end of the undo list: now nothing can bring it back.
     await page.evaluate(() => {
       const s = window.__exhbtEditor!;
@@ -804,7 +806,8 @@ test.describe("the status line", () => {
     const block = page.locator(`${READY} [data-xe-tray] [data-block="image"]`);
     const chooser = page.waitForEvent("filechooser");
     await block.click();
-    await expect(block).toBeFocused();
+    // In Safari the pressed button has no focus and nothing else has: the cursor goes to the description from there too.
+    if (pressFocuses) await expect(block).toBeFocused();
     await (await chooser).setFiles({ name: "a.png", mimeType: "image/png", buffer: png(30, 10) });
     await expect(page.locator(`${READY} [data-kind="image"]`)).toHaveCount(1);
     await expect(page.locator("#image-0-alt")).toBeFocused();
@@ -1172,8 +1175,8 @@ test("sections a layout keeps but does not draw are listed under the page; Remov
   await expect(page.getByRole("region", { name: "Kept, not shown in this layout" })).toHaveCount(0);
   await seeAsVisitor(page, false);
   await kept.getByRole("button", { name: "Remove Aim or hypothesis" }).click();
-  await expect(kept.getByRole("listitem")).toHaveCount(1);
-  expect((await docNow(page)).sections.some((s) => s.kind === "aim")).toBe(false);
+  // The list and the doc together, so that a failure says which did not follow the press (on WebKit, once, the list kept both for 20s).
+  await expect.poll(async () => ({ listed: await kept.getByRole("listitem").count(), aimInDoc: (await docNow(page)).sections.some((s) => s.kind === "aim") })).toEqual({ listed: 1, aimInDoc: false });
   await pressUndo(page);
   await expect(kept.getByRole("listitem")).toHaveCount(2);
   expect((await docNow(page)).sections.some((s) => s.kind === "aim")).toBe(true);

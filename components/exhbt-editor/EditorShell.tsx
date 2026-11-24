@@ -31,6 +31,7 @@ import { PageCtxContext } from "./Frame";
 import { CANVAS, LOOK_GROUND } from "./geometry";
 import { jumpTo } from "./jump";
 import { notePending } from "./pending";
+import { useNoZoomOnFocus } from "./phone/noZoom";
 import { PhoneBar } from "./phone/PhoneBar";
 import { ReorderSheet } from "./phone/ReorderSheet";
 import { CardSheet } from "./sheets/CardSheet";
@@ -88,6 +89,8 @@ export function PageEditor(props: PageEditorProps) {
   if (devParam("crash") === "render") throw new Error("The new editor was told to fail (?crash=render, development only).");
   const [visit] = useState(() => startVisit(props));
   const [ready, setReady] = useState(false);
+  // An iPhone zooms in on a field under 16px, and the page's own type is mostly under it (phone/noZoom.ts).
+  useNoZoomOnFocus();
   useEffect(() => {
     setReady(true);
     // Their chunk is fetched now, so a field clicked first only has to make its editor.

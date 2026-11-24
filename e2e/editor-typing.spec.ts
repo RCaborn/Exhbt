@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./editor-test";
 import { plain, type ExhbtDoc, type RichText } from "../lib/exhbt/blocks";
 import { docNow, field, freshName, full, holdRichEditor, openDoc, readStored, READY, sampleDoc, waitSaved } from "./page-editor";
 

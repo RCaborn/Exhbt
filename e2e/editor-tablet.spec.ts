@@ -1,12 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "./editor-test";
 import { FORMAT_RULES } from "../lib/exhbt/formats";
 import { labelOf } from "../components/exhbt-editor/labels";
-import { docNow, field, flowChipsNearWords, frame, grip, offered, openTiming, pageOrder, plusClashes, READY, smallPresses, toolbarClashes, typeIn, undoLabel, waitLive } from "./page-editor";
+import { docNow, field, finger, flowChipsNearWords, frame, grip, offered, openTiming, pageOrder, plusClashes, READY, smallPresses, toolbarClashes, typeIn, undoLabel, waitLive } from "./page-editor";
 
 /*
  * The editor on a tablet (decision 0026, "The chrome"; docs/briefs/edit-on-page/r3-l-phone.md), on the
- * tablet project: 820 by 1180 with touch, wider than 48rem, so there is no phone bar. Each section's
+ * tablet project (820 by 1180 with touch) and WebKit's ipad: wider than 48rem, so there is no phone bar. Each section's
  * toolbar is shown without hovering and every button in it is 44px (G's rule for a coarse pointer); a
  * 260ms press on a grip picks a section up and a drag moves it (F's); "Reorder sections" is in the top
  * bar's menu (H's) and works (L's sheet).
@@ -28,22 +28,6 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-/** Real touch input through the browser, so scrolling and the press delay behave as they do under a finger. */
-async function finger(page: Page) {
-  const cdp = await page.context().newCDPSession(page);
-  const send = (type: "touchStart" | "touchMove" | "touchEnd", x = 0, y = 0) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
-  return {
-    down: (x: number, y: number) => send("touchStart", x, y),
-    move: (x: number, y: number) => send("touchMove", x, y),
-    up: () => send("touchEnd"),
-    async slide(from: { x: number; y: number }, to: { x: number; y: number }, steps = 14) {
-      for (let i = 1; i <= steps; i++) {
-        await send("touchMove", from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
-        await page.waitForTimeout(16);
-      }
-    },
-  };
-}
 const middle = async (l: Locator) => {
   const b = (await l.boundingBox())!;
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
@@ -356,7 +340,7 @@ test("a 260ms press on a grip picks the section up, and a drag moves it", async 
   // Carried down past the section after it.
   const next = order[order.indexOf("quote-1") + 1]!;
   const b = (await frame(page, next).boundingBox())!;
-  await touch.slide(at, { x: at.x, y: b.y + b.height * 0.85 });
+  await touch.slide(at, { x: at.x, y: b.y + b.height * 0.85 }, 14);
   await page.waitForTimeout(250);
   const shown = (await page.evaluate(() => window.__exhbtDrag?.state()?.place ?? null))!;
   expect(shown).toBe(order.indexOf("quote-1") + 1);
@@ -399,7 +383,7 @@ test("Reorder sections is in the top bar's menu, and its sheet moves sections by
   await touch.down(from.x, from.y);
   await page.waitForTimeout(260);
   await touch.move(from.x, from.y - 2);
-  await touch.slide(from, { x: from.x, y: from.y - row * 3 });
+  await touch.slide(from, { x: from.x, y: from.y - row * 3 }, 14);
   await page.waitForTimeout(250);
   await touch.up();
   const r = one.indexOf("reflection-1");

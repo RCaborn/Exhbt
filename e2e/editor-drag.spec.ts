@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./editor-test";
 import { LIMITS, wordCount, type ExhbtDoc, type Section } from "../lib/exhbt/blocks";
 import { formatOf, FORMAT_RULES, type Format } from "../lib/exhbt/formats";
 import { blockOptions, pageItems, rowsFor, type Cell, type Row } from "../lib/exhbt/layouts";
@@ -8,7 +8,7 @@ import { newImageSection, newSection, roomFor } from "../lib/exhbt/sections";
 import { ALL_THEMES, PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import { labelOf } from "../components/exhbt-editor/labels";
 import { HYSTERESIS, makePlan, orderWith, placeAt, pointFor, rowsInfo, type Box } from "../components/exhbt-editor/drag/plan";
-import { docNow, frame, freshName, grip, offered, openDoc, openTiming, pageOrder, plusClashes, READY, SAMPLES, toolbarClashes, typeIn, waitLive, waitReady } from "./page-editor";
+import { docNow, finger, frame, freshName, grip, offered, openDoc, openTiming, pageOrder, plusClashes, READY, SAMPLES, toolbarClashes, typeIn, waitLive, waitReady } from "./page-editor";
 import { uniqueBytes } from "./unique-bytes";
 
 /*
@@ -424,7 +424,8 @@ test.describe("each section's toolbar, at 1440 wide", () => {
     const n = (await pageOrder(page)).length;
     expect(await page.evaluate((at) => window.__exhbtEditor!.insert("link", at), n)).toBeTruthy();
     await expect.poll(async () => (await pageOrder(page)).length).toBe(n + 1);
-    expect(await toolbarClashes(page)).toEqual([]);
+    // The toolbars are placed in the frame after the new line is drawn: WebKit answers before that frame (as the tests below wait).
+    await expect.poll(() => toolbarClashes(page)).toEqual([]);
   });
 
   test("research's hypothesis, beside the graph: its toolbar runs down the gutter from its corner, clear of its words, and stays clear of a long first line", async ({ page }) => {
@@ -1004,7 +1005,11 @@ test.describe("while carrying", () => {
     expect(await place(page)).not.toBe(p0);
     // Near the top edge it scrolls back, and stops at the top.
     await page.mouse.move(view.width / 2, 70, { steps: 12 });
-    await expect.poll(() => scrollY(page), { timeout: 30_000 }).toBe(0);
+    // On WebKit the page once stayed at its foot here (24 Nov): a failure says whether the section was still carried, and where to.
+    const stuck = async (e: Error) => {
+      throw new Error(`${e.message}\nStill carried: ${await lifting(page).count()}; its place: ${await place(page)}; scrollY: ${await scrollY(page)}.`);
+    };
+    await expect.poll(() => scrollY(page), { timeout: 30_000 }).toBe(0).catch(stuck);
     await page.mouse.up();
     await expect(lifting(page)).toHaveCount(0);
   });
@@ -1570,22 +1575,6 @@ test.describe("the tray", () => {
 test.describe("by touch", () => {
   test.skip(({ isMobile }) => !isMobile, "runs in the touch project");
 
-  /** Real touch input through the browser, so scrolling and the press delay behave as they do under a finger. */
-  async function finger(page: Page) {
-    const cdp = await page.context().newCDPSession(page);
-    const send = (type: "touchStart" | "touchMove" | "touchEnd", x = 0, y = 0) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
-    return {
-      down: (x: number, y: number) => send("touchStart", x, y),
-      move: (x: number, y: number) => send("touchMove", x, y),
-      up: () => send("touchEnd"),
-      async slide(from: { x: number; y: number }, to: { x: number; y: number }, steps = 12) {
-        for (let i = 1; i <= steps; i++) {
-          await send("touchMove", from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
-          await page.waitForTimeout(16);
-        }
-      },
-    };
-  }
 
   test("a swipe on a section's words or a picture scrolls and moves nothing; a quick swipe from a grip picks nothing up; a 260ms press does; no tray", async ({ page }) => {
     await open(page, "gallery");
@@ -1600,7 +1589,8 @@ test.describe("by touch", () => {
     await touch.down(w.x + 80, w.y + 40);
     await touch.slide({ x: w.x + 80, y: w.y + 40 }, { x: w.x + 80, y: w.y - 260 });
     await touch.up();
-    await expect.poll(() => scrollY(page)).toBeGreaterThan(y0 + 150);
+    // Touches made in the page (WebKit: finger, page-editor.ts) can't scroll it, so the scroll is checked only under real ones.
+    if (touch.native) await expect.poll(() => scrollY(page)).toBeGreaterThan(y0 + 150);
     expect(await pageOrder(page)).toEqual(order);
     await expect(lifting(page)).toHaveCount(0);
 
@@ -1612,7 +1602,7 @@ test.describe("by touch", () => {
     await touch.down(t.x + t.width / 2, t.y + t.height / 2);
     await touch.slide({ x: t.x + t.width / 2, y: t.y + t.height / 2 }, { x: t.x + t.width / 2, y: t.y + t.height / 2 - 220 });
     await touch.up();
-    await expect.poll(() => scrollY(page)).toBeGreaterThan(y1 + 120);
+    if (touch.native) await expect.poll(() => scrollY(page)).toBeGreaterThan(y1 + 120);
     expect(await pageOrder(page)).toEqual(order);
     await expect(lifting(page)).toHaveCount(0);
 

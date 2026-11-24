@@ -15,6 +15,7 @@ import { useFrame } from "../Frame";
 import { DESCRIPTION_PLACEHOLDER, descriptionClass, descriptionLabel } from "../geometry";
 import { useDoc, useSection, useStore } from "../store";
 import { useAnchoredPopover } from "./anchor";
+import { opensPanel, Panel } from "./pop";
 
 /*
  * An image's edit-only parts (decision 0026, "What the page does not draw"):
@@ -59,7 +60,14 @@ function Description({ sectionId }: { sectionId: string }) {
  * in the field's own type and width, with the mark after them, over the field (it takes no room and
  * lets every press through). Where the words would not fit on that last line (a narrow gallery tile,
  * whose rows are 12px apart) the mark is a dot there instead, its words kept for screen readers and
- * as its tooltip, so it never hangs under the figure into the next row.
+ * as its tooltip, so it never hangs under the figure into the next row. Where that line is full to its
+ * end the dot has no room either: it then sits on the end of the line, over the top of its last letters.
+ *
+ * The mark starts from a point that takes no room on the line (`xe-fig-needs-at`), so the unseen words
+ * break exactly as the field's do whatever follows them, and the mark is always on their last line.
+ * When it took room, the page's `text-wrap: pretty` would not leave it alone on a line: it brought the
+ * placeholder's last word down to it, a line under the field, and the two hung under the figure (in a
+ * gallery's tile at about 900 wide on Chromium, and at 1440 on Safari, which breaks lines its own way).
  */
 function NeedsMark({ words }: { words: string }) {
   const line = useRef<HTMLSpanElement>(null);
@@ -67,12 +75,14 @@ function NeedsMark({ words }: { words: string }) {
     const el = line.current;
     if (!el) return;
     const fit = () => {
-      const ghost = el.firstElementChild!;
-      const mark = el.lastElementChild!;
+      const mark = el.querySelector(".xe-fig-needs")!;
+      // The mark runs past the field's right edge (by more than the browser's own rounding).
+      const over = () => mark.getBoundingClientRect().right > el.getBoundingClientRect().right + 0.02;
       el.removeAttribute("data-compact");
-      const lines = ghost.getClientRects();
-      const last = lines[lines.length - 1];
-      if (last && mark.getBoundingClientRect().top >= last.bottom - 1) el.setAttribute("data-compact", "");
+      el.removeAttribute("data-tight");
+      if (!over()) return;
+      el.setAttribute("data-compact", "");
+      if (over()) el.setAttribute("data-tight", "");
     };
     fit();
     const sized = new ResizeObserver(fit);
@@ -84,8 +94,10 @@ function NeedsMark({ words }: { words: string }) {
       <span aria-hidden className="xe-fig-needs-ghost">
         {words}
       </span>
-      <span className="xe-fig-needs" title="Needs a description">
-        <span className="xe-fig-needs-words">Needs a description</span>
+      <span className="xe-fig-needs-at">
+        <span className="xe-fig-needs" title="Needs a description">
+          <span className="xe-fig-needs-words">Needs a description</span>
+        </span>
       </span>
     </span>
   );
@@ -139,7 +151,7 @@ function PickedLabelOf({ s }: { s: SectionOf<"image"> & { picked: Picked } }) {
   const id = useId();
   const tickId = `${id}-tick`;
   const button = useRef<HTMLButtonElement>(null);
-  const pop = useRef<HTMLDivElement>(null);
+  const pop = useRef<HTMLElement>(null);
   useAnchoredPopover(button, pop);
   const p = s.picked;
   // The stored report it came from: linked when the page was opened, or one of the reports a figure can be taken from (a figure taken by hand this visit).
@@ -154,7 +166,7 @@ function PickedLabelOf({ s }: { s: SectionOf<"image"> & { picked: Picked } }) {
   const inside = useFrame()?.as === "lead";
   return (
     <span ref={label} className="xe-fig-picked" data-edit-only data-inside={inside ? "" : undefined} data-ticked={p.shareOk ? "" : undefined} data-invalid={issue ? "" : undefined}>
-      <button ref={button} type="button" className="xe-fig-picked-open" popoverTarget={`${id}-pop`} aria-label={`${where}: crop it, choose another page, or say you may share it`}>
+      <button ref={button} type="button" className="xe-fig-picked-open" {...opensPanel(`${id}-pop`, () => pop.current)} aria-label={`${where}: crop it, choose another page, or say you may share it`}>
         <FileText aria-hidden size={13} strokeWidth={2.25} />
         <span className="xe-fig-long">{where}</span>
         <span aria-hidden className="xe-fig-short">
@@ -186,7 +198,7 @@ function PickedLabelOf({ s }: { s: SectionOf<"image"> & { picked: Picked } }) {
           <IssueNote id={issueId(tickId)} text={issue} />
         </>
       )}
-      <div ref={pop} id={`${id}-pop`} popover="auto" className="xe-fig-pop xe-fig-pop-picked">
+      <Panel panelRef={pop} id={`${id}-pop`} className="xe-fig-pop-picked">
         <PickedFigure
           s={s}
           path={path}
@@ -195,7 +207,7 @@ function PickedLabelOf({ s }: { s: SectionOf<"image"> & { picked: Picked } }) {
           onTick={tick}
           onReplace={(file, picked, opts) => files.replaceImage(s.id, file, picked, opts)}
         />
-      </div>
+      </Panel>
     </span>
   );
 }

@@ -10,12 +10,13 @@ import { useFieldIssue } from "../fields/issues";
 import { labelOf } from "../labels";
 import { useDoc, useStore } from "../store";
 import { useAnchoredPopover } from "./anchor";
+import { closePanel, opensPanel, Panel } from "./pop";
 
 /*
  * A link's "Web address" (decision 0026, "What the page does not draw"): a button over the link's
  * bottom corner, always shown (the address is a link's main field, so it is never hidden until hover),
  * named "Web address: Link 1", and marked while the address is missing or not a full https:// one. It
- * opens a native popover holding the field (path sections.N.href), "(optional)" where the layout lets a
+ * opens a native popover (a dialog where the browser has none: pop.ts) holding the field (path sections.N.href), "(optional)" where the layout lets a
  * link go without one. A link just added opens it with the cursor in the field: F's board.add jumps to
  * the href path, and G's jump opens the popover before it focuses the field. Nothing here takes room.
  */
@@ -38,7 +39,7 @@ function WebAddress({ sectionId }: { sectionId: string }) {
   const id = useId();
   const fieldId = `${id}-href`;
   const button = useRef<HTMLButtonElement>(null);
-  const pop = useRef<HTMLDivElement>(null);
+  const pop = useRef<HTMLElement>(null);
   const input = useRef<HTMLInputElement>(null);
   useAnchoredPopover(button, pop, "end");
   // Opened by its button, the cursor goes straight into the field (the jump to an issue puts it there itself).
@@ -55,7 +56,7 @@ function WebAddress({ sectionId }: { sectionId: string }) {
   // Missing (where the layout needs one) or not a usable https:// address: the button says so.
   const wrong = href.trim() ? safeHref(href) === null : !optional;
   const close = () => {
-    pop.current?.hidePopover();
+    if (pop.current) closePanel(pop.current);
     button.current?.focus();
   };
   return (
@@ -64,7 +65,7 @@ function WebAddress({ sectionId }: { sectionId: string }) {
         ref={button}
         type="button"
         className="xe-fig-chip xe-fig-corner"
-        popoverTarget={`${id}-pop`}
+        {...opensPanel(`${id}-pop`, () => pop.current)}
         aria-label={`Web address: ${label}`}
         aria-describedby={wrong ? `${id}-state` : undefined}
         data-missing={wrong ? "" : undefined}
@@ -78,7 +79,7 @@ function WebAddress({ sectionId }: { sectionId: string }) {
           {href.trim() ? "Not a full https:// address" : "No address yet"}
         </span>
       )}
-      <div ref={pop} id={`${id}-pop`} popover="auto" className="xe-fig-pop xe-fig-pop-link">
+      <Panel panelRef={pop} id={`${id}-pop`} className="xe-fig-pop-link">
         <label htmlFor={fieldId} className="xe-fig-pop-label">
           Web address {optional && <span className="xe-fig-pop-optional">(optional)</span>}
         </label>
@@ -112,7 +113,7 @@ function WebAddress({ sectionId }: { sectionId: string }) {
             The full address, starting https://
           </p>
         )}
-      </div>
+      </Panel>
     </span>
   );
 }

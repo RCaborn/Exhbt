@@ -1,13 +1,15 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "./editor-test";
 import { plain, text, type ExhbtDoc, type RichText, type Section } from "../lib/exhbt/blocks";
 import { FORMAT_RULES } from "../lib/exhbt/formats";
 import {
   allowEditOnly,
   boxes,
+  chooseAll,
   differences,
   docNow,
   field,
+  finger,
   flowChipsNearWords,
   frame,
   freshName,
@@ -71,22 +73,6 @@ async function choose(page: Page, id: string) {
   await expect(bar(page)).toHaveAttribute("aria-label", /: tools$/);
 }
 
-/** Real touch input through the browser, so scrolling and the press delay behave as they do under a finger. */
-async function finger(page: Page) {
-  const cdp = await page.context().newCDPSession(page);
-  const send = (type: "touchStart" | "touchMove" | "touchEnd", x = 0, y = 0) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
-  return {
-    down: (x: number, y: number) => send("touchStart", x, y),
-    move: (x: number, y: number) => send("touchMove", x, y),
-    up: () => send("touchEnd"),
-    async slide(from: { x: number; y: number }, to: { x: number; y: number }, steps = 12) {
-      for (let i = 1; i <= steps; i++) {
-        await send("touchMove", from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
-        await page.waitForTimeout(16);
-      }
-    },
-  };
-}
 
 const middle = async (l: Locator) => {
   const b = (await l.boundingBox())!;
@@ -116,16 +102,26 @@ test.describe("each section shows only its grip", () => {
           const g = buttons[0]?.getBoundingClientRect();
           if (g && (Math.round(g.width) < 44 || Math.round(g.height) < 44)) bad.push(`${id}: grip ${g.width}x${g.height}`);
           if (!g) continue;
-          const over = (b: DOMRect) => g.right > b.left && g.left < b.right && g.bottom > b.top && g.top < b.bottom;
+          // Over: by more than half a pixel both ways, as the editor itself and toolbarClashes count it (Toolbar.tsx, page-editor.ts).
+          // A word's box is as tall as its line and its bottom edge lands within a pixel of a grip's top; where on that pixel differs by browser.
+          const over = (b: DOMRect) => Math.min(g.right, b.right) - Math.max(g.left, b.left) > 0.5 && Math.min(g.bottom, b.bottom) - Math.max(g.top, b.top) > 0.5;
           // No grip lies over words outside its own section, nor over another section's pictures or controls, nor over a control of its own section.
           const article = fr.closest("article")!;
           const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT);
           for (let n = walker.nextNode(); n; n = walker.nextNode()) {
             const parent = n.parentElement!;
             if (!n.textContent?.trim() || fr.contains(n) || !shown(parent) || parent.closest(".sr-only, .xe-tools")) continue;
+            // Word by word, as toolbarClashes reads them (page-editor.ts): the space hanging at the end of a wrapped line is no word.
             const range = document.createRange();
-            range.selectNodeContents(n);
-            if ([...range.getClientRects()].some(over)) bad.push(`${id}'s grip is over "${n.textContent.trim().slice(0, 20)}" in ${parent.closest("[data-section-id]")?.getAttribute("data-section-id") ?? "the page"}`);
+            for (const word of n.textContent.matchAll(/\S+/g)) {
+              range.setStart(n, word.index);
+              range.setEnd(n, word.index + word[0].length);
+              const hit = [...range.getClientRects()].find(over);
+              if (!hit) continue;
+              const at = (r: DOMRect) => [r.left, r.top, r.width, r.height].map((v) => Math.round(v * 10) / 10).join(",");
+              bad.push(`${id}'s grip (${at(g)}) is over "${word[0]}" (${at(hit)}) in ${parent.closest("[data-section-id]")?.getAttribute("data-section-id") ?? "the page"}`);
+              break;
+            }
           }
           for (const other of frames) {
             if (other === fr) continue;
@@ -378,7 +374,7 @@ test.describe("formatting on the bar", () => {
     // The page's own formatting buttons are not drawn on a phone.
     await expect(gap.locator(".xe-format")).toBeHidden();
 
-    await page.keyboard.press("ControlOrMeta+a");
+    await chooseAll(page);
     await onBar(page, "Highlight").tap();
     await expect(pm).toBeFocused();
     await expect(onBar(page, "Highlight")).toHaveAttribute("aria-pressed", "true");
@@ -426,7 +422,7 @@ test.describe("formatting on the bar", () => {
     await f.scrollIntoViewIfNeeded();
     await f.tap();
     await expect(f.locator(".ProseMirror")).toBeFocused();
-    await page.keyboard.press("ControlOrMeta+a");
+    await chooseAll(page);
     await onBar(page, "Link").tap();
     const address = f.getByLabel("Link address (starting https://)");
     await expect(address).toBeFocused();
@@ -609,7 +605,8 @@ test("a swipe on a section's words scrolls and moves nothing; a 260ms press on a
   await touch.down(w.x + 80, w.y + 60);
   await touch.slide({ x: w.x + 80, y: w.y + 60 }, { x: w.x + 80, y: w.y - 200 });
   await touch.up();
-  await expect.poll(() => scrollY(page)).toBeGreaterThan(y0 + 120);
+  // Touches made in the page (WebKit: finger, page-editor.ts) can't scroll it, so the scroll is checked only under real ones.
+  if (touch.native) await expect.poll(() => scrollY(page)).toBeGreaterThan(y0 + 120);
   expect(await pageOrder(page)).toEqual(order);
   await expect(page.locator(`${READY} [data-xe-drag]`)).toHaveCount(0);
 

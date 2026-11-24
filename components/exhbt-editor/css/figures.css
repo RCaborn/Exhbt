@@ -101,6 +101,13 @@
   .xe-fig-needs-ghost {
     color: transparent;
   }
+  /* Where the mark starts, at the end of the placeholder's last word: a point that takes no room on the
+     line, so nothing that follows the words changes where they break. */
+  .xe-fig-needs-at {
+    display: inline-block;
+    width: 0;
+    white-space: nowrap;
+  }
   .xe-fig-needs {
     display: inline-block;
     margin-left: 0.5rem;
@@ -130,6 +137,12 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+  /* No room for the dot either (the last line is full to its end): it sits on the end of that line, over
+     the top of its last letters. */
+  .xe-fig-needs-line[data-tight] .xe-fig-needs {
+    margin-left: -0.5rem;
+    transform: translateY(-0.55em);
   }
 
   /* ---------- A figure picked from the report: the label over the picture's top edge ---------- */
@@ -244,6 +257,10 @@
     text-align: left;
     text-transform: none;
     pointer-events: auto;
+  }
+  /* Where the browser has no popovers the panel is a modal dialog (figures/pop.ts): nothing drawn over the page behind it. */
+  .xe-fig-pop::backdrop {
+    background: transparent;
   }
   .xe-fig-pop-picked {
     width: min(30rem, calc(100vw - 2rem));

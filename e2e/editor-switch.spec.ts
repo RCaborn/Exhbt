@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "./editor-test";
 
 // The switch between the two editors (lib/editor-kind.ts, release 2: nothing but /api/health reads it).
 // In production it is the runtime variable EXHBT_EDITOR; in development a cookie, set by /dev/editor, overrides
