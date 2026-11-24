@@ -11,6 +11,7 @@ const PORT = Number(process.env.E2E_PORT) || 3200;
  * Chromium, for a machine with no WebKit: a test that fails there too fails on the size, not on the engine.
  *  - `safari`: Playwright's "Desktop Safari" at the desktop project's 1440 by 900, on the desktop project's editor specs.
  *  - `iphone`: Playwright's "iPhone 14" (390 by 664, a touch screen), on the touch project's specs.
+ * Both also run e2e/*.webkit.ts: the tests of what only Safari does, which no other project's pattern matches.
  * Each test is its own shard unit there (fullyParallel, still one worker), so a long spec splits across shards.
  * WebKit on Linux is not Safari on an iPhone: docs/briefs/edit-on-page/r3-notes-from-earlier-agents.md says
  * what it can and cannot show.
@@ -23,9 +24,10 @@ const engine = WEBKIT === "chromium" ? { browserName: "chromium" as const } : { 
  * (editor-tablet.spec.ts is in neither project: it needs a tablet's 820px touch screen, and there is no WebKit tablet project.)
  */
 const NOT_ON_WEBKIT: [name: RegExp, why: string][] = [];
+const ONLY_WEBKIT = /[\\/][a-z-]+\.webkit\.ts$/;
 const webkitProjects = [
-  { name: "safari", fullyParallel: true, use: { ...devices["Desktop Safari"], viewport: { width: 1440, height: 900 }, ...engine }, testMatch: /[\\/]editor-[a-z-]+\.spec\.ts$/, testIgnore: /editor-(phone|tablet)\.spec\.ts/, grepInvert: NOT_ON_WEBKIT.map(([name]) => name) },
-  { name: "iphone", fullyParallel: true, use: { ...devices["iPhone 14"], ...engine }, testMatch: /editor-(drag|flow|phone|figures)\.spec\.ts/, grepInvert: NOT_ON_WEBKIT.map(([name]) => name) },
+  { name: "safari", fullyParallel: true, use: { ...devices["Desktop Safari"], viewport: { width: 1440, height: 900 }, ...engine }, testMatch: [/[\\/]editor-[a-z-]+\.spec\.ts$/, ONLY_WEBKIT], testIgnore: /editor-(phone|tablet)\.spec\.ts/, grepInvert: NOT_ON_WEBKIT.map(([name]) => name) },
+  { name: "iphone", fullyParallel: true, use: { ...devices["iPhone 14"], ...engine }, testMatch: [/editor-(drag|flow|phone|figures)\.spec\.ts/, ONLY_WEBKIT], grepInvert: NOT_ON_WEBKIT.map(([name]) => name) },
 ];
 
 /**

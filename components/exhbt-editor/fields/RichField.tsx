@@ -7,6 +7,7 @@ import { RichText } from "@/components/exhbt/RichText";
 import type { RichSlot } from "@/components/portfolio/page-ctx";
 import type { RichText as RichTextValue, Run } from "@/lib/exhbt/blocks";
 import { docToRuns, runsToDoc, sameRuns, type TiptapNode } from "@/lib/exhbt/richtext-tiptap";
+import { again } from "../again";
 import { useFieldPath } from "../Frame";
 import { MUTED } from "../geometry";
 import { useStore } from "../store";
@@ -35,7 +36,7 @@ import { IssueNote, issueId, useFieldIssue } from "./issues";
  * No key can come in between, so none is lost, and nothing moves.
  */
 
-const loadEditor = () => import("./RichEditor");
+const loadEditor = () => again(() => import("./RichEditor"));
 const RichEditor = lazy(loadEditor);
 
 /** Starts fetching the editor's chunk, so a click only has to make the editor (EditorShell.tsx, when the page is up). */
