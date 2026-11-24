@@ -216,8 +216,9 @@ export const replacesDraftedGraph = (kind: FigureKind): boolean => kind === "gra
  * It runs once, straight after the draft and before the editor opens, so every graph on the exhbt
  * is one the draft made. Numbers flagged to check that were only on a graph it removed are no longer
  * on the page, so they leave the list. `opts.wants` is for a layout that isn't in FORMAT_RULES yet.
+ * `opts.keepGraphs` places the figure and takes no graph off, for an exhbt the person has edited.
  */
-export function withWorkVisual(doc: ExhbtDoc, visual: WorkVisual, opts: { wants?: FromWork } = {}): WorkVisualResult {
+export function withWorkVisual(doc: ExhbtDoc, visual: WorkVisual, opts: { wants?: FromWork; keepGraphs?: boolean } = {}): WorkVisualResult {
   const f = formatOf(doc);
   const wants = opts.wants ?? FORMAT_RULES[f].fromWork;
   const unchanged = (why: NonNullable<WorkVisualResult["why"]>): WorkVisualResult => ({ doc, placed: false, why, removed: [] });
@@ -234,7 +235,10 @@ export function withWorkVisual(doc: ExhbtDoc, visual: WorkVisual, opts: { wants?
     gap = i;
   };
   const lastGraph = () => sections.reduce((at, s, i) => (s.kind === "graph" ? i : at), -1);
-  if (replacesDraftedGraph(visual.kind)) {
+  // keepGraphs: the exhbt has been edited, so any graph on it may be the person's own. Nothing is taken off, and no room is no room.
+  if (opts.keepGraphs) {
+    // Placed beside what is there, or not at all.
+  } else if (replacesDraftedGraph(visual.kind)) {
     for (let i = lastGraph(); i >= 0; i = lastGraph()) takeOff(i);
   } else {
     for (let i = lastGraph(); i >= 0 && roomFor(sections, "image", f) === 0; i = lastGraph()) takeOff(i);

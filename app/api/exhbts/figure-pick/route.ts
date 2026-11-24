@@ -19,7 +19,7 @@ import { getStore } from "@/lib/store";
  *
  * Part of the draft, so it uses none of the person's drafts or rewrites. One pick per draft: a
  * person can ask for as many as their plan has drafts in the window, plus a couple for drafts
- * that fail and are tried again.
+ * that fail and are tried again. A pick is counted only when the AI call succeeded.
  *
  * Outside production the answer also carries `debug`: the model that answered, its token counts
  * and its answer before the checks, which the figure eval reads (evals/figure-pick/README.md).
@@ -63,16 +63,17 @@ export async function POST(req: Request) {
   if (!e.drafting) return fail("AI drafting isn't part of your plan.", 403);
   const used = await store.countRecentEventsForUser("figure_picked", user.id, DRAFT_WINDOW_HOURS);
   if (used >= e.draftsPer30Days + SPARE_PICKS) return fail("No more figure picks until a draft frees up.", 429);
-  // Counted before the call, so failed attempts count too.
-  await store.logEvent("figure_picked", user.id, { pages: images.length });
 
   let result;
   try {
     result = await pickFigure(images);
   } catch (err) {
     console.error("figure pick failed", (err as Error).message);
-    return fail("We couldn't pick a figure just now.", 502);
+    // Outside production the reason is on the answer too, so the eval can say why a real call failed (never shown to people).
+    return fail(process.env.NODE_ENV === "production" ? "We couldn't pick a figure just now." : `We couldn't pick a figure just now. (${(err as Error).message.slice(0, 300)})`, 502);
   }
+  // Counted once the AI answered, so a pick that failed doesn't spend the person's allowance.
+  await store.logEvent("figure_picked", user.id, { pages: images.length });
   // Its own step, so picking figures is costed apart from drafting. ai_call_logs only accepts
   // 'figure_pick' once supabase/migrations/20261124000000_figure_pick.sql is applied; until then
   // the log fails and is reported, and the person still gets their figure.
