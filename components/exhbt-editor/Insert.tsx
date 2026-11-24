@@ -39,6 +39,10 @@ export function Insert({ at, end }: InsertSlot) {
   const [open, setOpen] = useState<Open | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
+  // A button of this "+" is being pressed. Safari gives a pressed button no focus and takes the focus from whatever had it,
+  // so a press on a menu item while the "+" has the focus (the phone bar's Add and "Things to fix" both put it there) is a blur
+  // to nowhere: it is not the person leaving the menu, and closing on it would take the item from under the press.
+  const pressing = useRef(false);
   const menuId = useId();
   const before = end ? null : labelAt(store.get(), at);
   const name = before ? `Add a section before ${before}` : "Add a section";
@@ -87,8 +91,13 @@ export function Insert({ at, end }: InsertSlot) {
         setOpen(null);
         button.current?.focus();
       }}
+      onMouseDownCapture={(e) => {
+        if (!(e.target as Element).closest("button")) return;
+        pressing.current = true;
+        window.addEventListener("mouseup", () => (pressing.current = false), { once: true, capture: true });
+      }}
       onBlur={(e) => {
-        if (open && !e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(null);
+        if (open && !pressing.current && !e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(null);
       }}
     >
       {/* The end one's path is on the "+" alone, not on its menu: "Things to fix" lands on the "+" and opens the menu beside it. */}

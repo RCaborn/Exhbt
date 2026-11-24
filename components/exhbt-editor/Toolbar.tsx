@@ -661,6 +661,8 @@ export function Toolbar() {
             onClick={(e) => {
               uiApi.say(stays);
               e.currentTarget.setAttribute("data-explain", "");
+              // Safari gives a pressed button no focus: without it the reason would never be taken away again.
+              e.currentTarget.focus();
             }}
             onBlur={(e) => e.currentTarget.removeAttribute("data-explain")}
           >
