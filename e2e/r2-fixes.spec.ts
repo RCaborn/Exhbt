@@ -9,10 +9,11 @@ import { fillValid, signInAs, startFromScratch, waitForSaved } from "./editor";
 import { uniqueEmail } from "./helpers";
 
 // The fixes from the release 2 review: the server holds the layout line (model-1), the figure route is
-// safe to call at any time (figure-1), the alt text's numbers are checked (figure-2), a failed pick
-// isn't counted (figure-3), the scan wording (figure-5), captions are cut without changing what they
-// say (job 1, item 6, then caption-cut-early-clause) and the findings go after the flowchart's marker
-// (model-2). The key order the live database hands docs back in has its own spec, key-order.spec.ts.
+// safe to call at any time (figure-1), the alt text's numbers are checked (figure-2), a pick is counted
+// before the AI call and given back when the service never answered (figure-3, then its second review),
+// the scan wording (figure-5), captions are cut without changing what they say (job 1, item 6, then
+// caption-cut-early-clause) and the findings go after the flowchart's marker (model-2). The key order
+// the live database hands docs back in has its own spec, key-order.spec.ts.
 
 const unique = (tag: string) => `${tag}-${Date.now().toString(36)}${Math.floor(Math.random() * 1e3)}`;
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
@@ -489,15 +490,19 @@ test.describe("The figure route is safe to call at any time", () => {
   });
 });
 
-test.describe("A pick that fails isn't counted", () => {
+// The stand-in reads the file's name (lib/ai/figure-pick.ts): "pick-fails" fails as a call the service never
+// answered does, "pick-unusable" as one it answered with nothing usable, and "pick-slow" takes two seconds.
+test.describe("A pick is counted before the AI call, and given back when the service never answered", () => {
   const ask = (page: Page, name: string) =>
     page.request.post("/api/exhbts/figure-pick", {
       multipart: { label: name, image: { name: "image-1.png", mimeType: "image/png", buffer: PNG } },
     });
+  /** A new person on the free plan, which has one draft and two spare picks: three picks. */
+  const signIn = (page: Page, tag: string) => page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(tag))}&next=/exhbts/new`);
 
-  test("failures leave the allowance alone", async ({ page }) => {
-    await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail("pickfail"))}&next=/exhbts/new`);
-    // A free plan has one draft and two spare picks. Five failures would have used them all, and more.
+  test("a call that failed before the service answered is given back", async ({ page }) => {
+    await signIn(page, "pickfail");
+    // Each is counted before its call and given back after it. Had they stayed counted, the fourth would have been refused.
     for (let i = 0; i < 5; i++) expect((await ask(page, "report-pick-fails.pdf, page 3")).status()).toBe(502);
     const ok = await ask(page, "report-with-chart.pdf, page 3");
     expect(ok.status()).toBe(200);
@@ -506,6 +511,37 @@ test.describe("A pick that fails isn't counted", () => {
     expect((await ask(page, "x")).status()).toBe(200);
     expect((await ask(page, "x")).status()).toBe(200);
     expect((await ask(page, "x")).status()).toBe(429);
+    // At the limit nothing is called, so there is nothing to give back: a request that would have failed is refused too.
+    expect((await ask(page, "report-pick-fails.pdf, page 3")).status()).toBe(429);
+  });
+
+  test("a call the service answered with nothing usable stays counted", async ({ page }) => {
+    await signIn(page, "pickunusable");
+    for (let i = 0; i < 3; i++) expect((await ask(page, "report-pick-unusable.pdf, page 3")).status()).toBe(502);
+    // Three calls were made and paid for, so the three picks are spent.
+    expect((await ask(page, "report-with-chart.pdf, page 3")).status()).toBe(429);
+  });
+
+  test("requests that overlap can't all pass the check: the limit holds", async ({ page }) => {
+    await signIn(page, "pickoverlap");
+    // The dev server builds the route on its first request. This one is refused before anything is counted.
+    expect((await page.request.post("/api/exhbts/figure-pick", { multipart: { label: "report-pick-slow.pdf, page 3" } })).status()).toBe(400);
+    // Eight requests a tenth of a second apart, each held open for two seconds by the slow stand-in, so all eight are
+    // being answered at once. Counted after the call, as picks were, every one of them passed the check.
+    const sent: number[] = [];
+    const calls: Promise<{ status: number; back: number }>[] = [];
+    for (let i = 0; i < 8; i++) {
+      sent.push(Date.now());
+      calls.push(ask(page, "report-pick-slow.pdf, page 3").then((res) => ({ status: res.status(), back: Date.now() })));
+      await page.waitForTimeout(100);
+    }
+    const answers = await Promise.all(calls);
+    expect(answers.map((a) => a.status).sort()).toEqual([200, 200, 200, 429, 429, 429, 429, 429]);
+    // They did overlap: the last was sent before the first of the three came back.
+    const firstBack = Math.min(...answers.filter((a) => a.status === 200).map((a) => a.back));
+    expect(Math.max(...sent)).toBeLessThan(firstBack);
+    // The three stay counted once they are answered, and a refusal gives nothing back.
+    expect((await ask(page, "report-with-chart.pdf, page 3")).status()).toBe(429);
   });
 });
 

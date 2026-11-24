@@ -422,6 +422,13 @@ export interface Store {
   /* uploads and drafts */
   /** How many events with this name this user had in the last `hours`. For per-user limits (AI drafts). */
   countRecentEventsForUser(name: EventName, userId: string, hours: number): Promise<number>;
+  /**
+   * Takes back the one event of this user's that was logged with `claim` in its props. For a limit
+   * that is counted before the work is done (a figure pick) and given back when the work never
+   * happened. It names its own event by the claim, never "the latest", which with requests that
+   * overlap is another request's. A failure is reported and leaves the event counted.
+   */
+  returnEvent(name: EventName, userId: string, claim: string): Promise<void>;
   /** Records an uploaded (or about-to-be-uploaded) file. The id is chosen by the caller, as it is part of the path. */
   createFile(file: StoredFile & { exhbtId?: string | null }): Promise<void>;
   /** Bytes of every file this user has stored, for the plan's storage cap. */
@@ -1247,6 +1254,11 @@ function supabaseStore(): Store {
         .gte("created_at", since(hours));
       if (res.error) throw new Error(res.error.message);
       return res.count ?? 0;
+    },
+    async returnEvent(name, userId, claim) {
+      // As logEvent: it must never break a user flow.
+      const { error } = await db.from("events").delete().eq("name", name).eq("user_id", userId).eq("props->>claim", claim);
+      if (error) console.error("event return failed", error.message);
     },
     async createFile(f) {
       check(
@@ -2386,6 +2398,10 @@ function memoryStore(): Store {
     async countRecentEventsForUser(name, userId, hours) {
       const after = Date.now() - hours * 3_600_000;
       return m.events.filter((e) => e.name === name && e.userId === userId && Date.parse(e.at) >= after).length;
+    },
+    async returnEvent(name, userId, claim) {
+      const at = m.events.findIndex((e) => e.name === name && e.userId === userId && e.props.claim === claim);
+      if (at >= 0) m.events.splice(at, 1);
     },
     async createFile(f) {
       files().set(f.id, { ...f, exhbtId: f.exhbtId ?? null, sha256: f.sha256 ?? null, createdAt: new Date().toISOString() });
