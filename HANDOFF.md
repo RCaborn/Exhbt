@@ -120,6 +120,7 @@ Phase 2 (portfolios, the exhbt editor, uploads and AI drafts, paid plans) is on 
 | **Phase 2 switch** | `EXHBT_PHASE2=1`, a runtime variable (not a build one) | Always on in development and tests. In production, Phase 2 pages return 404 until it's set, so turning it off hides them without a redeploy |
 | **Stripe** (checkout, billing portal, webhook) | Secrets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`. Price ids `STRIPE_PRICE_PREMIUM`, `STRIPE_PRICE_MAX` in `wrangler.jsonc` `vars` (not secret) | Billing page can't take payments. The e2e suite sets test values in `playwright.config.ts` |
 | **Supabase Storage** | Buckets `sources` and `evidence`, both private, created by `supabase/migrations/20261114000000_phase2_schema.sql`. Uses the Supabase keys above | Uploads go to an in-memory stand-in (`/dev/upload`, `/dev/files`) |
+| **The editor switch** | `EXHBT_EDITOR`, a runtime variable set in the Cloudflare dashboard, never in `wrangler.jsonc` or `next.config.ts`: `page` or `classic`, for everyone | `DEFAULT_EDITOR` in `lib/editor-kind.ts` decides: the classic editor (below, "The editor switch") |
 
 `/api/health` reports these under `phase2`: each Stripe setting (present or not, never the value), whether the Stripe key and both price ids work, and whether both buckets exist and are private. None of it changes the overall `ok` yet. Fold it in when payments are meant to be live.
 
@@ -129,6 +130,27 @@ Development pages for Phase 2 (all 404 in production and when Supabase is connec
 - **`/dev/portfolio?username=amara&plan=premium&count=2`**: makes a fictional portfolio with published exhbts and opens it. The owner is the dev sign-in user `<username>@example.com`, so sign in with that address (`/auth/dev?email=amara@example.com`) to edit the same portfolio. Add `look=night` (any look or colourway id, decision 0018), `rich=1` (every profile field and section filled in), `name=` (try a long one), `graphs=none` and `with=open-banking` to see every look with real-world content. `with` is a comma list: `with=gallery` publishes a gallery at `/p/<username>/freshers-campaign`, `with=research` a research poster at `/p/<username>/walk-and-recall`, and `with=formats` both (decision 0024).
 - **`/dev/plan?plan=max&next=/exhbts`**: puts the signed-in dev user on a plan without Stripe.
 - **`/dev/upload/<id>`** and **`/dev/files/<id>`**: the in-memory stand-in for Storage. Uploads PUT to the first; portfolio pages read from the second. Files are gone when the server restarts.
+- **`/dev/editor?kind=page`**: stands in for `EXHBT_EDITOR` in this browser alone. `kind=classic` and `kind=default` (the variable not set) are the other settings, and an empty `kind=` clears it.
+- **`/dev/admin?role=admin`**: makes the signed-in dev user an admin (`role=user` takes it back), for `/admin` and the admin's own editor switch.
+
+### The editor switch
+
+The edit-on-page editor (decision 0026) is on the live site switched off: everyone gets the classic editor. Rory decided to launch it this way on 24 Nov 2026, because three iPhone behaviours cannot be tested without a real iPhone. He tries it on his own iPhone, and it is switched on for everyone the same day. The rule and its one constant are `lib/editor-kind.ts`; decision 0026 has the detail, under "The classic editor: the switch, the fallback, the escape" and "Going live: switched off, then on".
+
+- **Switched off by default.** `DEFAULT_EDITOR` in `lib/editor-kind.ts` is `"classic"`. `/api/health` reports what an ordinary person gets, as `editor`.
+- **An admin's own switch.** An admin can turn the new editor on for themselves. On a phone:
+  1. Log in with your own account, and stay on the host the address bar then shows (`www.exhbt.co.uk`, or `app.exhbt.co.uk` once `EXHBT_TOOL_HOST` has moved the tool there). Sign-in and this choice are both kept per host.
+  2. Open `/admin` on that host. If the overview opens, the account is an admin there; if the page is not found, it is not, and the button will not be there.
+  3. Open "Your exhbts" (on a phone it is under Menu in the site's header, or go to `/exhbts`) and open any exhbt. It opens in the classic editor.
+  4. Near the top of the page, under the site's header and the teammates line and above "Edit exhbt", is a line that starts "Admins only". Press "Try the new editor" in it.
+  5. That exhbt, and every one opened in that browser afterwards, is in the new editor.
+  6. To go back: the three dots at the end of the editor's own bar (not Menu in the site's header), then "Use the classic editor", the last item. That is remembered too.
+
+  Nobody who is not an admin is sent the button, and the cookie that remembers the choice counts for nothing in their browser: whether the person signed in is an admin is checked on every request.
+- **On for everyone.** With no deploy, set `EXHBT_EDITOR` to `page` on the live Worker in the Cloudflare dashboard. `keep_vars` in `wrangler.jsonc` keeps a variable set there through a deploy; if it were ever lost, everyone would be back on the default, so read `editor` in `/api/health` after a deploy. Or in the code: change `DEFAULT_EDITOR` to `"page"`, and `SHIPPED_DEFAULT` at the top of `e2e/editor-admin-switch.spec.ts` to match (the one test that pins the default), then deploy.
+- **Everyone back to the classic editor.** Set `EXHBT_EDITOR` to `classic`. It needs no deploy and works after either way of switching on. An admin's own choice still comes first.
+
+`npm run dev` serves the classic editor, as the live site does. To work on the new one, put `EXHBT_EDITOR=page` in `.env.local`, or open `/dev/editor?kind=page` once in the browser.
 
 Where Phase 2 lives:
 
@@ -138,6 +160,7 @@ Where Phase 2 lives:
 | How an exhbt looks | `components/portfolio/ProjectView.tsx` |
 | An exhbt's layout (case study, gallery, research) | `lib/exhbt/formats.ts`, `lib/exhbt/layouts.ts` (the order and rows), `components/portfolio/LayoutMain.tsx` with `layout-rows.ts` (the renderer), `components/editor/LayoutPicker.tsx` (decision 0024) |
 | The editor | `app/(app)/exhbts/[id]/edit/`, `components/exhbt-editor/` (the page itself, decision 0026; `css/` holds each owner's styles), `components/editor/` (the classic editor, for one release) |
+| Which editor a person gets | `lib/editor-kind.ts` (the rule and `DEFAULT_EDITOR`), `lib/editor-kind-server.ts`, `app/api/exhbts/editor/route.ts` (an admin's own choice) |
 | Uploads and AI drafts | `app/(app)/exhbts/new/`, `lib/uploads.ts`, `lib/files.ts`, `lib/ai/exhbt-draft.ts`, `lib/exhbt/verify.ts` |
 | The portfolio builder (profile, look, projects, address) | `app/(app)/portfolio/` (decision 0016) |
 | Portfolio pages | `app/(portfolio)/` (hosts: decision 0001; the subdomain routing is being built separately) |
@@ -174,7 +197,7 @@ Where Phase 2 lives:
 - `preview.spec.ts`: private-preview noindex, robots and banner.
 
 - Phase 2: `phase2-account.spec.ts` (usernames, profile), `phase2-portfolio.spec.ts` (blocks, plan rules, portfolio pages), `phase2-draft.spec.ts` (uploads, AI draft), `auto-figure.spec.ts` (the figure picked from an uploaded PDF: the work's own graph taking the place of the drafted one, scans, and the line the editor says after a draft), `phase2-editor.spec.ts` (editor, publish), `phase2-billing.spec.ts` (Stripe), `phase2-hardening.spec.ts` (account export, privacy and terms).
-- The edit-on-page editor (decision 0026): `editor-inplace.spec.ts` (every field typed in place and stored at its path, the jump to each kind of issue path, Undo, files, publishing in order, the editing page against the visitor's box for box in every look, axe), `editor-smooth.spec.ts` (the smoothness checks that gate CI: one render per key, nothing moving on focus), `editor-classic.spec.ts` (the switch, the escape and the crash fallback). Their page object is `e2e/page-editor.ts`, which holds `EDIT_ONLY_IN_FLOW`, the one list of what is in the flow in the editor only. `/dev/editor-timing` draws the editor on a sample with no sign-in, for the box tests and the timing script.
+- The edit-on-page editor (decision 0026): `editor-inplace.spec.ts` (every field typed in place and stored at its path, the jump to each kind of issue path, Undo, files, publishing in order, the editing page against the visitor's box for box in every look, axe), `editor-smooth.spec.ts` (the smoothness checks that gate CI: one render per key, nothing moving on focus), `editor-classic.spec.ts` (the switch, the escape and the crash fallback), `editor-admin-switch.spec.ts` (the new editor switched off for everyone, an admin's own switch, `EXHBT_EDITOR` both ways, and what `/api/health` reports). The suite's server runs with `EXHBT_EDITOR=page` (`playwright.config.ts`), so every spec tests the new editor as it is once on for everyone, and `editor-admin-switch.spec.ts` sets the switched-off state for its own browser. Their page object is `e2e/page-editor.ts`, which holds `EDIT_ONLY_IN_FLOW`, the one list of what is in the flow in the editor only. `/dev/editor-timing` draws the editor on a sample with no sign-in, for the box tests and the timing script.
 
 Tests run against the dev server with no services connected. They use the build folder `.next-e2e`, so they can run while `npm run dev` is up.
 
