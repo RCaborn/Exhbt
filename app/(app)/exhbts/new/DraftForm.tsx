@@ -396,7 +396,7 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
                   <p className="mt-1 text-sm text-graphite">
                     {it.needs === "image"
                       ? "We can send it to our AI reader to turn it into text. Only the text comes back, and the file stays private to you."
-                      : "We can send it to our AI reader to turn it into text and to look for a figure, such as a graph, for your exhbt. Only the text and where the figure is come back, and the file stays private to you."}
+                      : "We can send it to our AI reader to turn it into text and to look for a figure, such as a graph, for your exhbt. Only the text, where the figure is, and a short description and caption of it come back, and the file stays private to you."}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-3">
                     <Button variant="primary" size="sm" onClick={() => void readOnServerFor(it)}>

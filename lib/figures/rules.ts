@@ -1,4 +1,5 @@
 import { LIMITS, type FigureBox } from "@/lib/exhbt/blocks";
+import { cutCaption } from "./caption";
 
 /**
  * The fixed numbers and pure helpers for picking a figure from an upload (decision 0017), shared
@@ -107,8 +108,7 @@ export const pixelsFromBox = (b: FigureBox, size: PixelSize): PixelBox => ({
 
 /** A caption cut to the word limit for image captions, so a picked figure never blocks publishing on length. */
 export function fitCaption(s: string, max: number = LIMITS.images.captionWords): string {
-  const w = s.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
-  return w.slice(0, max).join(" ");
+  return cutCaption(s, max);
 }
 
 /** Alt text tidied and capped. */

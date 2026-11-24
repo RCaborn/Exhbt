@@ -21,7 +21,7 @@ const DOCS: Record<string, Doc> = {
 
         <h2>What we collect</h2>
         <ul>
-          <li>Your email address, and a password you choose, to create your account and sign you in. Supabase Auth stores the password in a form that cannot be read back. We also email you sign-in and password-reset links when you ask for them.</li>
+          <li>Your email address, and a password you choose, to create your account and sign you in. Supabase Auth stores the password in a form that cannot be read back. We also email you sign-in and password-reset links when you ask for them. If you choose Google, we receive the name and email on that Google account. We never see the Google password.</li>
           <li>Your name, and your LinkedIn profile address if you give it.</li>
           <li>
             The text of your CV and what you type into the roadmap form: the job you want, your education and your
@@ -170,6 +170,7 @@ const DOCS: Record<string, Doc> = {
         <h2>Who processes it for us</h2>
         <ul>
           <li>Supabase: database, sign-in and file storage. Your data is stored in the European Union (Paris, France).</li>
+          <li>Google, if you choose it to sign in: the name and email on that account. Supabase handles the sign-in.</li>
           <li>Cloudflare: hosting and delivery of the website, and Web Analytics, which sets no cookies.</li>
           <li>Anthropic: the AI steps above.</li>
           <li>Resend: sending sign-in, confirmation and password-reset emails, roadmap emails and teammate invites.</li>

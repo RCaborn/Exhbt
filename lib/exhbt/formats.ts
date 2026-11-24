@@ -16,6 +16,12 @@ export const OFFERED_FORMATS: readonly Format[] = ["case-study", "gallery", "res
 /** The layouts the AI draft may choose, as a tuple for its schema's enum: the same as OFFERED_FORMATS. */
 export const DRAFT_FORMATS = ["case-study", "gallery", "research"] as const satisfies readonly Format[];
 export const DEFAULT_FORMAT: Format = "case-study";
+/**
+ * Whether a save or a publish may carry this layout: one that is offered, or the one already stored
+ * for the exhbt (a draft made before a layout was withdrawn keeps working). A hand-built request that
+ * names a layout nothing offers yet (build, essay, before and after, event) is not let through.
+ */
+export const mayCarryFormat = (next: Format, stored: Format): boolean => OFFERED_FORMATS.includes(next) || next === stored;
 export const isFormat = (v: unknown): v is Format => typeof v === "string" && (FORMATS as readonly string[]).includes(v);
 export const formatOf = (d: { format?: unknown }): Format => (isFormat(d.format) ? d.format : DEFAULT_FORMAT);
 
@@ -271,7 +277,7 @@ export type FormatCopy = {
   quote: string;
   /** What the skill pills are called, the list's accessible name: "Skills used", or "Built with" in a build. Today a literal in ProjectView.tsx. */
   skills: string;
-  /** The heading over links drawn as a list (the "refs" group): "References" in research (today a literal in ResearchMain.tsx), "Sources" in an essay. Absent where the layout draws no such list. */
+  /** The heading over links drawn as a list (the "refs" group): "References" in research, "Sources" in an essay (a literal in the deleted ResearchMain.tsx before release 2). Absent where the layout draws no such list. */
   refs?: string;
   /** The layout as blockOptions' reasons name it: "in a case study", "in a gallery", "in research", and the same way for the four new ones ("in an essay"). */
   inLayout: string;

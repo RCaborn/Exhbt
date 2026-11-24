@@ -7,12 +7,14 @@ export const dynamic = "force-dynamic";
 
 /**
  * Stripe tells us about subscriptions here (docs/phase-2.md section 2). Set up in Stripe as
- * https://app.exhbt.co.uk/api/stripe/webhook with the three events below (LAUNCH.md).
+ * https://app.exhbt.co.uk/api/stripe/webhook with the events below (LAUNCH.md).
  *
  * - Bad or missing signature: 400.
  * - Events we don't use: 200, ignored, so Stripe doesn't retry them.
  * - Repeats are harmless: rows are keyed on the Stripe subscription id.
  * - Order is handled: each row keeps the newest event's time, and an older event arriving late is ignored.
+ * A renewal (`invoice.paid`) and a failed card (`invoice.payment_failed`) refresh the same row from
+ * the subscription, so access stays right even when the subscription event itself is late.
  * Nothing about amounts or cards is stored or logged.
  */
 export async function POST(req: NextRequest) {
@@ -50,6 +52,13 @@ export async function POST(req: NextRequest) {
       case "customer.subscription.deleted":
         await save(event.data.object, null, event.created, "canceled");
         break;
+      case "invoice.paid":
+      case "invoice.payment_failed": {
+        // Billing creates these invoices itself. An invoice with no subscription is not one of ours.
+        const sub = await subscriptionOnInvoice(event.data.object);
+        if (sub) await save(sub, null, event.created);
+        break;
+      }
       default:
         break;
     }
@@ -59,6 +68,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Could not process the event" }, { status: 500 });
   }
   return NextResponse.json({ received: true });
+}
+
+/**
+ * The subscription an invoice was raised for. Current webhook payloads put it on
+ * `parent.subscription_details`; older ones put it on `subscription`. A string id is fetched.
+ * An expanded subscription is used as sent, so a test can exercise this without calling Stripe.
+ */
+async function subscriptionOnInvoice(invoice: Stripe.Invoice): Promise<Stripe.Subscription | null> {
+  const ref = subscriptionRef(invoice);
+  if (!ref) return null;
+  return typeof ref === "string" ? stripe().subscriptions.retrieve(ref) : ref;
+}
+
+function subscriptionRef(invoice: Stripe.Invoice): string | Stripe.Subscription | null {
+  const details = invoice.parent?.type === "subscription_details" ? invoice.parent.subscription_details : null;
+  if (details?.subscription) return details.subscription;
+  const legacy = (invoice as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null }).subscription;
+  return legacy || null;
 }
 
 /**

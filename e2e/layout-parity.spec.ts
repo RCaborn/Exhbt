@@ -24,6 +24,11 @@ import { ORDER_FIXTURES, SAMPLE_FIXTURES } from "./fixtures/order-docs";
  * must run unchanged on main's live commit, so they import nothing the release adds.
  *
  * The agent who changes the renderer runs this and may not edit it or the golden copies.
+ *
+ * The box check is local only: on CI (the CI variable set) the boxes are not compared, because the golden
+ * boxes were drawn in the sandbox's Chromium and CI's draws text a fraction differently, so on CI only the
+ * normalised markup is compared. A CSS-only change that moves a box and changes no markup passes CI. Run this
+ * spec locally, in the same Chromium, before merging anything that touches the page's CSS.
  */
 
 const WRITE = process.env.GOLDEN === "write";

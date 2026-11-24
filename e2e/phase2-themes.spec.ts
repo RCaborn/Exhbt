@@ -166,7 +166,7 @@ test.describe("Portfolio looks (Phase 2)", () => {
     // A locked look previews at once but isn't saved: the upgrade offer shows instead.
     await option(page, "night").click();
     await expect(preview(page)).toHaveAttribute("data-theme", "night");
-    await expect(page.getByTestId("upgrade-prompt")).toContainText("Max");
+    await expect(page.locator("section[aria-labelledby=step-heading]").getByTestId("upgrade-prompt")).toContainText("Max");
     await expect(status(page)).toHaveText("Saved");
 
     // An open look, in one of its colourways, saves; the portfolio and its exhbts take it.
