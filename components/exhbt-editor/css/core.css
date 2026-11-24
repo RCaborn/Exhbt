@@ -288,6 +288,28 @@
     opacity: 1;
     pointer-events: auto;
   }
+  /* A toolbar with a menu open stays, wherever the pointer and the focus are: the compact form's "More
+     actions" (data-open), and in any other place an AI draft's own menu, its rewrite form and "No rewrites
+     left" (BlockTools marks itself data-open; in the compact form it is inside that menu). "Rewrite this
+     block" hides the button that was pressed, so the focus falls to the page, and from then on only the
+     pointer kept the toolbar up. Once the pointer was off the section too (moved away, or the page scrolled
+     under it, as a press on a button below the fold scrolls it) the toolbar went, the form with it, and the
+     section under the form took the press meant for "Rewrite now". */
+  .xe-frame > .xe-tools:is([data-open], :not([data-place="compact"]):has(.xe-more [data-open])) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* Its section is raised with it, in every place and not only where the toolbar is the compact pair: an
+     open menu runs down over the sections after it, which paint later (a toolbar of theirs, a field's
+     formatting buttons or its issue would lie over it). Whatever holds the section in the main column
+     (the page's .@container/main, ProjectView.tsx) is raised too: where a size container makes a stacking
+     context, as the first container queries did, a stack that is one (research's method) keeps all it
+     holds under what follows it. Chromium no longer does; Safari has not been tried. */
+  .\@container\/main :has(.xe-tools[data-open], .xe-tools:not([data-place="compact"]) .xe-more [data-open]) {
+    position: relative;
+    /* Over everything else on the page (a field's issue is 26), and under the top bar (30), which stays over the page as it scrolls. */
+    z-index: 29;
+  }
   /* One order everywhere, as drawn from left to right: Remove, More actions, the layout's action, Move
      up, Move down, the grip. So the grip is always at the section's corner, wherever the toolbar sits,
      and Remove is farthest from it (design round 2, item 2). The reading and Tab order stay the
@@ -386,10 +408,7 @@
     .xe-frame > .xe-tools[data-place="compact"]:not([data-open]) > [data-tool]:not([data-tool="menu"]) {
       display: none;
     }
-    /* Its section is raised with it: the card runs down over the sections after it, which paint later (their chips over it). */
-    .xe-frame:has(> .xe-tools[data-place="compact"][data-open]) {
-      z-index: 30;
-    }
+    /* Its section is raised with it, over the sections after it (above: every toolbar with a menu open). */
     .xe-frame > .xe-tools[data-place="compact"][data-open] {
       z-index: 30;
       display: grid;
@@ -507,6 +526,11 @@
     opacity: 1;
     pointer-events: auto;
   }
+  /* It stays while its menu or its rewrite form is open, as a section's toolbar does (above). */
+  .xe-shell-tools:has([data-open]) {
+    opacity: 1;
+    pointer-events: auto;
+  }
   @media (pointer: coarse) {
     .xe-shell-tools {
       opacity: 1;
@@ -585,10 +609,11 @@
      gutter beside it or on its right edge) shows only its grip at rest, in its place, at the corner and
      clear of words, as the whole toolbar is: five 44px buttons are wider than a tile. The rest show while
      the section is touched or the focus is in it (its caption, its description, or the grip from the
-     keyboard), running from the grip, which stays where it is. */
+     keyboard), running from the grip, which stays where it is. One with a menu open keeps its buttons
+     (above: an AI draft's rewrite form is in one of them). */
   @media (pointer: coarse) and (min-width: 48rem) {
     .xe-frame[data-kind="image"]:not(:hover):not(:focus-within) > .xe-tools > [data-tool],
-    .xe-frame:not(:hover):not(:focus-within) > .xe-tools[data-place] > [data-tool] {
+    .xe-frame:not(:hover):not(:focus-within) > .xe-tools[data-place]:not([data-open], :not([data-place="compact"]):has(.xe-more [data-open])) > [data-tool] {
       display: none;
     }
     /* Half over the top edge: half of a 44px row; half over the right edge, half of a 44px column. */

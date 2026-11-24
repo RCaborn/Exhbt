@@ -1,9 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { ENTITLEMENTS } from "../lib/entitlements";
 import { emptyDoc, text, type ExhbtDoc, type RichText } from "../lib/exhbt/blocks";
 import { aiVersionOf, blockValue, replaceBlock, sameBlock } from "../lib/exhbt/draft-blocks";
-import { backToAiVersion, cardMenuButton, DRAFT_PROJECT as PROJECT, draftAndOpen, findingsField, openCardMenu, revealCardMenu, rewritesLeft, signInToDraft, startRewrite, waitForSaved } from "./editor";
+import { backToAiVersion, cardMenuButton, chooseLayout, DRAFT_PROJECT as PROJECT, draftAndOpen, findingsField, openCardMenu, previewArticle, revealCardMenu, rewritesLeft, signInToDraft, startRewrite, waitForSaved } from "./editor";
+import { READY } from "./page-editor";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -168,6 +169,135 @@ test.describe("Rewrite and back to the AI version", () => {
     await expect(backToAiVersion(page, "findings")).toBeVisible();
     const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
     expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
+  });
+});
+
+// A section's toolbar, and a shell part's corner toolbar, show under the pointer or the focus (decision 0026). "Rewrite
+// this block" hides the button that was pressed, so the focus falls to the page and only the pointer is left holding the
+// toolbar up. A press on a button below the fold scrolls the page under the still pointer, which takes that away too: the
+// toolbar went, the form with it, and the section under it took the press ("on Free the rewrites run out" above, whenever
+// the runner was slow enough). So these tests take the pointer and the focus off the page's parts on purpose: an open
+// form must still be drawn, lie over whatever is under it, and take the press, whatever the layout and wherever the
+// part's toolbar sits. Nothing here depends on the window's height or on what is above the page.
+test.describe("An open rewrite form stays up and takes the press", () => {
+  const BLOCKS = ["header", "skills", "gap", "flow", "findings"] as const;
+  /** The form's own button ("Rewrite the process now"), whatever the layout calls the part. */
+  const rewriteNow = (page: Page, block: string) => page.getByTestId(`tools-${block}`).getByRole("button", { name: /^Rewrite the .+ now$/ });
+
+  /** Takes the pointer off the page's parts and the focus out of them: nothing there is under the pointer, and nothing has the focus. */
+  async function leave(page: Page) {
+    await page.mouse.move(2, 2);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await expect.poll(() => page.evaluate(() => document.activeElement === document.body && !document.querySelector('[data-editor="page"] article :hover'))).toBe(true);
+  }
+
+  /** The block's open form is drawn, a press on its button would land on the button, and nothing on the page lies over any of it. */
+  async function takesThePress(page: Page, block: string, what: string) {
+    const button = rewriteNow(page, block);
+    await expect(button, what).toBeVisible();
+    // An unforced press, short of pressing: Playwright scrolls the button into view and checks that the press would land on it.
+    await button.click({ trial: true, timeout: 5_000 });
+    const found = await page.getByTestId(`tools-${block}`).evaluate((tools) => {
+      const name = (e: Element) => `${e.tagName.toLowerCase()}.${e.getAttribute("class") ?? ""}`.slice(0, 80);
+      // Drawn, not only laid out (Playwright counts a see-through button as visible).
+      for (let e: Element | null = tools; e; e = e.parentElement) if (getComputedStyle(e).opacity !== "1") return `see-through at ${name(e)}`;
+      // Every point of it that is on screen, under the editor's top bar, is its own: nothing later on the page is drawn over it.
+      const r = tools.getBoundingClientRect();
+      const top = Math.max(r.top, document.querySelector("[data-topbar]")?.getBoundingClientRect().bottom ?? 0);
+      let seen = 0;
+      for (let y = top + 2; y < Math.min(r.bottom, window.innerHeight) - 1; y += 6) {
+        for (let x = Math.max(r.left, 0) + 2; x < Math.min(r.right, window.innerWidth) - 1; x += 6) {
+          const at = document.elementFromPoint(x, y);
+          if (!at || !tools.contains(at)) return `${at ? name(at) : "nothing"} is over it at ${Math.round(x - r.left)}, ${Math.round(y - r.top)} of ${Math.round(r.width)} by ${Math.round(r.height)}`;
+          seen++;
+        }
+      }
+      return seen > 50 ? "drawn, on top" : `only ${seen} points of it are on screen`;
+    });
+    expect(found, what).toBe("drawn, on top");
+  }
+
+  /** Closes the block's form again (Cancel), and the compact form's menu where the form was in one. */
+  async function close(page: Page, block: string) {
+    await page.getByTestId(`tools-${block}`).getByRole("button", { name: "Cancel" }).click();
+    await expect(rewriteNow(page, block)).toHaveCount(0);
+    const menu = page.locator(`${READY} .xe-tools[data-open] > [data-tool="menu"]`);
+    if (await menu.count()) await menu.click();
+    await expect(page.locator(`${READY} .xe-tools[data-open]`)).toHaveCount(0);
+  }
+
+  for (const layout of ["Case study", "Gallery", "Research"] as const) {
+    test(`${layout}: each drafted part's form, with the pointer and the focus off the page's parts`, async ({ page }) => {
+      await draftAndOpen(page, "stays");
+      if (layout !== "Case study") {
+        await chooseLayout(page, layout);
+        await page.keyboard.press("Escape");
+      }
+      await expect(page.getByRole("button", { name: `Layout: ${layout}` })).toBeVisible();
+      await expect(previewArticle(page)).toBeVisible();
+      for (const block of BLOCKS) {
+        await startRewrite(page, block);
+        await leave(page);
+        await takesThePress(page, block, `${layout}, ${block}`);
+        await close(page, block);
+      }
+      // And the press itself on the flowchart's form, as "on Free the rewrites run out" makes it.
+      await startRewrite(page, "flow");
+      await leave(page);
+      await rewriteNow(page, "flow").click();
+      await expect(rewritesLeft(page, "flow")).toContainText(`${FREE_REWRITES - 1} of`);
+    });
+  }
+
+  /**
+   * Holds a section's toolbar in one place. The editor places each toolbar by measuring the page (placeTools in
+   * components/exhbt-editor/Toolbar.tsx) and writes the place on it as data-place, with none for a row above the corner;
+   * held, the attribute is put back whenever the editor writes another.
+   */
+  const hold = (el: Element, want: string | null) => {
+    const held = el as Element & { held?: MutationObserver };
+    held.held?.disconnect();
+    const put = () => {
+      if (want === null) el.removeAttribute("data-place");
+      else if (el.getAttribute("data-place") !== want) el.setAttribute("data-place", want);
+    };
+    put();
+    held.held = new MutationObserver(put);
+    held.held.observe(el, { attributes: true, attributeFilter: ["data-place"] });
+  };
+
+  test("the flowchart's form and the findings' form, in each place a section's toolbar can be", async ({ page }) => {
+    test.setTimeout(150_000); // ten forms opened and closed
+    await draftAndOpen(page, "places");
+    for (const block of ["flow", "findings"] as const) {
+      const tools = page.locator(`${READY} [data-kind="${block}"] > .xe-tools`).first();
+      for (const place of ["above", "edge", "side", "rcol", "compact"] as const) {
+        const want = place === "above" ? null : place;
+        await tools.evaluate(hold, want);
+        await startRewrite(page, block);
+        await leave(page);
+        expect(await tools.getAttribute("data-place"), `${block}, held ${place}`).toBe(want);
+        await takesThePress(page, block, `${block}, toolbar ${place}`);
+        await close(page, block);
+      }
+    }
+  });
+
+  test("a section raised for its open menu still passes under the editor's top bar as the page scrolls", async ({ page }) => {
+    // A short window, so the page can scroll far enough to bring the flowchart's menu level with the bar.
+    await page.setViewportSize({ width: 1440, height: 480 });
+    await draftAndOpen(page, "underbar");
+    await startRewrite(page, "flow");
+    await leave(page);
+    const at = await page.getByTestId("tools-flow").evaluate((tools) => {
+      const bar = document.querySelector("[data-topbar]")!.getBoundingClientRect();
+      const more = tools.querySelector("button")!;
+      window.scrollBy(0, more.getBoundingClientRect().top - bar.top - 10);
+      const r = more.getBoundingClientRect();
+      const found = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return { levelWithTheBar: r.top < bar.bottom && r.bottom > bar.top, theBarIsOverIt: Boolean(found?.closest("[data-topbar]")) };
+    });
+    expect(at).toEqual({ levelWithTheBar: true, theBarIsOverIt: true });
   });
 });
 
