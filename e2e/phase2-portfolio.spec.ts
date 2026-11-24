@@ -119,8 +119,11 @@ test.describe("Hosts", () => {
       expect(go(host, "/login"), host).toBeNull();
     }
     expect(go("www.exhbt.co.uk", "/pricing")).toBeNull();
-    expect(go("www.exhbt.co.uk", "/account")).toBeNull();
-    expect(go("www.exhbt.co.uk", "/exhbts")).toBeNull();
+    expect(go("www.exhbt.co.uk", "/account")).toBe(`https://${APP_HOST}/account`);
+    expect(go("www.exhbt.co.uk", "/exhbts")).toBe(`https://${APP_HOST}/exhbts`);
+    expect(go("www.exhbt.co.uk", "/portfolio")).toBe(`https://${APP_HOST}/portfolio`);
+    expect(go("www.exhbt.co.uk", "/job-links")).toBe(`https://${APP_HOST}/job-links`);
+    expect(go("www.exhbt.co.uk", "/job-links/new")).toBe(`https://${APP_HOST}/job-links/new`);
     expect(go("www.exhbt.co.uk", "/start")).toBeNull();
   });
 

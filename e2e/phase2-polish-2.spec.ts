@@ -37,12 +37,12 @@ test.describe("Phone header", () => {
     // Nothing is clipped: the button and the logo sit inside the screen.
     const box = (await menu.boundingBox())!;
     expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
-    await expect(header.getByRole("link", { name: "Account" })).toBeHidden();
+    await expect(header.getByRole("link", { name: "Account" })).toBeVisible();
 
     await menu.click();
     await expect(menu).toHaveAttribute("aria-expanded", "true");
     const nav = header.getByRole("navigation", { name: "Main menu" });
-    for (const name of ["Roadmaps", "Your exhbts", "Portfolio", "Account"]) await expect(nav.getByRole("link", { name })).toBeVisible();
+    for (const name of ["Roadmaps", "Your exhbts", "Portfolio"]) await expect(nav.getByRole("link", { name })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Job links" })).toHaveCount(0);
     // Focus moves into the panel.
     await expect(nav.getByRole("link").first()).toBeFocused();
@@ -51,15 +51,13 @@ test.describe("Phone header", () => {
     await page.keyboard.press("Escape");
     await expect(menu).toHaveAttribute("aria-expanded", "false");
     await expect(menu).toBeFocused();
-    await expect(nav.getByRole("link", { name: "Account" })).toBeHidden();
 
-    await menu.click();
-    await nav.getByRole("link", { name: "Account" }).click();
+    await header.getByRole("link", { name: "Account" }).click();
     await page.waitForURL(/\/account$/);
     await expect(menu).toHaveAttribute("aria-expanded", "false");
   });
 
-  test("Max: Job links is in the menu, and a tap outside closes it", async ({ page }) => {
+  test("Max: the menu has the app links, and a tap outside closes it", async ({ page }) => {
     const name = unique("navmax");
     await seed(page, name, "max");
     await signInAs(page, `${name}@example.com`, "/exhbts");
@@ -69,7 +67,9 @@ test.describe("Phone header", () => {
     const menu = header.getByRole("button", { name: "Menu" });
     await menu.click();
     const nav = header.getByRole("navigation", { name: "Main menu" });
-    for (const label of ["Roadmaps", "Your exhbts", "Job links", "Portfolio", "Account"]) await expect(nav.getByRole("link", { name: label })).toBeVisible();
+    for (const label of ["Roadmaps", "Your exhbts", "Portfolio"]) await expect(nav.getByRole("link", { name: label })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Job links" })).toHaveCount(0);
+    await expect(header.getByRole("link", { name: "Account" })).toBeVisible();
     // A tap on the page below the panel (the gutter, so it hits no link).
     await page.mouse.click(4, page.viewportSize()!.height - 20);
     await expect(menu).toHaveAttribute("aria-expanded", "false");

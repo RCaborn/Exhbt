@@ -4,13 +4,11 @@ import { portfolioHost } from "../lib/hosts";
 import { buildRoadmap, CV_WITH_CONTACT, SAMPLE_CV, uniqueEmail, unlockProjects, waitForBuilder, waitForResult } from "./helpers";
 
 test.describe("Phase 1: from the home page to a roadmap", () => {
-  test("home job field pre-fills the builder and starts at the CV step", async ({ page }) => {
+  test("the home hero goes to building an exhbt", async ({ page }) => {
     await page.goto("/");
-    await page.locator("#start-hero").fill("Junior data analyst");
-    await page.locator("form:has(#start-hero) button[type=submit]").click();
-    await page.waitForURL(/\/roadmap\/new\?role=/);
-    await expect(page.getByText("Step 2 of 3")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Add your CV" })).toBeVisible();
+    await page.getByRole("button", { name: "Build your exhbt" }).click();
+    await page.waitForURL(/\/login\?next=/);
+    await expect(page.getByRole("heading", { level: 1, name: "Log in" })).toBeVisible();
   });
 
   test("/start is just the search bar, and carries ad tracking into the builder", async ({ page }) => {
@@ -32,7 +30,7 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     // old tile grid, its catalogue numbers and the editor excerpt are gone (Rory, 16 Nov 2026).
     const example = page.locator("section[aria-labelledby=one-exhbt]");
     await expect(example.getByRole("heading", { level: 2, name: "One project, one page" })).toBeVisible();
-    const heroBottom = (await page.locator("form:has(#start-hero)").boundingBox())!;
+    const heroBottom = (await page.getByRole("button", { name: "Build your exhbt" }).boundingBox())!;
     expect((await example.boundingBox())!.y).toBeGreaterThan(heroBottom.y + heroBottom.height);
     await expect(example.locator("[data-exhbt-page]")).toHaveCount(1);
     await expect(example.getByText(`${portfolioHost("amara")}/gp-reminders`)).toBeVisible();

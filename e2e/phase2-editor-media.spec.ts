@@ -259,9 +259,9 @@ test.describe("Free, the header and the live moment", () => {
     const nav = page.getByRole("navigation", { name: "Main" });
     await expect(nav.getByRole("link", { name: "Your exhbts" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Portfolio" })).toBeVisible();
-    await expect(nav.getByRole("link", { name: "Account" })).toBeVisible();
+    await expect(page.getByRole("banner").getByRole("link", { name: "Account" })).toBeVisible();
     await expect(page.getByRole("banner").getByRole("link", { name: "Log in" })).toHaveCount(0);
-    await nav.getByRole("link", { name: "Account" }).click();
+    await page.getByRole("banner").getByRole("link", { name: "Account" }).click();
     await expect(page.getByRole("link", { name: "Your exhbts" }).first()).toBeVisible();
     // Marketing pages stay as they were.
     await page.goto("/pricing");

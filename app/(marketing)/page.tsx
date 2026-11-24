@@ -128,9 +128,11 @@ export default function Home() {
             Turn your project work into a portfolio at {ADDRESS}. Start with a free roadmap that shows which skills to
             prove first.
           </p>
-          <div className="mt-10 flex w-full justify-center">
-            <StartForm id="start-hero" />
-          </div>
+          <form action="/exhbts/new" method="get" className="mt-10 flex w-full justify-center">
+            <Button type="submit" size="xl" variant="primary">
+              Build your exhbt
+            </Button>
+          </form>
           <p className="mt-5 text-[0.9375rem] text-slate">
             The roadmap is free. Your own address comes with {PLAN_NAMES.premium} and {PLAN_NAMES.max}.
           </p>
