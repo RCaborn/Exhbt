@@ -30,7 +30,7 @@ export default async function NewJobLinkPage() {
     <div className="min-h-[calc(100svh-4.75rem)] bg-mist px-4 pt-10 pb-16 sm:px-8 sm:pt-14">
       <div className="mx-auto max-w-[40rem]">
         <p className="text-sm font-semibold">
-          <Link href="/job-links" className="link">
+          <Link href="/portfolio#job-links" className="link">
             Job links
           </Link>
         </p>

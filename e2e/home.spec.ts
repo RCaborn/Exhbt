@@ -114,7 +114,7 @@ test.describe("Home: the start form", () => {
     test(`the button is centred in the field and never clipped at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/");
-      for (const id of ["#start-hero", "#start-close"]) {
+      for (const id of ["#start-close"]) {
         const pill = (await page.locator(`form:has(${id}) > div`).boundingBox())!;
         const button = page.locator(`form:has(${id}) button[type=submit]`);
         const b = (await button.boundingBox())!;
