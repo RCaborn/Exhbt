@@ -258,6 +258,10 @@
     text-transform: none;
     pointer-events: auto;
   }
+  /* Where the browser has no popovers the panel is a modal dialog (figures/pop.ts): nothing drawn over the page behind it. */
+  .xe-fig-pop::backdrop {
+    background: transparent;
+  }
   .xe-fig-pop-picked {
     width: min(30rem, calc(100vw - 2rem));
     padding: 0;

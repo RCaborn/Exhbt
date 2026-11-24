@@ -15,6 +15,7 @@ import { useFrame } from "../Frame";
 import { DESCRIPTION_PLACEHOLDER, descriptionClass, descriptionLabel } from "../geometry";
 import { useDoc, useSection, useStore } from "../store";
 import { useAnchoredPopover } from "./anchor";
+import { opensPanel, Panel } from "./pop";
 
 /*
  * An image's edit-only parts (decision 0026, "What the page does not draw"):
@@ -150,7 +151,7 @@ function PickedLabelOf({ s }: { s: SectionOf<"image"> & { picked: Picked } }) {
   const id = useId();
   const tickId = `${id}-tick`;
   const button = useRef<HTMLButtonElement>(null);
-  const pop = useRef<HTMLDivElement>(null);
+  const pop = useRef<HTMLElement>(null);
   useAnchoredPopover(button, pop);
   const p = s.picked;
   // The stored report it came from: linked when the page was opened, or one of the reports a figure can be taken from (a figure taken by hand this visit).
@@ -165,7 +166,7 @@ function PickedLabelOf({ s }: { s: SectionOf<"image"> & { picked: Picked } }) {
   const inside = useFrame()?.as === "lead";
   return (
     <span ref={label} className="xe-fig-picked" data-edit-only data-inside={inside ? "" : undefined} data-ticked={p.shareOk ? "" : undefined} data-invalid={issue ? "" : undefined}>
-      <button ref={button} type="button" className="xe-fig-picked-open" popoverTarget={`${id}-pop`} aria-label={`${where}: crop it, choose another page, or say you may share it`}>
+      <button ref={button} type="button" className="xe-fig-picked-open" {...opensPanel(`${id}-pop`, () => pop.current)} aria-label={`${where}: crop it, choose another page, or say you may share it`}>
         <FileText aria-hidden size={13} strokeWidth={2.25} />
         <span className="xe-fig-long">{where}</span>
         <span aria-hidden className="xe-fig-short">
@@ -197,7 +198,7 @@ function PickedLabelOf({ s }: { s: SectionOf<"image"> & { picked: Picked } }) {
           <IssueNote id={issueId(tickId)} text={issue} />
         </>
       )}
-      <div ref={pop} id={`${id}-pop`} popover="auto" className="xe-fig-pop xe-fig-pop-picked">
+      <Panel panelRef={pop} id={`${id}-pop`} className="xe-fig-pop-picked">
         <PickedFigure
           s={s}
           path={path}
@@ -206,7 +207,7 @@ function PickedLabelOf({ s }: { s: SectionOf<"image"> & { picked: Picked } }) {
           onTick={tick}
           onReplace={(file, picked, opts) => files.replaceImage(s.id, file, picked, opts)}
         />
-      </div>
+      </Panel>
     </span>
   );
 }
