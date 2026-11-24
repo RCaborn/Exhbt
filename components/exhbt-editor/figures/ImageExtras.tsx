@@ -59,7 +59,14 @@ function Description({ sectionId }: { sectionId: string }) {
  * in the field's own type and width, with the mark after them, over the field (it takes no room and
  * lets every press through). Where the words would not fit on that last line (a narrow gallery tile,
  * whose rows are 12px apart) the mark is a dot there instead, its words kept for screen readers and
- * as its tooltip, so it never hangs under the figure into the next row.
+ * as its tooltip, so it never hangs under the figure into the next row. Where that line is full to its
+ * end the dot has no room either: it then sits on the end of the line, over the top of its last letters.
+ *
+ * The mark starts from a point that takes no room on the line (`xe-fig-needs-at`), so the unseen words
+ * break exactly as the field's do whatever follows them, and the mark is always on their last line.
+ * When it took room, the page's `text-wrap: pretty` would not leave it alone on a line: it brought the
+ * placeholder's last word down to it, a line under the field, and the two hung under the figure (in a
+ * gallery's tile at about 900 wide on Chromium, and at 1440 on Safari, which breaks lines its own way).
  */
 function NeedsMark({ words }: { words: string }) {
   const line = useRef<HTMLSpanElement>(null);
@@ -67,12 +74,14 @@ function NeedsMark({ words }: { words: string }) {
     const el = line.current;
     if (!el) return;
     const fit = () => {
-      const ghost = el.firstElementChild!;
-      const mark = el.lastElementChild!;
+      const mark = el.querySelector(".xe-fig-needs")!;
+      // The mark runs past the field's right edge (by more than the browser's own rounding).
+      const over = () => mark.getBoundingClientRect().right > el.getBoundingClientRect().right + 0.02;
       el.removeAttribute("data-compact");
-      const lines = ghost.getClientRects();
-      const last = lines[lines.length - 1];
-      if (last && mark.getBoundingClientRect().top >= last.bottom - 1) el.setAttribute("data-compact", "");
+      el.removeAttribute("data-tight");
+      if (!over()) return;
+      el.setAttribute("data-compact", "");
+      if (over()) el.setAttribute("data-tight", "");
     };
     fit();
     const sized = new ResizeObserver(fit);
@@ -84,8 +93,10 @@ function NeedsMark({ words }: { words: string }) {
       <span aria-hidden className="xe-fig-needs-ghost">
         {words}
       </span>
-      <span className="xe-fig-needs" title="Needs a description">
-        <span className="xe-fig-needs-words">Needs a description</span>
+      <span className="xe-fig-needs-at">
+        <span className="xe-fig-needs" title="Needs a description">
+          <span className="xe-fig-needs-words">Needs a description</span>
+        </span>
       </span>
     </span>
   );
