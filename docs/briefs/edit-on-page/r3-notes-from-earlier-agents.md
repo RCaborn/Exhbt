@@ -343,3 +343,48 @@ Still open, most serious first:
   - It is not left out: the next run under the rule says which.
 - The hand-over on a real iPhone: whether the keyboard stays up when a person taps a formatted field before its editor is live. It should now (the focus no longer leaves the fields), but only a phone shows it.
 - The zoom on focus (`phone/noZoom.ts`) and everything else in "What WebKit on Linux cannot show at all" above.
+
+## From the green-CI agent, 24 Nov 2026 (branch `phase-2-r3-green`)
+
+What was red in CI, and why:
+- `e2e/r2-fixes.spec.ts`, the two layout-refusal tests (save and publish). Both came from release 2, where `e2e/editor.ts` was the classic editor's page object. Here it is the new editor's.
+  - Publish: the tick and Publish are in the "Review and publish" sheet, so the test waited 90 seconds for a tick that was not on the page.
+  - Save: `getByText` matched two elements, the top bar's visible words and its hidden live region. That pair is by design (`topbar/SaveStatus.tsx`). Find the visible words by `.xe-save-words` and what is said by `div[role=status].sr-only`.
+  - The product was right. A refused publish shows the whole reason in the sheet, under Publish and on screen with it, and says it once. The tests now assert that.
+  - Each test now runs in both editors.
+- `e2e/key-order.spec.ts` came with the graph patch (`phase-2-r2-fix2`, merged here at 8389717). Its test of the offer of a copy kept in the browser failed under the new editor, and it was right to.
+  - The patch fixed the comparison in the classic editor: a doc read from the database against one kept another way, as JSON text, which is always "different" on the live site.
+  - The new editor had its own copy of that line (`BackupOffer.tsx`). It now uses `sameJson`. The test runs in both editors.
+- `e2e/phase2-draft-tools.spec.ts`, "on Free the rewrites run out": the press on "Rewrite the process now" was refused, on and off.
+  - A section's toolbar was drawn, and took presses, only while its section was under the pointer or held the focus. An open menu was no exception.
+  - "Rewrite this block" hides the button that was pressed, so the focus falls to the page. Only the pointer then held the toolbar up.
+  - At 1440 by 900 the form's button is drawn below the fold. A press scrolls the page first, the pointer stays where it was, and the toolbar went at once, the form with it. The row under the form took the press.
+  - Whether the press landed was a race between the browser working the hover out again and Playwright's check. Here it passes with the processor up to 8 times slower and fails at 16 times. So a slow runner failed it and a quick one passed it. No merged commit caused it.
+  - It was never the stacking. The form was see-through and took no presses; nothing lay over it. 5d308fa's raise did not fix it.
+  - Fixed in `css/core.css`: a toolbar with a menu open stays, wherever the pointer and the focus are. `BlockTools` sets `data-open` on itself while its menu or its panel is open, and the CSS reads it. The same for the shell parts' corner toolbar and for the tablet's rule.
+  - The section with the open menu is raised in every place, to 29. At 30 it was drawn over the editor's top bar once the page scrolled it there.
+- `e2e/phase2-editor-media.spec.ts:316` ("File attached:" not seen in 20 seconds) did not fail here in three runs, one of them straight after the build folder was deleted, as CI's always starts. It is left as it was.
+  - That cold run took 43 seconds and the next one 11: the dev server builds each page and route the first time a test uses it. On a slower runner one step could pass its 20 seconds that way. Not proven.
+
+For whoever merges `main` into this line again:
+- A spec written on `main` imports the classic page object under the name `./editor`. Here that name is the new editor's. Run each such spec before trusting it, and check every import.
+- To run a test in the classic editor, take its helpers from `./editor-classic-helpers`: its `signInAs`, `signInToDraft` and `draftAndOpen` set the cookie. Or call `keepClassic(page)` first. Assert `[data-editor="classic"]` or `[data-editor="page"]`, so a test cannot run in the wrong editor without saying so.
+- The classic editor is what everyone gets on launch day. A test of something both editors do should run in both; `r2-fixes` and `key-order` show two ways.
+- A fix made to the classic editor on `main` may be missing from the new editor's own copy of the same thing. `BackupOffer.tsx` was one.
+
+For tests of the toolbars and menus:
+- Playwright counts an element with `opacity: 0` as visible. `toBeVisible` passes on a toolbar nobody can see. Use an unforced click, or `click({ trial: true })`, which checks where the press would land.
+- A click scrolls its target into view and leaves the pointer where it was. Anything that shows on hover can go at that moment.
+- To try a part without the pointer or the focus: `page.mouse.move(2, 2)`, then blur the active element. The tests under "An open rewrite form stays up and takes the press" do this.
+- To see a failure that comes and goes with the runner's speed: `Emulation.setCPUThrottlingRate` through `page.context().newCDPSession(page)`.
+- To try each place a toolbar can be in, hold `data-place` with a `MutationObserver` that puts it back. `placeTools` writes it again whenever any toolbar draws.
+- A size container (`@container`) makes no stacking context in Chromium now. Where it still does, research's method stack is one, so whatever holds a raised section is raised with it. Not tried on Safari.
+
+Still open:
+- Outside the compact card, the rewrite form has no ground of its own. It is drawn straight over the page's words, squeezed to the width of its button's column, and the toolbar's other buttons move to its middle. Seen on the case study's findings, the gallery's flowchart and research's flowchart; the findings in the gallery and in research have their toolbars in the same places (above, and on the edge). It takes its press, but it is hard to read. The context line's form, in its corner toolbar, is drawn over the title in the same way; the title's and the skills' forms use the same toolbar.
+  - Above its section, the toolbar grows upwards when the form opens, so "More actions" moves up, and can go under the top bar.
+  - Next step: draw the form and its status line as a card under "More actions", as the compact form does.
+  - An open form now stays until it is cancelled or used. Before, it went when the pointer left, which hid this.
+- The top bar cuts the reason for a failed save at 22rem with an ellipsis. "This couldn't be saved. Reload the page and try again." loses its second half. The whole of it is said to a screen reader. Under 64rem the words are not drawn at all.
+- `store.setAt` still compares a stored value with what a field built as JSON text (`sameValue` in `store-core.ts`). On the live site a formatted field typed in and put back as it was may then count as a change, and be saved once more. Not tested with a doc in the database's key order. The editor's other comparisons of JSON text (the undo list, a layout switch, the toolbar's check of its own words) each set the store's doc against one made from it. Reading them, the database's order should not mislead them; none is tested for it.
+- Not run here: `editor-drag` and `editor-flow`, and nothing on WebKit.
