@@ -321,7 +321,7 @@ The old editor stays for one release as "classic". It is what everyone gets whil
   4. **The default,** `DEFAULT_EDITOR` in `lib/editor-kind.ts`: `classic`.
 
   What a request says (its cookies, who is signed in) is read in `lib/editor-kind-server.ts`, which is marked server only because it imports `next/headers`. `/api/health` reports as `editor` what an ordinary person gets (3, then 4), never an admin's own choice. In development only, a cookie (`exhbt-editor-kind`, set by `/dev/editor?kind=`) stands in for the variable for one browser: `page`, `classic`, or `default` for a variable that is not set. So each browser test has its own setting and a failed test cannot leave one behind for the next. The end-to-end suite's server runs with `EXHBT_EDITOR=page` (`playwright.config.ts`), so every spec tests the new editor as it is once on for everyone; `e2e/editor-admin-switch.spec.ts` tests the switched-off state and the admin's own switch through that cookie, and runs the rule directly as the live site runs it.
-- **The admin's own switch.** In the classic editor an admin sees one line at the very top of the page, "Admins only", with a button, "Try the new editor". Nobody else is sent it. (It is a line and not a menu item because the classic editor has no menu.) Pressing it stores the choice and opens the same exhbt in the new editor; every exhbt opened in that browser after it is in the new editor too. In the new editor, "Use the classic editor" in the menu takes an admin back, and that choice is stored as well. Both go through `POST /api/exhbts/editor`, which answers 404 to anyone who is not an admin.
+- **The admin's own switch.** In the classic editor an admin sees one line above the editor, under the site's header and the teammates line: "Admins only", with a button, "Try the new editor". Nobody else is sent it. (It is a line and not a menu item because the classic editor has no menu.) Pressing it stores the choice and opens the same exhbt in the new editor; every exhbt opened in that browser after it is in the new editor too. In the new editor, "Use the classic editor" in the menu takes an admin back, and that choice is stored as well. Both go through `POST /api/exhbts/editor`, which answers 404 to anyone who is not an admin.
 - **The escape.** For everyone else, "Use the classic editor" opens the same exhbt with `?editor=classic`, for that visit. The classic editor shows a line with the way back.
 - **The crash fallback.** An error boundary sits round the new editor. If it throws, the boundary shows "Something went wrong with the new editor. Your work is saved.", waits for `flushPending()` (the store's newest doc sent to the server, three seconds at most; the browser copy was already written), and reloads the page with `?editor=classic`. It reloads, and does not swap editors in place, because the page's props are from when it was opened: an editor mounted on them could save over newer work. The address outranks an admin's own choice, so an admin who chose the new editor still lands in the classic one when it throws.
   - An error boundary cannot catch a throw while the server draws the page. So the new editor is never drawn on the server: it loads in the browser, inside the boundary. Until it has loaded, the person sees the editing page drawn by a static stand-in adapter: the same slots, with everything on `EDIT_ONLY_IN_FLOW` drawn inert (the placeholders as text; the description fields and the "Add a skill" box as they will be, not yet usable) and every other control left out (they take no room). The visitor's page would not do, because it leaves out empty parts and those two fields, and they would pop in when the editor arrived. With the stand-in the fields come alive in place and nothing moves, which a test checks on a blank new exhbt.
@@ -335,17 +335,17 @@ Rory decided this on 24 Nov 2026. Release 3 goes onto the live site with the new
 
 **To try it on a phone,** as an admin on the live site:
 
-1. Log in on the phone with your own account.
-2. Open `/admin` on the same site. If the overview opens, that account is an admin there. If the page is not found, it is not, and the button in step 4 will not be there.
-3. Open "Your exhbts" and open any exhbt. It opens in the classic editor.
-4. At the very top of the page, above "Your exhbts" and "Edit exhbt", is a line that starts "Admins only". Press "Try the new editor" in it.
+1. Log in on the phone with your own account, and stay on the host the address bar then shows: `www.exhbt.co.uk`, or `app.exhbt.co.uk` once `EXHBT_TOOL_HOST` has moved the tool there.
+2. Open `/admin` on that host. If the overview opens, that account is an admin there. If the page is not found, it is not, and the button in step 4 will not be there.
+3. Open "Your exhbts" (on a phone it is under Menu in the site's header, or go to `/exhbts`) and open any exhbt. It opens in the classic editor.
+4. Near the top of the page, under the site's header and the teammates line and above "Your exhbts" and "Edit exhbt", is a line that starts "Admins only". Press "Try the new editor" in it.
 5. The same exhbt opens in the new editor, and so does every exhbt opened in that browser from then on.
-6. To go back, press Menu (the three dots at the end of the editor's bar), then "Use the classic editor". That is remembered the same way, until "Try the new editor" is pressed again.
+6. To go back, press the three dots at the end of the editor's own bar (not Menu in the site's header), then "Use the classic editor", the last item. That is remembered the same way, until "Try the new editor" is pressed again.
 
-The choice belongs to the browser it was made in: another phone, or another browser on the same phone, starts in the classic editor.
+The choice belongs to the browser it was made in, on the host it was made on: another phone, another browser on the same phone, or the other host starts in the classic editor.
 
 **To switch it on for everyone,** either:
-- with no deploy, set the variable `EXHBT_EDITOR` to `page` on the live Worker in the Cloudflare dashboard; or
+- with no deploy, set the variable `EXHBT_EDITOR` to `page` on the live Worker in the Cloudflare dashboard (`keep_vars` in `wrangler.jsonc` keeps it through later deploys; if it were ever lost, everyone would be back on the default, so read `editor` in `/api/health` after a deploy); or
 - in the code, change `DEFAULT_EDITOR` in `lib/editor-kind.ts` from `"classic"` to `"page"` and deploy. One test pins the default so that a merge cannot change it unseen: change `SHIPPED_DEFAULT` at the top of `e2e/editor-admin-switch.spec.ts` to match.
 
 Then check `/api/health`: it says `"editor": "page"`.

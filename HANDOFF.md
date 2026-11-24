@@ -139,15 +139,15 @@ The edit-on-page editor (decision 0026) is on the live site switched off: everyo
 
 - **Switched off by default.** `DEFAULT_EDITOR` in `lib/editor-kind.ts` is `"classic"`. `/api/health` reports what an ordinary person gets, as `editor`.
 - **An admin's own switch.** An admin can turn the new editor on for themselves. On a phone:
-  1. Log in with your own account.
-  2. Open `/admin` on the same site. If the overview opens, the account is an admin there; if the page is not found, it is not, and the button will not be there.
-  3. Open "Your exhbts" and open any exhbt. It opens in the classic editor.
-  4. At the very top of the page is a line that starts "Admins only". Press "Try the new editor" in it.
+  1. Log in with your own account, and stay on the host the address bar then shows (`www.exhbt.co.uk`, or `app.exhbt.co.uk` once `EXHBT_TOOL_HOST` has moved the tool there). Sign-in and this choice are both kept per host.
+  2. Open `/admin` on that host. If the overview opens, the account is an admin there; if the page is not found, it is not, and the button will not be there.
+  3. Open "Your exhbts" (on a phone it is under Menu in the site's header, or go to `/exhbts`) and open any exhbt. It opens in the classic editor.
+  4. Near the top of the page, under the site's header and the teammates line and above "Edit exhbt", is a line that starts "Admins only". Press "Try the new editor" in it.
   5. That exhbt, and every one opened in that browser afterwards, is in the new editor.
-  6. To go back: Menu (the three dots at the end of the editor's bar), then "Use the classic editor". That is remembered too.
+  6. To go back: the three dots at the end of the editor's own bar (not Menu in the site's header), then "Use the classic editor", the last item. That is remembered too.
 
   Nobody who is not an admin is sent the button, and the cookie that remembers the choice counts for nothing in their browser: whether the person signed in is an admin is checked on every request.
-- **On for everyone.** With no deploy, set `EXHBT_EDITOR` to `page` on the live Worker in the Cloudflare dashboard. Or in the code: change `DEFAULT_EDITOR` to `"page"`, and `SHIPPED_DEFAULT` at the top of `e2e/editor-admin-switch.spec.ts` to match (the one test that pins the default), then deploy.
+- **On for everyone.** With no deploy, set `EXHBT_EDITOR` to `page` on the live Worker in the Cloudflare dashboard. `keep_vars` in `wrangler.jsonc` keeps a variable set there through a deploy; if it were ever lost, everyone would be back on the default, so read `editor` in `/api/health` after a deploy. Or in the code: change `DEFAULT_EDITOR` to `"page"`, and `SHIPPED_DEFAULT` at the top of `e2e/editor-admin-switch.spec.ts` to match (the one test that pins the default), then deploy.
 - **Everyone back to the classic editor.** Set `EXHBT_EDITOR` to `classic`. It needs no deploy and works after either way of switching on. An admin's own choice still comes first.
 
 `npm run dev` serves the classic editor, as the live site does. To work on the new one, put `EXHBT_EDITOR=page` in `.env.local`, or open `/dev/editor?kind=page` once in the browser.
