@@ -53,3 +53,12 @@ export function repairIdeas(raw: unknown, planSize: number): unknown {
 export function repairSwap(raw: unknown): unknown {
   return isObject(raw) ? { ...raw, project: repairProject(raw.project) } : raw;
 }
+
+/**
+ * A figure pick: a kind outside `kinds` is read as "other", the kind that takes nothing off the
+ * exhbt (as toPick in ./figure-pick.ts reads a visual with no kind). Which image, where the box is
+ * and the words are left for the schema and toPick.
+ */
+export function repairPick(raw: unknown, kinds: readonly string[]): unknown {
+  return isObject(raw) && !kinds.includes(String(raw.kind)) ? { ...raw, kind: "other" } : raw;
+}

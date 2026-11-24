@@ -40,7 +40,7 @@ import { AIFailure, structuredCall, type AIFeature } from "@/lib/ai/call";
 import { draftRequest, materialText, MAX_MATERIAL_CHARS, type DraftInput } from "@/lib/ai/exhbt-draft";
 import { DraftSchema, repairDraft } from "@/lib/ai/draft-answer";
 import { rewriteRequest, SCHEMAS } from "@/lib/ai/exhbt-rewrite";
-import { AnswerSchema, figurePickRequest, type PageImage } from "@/lib/ai/figure-pick";
+import { AnswerSchema, figurePickRequest, repairAnswer, type PageImage } from "@/lib/ai/figure-pick";
 import { jobMatchRequest, MatchSchema } from "@/lib/ai/job-match";
 import { IntroSchema, introRequest, MAX_CV_CHARS, type IntroFacts } from "@/lib/ai/portfolio-intro";
 import { ideasRequest, IdeasSchema, swapRequest, SwapSchema } from "@/lib/ai/projects";
@@ -361,8 +361,8 @@ async function cases(): Promise<Case[]> {
     { feature: "job match", size: "heavy", request: () => jobMatchRequest({ company: "Department for Education", roleTitle: "Graduate Policy Analyst", description: heavyListing(), candidates: candidates(ENTITLEMENTS.max.exhbts, true) }), read: structured("job_match", MatchSchema) },
     { feature: "portfolio intro", size: "typical", request: () => introRequest(introFacts(false)), read: structured("portfolio_intro", IntroSchema) },
     { feature: "portfolio intro", size: "heavy", request: () => introRequest(introFacts(true)), read: structured("portfolio_intro", IntroSchema) },
-    { feature: "figure pick", size: "typical", request: () => figurePickRequest(pageImages(3)), read: structured("figure_pick", AnswerSchema) },
-    { feature: "figure pick", size: "heavy", request: () => figurePickRequest(pageImages(FIGURE.maxImages)), read: structured("figure_pick", AnswerSchema) },
+    { feature: "figure pick", size: "typical", request: () => figurePickRequest(pageImages(3)), read: structured("figure_pick", AnswerSchema, repairAnswer) },
+    { feature: "figure pick", size: "heavy", request: () => figurePickRequest(pageImages(FIGURE.maxImages)), read: structured("figure_pick", AnswerSchema, repairAnswer) },
     { feature: "file read: cv", size: "typical", request: () => transcribeRequest(scan("cv-typical.jpg"), "image/jpeg", "cv"), read: { kind: "transcript" } },
     { feature: "file read: cv", size: "heavy", request: () => transcribeRequest(scan("cv-long.pdf"), "application/pdf", "cv"), read: { kind: "transcript" } },
     { feature: "file read: project", size: "typical", request: () => transcribeRequest(scan("project-page.jpg"), "image/jpeg", "project"), read: { kind: "transcript" } },

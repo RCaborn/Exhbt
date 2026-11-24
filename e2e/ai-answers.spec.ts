@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { z } from "zod/v4";
 import { DraftSchema, repairDraft, toChart, type DraftChart } from "../lib/ai/draft-answer";
-import { repairIdeas, repairRoadmap, repairSwap } from "../lib/ai/repair";
+import { repairIdeas, repairPick, repairRoadmap, repairSwap } from "../lib/ai/repair";
 import { ProjectSchema, RoadmapModelSchema } from "../lib/ai/schemas";
+import { FIGURE_KINDS } from "../lib/exhbt/blocks";
 
 /**
  * Reading the AI's answers (decision 0029): the repairs that let one stray value cost a graph or a
@@ -129,6 +130,32 @@ test.describe("Project ideas and swaps, repaired", () => {
     const fixed = repairSwap({ project: project(24) }) as z.infer<typeof Swap>;
     expect(fixed.project.weeks).toBe(12);
     expect(Swap.safeParse(fixed).success).toBe(true);
+  });
+});
+
+test.describe("The figure pick's answer, repaired", () => {
+  // The answer's shape as lib/ai/figure-pick.ts sends it (that file is server-only, so the shape is restated here).
+  const KINDS = [...FIGURE_KINDS, "none"] as const;
+  const Answer = z.object({
+    found: z.boolean(),
+    image: z.number().nullable(),
+    kind: z.enum(KINDS),
+    box: z.object({ left: z.number(), top: z.number(), right: z.number(), bottom: z.number() }).nullable(),
+    alt: z.string(),
+    caption: z.string(),
+  });
+  const pick = (kind: string) => ({ found: true, image: 2, kind, box: { left: 40, top: 60, right: 500, bottom: 400 }, alt: "A bar chart of queue times.", caption: "Queue times" });
+
+  test("a kind outside the list is read as 'other', which takes nothing off the exhbt, and the pick is kept", () => {
+    const raw = pick("bar chart");
+    expect(Answer.safeParse(raw).success).toBe(false);
+    const fixed = repairPick(raw, KINDS) as { kind: string };
+    expect(fixed.kind).toBe("other");
+    expect(Answer.safeParse(fixed).success).toBe(true);
+  });
+
+  test("a kind in the list is left alone, 'none' included", () => {
+    for (const k of KINDS) expect((repairPick(pick(k), KINDS) as { kind: string }).kind).toBe(k);
   });
 });
 

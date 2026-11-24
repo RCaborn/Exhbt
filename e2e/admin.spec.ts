@@ -214,6 +214,23 @@ test.describe("Admin panel", () => {
     await expect(row()).toContainText("ran out of room");
   });
 
+  test("after five failed drafts in a day the sixth isn't tried: it says so, and only five are counted", async ({ page }) => {
+    await signIn(page, { admin: true });
+    const failedBefore = await stat(page, "ai-failures-total");
+    const draft = (notes: string) =>
+      page.request.post("/api/exhbts/draft", {
+        data: { text: "We timed lunchtime queues at the union cafe for two weeks, then opened a second till at the busiest hour, and the queue fell.", notes },
+      });
+    for (let i = 0; i < 5; i++) expect((await draft("stand-in: fail")).status()).toBe(502);
+    // No call is made now, even for a draft that would have worked.
+    const stopped = await draft("");
+    expect(stopped.status()).toBe(429);
+    expect(((await stopped.json()) as { error: string }).error).toContain("Nothing was used up. Try again tomorrow.");
+
+    await page.reload();
+    expect(await stat(page, "ai-failures-total")).toBe(failedBefore + 5);
+  });
+
   test("no accessibility violations on the overview, accounts and an account", async ({ page }) => {
     await signIn(page, { admin: true });
     await page.request.get(`/dev/admin?seed=${stamp()}`);
