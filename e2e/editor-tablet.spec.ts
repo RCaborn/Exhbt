@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "./editor-test";
 import { FORMAT_RULES } from "../lib/exhbt/formats";
 import { labelOf } from "../components/exhbt-editor/labels";
 import { docNow, field, flowChipsNearWords, frame, grip, offered, openTiming, pageOrder, plusClashes, READY, smallPresses, toolbarClashes, typeIn, undoLabel, waitLive } from "./page-editor";

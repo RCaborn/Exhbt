@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./editor-test";
 import { LIMITS, wordCount, type ExhbtDoc, type Section } from "../lib/exhbt/blocks";
 import { formatOf, FORMAT_RULES, type Format } from "../lib/exhbt/formats";
 import { blockOptions, pageItems, rowsFor, type Cell, type Row } from "../lib/exhbt/layouts";
@@ -424,7 +424,8 @@ test.describe("each section's toolbar, at 1440 wide", () => {
     const n = (await pageOrder(page)).length;
     expect(await page.evaluate((at) => window.__exhbtEditor!.insert("link", at), n)).toBeTruthy();
     await expect.poll(async () => (await pageOrder(page)).length).toBe(n + 1);
-    expect(await toolbarClashes(page)).toEqual([]);
+    // The toolbars are placed in the frame after the new line is drawn: WebKit answers before that frame (as the tests below wait).
+    await expect.poll(() => toolbarClashes(page)).toEqual([]);
   });
 
   test("research's hypothesis, beside the graph: its toolbar runs down the gutter from its corner, clear of its words, and stays clear of a long first line", async ({ page }) => {

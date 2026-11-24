@@ -23,37 +23,13 @@ export type Plan = "free" | "premium" | "max";
 /** A fresh username for a test (letters and digits, as usernames are). */
 export const freshName = (tag: string) => `${tag.replace(/[^a-z0-9]/gi, "").toLowerCase()}${Math.random().toString(36).slice(2, 8)}`;
 
-/**
- * In the WebKit job (E2E_WEBKIT) a page's uncaught errors and its console errors go to the test's output,
- * which the job's summary prints (scripts/e2e-summary.mjs): the job's log is all a machine without WebKit
- * sees of a WebKit run.
- */
-const heard = new WeakSet<Page>();
-function hear(page: Page) {
-  if (!process.env.E2E_WEBKIT || heard.has(page)) return;
-  heard.add(page);
-  // Each thing a page says, once.
-  const said = new Set<string>();
-  const say = (line: string) => {
-    if (said.has(line)) return;
-    said.add(line);
-    console.log(line);
-  };
-  page.on("pageerror", (e) => say(`[page error] ${e.message}`));
-  page.on("console", (m) => {
-    if (m.type() === "error") say(`[console error] ${m.text().slice(0, 400)}`);
-  });
-}
-
 /** Waits for the editor to be up. */
 export async function waitReady(page: Page) {
-  hear(page);
   await expect(page.locator(READY)).toBeAttached();
 }
 
 /** Signs in as a development user with no exhbts, presses "Start from scratch" and waits for the editor; returns the new exhbt's id. */
 export async function openNew(page: Page, username: string, plan: Plan = "premium"): Promise<string> {
-  hear(page);
   await page.goto(`/dev/portfolio?username=${username}&plan=${plan}&count=0`);
   await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
   await page.getByRole("button", { name: "Start from scratch" }).click();
@@ -67,7 +43,6 @@ export async function openNew(page: Page, username: string, plan: Plan = "premiu
  * list by its slug's title; returns its id. The user is cleared and made again on the max plan.
  */
 export async function openSeeded(page: Page, username: string, withParam: string, slug: string): Promise<string> {
-  hear(page);
   await page.goto(`/dev/portfolio?username=${username}&plan=max&count=0&with=${withParam}`);
   await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
   const title = SAMPLE_TITLES[slug];
@@ -84,7 +59,6 @@ export async function openSeeded(page: Page, username: string, withParam: string
  * /dev/portfolio after seeding: both clear that user's exhbts. `files` maps each image section's id to its file.
  */
 export async function openDoc(page: Page, username: string, doc: ExhbtDoc, opts: { slug?: string; working?: ExhbtDoc; plan?: Plan; aiVersion?: unknown; query?: string } = {}): Promise<{ id: string; url: string; files: Record<string, string> }> {
-  hear(page);
   const res = await page.request.post("/dev/parity", { data: { username, slug: opts.slug ?? "page-editor", doc, working: opts.working, plan: opts.plan, aiVersion: opts.aiVersion } });
   expect(res.status(), await res.text()).toBe(200);
   const out = (await res.json()) as { id: string; url: string; files: Record<string, string> };
@@ -396,7 +370,6 @@ export function sampleDoc(f: Format): ExhbtDoc {
  */
 export async function openTiming(page: Page, f: Format | "new", opts: { full?: boolean; look?: string; grow?: "mirror" } = {}) {
   const q = new URLSearchParams({ sample: f, ...(opts.full ? { full: "1" } : {}), ...(opts.look ? { look: opts.look } : {}), ...(opts.grow ? { grow: opts.grow } : {}) });
-  hear(page);
   await page.goto(`/dev/editor-timing?${q}`);
   await waitReady(page);
 }

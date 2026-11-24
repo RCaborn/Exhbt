@@ -103,7 +103,8 @@ try {
     const page = await context.newPage();
     await page.setContent(PAGE);
     console.log(`-- as ${device}`);
-    console.log(JSON.stringify({ ...(await page.evaluate(read)), input: await act(page) }, null, 1));
+    // A line for each group, so the whole of it is a dozen lines of the job's log.
+    for (const [group, values] of Object.entries({ ...(await page.evaluate(read)), input: await act(page) })) console.log(`${group}: ${typeof values === "object" ? JSON.stringify(values) : values}`);
     await context.close();
   }
   await browser.close();

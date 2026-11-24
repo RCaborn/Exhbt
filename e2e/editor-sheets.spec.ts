@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./editor-test";
 import type { ExhbtDoc } from "../lib/exhbt/blocks";
 import { openBankingDoc } from "../lib/exhbt/sample";
 import { docNow, field, freshName, openDoc, openNew, READY, readStored, waitSaved } from "./page-editor";

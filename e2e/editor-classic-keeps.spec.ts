@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "./editor-test";
 import { SCHEMA_VERSION, text, type ContentSection, type ExhbtDoc, type Section } from "../lib/exhbt/blocks";
 import type { Format } from "../lib/exhbt/formats";
 import { tileFromDoc } from "../lib/exhbt/headline";

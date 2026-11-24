@@ -14,7 +14,9 @@ permissions:
   contents: read
 
 jobs:
-  # One job, in groups. In these two projects each test is its own shard unit, so a long spec is split.
+  # One job, in four groups: the desktop specs in three (about 110 tests and 16 minutes each on 24 Nov 2026, when six
+  # groups of 55 took 5 to 10 minutes), the phone's in one. In these two projects each test is its own shard unit, so a
+  # long spec is split between groups.
   e2e-webkit:
     name: e2e-webkit (${{ matrix.project }} ${{ matrix.shard }}/${{ matrix.of }})
     runs-on: ubuntu-latest
@@ -23,12 +25,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { project: safari, shard: 1, of: 6 }
-          - { project: safari, shard: 2, of: 6 }
-          - { project: safari, shard: 3, of: 6 }
-          - { project: safari, shard: 4, of: 6 }
-          - { project: safari, shard: 5, of: 6 }
-          - { project: safari, shard: 6, of: 6 }
+          - { project: safari, shard: 1, of: 3 }
+          - { project: safari, shard: 2, of: 3 }
+          - { project: safari, shard: 3, of: 3 }
           - { project: iphone, shard: 1, of: 1 }
     env:
       E2E_WEBKIT: "1"
@@ -40,11 +39,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps webkit
-      - name: What this WebKit says it is
-        if: matrix.project == 'iphone'
-        run: node scripts/webkit-probe.mjs
       # It stops itself after 38 minutes, inside the job's 45, so a slow run still writes its report and its summary.
-      - run: npx playwright test --project=${{ matrix.project }} --shard=${{ matrix.shard }}/${{ matrix.of }} --reporter=list,github,html,json --global-timeout=2280000 --retries=0
+      - run: npx playwright test --project=${{ matrix.project }} --shard=${{ matrix.shard }}/${{ matrix.of }} --reporter=list,github,html,json --global-timeout=2280000
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/webkit.json
           PLAYWRIGHT_HTML_OPEN: never
@@ -54,7 +50,10 @@ jobs:
           name: playwright-report-webkit-${{ matrix.project }}-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
-      # Last, so that the end of the job's log is the account of the run.
+      # Last, so that the end of the job's log is what this WebKit says it is (once a run) and the account of the run.
+      - name: What this WebKit says it is
+        if: always() && matrix.project == 'iphone'
+        run: node scripts/webkit-probe.mjs
       - name: Summary
         if: always()
         run: node scripts/e2e-summary.mjs test-results/webkit.json

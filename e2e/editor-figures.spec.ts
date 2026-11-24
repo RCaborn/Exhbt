@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "./editor-test";
 import { text, validateForPublish, type ExhbtDoc, type Section, type SectionOf } from "../lib/exhbt/blocks";
 import { normaliseNumber } from "../lib/exhbt/verify";
 import { fullDoc, openBankingDoc } from "../lib/exhbt/sample";
@@ -226,10 +226,17 @@ test.describe("a picture's description", () => {
       await expect(mark).toBeVisible();
       const t = (await tile.boundingBox())!;
       const m = (await mark.boundingBox())!;
-      expect(m.x).toBeGreaterThanOrEqual(t.x - 0.5);
-      expect(m.x + m.width).toBeLessThanOrEqual(t.x + t.width + 0.5);
+      // For a failure's message: how the mark is drawn (words, a dot, or the dot on the line's end), and the lines of the placeholder and of the field.
+      const how = await tile.locator(".xe-fig-needs-line").evaluate((el) => {
+        const at = (r: DOMRect) => [r.left, r.top, r.width, r.height].map((v) => Math.round(v * 10) / 10).join(",");
+        const drawn = el.hasAttribute("data-tight") ? "the dot on the line's end" : el.hasAttribute("data-compact") ? "a dot" : "words";
+        const lines = [...el.firstElementChild!.getClientRects()].map(at).join(" | ");
+        return `${drawn}; the placeholder's lines ${lines}; the field ${at(el.parentElement!.querySelector("textarea")!.getBoundingClientRect())}`;
+      });
+      expect(m.x, how).toBeGreaterThanOrEqual(t.x - 0.5);
+      expect(m.x + m.width, how).toBeLessThanOrEqual(t.x + t.width + 0.5);
       // On the description's own lines: never hanging under the tile into the next row.
-      expect(m.y + m.height).toBeLessThanOrEqual(t.y + t.height + 0.5);
+      expect(m.y + m.height, how).toBeLessThanOrEqual(t.y + t.height + 0.5);
       // In the caption's type: 0.8125rem in a tile.
       expect(await tile.locator('[data-edit-only="image-description"]').evaluate((e) => getComputedStyle(e).fontSize)).toBe("13px");
     }

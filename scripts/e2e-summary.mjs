@@ -67,9 +67,11 @@ function words(err, max) {
   return out.length > max ? [...out.slice(0, max), `… (${out.length - max} more lines)`] : out;
 }
 const firstError = (t) => t.results.find((r) => r.error || r.errors?.length);
+/** A test's errors as one: a timeout's first error is only "Test timeout exceeded", and what it was waiting on is in its second. */
 const errorOf = (t) => {
   const r = firstError(t);
-  return r?.error ?? r?.errors?.[0];
+  const all = r?.errors?.length ? r.errors : r?.error ? [r.error] : [];
+  return all.length ? { message: all.map((e) => e.message).join("\n") } : undefined;
 };
 const where = (t) => {
   const r = firstError(t);

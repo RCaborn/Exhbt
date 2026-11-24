@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "./editor-test";
 import { plain, text, type ExhbtDoc, type RichText, type Section } from "../lib/exhbt/blocks";
 import { FORMAT_RULES } from "../lib/exhbt/formats";
 import {
@@ -109,9 +109,17 @@ test.describe("each section shows only its grip", () => {
           for (let n = walker.nextNode(); n; n = walker.nextNode()) {
             const parent = n.parentElement!;
             if (!n.textContent?.trim() || fr.contains(n) || !shown(parent) || parent.closest(".sr-only, .xe-tools")) continue;
+            // Word by word, as toolbarClashes reads them (page-editor.ts): the space hanging at the end of a wrapped line is no word.
             const range = document.createRange();
-            range.selectNodeContents(n);
-            if ([...range.getClientRects()].some(over)) bad.push(`${id}'s grip is over "${n.textContent.trim().slice(0, 20)}" in ${parent.closest("[data-section-id]")?.getAttribute("data-section-id") ?? "the page"}`);
+            for (const word of n.textContent.matchAll(/\S+/g)) {
+              range.setStart(n, word.index);
+              range.setEnd(n, word.index + word[0].length);
+              const hit = [...range.getClientRects()].find(over);
+              if (!hit) continue;
+              const at = (r: DOMRect) => [r.left, r.top, r.width, r.height].map((v) => Math.round(v)).join(",");
+              bad.push(`${id}'s grip (${at(g)}) is over "${word[0]}" (${at(hit)}) in ${parent.closest("[data-section-id]")?.getAttribute("data-section-id") ?? "the page"}`);
+              break;
+            }
           }
           for (const other of frames) {
             if (other === fr) continue;

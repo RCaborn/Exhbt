@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { devices, expect, test, type Page } from "@playwright/test";
+import { devices, expect, test, type Page } from "./editor-test";
 import { emptyDoc, plain, text, type ExhbtDoc, type RichText, type Section } from "../lib/exhbt/blocks";
 import { FORMAT_RULES, formatOf } from "../lib/exhbt/formats";
 import { flowShown, hasMarker, pageItems } from "../lib/exhbt/layouts";
