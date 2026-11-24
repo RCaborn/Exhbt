@@ -434,7 +434,7 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
 
     const lockedId = PORTFOLIO_THEMES[open]!.id;
     await page.locator(`[data-theme-option="${lockedId}"]`).click();
-    await expect(page.getByTestId("upgrade-prompt")).toContainText("Max");
+    await expect(page.locator("section[aria-labelledby=step-heading]").getByTestId("upgrade-prompt")).toContainText("Max");
     await expect(page.locator("[data-testid=preview] [data-portfolio-home]")).toHaveAttribute("data-theme", lockedId); // previews
     await expect(status(page)).toHaveText("Saved"); // but nothing is sent
     await page.goto(`/p/${u}`);

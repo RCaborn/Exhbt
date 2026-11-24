@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { fileIdsOf } from "@/components/editor/media";
 import { ENTITLEMENTS } from "@/lib/entitlements";
 import { imagesOf } from "@/lib/exhbt/blocks";
+import { isFigureNews, isLayoutReason } from "@/lib/exhbt/drafted";
 import { isFormat } from "@/lib/exhbt/formats";
 import { loadAiVersion, loadDraftSource } from "@/lib/draft-tools";
 import { signedFileUrl } from "@/lib/files";
@@ -20,7 +21,7 @@ import { getStore } from "@/lib/store";
 
 export const metadata: Metadata = { title: "Edit exhbt", robots: { index: false } };
 
-type Params = { params: Promise<{ id: string }>; searchParams: Promise<{ skipped?: string; drafted?: string }> };
+type Params = { params: Promise<{ id: string }>; searchParams: Promise<{ skipped?: string; drafted?: string; why?: string; fig?: string }> };
 
 /** The exhbt editor (docs/phase-2.md section 6). Only the owner sees it; anyone else gets a 404. */
 export default async function EditExhbtPage({ params, searchParams }: Params) {
@@ -29,8 +30,12 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
   // Files a teammate's plan couldn't hold when they made their own exhbt (lib/team.ts makeOwnExhbt).
   const query = await searchParams;
   const skipped = Math.max(0, Math.min(99, Number(query.skipped) || 0));
-  // The layout the AI draft chose, said once in the editor (decision 0024).
-  const draftedAs = isFormat(query.drafted) ? query.drafted : undefined;
+  // What the draft page passed on, said once in the editor (decisions 0024 and 0025): the layout the
+  // AI chose, why, and what came of looking for a figure. Each is one of a fixed list, with fixed
+  // wording (lib/exhbt/drafted.ts); anything else in the address is ignored.
+  const drafted = isFormat(query.drafted)
+    ? { format: query.drafted, ...(isLayoutReason(query.why) ? { reason: query.why } : {}), ...(isFigureNews(query.fig) ? { figure: query.fig } : {}) }
+    : undefined;
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(`/exhbts/${id}/edit`)}`);
   const store = getStore();
@@ -63,7 +68,7 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
     <Editor
       draftTools={hasSource && aiVersion ? { aiVersion, rewritesLeft: allowance.left, rewritesLimit: allowance.limit } : null}
       id={record.id}
-      draftedAs={draftedAs}
+      drafted={drafted}
       // The store reads every doc into the current shape (sections, graph kinds; decision 0015).
       initialDoc={record.doc}
       status={record.status}

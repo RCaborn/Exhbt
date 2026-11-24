@@ -1,5 +1,5 @@
 import { chartsOf, findingsOf, imagesOf, plain, type Chart, type ExhbtDoc } from "./exhbt/blocks";
-import { formatOf } from "./exhbt/formats";
+import { flowShown, formatOf } from "./exhbt/formats";
 
 /**
  * What the portfolio home (Rory's layout spec, 16 Nov 2026; decision 0016) shows of each exhbt:
@@ -47,21 +47,26 @@ export function summaryOf(doc: ExhbtDoc): string {
 
 export function keyFigureOf(doc: ExhbtDoc): KeyFigure {
   const format = formatOf(doc);
+  const image = imagesOf(doc)[0];
+  const chart = chartsOf(doc)[0];
+  const ofImage = (i: NonNullable<typeof image>): KeyFigure => ({ kind: "image", fileId: i.fileId, alt: i.alt });
   if (format === "gallery") {
     // The lead image, else the graph, else the flow (decision 0024).
-    const lead = imagesOf(doc)[0];
-    if (lead) return { kind: "image", fileId: lead.fileId, alt: lead.alt };
-  } else if (format === "research") {
+    if (image) return ofImage(image);
+  } else if (format === "build" || format === "event" || format === "before-after") {
+    // The first image (the screenshot, the poster, the first picture), else the graph (decision 0028).
+    if (image) return ofImage(image);
+    if (chart) return { kind: "chart", chart };
+  } else if (format === "research" || format === "essay") {
     // The key figure is the first graph or image in list order.
     const first = doc.sections.find((s) => s.kind === "graph" || s.kind === "image");
     if (first?.kind === "graph") return { kind: "chart", chart: first.chart };
-    if (first?.kind === "image") return { kind: "image", fileId: first.fileId, alt: first.alt };
+    if (first?.kind === "image") return ofImage(first);
   }
-  const chart = chartsOf(doc)[0];
   if (chart) return { kind: "chart", chart };
-  const image = imagesOf(doc)[0];
-  if (image) return { kind: "image", fileId: image.fileId, alt: image.alt };
-  return { kind: "flow", steps: doc.flow.map((s) => s.step).filter((s) => s.trim()) };
+  if (image) return ofImage(image);
+  // The flowchart is the fallback only while it is on the page (decision 0027).
+  return { kind: "flow", steps: flowShown(doc) ? doc.flow.map((s) => s.step).filter((s) => s.trim()) : [] };
 }
 
 export function homeProject(id: string, doc: ExhbtDoc, href: string | null, imageUrl?: string | null): HomeProject {

@@ -77,7 +77,7 @@ export function readTranscript(response: Anthropic.Message): { text: string; tru
 }
 
 /**
- * Reads the file. A refusal or a service error throws an AIFailure (decision 0025). An answer cut
+ * Reads the file. A refusal or a service error throws an AIFailure (decision 0029). An answer cut
  * off at max_tokens comes back with `truncated`, so the person is told only the first part was read.
  * `name` is the file's name, used only by the development stand-in: "long-scan" in it plays a
  * cut-off read, so that notice can be seen without an API key.

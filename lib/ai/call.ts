@@ -17,7 +17,7 @@ export type StructuredRequest = {
 export type StructuredResult<T> = { value: T; model: string; inputTokens: number; outputTokens: number };
 
 /**
- * The one way the app makes a structured AI call (decision 0025). It sends the request exactly as
+ * The one way the app makes a structured AI call (decision 0029). It sends the request exactly as
  * built (messages.create), looks at why the model stopped before it reads a word, then reads the
  * answer loosely: JSON first, then `repair` (fixes what the API couldn't enforce, such as a list
  * over its maximum), then the strict schema. Any failure throws one AIFailure that says which

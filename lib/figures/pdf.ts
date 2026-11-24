@@ -39,20 +39,31 @@ const PICTURE_OPS = [
   "paintJpegXObject",
 ];
 
-async function open(bytes: Uint8Array): Promise<{ pdf: Pdf; codes: { shapes: Set<number>; pictures: Set<number> } }> {
+type Codes = { shapes: Set<number>; pictures: Set<number>; path?: number; endPath?: number };
+
+async function open(bytes: Uint8Array): Promise<{ pdf: Pdf; codes: Codes }> {
   const { getDocumentProxy, getResolvedPDFJS } = await import("unpdf");
   // A copy: pdf.js may detach the buffer it's given, and the caller keeps the bytes.
   const pdf = await getDocumentProxy(bytes.slice());
   const ops = (await getResolvedPDFJS()).OPS as Record<string, number>;
   const set = (names: string[]) => new Set(names.map((n) => ops[n]).filter((v): v is number => typeof v === "number"));
-  return { pdf, codes: { shapes: set(SHAPE_OPS), pictures: set(PICTURE_OPS) } };
+  return { pdf, codes: { shapes: set(SHAPE_OPS), pictures: set(PICTURE_OPS), path: ops.constructPath, endPath: ops.endPath } };
 }
 
-async function marksOf(page: Page, codes: { shapes: Set<number>; pictures: Set<number> }): Promise<PageMarks> {
-  const { fnArray } = await page.getOperatorList();
+/**
+ * How many shapes and pictures a page paints. A path that paints nothing isn't a shape: Word,
+ * browsers and LaTeX put clipping paths round ordinary text, and a page of plain text must still
+ * count as plain text (decision 0025). This build of pdf.js gives each path with how it ends as
+ * its first argument, so one that ends without a fill or a stroke ("endPath") is left out. A
+ * build that lists the fill or stroke apart is counted by those, as before.
+ */
+async function marksOf(page: Page, codes: Codes): Promise<PageMarks> {
+  const { fnArray, argsArray } = await page.getOperatorList();
   let shapes = 0;
   let pictures = 0;
-  for (const fn of fnArray) {
+  for (let i = 0; i < fnArray.length; i++) {
+    const fn = fnArray[i]!;
+    if (fn === codes.path && (argsArray[i] as unknown[] | null | undefined)?.[0] === codes.endPath && codes.endPath !== undefined) continue;
     if (codes.shapes.has(fn)) shapes++;
     else if (codes.pictures.has(fn)) pictures++;
   }

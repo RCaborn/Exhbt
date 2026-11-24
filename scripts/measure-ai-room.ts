@@ -1,6 +1,6 @@
 /**
  * How much of its max_tokens each AI call uses, and whether the app can read the answer (decision
- * 0025 has why this matters). Sends the app's own request for every feature, built by the request
+ * 0029 has why this matters). Sends the app's own request for every feature, built by the request
  * builder beside each call, with a typical and a heavy input, three times each, and reads each
  * answer the way the app does: structured answers through structuredCall (stop reason, then JSON,
  * the repair and the strict schema), transcriptions through readTranscript. Prints one table: the
@@ -11,6 +11,11 @@
  *   npm run measure:ai -- --runs 1     # quicker
  *   npm run measure:ai -- --only draft,roadmap
  *   npm run measure:ai -- --dry        # no API calls: each request's cap and size
+ *
+ * Every form but --dry calls the real API and is paid for: 84 calls, about 15 US cents, for the
+ * whole run. Nothing runs this script automatically: no push, pull request, deploy or schedule. It
+ * is run by hand (.github/workflows/ai-shapes.yml, or here), with the owner's say-so, the cost
+ * stated first (decision 0029).
  *
  * Inputs: the draft eval's fixtures (evals/exhbt-draft/fixtures) read the way the browser reads
  * them; page thumbnails of those PDFs (evals/ai-room/pages, made like the browser's: 768 px long
@@ -53,6 +58,7 @@ import type { JobProfile } from "@/lib/jobs";
 import type { MatchCandidate } from "@/lib/jobs/rank";
 import { MAX_LISTING_CHARS } from "@/lib/jobs/listing-text";
 import { FIGURE } from "@/lib/figures/rules";
+import { imageSize } from "@/lib/figures/image-size";
 import { PLAN_SIZE } from "@/lib/store";
 
 const ROOT = process.cwd();
@@ -314,7 +320,10 @@ function pageImages(n: number): PageImage[] {
   const files = readdirSync(PAGES).filter((f) => f.endsWith(".jpg")).sort();
   return Array.from({ length: n }, (_, i) => {
     const f = files[i % files.length]!;
-    return { label: `report.pdf, page ${i + 1} (${f})`, data: new Uint8Array(readFileSync(join(PAGES, f))), mediaType: "image/jpeg" as const };
+    const data = new Uint8Array(readFileSync(join(PAGES, f)));
+    // Each page's size in pixels, read from the file as the route reads it.
+    const size = imageSize(data) ?? { width: 0, height: 0 };
+    return { label: `report.pdf, page ${i + 1} (${f})`, data, mediaType: "image/jpeg" as const, ...size };
   });
 }
 

@@ -5,7 +5,7 @@ import { repairIdeas, repairRoadmap, repairSwap } from "../lib/ai/repair";
 import { ProjectSchema, RoadmapModelSchema } from "../lib/ai/schemas";
 
 /**
- * Reading the AI's answers (decision 0025): the repairs that let one stray value cost a graph or a
+ * Reading the AI's answers (decision 0029): the repairs that let one stray value cost a graph or a
  * list item rather than the whole feature, and how a drafted graph becomes a stored one. Pure
  * functions, no browser and no AI.
  */
@@ -15,6 +15,7 @@ const chart = (over: Omit<Partial<DraftChart>, "kind"> & { kind: string }): Draf
 
 const draft = (over: Record<string, unknown> = {}) => ({
   format: "case-study",
+  formatReason: "question-findings",
   title: "Q?",
   summary: "S",
   context: "",
@@ -42,6 +43,30 @@ test.describe("The draft's answer, repaired", () => {
     const fixed = repairDraft(raw) as { format: string };
     expect(fixed.format).toBe("case-study");
     expect(DraftSchema.safeParse(fixed).success).toBe(true);
+  });
+
+  test("a layout the draft may not choose yet (one of release 4's) becomes a case study too", () => {
+    const raw = draft({ format: "build" });
+    expect(DraftSchema.safeParse(raw).success).toBe(false);
+    const fixed = repairDraft(raw) as { format: string };
+    expect(fixed.format).toBe("case-study");
+    expect(DraftSchema.safeParse(fixed).success).toBe(true);
+  });
+
+  test("an unknown reason for the layout becomes 'default' (no reason is said), and the draft is kept", () => {
+    const raw = draft({ format: "research", formatReason: "it reads like a lab report" });
+    expect(DraftSchema.safeParse(raw).success).toBe(false);
+    const fixed = repairDraft(raw) as { format: string; formatReason: string };
+    expect(fixed).toMatchObject({ format: "research", formatReason: "default" });
+    expect(DraftSchema.safeParse(fixed).success).toBe(true);
+  });
+
+  test("a missing reason becomes 'default', and a known one is left alone", () => {
+    const without: Record<string, unknown> = draft();
+    delete without.formatReason;
+    expect(DraftSchema.safeParse(without).success).toBe(false);
+    expect((repairDraft(without) as { formatReason: string }).formatReason).toBe("default");
+    expect((repairDraft(draft({ formatReason: "notes" })) as { formatReason: string }).formatReason).toBe("notes");
   });
 
   test("a graph of an unknown kind is dropped and the other graphs stay", () => {

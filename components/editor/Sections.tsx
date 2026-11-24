@@ -16,12 +16,13 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowDown, ArrowUp, ChartBar, Flag, GripVertical, ImageIcon, Lightbulb, Link2, ListChecks, Plus, Quote, Target, X, type LucideIcon } from "lucide-react";
+import { ArrowDown, ArrowUp, ChartBar, Flag, GripVertical, ImageIcon, Lightbulb, Link2, ListChecks, Plus, Quote, Target, TextQuote, X, type LucideIcon } from "lucide-react";
 import { PickedFigure, type ReplaceFigure } from "./PickedFigure";
 import { Button } from "@/components/ui/Button";
 import { useReducedMotion } from "@/components/ui/useReducedMotion";
 import { formatLimits, LIMITS, plain, wordCount, words, type ExhbtDoc, type Issue, type Limits, type Section, type SectionKind, type SectionOf } from "@/lib/exhbt/blocks";
 import { FORMAT_COPY, FORMAT_RULES, formatOf, isShown, type Format } from "@/lib/exhbt/formats";
+import { isArranged } from "@/lib/exhbt/layouts";
 import { firstOfKinds, layoutNotes, moveSection, newSection, roomFor, sectionLabel } from "@/lib/exhbt/sections";
 import { BlockTools, type DraftTools } from "./BlockTools";
 import { ChartEditor } from "./ChartEditor";
@@ -55,12 +56,13 @@ function menuFor(f: Format): { kind: SectionKind; add: string; icon: LucideIcon;
     { kind: "graph", add: "Add a graph", icon: ChartBar, hint: "Figures from your work, typed in by hand." },
     { kind: "image", add: "Add an image", icon: ImageIcon, hint: `A screenshot or figure, with a caption of up to ${L.images.captionWords} words.` },
     { kind: "conclusion", add: "Add conclusion", icon: Flag, hint: `What the work concludes, up to ${L.conclusion.words} words.` },
+    { kind: "pullquote", add: "Add a pull quote", icon: TextQuote, hint: `A line from your own work, drawn large, up to ${L.pullquote.words} words.` },
     { kind: "quote", add: "Add a quote", icon: Quote, hint: `Feedback someone gave, up to ${L.quote.words} words, with their name.` },
     { kind: "reflection", add: `Add ${f === "research" ? "limitations and next steps" : "what I'd do next"}`, icon: Lightbulb, hint: `One or two lines, up to ${L.reflection.words} words.` },
     { kind: "link", add: f === "research" ? "Add a reference" : "Add a link", icon: Link2, hint: f === "research" ? "A paper or source you used, as a link." : f === "gallery" ? "The film, the full set of pictures or the deck." : "A repository, a demo or a document." },
   ];
   const kinds = FORMAT_RULES[f].kinds;
-  const order: SectionKind[] = ["findings", "graph", "image", "quote", "reflection", "link", "aim", "conclusion"];
+  const order: SectionKind[] = ["findings", "pullquote", "graph", "image", "quote", "reflection", "link", "aim", "conclusion"];
   const sorted = f === "research" ? all : [...all].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
   return sorted.filter((m) => kinds.includes(m.kind));
 }
@@ -144,6 +146,7 @@ export function Sections({
   const sections = doc.sections;
   const f = formatOf(doc);
   const L = formatLimits(f);
+  const arranged = isArranged(doc);
   const [status, setStatus] = useState<{ text: string; undo?: { section: Section; index: number; label: string } } | null>(null);
   const dndId = useId();
   const reduced = useReducedMotion();
@@ -248,11 +251,13 @@ export function Sections({
         </h2>
         {/* On the mist page, not a white card: graphite, since the hint's slate is under 4.5:1 here. */}
         <p className="mt-1 text-sm text-graphite">
-          {f === "case-study"
-            ? "Below the flowchart, in this order. Add the ones that suit the project; drag them, or use the arrows, to change the order."
-            : f === "gallery"
-              ? "In a gallery, the page sets where each part goes. The order of your images sets the gallery: the first is the lead."
-              : "In research, the page sets where each part goes. The order of your graphs and images sets the poster: the first is the key figure."}
+          {arranged || (f !== "case-study" && f !== "gallery" && f !== "research")
+            ? "The page is drawn in this order, the flowchart included. Drag the sections, or use the arrows, to change it."
+            : f === "case-study"
+              ? "Below the flowchart, in this order. Add the ones that suit the project; drag them, or use the arrows, to change the order."
+              : f === "gallery"
+                ? "In a gallery, the page sets where each part goes. The order of your images sets the gallery: the first is the lead."
+                : "In research, the page sets where each part goes. The order of your graphs and images sets the poster: the first is the key figure."}
         </p>
       </div>
 
@@ -265,6 +270,38 @@ export function Sections({
                 const label = sectionLabel(sections, i, f);
                 const lower = lowerFirst(label);
                 const hidden = !isShown(doc, s);
+                if (s.kind === "flow") {
+                  return (
+                    <SortableSection key={s.id} id={s.id} kind="flow" label={lower} reduced={reduced}>
+                      {(handle) => (
+                        <Card
+                          id={`card-section-${i}`}
+                          level="h3"
+                          title={label}
+                          controls={{
+                            before: handle,
+                            after: (
+                              <span className="flex flex-wrap items-center gap-1">
+                                <span data-move="up">
+                                  <Button size="sm" label={`Move ${lower} up`} disabled={i === 0} onClick={() => move(i, i - 1, "keys")}>
+                                    <ArrowUp aria-hidden size={14} strokeWidth={2.25} />
+                                  </Button>
+                                </span>
+                                <span data-move="down">
+                                  <Button size="sm" label={`Move ${lower} down`} disabled={i === sections.length - 1} onClick={() => move(i, i + 1, "keys")}>
+                                    <ArrowDown aria-hidden size={14} strokeWidth={2.25} />
+                                  </Button>
+                                </span>
+                              </span>
+                            ),
+                          }}
+                        >
+                          <p className="text-sm text-graphite">Edit its boxes in the card above.</p>
+                        </Card>
+                      )}
+                    </SortableSection>
+                  );
+                }
                 const makes =
                   f === "gallery" && s.kind === "image" && i !== firstOfKinds(sections, ["image"])
                     ? "Make lead image"
@@ -279,7 +316,7 @@ export function Sections({
                         level="h3"
                         title={label}
                         words={cw[key]}
-                        limit={s.kind === "reflection" ? L.reflection.words : s.kind === "aim" ? L.aim.words : s.kind === "conclusion" ? L.conclusion.words : undefined}
+                        limit={s.kind === "reflection" ? L.reflection.words : s.kind === "aim" ? L.aim.words : s.kind === "conclusion" ? L.conclusion.words : s.kind === "pullquote" ? L.pullquote.words : undefined}
                         hint={hintFor(s, maxFileMb, L, f)}
                         flagged={flaggedBy(key)}
                         heaviest={heaviest === key}
@@ -378,7 +415,7 @@ function SortableSection({
   children,
 }: {
   id: string;
-  kind: SectionKind;
+  kind: SectionKind | "flow";
   /** "graph 1", for "Drag graph 1". */
   label: string;
   reduced: boolean;
@@ -429,6 +466,10 @@ function hintFor(s: Section, maxFileMb: number, L: Limits, f: Format): string {
     case "aim":
     case "conclusion":
       return "Only what your report states.";
+    case "pullquote":
+      return "A line from your own words, drawn large on the page. Plain text.";
+    case "flow":
+      return "";
   }
 }
 
@@ -512,6 +553,31 @@ function SectionBody({
               multiline
               placeholder="e.g. Bar chart of queue times before and after"
             />
+            {f === "before-after" && (
+              <fieldset>
+                <legend className="label">{`Image ${nth + 1}: before or after`}</legend>
+                <div className="flex flex-wrap gap-5">
+                  {([["before", "Before"], ["after", "After"], [undefined, "Neither"]] as const).map(([v, name]) => (
+                    <label key={name} className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name={`${pid}-stage`}
+                        checked={s.stage === v}
+                        onChange={() =>
+                          patch<"image">(s.id, (x) => {
+                            const { stage: _old, ...rest } = x;
+                            void _old;
+                            return v ? { ...rest, stage: v } : rest;
+                          })
+                        }
+                        className="size-4 accent-jade"
+                      />
+                      {name}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            )}
             <div>
               <span id={`image-${nth}-caption`} className="label">
                 Image {nth + 1} caption
@@ -629,12 +695,24 @@ function SectionBody({
           <FieldIssues id={`${pid}-text-issues`} issues={issuesAt(issues, `${p}.text`)} />
         </div>
       );
+    case "pullquote":
+      return (
+        <TextInput
+          id={`${pid}-text`}
+          label="The pull quote"
+          value={s.text}
+          multiline
+          onChange={(text) => patch<"pullquote">(s.id, (x) => ({ ...x, text }))}
+          issues={issuesAt(issues, `${p}.text`)}
+          placeholder="e.g. A ruling is only as strong as the next court that reads it."
+        />
+      );
     case "link":
       return (
         <div className="space-y-4">
           <TextInput
             id={`${pid}-href`}
-            label="Web address"
+            label={L.link.hrefOptional ? "Web address (optional)" : "Web address"}
             type="url"
             value={s.href}
             placeholder="https://"
@@ -669,6 +747,8 @@ function SectionBody({
           </div>
         </div>
       );
+    case "flow":
+      return null;
   }
 }
 

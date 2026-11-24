@@ -3,22 +3,29 @@ import { pickFigure, type PageImage } from "@/lib/ai/figure-pick";
 import { mediaTypeOf } from "@/lib/ai/transcribe";
 import { getCurrentUser } from "@/lib/auth";
 import { DRAFT_WINDOW_HOURS } from "@/lib/drafting";
+import { imageSize } from "@/lib/figures/image-size";
 import { FIGURE } from "@/lib/figures/rules";
 import { getPlan, limitsFor } from "@/lib/plan";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
-import { recordAIFailure } from "@/lib/ai-failures";
+import { recordAIFailure, tooManyFailures, TOO_MANY_FAILURES } from "@/lib/ai-failures";
 
 /**
- * Picks the figure for an exhbt being drafted (decision 0017). The draft page sends it, beside
- * /api/exhbts/draft, small JPEGs of the pages of the person's PDF that draw something besides
- * text, as multipart form data: a `label` ("report.pdf, page 3") and an `image` for each. The
- * images go to the model and are dropped here; only the pick comes back:
- * { pick: { image, box, alt, caption } | null }, `image` counting from 1 in the order sent.
+ * Picks the figure for an exhbt being drafted (decisions 0017 and 0025). The draft page sends it,
+ * beside /api/exhbts/draft, small JPEGs of the pages of the person's PDF that draw something
+ * besides text, as multipart form data: a `label` ("report.pdf, page 3") and an `image` for each.
+ * The images go to the model and are dropped here; only the pick comes back:
+ * { pick: { image, kind, box, alt, caption } | null }, `image` counting from 1 in the order sent,
+ * `kind` "graph", "table" or "other", `box` in fractions of the image.
  *
  * Part of the draft, so it uses none of the person's drafts or rewrites. One pick per draft: a
  * person can ask for as many as their plan has drafts in the window, plus a couple for drafts
- * that fail and are tried again.
+ * that fail and are tried again. A pick is counted only when the AI call succeeded. A failed one
+ * is recorded as a failure event instead (lib/ai-failures.ts), and after the day's limit of those
+ * no call is made: the draft page then says it couldn't look, as it does for any failed pick.
+ *
+ * Outside production the answer also carries `debug`: the model that answered, its token counts
+ * and its answer before the checks, which the figure eval reads (evals/figure-pick/README.md).
  */
 
 /** Picks allowed in the drafts window beyond the plan's drafts, for drafts that failed and were tried again. */
@@ -48,7 +55,10 @@ export async function POST(req: Request) {
     const data = new Uint8Array(await f.arrayBuffer());
     const mediaType = mediaTypeOf(data);
     if (mediaType !== "image/jpeg" && mediaType !== "image/png") return fail("Page images must be JPEG or PNG.", 415);
-    images.push({ label: labels[i]!, data, mediaType });
+    // The model gives its box in pixels of the image, so the size is read here, from the file itself.
+    const size = imageSize(data);
+    if (!size) return fail("A page image couldn't be read.", 415);
+    images.push({ label: labels[i]!, data, mediaType, ...size });
   }
 
   const store = getStore();
@@ -56,17 +66,20 @@ export async function POST(req: Request) {
   if (!e.drafting) return fail("AI drafting isn't part of your plan.", 403);
   const used = await store.countRecentEventsForUser("figure_picked", user.id, DRAFT_WINDOW_HOURS);
   if (used >= e.draftsPer30Days + SPARE_PICKS) return fail("No more figure picks until a draft frees up.", 429);
-  // Counted before the call, so failed attempts count too.
-  await store.logEvent("figure_picked", user.id, { pages: images.length });
+  // A failed pick isn't counted as a pick (below), so the day's limit on failures is what stops one that keeps failing.
+  if (await tooManyFailures("figure_pick", { userId: user.id })) return fail(TOO_MANY_FAILURES, 429);
 
   let result;
   try {
     result = await pickFigure(images);
   } catch (err) {
-    // Already bounded: picks are counted before the call (figure_picked above).
+    // Recorded with its reason and tokens, and never any text (an AIFailure's message has none).
     await recordAIFailure("figure_pick", { userId: user.id }, err);
-    return fail("We couldn't pick a figure just now.", 502);
+    // Outside production the reason is on the answer too, so the eval can say why a real call failed (never shown to people).
+    return fail(process.env.NODE_ENV === "production" ? "We couldn't pick a figure just now." : `We couldn't pick a figure just now. (${(err as Error).message.slice(0, 300)})`, 502);
   }
+  // Counted once the AI answered, so a pick that failed doesn't spend the person's allowance.
+  await store.logEvent("figure_picked", user.id, { pages: images.length });
   // Its own step, so picking figures is costed apart from drafting. ai_call_logs only accepts
   // 'figure_pick' once supabase/migrations/20261124000000_figure_pick.sql is applied; until then
   // the log fails and is reported, and the person still gets their figure.
@@ -82,5 +95,18 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error("figure pick log failed", (err as Error).message);
   }
-  return NextResponse.json({ pick: result.pick });
+  const debug =
+    process.env.NODE_ENV === "production"
+      ? {}
+      : {
+          debug: {
+            model: result.model,
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+            costUsd: result.costUsd,
+            raw: result.raw,
+            sizes: images.map((im) => ({ width: im.width, height: im.height })),
+          },
+        };
+  return NextResponse.json({ pick: result.pick, ...debug });
 }

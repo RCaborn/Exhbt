@@ -209,6 +209,8 @@
     --xp-ground: var(--color-surface);
     --xp-ink: var(--color-ink);
     --xp-muted: var(--color-graphite);
+    /* Issues on the editing page (decision 0026): the app's own error colour outside a look. */
+    --xp-error: var(--color-error);
     --xp-rule: var(--color-line);
     --xp-rule-strong: var(--color-ink);
     --xp-card: var(--color-mist);
@@ -264,6 +266,7 @@
     --xp-ink: var(--pf-ink);
     --xp-heading: var(--pf-heading);
     --xp-muted: var(--pf-soft);
+    --xp-error: var(--pf-error);
     --xp-rule: var(--pf-line);
     --xp-rule-strong: var(--pf-rule);
     --xp-card: var(--pf-well);
@@ -547,6 +550,21 @@
   }
   .xp-section {
     margin-top: 2.75rem;
+  }
+  /* The editing page (decision 0026) draws each part of a stack in a frame of its own, so a part
+     can't carry the classes the page gives it for following another (stackItemClass in
+     components/portfolio/layout-rows.ts). The stack's wrapper takes one of these instead, for the
+     same place: research's method below the aim, the limitations below the conclusion with the
+     hairline above. Only the editing page uses them. */
+  .xp-stack-edit-method > * + * {
+    margin-top: 1.5rem;
+  }
+  .xp-stack-edit-closing > * + * {
+    margin-top: 1.25rem;
+  }
+  .xp-stack-edit-closing > * + * :where([data-part]) {
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--xp-rule);
   }
 
   /* Gallery and research pages (decision 0024). Only --xp-* variables, so every look applies. */
@@ -863,6 +881,16 @@
   .xp-section {
     margin-top: 0.85rem;
   }
+  /* The editing page's stacks, as print:mt-3 and print:mt-2 print:pt-2 draw them on the page. */
+  .xp-stack-edit-method > * + * {
+    margin-top: 0.75rem;
+  }
+  .xp-stack-edit-closing > * + * {
+    margin-top: 0.5rem;
+  }
+  .xp-stack-edit-closing > * + * :where([data-part]) {
+    padding-top: 0.5rem;
+  }
   /* Gallery and research (decision 0024): the lead image and the grid's rows are short, so a full
      gallery (a lead and seven more) still fits one page; the enlarge dialog and its chips never print. */
   .xp-lead {
@@ -898,6 +926,86 @@
   [data-format="gallery"] .xp-section,
   [data-format="research"] .xp-section {
     margin-top: 0.4rem;
+  }
+  /* The four layouts of decision 0028, in the same manner: a smaller title and context line and
+     tighter gaps between the parts, so each fits one A4 page. */
+  [data-format="build"] .xp-title,
+  [data-format="essay"] .xp-title,
+  [data-format="before-after"] .xp-title,
+  [data-format="event"] .xp-title {
+    font-size: 1.6rem;
+  }
+  [data-format="build"] .xp-context,
+  [data-format="essay"] .xp-context,
+  [data-format="before-after"] .xp-context,
+  [data-format="event"] .xp-context {
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+  [data-format="build"] .xp-section,
+  [data-format="essay"] .xp-section,
+  [data-format="before-after"] .xp-section,
+  [data-format="event"] .xp-section {
+    margin-top: 0.4rem;
+  }
+  /* Print give-way for the layouts that carry a graph, a flow and pictures at once (decision 0028):
+     Build, Before and after, and Event. Print only, so the screen is unchanged; every picture keeps
+     its whole shape (contain, never cropped) and nothing is hidden, they only take less paper. */
+  [data-format="build"] .xp-aside,
+  [data-format="before-after"] .xp-aside,
+  [data-format="event"] .xp-aside {
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  /* The key-result graph: a tighter frame, a closer title and shorter gaps between bars. */
+  [data-format="build"] [data-part="graph"],
+  [data-format="before-after"] [data-part="graph"],
+  [data-format="event"] [data-part="graph"] {
+    padding: 0.5rem 0.65rem;
+  }
+  [data-format="build"] [data-part="graph"] [role="img"],
+  [data-format="before-after"] [data-part="graph"] [role="img"],
+  [data-format="event"] [data-part="graph"] [role="img"] {
+    margin-top: 0.4rem;
+  }
+  [data-format="build"] [data-part="graph"] .space-y-2\.5 > :not(:last-child),
+  [data-format="before-after"] [data-part="graph"] .space-y-2\.5 > :not(:last-child),
+  [data-format="event"] [data-part="graph"] .space-y-2\.5 > :not(:last-child) {
+    margin-bottom: 0.3rem;
+  }
+  /* A lead picture (Build's screenshot, Event's poster) is whole and in its own shape; its box and
+     caption sit closer to it, and Event's poster, the tallest picture, is a little taller than the
+     gallery's 46mm so it stays readable. */
+  [data-format="build"] .xp-lead + figcaption,
+  [data-format="event"] .xp-lead + figcaption {
+    margin-top: 0.25rem;
+  }
+  [data-format="build"] .xp-figure:has(> .xp-lead),
+  [data-format="event"] .xp-figure:has(> .xp-lead) {
+    padding: 0.5rem;
+  }
+  /* Event: the grid's rows are lower, "What happened" is spaced closer, and the quote and the
+     reflection are set a step smaller. */
+  [data-format="event"] .xp-lead {
+    max-height: 52mm;
+  }
+  [data-format="event"] .xp-grid {
+    --row: 17mm;
+  }
+  [data-format="event"] [data-part="happened"] > * + * {
+    margin-top: 0.3rem;
+  }
+  [data-format="event"] [data-part="reflection"] p {
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+  [data-format="event"] .xp-quote {
+    font-size: 1.1rem;
+  }
+  /* The rem is a step smaller on paper for these, as Mono's is (above): each carries a picture, a
+     graph and the closing parts together, the fullest of the four. */
+  html:has([data-format="build"], [data-format="before-after"], [data-format="event"]):not(:has([data-look="mono"])) {
+    font-size: 11.5px;
   }
   .xp-zoom-chip,
   .xp-zoom-dialog {

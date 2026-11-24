@@ -1,8 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { slugify, uniqueSlug, SLUG_MAX } from "../lib/exhbt/slug";
 import { docToRuns, runsToDoc } from "../lib/exhbt/richtext-tiptap";
 import { LIMITS } from "../lib/exhbt/blocks";
+import { previewRegion, signInAs, startFromScratch, waitForSave } from "./editor";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -63,27 +64,6 @@ test.describe("rich text and Tiptap JSON", () => {
   });
 });
 
-/** Makes a dev user with a username on a plan, signs in, and opens /exhbts. */
-async function signInAs(page: Page, username: string, plan: "free" | "premium") {
-  await page.goto(`/dev/portfolio?username=${username}&plan=${plan}&count=0`);
-  await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
-  await expect(page.getByRole("heading", { level: 1, name: "Your exhbts" })).toBeVisible();
-}
-
-async function startFromScratch(page: Page) {
-  await page.getByRole("button", { name: "Start from scratch" }).click();
-  await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
-  await expect(page.locator("[data-ready=true]")).toBeAttached();
-  // Tiptap loads in its own chunk after the page.
-  await expect(page.getByRole("textbox", { name: "Context", exact: true })).toBeVisible();
-}
-
-/** Waits for the autosave after the last change to land. */
-async function waitForSave(page: Page) {
-  await expect(page.getByText("Saving…")).toBeVisible();
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
-}
-
 const TITLE = "Cutting queue times at the student union cafe";
 const SLUG = "cutting-queue-times-at-the-student-union-cafe";
 
@@ -115,7 +95,7 @@ test.describe("the exhbt editor", () => {
     await page.locator("#skill-new").press("Enter");
     await expect(page.getByRole("list", { name: "Skills", exact: true }).getByText("Process mapping")).toBeVisible();
     // The preview redraws as you type.
-    await expect(page.getByRole("region", { name: "Preview" }).getByText("Moved drinks to a second till")).toBeVisible();
+    await expect(previewRegion(page).getByText("Moved drinks to a second till")).toBeVisible();
     await waitForSave(page);
 
     // Autosave reached the server.

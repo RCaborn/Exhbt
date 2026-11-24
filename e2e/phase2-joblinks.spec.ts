@@ -123,8 +123,8 @@ test.describe("reading a listing", () => {
 /** A dev user with a username, published exhbts and a plan, signed in on /job-links. */
 async function signInAs(page: Page, username: string, plan: "premium" | "max", count = 2) {
   await page.goto(`/dev/portfolio?username=${username}&plan=${plan}&count=${count}`);
-  await page.goto(`/auth/dev?email=${username}@example.com&next=/job-links`);
-  await expect(page.getByRole("heading", { level: 1, name: "Job links" })).toBeVisible();
+  await page.goto(`/auth/dev?email=${username}@example.com&next=/portfolio`);
+  await expect(page.getByRole("heading", { level: 2, name: "Job links" })).toBeVisible();
 }
 
 async function openNewForm(page: Page) {
@@ -136,6 +136,7 @@ const picks = (page: Page) => page.getByRole("list", { name: "Picks, in order" }
 
 test.describe("job link pages", () => {
   test("Max: paste a description, check the picks, reorder, edit the intro, switch the address, turn off and on, delete", async ({ page }) => {
+    test.slow(); // one long scenario; each page compiles on first visit in the dev server
     await signInAs(page, "jlmax", "max");
     let { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
     expect(violations.map((v) => `list ${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
@@ -213,7 +214,7 @@ test.describe("job link pages", () => {
     // Delete, after a confirmation.
     await page.getByRole("button", { name: "Delete the link for Acme · Graduate Data Analyst" }).click();
     await page.getByRole("button", { name: "Yes, delete" }).click();
-    await page.waitForURL(/\/job-links$/);
+    await page.waitForURL(/\/portfolio/);
     await expect(page.getByRole("list", { name: /Your job links/ })).toHaveCount(0);
   });
 
@@ -334,7 +335,7 @@ test.describe("the public job page", () => {
     await page.goto(editor);
     await page.getByRole("button", { name: "Delete the link for Acme · Graduate Data Analyst" }).click();
     await page.getByRole("button", { name: "Yes, delete" }).click();
-    await page.waitForURL(/\/job-links$/);
+    await page.waitForURL(/\/portfolio/);
     expect((await page.goto(`${origin}/acme`))?.status()).toBe(404);
   });
 

@@ -6,6 +6,7 @@ import { unverifiedOf } from "@/components/editor/model";
 import { canView } from "@/lib/access";
 import { getCurrentUser } from "@/lib/auth";
 import { emptyDoc, ExhbtDocSchema, LIMITS, text, validateForPublish, type ExhbtDoc } from "@/lib/exhbt/blocks";
+import { formatOf, mayCarryFormat, OFFERED_FORMATS } from "@/lib/exhbt/formats";
 import { slugify, uniqueSlug } from "@/lib/exhbt/slug";
 import { canCreateExhbt, canPublish, getPlan } from "@/lib/plan";
 import { takenSlugs } from "@/lib/slugs";
@@ -34,6 +35,19 @@ function readDoc(raw: unknown): ExhbtDoc | null {
   return Array.isArray(unverified) && unverified.every((u) => typeof u === "string")
     ? ({ ...parsed.data, unverified: unverified.slice(0, 50) } as ExhbtDoc)
     : parsed.data;
+}
+
+const LAYOUT_NOT_OFFERED = "That layout isn't available yet. Choose another layout and try again.";
+
+/**
+ * Whether the doc's layout may be stored for this exhbt: an offered one, or the one it already has.
+ * The page only offers three, but the schema reads all seven, so the server holds the line (release 2).
+ */
+async function layoutAllowed(id: string, userId: string, doc: ExhbtDoc): Promise<boolean> {
+  const f = formatOf(doc);
+  if (OFFERED_FORMATS.includes(f)) return true;
+  const stored = await getStore().getExhbt(id);
+  return !!stored && stored.userId === userId && mayCarryFormat(f, formatOf(stored.doc));
 }
 
 /** "Start from scratch" on the list: an empty exhbt, if the plan has room. */
@@ -138,6 +152,7 @@ export async function saveDraft(id: string, raw: unknown): Promise<SaveResult> {
   const user = await signedIn();
   const doc = readDoc(raw);
   if (!doc) return { ok: false, error: "This couldn't be saved. Reload the page and try again." };
+  if (!(await layoutAllowed(id, user.id, doc))) return { ok: false, error: LAYOUT_NOT_OFFERED };
   const ok = await getStore().saveExhbtDraft(id, user.id, doc);
   return ok ? { ok: true, savedAt: new Date().toISOString() } : { ok: false, error: "This exhbt isn't yours to edit." };
 }
@@ -153,6 +168,7 @@ export async function publishExhbt(id: string, raw: unknown, confirmed: boolean)
   const store = getStore();
   const doc = readDoc(raw);
   if (!doc) return { ok: false, reasons: ["This couldn't be saved. Reload the page and try again."] };
+  if (!(await layoutAllowed(id, user.id, doc))) return { ok: false, reasons: [LAYOUT_NOT_OFFERED] };
   if (!(await store.saveExhbtDraft(id, user.id, doc))) return { ok: false, reasons: ["This exhbt isn't yours to publish."] };
 
   const [plan, all, profile] = await Promise.all([getPlan(user.id), store.listExhbts(user.id), store.getPortfolioProfile(user.id)]);

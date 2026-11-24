@@ -87,7 +87,7 @@ export type Overview = {
   }>;
   ideas: Section<{ generated: number; swaps: number; saved: number; failures: number; roadmapsFailed: number | null }>;
   /**
-   * Failed AI calls, one row per feature (decision 0025): how many, why (cut off, refused, wrong shape,
+   * Failed AI calls, one row per feature (decision 0029): how many, why (cut off, refused, wrong shape,
    * service error, empty) and the tokens they spent, which the call log (successes only) leaves out.
    */
   aiFailures: Section<{

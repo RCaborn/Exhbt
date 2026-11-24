@@ -1,6 +1,7 @@
 Status: accepted
 Date: 17 Nov 2026
 Amends: 0015 (two new section kinds, used by research only; caps per layout; in a gallery or research page the page sets where each kind goes), 0017 (where a picked figure lands), 0022 (the page now has three layouts; the case study is the page 0022 describes, unchanged)
+Amended by: 0025 (each layout says what it takes from the person's work: a figure, pictures or nothing; the editor's line after a draft now gives the layout, why it was chosen and what came of looking for a figure, for a case study too), 0027 (every layout is drawn in the doc's own order; picking a layout arranges the sections in its usual order, and Undo, not switching back, restores the order you had; the flowchart can be removed in a gallery), 0028 (four more layouts: Build, Essay, Before and after, Event or performance; "My part" is built as "My role")
 
 # Exhbt layouts: case study, gallery and research
 

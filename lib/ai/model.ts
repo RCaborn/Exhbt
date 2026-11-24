@@ -20,7 +20,7 @@ export function anthropicApiKey(): string | undefined {
 /**
  * The highest max_tokens a non-streaming call can ask for with SDK 1.6.0: above about 21,333 the SDK
  * refuses with "Streaming is required" (it expects such a call to take over 10 minutes). Every AI
- * call here is non-streaming, so no cap may go past this. The caps beside each call (decision 0025)
+ * call here is non-streaming, so no cap may go past this. The caps beside each call (decision 0029)
  * are at least three times the largest answer measured, up to this ceiling; the draft's 16,000 is
  * about twice its largest, because three times would pass it.
  */

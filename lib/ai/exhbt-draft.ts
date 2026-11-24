@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { formatLimits, LIMITS, SCHEMA_VERSION, text, withHighlight, words, type ExhbtDoc, type Section } from "@/lib/exhbt/blocks";
 import { isFormat } from "@/lib/exhbt/formats";
+import { checkedReason, type LayoutReason } from "@/lib/exhbt/drafted";
 import { hasData, type Chart } from "@/lib/exhbt/charts";
 import { DraftSchema, repairDraft, toChart, type Draft, type DraftChart } from "./draft-answer";
 import { referencesFrom, squash } from "@/lib/exhbt/references";
@@ -71,6 +72,7 @@ Layout (the "format" field):
 - "gallery" only when the material is mostly visual work (a campaign, posters, a brand, a design, drawings, a building, a film, a product) and what came of it is shown by the work itself. Many pictures and little text in the upload facts point that way.
 - "case-study" otherwise, and whenever you are unsure.
 - If the person's notes name a layout, use that one. The subject of the course alone is not evidence of a layout.
+- formatReason: why you chose the layout, as one of these signals, and only one that is true of the material. "notes": the person's notes name the layout. "aim-results": research, and the material states an aim and reports results. "hypothesis-results": research, and the material states a hypothesis and reports results. "study": research, an experiment or a study with a method and results, with no aim or hypothesis stated. "visual-work": a gallery, because the work is shown by its pictures. "mostly-pictures": a gallery, because the upload facts say most of the upload is pictures. "question-findings": a case study, because the material sets out a question and what was found. "default": a case study for any other reason, or because you are unsure.
 - For a gallery: gap is the brief (what was asked, and for whom), at most ${G.gapWords} words, with gapHighlight the ask; findings are 0 to ${G.findings.max} bullets of what happened, each at most ${G.findings.wordsEach} words, only if the material says what happened, otherwise an empty list; at most ${G.sections.graph} graph. aim, conclusion and references stay empty. You never see the pictures: do not describe them.
 - For research: gap is the background and the gap, at most ${R.gapWords} words; findings are the results, ${R.findings.min} to ${R.findings.max} bullets, each at most ${R.findings.wordsEach} words; next holds the limitations the material itself states and what the person would do next, at most ${R.reflection.words} words. Never invent a limitation: leave it empty if the material states none.
 - Fields that belong to another layout stay empty.`;
@@ -89,6 +91,8 @@ export type DraftInput = {
 export type DraftNumber = { value: string; sourceQuote: string };
 export type DraftResult = {
   doc: ExhbtDoc;
+  /** Why the layout was chosen: the model's signal, kept only if the draft, the notes and the upload counts bear it out. */
+  formatReason: LayoutReason;
   numbers: DraftNumber[];
   model: string;
   inputTokens: number;
@@ -109,7 +113,7 @@ export function draftRequest(input: DraftInput) {
   return {
     model: AI_MODEL,
     // The model thinks before it answers: roughly 1,400 to 4,900 tokens on the eval fixtures,
-    // and up to 5,800 tokens in all. At 4,000 most drafts were cut off mid-answer (decision 0025).
+    // and up to 5,800 tokens in all. At 4,000 most drafts were cut off mid-answer (decision 0029).
     max_tokens: 16000,
     output_config: DRAFT_OUTPUT_CONFIG,
     system: SYSTEM,
@@ -144,8 +148,10 @@ export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
     schema: DraftSchema,
     repair: repairDraft,
   });
+  const doc = toDoc(draft, materialText(input));
   return {
-    doc: toDoc(draft, materialText(input)),
+    doc,
+    formatReason: checkedReason(doc, draft.formatReason, input),
     numbers: draft.numbers,
     model,
     inputTokens,
@@ -289,14 +295,11 @@ function mockDraft(input: DraftInput): DraftResult {
           },
         ]
       : [];
-  return {
-    model: "mock",
-    inputTokens: 0,
-    outputTokens: 0,
-    costUsd: 0,
-    numbers,
-    doc: toDoc({
+  // The stand-in's reason for its layout: the notes when they named it, else the signal its own draft bears out.
+  const formatReason: LayoutReason = named ? "notes" : format === "research" ? "aim-results" : "question-findings";
+  const doc = toDoc({
       format,
+      formatReason,
       aim: format === "research" ? "Placeholder aim: what the material set out to test." : "",
       aimIsHypothesis: false,
       conclusion: format === "research" ? "Placeholder conclusion." : "",
@@ -318,6 +321,6 @@ function mockDraft(input: DraftInput): DraftResult {
       quote: feedback ?? { text: "", name: "", role: "" },
       next,
       numbers,
-    }, materialText(input)),
-  };
+    }, materialText(input));
+  return { model: "mock", inputTokens: 0, outputTokens: 0, costUsd: 0, numbers, doc, formatReason: checkedReason(doc, formatReason, input) };
 }

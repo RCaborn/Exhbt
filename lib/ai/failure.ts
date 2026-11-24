@@ -1,5 +1,5 @@
 /**
- * How an AI call failed, as the app records it (decision 0025). Pure, so pages and tests can use
+ * How an AI call failed, as the app records it (decision 0029). Pure, so pages and tests can use
  * it. Thrown by structuredCall (./call.ts) and transcribe (./transcribe.ts); each caller logs it as
  * a failure event (failureProps) and the admin panel counts them.
  */

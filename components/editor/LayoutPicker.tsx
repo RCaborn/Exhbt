@@ -1,10 +1,11 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
-import { FORMAT_RULES, FORMATS, formatOf, withFormat, type Format } from "@/lib/exhbt/formats";
+import { figureSentence, layoutSentence, type FigureNews, type LayoutReason } from "@/lib/exhbt/drafted";
+import { FORMAT_RULES, formatOf, OFFERED_FORMATS, withFormat, type Format } from "@/lib/exhbt/formats";
 import { layoutNotes } from "@/lib/exhbt/sections";
 
 /**
@@ -12,9 +13,12 @@ import { layoutNotes } from "@/lib/exhbt/sections";
  * Three native radios in a vertical list (not a card grid), each with a small sketch and one line
  * on what it suits. Switching takes effect at once, changes `format` and nothing else, and says
  * what was kept but isn't shown and what is over the layout's caps, with an Undo.
+ *
+ * Right after a draft it also says, once and quietly, which layout the AI chose and why, and
+ * whether a figure was taken from the person's files (decision 0025, lib/exhbt/drafted.ts).
  */
 
-const SKETCHES: Record<Format, React.ReactNode> = {
+const SKETCHES: Partial<Record<Format, React.ReactNode>> = {
   // A title bar, a row of three boxes, two columns.
   "case-study": (
     <>
@@ -47,9 +51,16 @@ const SKETCHES: Record<Format, React.ReactNode> = {
   ),
 };
 
-export function LayoutPicker({ doc, setDoc, draftedAs }: { doc: ExhbtDoc; setDoc: React.Dispatch<React.SetStateAction<ExhbtDoc>>; /** The layout the AI draft chose, for a one-off line right after drafting. */ draftedAs?: Format }) {
+/**
+ * What the draft page passed on, said once right after drafting (decision 0025): the layout the AI
+ * chose, why (a fixed signal), and what came of looking for a figure when none went on.
+ */
+export type Drafted = { format: Format; reason?: LayoutReason; figure?: FigureNews };
+
+export function LayoutPicker({ doc, setDoc, drafted }: { doc: ExhbtDoc; setDoc: React.Dispatch<React.SetStateAction<ExhbtDoc>>; drafted?: Drafted }) {
   const f = formatOf(doc);
   const name = useId();
+  const group = useRef<HTMLDivElement>(null);
   const [said, setSaid] = useState<{ to: Format; from: Format | null } | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
@@ -67,7 +78,10 @@ export function LayoutPicker({ doc, setDoc, draftedAs }: { doc: ExhbtDoc; setDoc
 
   const notes = layoutNotes(doc);
   const showSaid = said && said.to === f;
-  const showDrafted = draftedAs && draftedAs !== "case-study" && draftedAs === f && !dismissed && !said;
+  // The one line after a draft: the layout and why (until it is switched), then the figure.
+  const layoutLine = drafted && drafted.format === f && !said ? layoutSentence(f, drafted.reason) : null;
+  const figureLine = drafted ? figureSentence(doc, drafted.figure) : null;
+  const showDrafted = !dismissed && Boolean(layoutLine || figureLine);
 
   return (
     <section id="card-layout" aria-labelledby="card-layout-h" className="rounded-[20px] border border-line bg-surface p-5 sm:p-6">
@@ -76,14 +90,14 @@ export function LayoutPicker({ doc, setDoc, draftedAs }: { doc: ExhbtDoc; setDoc
           Layout
         </legend>
         <p className="hint mt-1">How the page reads. Switching never deletes anything.</p>
-        <div role="radiogroup" aria-label="Layout" className="mt-4 space-y-2">
-          {FORMATS.map((k) => {
+        <div ref={group} role="radiogroup" aria-label="Layout" className="mt-4 space-y-2">
+          {(OFFERED_FORMATS.includes(f) ? OFFERED_FORMATS : [...OFFERED_FORMATS, f]).map((k) => {
             const hint = `${name}-${k}`;
             return (
               <label key={k} className="flex cursor-pointer items-center gap-3 rounded-[12px] border border-line p-3 has-[:checked]:border-ink has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink">
                 <input type="radio" name={name} value={k} checked={f === k} onChange={() => choose(k)} aria-describedby={hint} className="size-4 shrink-0 accent-jade" />
                 <svg aria-hidden width="56" height="40" viewBox="0 0 56 40" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0 text-graphite">
-                  {SKETCHES[k]}
+                  {SKETCHES[k] ?? SKETCHES["case-study"]}
                 </svg>
                 <span className="min-w-0">
                   <span className="block font-semibold">{FORMAT_RULES[k].name}</span>
@@ -116,8 +130,24 @@ export function LayoutPicker({ doc, setDoc, draftedAs }: { doc: ExhbtDoc; setDoc
           </>
         )}
         {showDrafted && (
-          <p className="flex flex-wrap items-center gap-2 text-graphite">
-            <span>Drafted as a {FORMAT_RULES[f].name.toLowerCase()}. Change it any time; nothing is lost.</span>
+          <p data-drafted className="flex flex-wrap items-center gap-x-2 gap-y-1 text-graphite">
+            {layoutLine && (
+              <>
+                <span>{layoutLine}</span>
+                <a
+                  href="#card-layout-h"
+                  className="link"
+                  onClick={(e) => {
+                    // The choices are just above: put the cursor on the one in use.
+                    e.preventDefault();
+                    group.current?.querySelector<HTMLInputElement>("input:checked")?.focus();
+                  }}
+                >
+                  Change layout
+                </a>
+              </>
+            )}
+            {figureLine && <span data-drafted-figure>{figureLine}</span>}
             <Button size="sm" label="Dismiss this note" onClick={() => setDismissed(true)}>
               <X aria-hidden size={14} strokeWidth={2.25} />
             </Button>

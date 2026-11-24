@@ -30,6 +30,8 @@ const GRAPHITE = "#3e4044";
 const FAINT = "#686b71";
 const LINE = "#e5e6e8";
 const ON_INK = "#c9cbcf";
+/** The app's own error colour (ERROR in themes/exhbt/exhbtTheme.ts): issues on the editing page, in every look where it reads (decision 0026). */
+const ERROR = "#c92324";
 
 const hex2 = (n: number) => Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, "0");
 const rgbOf = (hex: string) => [0, 1, 2].map((i) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16)) as [number, number, number];
@@ -132,6 +134,11 @@ export type Palette = {
   bandSoft: string;
   bandAccent: string;
   bandEdge: string;
+  /**
+   * Issues on the editing page: "Needs a description", an invalid field's outline, words over the cap (decision 0026).
+   * The app's own error colour wherever it reads at 4.5:1 on the ground, the cards and the well; a look where it doesn't has its own.
+   */
+  error: string;
   /** Graphs: one hue in two shades. Strong is the highlighted series and "after"; soft is "before". */
   chartStrong: string;
   chartSoft: string;
@@ -279,6 +286,7 @@ function lightPalette(p: Partial<Palette> & { deep: string }): Palette {
     bandSoft: GRAPHITE,
     bandAccent: deep,
     bandEdge: INK,
+    error: ERROR,
     chartStrong: deep,
     chartSoft: soft,
     chartRamp: ramp(deep, soft),
@@ -328,6 +336,7 @@ const EXHBT: Base = {
     bandSoft: GRAPHITE,
     bandAccent: JADE,
     bandEdge: WASH,
+    error: ERROR,
     // The brand's own pair and ramp (components/charts/series.ts, decision 0011).
     chartStrong: JADE,
     chartSoft: MINT,
@@ -469,6 +478,8 @@ const NIGHT: Base = {
     bandSoft: ON_INK,
     bandAccent: MINT,
     bandEdge: N_LINE,
+    // The app's red is under 4.5:1 on the dark ground, cards and well: the same hue and saturation, lighter (5.30, 4.86, 4.51; open question 10).
+    error: "#e25958",
     // On a dark ground the highlighted series is the light shade.
     chartStrong: MINT,
     chartSoft: "#2a8a6d",
@@ -605,6 +616,7 @@ function bloom(ground: string, swatch: string, deep: string): Palette {
     bandSoft: GRAPHITE,
     bandAccent: deep,
     bandEdge: WHITE,
+    error: ERROR,
     chartStrong: deep,
     chartSoft: soft,
     chartRamp: ramp(deep, soft),
@@ -810,6 +822,10 @@ export function contrastPairs(t: PortfolioTheme): { label: string; fg: string; b
     graphic("the two graph shades apart", p.chartStrong, p.chartSoft, 2.5),
     graphic("the ramp's lightest step", p.chartRamp[3], p.figure, 2),
     text("a highlighted row or tile in a graph", p.ink, chartWash(p)),
+    // Issues on the editing page (decision 0026): the words "Needs a description", over-cap counts and the rest.
+    text("error text on the ground", p.error, p.ground),
+    text("error text on cards", p.error, p.card),
+    text("error text on the well", p.error, p.well),
   ];
 }
 

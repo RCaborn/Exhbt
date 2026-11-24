@@ -1,7 +1,24 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { Plan } from "@/lib/entitlements";
 import { normaliseDoc, type ExhbtDoc } from "@/lib/exhbt/blocks";
-import { fullDoc, GALLERY_IMAGES, galleryDoc, openBankingDoc, RESEARCH_IMAGE, researchDoc, sampleDocs, sampleSeeds } from "@/lib/exhbt/sample";
+import {
+  BEFORE_AFTER_IMAGES,
+  beforeAfterDoc,
+  BUILD_IMAGES,
+  buildDoc,
+  ESSAY_IMAGE,
+  essayDoc,
+  EVENT_IMAGES,
+  eventDoc,
+  fullDoc,
+  GALLERY_IMAGES,
+  galleryDoc,
+  openBankingDoc,
+  RESEARCH_IMAGE,
+  researchDoc,
+  sampleDocs,
+  sampleSeeds,
+} from "@/lib/exhbt/sample";
 import { devBlobs } from "@/lib/files";
 import { usernameProblem } from "@/lib/hosts";
 import { normaliseLayout } from "@/lib/portfolio-layout";
@@ -35,6 +52,10 @@ const MAX_COUNT = sampleSeeds.length + MORE_TITLES.length;
  * the research one at /p/<username>/walk-and-recall (decision 0024); `with=formats` both. `with` is a
  * comma list (`with=open-banking,formats`). Their pictures are flat SVG drawings stored as the
  * user's own files, so they go through the same ownership checks as an upload.
+ * The four layouts of decision 0028 (lib/exhbt/sample.ts): `with=build` at /p/<username>/shift-swap,
+ * `with=essay` at /p/<username>/reform-act, `with=before-after` at /p/<username>/cafe-checkout and
+ * `with=event` at /p/<username>/the-crucible; `with=layouts` all four. Use `plan=max` and `count=0`
+ * with them, or the plan's cap on published exhbts can hide one.
  */
 export async function GET(req: NextRequest) {
   if (isSupabaseConfigured() || process.env.NODE_ENV === "production") return new NextResponse("Not found", { status: 404 });
@@ -69,6 +90,8 @@ export async function GET(req: NextRequest) {
     photoFileId: q.get("photo") === "1" ? await placeholderPhoto(userId) : null,
   });
   for (const e of await store.listExhbts(userId)) await store.deleteExhbt(e.id, userId);
+  // And no job links left from an earlier visit (a test that failed part-way, then retried, would trip over them).
+  for (const l of await store.listJobLinks(userId)) await store.deleteJobLink(l.id, userId);
   // A fresh arrangement too: the default layout, nothing hidden or featured.
   const layout = normaliseLayout(
     rich
@@ -129,6 +152,31 @@ export async function GET(req: NextRequest) {
     const fileId = await placeholderPicture(userId, RESEARCH_IMAGE.w, RESEARCH_IMAGE.h, "Walking route", 1);
     const id = await store.createExhbt(userId, researchDoc(fileId));
     await store.publishExhbt(id, userId, "walk-and-recall");
+  }
+  // The four layouts of decision 0028, each with flat placeholder pictures stored as the user's own files.
+  const all = withs.has("layouts");
+  if (all || withs.has("build")) {
+    const ids: string[] = [];
+    for (const [i, im] of BUILD_IMAGES.entries()) ids.push(await placeholderPicture(userId, im.w, im.h, `Screenshot ${i + 1}`, i));
+    const id = await store.createExhbt(userId, buildDoc(ids));
+    await store.publishExhbt(id, userId, "shift-swap");
+  }
+  if (all || withs.has("essay")) {
+    const fileId = await placeholderPicture(userId, ESSAY_IMAGE.w, ESSAY_IMAGE.h, "Reform meeting notice", 1);
+    const id = await store.createExhbt(userId, essayDoc(fileId));
+    await store.publishExhbt(id, userId, "reform-act");
+  }
+  if (all || withs.has("before-after")) {
+    const ids: string[] = [];
+    for (const [i, im] of BEFORE_AFTER_IMAGES.entries()) ids.push(await placeholderPicture(userId, im.w, im.h, `${im.stage === "before" ? "Before" : "After"} ${Math.floor(i / 2) + 1}`, i));
+    const id = await store.createExhbt(userId, beforeAfterDoc(ids));
+    await store.publishExhbt(id, userId, "cafe-checkout");
+  }
+  if (all || withs.has("event")) {
+    const ids: string[] = [];
+    for (const [i, im] of EVENT_IMAGES.entries()) ids.push(await placeholderPicture(userId, im.w, im.h, i === 0 ? "Poster" : `Photo ${i}`, i));
+    const id = await store.createExhbt(userId, eventDoc(ids));
+    await store.publishExhbt(id, userId, "the-crucible");
   }
   return NextResponse.redirect(new URL(`/p/${username}`, req.url));
 }

@@ -245,7 +245,7 @@ export type EventName =
   | "referral_recorded"
   | "referral_credited"
   | "page_view"
-  // Failed AI calls (lib/ai-failures.ts, decision 0025): feature, reason, status and tokens, never any text.
+  // Failed AI calls (lib/ai-failures.ts, decision 0029): feature, reason, status and tokens, never any text.
   | "exhbt_draft_failed"
   | "exhbt_rewrite_failed"
   | "figure_pick_failed"

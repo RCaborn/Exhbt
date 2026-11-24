@@ -3,7 +3,7 @@ import { AIFailure, failureProps, type AIFeature } from "@/lib/ai/failure";
 import { getStore, type EventName } from "@/lib/store";
 
 /**
- * Failed AI calls, recorded and limited (decision 0025). Every caller of an AI feature logs a
+ * Failed AI calls, recorded and limited (decision 0029). Every caller of an AI feature logs a
  * failure event when the call fails: the feature, the reason, the HTTP status and the tokens spent,
  * never text from the person's files or the model's answer. The admin panel counts them.
  *

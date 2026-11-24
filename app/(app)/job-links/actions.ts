@@ -196,5 +196,5 @@ export async function deleteJobLink(id: string) {
   const user = await signedIn("/job-links");
   await getStore().deleteJobLink(id, user.id);
   revalidatePath("/job-links");
-  redirect("/job-links");
+  redirect("/portfolio#job-links");
 }

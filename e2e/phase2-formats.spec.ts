@@ -16,13 +16,14 @@ import {
   type Section,
 } from "../lib/exhbt/blocks";
 import { applyBlock } from "../lib/exhbt/draft-blocks";
-import { formatOf, FORMATS, hiddenSections, shownSections, withFormat } from "../lib/exhbt/formats";
+import { formatOf, hiddenSections, OFFERED_FORMATS, shownSections, withFormat } from "../lib/exhbt/formats";
 import { fitCaption } from "../lib/figures/rules";
 import { keyFigureOf } from "../lib/portfolio-home";
 import { referencesFrom } from "../lib/exhbt/references";
 import { fullDoc, GALLERY_IMAGES, galleryDoc, libraryDoc, openBankingDoc, researchDoc, sampleDocs, sampleSeeds } from "../lib/exhbt/sample";
 import { firstOfKinds, layoutNotes, leadRatio, imageRatio, sectionLabel, withKeyFigure } from "../lib/exhbt/sections";
 import { unverifiedNumbers } from "../lib/exhbt/verify";
+import { chooseLayout, layoutGroup, pickImages, previewArticle, sectionsArea, signInAs, startEditor, wordsOnBar } from "./editor";
 
 // Exhbt layouts (decision 0024): case study, gallery and research. One optional field, `format`;
 // no migration; a doc without one (or with one this code doesn't know) is a case study.
@@ -92,13 +93,14 @@ test.describe("model: the layout field", () => {
   });
 
   test("a layout this code doesn't know reads as a case study and nothing else is lost", () => {
-    const d = normaliseDoc({ ...research(), format: "build" });
+    // "build" was the example until release 2 made it a layout (decision 0028); any id no release knows will do.
+    const d = normaliseDoc({ ...research(), format: "timeline" });
     expect("format" in d).toBe(false);
     expect(d.sections).toHaveLength(research().sections.length);
     expect(d.title).toBe(research().title);
     const parsed = ExhbtDocSchema.parse({ ...gallery(), format: 42 });
     expect(formatOf(parsed)).toBe("case-study");
-    expect(() => normaliseDoc({ format: "build" })).not.toThrow();
+    expect(() => normaliseDoc({ format: "timeline" })).not.toThrow();
     expect(() => normaliseDoc(null)).not.toThrow();
   });
 
@@ -124,7 +126,7 @@ test.describe("model: the layout field", () => {
       expect(withFormat(there, "case-study")).toEqual(withFormat(doc, "case-study"));
     }
     for (const doc of sampleDocs) expect(withFormat(withFormat(withFormat(doc, "case-study"), "gallery"), "case-study")).toEqual(doc);
-    expect(FORMATS).toEqual(["case-study", "gallery", "research"]);
+    expect(OFFERED_FORMATS).toEqual(["case-study", "gallery", "research"]);
   });
 });
 
@@ -513,30 +515,10 @@ test.describe("Looks and the home page", () => {
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 const png = (name: string) => ({ name, mimeType: "image/png", buffer: PNG });
 
-async function startEditor(page: Page, username: string) {
-  await page.goto(`/dev/portfolio?username=${username}&plan=premium&count=0`);
-  await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
-  await expect(page.getByRole("heading", { level: 1, name: "Your exhbts" })).toBeVisible();
-  await page.getByRole("button", { name: "Start from scratch" }).click();
-  await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
-  await expect(page.locator("[data-ready=true]")).toBeAttached();
-}
-
-const chooseLayout = (page: Page, name: "Case study" | "Gallery" | "Research") => page.getByRole("radio", { name: new RegExp(`^${name}`) }).check();
-const sectionsArea = (page: Page) => page.getByRole("region", { name: "Sections", exact: true });
-const previewArticle = (page: Page) => page.getByRole("region", { name: "Preview" }).locator("article[data-exhbt-page]");
-const wordsOnBar = async (page: Page) => Number((await page.locator("[data-word-bar]").innerText()).match(/^(\d+) words/)?.[1]);
-const images = (page: Page) => page.locator("input[aria-label='Choose an image']");
-/** As in use: the person pressed "Add a section" > "Add an image", so focus is in the sections when the pictures are chosen. */
-async function pick(page: Page, files: Parameters<ReturnType<typeof images>["setInputFiles"]>[0]) {
-  await page.locator("#add-section").focus();
-  await images(page).setInputFiles(files);
-}
-
 test.describe("The layout choice in the editor", () => {
   test("three radios named Layout; the arrow keys pick Gallery, the preview follows, Undo goes back", async ({ page }) => {
     await startEditor(page, `lay${stamp()}`);
-    const group = page.getByRole("radiogroup", { name: "Layout" });
+    const group = layoutGroup(page);
     await expect(group.getByRole("radio")).toHaveCount(3);
     await expect(previewArticle(page)).toHaveAttribute("data-format", "case-study");
     await page.getByRole("radio", { name: /^Case study/ }).focus();
@@ -594,7 +576,7 @@ test.describe("Pictures in the editor", () => {
   test("three at once in a gallery: three cards, the first the lead image, the cursor in the first description", async ({ page }) => {
     await startEditor(page, `gal${stamp()}`);
     await chooseLayout(page, "Gallery");
-    await pick(page, [png("a.png"), png("b.png"), png("c.png")]);
+    await pickImages(page, [png("a.png"), png("b.png"), png("c.png")]);
     const area = sectionsArea(page);
     await expect(area.getByRole("region", { name: "Lead image", exact: true })).toBeVisible();
     await expect(area.getByRole("region", { name: "Image 2", exact: true })).toBeVisible();
@@ -608,7 +590,7 @@ test.describe("Pictures in the editor", () => {
 
   test("a case study with no images takes two of three and says so", async ({ page }) => {
     await startEditor(page, `two${stamp()}`);
-    await pick(page, [png("a.png"), png("b.png"), png("c.png")]);
+    await pickImages(page, [png("a.png"), png("b.png"), png("c.png")]);
     await expect(sectionsArea(page).getByRole("region", { name: /^Image [12]$/ })).toHaveCount(2);
     await expect(page.getByText("Only 2 more fit in this layout. The rest weren't added.")).toBeVisible();
   });
@@ -616,7 +598,7 @@ test.describe("Pictures in the editor", () => {
   test("a file that isn't a picture is named and skipped", async ({ page }) => {
     await startEditor(page, `bad${stamp()}`);
     await chooseLayout(page, "Gallery");
-    await pick(page, [png("good.png"), { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hi") }, png("good2.png")]);
+    await pickImages(page, [png("good.png"), { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hi") }, png("good2.png")]);
     await expect(sectionsArea(page).getByRole("region", { name: /^(Lead image|Image 2)$/ })).toHaveCount(2);
     await expect(page.getByRole("alert").filter({ hasText: "notes.txt: Use a JPEG, PNG, WebP or GIF picture." })).toBeVisible();
   });
@@ -635,7 +617,7 @@ test.describe("Pictures in the editor", () => {
     });
     const buffer = Buffer.from(dataUrl.split(",")[1]!, "base64");
     const sent = page.waitForRequest((r) => r.url().includes("/api/files/upload-url"));
-    await pick(page, { name: "big.png", mimeType: "image/png", buffer });
+    await pickImages(page, { name: "big.png", mimeType: "image/png", buffer });
     const body = (await sent).postDataJSON() as { name: string; mime: string };
     expect(body.name.endsWith(".webp")).toBe(true);
     expect(body.mime).toBe("image/webp");
@@ -647,7 +629,7 @@ test.describe("Pictures in the editor", () => {
   test("Make lead image moves Image 2 to the front, and the preview follows", async ({ page }) => {
     await startEditor(page, `lead${stamp()}`);
     await chooseLayout(page, "Gallery");
-    await pick(page, [png("a.png"), png("b.png"), png("c.png")]);
+    await pickImages(page, [png("a.png"), png("b.png"), png("c.png")]);
     for (const [n, alt] of ["first", "second", "third"].entries()) await page.locator(`#image-${n}-alt`).fill(alt);
     const preview = previewArticle(page).locator("[data-part=lead] img").first();
     await expect(preview).toHaveAttribute("alt", "first");
@@ -662,42 +644,69 @@ test.describe("Pictures in the editor", () => {
 const PLAIN_MATERIAL =
   "We timed lunchtime queues at the union cafe for two weeks, then tried a second till at the busiest hour. The queue fell, and staff said the rush felt calmer.";
 
-async function signedIn(page: Page, username: string) {
-  await page.goto(`/dev/portfolio?username=${username}&plan=max&count=0`);
-  await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
-  await expect(page.getByRole("heading", { level: 1, name: "Your exhbts" })).toBeVisible();
-}
-
 const draft = async (page: Page, data: Record<string, string>) => {
   const res = await page.request.post("/api/exhbts/draft", { data });
   expect(res.status(), await res.text()).toBe(200);
-  return (await res.json()) as { id: string; format: string };
+  return (await res.json()) as { id: string; format: string; formatReason: string };
 };
 
 test.describe("The draft suggests a layout", () => {
-  test("notes can name a gallery: the editor opens on it and says so once", async ({ page }) => {
-    await signedIn(page, `dg${stamp()}`);
+  test("notes can name a gallery: the editor opens on it and says so, with why, once", async ({ page }) => {
+    await signInAs(page, `dg${stamp()}`, "max");
     const d = await draft(page, { text: PLAIN_MATERIAL, notes: "stand-in: layout gallery" });
     expect(d.format).toBe("gallery");
-    await page.goto(`/exhbts/${d.id}/edit?drafted=${d.format}`);
+    // Why: a fixed signal, not the AI's words (decision 0025). The notes named the layout.
+    expect(d.formatReason).toBe("notes");
+    await page.goto(`/exhbts/${d.id}/edit?drafted=${d.format}&why=${d.formatReason}`);
     await expect(page.locator("[data-ready=true]")).toBeAttached();
     await expect(page.getByRole("radio", { name: /^Gallery/ })).toBeChecked();
-    await expect(page.getByText("Drafted as a gallery. Change it any time; nothing is lost.")).toBeVisible();
+    const line = page.locator("[data-drafted]");
+    await expect(line).toContainText("Laid out as Gallery because your notes name this layout.");
+    await expect(line.getByRole("link", { name: "Change layout" })).toBeVisible();
     await expect(previewArticle(page)).toHaveAttribute("data-format", "gallery");
-    // Not said again on a plain visit.
+    // Said once: the editor takes it off the address, so a reload doesn't repeat it, and nor does a plain visit.
+    await expect(page).toHaveURL(new RegExp(`/exhbts/${d.id}/edit$`));
+    // Switching the layout takes the line's place.
+    await page.getByRole("radio", { name: /^Case study/ }).check();
+    await expect(page.getByText("Switched to Case study. Nothing was deleted.")).toBeVisible();
+    await expect(page.getByText("Laid out as")).toHaveCount(0);
     await page.goto(`/exhbts/${d.id}/edit`);
     await expect(page.locator("[data-ready=true]")).toBeAttached();
-    await expect(page.getByText("Drafted as a gallery.")).toHaveCount(0);
+    await expect(page.locator("[data-drafted]")).toHaveCount(0);
+  });
+
+  test("the reason is fixed wording: one that doesn't fit the layout, or isn't on the list, is left out", async ({ page }) => {
+    await signInAs(page, `dw${stamp()}`, "max");
+    const d = await draft(page, { text: PLAIN_MATERIAL });
+    expect(d.format).toBe("case-study");
+    expect(d.formatReason).toBe("question-findings");
+    await page.goto(`/exhbts/${d.id}/edit?drafted=case-study&why=${d.formatReason}`);
+    await expect(page.locator("[data-drafted]")).toContainText("Laid out as Case study because your work sets out a question and what you found.");
+    // A research reason on a case study, and words typed into the address, say nothing.
+    for (const why of ["aim-results", encodeURIComponent("because the AI is always right")]) {
+      await page.goto(`/exhbts/${d.id}/edit?drafted=case-study&why=${why}&fig=${encodeURIComponent("we lost your figure")}`);
+      await expect(page.locator("[data-ready=true]")).toBeAttached();
+      const line = page.locator("[data-drafted]");
+      await expect(line).toContainText("Laid out as Case study.");
+      await expect(line).not.toContainText("because");
+      await expect(line).not.toContainText("figure");
+    }
+    // The layout named in the address must be the exhbt's own.
+    await page.goto(`/exhbts/${d.id}/edit?drafted=research&why=aim-results`);
+    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await expect(page.locator("[data-drafted]")).toHaveCount(0);
   });
 
   test("a hypothesis and an https link draft as research, with an aim and one reference; an http link is dropped", async ({ page }) => {
-    await signedIn(page, `dr${stamp()}`);
+    await signInAs(page, `dr${stamp()}`, "max");
     const material = `${PLAIN_MATERIAL} Our hypothesis was that walking helps recall. We built on https://example.com/paper and an old note at http://plain.example/x.`;
     const d = await draft(page, { text: material });
     expect(d.format).toBe("research");
-    await page.goto(`/exhbts/${d.id}/edit?drafted=research`);
+    expect(d.formatReason).toBe("aim-results");
+    await page.goto(`/exhbts/${d.id}/edit?drafted=research&why=${d.formatReason}`);
     await expect(page.locator("[data-ready=true]")).toBeAttached();
     await expect(page.getByRole("radio", { name: /^Research/ })).toBeChecked();
+    await expect(page.locator("[data-drafted]")).toContainText("Laid out as Research because your work has an aim and results.");
     const area = sectionsArea(page);
     await expect(area.getByRole("region", { name: "Aim or hypothesis", exact: true })).toBeVisible();
     await expect(area.getByRole("region", { name: /^Reference/ })).toHaveCount(1);
@@ -705,7 +714,7 @@ test.describe("The draft suggests a layout", () => {
   });
 
   test("a link that is only in the notes is kept: the notes are material", async ({ page }) => {
-    await signedIn(page, `dn${stamp()}`);
+    await signInAs(page, `dn${stamp()}`, "max");
     const d = await draft(page, { text: `${PLAIN_MATERIAL} The hypothesis was that a second till helps.`, notes: "Read https://example.com/notes-only too." });
     await page.goto(`/exhbts/${d.id}/edit`);
     await expect(page.locator("[data-ready=true]")).toBeAttached();
@@ -713,7 +722,7 @@ test.describe("The draft suggests a layout", () => {
   });
 
   test("plain material is a case study, and its doc has no layout key", async ({ page }) => {
-    await signedIn(page, `dc${stamp()}`);
+    await signInAs(page, `dc${stamp()}`, "max");
     const d = await draft(page, { text: PLAIN_MATERIAL });
     expect(d.format).toBe("case-study");
     const html = await (await page.request.get(`/exhbts/${d.id}/edit`)).text();
@@ -749,7 +758,7 @@ test.describe("Pictures keep the order they were picked in", () => {
       if (body.name.startsWith("big")) await new Promise((r) => setTimeout(r, 2500));
       await route.continue();
     });
-    await pick(page, [{ name: "big.png", mimeType: "image/png", buffer: big }, png("small.png")]);
+    await pickImages(page, [{ name: "big.png", mimeType: "image/png", buffer: big }, png("small.png")]);
     // While the first is held back, the second (already uploaded) is not placed ahead of it.
     await page.waitForTimeout(900);
     await expect(sectionsArea(page).getByRole("region", { name: /^(Lead image|Image \d)$/ })).toHaveCount(0);
@@ -781,7 +790,7 @@ test.describe("Pictures land as each picked prefix settles", () => {
       if (body.name.startsWith("big")) await new Promise((r) => setTimeout(r, 3000));
       await route.continue();
     });
-    await pick(page, [png("first.png"), { name: "big.png", mimeType: "image/png", buffer: big }, png("third.png")]);
+    await pickImages(page, [png("first.png"), { name: "big.png", mimeType: "image/png", buffer: big }, png("third.png")]);
     // The first is placed without waiting for the slow second; the third waits behind it.
     await expect(sectionsArea(page).getByRole("region", { name: "Lead image", exact: true })).toBeVisible();
     await expect(sectionsArea(page).getByRole("region", { name: "Image 2", exact: true })).toHaveCount(0);
@@ -843,7 +852,7 @@ test.describe("Research's figure cap", () => {
       await page.getByRole("button", { name: "Add a section" }).click();
       await page.getByRole("button", { name: "Add a graph", exact: true }).click();
     }
-    await pick(page, png("one.png"));
+    await pickImages(page, png("one.png"));
     await expect(sectionsArea(page).getByRole("region", { name: /^Image/ })).toHaveCount(1);
     await page.getByRole("button", { name: "Add a section" }).click();
     const add = page.getByRole("button", { name: "Add an image", exact: true });
@@ -928,7 +937,7 @@ test.describe("A picture the person removed mid-batch is not deleted again by th
       if (body.name.startsWith("big")) await new Promise((r) => setTimeout(r, 3000));
       await route.continue();
     });
-    await pick(page, [png("first.png"), { name: "big.png", mimeType: "image/png", buffer: big }]);
+    await pickImages(page, [png("first.png"), { name: "big.png", mimeType: "image/png", buffer: big }]);
     // The first lands at once; the person removes it while the big one is still uploading.
     const lead = sectionsArea(page).getByRole("region", { name: "Lead image", exact: true });
     await expect(lead).toBeVisible();
@@ -946,7 +955,7 @@ test.describe("A picture the person removed mid-batch is not deleted again by th
 
 test.describe("The rewrite names read right in every layout", () => {
   test("no 'the the' or 'the your', and each layout's own nouns", async ({ page }) => {
-    await signedIn(page, `rw${stamp()}`);
+    await signInAs(page, `rw${stamp()}`, "max");
     const expected: [string | undefined, string][] = [
       [undefined, "question and details"],
       ["gallery", "work and details"],

@@ -1,10 +1,12 @@
 import { z } from "zod/v4";
 import { LIMITS } from "@/lib/exhbt/blocks";
-import { FORMATS } from "@/lib/exhbt/formats";
+import { DRAFT_FORMATS } from "@/lib/exhbt/formats";
+import { LAYOUT_REASONS } from "@/lib/exhbt/drafted";
 import { CHART_KINDS, type Chart } from "@/lib/exhbt/charts";
 
-/** The layouts the draft may choose: the schema's enum and repairDraft read this one list. */
-const DRAFT_LAYOUTS: readonly string[] = FORMATS;
+/** The layouts the draft may choose, and the reasons it may give: the schema's enums and repairDraft read these lists. */
+const DRAFT_LAYOUTS: readonly string[] = DRAFT_FORMATS;
+const REASONS: readonly string[] = LAYOUT_REASONS;
 
 /**
  * The draft's answer shape and the code that reads it. Pure (no server-only), so the tests in
@@ -13,7 +15,7 @@ const DRAFT_LAYOUTS: readonly string[] = FORMATS;
  * A graph as the model writes it: one flat shape for every kind, turned into the stored kind by
  * toChart. Unused fields are empty strings, empty lists or false.
  *
- * The answer shape is kept small on purpose (decision 0025): the API compiles it into a grammar
+ * The answer shape is kept small on purpose (decision 0029): the API compiles it into a grammar
  * and refuses one that is too large, at about 52 to 56 fields in all, with a nullable field
  * costing about two and an array of objects a little more than its fields. So nothing here is
  * nullable (empty means "none"), and every kind shares one row type: a scatter point is a row
@@ -39,7 +41,9 @@ export const DraftChartSchema = z.object({
 export type DraftChart = z.infer<typeof DraftChartSchema>;
 
 export const DraftSchema = z.object({
-  format: z.enum(FORMATS),
+  format: z.enum(DRAFT_FORMATS),
+  /** Why that layout: a fixed signal, never the model's own words (lib/exhbt/drafted.ts, decision 0025). Non-null, like every field here. */
+  formatReason: z.enum(LAYOUT_REASONS),
   title: z.string(),
   summary: z.string(),
   context: z.string(),
@@ -66,13 +70,16 @@ const KINDS: readonly string[] = CHART_KINDS;
 
 /**
  * The model's answer made to fit the strict schema, where it can be without guessing: an unknown
- * layout becomes a case study (as toDoc would read it anyway), and a graph of an unknown kind is
- * dropped. Anything else that's wrong is left for the schema to reject.
+ * layout becomes a case study (as toDoc would read it anyway), an unknown or missing reason for the
+ * layout becomes "default", which says no reason at all (checkedReason does the same to a reason
+ * the draft doesn't bear out), and a graph of an unknown kind is dropped. Anything else that's
+ * wrong is left for the schema to reject.
  */
 export function repairDraft(raw: unknown): unknown {
   if (!isObject(raw)) return raw;
   const out: Record<string, unknown> = { ...raw };
   if (!DRAFT_LAYOUTS.includes(String(out.format))) out.format = "case-study";
+  if (!REASONS.includes(String(out.formatReason))) out.formatReason = "default";
   if (Array.isArray(out.charts)) out.charts = out.charts.filter((c) => !isObject(c) || KINDS.includes(String(c.kind)));
   return out;
 }
@@ -89,7 +96,7 @@ const squashed = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
 export function toChart(g: DraftChart): Chart | null {
   const C = LIMITS.charts;
   const t = (s: string | undefined) => (s ?? "").trim();
-  // false stores nothing, as null did before (decision 0025), so the graph's default holds.
+  // false stores nothing, as null did before (decision 0029), so the graph's default holds.
   const better = g.lowerIsBetter ? true : undefined;
   const some = (o: Record<string, string | boolean | undefined>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== ""));
   const axes = some({ xTitle: t(g.xTitle), yTitle: t(g.yTitle), unit: t(g.unit) });

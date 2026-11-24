@@ -36,7 +36,8 @@ export const headingFamily = (t: Pick<PortfolioTheme, "type">) => FAMILY[t.type.
  * Everything a look sets, as CSS custom properties on the wrapper of a portfolio page (the home
  * page's root, the exhbt page's frame). One set, decision 0018:
  *   --pf-*      the page: ground, text, rules, cards, wells, buttons, ticks, pills, the highlight,
- *               the flowchart's last box, initials, corners, faces (the names of decision 0016 kept)
+ *               the flowchart's last box, initials, the editing page's error colour, corners,
+ *               faces (the names of decision 0016 kept)
  *   --band-*    the best-work band
  *   --chart-*   the graphs' two shades and their ramp
  *   --font-display  the heading face (the site's own variable, so every heading inside follows)
@@ -77,6 +78,7 @@ export function themeStyle(t: PortfolioTheme): React.CSSProperties {
     "--pf-flow-end-soft": p.flowEndSoft,
     "--pf-avatar": p.avatar,
     "--pf-avatar-ink": p.avatarInk,
+    "--pf-error": p.error,
     "--pf-radius": s.radius,
     "--pf-radius-lg": s.radiusLarge,
     "--pf-radius-box": s.radiusBox,

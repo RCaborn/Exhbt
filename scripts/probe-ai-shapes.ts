@@ -1,5 +1,5 @@
 /**
- * Checks every structured answer the app asks the AI for against the real API (decision 0025).
+ * Checks every structured answer the app asks the AI for against the real API (decision 0029).
  *
  * The API compiles each answer's JSON schema into a grammar before the model writes a word, and
  * refuses a schema whose grammar is too large ("The compiled grammar is too large..."). Only the
@@ -11,13 +11,17 @@
  *   npm run probe:ai               # every shape the app sends, plus "draft with planned growth"
  *   npm run probe:ai -- --dry      # no API calls: the size of each schema only (no key needed)
  *   npm run probe:ai -- --explore  # also the measuring variants (what each construct costs)
- *   npm run probe:ai -- --warn-unchecked  # CI and deploy: only a definite refusal fails
+ *   npm run probe:ai -- --warn-unchecked  # only a definite refusal fails
+ *
+ * Every form but --dry calls the real API and is paid for. Nothing runs this script automatically:
+ * no push, pull request, deploy or schedule. It is run by hand (.github/workflows/ai-shapes.yml,
+ * or here), with the owner's say-so, the cost stated first (decision 0029).
  *
  * Exits non-zero if any shape the app sends, or the planned-growth check, is refused. A shape that
  * couldn't be checked (no key, the service unreachable, a rate limit) also fails, unless
- * --warn-unchecked is given: then it prints a GitHub warning and passes, so a missing key or an API
- * outage doesn't block CI or a deploy, while a refused shape always does. Explore variants are
- * measurements and never fail the run. Never prints the key or the environment.
+ * --warn-unchecked is given: then it prints a GitHub warning and passes, while a refused shape
+ * always fails. Explore variants are measurements and never fail the run. Never prints the key or
+ * the environment.
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -31,6 +35,8 @@ import { IDEAS_OUTPUT_CONFIG, SWAP_OUTPUT_CONFIG } from "@/lib/ai/projects";
 import { ROADMAP_OUTPUT_CONFIG } from "@/lib/ai/roadmap";
 import { AI_MODEL, anthropicApiKey } from "@/lib/ai/model";
 import { DRAFT_BLOCKS } from "@/lib/exhbt/draft-blocks";
+import { LAYOUT_REASONS } from "@/lib/exhbt/drafted";
+import { FORMATS } from "@/lib/exhbt/formats";
 
 type Json = Record<string, unknown>;
 type OutputConfig = { effort: "low" | "medium" | "high"; format: { type: "json_schema"; schema: Json } };
@@ -52,21 +58,18 @@ const APP_SHAPES: Shape[] = [
 
 /**
  * The draft as it will be once the work already built or decided has landed, so a release can't
- * take the schema over the limit unseen.
- * - Release 2: formatReason, a fixed signal for the layout (8 values, as on phase-2-r2).
- * - Release 4 (decision 0028): 7 layouts; a fixed reason for each new layout, so about 12 reasons;
- *   a pull quote and a "my role" line; an essay's sources, each a citation with an optional
- *   address (kept apart from research's references here, the larger case); and the demo and code
- *   links of a build, each with a label, an address and a short description. Before and After
- *   marks on images are never drafted (0028), so they are not here.
- * Release 4's own schema isn't on a branch yet, so its field names here are stand-ins.
+ * take the schema over the limit unseen. Release 2's formatReason is in the real schema now; on
+ * top of it, release 4 (decision 0028) lets the draft choose any of the 7 layouts (FORMATS) and
+ * adds: a fixed reason for each new layout, so about 12 reasons; a pull quote and a "my role"
+ * line; an essay's sources, each a citation with an optional address (kept apart from research's
+ * references here, the larger case); and the demo and code links of a build, each with a label,
+ * an address and a short description. Before and After marks on images are never drafted (0028),
+ * so they are not here.
+ * Release 4's own schema isn't on a branch yet, so its field names and new reasons here are stand-ins.
  */
 const PlannedGrowth = (DraftSchema as unknown as z.ZodObject<z.ZodRawShape>).extend({
-  format: z.enum(["case-study", "gallery", "research", "build", "essay", "before-after", "event"]),
-  formatReason: z.enum([
-    "notes", "aim-results", "hypothesis-results", "study", "visual-work", "mostly-pictures", "question-findings", "default",
-    "built-thing", "argument-sources", "before-and-after", "event-role",
-  ]),
+  format: z.enum(FORMATS),
+  formatReason: z.enum([...LAYOUT_REASONS, "built-thing", "argument-sources", "before-and-after", "event-role"]),
   pullQuote: z.string(),
   myRole: z.string(),
   sources: z.array(z.object({ label: z.string(), url: z.string() })),
@@ -126,7 +129,7 @@ const NSTR = { type: ["string", "null"] };
 
 /**
  * Measurements, not checks: how many more fields fit on top of the draft and of the planned
- * growth (decision 0025 has the numbers). A rung that flips from accepted to refused places the limit.
+ * growth (decision 0029 has the numbers). A rung that flips from accepted to refused places the limit.
  */
 function exploreShapes(): Shape[] {
   const draft = DRAFT_OUTPUT_CONFIG.format.schema as Json;
@@ -180,7 +183,7 @@ async function probe(client: Anthropic, shape: Shape): Promise<Outcome> {
       const body = e.error as { error?: { message?: string } } | undefined;
       const message = body?.error?.message ?? e.message;
       // Only a 400 about the schema is a refusal of the shape. Any other 400 (no credit, a bad key setting) says
-      // nothing about the shape, so it is "unchecked", which warns rather than blocking CI or a deploy.
+      // nothing about the shape, so it is "unchecked": a run to repeat, not a shape to fix.
       const aboutShape = e.status === 400 && /grammar|schema|union|output_config|output format/i.test(message);
       return { shape, ok: false, status: aboutShape ? "refused" : "unchecked", message: `${e.status}: ${message}` };
     }
