@@ -41,6 +41,18 @@ export function MenuButton({ before }: { before?: (close: (restoreFocus?: boolea
   async function classic() {
     // What was just typed is saved first, so the classic editor opens with it.
     await save.flush();
+    // An admin's choice is stored (POST /api/exhbts/editor, lib/editor-kind.ts): this address then serves the classic editor
+    // from now on, so the page is loaded again as it is. Everyone else, and an admin whose choice could not be stored, gets
+    // the classic editor by the address, for this visit.
+    const choice = new FormData();
+    choice.set("kind", "classic");
+    const stored = env.adminSwitch
+      ? await fetch("/api/exhbts/editor", { method: "POST", body: choice }).then(
+          (res) => res.ok,
+          () => false,
+        )
+      : false;
+    if (stored) return window.location.reload();
     const url = new URL(window.location.href);
     url.searchParams.set("editor", "classic");
     window.location.assign(url.pathname + url.search);

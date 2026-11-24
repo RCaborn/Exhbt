@@ -26,6 +26,8 @@ export type PageEditorProps = EditorProps & {
   team?: Teammate[];
   /** When this exhbt was last published (ISO), or null while it is a draft: the date the public page draws beside the checks. */
   publishedAt?: string | null;
+  /** True for an admin: "Use the classic editor" is stored as their own choice of editor (lib/editor-kind.ts), where everyone else's is for the visit. */
+  adminSwitch?: boolean;
 };
 
 export type SheetName = "publish" | "card" | "work" | "chart" | "figure" | "reorder";

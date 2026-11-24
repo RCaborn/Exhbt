@@ -10,6 +10,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { fileIdsOf } from "@/components/editor/media";
 import { isAdmin } from "@/lib/admin";
 import { editorKind } from "@/lib/editor-kind-server";
+import { TryNewEditor } from "./TryNewEditor";
 import { ENTITLEMENTS } from "@/lib/entitlements";
 import { imagesOf } from "@/lib/exhbt/blocks";
 import { isFigureNews, isLayoutReason } from "@/lib/exhbt/drafted";
@@ -123,11 +124,15 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
             </p>
           </div>
         )}
+        {/* An admin whose editor is the classic one: the way to the new one, and nobody else is sent it. */}
+        {admin && kind === "classic" && <TryNewEditor id={record.id} />}
         <Editor {...editorProps} />
       </div>
     ) : (
       <EditorGate
         {...editorProps}
+        // An admin's "Use the classic editor" is stored as their choice; everyone else's is for the visit.
+        adminSwitch={admin}
         // The look the person's public pages use (as app/(portfolio)/p/[username]/[slug]/layout.tsx gets it); with no username yet, the one their plan allows.
         theme={profile.username ? await portfolioLook(profile.username) : themeFor(profile, plan)}
         reportFiles={await reportFilesOf(user.id, record.id)}
