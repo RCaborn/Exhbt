@@ -267,3 +267,64 @@ What it built (`components/exhbt-editor/phone/PhoneBar.tsx`, `ReorderSheet.tsx`,
   - So Graph 1's toolbar covers box 3's chips on the "figure before findings" fixture.
   - On a drafted research page, the hypothesis's gutter column passes box 1's grip, and the results' toolbar covers box 3's Remove.
   - Next step: add them to `CHIPS`, then check every layout's placement again.
+
+## From the Safari agent: the editor on WebKit (24 Nov 2026; branch `phase-2-r3-safari`)
+
+What runs on WebKit:
+- Three Playwright projects, listed only when `E2E_WEBKIT` is set, so a plain `playwright test` and CI's ten e2e groups are untouched (`playwright.config.ts`):
+  - `safari`: Playwright's Desktop Safari at 1440 by 900, on every `editor-*.spec.ts` but the phone's and the tablet's.
+  - `iphone`: Playwright's iPhone 14 (390 by 664, a touch screen), on the touch project's four specs.
+  - `ipad`: Playwright's iPad (gen 7) (810 by 1080, a touch screen), on `editor-tablet.spec.ts`.
+  - `safari` and `iphone` also run `e2e/*.webkit.ts`, the tests of what only Safari does. No other project matches that name, so adding a test there never moves CI's ten groups.
+- `.github/workflows/webkit.yml` runs them on every push, in a workflow of its own: a red WebKit run never makes the CI run red.
+  - One job in eight groups: the desktop specs in three, the phone's and the tablet's in one, and the same four again under Safari's rule about the focus (below).
+  - A group takes about 15 minutes; the job's limit is 45.
+  - A push whose last commit message has `[skip ci]` starts neither workflow.
+- Reading a run from a machine with no WebKit (this one: the proxy blocks artifact downloads and `gh` has no token):
+  - Each group's log ends with a summary (`scripts/e2e-summary.mjs`): failures grouped by the line they failed on, every error, the tests that passed only on a retry, what the pages said, and the slowest tests.
+  - The phone's group also prints what its WebKit says it is (`scripts/webkit-probe.mjs`).
+  - `get_job_logs` with a tail of about 150 lines shows both.
+- Three switches for a machine with only Chromium:
+  - `E2E_WEBKIT=chromium` runs the three projects' sizes and user agents on Chromium. What fails there too is a size or a user-agent assumption, not the engine.
+  - `E2E_FOCUS=safari` gives every page Safari's rule about the focus.
+  - `E2E_TOUCH=page` makes Chromium use touches made in the page, as the WebKit projects must.
+- Every editor spec takes `test` from `e2e/editor-test.ts`, not from Playwright. A new editor spec must too, or it fails on WebKit at random (next dev's hot reload, below).
+
+What is left out, and why:
+- No test is left out by name: `NOT_ON_WEBKIT` in `playwright.config.ts` is empty. A test that cannot run there goes in it with its reason.
+- "A swipe scrolls the page" is checked only under real touches, which only Chromium has (`touch.native` in `e2e/page-editor.ts`).
+  - Playwright's WebKit has a tap and nothing more, so there a touch is an event made in the page, and such a touch cannot scroll.
+  - Four checks: two in `editor-drag.spec.ts`, one in `editor-flow.spec.ts`, one in `editor-phone.spec.ts`. The rest of each test still runs.
+- Not in these projects: `edit-slots.spec.ts` and the specs that drive the editor for another feature (`phase2-*`, `auto-figure`, `exhbt-page`, `file-ownership`). The classic editor and the public pages have never run on WebKit either.
+- What WebKit on Linux cannot show at all. Each needs a real iPhone:
+  - the zoom when a field under 16px takes the focus;
+  - a real finger: the long press on a grip, the drag, scrolling while holding;
+  - the on-screen keyboard, and where the phone's bar sits above it;
+  - Safari's own bars coming and going;
+  - Safari's rule about the focus (it is given to the page by a script here);
+  - anything older than the WebKit Playwright ships (26.6 on 24 Nov).
+
+How Safari differs, as found here:
+- A press on a button, a link or a tick box gives it no focus, and takes the focus from whatever had it. The blur has no `relatedTarget`.
+  - True on a Mac and on an iPhone. WebKit on Linux does not do it, so no run here meets it by itself.
+  - `safariFocus` in `e2e/editor-test.ts` gives a page the rule; `E2E_FOCUS=safari` gives it to every page.
+  - It found the "+" menu closing under a press while the "+" had the focus: on an iPhone, every use of Add on the bar added nothing. Fixed in `Insert.tsx`.
+  - Anything that closes or saves on a blur "to nowhere" must allow for a press on its own buttons.
+  - Not changed: a sheet gives the focus back to its opener, which in Safari never had it; `EditorShell` saves on every such blur, so Safari saves more often.
+- When a navigation starts, WebKit stops the loads of the page being left while that page is still alive.
+  - A lazy chunk then fails with `ChunkLoadError`, the editor's crash fallback fired, and its `location.replace` to the classic editor beat the person's own navigation.
+  - `components/exhbt-editor/again.ts` asks for a chunk again (twice, after 0.5s and 1.5s) before the fallback. Use it for any new lazy import in the editor.
+- Safari has no `requestIdleCallback`. `fields/idle.ts` then starts the formatted fields' editors 50ms apart, so a page's fields go live over a second or two, later than on Chromium. A test that needs live editors waits for them (`waitLive`).
+- Tiptap picks the Mac key map by the user agent ("Mac" and a touch screen), and ProseMirror by `navigator.platform`. Under an iPhone user agent on a Linux host there is no key for "select all". `chooseAll` in `e2e/page-editor.ts` selects through the page instead.
+- A toolbar's placement lands a frame later than on Chromium. A test reads `toolbarClashes` with `expect.poll`.
+- `text-wrap: pretty` (on `p`, `li`, `dd` in `globals.css`) pulls the last word down to keep an inline mark company. The "Needs a description" mark hung under a narrow gallery tile, on Chromium too at about 900px wide. The mark now takes no room on its line (`.xe-fig-needs-at`).
+- Boxes land on different fractions of a pixel. A check for "over" counts an overlap past half a pixel each way, as the editor's own placement does.
+- An iPhone zooms in on a focused field under 16px, and nearly every field here is under it. `phone/noZoom.ts` sets `maximum-scale=1` on the viewport while the editor is open, for an iPhone's user agent only. Not proven on a phone.
+- Safari before 17 has no popovers. `figures/pop.ts` asks the browser, and gives the chips' panels a modal `<dialog>` instead. The sheets are native dialogs already, so the editor needs Safari 15.4 either way.
+- next dev's hot-reload client reloads the page when its update fetch fails, and WebKit fails that fetch during a navigation. The fixture in `e2e/editor-test.ts` keeps the client quiet on WebKit. Development server only.
+
+Still open:
+- React refuses the `flushSync` in `RichField`'s `onReady`, because it is called from an effect (the pages log "flushSync was called from inside a lifecycle method" on every load, on Chromium too).
+  - So the hand-over is not one step: the editor is asked to take the focus while it is still inert, the resting field goes, and the editor takes the focus a frame later.
+  - On an iPhone that may drop the keyboard when a person taps a formatted field in the first second or two, before its editor is live. Not determined here.
+  - A likely fix: start the hand-over from a microtask, outside the effect.

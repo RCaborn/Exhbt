@@ -1172,8 +1172,8 @@ test("sections a layout keeps but does not draw are listed under the page; Remov
   await expect(page.getByRole("region", { name: "Kept, not shown in this layout" })).toHaveCount(0);
   await seeAsVisitor(page, false);
   await kept.getByRole("button", { name: "Remove Aim or hypothesis" }).click();
-  await expect(kept.getByRole("listitem")).toHaveCount(1);
-  expect((await docNow(page)).sections.some((s) => s.kind === "aim")).toBe(false);
+  // The list and the doc together, so that a failure says which did not follow the press (on WebKit, once, the list kept both for 20s).
+  await expect.poll(async () => ({ listed: await kept.getByRole("listitem").count(), aimInDoc: (await docNow(page)).sections.some((s) => s.kind === "aim") })).toEqual({ listed: 1, aimInDoc: false });
   await pressUndo(page);
   await expect(kept.getByRole("listitem")).toHaveCount(2);
   expect((await docNow(page)).sections.some((s) => s.kind === "aim")).toBe(true);

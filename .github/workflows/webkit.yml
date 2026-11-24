@@ -1,6 +1,6 @@
-# The edit-on-page editor's specs on Safari's engine (WebKit), in the two Playwright projects that are
+# The edit-on-page editor's specs on Safari's engine (WebKit), in the three Playwright projects that are
 # listed only when E2E_WEBKIT is set (playwright.config.ts): `safari` (Desktop Safari, the desktop
-# project's editor specs) and `iphone` (iPhone 14, the touch project's specs).
+# project's editor specs), `iphone` (iPhone 14, the touch project's specs) and `ipad` (iPad, the tablet's).
 # It is a workflow of its own so that CI's check and e2e jobs are not touched and report on their own:
 # a red WebKit run never makes the CI run red.
 # WebKit on Linux is not Safari on an iPhone (no real finger, on-screen keyboard or toolbars). What it can
@@ -9,28 +9,39 @@ name: WebKit
 
 on:
   push:
+    # A push that changes only the docs runs nothing here.
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
 
 permissions:
   contents: read
 
 jobs:
-  # One job, in four groups: the desktop specs in three (about 110 tests and 16 minutes each on 24 Nov 2026, when six
-  # groups of 55 took 5 to 10 minutes), the phone's in one. In these two projects each test is its own shard unit, so a
-  # long spec is split between groups.
+  # One job, in groups: the desktop specs in three (about 110 tests each; six groups of 55 took 5 to 10 minutes on
+  # 24 Nov 2026), the phone's and the tablet's together in one, and the same four again under Safari's rule about the
+  # focus. Eight groups, so that with CI's eleven a push stays under twenty jobs at once. In these projects each test is
+  # its own shard unit, so a long spec is split between groups.
   e2e-webkit:
-    name: e2e-webkit (${{ matrix.project }} ${{ matrix.shard }}/${{ matrix.of }})
+    name: e2e-webkit (${{ matrix.name }} ${{ matrix.shard }}/${{ matrix.of }}${{ matrix.focus && ', the focus rule' || '' }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { project: safari, shard: 1, of: 3 }
-          - { project: safari, shard: 2, of: 3 }
-          - { project: safari, shard: 3, of: 3 }
-          - { project: iphone, shard: 1, of: 1 }
+          - { name: safari, projects: "--project=safari", shard: 1, of: 3 }
+          - { name: safari, projects: "--project=safari", shard: 2, of: 3 }
+          - { name: safari, projects: "--project=safari", shard: 3, of: 3 }
+          - { name: iphone-ipad, projects: "--project=iphone --project=ipad", shard: 1, of: 1 }
+          # The same again under Safari's rule about the focus, which WebKit on Linux does not have (e2e/editor-test.ts, safariFocus).
+          - { name: safari, projects: "--project=safari", shard: 1, of: 3, focus: safari }
+          - { name: safari, projects: "--project=safari", shard: 2, of: 3, focus: safari }
+          - { name: safari, projects: "--project=safari", shard: 3, of: 3, focus: safari }
+          - { name: iphone-ipad, projects: "--project=iphone --project=ipad", shard: 1, of: 1, focus: safari }
     env:
       E2E_WEBKIT: "1"
+      E2E_FOCUS: ${{ matrix.focus }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,19 +51,19 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps webkit
       # It stops itself after 38 minutes, inside the job's 45, so a slow run still writes its report and its summary.
-      - run: npx playwright test --project=${{ matrix.project }} --shard=${{ matrix.shard }}/${{ matrix.of }} --reporter=list,github,html,json --global-timeout=2280000
+      - run: npx playwright test ${{ matrix.projects }} --shard=${{ matrix.shard }}/${{ matrix.of }} --reporter=list,github,html,json --global-timeout=2280000
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/webkit.json
           PLAYWRIGHT_HTML_OPEN: never
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report-webkit-${{ matrix.project }}-${{ matrix.shard }}
+          name: playwright-report-webkit-${{ matrix.name }}-${{ matrix.shard }}${{ matrix.focus && '-focus' || '' }}
           path: playwright-report/
           retention-days: 7
       # Last, so that the end of the job's log is what this WebKit says it is (once a run) and the account of the run.
       - name: What this WebKit says it is
-        if: always() && matrix.project == 'iphone'
+        if: always() && matrix.name == 'iphone-ipad' && !matrix.focus
         run: node scripts/webkit-probe.mjs
       - name: Summary
         if: always()
