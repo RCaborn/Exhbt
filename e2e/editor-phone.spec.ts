@@ -102,7 +102,9 @@ test.describe("each section shows only its grip", () => {
           const g = buttons[0]?.getBoundingClientRect();
           if (g && (Math.round(g.width) < 44 || Math.round(g.height) < 44)) bad.push(`${id}: grip ${g.width}x${g.height}`);
           if (!g) continue;
-          const over = (b: DOMRect) => g.right > b.left && g.left < b.right && g.bottom > b.top && g.top < b.bottom;
+          // Over: by more than half a pixel both ways, as the editor itself and toolbarClashes count it (Toolbar.tsx, page-editor.ts).
+          // A word's box is as tall as its line and its bottom edge lands within a pixel of a grip's top; where on that pixel differs by browser.
+          const over = (b: DOMRect) => Math.min(g.right, b.right) - Math.max(g.left, b.left) > 0.5 && Math.min(g.bottom, b.bottom) - Math.max(g.top, b.top) > 0.5;
           // No grip lies over words outside its own section, nor over another section's pictures or controls, nor over a control of its own section.
           const article = fr.closest("article")!;
           const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT);
@@ -116,7 +118,7 @@ test.describe("each section shows only its grip", () => {
               range.setEnd(n, word.index + word[0].length);
               const hit = [...range.getClientRects()].find(over);
               if (!hit) continue;
-              const at = (r: DOMRect) => [r.left, r.top, r.width, r.height].map((v) => Math.round(v)).join(",");
+              const at = (r: DOMRect) => [r.left, r.top, r.width, r.height].map((v) => Math.round(v * 10) / 10).join(",");
               bad.push(`${id}'s grip (${at(g)}) is over "${word[0]}" (${at(hit)}) in ${parent.closest("[data-section-id]")?.getAttribute("data-section-id") ?? "the page"}`);
               break;
             }
