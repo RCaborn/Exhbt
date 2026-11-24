@@ -56,7 +56,7 @@ export default async function JobLinkEditPage({ params, searchParams }: Props) {
   return (
     <div className="bg-mist">
       <div className="mx-auto max-w-3xl px-4 pt-10 pb-16 sm:px-8 lg:pt-14">
-        <Link href="/job-links" className="inline-flex items-center gap-1.5 text-sm font-semibold hover:text-graphite">
+        <Link href="/portfolio#job-links" className="inline-flex items-center gap-1.5 text-sm font-semibold hover:text-graphite">
           <ArrowLeft aria-hidden size={15} strokeWidth={2.25} /> Job links
         </Link>
         <div className="mt-3 flex flex-wrap items-center gap-3">

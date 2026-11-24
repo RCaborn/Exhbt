@@ -57,12 +57,6 @@ export type HostKind =
   | { kind: "unknown" };
 
 /**
- * Paths that belong on the tool host. The notes name /login and /roadmap
- * (docs/phase-2.md). /auth is included too: the sign-in cookie is host-only, so a confirm
- * link opened on www would set it there and the next page would open on app without a session.
- * /account, /exhbts and /start are not in that list, so they stay on the host that was opened.
- */
-/**
  * The move to the app host is off until EXHBT_TOOL_HOST=1. Sign-in cookies are host-only, so turning
  * it on signs everyone out once, and app.exhbt.co.uk must already reach this Worker (the routes ship
  * with the phase-2 launch). Until then sign-in stays on www.
@@ -71,7 +65,13 @@ export function toolHostEnabled(): boolean {
   return process.env.EXHBT_TOOL_HOST === "1";
 }
 
-const TOOL_PATHS = ["/login", "/roadmap", "/auth"];
+/**
+ * Paths that belong on the app host: sign-in, roadmaps, exhbts, the portfolio, job links and the account.
+ * /auth is included too: the sign-in cookie is host-only, so a confirm link opened on www
+ * would set it there and the next page would open on app without a session.
+ * /start stays on www: it is an ad landing page, not the tool.
+ */
+const TOOL_PATHS = ["/login", "/roadmap", "/auth", "/account", "/exhbts", "/portfolio", "/job-links"];
 
 /**
  * Where www and the apex should send a tool path, or null when the request stays put.
