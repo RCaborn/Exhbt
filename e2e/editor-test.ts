@@ -26,6 +26,13 @@ export const test = base.extend({
   },
 });
 
+/**
+ * Whether a press on a button gives it the focus in this run: not under Safari's rule (E2E_FOCUS=safari). A check
+ * that a pressed button has the focus, or that a sheet gives the focus back to the button pressed to open it,
+ * asks for something Safari never does, so it is made only where this is true.
+ */
+export const pressFocuses = process.env.E2E_FOCUS !== "safari";
+
 /** Each thing a page says (an uncaught error, a console error with where it came from), once, to the test's output. */
 function hear(page: Page) {
   const said = new Set<string>();

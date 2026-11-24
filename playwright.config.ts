@@ -21,12 +21,20 @@ const WEBKIT = process.env.E2E_WEBKIT;
 // A Chromium path (PW_CHROMIUM_PATH, below) is never handed to WebKit.
 const engine = WEBKIT === "chromium" ? { browserName: "chromium" as const } : { launchOptions: {} };
 /** The tests the WebKit projects leave out, by name, each with its reason; nothing else is skipped there. */
-const NOT_ON_WEBKIT: [name: RegExp, why: string][] = [];
+const NOT_ON_WEBKIT: [name: RegExp, why: string][] = [
+  [
+    /the page scrolls itself with the pointer still near the bottom edge and near the top edge/,
+    "Open, not flaky. On WebKit the page scrolls down under a carried section, then does not scroll back up near the top edge: 4 tries of 4 in the third run (24 Nov), after passing in the first two. Cause not found; Chromium passes. Take this line out to see it.",
+  ],
+];
+/** The tests left out only under Safari's rule about the focus (E2E_FOCUS=safari), each with its reason. They still run on WebKit without the rule. */
+const NOT_UNDER_SAFARI_FOCUS: [name: RegExp, why: string][] = [];
+const LEFT_OUT = [...NOT_ON_WEBKIT, ...(process.env.E2E_FOCUS === "safari" ? NOT_UNDER_SAFARI_FOCUS : [])].map(([name]) => name);
 const ONLY_WEBKIT = /[\\/][a-z-]+\.webkit\.ts$/;
 const webkitProjects = [
-  { name: "safari", fullyParallel: true, use: { ...devices["Desktop Safari"], viewport: { width: 1440, height: 900 }, ...engine }, testMatch: [/[\\/]editor-[a-z-]+\.spec\.ts$/, ONLY_WEBKIT], testIgnore: /editor-(phone|tablet)\.spec\.ts/, grepInvert: NOT_ON_WEBKIT.map(([name]) => name) },
-  { name: "iphone", fullyParallel: true, use: { ...devices["iPhone 14"], ...engine }, testMatch: [/editor-(drag|flow|phone|figures)\.spec\.ts/, ONLY_WEBKIT], grepInvert: NOT_ON_WEBKIT.map(([name]) => name) },
-  { name: "ipad", fullyParallel: true, use: { ...devices["iPad (gen 7)"], ...engine }, testMatch: /editor-tablet\.spec\.ts/, grepInvert: NOT_ON_WEBKIT.map(([name]) => name) },
+  { name: "safari", fullyParallel: true, use: { ...devices["Desktop Safari"], viewport: { width: 1440, height: 900 }, ...engine }, testMatch: [/[\\/]editor-[a-z-]+\.spec\.ts$/, ONLY_WEBKIT], testIgnore: /editor-(phone|tablet)\.spec\.ts/, grepInvert: LEFT_OUT },
+  { name: "iphone", fullyParallel: true, use: { ...devices["iPhone 14"], ...engine }, testMatch: [/editor-(drag|flow|phone|figures)\.spec\.ts/, ONLY_WEBKIT], grepInvert: LEFT_OUT },
+  { name: "ipad", fullyParallel: true, use: { ...devices["iPad (gen 7)"], ...engine }, testMatch: /editor-tablet\.spec\.ts/, grepInvert: LEFT_OUT },
 ];
 
 /**

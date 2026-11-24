@@ -291,7 +291,9 @@ What runs on WebKit:
 - Every editor spec takes `test` from `e2e/editor-test.ts`, not from Playwright. A new editor spec must too, or it fails on WebKit at random (next dev's hot reload, below).
 
 What is left out, and why:
-- No test is left out by name: `NOT_ON_WEBKIT` in `playwright.config.ts` is empty. A test that cannot run there goes in it with its reason.
+- Tests left out by name are listed in `playwright.config.ts`, each with its reason; nothing else is skipped on WebKit.
+  - `NOT_ON_WEBKIT`, for every WebKit run: one test, "while carrying: the page scrolls itself with the pointer still near the bottom edge and near the top edge" (`editor-drag.spec.ts`). It is open, not flaky (below).
+  - `NOT_UNDER_SAFARI_FOCUS`, only for the runs under Safari's rule about the focus: empty.
 - "A swipe scrolls the page" is checked only under real touches, which only Chromium has (`touch.native` in `e2e/page-editor.ts`).
   - Playwright's WebKit has a tap and nothing more, so there a touch is an event made in the page, and such a touch cannot scroll.
   - Four checks: two in `editor-drag.spec.ts`, one in `editor-flow.spec.ts`, one in `editor-phone.spec.ts`. The rest of each test still runs.
@@ -310,7 +312,9 @@ How Safari differs, as found here:
   - `safariFocus` in `e2e/editor-test.ts` gives a page the rule; `E2E_FOCUS=safari` gives it to every page.
   - It found the "+" menu closing under a press while the "+" had the focus: on an iPhone, every use of Add on the bar added nothing. Fixed in `Insert.tsx`.
   - Anything that closes or saves on a blur "to nowhere" must allow for a press on its own buttons.
-  - Not changed: a sheet gives the focus back to its opener, which in Safari never had it; `EditorShell` saves on every such blur, so Safari saves more often.
+  - Escape did not close the "+" menu after a press on the "+": the "+" hears the key only with the focus in it. It now takes the focus when pressed (`Insert.tsx`).
+  - Not changed: a sheet gives the focus back to its opener, which in Safari never had it when it was pressed; `EditorShell` saves on every such blur, so Safari saves more often.
+  - A test's check that a pressed button has the focus, or that a sheet gives the focus back to the button pressed to open it, is made only where `pressFocuses` is true (`e2e/editor-test.ts`).
 - When a navigation starts, WebKit stops the loads of the page being left while that page is still alive.
   - A lazy chunk then fails with `ChunkLoadError`, the editor's crash fallback fired, and its `location.replace` to the classic editor beat the person's own navigation.
   - `components/exhbt-editor/again.ts` asks for a chunk again (twice, after 0.5s and 1.5s) before the fallback. Use it for any new lazy import in the editor.
@@ -323,8 +327,19 @@ How Safari differs, as found here:
 - Safari before 17 has no popovers. `figures/pop.ts` asks the browser, and gives the chips' panels a modal `<dialog>` instead. The sheets are native dialogs already, so the editor needs Safari 15.4 either way.
 - next dev's hot-reload client reloads the page when its update fetch fails, and WebKit fails that fetch during a navigation. The fixture in `e2e/editor-test.ts` keeps the client quiet on WebKit. Development server only.
 
-Still open:
-- React refuses the `flushSync` in `RichField`'s `onReady`, because it is called from an effect (the pages log "flushSync was called from inside a lifecycle method" on every load, on Chromium too).
-  - So the hand-over is not one step: the editor is asked to take the focus while it is still inert, the resting field goes, and the editor takes the focus a frame later.
-  - On an iPhone that may drop the keyboard when a person taps a formatted field in the first second or two, before its editor is live. Not determined here.
-  - A likely fix: start the hand-over from a microtask, outside the effect.
+- The hand-over from a resting field to its editor (`RichField`'s `onReady`) runs from a microtask.
+  - The editor says it is made from an effect, and there React refuses `flushSync` (every page logged "flushSync was called from inside a lifecycle method"). The swap was drawn late, the focus was on nothing for a frame, and a key typed then was lost: on WebKit "five six" came out "fivesix" once.
+  - From a microtask the flush is honoured, and the editor's view takes the focus in the same step.
+  - Seen on Chromium only: the focus goes from the one field to the other in one task, and the React line is gone. Its first WebKit run is the one after this note.
+
+Still open, most serious first:
+- While carrying a section with a mouse on WebKit, the page scrolls itself down near the bottom edge but did not scroll back up near the top edge (`editor-drag.spec.ts`, "while carrying").
+  - 4 tries of 4 in the third WebKit run, with and without the focus rule, after passing in the first two. Chromium passes.
+  - Cause not found. Between those runs the editor's changes were the "Needs a description" mark (its `ResizeObserver` refits it), the popover fallback and the iPhone's viewport rule.
+  - The page ended at 704px in one run and 694px in the other, so the scroll stopped after one 10px step or none: either the carry had ended or `window.scrollBy` did nothing. The test now says which when it fails.
+  - It is left out on WebKit by name. A Mac with Safari settles it in a minute: pick a section up at the foot of a long page and hold it near the top of the window.
+- Under Safari's rule on WebKit only, "a picture: its file is not deleted while Undo can bring it back, and is once it cannot" failed (`editor-inplace.spec.ts`). Chromium passes it under the same rule, and WebKit passes it without the rule.
+  - Either the press on a picture's Remove did nothing there, or the press worked and the file was never deleted. The test could not tell which; it now checks that the picture left the page first.
+  - It is not left out: the next run under the rule says which.
+- The hand-over on a real iPhone: whether the keyboard stays up when a person taps a formatted field before its editor is live. It should now (the focus no longer leaves the fields), but only a phone shows it.
+- The zoom on focus (`phone/noZoom.ts`) and everything else in "What WebKit on Linux cannot show at all" above.

@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "./editor-test";
+import { expect, pressFocuses, test, type Page } from "./editor-test";
 import type { ExhbtDoc } from "../lib/exhbt/blocks";
 import { openBankingDoc } from "../lib/exhbt/sample";
 import { docNow, field, freshName, openDoc, openNew, READY, readStored, waitSaved } from "./page-editor";
@@ -233,7 +233,8 @@ test.describe("every sheet", () => {
       await page.keyboard.press("Escape");
       await expect(s).toBeHidden();
       const back = name === "publish" ? "Review and publish" : name === "work" ? "Add the work" : "Review and publish";
-      await expect(page.getByRole("button", { name: back })).toBeFocused();
+      // The card sheet's opener was given the focus; the other two were pressed, and in Safari a pressed button never has it to be given back.
+      if (pressFocuses || name === "card") await expect(page.getByRole("button", { name: back })).toBeFocused();
     });
   }
 });

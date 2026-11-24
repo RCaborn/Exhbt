@@ -1005,7 +1005,11 @@ test.describe("while carrying", () => {
     expect(await place(page)).not.toBe(p0);
     // Near the top edge it scrolls back, and stops at the top.
     await page.mouse.move(view.width / 2, 70, { steps: 12 });
-    await expect.poll(() => scrollY(page), { timeout: 30_000 }).toBe(0);
+    // On WebKit the page once stayed at its foot here (24 Nov): a failure says whether the section was still carried, and where to.
+    const stuck = async (e: Error) => {
+      throw new Error(`${e.message}\nStill carried: ${await lifting(page).count()}; its place: ${await place(page)}; scrollY: ${await scrollY(page)}.`);
+    };
+    await expect.poll(() => scrollY(page), { timeout: 30_000 }).toBe(0).catch(stuck);
     await page.mouse.up();
     await expect(lifting(page)).toHaveCount(0);
   });

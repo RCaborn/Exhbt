@@ -111,7 +111,13 @@ export function Insert({ at, end }: InsertSlot) {
           data-tip={name}
           aria-expanded={open !== null}
           aria-controls={open ? menuId : undefined}
-          onClick={() => (open ? setOpen(null) : show())}
+          onClick={() => {
+            // Safari gives a pressed button no focus. This "+" hears Escape only with the focus in it, so it takes the focus
+            // here, as the other browsers give it: Escape then closes the menu there too.
+            if (document.activeElement !== button.current) button.current?.focus({ preventScroll: true });
+            if (open) setOpen(null);
+            else show();
+          }}
         >
           <Plus aria-hidden size={16} strokeWidth={2.5} />
         </button>
