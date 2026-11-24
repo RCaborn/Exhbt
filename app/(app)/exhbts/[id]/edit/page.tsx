@@ -8,7 +8,8 @@ import { MatchPrompt } from "@/components/team/MatchPrompt";
 import { TeamStrip } from "@/components/team/TeamStrip";
 import { getCurrentUser } from "@/lib/auth";
 import { fileIdsOf } from "@/components/editor/media";
-import { editorKind } from "@/lib/editor-kind";
+import { isAdmin } from "@/lib/admin";
+import { editorKind } from "@/lib/editor-kind-server";
 import { ENTITLEMENTS } from "@/lib/entitlements";
 import { imagesOf } from "@/lib/exhbt/blocks";
 import { isFigureNews, isLayoutReason } from "@/lib/exhbt/drafted";
@@ -32,9 +33,11 @@ type Params = { params: Promise<{ id: string }>; searchParams: Promise<Query> };
 /**
  * The exhbt editor (docs/phase-2.md section 6). Only the owner sees it; anyone else gets a 404.
  *
- * It serves the edit-on-page editor (decision 0026) unless the classic one is asked for: by the
- * address (`?editor=classic`, for this visit: the new editor's menu and its crash fallback open it so)
- * or by the switch (`editorKind()`, the runtime variable EXHBT_EDITOR, for everyone, with no deploy).
+ * Which editor it serves is the switch's to say (lib/editor-kind.ts, decision 0026): the classic one
+ * for everyone until the edit-on-page editor is switched on (DEFAULT_EDITOR, or the runtime variable
+ * EXHBT_EDITOR for everyone with no deploy), and an admin's own choice before either. An address that
+ * asks for the classic editor (`?editor=classic`, for this visit: the new editor's menu and its crash
+ * fallback open it so) gets it whatever the switch says.
  * The new editor is drawn only in the browser, behind a crash fallback (EditorGate). If this page
  * itself fails on the server, the route's error page (error.tsx) links to the classic editor.
  */
@@ -96,9 +99,11 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
     liveFileIds: record.status === "published" && record.published ? fileIdsOf(record.published) : [],
   };
 
-  // Which editor: the classic one when the address asks for it, or when the switch says so for everyone.
+  // Which editor: the classic one when the address asks for it, or when the switch says so for this person
+  // (an admin's own choice first, then what everyone gets). Whether they are an admin is read on every request.
   const asked = query.editor === "classic";
-  const kind = await editorKind();
+  const admin = await isAdmin(user);
+  const kind = await editorKind(admin);
 
   return (
     <>

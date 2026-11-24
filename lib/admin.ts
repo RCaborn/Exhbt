@@ -20,6 +20,22 @@ export const requireAdmin = cache(async (): Promise<SessionUser> => {
   return user;
 });
 
+/**
+ * Whether this person is an admin, for a page that draws something extra for one and is otherwise the
+ * same for everyone (the edit page's own editor switch, lib/editor-kind.ts). It is the check requireAdmin
+ * makes, profiles.role is exhbt_admin, read on every call. It never throws and never sends anyone to the
+ * 404 page: with nobody signed in, or when the role cannot be read, the answer is no.
+ */
+export async function isAdmin(user: SessionUser | null): Promise<boolean> {
+  if (!user) return false;
+  try {
+    return await getStore().isAdmin(user.id);
+  } catch (e) {
+    console.error("admin: could not read the role, so this person is treated as not an admin:", (e as Error).message);
+    return false;
+  }
+}
+
 export const RANGES = ["7d", "30d", "90d", "all"] as const;
 export type Range = (typeof RANGES)[number];
 export const RANGE_LABEL: Record<Range, string> = { "7d": "7 days", "30d": "30 days", "90d": "90 days", all: "All time" };

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey } from "@/lib/ai/model";
-import { editorKind } from "@/lib/editor-kind";
+import { editorForEveryone } from "@/lib/editor-kind-server";
 import { isSupabaseConfigured, supabaseAdmin } from "@/lib/store";
 import { isStripeConfigured, priceForPlan, stripe, PAID_PLANS } from "@/lib/stripe";
 
@@ -103,7 +103,9 @@ async function checkStorage(): Promise<Check> {
 }
 
 export async function GET(req: Request) {
-  const editor = await editorKind();
+  // The editor an ordinary person gets (lib/editor-kind.ts): "classic" until the new editor is switched on for
+  // everyone. An admin's own choice never shows here, even when an admin asks.
+  const editor = await editorForEveryone();
   // ?only=editor answers at once, without the other checks (the end-to-end tests read it, and the full route calls Stripe).
   if (new URL(req.url).searchParams.get("only") === "editor") return NextResponse.json({ editor }, { headers: { "Cache-Control": "no-store" } });
   const settings: Record<string, boolean> = Object.fromEntries(REQUIRED.map((k) => [k, Boolean(process.env[k])]));

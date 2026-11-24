@@ -38,6 +38,9 @@ export default defineConfig({
     // The suite builds many roadmaps from one address, more than the production per-connection cap.
     env: { NEXT_TELEMETRY_DISABLED: "1", NEXT_DIST_DIR: ".next-e2e", EXHBT_PER_IP_PER_DAY: "100", EXHBT_PV_PER_MINUTE: "100000", EXHBT_LOGINS_PER_HOUR: "100",
       STRIPE_SECRET_KEY: "sk_test_dummy", STRIPE_WEBHOOK_SECRET: "whsec_test", STRIPE_PRICE_PREMIUM: "price_test_premium", STRIPE_PRICE_MAX: "price_test_max",
+      // The suite tests the edit-on-page editor as it is once switched on for everyone. The live site's default is the
+      // classic editor (DEFAULT_EDITOR in lib/editor-kind.ts); e2e/editor-admin-switch.spec.ts tests that state, per browser.
+      EXHBT_EDITOR: "page",
       // "Use a link" on job links may read this server's own /dev/listing page (never in production).
       // Referrals are off in production; this turns them on here, with the Stripe credit recorded, not sent (lib/referrals.ts).
       EXHBT_REFERRALS_TEST: "1",
