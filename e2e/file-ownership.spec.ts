@@ -1,42 +1,12 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Browser } from "@playwright/test";
 import { SCHEMA_VERSION } from "../lib/exhbt/blocks";
+import { fillValid, publish, signInAs, startFromScratch, waitForSaved } from "./editor";
 
 // A file can only be shown as part of its owner's exhbt. Someone who learns another person's file id
 // can't put it in their own exhbt and get a link to it: the save strips it, and no page signs it.
 
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 const unique = (tag: string) => `${tag}-${Date.now().toString(36)}${Math.floor(Math.random() * 1e3)}`;
-
-async function signInAs(page: Page, username: string) {
-  await page.goto(`/dev/portfolio?username=${username}&plan=premium&count=0`);
-  await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
-  await expect(page.getByRole("heading", { level: 1, name: "Your exhbts" })).toBeVisible();
-}
-
-async function startFromScratch(page: Page) {
-  await page.getByRole("button", { name: "Start from scratch" }).click();
-  await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
-  await expect(page.locator("[data-ready=true]")).toBeAttached();
-  await expect(page.getByRole("textbox", { name: "Context", exact: true })).toBeVisible();
-}
-
-const waitForSaved = (page: Page) => expect(page.getByText("Saved", { exact: true })).toBeVisible();
-
-async function fillValid(page: Page, title: string) {
-  await page.locator("#title").fill(title);
-  await page.getByRole("textbox", { name: "Context", exact: true }).fill("Queues ran long at lunch. Would a second till help?");
-  await page.getByLabel("Box 1", { exact: true }).fill("Timed the queue");
-  await page.getByLabel("Box 2", { exact: true }).fill("Added a second till");
-  await page.getByLabel("Box 3", { exact: true }).fill("Waits fell");
-  await page.getByRole("textbox", { name: "Finding 1" }).fill("Waits fell from 11 to 4 minutes.");
-  await page.getByRole("textbox", { name: "Finding 2" }).fill("Sales held steady.");
-}
-
-async function publish(page: Page) {
-  await page.getByLabel("This is my work, and the numbers are true").check();
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
-  await expect(page.getByText("It's live.")).toBeVisible();
-}
 
 async function asSecondPerson(browser: Browser, baseURL: string | undefined) {
   const context = await browser.newContext({ baseURL });

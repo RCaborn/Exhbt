@@ -266,6 +266,208 @@ export function researchDoc(imageFileId: string): ExhbtDoc {
   };
 }
 
+/**
+ * The four layouts of decision 0028, one fictional sample each, for development and the print
+ * checks (e2e/layouts-new.spec.ts). Each is a function of the file ids of its pictures (app/dev/portfolio
+ * makes the files), its picture facts exported beside it. Each is stored in the layout's usual order
+ * with no flowchart marker, as an AI draft would be, and as full as a real exhbt would be.
+ * Not in sampleSeeds, which other specs loop over: app/dev/portfolio adds them with `with=build`,
+ * `with=essay`, `with=before-after`, `with=event` or `with=layouts`.
+ */
+
+/** Build: a working tool, with a lead screenshot, what it does, a demo and the code. */
+export const BUILD_IMAGES = [
+  { w: 1440, h: 900, alt: "The Shift Swap rota for one week: a grid of shifts, with two open shifts marked in green.", caption: "The weekly rota, with open shifts marked" },
+  { w: 900, h: 1600, alt: "A phone screen showing one swap request with Approve and Decline buttons.", caption: "A swap waiting for a manager's approval" },
+];
+
+export function buildDoc(fileIds: string[]): ExhbtDoc {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    format: "build",
+    title: "Shift Swap: a web app for the Students' Union bar rota",
+    context: "BEng Computer Science, Year 2 team project",
+    whereWhen: "University of Bristol, May 2026",
+    summary: "A working app that replaced a group chat for swapping shifts.",
+    skills: ["React", "Node.js", "PostgreSQL", "Git"],
+    gap: text("The bar team swapped shifts in a group chat. Cover was found late, and twice nobody turned up."),
+    flow: [
+      { step: "Interviewed six staff about swaps" },
+      { step: "Sketched the screens and data" },
+      { step: "Built it in React and Node", detail: "five weeks" },
+      { step: "Tested it with the bar team" },
+    ],
+    sections: [
+      { id: "image-1", kind: "image", fileId: fileIds[0] ?? "missing-1", alt: BUILD_IMAGES[0]!.alt, caption: text(BUILD_IMAGES[0]!.caption), w: BUILD_IMAGES[0]!.w, h: BUILD_IMAGES[0]!.h },
+      {
+        id: "findings",
+        kind: "findings",
+        items: [text("Staff post a shift they cannot work and a colleague claims it."), text("Managers approve each swap in one tap."), text("A reminder goes out the evening before every shift.")],
+      },
+      {
+        id: "graph-1",
+        kind: "graph",
+        chart: { kind: "beforeAfter", title: "Shifts left uncovered each month", beforeLabel: "Group chat", afterLabel: "Shift Swap", lowerIsBetter: true, rows: [{ label: "Uncovered shifts", before: 9, after: 2 }] },
+      },
+      { id: "image-2", kind: "image", fileId: fileIds[1] ?? "missing-2", alt: BUILD_IMAGES[1]!.alt, caption: text(BUILD_IMAGES[1]!.caption), w: BUILD_IMAGES[1]!.w, h: BUILD_IMAGES[1]!.h },
+      { id: "quote-1", kind: "quote", text: "It saves me a Sunday of messages.", name: "Priya Nair", role: "Bar manager" },
+      { id: "reflection-1", kind: "reflection", text: text("Add a calendar feed so shifts appear on staff phones, and test it with a bigger team before term starts.") },
+      { id: "link-1", kind: "link", href: "https://example.com/shift-swap-demo", label: "Try the demo", description: "A test login for the live app" },
+      { id: "link-2", kind: "link", href: "https://example.com/shift-swap-code", label: "Source code", description: "On GitHub, with setup notes" },
+    ],
+    evidence: { kind: "link", href: "https://example.com/shift-swap-report.pdf", label: "Project report (PDF)" },
+  };
+}
+
+/** Essay: an argument and its sources. Its one picture is optional. */
+export const ESSAY_IMAGE = { w: 1400, h: 1000, alt: "A printed notice calling a reform meeting in Newcastle, in dense black type on aged paper.", caption: "Notice for a reform meeting in Newcastle, 1831" };
+
+export function essayDoc(fileId?: string): ExhbtDoc {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    format: "essay",
+    title: "Did the 1832 Reform Act protect the old order or end it?",
+    context: "BA History, Year 2 essay",
+    whereWhen: "University of Durham, March 2026",
+    summary: "It kept the old order standing for a generation, but opened a door it could not shut.",
+    skills: ["Source analysis", "Historiography", "Argument"],
+    gap: text("Historians split on whether Grey's ministry meant to reform or to preserve. I tested both readings against the debates and the vote figures."),
+    flow: [
+      { step: "Read the 1831 Commons debates" },
+      { step: "Compared three historians' readings" },
+      { step: "Counted who gained the vote", detail: "by borough" },
+      { step: "Weighed intent against effect" },
+    ],
+    sections: [
+      {
+        id: "findings",
+        kind: "findings",
+        items: [
+          text("Grey said openly that he meant to preserve the aristocracy's role, not widen it."),
+          text("Even afterwards, only about one adult man in five could vote."),
+          text("Later reformers used the Act's own reasoning to demand more."),
+        ],
+      },
+      { id: "pullquote-1", kind: "pullquote", text: "A reform meant to close a door became the first step through it." },
+      {
+        id: "graph-1",
+        kind: "graph",
+        chart: { kind: "bar", title: "Adult men who could vote (%)", unit: "%", highlight: 1, rows: [{ label: "Before 1832", value: 12 }, { label: "After 1832", value: 18 }] },
+      },
+      ...(fileId ? [{ id: "image-1", kind: "image" as const, fileId, alt: ESSAY_IMAGE.alt, caption: text(ESSAY_IMAGE.caption), w: ESSAY_IMAGE.w, h: ESSAY_IMAGE.h }] : []),
+      { id: "reflection-1", kind: "reflection", text: text("I'd look at petitions from towns that gained no seat, to see who felt left out.") },
+      { id: "link-1", kind: "link", href: "https://example.com/commons-debates-1831", label: "Commons debates on the Reform Bill, 1831", description: "" },
+      { id: "link-2", kind: "link", href: "https://example.com/hartley-reform-limits", label: "Hartley, Reform and Its Limits (2004)", description: "Chapter four, on the electorate" },
+      { id: "link-3", kind: "link", href: "", label: "Grey's letters, held in the university library", description: "" },
+    ],
+  };
+}
+
+/** Before and after: a redesign shown as it was and as it is now, in two pairs. */
+export const BEFORE_AFTER_IMAGES = [
+  { w: 1200, h: 900, stage: "before" as const, alt: "The old checkout: five small steps in a row, the total only at the last one.", caption: "Before: five steps, the total shown last" },
+  { w: 1200, h: 900, stage: "after" as const, alt: "The new checkout: three steps, with a running total always in view.", caption: "After: three steps, the total always in view" },
+  { w: 1200, h: 900, stage: "before" as const, alt: "The old pay button: small, pale grey text on a white background.", caption: "Before: a small, pale pay button" },
+  { w: 1200, h: 900, stage: "after" as const, alt: "The new pay button: large, dark green with white text.", caption: "After: a large, high-contrast pay button" },
+];
+
+export function beforeAfterDoc(fileIds: string[]): ExhbtDoc {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    format: "before-after",
+    title: "Redesigning the checkout of a campus cafe's order app",
+    context: "BA Interaction Design, Year 3 project",
+    whereWhen: "Edinburgh Napier University, April 2026",
+    summary: "Three steps instead of five cut abandoned orders by a third.",
+    skills: ["Figma", "Usability testing", "Prototyping", "Accessibility"],
+    gap: text("One order in four was abandoned at checkout. The old page hid the total until the last of five steps."),
+    flow: [
+      { step: "Watched eight students place orders" },
+      { step: "Mapped where they hesitated" },
+      { step: "Cut five steps to three" },
+      { step: "Tested a prototype with 12 people" },
+    ],
+    sections: [
+      ...BEFORE_AFTER_IMAGES.map((im, i): Section => ({ id: `image-${i + 1}`, kind: "image", fileId: fileIds[i] ?? `missing-${i + 1}`, alt: im.alt, caption: text(im.caption), w: im.w, h: im.h, stage: im.stage })),
+      {
+        id: "findings",
+        kind: "findings",
+        items: [
+          text("The total and every price now share one screen, so nobody meets a surprise at the end."),
+          text("Bigger buttons with passing contrast stopped the mis-taps seen in testing."),
+          text("Saved card and pickup time make a repeat order two taps."),
+        ],
+      },
+      {
+        id: "graph-1",
+        kind: "graph",
+        chart: {
+          kind: "beforeAfter",
+          title: "Abandoned orders (%)",
+          beforeLabel: "Before",
+          afterLabel: "After",
+          lowerIsBetter: true,
+          unit: "%",
+          rows: [{ label: "All orders", before: 24, after: 16 }, { label: "First-time users", before: 31, after: 19 }],
+        },
+      },
+      { id: "quote-1", kind: "quote", text: "Much quicker. I did not have to hunt for the total.", name: "Callum Reid", role: "Test participant" },
+      { id: "reflection-1", kind: "reflection", text: text("Test it on older phones, and in the cafe's lunchtime queue rather than one student at a time.") },
+      { id: "link-1", kind: "link", href: "https://example.com/cafe-checkout-prototype", label: "Try the prototype", description: "Clickable, in Figma" },
+    ],
+  };
+}
+
+/** Event or performance: a show put on by a society, with the poster as the lead. */
+export const EVENT_IMAGES = [
+  { w: 1200, h: 1700, alt: "A tall poster: the title The Crucible in white on deep red, with the dates and the studio theatre.", caption: "The poster, printed for the union and halls" },
+  { w: 1600, h: 1000, alt: "The finished set: a bare wooden courtroom with a long bench and tall windows.", caption: "The set on the first night of tech week" },
+  { w: 1600, h: 1000, alt: "The cast mid-scene on stage under warm side lighting.", caption: "Dress rehearsal, Act Three" },
+];
+
+export function eventDoc(fileIds: string[]): ExhbtDoc {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    format: "event",
+    title: "The Crucible: the Drama Society's spring show",
+    context: "Drama Society production, Year 2",
+    whereWhen: "Cardiff University, March 2026",
+    myRole: "Stage manager",
+    summary: "A four-night run that sold 82% of its seats.",
+    skills: ["Stage management", "Scheduling", "Budgeting", "Teamwork"],
+    gap: text("The society asked for a full-length show on a budget of £600, built and rehearsed in ten weeks."),
+    flow: [
+      { step: "Cast and read-through", detail: "week one" },
+      { step: "Built the set in the studio" },
+      { step: "Ran tech week and a dress rehearsal" },
+      { step: "Called four performances" },
+    ],
+    sections: [
+      ...EVENT_IMAGES.map((im, i): Section => ({ id: `image-${i + 1}`, kind: "image", fileId: fileIds[i] ?? `missing-${i + 1}`, alt: im.alt, caption: text(im.caption), w: im.w, h: im.h })),
+      {
+        id: "findings",
+        kind: "findings",
+        items: [text("312 of 380 seats sold across four nights."), text("We finished £48 under budget."), text("Every cue ran on time on the final night.")],
+      },
+      {
+        id: "graph-1",
+        kind: "graph",
+        chart: {
+          kind: "bar",
+          title: "Tickets sold each night (of 95 seats)",
+          highlight: 3,
+          rows: [{ label: "Wednesday", value: 64 }, { label: "Thursday", value: 65 }, { label: "Friday", value: 88 }, { label: "Saturday", value: 95 }],
+        },
+      },
+      { id: "quote-1", kind: "quote", text: "Tense and tidy. The cues were never late.", name: "Rhian Evans", role: "Reviewer, student newspaper" },
+      { id: "reflection-1", kind: "reflection", text: text("Start the budget tracker in week one, not week three, and book the lighting rig earlier.") },
+      { id: "link-1", kind: "link", href: "https://example.com/crucible-recording", label: "Watch the recording", description: "The full show, filmed on the final night" },
+      { id: "link-2", kind: "link", href: "https://example.com/crucible-programme", label: "Read the programme", description: "A PDF with the cast and crew" },
+    ],
+    evidence: { kind: "link", href: "https://example.com/crucible-production-report.pdf", label: "Production report (PDF)" },
+  };
+}
+
 /** The samples as they're stored by app/dev/portfolio: the GP one in the old layout. */
 export const sampleSeeds: unknown[] = [legacyGpDoc, libraryDoc];
 

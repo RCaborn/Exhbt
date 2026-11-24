@@ -37,7 +37,7 @@ export function readBackup(id: string): Backup | null {
     return null;
   }
 }
-function writeBackup(id: string, doc: ExhbtDoc) {
+export function writeBackup(id: string, doc: ExhbtDoc) {
   try {
     window.localStorage.setItem(key(id), JSON.stringify({ doc, at: Date.now() } satisfies Backup));
   } catch {

@@ -1,7 +1,7 @@
 Status: accepted
 Date: 16 Nov 2026
 Amends: 0022 (the key figure beside What I found is now filled in when the exhbt is drafted)
-Amended by: 0024 (where a picked figure lands depends on the layout: after What I found, the lead image, or the key figure)
+Amended by: 0024 (where a picked figure lands depends on the layout: after What I found, the lead image, or the key figure), 0025 (a picked graph or results table takes the place of the graph the draft drew; the pick says what kind of visual it is and gives its box in pixels; a scan's pages are looked at once the person agrees to send it; a clipping path no longer counts as a shape; a pick that finds nothing or fails is said in the editor; the real model is measured by `evals/figure-pick/`), 0026 (the picked figure is managed on the page; a figure can be taken by hand when none was picked)
 
 # The figure from the report, picked when the exhbt is drafted
 

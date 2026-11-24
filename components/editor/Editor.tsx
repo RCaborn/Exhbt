@@ -11,10 +11,11 @@ import { Button } from "@/components/ui/Button";
 import { CopyLink } from "@/components/ui/CopyLink";
 import type { Plan } from "@/lib/entitlements";
 import { formatLimits, LIMITS, normaliseDoc, safeHref, validateForPublish, wordCount, type ExhbtDoc, type Picked } from "@/lib/exhbt/blocks";
-import { FORMAT_COPY, formatOf, type Format } from "@/lib/exhbt/formats";
+import { flowShown, FORMAT_COPY, formatOf } from "@/lib/exhbt/formats";
+import { isArranged, restoreFlow } from "@/lib/exhbt/layouts";
 import { hasData } from "@/lib/exhbt/charts";
 import { newImageSection, roomFor } from "@/lib/exhbt/sections";
-import { LayoutPicker } from "./LayoutPicker";
+import { LayoutPicker, type Drafted } from "./LayoutPicker";
 import { BlockTools, useDraftTools, type DraftToolsInit } from "./BlockTools";
 import { ConfirmAction } from "./ConfirmAction";
 import { FieldIssues } from "./FieldIssues";
@@ -59,8 +60,12 @@ export type EditorProps = {
   figureSources?: Record<string, string | null>;
   /** Rewrite and "Back to the AI version"; null or missing when the exhbt has no kept source text. */
   draftTools?: DraftToolsInit;
-  /** The layout the AI draft chose, right after drafting (?drafted=gallery): a one-off line under the layout choice. */
-  draftedAs?: Format;
+  /**
+   * What the draft page passed on, right after drafting (?drafted=research&why=aim-results&fig=none): the
+   * layout chosen, why, and what came of looking for a figure. Said in one line under the layout choice,
+   * once: the editor takes it off the address, so a reload doesn't say it again (decision 0025).
+   */
+  drafted?: Drafted;
 };
 
 /** Where the list at the top jumps to for an issue: the card's heading, or the "Add a section" button for the sections as a whole. */
@@ -87,6 +92,9 @@ const GUIDE_KEY = "exhbt-guide-hidden";
 export function Editor(props: EditorProps) {
   const { id, status, slug, liveBase, owner, planBlock, canGoLive, maxFileMb } = props;
   const [doc, setDoc] = useState<ExhbtDoc>(props.initialDoc);
+  // What the draft page passed on, kept from the first render: it comes off the address below, so a
+  // later render of this page on the server (after publishing, say) no longer carries it.
+  const [drafted] = useState(props.drafted);
   const docRef = useRef(doc);
   docRef.current = doc;
   const f = formatOf(doc);
@@ -148,6 +156,8 @@ export function Editor(props: EditorProps) {
       if (b.at > Date.parse(props.updatedAt) && JSON.stringify(b.doc) !== JSON.stringify(props.initialDoc)) setOffer(b);
       else clearBackup(id);
     }
+    // What the draft page passed on is said once: it comes off the address, so a reload doesn't repeat it.
+    if (drafted && window.location.search) window.history.replaceState(null, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -363,7 +373,10 @@ export function Editor(props: EditorProps) {
     sections: doc.sections.filter((s) => s.kind !== "graph" || hasData(s.chart)),
   };
   const liveUrl = liveBase && slug ? `${liveBase}/${slug}` : null;
-  const arrangeable = f === "case-study" && doc.sections.length > 1;
+  const arrangeable = f === "case-study" && doc.sections.length > 1 && !isArranged(doc);
+  const flowOff = !flowShown(doc);
+  // "My role" is shown only where a doc already has one, or in an event: release 2 offers nobody a new field.
+  const showMyRole = doc.myRole !== undefined || f === "event";
   const justLiveUrl = liveBase && justLive ? `${liveBase}/${justLive.slug}` : null;
   const shownLive = canGoLive && status === "published";
 
@@ -504,7 +517,7 @@ export function Editor(props: EditorProps) {
                 }}
               />
             )}
-            <LayoutPicker doc={doc} setDoc={setDoc} draftedAs={props.draftedAs} />
+            <LayoutPicker doc={doc} setDoc={setDoc} drafted={drafted} />
             <Card id="card-header" title={copy.header} words={cw.header} flagged={flaggedBy("header")} heaviest={heaviest === "header"}>
               {flags.length > 0 && (
                 <ul aria-label="Numbers to check" className="mb-4 space-y-2">
@@ -548,7 +561,7 @@ export function Editor(props: EditorProps) {
                   multiline
                   placeholder="What you found, in one sentence. Shown on your portfolio's cards."
                 />
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className={`grid gap-4 ${showMyRole ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
                   <TextInput id="context" label="What it is" value={doc.context} max={LIMITS.contextChars} onChange={(context) => update({ context })} issues={issuesAt(issues, "context")} placeholder="e.g. MSc Finance dissertation" />
                   <TextInput
                     id="whereWhen"
@@ -559,6 +572,17 @@ export function Editor(props: EditorProps) {
                     issues={issuesAt(issues, "whereWhen")}
                     placeholder="e.g. University of Leeds, May 2026"
                   />
+                  {showMyRole && (
+                    <TextInput
+                      id="myRole"
+                      label="My role (optional)"
+                      value={doc.myRole ?? ""}
+                      max={LIMITS.myRoleChars}
+                      onChange={(myRole) => update({ myRole })}
+                      issues={issuesAt(issues, "myRole")}
+                      placeholder="e.g. Producer"
+                    />
+                  )}
                 </div>
                 <fieldset>
                   <legend className="label">
@@ -615,8 +639,16 @@ export function Editor(props: EditorProps) {
               <FieldIssues id="gap-issues" issues={issuesAt(issues, "gap")} />
             </Card>
 
-            <Card id="card-flow" title={copy.flow} words={cw.flow} hint="How you did it, as a flowchart. Type in the boxes. Every exhbt has one." flagged={flaggedBy("flow")} heaviest={heaviest === "flow"}>
+            <Card id="card-flow" title={copy.flow} words={cw.flow} hint={flowOff ? "How you did it, as a flowchart. Its boxes are kept while it is off the page." : "How you did it, as a flowchart. Type in the boxes. Every exhbt has one."} flagged={flaggedBy("flow")} heaviest={heaviest === "flow"}>
               <BlockTools dt={dt} block="flow" />
+              {flowOff && (
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-[10px] bg-mist px-3 py-2 text-sm text-graphite" data-flow-off>
+                  <p>The flowchart is off the page.</p>
+                  <Button size="sm" label="Put the flowchart back" onClick={() => setDoc((d) => restoreFlow(d))}>
+                    Put the flowchart back
+                  </Button>
+                </div>
+              )}
               <FlowEditor steps={doc.flow} onChange={(flow) => update({ flow })} issues={issues} />
               <FieldIssues id="flow-issues" issues={issuesAt(issues, "flow")} />
             </Card>

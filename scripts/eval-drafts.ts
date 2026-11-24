@@ -380,6 +380,8 @@ type Attempt =
       latencyMs: number;
       usage: { inputTokens: number; outputTokens: number; costUsd: number };
       doc: ExhbtDoc;
+      /** The layout's reason as the app keeps it (after checkedReason). */
+      formatReason: DraftResult["formatReason"];
       rendered: string;
       numbers: DraftResult["numbers"];
       checks: Checks;
@@ -427,6 +429,7 @@ async function attempt(rep: number, input: DraftInput, source: string, f: Facts,
     latencyMs,
     usage: { inputTokens: result.inputTokens, outputTokens: result.outputTokens, costUsd: result.costUsd },
     doc: result.doc,
+    formatReason: result.formatReason,
     rendered: renderDoc(result.doc),
     numbers: result.numbers,
     checks,
@@ -607,7 +610,7 @@ async function selfTest(banned: Banned): Promise<boolean> {
   const f = loadFixtures(["08"])[0]!;
   const { input } = await loadInput(f);
   const source = materialText(input);
-  const asResult = (doc: ExhbtDoc): DraftResult => ({ doc, numbers: [], model: "self-test", inputTokens: 0, outputTokens: 0, costUsd: 0 });
+  const asResult = (doc: ExhbtDoc): DraftResult => ({ doc, formatReason: "default", numbers: [], model: "self-test", inputTokens: 0, outputTokens: 0, costUsd: 0 });
   const empty: ExhbtDoc = { ...ORACLE_08, title: "", headline: undefined, skills: [], gap: [], flow: [], sections: [] };
   const cases: { name: string; doc: ExhbtDoc; want: Partial<Record<Criterion, number>> }[] = [
     { name: "oracle", doc: ORACLE_08, want: { C1: 2, C2: 2, C5: 2, C8: 2 } },
@@ -702,7 +705,7 @@ async function main() {
       attempts.push(a);
       const line =
         a.status === "ok"
-          ? `${a.checks.wordCount} words, ${a.checks.publishIssues.length} publish issues, ${a.checks.unverified.length + a.checks.badQuotes.length} unverified${a.checks.unverified.length + a.checks.badQuotes.length ? ` (${[...a.checks.unverified.map((n) => `${n} not in the material`), ...a.checks.badQuotes.map((n) => `${n}: its quote isn't`)].join("; ")})` : ""}, key facts ${a.checks.coverage.covered.length}/${f.keyFacts.length}` +
+          ? `${a.doc.format ?? "case-study"} (${a.formatReason}), ${a.checks.wordCount} words, ${a.checks.publishIssues.length} publish issues, ${a.checks.unverified.length + a.checks.badQuotes.length} unverified${a.checks.unverified.length + a.checks.badQuotes.length ? ` (${[...a.checks.unverified.map((n) => `${n} not in the material`), ...a.checks.badQuotes.map((n) => `${n}: its quote isn't`)].join("; ")})` : ""}, key facts ${a.checks.coverage.covered.length}/${f.keyFacts.length}` +
             (a.judge ? (a.judge.status === "ok" ? `, AI-judged ${judgeTotal(a.judge)}/16` : `, judge failed: ${a.judge.error}`) : "")
           : `failed (${a.errorClass}): ${a.error}`;
       console.log(`  ${f.fixture}${args.reps > 1 ? ` #${rep}` : ""}: ${line}`);

@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   chartsOf,
   emptyDoc,
@@ -14,6 +14,7 @@ import {
   wordCount,
   words,
   type Chart,
+  type ContentSection,
   type ExhbtDoc,
   type ExhbtDocV1,
   type Section,
@@ -23,6 +24,7 @@ import { legacyGpDoc } from "../lib/exhbt/sample";
 import { moveSection, nextSectionId, sectionLabel } from "../lib/exhbt/sections";
 import { slugify } from "../lib/exhbt/slug";
 import { unverifiedNumbers } from "../lib/exhbt/verify";
+import { addSection, card, fillFindings, listOrder, openAddSectionMenu, pageOrder, previewRegion, publish, sectionsArea, signInAs, startWithCore, waitForSave, wordsOnBar } from "./editor";
 
 // Sections (decision 0015): the core (header, the question, the flowchart) is on every exhbt;
 // below it, findings, graphs, images, a quote, what I'd do next and a link can be added, removed
@@ -38,9 +40,9 @@ const F: Section = { id: "findings", kind: "findings", items: [text("Waits fell.
 const bar: Chart = { kind: "bar", title: "Waits", unit: "min", rows: [{ label: "Before", value: 11 }, { label: "After", value: 4 }] };
 const graph = (n = 1, chart: Chart = bar): Section => ({ id: `graph-${n}`, kind: "graph", chart });
 const image = (n = 1): Section => ({ id: `image-${n}`, kind: "image", fileId: `f${n}`, alt: "A queue at the till", caption: [] });
-const quote = (t = "Lunch is calmer now.", name = "Priya Shah", role = "Cafe manager"): Section => ({ id: "quote-1", kind: "quote", text: t, name, role });
-const next = (t = "Next time I'd time the evening queue too."): Section => ({ id: "reflection-1", kind: "reflection", text: text(t) });
-const link = (href = "https://example.com/code", label = "Model code", description = ""): Section => ({ id: "link-1", kind: "link", href, label, description });
+const quote = (t = "Lunch is calmer now.", name = "Priya Shah", role = "Cafe manager"): ContentSection => ({ id: "quote-1", kind: "quote", text: t, name, role });
+const next = (t = "Next time I'd time the evening queue too."): ContentSection => ({ id: "reflection-1", kind: "reflection", text: text(t) });
+const link = (href = "https://example.com/code", label = "Model code", description = ""): ContentSection => ({ id: "link-1", kind: "link", href, label, description });
 /** A complete core, with these sections below the flowchart. */
 const core = (sections: Section[]): ExhbtDoc => ({
   ...emptyDoc(),
@@ -171,61 +173,6 @@ test.describe("Sections: the model", () => {
 
 /* ---------------- In the browser ---------------- */
 
-async function signInAs(page: Page, username: string) {
-  await page.goto(`/dev/portfolio?username=${username}&plan=premium&count=0`);
-  await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
-  await expect(page.getByRole("heading", { level: 1, name: "Your exhbts" })).toBeVisible();
-}
-
-/** Starts from scratch and fills the core: title, the question and three process boxes. */
-async function startWithCore(page: Page, title: string) {
-  await page.getByRole("button", { name: "Start from scratch" }).click();
-  await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
-  await expect(page.locator("[data-ready=true]")).toBeAttached();
-  await expect(page.getByRole("textbox", { name: "Context", exact: true })).toBeVisible();
-  await page.locator("#title").fill(title);
-  await page.getByRole("textbox", { name: "Context", exact: true }).fill("Lunch queues ran long. Would a second till help?");
-  for (const [i, box] of ["Timed the queue", "Opened a second till", "Timed it again"].entries()) await page.getByLabel(`Box ${i + 1}`, { exact: true }).fill(box);
-}
-
-async function fillFindings(page: Page) {
-  await page.getByRole("textbox", { name: "Finding 1" }).fill("Average wait fell from 11 to 4 minutes.");
-  await page.getByRole("textbox", { name: "Finding 2" }).fill("Sales held steady, so the till paid for itself.");
-}
-
-const sectionsArea = (page: Page) => page.getByRole("region", { name: "Sections", exact: true });
-const card = (page: Page, name: string) => sectionsArea(page).getByRole("region", { name, exact: true });
-const preview = (page: Page) => page.getByRole("region", { name: "Preview" });
-const openMenu = (page: Page) => page.getByRole("button", { name: "Add a section" }).click();
-
-async function addSection(page: Page, name: string) {
-  await openMenu(page);
-  await page.getByRole("button", { name, exact: true }).click();
-}
-
-/** The kinds in the editor's list, in order. */
-const listOrder = (page: Page) => page.locator('ol[aria-label="Sections, in page order"] > li').evaluateAll((lis) => lis.map((li) => li.getAttribute("data-kind")));
-
-/** The parts of a drawn exhbt below the title, in order: the flowchart, then each section's kind (data-part, ProjectView). */
-const pageOrder = (scope: Locator) => scope.locator("article [data-part]").evaluateAll((els) => els.map((e) => e.getAttribute("data-part") ?? ""));
-
-/** The figure on the word bar. */
-async function wordsOnBar(page: Page): Promise<number> {
-  const t = await page.locator("[data-word-bar]").innerText();
-  return Number(t.match(/^(\d+) words/)?.[1]);
-}
-
-async function waitForSave(page: Page) {
-  await expect(page.getByText("Saving…")).toBeVisible();
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
-}
-
-async function publish(page: Page) {
-  await page.getByLabel("This is my work, and the numbers are true").check();
-  await page.getByRole("button", { name: /^Publish( changes)?$/ }).click();
-  await expect(page.getByText(/^(It's live\.|Your changes are live\.)$/)).toBeVisible();
-}
-
 const axe = async (page: Page, where: string) => {
   const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
   expect(violations.map((v) => `${where} ${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
@@ -241,7 +188,7 @@ test.describe("Sections in the editor", () => {
     await startWithCore(page, title);
 
     // A new exhbt starts with findings; the menu says how many words are left, and findings are taken.
-    await openMenu(page);
+    await openAddSectionMenu(page);
     const left = LIMITS.totalWords - (await wordsOnBar(page));
     await expect(page.getByTestId("words-left")).toHaveText(`${left} words left of ${LIMITS.totalWords}. Every word in a section counts.`);
     await expect(page.getByRole("button", { name: "Add findings" })).toBeDisabled();
@@ -260,7 +207,7 @@ test.describe("Sections in the editor", () => {
     await g.getByLabel("Graph 1, row 1 After").fill("4");
 
     // An image, through the file picker.
-    await openMenu(page);
+    await openAddSectionMenu(page);
     const chooser = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "Add an image" }).click();
     await (await chooser).setFiles({ name: "queue.png", mimeType: "image/png", buffer: PNG });
@@ -281,7 +228,7 @@ test.describe("Sections in the editor", () => {
 
     expect(await listOrder(page)).toEqual(["findings", "graph", "image", "quote", "reflection", "link"]);
     // The preview follows as you type, in the same order.
-    const pv = preview(page);
+    const pv = previewRegion(page);
     await expect(pv.getByText(`“${QUOTE}”`)).toBeVisible();
     await expect(pv.getByText("Priya Shah, Cafe manager")).toBeVisible();
     await expect(pv.getByText(NEXT)).toBeVisible();
@@ -289,7 +236,7 @@ test.describe("Sections in the editor", () => {
     expect(await pageOrder(pv)).toEqual(["process", "findings", "graph", "image", "quote", "reflection", "link"]);
 
     // The menu now offers only what there's room for, and the words left went down.
-    await openMenu(page);
+    await openAddSectionMenu(page);
     for (const taken of ["Add findings", "Add a quote", "Add what I'd do next", "Add a link"]) await expect(page.getByRole("button", { name: taken })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Add a graph" })).toBeEnabled();
     await expect(page.getByRole("button", { name: "Add a graph" })).toHaveAccessibleDescription(/1 of 2 left\./);
@@ -308,7 +255,7 @@ test.describe("Sections in the editor", () => {
     expect(await listOrder(page)).toEqual(["findings", "graph", "image", "quote", "reflection", "link"]);
 
     // Published, the project page has every section in order.
-    await publish(page);
+    await publish(page, { changes: true });
     await page.goto(`/p/sasha/${slugify(title)}`);
     const article = page.locator("article");
     expect(await pageOrder(page.locator("main"))).toEqual(["process", "findings", "graph", "image", "quote", "reflection", "link"]);
@@ -351,7 +298,7 @@ test.describe("Sections in the editor", () => {
     // At the top the up button is off, so focus moves to the down one.
     await expect(up).toBeDisabled();
     await expect(page.getByRole("button", { name: "Move what I'd do next down" })).toBeFocused();
-    expect(await pageOrder(preview(page))).toEqual(["process", "reflection", "findings", "quote"]);
+    expect(await pageOrder(previewRegion(page))).toEqual(["process", "reflection", "findings", "quote"]);
 
     // The drag handle from the keyboard (dnd-kit): Space, an arrow, Space.
     const quoteHandle = page.getByRole("button", { name: "Drag quote to move it" });
@@ -381,7 +328,7 @@ test.describe("Sections in the editor", () => {
     await page.mouse.move(x, y + (onto.y + onto.height / 2) - (from.y + from.height / 2), { steps: 20 });
     await page.mouse.up();
     await expect.poll(() => listOrder(page)).toEqual(["quote", "reflection", "findings"]);
-    expect(await pageOrder(preview(page))).toEqual(["process", "quote", "reflection", "findings"]);
+    expect(await pageOrder(previewRegion(page))).toEqual(["process", "quote", "reflection", "findings"]);
 
     // The order is saved with the exhbt.
     await waitForSave(page);
@@ -406,7 +353,7 @@ test.describe("Sections in the editor", () => {
     const room = LIMITS.totalWords - total;
     expect(room).toBeGreaterThan(0);
     expect(room).toBeLessThan(LIMITS.quote.words + 2);
-    await openMenu(page);
+    await openAddSectionMenu(page);
     await expect(page.getByTestId("words-left")).toHaveText(`${room} words left of ${LIMITS.totalWords}. Every word in a section counts.`);
     await expect(page.locator("[data-word-bar]")).not.toHaveAttribute("data-over");
 
@@ -417,7 +364,7 @@ test.describe("Sections in the editor", () => {
     const over = total + LIMITS.quote.words + 2 - LIMITS.totalWords;
     await expect(page.locator("[data-word-bar]")).toHaveAttribute("data-over", "true");
     await expect(page.locator("[data-word-bar]").locator(".text-error")).toHaveText(String(total + LIMITS.quote.words + 2));
-    await openMenu(page);
+    await openAddSectionMenu(page);
     await expect(page.getByTestId("words-left")).toHaveText(`${over} ${over === 1 ? "word" : "words"} over the ${LIMITS.totalWords}-word limit. Trim something before you publish.`);
     await page.keyboard.press("Escape");
 
@@ -434,7 +381,7 @@ test.describe("Sections in the editor", () => {
     const processCard = page.getByRole("region", { name: "Process", exact: true });
     await expect(processCard.getByRole("button", { name: /^Remove process/ })).toHaveCount(0);
     await expect(sectionsArea(page).getByRole("region", { name: "Process" })).toHaveCount(0);
-    await openMenu(page);
+    await openAddSectionMenu(page);
     const menu = page.getByTestId("words-left").locator("xpath=..");
     expect(await menu.getByRole("button").evaluateAll((bs) => bs.map((b) => b.getAttribute("aria-label")))).toEqual([
       "Add findings",
@@ -455,7 +402,7 @@ test.describe("Sections in the editor", () => {
     // With every section taken away, the flowchart is still drawn, and publishing asks for findings or a graph.
     await page.getByRole("button", { name: "Remove findings" }).click();
     await expect(page.locator('ol[aria-label="Sections, in page order"]')).toHaveCount(0);
-    await expect(preview(page).getByRole("list", { name: "Methodology" })).toBeVisible();
+    await expect(previewRegion(page).getByRole("list", { name: "Methodology" })).toBeVisible();
     for (let n = 4; n <= LIMITS.flow.max; n++) await page.getByLabel(`Box ${n}`, { exact: true }).fill(`Step ${n}`);
     await page.getByLabel("This is my work, and the numbers are true").check();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
@@ -539,7 +486,7 @@ test.describe("Sections in the editor", () => {
     await page.getByLabel("Web address").fill("https://example.com/queue-model");
     await page.getByLabel("What the link is").fill("Queue model notebook");
     await page.getByLabel("One line about it (optional)").fill("The timings and the code");
-    await publish(page);
+    await publish(page, { changes: true });
 
     await page.goto(`/p/pia/${slugify(title)}`);
     await page.emulateMedia({ media: "print" });
@@ -554,7 +501,7 @@ test.describe("Sections in the editor: blank boxes in the preview", () => {
   test("a blank last box is left out of the preview, so the last filled step keeps the result box", async ({ page }) => {
     await signInAs(page, "blanky");
     await startWithCore(page, "Blank boxes stay out of the preview");
-    const list = preview(page).getByRole("list", { name: "Methodology" });
+    const list = previewRegion(page).getByRole("list", { name: "Methodology" });
     await expect(list.getByRole("listitem")).toHaveCount(3);
     await page.getByRole("button", { name: "Add a box at the end" }).click();
     await expect(page.getByLabel(/^Box \d$/)).toHaveCount(4);
@@ -573,6 +520,6 @@ test.describe("Sections in the editor: blank boxes in the preview", () => {
     await page.getByRole("button", { name: "Start from scratch" }).click();
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
     await expect(page.locator("[data-ready=true]")).toBeAttached();
-    await expect(preview(page).getByRole("list", { name: "Methodology" }).getByRole("listitem")).toHaveCount(3);
+    await expect(previewRegion(page).getByRole("list", { name: "Methodology" }).getByRole("listitem")).toHaveCount(3);
   });
 });

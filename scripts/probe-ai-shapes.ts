@@ -1,5 +1,5 @@
 /**
- * Checks every structured answer the app asks the AI for against the real API (decision 0025).
+ * Checks every structured answer the app asks the AI for against the real API (decision 0029).
  *
  * The API compiles each answer's JSON schema into a grammar before the model writes a word, and
  * refuses a schema whose grammar is too large ("The compiled grammar is too large..."). Only the
@@ -26,6 +26,7 @@ import { INTRO_OUTPUT_CONFIG } from "@/lib/ai/portfolio-intro";
 import { IDEAS_OUTPUT_CONFIG, SWAP_OUTPUT_CONFIG } from "@/lib/ai/projects";
 import { ROADMAP_OUTPUT_CONFIG } from "@/lib/ai/roadmap";
 import { AI_MODEL, anthropicApiKey } from "@/lib/ai/model";
+import { FORMATS } from "@/lib/exhbt/formats";
 
 type Json = Record<string, unknown>;
 type OutputConfig = { effort: "low" | "medium" | "high"; format: { type: "json_schema"; schema: Json } };
@@ -47,13 +48,13 @@ const APP_SHAPES: Shape[] = [
 
 /**
  * The draft as it will be once the work already built has landed, so a release can't take the
- * schema over the limit unseen: release 2's formatReason (its 8 values, as on phase-2-r2), and
- * release 4's 7 layouts, a pull quote, a "my role" line and a before/after mark on each image
- * (modelled: release 4's own schema isn't on a branch yet, so its names here are stand-ins).
+ * schema over the limit unseen. Release 2's formatReason is in the real schema now; on top of it,
+ * release 4 lets the draft choose any of the 7 layouts (FORMATS) and adds a pull quote, a "my
+ * role" line and a before/after mark on each image (modelled: release 4's own schema isn't on a
+ * branch yet, so those names are stand-ins).
  */
 const PlannedGrowth = (DraftSchema as unknown as z.ZodObject<z.ZodRawShape>).extend({
-  format: z.enum(["case-study", "gallery", "research", "r4-a", "r4-b", "r4-c", "r4-d"]),
-  formatReason: z.enum(["notes", "aim-results", "hypothesis-results", "study", "visual-work", "mostly-pictures", "question-findings", "default"]),
+  format: z.enum(FORMATS),
   pullQuote: z.string(),
   myRole: z.string(),
   imageMarks: z.array(z.object({ file: z.string(), mark: z.enum(["none", "before", "after"]) })),
@@ -112,7 +113,7 @@ const NSTR = { type: ["string", "null"] };
 
 /**
  * Measurements, not checks: how many more fields fit on top of the draft and of the planned
- * growth (decision 0025 has the numbers). A rung that flips from accepted to refused places the limit.
+ * growth (decision 0029 has the numbers). A rung that flips from accepted to refused places the limit.
  */
 function exploreShapes(): Shape[] {
   const draft = DRAFT_OUTPUT_CONFIG.format.schema as Json;

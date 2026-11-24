@@ -62,7 +62,7 @@ Options: `--mock`, `--model-judge`, `--only <prefixes>` (comma-separated, such a
 
 ### In GitHub Actions
 
-This sandbox has no key, so real runs happen in Actions. Add the key as the repository secret `ANTHROPIC_API_KEY` (Settings > Secrets and variables > Actions), then go to Actions > "Exhbt draft eval" > Run workflow. Leave "judge" ticked for AI-judged scores as well.
+This sandbox has no key, so real runs happen in Actions. Add the key as the repository secret `ANTHROPIC_API_KEY` (Settings > Secrets and variables > Actions), then go to Actions > "Exhbt draft eval" > Run workflow. Leave "suite" on `drafts` (the same workflow also runs the figure eval, `evals/figure-pick/README.md`, when it is set to `figures` or `both`), and leave "judge" ticked for AI-judged scores as well.
 
 The workflow runs only when started by hand, never on a push or pull request. It puts `SUMMARY.md` on the run's summary page and uploads the whole run folder as the artifact `exhbt-draft-eval`. If the secret is missing it stops with an error that names it.
 

@@ -1,6 +1,7 @@
 import type { TileExhbt } from "@/components/exhbt/ExhbtTile";
 import { chartsOf, type ExhbtDoc } from "./blocks";
 import { asChart } from "./charts";
+import { flowShown } from "./formats";
 
 export type Headline = { value: string; label: string };
 
@@ -32,13 +33,13 @@ export function headlineFor(doc: Pick<ExhbtDoc, "headline" | "sections">): Headl
   return { value, label: label.trim() };
 }
 
-/** A published exhbt as a portfolio tile (components/exhbt/ExhbtTile.tsx): the same tile the demo uses. */
+/** A published exhbt as a portfolio tile (components/exhbt/ExhbtTile.tsx): the same tile the demo uses. No methodology steps when the flowchart is off the page (decision 0027). */
 export function tileFromDoc(doc: ExhbtDoc): TileExhbt {
   return {
     title: doc.title,
     context: doc.context,
     headline: headlineFor(doc),
-    methodology: doc.flow.filter((s) => s.step.trim()),
+    methodology: flowShown(doc) ? doc.flow.filter((s) => s.step.trim()) : [],
     skills: doc.skills,
   };
 }

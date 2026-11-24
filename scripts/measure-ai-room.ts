@@ -1,5 +1,5 @@
 /**
- * How much of its max_tokens each AI call uses (decision 0025 has why this matters). Sends the
+ * How much of its max_tokens each AI call uses (decision 0029 has why this matters). Sends the
  * app's own request for every feature, built by the request builder beside each call, with a
  * typical and a heavy input, three times each, and prints one table: the cap, the stop reason of
  * each run and the output tokens it used (thinking included). A call that stops at max_tokens is a
@@ -35,6 +35,7 @@ import type { JobProfile } from "@/lib/jobs";
 import type { MatchCandidate } from "@/lib/jobs/rank";
 import { MAX_LISTING_CHARS } from "@/lib/jobs/listing-text";
 import { FIGURE } from "@/lib/figures/rules";
+import { imageSize } from "@/lib/figures/image-size";
 
 const ROOT = process.cwd();
 const FIXTURES = join(ROOT, "evals/exhbt-draft/fixtures");
@@ -262,7 +263,10 @@ function pageImages(n: number): PageImage[] {
   const files = readdirSync(PAGES).filter((f) => f.endsWith(".jpg")).sort();
   return Array.from({ length: n }, (_, i) => {
     const f = files[i % files.length]!;
-    return { label: `report.pdf, page ${i + 1} (${f})`, data: new Uint8Array(readFileSync(join(PAGES, f))), mediaType: "image/jpeg" as const };
+    const data = new Uint8Array(readFileSync(join(PAGES, f)));
+    // Each page's size in pixels, read from the file as the route reads it.
+    const size = imageSize(data) ?? { width: 0, height: 0 };
+    return { label: `report.pdf, page ${i + 1} (${f})`, data, mediaType: "image/jpeg" as const, ...size };
   });
 }
 
