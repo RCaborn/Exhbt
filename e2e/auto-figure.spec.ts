@@ -699,6 +699,9 @@ test.describe("Drafts with no figure", () => {
     await signInFree(page, "figclip");
     const seen = countPicks(page);
     await addFile(page, PRINTED_ESSAY_PDF);
+    // Its own words say "this essay", so in the new editor the stand-in drafts an essay, which takes nothing from the work
+    // (decision 0028) and never looks for a figure. The notes name a layout that does, so the PDF is looked through.
+    await page.getByLabel("Notes").fill("stand-in: layout research");
     await draft(page);
     expect(seen.picks).toBe(0);
     expect(await sectionKinds(page)).not.toContain("image");
