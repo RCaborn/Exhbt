@@ -184,12 +184,13 @@
     .xe-flow:is([data-axis="column"], [data-axis="row"]) .xe-flow-tools > [data-flow-remove]::before {
       inset: -1rem -1rem 0 0;
     }
-    /* In a row only the box with the focus shows them: one box's grip and the next one's Remove, across the
-       arrow between them, are nearer than a press. */
-    .xe-flow[data-axis="row"] .xp-flow-box:not(:focus-within) > .xe-flow-tools {
+    /* In a row only the box with the focus, or the one just touched, shows them: one box's grip and the next
+       one's Remove, across the arrow between them, are nearer than a press. The touch keeps them up while it
+       lasts: on Safari a press on a button takes the focus from the box, and the chip would go under it. */
+    .xe-flow[data-axis="row"] [data-flow-step]:not(:hover) > .xp-flow-box:not(:focus-within) > .xe-flow-tools {
       opacity: 0;
     }
-    .xe-flow[data-axis="row"] .xp-flow-box:not(:focus-within) > .xe-flow-tools > .xe-flow-chip {
+    .xe-flow[data-axis="row"] [data-flow-step]:not(:hover) > .xp-flow-box:not(:focus-within) > .xe-flow-tools > .xe-flow-chip {
       pointer-events: none;
     }
   }
