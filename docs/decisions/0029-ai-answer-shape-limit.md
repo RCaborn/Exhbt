@@ -2,6 +2,7 @@ Status: accepted
 Date: 23 Nov 2026
 Numbered 0025 on `main` until release 2, which already had a 0025 (the key visual from the work).
 Amends: 0007 (the shape of the draft's answer; the stored exhbt doc is unchanged)
+Added to in place on 25 Nov 2026: "Emphasis inside the answer", at the end (the draft and the rewrite mark bold and italic inside the text they return, with no field added)
 
 # The AI draft's answer must fit the API's grammar limit
 
@@ -71,3 +72,27 @@ Added after a review of the first two fixes.
 - **A scan cut off** at `max_tokens` keeps what was read, and the draft page says under the file that only the first part was read.
 - **A roadmap generated twice** (a reload, a second tab): the first result saved wins, and the later one hands back what was saved. Stopping the second AI call itself needs a database column, so it waits.
 - **Cost.** A prompt over 100,000 input tokens is priced at the higher rate (input and output), call by call.
+
+## Emphasis inside the answer (25 Nov 2026)
+
+Rory, 25 Nov 2026: "Maybe we could do some AI bolding where we think it should be, or italics where it's important information; make it really skimmable within the AI-generated bit."
+
+The draft and the rewrite of a section mark emphasis inline, in the text they already return, as `**bold**` and `*italic*`. No field is added to either answer, so their sizes are as they were: 39 fields for the three-layout draft, 41 for the seven-layout one, and the rewrites unchanged (`npm run probe:ai -- --dry`, 25 Nov 2026).
+
+**What the AI may mark, and why.**
+
+- Only the parts that read as paragraphs: each finding, what I'd do next, and research's aim and conclusion; in a rewrite, the findings. These are what a recruiter skims, and a result or a number in bold is found at a glance.
+- Bold: one phrase at most in each, of at most six words, for the key result or number. Never a whole sentence, and none where nothing stands out.
+- Italic: rarely, for a term or the title of a work. One at most in each, of at most eight words.
+- Nowhere else. One-line fields, the title, the flowchart's boxes and the graphs' labels are short and set apart by the page already. The context line keeps its own meaning: its bold is the gap it highlights, named by `gapHighlight` (decision 0022), never a mark of the AI's.
+
+**What the code holds it to, whatever the model sends** (`lib/exhbt/emphasis.ts`):
+
+- A mark hugs a word: `**` or `*` at the start of a word opens and at the end of one closes. One inside a word, or with a space on both sides, is part of the words ("2 * 3", "x**2").
+- Marks left open, nested, crossed or past the limits are dropped, and their words kept. A mark that pairs with nothing is kept only where the material has it as written, so an A* grade or a significance star (0.42**) stays as it was.
+- Every other field is read with the marks taken out before any check (`plainAnswer` in `lib/ai/draft-answer.ts`, `toBlockValue` in `lib/ai/exhbt-rewrite.ts`).
+- Word counts, the number check and the checks that keep only what the person supplied read the plain words. A number's source quote, a quote, a pull quote, a role and an essay's source are looked for in the material as written, and again with the marks taken out of both (`misquoted` in `lib/exhbt/verify.ts`, `saidIn` in `lib/exhbt/references.ts`). So a mark, the AI's or a Markdown file's own, never makes a true quote look made up, and a quote whose words aren't there is still caught.
+
+Only new drafts and rewrites carry marks; exhbts already stored are unchanged. A person takes any of it off with the editor's Bold or Italic button. The stand-in AI marks one word of its placeholder finding, and with "stand-in: bad emphasis" in the notes writes marks the rules refuse, so the tests reach the editors, the page and print without the API (`e2e/ai-emphasis.spec.ts`).
+
+**Not yet checked against the real model**, because no call to the API was allowed when this was written: how often Haiku marks and what it marks, whether it keeps to one phrase of six words, and whether the added rules change the drafts' words or their length. The three-layout prompt's words are no longer exactly those the live site was proven on; its answer's shape is. The figure pick's caption is not marked: the pick is a call of its own, with its own prompt.
