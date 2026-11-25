@@ -512,6 +512,63 @@ test.describe("undo", () => {
     await expect.poll(() => fileExists(page, fileId)).toBe(false);
   });
 
+  // The test above failed now and then under Safari's rule about the focus: a press on Remove gives the button no focus, so
+  // the field the focus leaves saved at once, the picture still in its doc, and the removal falling off the undo list sent
+  // the picture's DELETE while that save was still on its way. When the save landed first, the server kept the file (it
+  // deletes nothing a working copy points at) and the editor had forgotten it. Here that order is made, not waited for.
+  test("a picture: a save still on its way with it in keeps its file from the rule; it goes once a save without it lands", async ({ page }) => {
+    const working: ExhbtDoc = { ...sampleDoc("case-study"), sections: [...sampleDoc("case-study").sections, { id: "image-1", kind: "image", fileId: "x", alt: "The queue", caption: text("Lunch"), w: 1200, h: 800 }] };
+    const { id, files } = await openDoc(page, freshName("inflight"), sampleDoc("case-study"), { working });
+    const fileId = files["image-1"]!;
+    // Saved without it, then brought back by Undo.
+    await page.evaluate(() => window.__exhbtEditor!.remove("image-1"));
+    await waitSaved(page, id);
+    await pressUndo(page);
+    await expect(frame(page, "image-1")).toBeVisible();
+    // The next save, the picture back in it, is held on its way. A DELETE sent meanwhile reaches the server once that save
+    // has landed there, and before the page hears the save's answer (the next save goes only after it): the order that lost
+    // the file.
+    const tick = () => new Promise((r) => setTimeout(r, 10));
+    let release = () => {};
+    const out = new Promise<void>((r) => (release = r));
+    let holding = false;
+    let landed = false;
+    let sent = 0;
+    let answered = 0;
+    await page.route(/\/exhbts\/[0-9a-f-]{36}\/edit/, async (route) => {
+      const req = route.request();
+      if (landed || req.method() !== "POST" || !req.headers()["next-action"] || !(req.postData() ?? "").includes('"image-1"')) return route.continue();
+      holding = true;
+      await out;
+      const res = await route.fetch();
+      landed = true;
+      while (answered < sent) await tick();
+      return route.fulfill({ response: res });
+    });
+    await page.route("**/api/files/**", async (route) => {
+      if (route.request().method() !== "DELETE") return route.continue();
+      sent++;
+      while (!landed) await tick();
+      const res = await route.fetch();
+      answered++;
+      return route.fulfill({ response: res });
+    });
+    await expect.poll(() => holding).toBe(true);
+    // Removed again, and thirty steps push the removal off the end of the undo list while that save is out: the rule runs.
+    await page.evaluate(() => {
+      const s = window.__exhbtEditor!;
+      s.remove("image-1");
+      for (let i = 0; i < 30; i++) s.move("flow", i % 2);
+    });
+    // Time for a DELETE sent then to reach the route before the save goes on.
+    await page.waitForTimeout(500);
+    release();
+    await expect.poll(() => landed).toBe(true);
+    await waitSaved(page, id);
+    expect((await readStored(page, id)).working.sections.some((s) => s.id === "image-1")).toBe(false);
+    await expect.poll(() => fileExists(page, fileId)).toBe(false);
+  });
+
   test("a layout switch and its Undo give back the layout and the order", async ({ page }) => {
     const doc = sampleDoc("case-study");
     const { id } = await openDoc(page, freshName("layout"), doc);
