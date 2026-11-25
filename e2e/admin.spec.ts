@@ -231,6 +231,37 @@ test.describe("Admin panel", () => {
     expect(await stat(page, "ai-failures-total")).toBe(failedBefore + 5);
   });
 
+  test("a failed figure pick shows in Failed AI calls with its reason, whether its pick was given back or stays counted", async ({ page }) => {
+    await signIn(page, { admin: true });
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+    const ask = (name: string) => page.request.post("/api/exhbts/figure-pick", { multipart: { label: name, image: { name: "image-1.png", mimeType: "image/png", buffer: png } } });
+    const cells = page.getByRole("table", { name: "Failed AI calls by feature" }).getByRole("row", { name: /^Figure picks/ }).getByRole("cell");
+    /** The row's count and how many of them each reason accounts for ("service error 3, wrong shape 1"). */
+    const read = async () => {
+      const why = await cells.nth(2).innerText();
+      const of = (reason: string) => Number(new RegExp(`${reason} (\\d+)`).exec(why)?.[1] ?? 0);
+      return { failed: Number((await cells.nth(1).innerText()).replace(/,/g, "")), service: of("service error"), shape: of("wrong shape") };
+    };
+    const before = await read();
+    const inBefore = await stat(page, "ai-failures-in");
+    const outBefore = await stat(page, "ai-failures-out");
+
+    // The stand-in reads the file's name (lib/ai/figure-pick.ts): "pick-fails" is a call the service never answered, whose
+    // pick is given back, and "pick-unusable" one it answered with nothing usable, whose pick stays counted. Both are recorded.
+    expect((await ask("report-pick-fails.pdf, page 3")).status()).toBe(502);
+    expect((await ask("report-pick-unusable.pdf, page 3")).status()).toBe(502);
+
+    await page.reload();
+    expect(await read()).toEqual({ failed: before.failed + 2, service: before.service + 1, shape: before.shape + 1 });
+    // Only the answered call spent tokens (the stand-in's 1,500 in and 120 out).
+    expect(await stat(page, "ai-failures-in")).toBe(inBefore + 1500);
+    expect(await stat(page, "ai-failures-out")).toBe(outBefore + 120);
+    // This account has a free plan's three picks. The call that was answered spent one, so two are left and the third is refused.
+    expect((await ask("report-with-chart.pdf, page 3")).status()).toBe(200);
+    expect((await ask("report-with-chart.pdf, page 3")).status()).toBe(200);
+    expect((await ask("report-with-chart.pdf, page 3")).status()).toBe(429);
+  });
+
   test("no accessibility violations on the overview, accounts and an account", async ({ page }) => {
     await signIn(page, { admin: true });
     await page.request.get(`/dev/admin?seed=${stamp()}`);
