@@ -5,6 +5,7 @@ import { formatLimits, LIMITS, type ExhbtDoc } from "@/lib/exhbt/blocks";
 import { FORMAT_RULES, type Format } from "@/lib/exhbt/formats";
 import { checkedReason, type LayoutReason } from "@/lib/exhbt/drafted";
 import { DraftSchema, DraftSchemaSeven, draftSchema, leftOff, repairDraft, toDoc, type Draft, type DraftChart, type DraftLayouts } from "./draft-answer";
+import { DRAFT_TARGETS, draftTargets } from "./draft-targets";
 import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
 import { AIFailure, structuredCall } from "./call";
@@ -38,6 +39,15 @@ const B = formatLimits("build");
 const E = formatLimits("essay");
 const BA = formatLimits("before-after");
 const EV = formatLimits("event");
+// How many words the AI writes in each part, by layout (decision 0030). People have no such cap: only the
+// page's 200 words. The counts and characters above are the page's own limits, the same for the AI as for people.
+const LW = DRAFT_TARGETS;
+const GW = draftTargets("gallery");
+const RW = draftTargets("research");
+const BW = draftTargets("build");
+const EW = draftTargets("essay");
+const BAW = draftTargets("before-after");
+const EVW = draftTargets("event");
 /** Roughly 15-20k tokens of material: enough for a report, and keeps a draft well under a penny. */
 export const MAX_MATERIAL_CHARS = 80_000;
 
@@ -54,14 +64,14 @@ Rules:
 Fields:
 - format: the layout of the page (see Layout below).
 - title: the question the work set out to answer, written as a question that ends with "?", at most ${L.titleChars} characters, e.g. "Will banks and fintechs cooperate under open banking?". Use the material's own subject and words. For a gallery it is instead the plain name of the work, not a question, e.g. "Freshers' Week campaign for the Law Society".
-- summary: one sentence, at most ${L.summaryWords} words, on what the work found. It goes on portfolio cards, so it must make sense on its own.
+- summary: one sentence, at most ${LW.summaryWords} words, on what the work found. It goes on portfolio cards, so it must make sense on its own.
 - context: what the work is, at most ${L.contextChars} characters, e.g. "MSc Finance dissertation" or "Year 2 group project". Empty if the material doesn't say.
 - whereWhen: where and when it was done, at most ${L.whereWhenChars} characters, e.g. "University of St Andrews, August 2026". Only what the material states; empty if it doesn't say.
 - skills: up to ${L.skills.max} skills the material shows being used, each at most ${L.skills.wordsEach} words (e.g. "Python", "Regression analysis").
-- gap: the line of context under the question: why it matters, at most ${L.gapWords} words, at most 2 short sentences, e.g. "Open banking makes banks share customer data. Nobody knows whether banks and fintechs will then cooperate or compete."
+- gap: the line of context under the question: why it matters, at most ${LW.gapWords} words, at most 2 short sentences, e.g. "Open banking makes banks share customer data. Nobody knows whether banks and fintechs will then cooperate or compete."
 - gapHighlight: the words in gap that name the gap (what nobody knew or had done), copied exactly from gap, e.g. "Nobody knows whether banks and fintechs will then cooperate or compete." Empty if gap has no such words.
 - flow: ${L.flow.min} to ${L.flow.max} steps of the process, in order, each at most ${L.flow.stepWords} words. "detail" is an optional note of at most ${L.flow.detailWords} words (e.g. "14,200 rows"), or empty.
-- findings: ${L.findings.min} to ${L.findings.max} short bullets of what was found or achieved, each at most ${L.findings.wordsEach} words.
+- findings: ${L.findings.min} to ${L.findings.max} short bullets of what was found or achieved, each at most ${LW.findingWords} words.
 - charts: usually one graph, a second only when the material has a separate set of figures worth one (never more than ${L.charts.max}), only from figures stated in the material, each value copied as written there (no totals, averages or changes you work out). An empty list when the material has no figures worth a graph. Choose the kind that fits the figures:
   - "beforeAfter": one measure before and after a change. series: [what "before" is called, what "after" is called]; rows: ${L.charts.beforeAfter.rows.min} to ${L.charts.beforeAfter.rows.max}, each with values [before, after]. Set lowerIsBetter.
   - "bar": one measure across ${L.charts.bar.rows.min} to ${L.charts.bar.rows.max} categories. rows: each with values [value].
@@ -72,15 +82,15 @@ Fields:
   - "numbers": ${L.charts.numbers.tiles.min} to ${L.charts.numbers.tiles.max} headline figures, for when the results are a few separate figures, often in different units (a count, a sum of money, a percentage), rather than one measure compared. rows: one per figure, each with its label and values [value], or [value, from] where "from" is the starting value the material states for that figure (so "72%, up from 58%" is [72, 58]); never one it doesn't state. series: each figure's unit, in the same order as rows, or an empty string for none.
   - "table": a small table of results that the material itself sets out as a table, up to ${L.charts.table.columns.max} columns and ${L.charts.table.rows.max} rows. Its cells may be words rather than figures, in the material's own words, each cell at most ${L.charts.labelChars} characters: cut a long cell to fit, never add to it. cells: the first row is the headings, then one row per table row.
   Fill only the fields the kind uses; leave the rest as empty strings, empty lists or false. Labels at most ${L.charts.labelChars} characters.
-- quote: feedback someone gave on the work (a supervisor, a client, a user), only if the material contains it: "text" copied word for word from the material, at most ${L.quote.words} words; "name" as the material gives it; "role" as the material gives it, or empty. Never write, shorten, join or reword a quote; if the only one is longer than ${L.quote.words} words, or nobody is named, or there is none, leave text, name and role all empty.
-- next: what the person says they would do next or do differently, at most ${L.reflection.words} words, only if the material says so. Empty otherwise.
-- aim: research only. The aim or hypothesis as the material states it, at most ${R.aim.words} words, empty if the material states none. aimIsHypothesis is true only if the material itself calls it a hypothesis.
-- conclusion: research only. What the material itself concludes, at most ${R.conclusion.words} words. Never a conclusion the material doesn't draw. Empty otherwise.`;
+- quote: feedback someone gave on the work (a supervisor, a client, a user), only if the material contains it: "text" copied word for word from the material, at most ${LW.quoteWords} words; "name" as the material gives it; "role" as the material gives it, or empty. Never write, shorten, join or reword a quote; if the only one is longer than ${LW.quoteWords} words, or nobody is named, or there is none, leave text, name and role all empty.
+- next: what the person says they would do next or do differently, at most ${LW.reflectionWords} words, only if the material says so. Empty otherwise.
+- aim: research only. The aim or hypothesis as the material states it, at most ${RW.aimWords} words, empty if the material states none. aimIsHypothesis is true only if the material itself calls it a hypothesis.
+- conclusion: research only. What the material itself concludes, at most ${RW.conclusionWords} words. Never a conclusion the material doesn't draw. Empty otherwise.`;
 
 /** What each field is in a gallery and in research: the same in both prompts. */
-const GALLERY_NOTE = `- For a gallery: gap is the brief (what was asked, and for whom), at most ${G.gapWords} words, with gapHighlight the ask; findings are 0 to ${G.findings.max} bullets of what happened, each at most ${G.findings.wordsEach} words, only if the material says what happened, otherwise an empty list; at most ${G.sections.graph} graph. aim, conclusion and references stay empty. You never see the pictures: do not describe them.`;
+const GALLERY_NOTE = `- For a gallery: gap is the brief (what was asked, and for whom), at most ${GW.gapWords} words, with gapHighlight the ask; findings are 0 to ${G.findings.max} bullets of what happened, each at most ${GW.findingWords} words, only if the material says what happened, otherwise an empty list; at most ${G.sections.graph} graph. aim, conclusion and references stay empty. You never see the pictures: do not describe them.`;
 
-const RESEARCH_NOTE = `- For research: gap is the background and the gap, at most ${R.gapWords} words; findings are the results, ${R.findings.min} to ${R.findings.max} bullets, each at most ${R.findings.wordsEach} words; next holds the limitations the material itself states and what the person would do next, at most ${R.reflection.words} words. Never invent a limitation: leave it empty if the material states none.`;
+const RESEARCH_NOTE = `- For research: gap is the background and the gap, at most ${RW.gapWords} words; findings are the results, ${R.findings.min} to ${R.findings.max} bullets, each at most ${RW.findingWords} words; next holds the limitations the material itself states and what the person would do next, at most ${RW.reflectionWords} words. Never invent a limitation: leave it empty if the material states none.`;
 
 const LAST = `- Fields that belong to another layout stay empty.`;
 
@@ -108,14 +118,15 @@ ${LAST}`;
  *  - `references` also holds an essay's sources and a build's links, and there are two more fields, `pullquote` and `myRole`;
  *  - the layout rules are 0028's list, in its order, with its tie-break;
  *  - four more signals for formatReason, and a note for each new layout saying what its title, context line and
- *    findings are (0028's table; the caps are read from FORMAT_LIMITS, so they can't drift from the editor's).
+ *    findings are (0028's table). Counts are read from FORMAT_LIMITS, so they can't drift from the editor's; how
+ *    many words each part has is the AI's own target, draftTargets (decision 0030), which people are not held to.
  */
 const SYSTEM_SEVEN = `${HEAD}
 - references: research, essay and build only; an empty list in any other layout. Each has "label" and "url".
   - research: up to ${R.sections.link}. Each is an https address that appears in the material, copied exactly, with "label" the citation as the material gives it (at most ${R.link.labelWords} words). Never make up a DOI or an address.
   - essay: the sources the material cites, up to ${E.sections.link}. "label" is the citation, copied word for word from the material, at most ${E.link.labelWords} words: from a longer one, copy the run of words that names the author and the title. "url" is its https address if the material gives one, copied exactly, otherwise an empty string. Never make up a source or an address.
   - build: up to ${B.sections.link} links to the thing itself, such as a demo and the code, only where the material gives the https address, copied exactly. "label" says what the link is in at most ${B.link.labelWords} words, e.g. "Try the demo" or "Source code". Never a paper or a page the material only cites.
-- pullquote: essay only. One sentence of the person's own from the material that carries the argument, copied word for word, at most ${E.pullquote.words} words. Never write, shorten, join or reword one, and never use a source's words or anyone else's; if no sentence in the material will do, leave it empty.
+- pullquote: essay only. One sentence of the person's own from the material that carries the argument, copied word for word, at most ${EW.pullquoteWords} words. Never write, shorten, join or reword one, and never use a source's words or anyone else's; if no sentence in the material will do, leave it empty.
 - myRole: event only. The person's own part in the event, in the material's own words, copied exactly, at most ${L.myRoleChars} characters, e.g. "Stage manager". Empty if the material doesn't say what their part was.
 - In total, aim for about ${L.targetWords} words across everything you write (graph labels, the quote and its name included), ${R.targetWords} for research and for an essay, and never more than ${L.totalWords}.
 
@@ -134,10 +145,10 @@ Layout (the "format" field). Go down this list and take the first that is true o
 - formatReason: why you chose the layout, as one of these signals, and only one that is true of the material. "notes": the person's notes name the layout. "aim-results": research, and the material states an aim and reports results. "hypothesis-results": research, and the material states a hypothesis and reports results. "study": research, an experiment or a study with a method and results, with no aim or hypothesis stated. "built-thing": a build, because the person made a thing that works and the material says what it does. "before-and-after": a before and after, because the material describes how the thing was and how it is now. "event-role": an event, because the material says what the person's part in it was. "argument-sources": an essay, because the material argues a case and names its sources. "visual-work": a gallery, because the work is shown by its pictures. "mostly-pictures": a gallery, because the upload facts say most of the upload is pictures. "question-findings": a case study, because the material sets out a question and what was found. "default": any other reason, or because you are unsure.
 ${GALLERY_NOTE}
 ${RESEARCH_NOTE}
-- For a build: title is the plain name of what was built and what it is, not a question, e.g. "Shift Swap: a web app for the Students' Union bar rota"; gap is the problem it solves, and for whom, at most ${B.gapWords} words, with gapHighlight the problem; flow is how it was built; findings are 0 to ${B.findings.max} bullets of what it does, each at most ${B.findings.wordsEach} words, only what the material says it does, otherwise an empty list; skills are what it was built with; at most ${B.sections.graph} graph; next is what the person says they would add or change next; references are its links.
-- For an essay: title is the question the essay answers, as a question, or its thesis as a statement if it asks none; gap is the context: why the question matters, at most ${E.gapWords} words; flow is how the argument runs, in order; findings are the argument's key points, ${E.findings.min} to ${E.findings.max} bullets, each at most ${E.findings.wordsEach} words; at most ${E.sections.graph} graph, and only from figures the material quotes; next is what the person says they would look at next, at most ${E.reflection.words} words; references are its sources. Never add a point or a reading the material doesn't make.
-- For a before and after: title is the plain name of what was redesigned, not a question, e.g. "Redesigning the checkout of a campus cafe's order app"; gap is the problem: what was wrong with it, and for whom, at most ${BA.gapWords} words, with gapHighlight the problem; flow is what the person did; findings are ${BA.findings.min} to ${BA.findings.max} bullets of what changed and why, each at most ${BA.findings.wordsEach} words; at most ${BA.sections.graph} graph. You never see the pictures: do not describe them, and never say which shows before and which after.
-- For an event: title is the plain name of the event, not a question, e.g. "The Crucible: the Drama Society's spring show"; gap is the brief: what the event was for, and who it was for, at most ${EV.gapWords} words, with gapHighlight the aim; flow is how it was put on; findings are 0 to ${EV.findings.max} bullets of how it went, each at most ${EV.findings.wordsEach} words, only if the material says how it went, otherwise an empty list; at most ${EV.sections.graph} graph; quote may be a review of it. You never see the pictures: do not describe them.
+- For a build: title is the plain name of what was built and what it is, not a question, e.g. "Shift Swap: a web app for the Students' Union bar rota"; gap is the problem it solves, and for whom, at most ${BW.gapWords} words, with gapHighlight the problem; flow is how it was built; findings are 0 to ${B.findings.max} bullets of what it does, each at most ${BW.findingWords} words, only what the material says it does, otherwise an empty list; skills are what it was built with; at most ${B.sections.graph} graph; next is what the person says they would add or change next; references are its links.
+- For an essay: title is the question the essay answers, as a question, or its thesis as a statement if it asks none; gap is the context: why the question matters, at most ${EW.gapWords} words; flow is how the argument runs, in order; findings are the argument's key points, ${E.findings.min} to ${E.findings.max} bullets, each at most ${EW.findingWords} words; at most ${E.sections.graph} graph, and only from figures the material quotes; next is what the person says they would look at next, at most ${EW.reflectionWords} words; references are its sources. Never add a point or a reading the material doesn't make.
+- For a before and after: title is the plain name of what was redesigned, not a question, e.g. "Redesigning the checkout of a campus cafe's order app"; gap is the problem: what was wrong with it, and for whom, at most ${BAW.gapWords} words, with gapHighlight the problem; flow is what the person did; findings are ${BA.findings.min} to ${BA.findings.max} bullets of what changed and why, each at most ${BAW.findingWords} words; at most ${BA.sections.graph} graph. You never see the pictures: do not describe them, and never say which shows before and which after.
+- For an event: title is the plain name of the event, not a question, e.g. "The Crucible: the Drama Society's spring show"; gap is the brief: what the event was for, and who it was for, at most ${EVW.gapWords} words, with gapHighlight the aim; flow is how it was put on; findings are 0 to ${EV.findings.max} bullets of how it went, each at most ${EVW.findingWords} words, only if the material says how it went, otherwise an empty list; at most ${EV.sections.graph} graph; quote may be a review of it. You never see the pictures: do not describe them.
 ${LAST}`;
 
 export { DraftSchema, DraftSchemaSeven, toChart, toDoc, type DraftChart, type DraftLayouts } from "./draft-answer";
@@ -301,7 +312,7 @@ function mockDraft(input: DraftInput): DraftResult {
   const invent = /stand-in: invent/i.test(input.notes ?? "");
   const links = [...new Set((source.match(/https:\/\/[^\s)\]>"'<]+/g) ?? []).map((u) => u.replace(/[.,;:]+$/, "")))];
   const firstSentence = (source.replace(/\s+/g, " ").match(/[^.!?]{12,}[.!?]/)?.[0] ?? source.slice(0, 120)).trim();
-  const quote = firstSentence.split(" ").slice(0, L.findings.wordsEach).join(" ");
+  const quote = firstSentence.split(" ").slice(0, LW.findingWords).join(" ");
   const numbers = numbersIn(quote).map((value) => ({ value, sourceQuote: quote }));
   const figures = [...new Set(numbersIn(source).map(normaliseNumber).filter((v): v is string => v !== null))].slice(0, 4).map(Number);
   // No digits in the labels: they'd be numbers the material doesn't have.
@@ -311,7 +322,7 @@ function mockDraft(input: DraftInput): DraftResult {
   // Feedback in the material: "…" Priya Shah, Cafe manager. (dashes and a comma before the name are fine).
   const q = source.match(/["“]([^"”]{8,400})["”]\s*(?:[-–—,]\s*)?((?:[A-Z][\w'’-]+)(?:\s[A-Z][\w'’-]+){0,3})(?:,\s*([^.\n]{2,60}))?/);
   const feedback = q ? { text: q[1]!.trim(), name: q[2]!.trim(), role: (q[3] ?? "").trim() } : null;
-  const next = source.replace(/\s+/g, " ").match(/(?:^|[.!?]\s+)((?:Next time|If I did (?:this|it) again)[^.!?]{3,}[.!?])/i)?.[1]?.split(" ").slice(0, L.reflection.words).join(" ") ?? "";
+  const next = source.replace(/\s+/g, " ").match(/(?:^|[.!?]\s+)((?:Next time|If I did (?:this|it) again)[^.!?]{3,}[.!?])/i)?.[1]?.split(" ").slice(0, LW.reflectionWords).join(" ") ?? "";
   const charts: DraftChart[] =
     figures.length >= 2
       ? [
@@ -342,7 +353,7 @@ function mockDraft(input: DraftInput): DraftResult {
         : format === "build"
           ? [...(invent ? [{ label: "Placeholder: a made-up link", url: INVENTED.link }] : []), ...links.map((url) => ({ label: "Placeholder: a link from your files", url }))]
           : [];
-  const pullquote = format !== "essay" ? "" : invent ? INVENTED.pullquote : firstSentence.split(" ").length <= E.pullquote.words ? firstSentence : "";
+  const pullquote = format !== "essay" ? "" : invent ? INVENTED.pullquote : firstSentence.split(" ").length <= EW.pullquoteWords ? firstSentence : "";
   const myRole = format !== "event" ? "" : invent ? INVENTED.role : (source.match(/\bmy role was ([^.\n]{2,60})/i)?.[1]?.trim() ?? "");
   // The stand-in's reason for its layout: the notes when they named it, else the signal its own draft bears out.
   const formatReason: LayoutReason = named ? "notes" : STAND_IN_REASON[format];

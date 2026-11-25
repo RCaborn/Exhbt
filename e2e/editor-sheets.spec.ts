@@ -118,7 +118,7 @@ test.describe("review and publish", () => {
 });
 
 test.describe("card and link details", () => {
-  test("the summary shows on the tile beside it, is saved, and an over-long one shows its issue", async ({ page }) => {
+  test("the summary shows on the tile beside it and is saved; a long one has no limit of its own", async ({ page }) => {
     const id = await openNew(page, freshName("card"));
     await openUi(page, "card");
     const s = sheet(page, "card");
@@ -134,18 +134,24 @@ test.describe("card and link details", () => {
     expect(stored.summary).toBe("Waits fell by two thirds.");
     expect(stored.headline).toEqual({ value: "-18%", label: "missed appointments" });
 
+    // No word limit of its own (decision 0030): 30 words, past the 25 it was held to, show no issue and no count against a
+    // limit. Its words count towards the page's 200.
     await summary.fill(Array.from({ length: 30 }, (_, i) => `word${i}`).join(" "));
-    await expect(s.getByText(/Keep the summary to one sentence/)).toBeVisible();
-    await expect(summary).toHaveAttribute("aria-invalid", "true");
+    await expect(s.getByTestId("tile-summary")).toContainText("word29");
+    await expect(summary).not.toHaveAttribute("aria-invalid");
+    await expect(s.getByText(/Keep the summary/)).toHaveCount(0);
+    await expect(s.getByText(/\d+ \/ \d+ words/)).toHaveCount(0);
   });
 
-  test("Show me on a summary issue opens the card sheet with the cursor in the field", async ({ page }) => {
-    const id = await openNew(page, freshName("cardjump"));
+  test("a long summary leaves nothing to fix: the publish sheet lists no issue for it, and it goes live", async ({ page }) => {
+    const id = await openNew(page, freshName("cardlong"));
     await setDoc(page, id, complete({ summary: Array.from({ length: 30 }, (_, i) => `word${i}`).join(" ") }));
     await openPublish(page);
-    await sheet(page, "publish").getByRole("button", { name: "Show me" }).first().click();
-    await expect(sheet(page, "card")).toBeVisible();
-    await expect(sheet(page, "card").getByLabel("One-sentence summary")).toBeFocused();
+    const s = sheet(page, "publish");
+    await expect(s.getByRole("button", { name: "Show me" })).toHaveCount(0);
+    await s.getByLabel("This is my work, and the numbers are true").check();
+    await s.getByRole("button", { name: "Publish", exact: true }).click();
+    await expect(s.getByText("It's live.")).toBeVisible();
   });
 });
 

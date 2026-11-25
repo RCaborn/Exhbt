@@ -2,9 +2,8 @@
 
 import type { ReactNode } from "react";
 import { FieldIssues } from "@/components/editor/FieldIssues";
-import { WordsOf } from "@/components/editor/parts";
 import { ExhbtTile } from "@/components/exhbt/ExhbtTile";
-import { exhbtSummary, LIMITS, words, type ExhbtDoc } from "@/lib/exhbt/blocks";
+import { exhbtSummary, type ExhbtDoc } from "@/lib/exhbt/blocks";
 import { tileFromDoc } from "@/lib/exhbt/headline";
 import { useIssues } from "../context";
 import { useDoc, useStore } from "../store";
@@ -15,6 +14,7 @@ import "../css/sheets.css";
  * "Card and link details" (decision 0026, "What the page does not draw"): the one-sentence summary
  * and the headline number, which the page does not draw, beside the portfolio tile drawn from the doc
  * as it is typed. Typing, so no undo entry. A port of two fields from the classic editor's first card.
+ * The summary has no word limit of its own; its words count towards the page's (decision 0030).
  */
 export function CardSheet(): ReactNode {
   return (
@@ -31,7 +31,6 @@ function CardBody() {
   const issues = useIssues();
   const doc = useDoc((d) => d);
   const summaryIssues = issues.at("summary");
-  const n = words(doc.summary ?? "");
   const summary = exhbtSummary(doc);
 
   function set(next: Partial<ExhbtDoc>) {
@@ -46,12 +45,9 @@ function CardBody() {
     <div className="xe-card-cols">
       <div className="xe-sheet-stack">
         <div>
-          <div className="flex items-baseline justify-between gap-2">
-            <label htmlFor="summary" className="label">
-              One-sentence summary
-            </label>
-            <WordsOf n={n} limit={LIMITS.summaryWords} />
-          </div>
+          <label htmlFor="summary" className="label">
+            One-sentence summary
+          </label>
           <p id="summary-hint" className="hint mb-1">
             What you found, in one sentence. Shown on your portfolio&apos;s cards.
           </p>

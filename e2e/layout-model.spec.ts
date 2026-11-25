@@ -241,7 +241,8 @@ test.describe("The model: a removed flowchart and the published copy", () => {
     expect(messages(essay)).toEqual([]);
     expect(messages({ ...essay, myRole: "x".repeat(61) })).toEqual(['myRole: Keep "My role" to 60 characters.']);
     expect(messages(core([findings(), { ...pull(), text: "" } as ContentSection], "essay"))).toEqual(["sections.1.text: Type in the pull quote or remove it."]);
-    expect(messages(core([findings(), { ...pull(), text: "word ".repeat(31) } as ContentSection], "essay"))).toEqual(["sections.1.text: Keep the pull quote to 30 words."]);
+    // No word limit of its own (decision 0030): a 31-word pull quote passes, past the 30 it was held to; only the page's 200 words hold it.
+    expect(messages(core([findings(), { ...pull(), text: "word ".repeat(31) } as ContentSection], "essay"))).toEqual([]);
     expect(messages(core([findings(), link(1, "")]))).toEqual(["sections.1.href: Use a full https:// link."]);
     expect(messages(core([findings(), link(1, "http://example.com")], "essay"))).toEqual(["sections.1.href: Use a full https:// link."]);
     // A pull quote outside an essay is kept, not counted and not checked.

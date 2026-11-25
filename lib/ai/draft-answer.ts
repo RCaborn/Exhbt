@@ -4,6 +4,7 @@ import { CLASSIC_FORMATS, FORMATS, isFormat } from "@/lib/exhbt/formats";
 import { CLASSIC_REASONS, LAYOUT_REASONS } from "@/lib/exhbt/drafted";
 import { CHART_KINDS, hasData, type Chart } from "@/lib/exhbt/charts";
 import { pullquoteFrom, referencesFrom, roleFrom, sourcesFrom, squash } from "@/lib/exhbt/references";
+import { DRAFT_TARGETS, draftTargets } from "./draft-targets";
 
 /**
  * The draft's answer shape and the code that reads it: the schemas, the repair, and the answer
@@ -235,21 +236,24 @@ const L = LIMITS;
 /**
  * The quote the model proposed, if it's really in the material: its words as written there, and
  * the name too. Anything else is dropped rather than flagged: a quote can't be checked like a
- * number, and an invented one would put words in someone's mouth.
+ * number, and an invented one would put words in someone's mouth. One longer than the AI's target
+ * (decision 0030) is dropped too, never cut: a cut quote is not what was said. A person may type a
+ * longer one; the page's 200 words are the only limit on theirs.
  */
 export function quoteFrom(q: Draft["quote"] | null, source: string): { text: string; name: string; role: string } | null {
   if (!q) return null;
   const said = q.text.trim().replace(/^["“‘']+|["”’']+$/g, "").trim();
   const name = q.name.trim();
   const flat = squash(source);
-  if (!said || !name || words(said) > L.quote.words || !flat.includes(squash(said)) || !flat.includes(squash(name))) return null;
+  if (!said || !name || words(said) > DRAFT_TARGETS.quoteWords || !flat.includes(squash(said)) || !flat.includes(squash(name))) return null;
   const role = q.role.trim();
   return { text: said, name: name.slice(0, L.quote.nameChars), role: role && flat.includes(squash(role)) ? role.slice(0, L.quote.roleChars) : "" };
 }
 
 /**
- * The model's strings as an ExhbtDoc, trimmed to the block counts. Word limits are left to the
- * editor (drafts may run over; publishing may not), but counts are clamped so the layout holds.
+ * The model's strings as an ExhbtDoc, trimmed to the block counts. Nothing is cut to a number of
+ * words: the AI is asked to write each part to its target (draftTargets, decision 0030), and only the
+ * page's 200 words limit what can be published. Counts are clamped so the layout holds.
  * `source` is the material (materialText in ./exhbt-draft.ts): everything the person supplied.
  *
  * Only what the person supplied (AGENTS.md; decision 0028, "The AI chooses among seven"). The parts
@@ -298,7 +302,7 @@ export function toDoc(d: Draft, source: string): ExhbtDoc {
     ];
   } else if (f === "essay") {
     // An essay's usual order: the key points, the pull quote, the graph, feedback, what I'd look at next, then the sources.
-    const pullquote = pullquoteFrom(d.pullquote ?? "", source, FL.pullquote.words);
+    const pullquote = pullquoteFrom(d.pullquote ?? "", source, draftTargets(f).pullquoteWords);
     sections = [
       ...findingsSection,
       ...(pullquote ? [{ id: "pullquote-1", kind: "pullquote" as const, text: pullquote }] : []),

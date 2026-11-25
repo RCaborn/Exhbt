@@ -20,7 +20,7 @@ import { ArrowDown, ArrowUp, ChartBar, Flag, GripVertical, ImageIcon, Lightbulb,
 import { PickedFigure, type ReplaceFigure } from "./PickedFigure";
 import { Button } from "@/components/ui/Button";
 import { useReducedMotion } from "@/components/ui/useReducedMotion";
-import { formatLimits, LIMITS, plain, wordCount, words, type ExhbtDoc, type Issue, type Limits, type Section, type SectionKind, type SectionOf } from "@/lib/exhbt/blocks";
+import { formatLimits, LIMITS, wordCount, words, type ExhbtDoc, type Issue, type Limits, type Section, type SectionKind, type SectionOf } from "@/lib/exhbt/blocks";
 import { FORMAT_COPY, FORMAT_RULES, formatOf, isShown, type Format } from "@/lib/exhbt/formats";
 import { isArranged } from "@/lib/exhbt/layouts";
 import { firstOfKinds, layoutNotes, moveSection, newSection, roomFor, sectionLabel } from "@/lib/exhbt/sections";
@@ -40,13 +40,13 @@ type SetDoc = React.Dispatch<React.SetStateAction<ExhbtDoc>>;
 
 /**
  * The "Add a section" menu for a layout, in order, with what each kind is for: only the kinds the
- * layout draws, named in its own words, with hints and caps from formatLimits (decision 0024).
- * A case study's menu is as it always was.
+ * layout draws, named in its own words, with counts from formatLimits (decision 0024). No part has a
+ * word limit of its own, only the page (decision 0030).
  */
 function menuFor(f: Format): { kind: SectionKind; add: string; icon: LucideIcon; hint: string }[] {
   const L = formatLimits(f);
   const all: { kind: SectionKind; add: string; icon: LucideIcon; hint: string }[] = [
-    { kind: "aim", add: "Add aim or hypothesis", icon: Target, hint: `What the study set out to test, up to ${L.aim.words} words.` },
+    { kind: "aim", add: "Add aim or hypothesis", icon: Target, hint: "What the study set out to test." },
     {
       kind: "findings",
       add: f === "research" ? "Add results" : f === "gallery" ? "Add what happened" : "Add findings",
@@ -54,11 +54,11 @@ function menuFor(f: Format): { kind: SectionKind; add: string; icon: LucideIcon;
       hint: `${L.findings.min} to ${L.findings.max} bullets of ${f === "research" ? "what the study found" : "what you found or achieved"}.`,
     },
     { kind: "graph", add: "Add a graph", icon: ChartBar, hint: "Figures from your work, typed in by hand." },
-    { kind: "image", add: "Add an image", icon: ImageIcon, hint: `A screenshot or figure, with a caption of up to ${L.images.captionWords} words.` },
-    { kind: "conclusion", add: "Add conclusion", icon: Flag, hint: `What the work concludes, up to ${L.conclusion.words} words.` },
-    { kind: "pullquote", add: "Add a pull quote", icon: TextQuote, hint: `A line from your own work, drawn large, up to ${L.pullquote.words} words.` },
-    { kind: "quote", add: "Add a quote", icon: Quote, hint: `Feedback someone gave, up to ${L.quote.words} words, with their name.` },
-    { kind: "reflection", add: `Add ${f === "research" ? "limitations and next steps" : "what I'd do next"}`, icon: Lightbulb, hint: `One or two lines, up to ${L.reflection.words} words.` },
+    { kind: "image", add: "Add an image", icon: ImageIcon, hint: "A screenshot or figure, with a caption." },
+    { kind: "conclusion", add: "Add conclusion", icon: Flag, hint: "What the work concludes." },
+    { kind: "pullquote", add: "Add a pull quote", icon: TextQuote, hint: "A line from your own work, drawn large." },
+    { kind: "quote", add: "Add a quote", icon: Quote, hint: "Feedback someone gave, with their name." },
+    { kind: "reflection", add: `Add ${f === "research" ? "limitations and next steps" : "what I'd do next"}`, icon: Lightbulb, hint: "One or two lines." },
     { kind: "link", add: f === "research" ? "Add a reference" : "Add a link", icon: Link2, hint: f === "research" ? "A paper or source you used, as a link." : f === "gallery" ? "The film, the full set of pictures or the deck." : "A repository, a demo or a document." },
   ];
   const kinds = FORMAT_RULES[f].kinds;
@@ -316,7 +316,6 @@ export function Sections({
                         level="h3"
                         title={label}
                         words={cw[key]}
-                        limit={s.kind === "reflection" ? L.reflection.words : s.kind === "aim" ? L.aim.words : s.kind === "conclusion" ? L.conclusion.words : s.kind === "pullquote" ? L.pullquote.words : undefined}
                         hint={hintFor(s, maxFileMb, L, f)}
                         flagged={flaggedBy(key)}
                         heaviest={heaviest === key}
@@ -452,13 +451,13 @@ function SortableSection({
 function hintFor(s: Section, maxFileMb: number, L: Limits, f: Format): string {
   switch (s.kind) {
     case "findings":
-      return `${L.findings.min} to ${L.findings.max} bullets, up to ${L.findings.wordsEach} words each.`;
+      return `${L.findings.min} to ${L.findings.max} bullets.`;
     case "graph":
       return "From figures in your work, typed in by hand. To keep figures confidential, protect the real numbers: the page then shows only the change. Anything else can go in as an image.";
     case "image":
-      return `A caption of up to ${L.images.captionWords} words. JPEG, PNG, WebP or GIF, up to ${maxFileMb} MB.`;
+      return `JPEG, PNG, WebP or GIF, up to ${maxFileMb} MB.`;
     case "quote":
-      return `Feedback someone gave on the work, in their own words: up to ${L.quote.words} words, with their name.`;
+      return "Feedback someone gave on the work, in their own words, with their name.";
     case "reflection":
       return f === "research" ? "One or two lines: the limits of the study, and what you'd do next." : "One or two lines: what you'd do next, or do differently.";
     case "link":
@@ -598,20 +597,15 @@ function SectionBody({
     case "quote":
       return (
         <div className="space-y-4">
-          <div>
-            <TextInput
-              id={`${pid}-text`}
-              label="The quote, word for word"
-              value={s.text}
-              multiline
-              onChange={(text) => patch<"quote">(s.id, (x) => ({ ...x, text }))}
-              issues={issuesAt(issues, `${p}.text`)}
-              placeholder="e.g. The second till made lunchtimes calmer for staff and students."
-            />
-            <p className="mt-1">
-              <WordsOf n={words(s.text)} limit={LIMITS.quote.words} />
-            </p>
-          </div>
+          <TextInput
+            id={`${pid}-text`}
+            label="The quote, word for word"
+            value={s.text}
+            multiline
+            onChange={(text) => patch<"quote">(s.id, (x) => ({ ...x, text }))}
+            issues={issuesAt(issues, `${p}.text`)}
+            placeholder="e.g. The second till made lunchtimes calmer for staff and students."
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <TextInput
               id={`${pid}-name`}
@@ -732,19 +726,14 @@ function SectionBody({
               <WordsOf n={words(s.label)} limit={L.link.labelWords} />
             </p>
           </div>
-          <div>
-            <TextInput
-              id={`${pid}-description`}
-              label="One line about it (optional)"
-              value={s.description}
-              placeholder="e.g. The notebook, with the cleaned data"
-              onChange={(description) => patch<"link">(s.id, (x) => ({ ...x, description }))}
-              issues={issuesAt(issues, `${p}.description`)}
-            />
-            <p className="mt-1">
-              <WordsOf n={words(s.description)} limit={L.link.descriptionWords} />
-            </p>
-          </div>
+          <TextInput
+            id={`${pid}-description`}
+            label="One line about it (optional)"
+            value={s.description}
+            placeholder="e.g. The notebook, with the cleaned data"
+            onChange={(description) => patch<"link">(s.id, (x) => ({ ...x, description }))}
+            issues={issuesAt(issues, `${p}.description`)}
+          />
         </div>
       );
     case "flow":
@@ -755,7 +744,7 @@ function SectionBody({
 function FindingsFields({ s, p, patch, issues, dt, L }: { s: SectionOf<"findings">; p: string; patch: Patch; issues: Issue[]; dt: DraftTools; L: Limits }) {
   const set = (fn: (items: SectionOf<"findings">["items"]) => SectionOf<"findings">["items"]) => patch<"findings">(s.id, (x) => ({ ...x, items: fn(x.items) }));
   const swap = (i: number, j: number) => set((items) => moveSection(items, i, j));
-  const { min, max, wordsEach } = L.findings;
+  const { min, max } = L.findings;
   return (
     <>
       <BlockTools dt={dt} block="findings" />
@@ -767,7 +756,6 @@ function FindingsFields({ s, p, patch, issues, dt, L }: { s: SectionOf<"findings
                 Finding {i + 1}
               </span>
               <span className="flex items-center gap-1">
-                <WordsOf n={words(plain(f))} limit={wordsEach} />
                 <Button size="sm" label={`Move finding ${i + 1} up`} disabled={i === 0} onClick={() => swap(i, i - 1)}>
                   <ArrowUp aria-hidden size={14} strokeWidth={2.25} />
                 </Button>

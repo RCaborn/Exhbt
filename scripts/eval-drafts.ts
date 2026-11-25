@@ -26,6 +26,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
 import { draftExhbt, materialText, type DraftInput, type DraftResult } from "@/lib/ai/exhbt-draft";
+import { overTargets } from "@/lib/ai/draft-targets";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "@/lib/ai/model";
 import { extractTextInBrowser } from "@/lib/doc-readers";
 import { chartsOf, findingsOf, LIMITS, normaliseDoc, plain, sectionTexts, validateForPublish, wordCount, words, type ExhbtDoc, type Issue, type RichText } from "@/lib/exhbt/blocks";
@@ -252,6 +253,11 @@ type Checks = {
   /** Everything that would stop publishing. `needsPerson` is the part of it no draft can clear (pictures, Before and After marks): left out of C2. */
   publishIssues: Issue[];
   needsPerson: Issue[];
+  /**
+   * Parts longer than the AI is asked to write them (draftTargets, decision 0030). People have no word limit on a
+   * part, only the page, so publishing doesn't stop for these; a draft is still marked down for them in C2.
+   */
+  overTargets: Issue[];
   /** The layout chosen, against the answer key's. */
   layout: LayoutMark;
   /** A pull quote, a role, a source or a link on the draft that its material doesn't hold: fails C1 and the run. */
@@ -339,6 +345,7 @@ function runChecks(result: DraftResult, source: string, f: Facts, banned: Banned
     wordCount: wordCount(d),
     publishIssues,
     needsPerson: publishIssues.filter((i) => needsThePerson(i, d)),
+    overTargets: overTargets(d),
     // The answer keys name the layout among seven: a three-layout draft's choice is shown, not marked.
     layout: markLayout(d, layouts === "seven" ? f.expect.layout : undefined),
     unsupported: unsupportedParts(d, source),
@@ -382,7 +389,8 @@ function runChecks(result: DraftResult, source: string, f: Facts, banned: Banned
 function autoScores(c: Checks): Partial<Record<Criterion, number>> {
   const factsOk = c.unverified.length === 0 && c.badQuotes.length === 0 && c.expectations.noNumbers !== "broken" && c.unsupported.length === 0;
   // What only the person can clear (pictures, Before and After marks) says nothing about the draft.
-  const issues = c.publishIssues.filter((i) => !c.needsPerson.includes(i));
+  // What would stop publishing that a draft can clear, and every part past the AI's word target.
+  const issues = [...c.publishIssues.filter((i) => !c.needsPerson.includes(i)), ...c.overTargets];
   const onlyTotal = issues.length === 1 && issues[0]!.path === "";
   const C2 = issues.length === 0 ? (c.wordCount <= 180 ? 2 : 1) : onlyTotal && c.wordCount <= LIMITS.totalWords + 20 ? 1 : 0;
   const C5 = c.coverage.fraction >= 0.75 ? 2 : c.coverage.fraction >= 0.4 ? 1 : 0;
@@ -642,6 +650,7 @@ function summary(runs: FixtureRun[], meta: { started: string; mode: string; judg
       const draftable = c.publishIssues.filter((i) => !c.needsPerson.includes(i));
       if (draftable.length) notes.push(`Publish issues: ${draftable.map((i) => `${i.path || "page"}: ${i.message}`).join("; ")}`);
       if (c.needsPerson.length) notes.push(`Only the person can clear (not scored): ${c.needsPerson.map((i) => i.message).join("; ")}`);
+      if (c.overTargets.length) notes.push(`Longer than the AI's targets (scored in C2): ${c.overTargets.map((i) => i.message).join("; ")}`);
       if (c.unverified.length) notes.push(`Numbers not found in the material: ${c.unverified.join(", ")}`);
       if (c.badQuotes.length) notes.push(`Numbers whose source quote isn't in the material: ${c.badQuotes.join(", ")}`);
       notes.push(`Key facts covered: ${c.coverage.covered.join(", ") || "none"}. Missing: ${c.coverage.missing.join(", ") || "none"}`);
@@ -703,7 +712,7 @@ const ORACLE_08: ExhbtDoc = normaliseDoc({
 /** The doc with its findings bullets replaced. */
 const withFindings = (d: ExhbtDoc, items: RichText[]): ExhbtDoc => ({ ...d, sections: d.sections.map((s) => (s.kind === "findings" ? { ...s, items } : s)) });
 
-/** The same draft broken on purpose: an invented number, a banned word, "we", an exclamation mark, too many words. */
+/** The same draft broken on purpose: an invented number, a banned word, "we", an exclamation mark, a finding and a context line past the AI's targets. */
 const BAD_08: ExhbtDoc = {
   ...withFindings(ORACLE_08, [
     [{ t: "We cut waiting times by 65% across the larder, a pivotal change for every single member who came through the doors each week." }],

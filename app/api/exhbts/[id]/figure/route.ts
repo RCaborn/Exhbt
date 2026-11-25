@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { getCurrentUser } from "@/lib/auth";
 import { loadAiVersion, loadDraftSource, saveAiVersion } from "@/lib/draft-tools";
-import { FIGURE_KINDS, FigureBoxSchema, formatLimits, normaliseDoc, type Section } from "@/lib/exhbt/blocks";
+import { draftTargets } from "@/lib/ai/draft-targets";
+import { FIGURE_KINDS, FigureBoxSchema, normaliseDoc, type Section } from "@/lib/exhbt/blocks";
 import { graphsAsDrafted } from "@/lib/exhbt/draft-blocks";
 import { formatOf } from "@/lib/exhbt/formats";
 import { withWorkVisual } from "@/lib/exhbt/sections";
@@ -83,8 +84,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Compared as graphs, not as JSON text: the database hands the exhbt back with its keys in another order (graphsAsDrafted).
   const ai = await loadAiVersion(user.id, id).catch(() => null);
   const fresh = !replaces && graphsAsDrafted(doc, ai?.drafted);
-  // The caption is cut to the layout's cap; withWorkVisual applies the rule and puts the picture where the layout wants it.
-  const shown = fitCaption(caption, formatLimits(formatOf(doc)).images.captionWords);
+  // The AI's caption is cut to its target for the layout (decision 0030); withWorkVisual applies the rule and puts the picture where the layout wants it.
+  const shown = fitCaption(caption, draftTargets(formatOf(doc)).captionWords);
   const result = withWorkVisual(doc, {
     fileId,
     kind,

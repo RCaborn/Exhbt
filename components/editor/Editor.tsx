@@ -633,7 +633,6 @@ export function Editor(props: EditorProps & { /** This editor only: how this per
               id="card-gap"
               title={copy.gap}
               words={cw.gap}
-              limit={L.gapWords}
               hint={f === "case-study" ? "Why the question matters, in one or two short sentences. Select the gap nobody has filled yet and press Highlight." : `${copy.gapHint} Select the words and press Highlight.`}
               flagged={flaggedBy("gap")}
               heaviest={heaviest === "gap"}

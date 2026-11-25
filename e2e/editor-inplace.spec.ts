@@ -1006,11 +1006,16 @@ test.describe("a formatted field's buttons, and an issue on the page", () => {
     expect(((await readStored(page, id)).working.sections[0] as { items: RichText[] }).items[0]).toEqual([{ t: "Waits fell a lot.", b: true, href: "https://example.com/log" }]);
   });
 
-  test("a finding over its cap is outlined and marked invalid, its message shows only while it has the focus, and nothing moves", async ({ page }) => {
+  test("a finding with an issue is outlined and marked invalid, its message shows only while it has the focus, and nothing moves; a long one has no issue", async ({ page }) => {
     await openDoc(page, freshName("issue"), doc());
+    // No finding has a word limit of its own (decision 0030): 24 words, past the 20 one was held to until 25 Nov 2026, mark nothing.
     const words = Array.from({ length: 24 }, (_, i) => `word${i + 1}`).join(" ");
     await typeIn(page, "sections.0.items.0", words);
-    const pm = field(page, "sections.0.items.0").locator(".ProseMirror");
+    await expect(field(page, "sections.0.items.0").locator(".ProseMirror")).not.toHaveAttribute("aria-invalid");
+    // An emptied finding is an issue once publishing has been tried.
+    await typeIn(page, "sections.0.items.1", "");
+    await page.evaluate(() => window.__exhbtUi!.setTried(true));
+    const pm = field(page, "sections.0.items.1").locator(".ProseMirror");
     await expect(pm).toHaveAttribute("aria-invalid", "true");
     const note = page.locator(`${READY} #${await pm.getAttribute("aria-describedby")}`);
     await expect(note).not.toHaveText("");

@@ -31,7 +31,14 @@ export const SCHEMA_VERSION = 2;
 export const SECTION_KINDS = ["findings", "graph", "image", "quote", "reflection", "link", "aim", "conclusion", "pullquote"] as const;
 export type SectionKind = (typeof SECTION_KINDS)[number];
 
-/** Hard limits, checked on publish. The editor shows them as it goes. */
+/**
+ * Hard limits, checked on publish. The editor shows them as it goes.
+ *
+ * The page as a whole has a word limit, `totalWords`; no part of it has one of its own (decision 0030,
+ * Rory, 25 Nov 2026). What is here keeps the page's shape: how many of each thing there may be, the
+ * characters a one-line field holds, a link's label, and the flowchart's boxes, whose words have to fit
+ * the diagram. How long the AI writes each part is its own target, `draftTargets` in lib/ai/draft-targets.ts.
+ */
 export const LIMITS = {
   /** The title is the question the work answers (decision 0022). */
   titleChars: 80,
@@ -41,29 +48,18 @@ export const LIMITS = {
   whereWhenChars: 60,
   /** "My role", in the sidebar (decision 0028), e.g. "Stage manager". */
   myRoleChars: 60,
-  /** One sentence on what you found, for portfolio cards (exhbtSummary). */
-  summaryWords: 25,
   skills: { max: 6, wordsEach: 3, charsEach: 32 },
-  gapWords: 40,
   flow: { min: 3, max: 6, stepWords: 8, detailWords: 6 },
-  findings: { min: 2, max: 4, wordsEach: 20 },
+  findings: { min: 2, max: 4 },
   /** Graphs: up to 2, each one of a fixed set of kinds with its own caps (lib/exhbt/charts.ts, decision 0011). */
   charts: CHART_LIMITS,
-  images: { max: 2, captionWords: 15 },
+  images: { max: 2 },
   /** Feedback someone gave, in their words, with their name and (optionally) role. */
-  quote: { words: 30, nameChars: 60, roleChars: 60 },
-  /** What I'd do next: one or two lines. */
-  reflection: { words: 35 },
+  quote: { nameChars: 60, roleChars: 60 },
   /** A repository, demo or document: https only. `hrefOptional`: a layout may allow a link with no address (an essay's sources, decision 0028). */
-  link: { labelWords: 8, descriptionWords: 15, hrefOptional: false },
-  /** Research only (decision 0024). */
-  aim: { words: 20 },
-  conclusion: { words: 25 },
-  /** Essay only: the person's own words, drawn large (decision 0028). */
-  pullquote: { words: 30 },
+  link: { labelWords: 8, hrefOptional: false },
   /** How many of each section an exhbt can have (decision 0015). */
   sections: { findings: 1, graph: CHART_LIMITS.max, image: 2, quote: 1, reflection: 1, link: 1, aim: 1, conclusion: 1, pullquote: 1 } satisfies Record<SectionKind, number>,
-  evidenceCaptionWords: 15,
   /** Every word on the page (see wordCount). 150 is what the editor aims for; 200 is the limit. */
   totalWords: 200,
   targetWords: 150,
@@ -84,11 +80,9 @@ export type Limits = Omit<Widen<typeof LIMITS>, "sections"> & {
  */
 export function formatLimits(f: Format): Limits {
   const o = FORMAT_LIMITS[f] as {
-    gapWords?: number;
     findings?: Partial<Limits["findings"]>;
     images?: Partial<Limits["images"]>;
     link?: Partial<Limits["link"]>;
-    reflection?: Partial<Limits["reflection"]>;
     sections?: Partial<Record<SectionKind, number>>;
     minImages?: number;
     maxFigures?: number;
@@ -96,12 +90,10 @@ export function formatLimits(f: Format): Limits {
   };
   return {
     ...LIMITS,
-    gapWords: o.gapWords ?? LIMITS.gapWords,
     targetWords: o.targetWords ?? LIMITS.targetWords,
     findings: { ...LIMITS.findings, ...o.findings },
     images: { ...LIMITS.images, ...o.images },
     link: { ...LIMITS.link, ...o.link },
-    reflection: { ...LIMITS.reflection, ...o.reflection },
     sections: { ...LIMITS.sections, ...o.sections },
     minImages: o.minImages ?? 0,
     maxFigures: o.maxFigures ?? null,
@@ -521,7 +513,6 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
   need(doc.context.length <= L.contextChars, "context", `Keep "What it is" to ${L.contextChars} characters.`);
   need((doc.whereWhen ?? "").length <= L.whereWhenChars, "whereWhen", `Keep "Where and when" to ${L.whereWhenChars} characters.`);
   need((doc.myRole ?? "").length <= L.myRoleChars, "myRole", `Keep "My role" to ${L.myRoleChars} characters.`);
-  need(words(doc.summary ?? "") <= L.summaryWords, "summary", `Keep the summary to one sentence of ${L.summaryWords} words or fewer.`);
 
   need(doc.skills.length <= L.skills.max, "skills", `Up to ${L.skills.max} skills.`);
   doc.skills.forEach((s, i) => {
@@ -530,7 +521,6 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
   });
 
   need(words(plain(doc.gap)) > 0, "gap", FORMAT_COPY[F].gapMissing);
-  need(words(plain(doc.gap)) <= L.gapWords, "gap", `Keep the context to ${L.gapWords} words.`);
   httpsOnly(doc.gap, "gap");
 
   // A flowchart taken off the page (decision 0027) is kept, not checked.
@@ -565,7 +555,6 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
         need(s.items.length <= L.findings.max, `${p}.items`, `Up to ${L.findings.max} findings.`);
         s.items.forEach((f, i) => {
           need(words(plain(f)) > 0, `${p}.items.${i}`, "Fill in this finding or remove it.");
-          need(words(plain(f)) <= L.findings.wordsEach, `${p}.items.${i}`, `Keep each finding to ${L.findings.wordsEach} words.`);
           httpsOnly(f, `${p}.items.${i}`);
         });
         break;
@@ -576,19 +565,16 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
         // A figure picked from their upload may not be theirs to share (decision 0017).
         need(!s.picked || s.picked.shareOk, `${p}.picked.shareOk`, "Tick that you may share this figure, or remove it.");
         need(s.alt.trim().length > 0, `${p}.alt`, "Describe the image for people who can't see it.");
-        need(words(plain(s.caption)) <= L.images.captionWords, `${p}.caption`, `Keep the caption to ${L.images.captionWords} words.`);
         httpsOnly(s.caption, `${p}.caption`);
         break;
       case "quote":
         need(words(s.text) > 0, `${p}.text`, "Type in the quote or remove it.");
-        need(words(s.text) <= L.quote.words, `${p}.text`, `Keep the quote to ${L.quote.words} words.`);
         need(s.name.trim().length > 0, `${p}.name`, "Say who said it.");
         need(s.name.length <= L.quote.nameChars, `${p}.name`, `Keep the name to ${L.quote.nameChars} characters.`);
         need(s.role.length <= L.quote.roleChars, `${p}.role`, `Keep the role to ${L.quote.roleChars} characters.`);
         break;
       case "reflection":
         need(words(plain(s.text)) > 0, `${p}.text`, "Say what you'd do next, or remove this.");
-        need(words(plain(s.text)) <= L.reflection.words, `${p}.text`, `Keep this to ${L.reflection.words} words.`);
         httpsOnly(s.text, `${p}.text`);
         break;
       case "link":
@@ -596,21 +582,17 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
         need(safeHref(s.href) !== null || (L.link.hrefOptional && s.href.trim() === ""), `${p}.href`, "Use a full https:// link.");
         need(s.label.trim().length > 0, `${p}.label`, "Say what the link is.");
         need(words(s.label) <= L.link.labelWords, `${p}.label`, `Keep the label to ${L.link.labelWords} words.`);
-        need(words(s.description) <= L.link.descriptionWords, `${p}.description`, `Keep the description to ${L.link.descriptionWords} words.`);
         break;
       case "aim":
         need(words(plain(s.text)) > 0, `${p}.text`, "Write your aim or hypothesis, or remove this.");
-        need(words(plain(s.text)) <= L.aim.words, `${p}.text`, `Keep the aim to ${L.aim.words} words.`);
         httpsOnly(s.text, `${p}.text`);
         break;
       case "conclusion":
         need(words(plain(s.text)) > 0, `${p}.text`, "Write your conclusion, or remove this.");
-        need(words(plain(s.text)) <= L.conclusion.words, `${p}.text`, `Keep the conclusion to ${L.conclusion.words} words.`);
         httpsOnly(s.text, `${p}.text`);
         break;
       case "pullquote":
         need(words(s.text) > 0, `${p}.text`, "Type in the pull quote or remove it.");
-        need(words(s.text) <= L.pullquote.words, `${p}.text`, `Keep the pull quote to ${L.pullquote.words} words.`);
         break;
     }
   });

@@ -85,7 +85,8 @@ This rewrites the PDF and Word files (byte for byte the same if nothing changed)
 The code checks run on every draft:
 
 - **Words**: `wordCount` from `lib/exhbt/blocks.ts`, every word on the page except image alt text. The limit is 200 and the editor aims for 150.
-- **Publish issues**: what `validateForPublish` would block on (a box over its word limit, too few findings and so on).
+- **Publish issues**: what `validateForPublish` would block on (a flowchart box over its word limit, too few findings and so on).
+- **Over the AI's targets**: a part longer than the AI is asked to write it in that layout (`overTargets` in `lib/ai/draft-targets.ts`: the summary, the context line, each finding, the quote, what I'd do next, the aim, the conclusion and the pull quote). People have no such limit, only the page's 200 words (decision 0030), so these don't stop publishing; they are listed in the notes and cost C2.
 - **Unverified numbers**: the editor's number check, exactly as `app/api/exhbts/draft/route.ts` runs it: numbers in the draft that aren't in the material (`unverifiedNumbers`), plus numbers whose source quote isn't in the material.
 - **Key facts**: how many of the answer key's facts the draft mentions, and which are missing.
 - **Should not appear**: the answer key's forbidden list.
