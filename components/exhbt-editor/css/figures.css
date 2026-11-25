@@ -348,11 +348,18 @@
     /* The gap under a part holds the "+" at its left and the next section's toolbar at its right on a touch
        screen (both always shown there): the chip sits in the middle of the part's bottom edge. */
     .xe-fig-corner,
-    .xe-frame:is([data-as="listed"], [data-as="button"]) .xe-fig-link > .xe-fig-corner {
+    .xe-frame[data-as="listed"] .xe-fig-link > .xe-fig-corner {
       position: absolute;
       right: auto;
       left: 50%;
       transform: translateX(-50%);
+    }
+    /* Under a button link, at its start: on a phone the buttons wrap one to a line, and the next one's grip is at its own
+       right end, half over its top edge, just under this chip. Centred, the chip met it. */
+    .xe-frame[data-as="button"] .xe-fig-link > .xe-fig-corner {
+      right: auto;
+      left: 0;
+      transform: none;
     }
     .xe-fig-chip::after,
     .xe-fig-picked-open::after,

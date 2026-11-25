@@ -153,6 +153,12 @@
       opacity: 1;
       pointer-events: auto;
     }
+    /* Side by side, 16px apart, so each one's 44px press (below) is its own: 4px apart, Remove's took 12px of the grip's.
+       A flowchart of four boxes or fewer is a row on a tablet from 36rem of column (MethodFlow), as Build's, Before and
+       after's and Event's are. */
+    .xe-flow[data-axis="row"] .xe-flow-tools {
+      gap: 1rem;
+    }
     .xe-flow-chip::before {
       content: "";
       position: absolute;

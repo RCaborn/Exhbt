@@ -239,11 +239,15 @@ function placeTools() {
     // A picture's is always inside its corner (css/core.css).
     if (INSIDE_KINDS.has(frame.dataset.kind ?? "")) continue;
     // What it must not lie over: every other section and the page's own words and chips (`boxes`), and its own section's words.
+    // Those are looked for on and just round the section: a large face set close (an essay's pull quote) draws its first line a
+    // pixel or two above its box, where a row above the corner on a touch screen, with no strip under it, met it.
     let own: Box[] | null = null;
-    const clear = (b: Box) =>
-      ![...boxes].some(([el, o]) => el !== frame && o.w > 0 && o.h > 0 && overlap(b, o)) && !(overlap(b, f) && (own ??= ownWords(frame)).some((o) => overlap(b, o)));
+    const round = { x: f.x - 8, y: f.y - 8, w: f.w + 16, h: f.h + 16 };
+    /** `b` lies over nothing it must not; `drawn`, the buttons themselves (not the strip under a row above), over none of its own words. */
+    const clear = (b: Box, drawn = b) =>
+      ![...boxes].some(([el, o]) => el !== frame && o.w > 0 && o.h > 0 && overlap(b, o)) && !(overlap(drawn, round) && (own ??= ownWords(frame)).some((o) => overlap(drawn, o)));
     // 1. A row above the corner.
-    if (clear({ x: f.x + f.w - width, y: f.y - buttons - bridge, w: width, h: buttons + bridge })) continue;
+    if (clear({ x: f.x + f.w - width, y: f.y - buttons - bridge, w: width, h: buttons + bridge }, { x: f.x + f.w - width, y: f.y - buttons - bridge, w: width, h: buttons })) continue;
     // 2. A row half over the top edge; a little lower where the gap above is short of half of it, a little to the right where its
     // own chips reach the corner (the aim's switch), never inside. A flowchart's keeps clear of its first box's grip, on that box's corner.
     const right = frame.dataset.kind === "flow" ? 32 : 0;
@@ -361,8 +365,16 @@ function placePluses(main: HTMLElement, coarse: boolean) {
     .filter((c) => !c.closest(".xe-measure, .xe-drag-overlay") && c.getClientRects().length > 0 && (coarse || !c.matches(".xe-flow-chip")))
     .map((c) => {
       const b = pageBox(c);
-      const r = coarse && c.matches(".xe-flow-chip") ? 16 : 0;
-      return { x: b.x - r, y: b.y - r, w: b.w + 2 * r, h: b.h + 2 * r };
+      if (!coarse) return b;
+      const r = c.matches(".xe-flow-chip") ? 16 : 0;
+      if (r) return { x: b.x - r, y: b.y - r, w: b.w + 2 * r, h: b.h + 2 * r };
+      // A chip's press under a finger: 44px tall and 4px past each end, about its middle (figures.css). Build's last link has its
+      // "Web address" in the gap after the last row, and its press took 3px of the "+" there.
+      if (c.matches(".xe-fig-chip")) {
+        const w = Math.max(b.w + 8, 44);
+        return { x: b.x + b.w / 2 - w / 2, y: b.y + b.h / 2 - 22, w, h: 44 };
+      }
+      return b;
     });
   const writes = inserts.map((insert) => {
     const at = pageBox(insert);
