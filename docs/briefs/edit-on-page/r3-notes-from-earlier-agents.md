@@ -413,9 +413,35 @@ For tests:
 - The test server is the new editor, so its stand-in drafts among seven. Material holding one of its cue words drafts that layout: "I built", "redesigned", "my role was", "this essay" (and "hypothesis", as before). Check a new test's material for them.
 - `stand-in: layout <name>` in the notes names a layout. `stand-in: invent` makes the stand-in write a pull quote, a source, a link and a role the material doesn't hold, to show each is left off.
 - "Things to fix" leaves out a layout's needs until publishing has been tried. `window.__exhbtUi.setTried(true)` is what a press on Publish does to it.
-- `offered()` now returns seven, so `editor-drag`, `editor-flow`, `editor-inplace`, `editor-smooth`, `editor-phone` and `editor-tablet` loop over seven. None was run here: that is brief Q's.
+- `offered()` now returns seven, so `editor-drag`, `editor-flow`, `editor-inplace`, `editor-smooth`, `editor-phone` and `editor-tablet` loop over seven. None was run in this first run; the second run below ran them and fixed what failed.
 
 Still open:
 - The layout rules are decision 0028's, word for word in meaning. Rule 4 (before and after) fits any improvement that gives figures for before and after, not only a redesign shown in pictures; eval fixture 08 is one. Such a draft can't be published until two pictures are marked.
 - `HANDOFF.md` (the layout row) and `DESIGN.md` (lines 130 and 135) still say three layouts, and "not offered until release 4".
 - In the classic picker, one of the four is drawn with the case study's sketch (as brief E asked).
+
+## From agent M's second run: CI with seven layouts (25 Nov 2026; branch `phase-2-r4-m-ai`)
+
+Once `offered()` held seven, the editor's specs ran the four new samples through every placement and drag check. What failed, and what changed. Each was a fault in the editor unless it says the test was wrong.
+- Toolbars (`Toolbar.tsx`):
+  - A flowchart box's grip and Remove now count as chips (`CHIPS`), as agent Y's note above asked. In a row of boxes they hang half under the box's foot, and Build, Essay and Before and after put their findings straight under a three-box flowchart: the findings' toolbar sat on the middle box's chips.
+  - A section's own words count just round its box too. An essay's pull quote, a large face set close, draws its first line a pixel above its box, and on a tablet a row above the corner (no strip under it there) lay on it. Only the buttons count against its own words, not the strip under them.
+- The "+" (`placePluses`): it moves on until nothing is under it (at 700px Build's two links sit side by side, and it stopped on the second link's grip); the one after the last row is moved too (it lay on the last link's "Web address"); and under a finger a chip counts by its 44px press, not its box (that press took 3px of the "+").
+- The drag's hidden copy (`drag/measure.ts`) keeps each of Build's buttons at its width. An empty box in a flex row has none, so every button after the first was measured at the row's start.
+- A link drawn as a button (Build's demo and code) has its "Web address" just under its line (`figures.css`), not on it: there it took the press meant for the line's own field (`editor-smooth`, `editor-inplace`). Under a finger it is at the link's start: on a phone the buttons wrap one to a line, and centred it met the next one's grip.
+- A flowchart of four boxes or fewer is a row on a tablet (MethodFlow), as the four new samples' are. A row's box shows its grip and Remove while it has the focus (flow.css), and they were 4px apart, so Remove's press took 12px of the grip's. They are 16px apart under a finger now.
+- Tests that were wrong, each said in its commit:
+  - `editor-drag`, "a new block lands where its + was": Build's, Before and after's and Event's samples have no room for a quote, a "What I'd do next", a link or a pull quote. It takes the quote out first.
+  - `editor-drag`, "a click on a grip…": it pressed at the middle of the first flowchart box. The essay's first box wraps onto two lines, and the middle is the edge between them, where the drag selected nothing. It presses along the first line.
+  - `editor-drag`, "no flicker…", down the side of a pair: it walked to 30px under the left side. In Event's sample the stack on the right is taller, so that is still inside the pair's row. It walks to 30px under the row. And Event's grid is one row of two, so the step between two rows of the grid runs only where there are two.
+  - `editor-tablet`: it pressed every flowchart chip at rest. A row's chips show only while their box has the focus, so in a row each box's are pressed with the focus in it.
+  - `phase2-formats`, "three radios named Layout": it drives the new editor, so the count is `OFFERED_FORMATS`.
+  - `editor-admin-switch` took `test` from Playwright, not `./editor-test`, so on WebKit next dev's hot-reload client broke two of its navigations at random.
+  - `safariFocus` (`e2e/editor-test.ts`) moved the focus with a scroll. A press never scrolls the page; here it scrolled 38px between the press and its release, and the click on a layout in the 390px menu landed elsewhere (`editor-topbar`, under Safari's rule only). It moves the focus with `preventScroll` now. That a press moves the focus without a scroll on a Mac or an iPhone is how Chromium and WebKit treat a press elsewhere; it has not been seen on a real Safari.
+
+Still open:
+- On a phone Build's buttons wrap one to a line, 12px apart (the page's own row gap), so the first one's "Web address" lies over the top of the second button, and over the top of its words where they start at the left. Nothing on the page is free there; more room would change the visitor's page too.
+- With seven layouts the narrow menu (390px) is taller than the screen under the bar while the page is at its top: the layout list ends below the fold.
+- `editor-inplace`'s picture-deletion test on WebKit under Safari's rule is the other agent's, as before.
+- On a tablet, in the first three layouts, a section's grip can cover "Remove finding 1" (seen by the main session). Left as it was: it did not fall out of these fixes. A finding's controls (`.xe-list-tools`) are not among `CHIPS`; adding them would be the next step, then every layout's placement checked again.
+- Not run here: anything on real WebKit or a real iPhone; `E2E_WEBKIT=chromium` covered the Safari sizes and the focus rule only.
