@@ -133,6 +133,16 @@ export function measureOrder(host: HTMLElement, f: Format, items: PageItem[], fr
             root.appendChild(ul);
             break;
           }
+          case "buttons":
+            // Build's demo and code: a row of buttons, each as wide as its own words (LayoutMain), so each box keeps its width
+            // too. An empty box in a flex row has none, and every button after the first was measured at the row's start.
+            root = el("div", rc);
+            for (const c of row.items) {
+              const e = leaf(c);
+              e.style.width = `${frozen[c.item.id]?.box.w ?? 0}px`;
+              root.appendChild(e);
+            }
+            break;
           default:
             root = el("div", rc);
             if (row.of === "figures") root.dataset.part = "figures";
