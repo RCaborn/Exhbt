@@ -16,19 +16,22 @@ export const SKILL_MAP_MAX = 6;
  * What the four-step builder collects. Order (docs/decisions/0003-cv-step-and-skill-radar.md):
  * job, CV (skippable), situation with education and skills, email.
  */
+/** The most the builder takes in each field (also the measuring script's heavy roadmap input). */
+export const ROADMAP_INPUT_MAX = { targetRole: 300, cvText: 20_000, situationDetail: 200, education: 1_000, skills: 1_000 } as const;
+
 export const RoadmapInputSchema = z
   .object({
     /** Step 1: the job they want, in their own words. */
-    targetRole: z.string().trim().min(2, "Describe the job you want.").max(300),
+    targetRole: z.string().trim().min(2, "Describe the job you want.").max(ROADMAP_INPUT_MAX.targetRole),
     /** Step 2: the CV. Preferred, but the step can be skipped. */
-    cvText: z.string().trim().max(20_000, "That CV is too long. Paste the most relevant parts.").default(""),
+    cvText: z.string().trim().max(ROADMAP_INPUT_MAX.cvText, "That CV is too long. Paste the most relevant parts.").default(""),
     /** Step 3: where they are now, plus anything the CV doesn't cover. */
     situation: z.enum(Object.keys(SITUATIONS) as [Situation, ...Situation[]], {
       error: "Choose the option closest to where you are now.",
     }),
-    situationDetail: z.string().trim().max(200).default(""),
-    education: z.string().trim().max(1_000).default(""),
-    skills: z.string().trim().max(1_000).default(""),
+    situationDetail: z.string().trim().max(ROADMAP_INPUT_MAX.situationDetail).default(""),
+    education: z.string().trim().max(ROADMAP_INPUT_MAX.education).default(""),
+    skills: z.string().trim().max(ROADMAP_INPUT_MAX.skills).default(""),
   })
   .refine((v) => (v.education + v.skills + v.cvText).replace(/\s/g, "").length >= 20, {
     path: ["education"],

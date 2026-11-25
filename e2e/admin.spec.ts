@@ -194,6 +194,96 @@ test.describe("Admin panel", () => {
     await expect.poll(async () => (await stat(page, "views-total")) - before).toBeGreaterThanOrEqual(1);
   });
 
+  test("a failed AI draft shows in Failed AI calls, with its reason and the tokens it spent", async ({ page }) => {
+    await signIn(page, { admin: true });
+    await expect(page.getByRole("heading", { level: 2, name: "Failed AI calls" })).toBeVisible();
+    const row = () => page.getByRole("table", { name: "Failed AI calls by feature" }).getByRole("row", { name: /^Exhbt drafts/ });
+    const failedBefore = await stat(page, "ai-failures-total");
+    const outBefore = await stat(page, "ai-failures-out");
+
+    // The stand-in fails the way a real draft does when it runs out of room ("stand-in: fail" in the notes).
+    const res = await page.request.post("/api/exhbts/draft", {
+      data: { text: "We timed lunchtime queues at the union cafe for two weeks, then opened a second till at the busiest hour, and the queue fell.", notes: "stand-in: fail" },
+    });
+    expect(res.status()).toBe(502);
+    expect(((await res.json()) as { error: string }).error).toContain("didn't use up a draft");
+
+    await page.reload();
+    expect(await stat(page, "ai-failures-total")).toBe(failedBefore + 1);
+    expect(await stat(page, "ai-failures-out")).toBe(outBefore + 16000);
+    await expect(row()).toContainText("ran out of room");
+  });
+
+  test("after five failed drafts in a day the sixth isn't tried: it says so, and only five are counted", async ({ page }) => {
+    await signIn(page, { admin: true });
+    const failedBefore = await stat(page, "ai-failures-total");
+    const draft = (notes: string) =>
+      page.request.post("/api/exhbts/draft", {
+        data: { text: "We timed lunchtime queues at the union cafe for two weeks, then opened a second till at the busiest hour, and the queue fell.", notes },
+      });
+    for (let i = 0; i < 5; i++) expect((await draft("stand-in: fail")).status()).toBe(502);
+    // No call is made now, even for a draft that would have worked.
+    const stopped = await draft("");
+    expect(stopped.status()).toBe(429);
+    expect(((await stopped.json()) as { error: string }).error).toContain("Nothing was used up. Try again tomorrow.");
+
+    await page.reload();
+    expect(await stat(page, "ai-failures-total")).toBe(failedBefore + 5);
+  });
+
+  test("five drafts the service never answered aren't counted towards that limit: the sixth is still tried, and the panel shows all five", async ({ page }) => {
+    await signIn(page, { admin: true });
+    const why = page.getByRole("table", { name: "Failed AI calls by feature" }).getByRole("row", { name: /^Exhbt drafts/ }).getByRole("cell").nth(2);
+    /** How many of the row's failures were a service error ("ran out of room 6, service error 5"). */
+    const unanswered = async () => Number(/service error (\d+)/.exec(await why.innerText())?.[1] ?? 0);
+    const failedBefore = await stat(page, "ai-failures-total");
+    const unansweredBefore = await unanswered();
+    const draft = (notes: string) =>
+      page.request.post("/api/exhbts/draft", {
+        data: { text: "We timed lunchtime queues at the union cafe for two weeks, then opened a second till at the busiest hour, and the queue fell.", notes },
+      });
+    // "stand-in: unanswered" fails as a call the service never answered does: the key out of credit, the API down.
+    for (let i = 0; i < 5; i++) expect((await draft("stand-in: unanswered")).status()).toBe(502);
+    // That cost nothing and isn't the person's doing, so nobody is locked out: the sixth try makes its call, and this one works.
+    expect((await draft("")).status()).toBe(200);
+
+    // All five are still recorded for the team, as service errors.
+    await page.reload();
+    expect(await stat(page, "ai-failures-total")).toBe(failedBefore + 5);
+    expect(await unanswered()).toBe(unansweredBefore + 5);
+  });
+
+  test("a failed figure pick shows in Failed AI calls with its reason, whether its pick was given back or stays counted", async ({ page }) => {
+    await signIn(page, { admin: true });
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+    const ask = (name: string) => page.request.post("/api/exhbts/figure-pick", { multipart: { label: name, image: { name: "image-1.png", mimeType: "image/png", buffer: png } } });
+    const cells = page.getByRole("table", { name: "Failed AI calls by feature" }).getByRole("row", { name: /^Figure picks/ }).getByRole("cell");
+    /** The row's count and how many of them each reason accounts for ("service error 3, wrong shape 1"). */
+    const read = async () => {
+      const why = await cells.nth(2).innerText();
+      const of = (reason: string) => Number(new RegExp(`${reason} (\\d+)`).exec(why)?.[1] ?? 0);
+      return { failed: Number((await cells.nth(1).innerText()).replace(/,/g, "")), service: of("service error"), shape: of("wrong shape") };
+    };
+    const before = await read();
+    const inBefore = await stat(page, "ai-failures-in");
+    const outBefore = await stat(page, "ai-failures-out");
+
+    // The stand-in reads the file's name (lib/ai/figure-pick.ts): "pick-fails" is a call the service never answered, whose
+    // pick is given back, and "pick-unusable" one it answered with nothing usable, whose pick stays counted. Both are recorded.
+    expect((await ask("report-pick-fails.pdf, page 3")).status()).toBe(502);
+    expect((await ask("report-pick-unusable.pdf, page 3")).status()).toBe(502);
+
+    await page.reload();
+    expect(await read()).toEqual({ failed: before.failed + 2, service: before.service + 1, shape: before.shape + 1 });
+    // Only the answered call spent tokens (the stand-in's 1,500 in and 120 out).
+    expect(await stat(page, "ai-failures-in")).toBe(inBefore + 1500);
+    expect(await stat(page, "ai-failures-out")).toBe(outBefore + 120);
+    // This account has a free plan's three picks. The call that was answered spent one, so two are left and the third is refused.
+    expect((await ask("report-with-chart.pdf, page 3")).status()).toBe(200);
+    expect((await ask("report-with-chart.pdf, page 3")).status()).toBe(200);
+    expect((await ask("report-with-chart.pdf, page 3")).status()).toBe(429);
+  });
+
   test("no accessibility violations on the overview, accounts and an account", async ({ page }) => {
     await signIn(page, { admin: true });
     await page.request.get(`/dev/admin?seed=${stamp()}`);

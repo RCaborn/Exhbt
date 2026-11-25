@@ -22,7 +22,8 @@ import { draftExhbt, materialText, type DraftInput, type DraftResult } from "@/l
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "@/lib/ai/model";
 import { extractTextInBrowser } from "@/lib/doc-readers";
 import { chartsOf, findingsOf, LIMITS, normaliseDoc, plain, sectionTexts, validateForPublish, wordCount, words, type ExhbtDoc, type Issue, type RichText } from "@/lib/exhbt/blocks";
-import { chartTexts, chartValues, KIND_NAMES } from "@/lib/exhbt/charts";
+import { chartTexts, chartValues, KIND_NAMES, type Chart } from "@/lib/exhbt/charts";
+import { AIFailure } from "@/lib/ai/failure";
 import { normaliseNumber, numbersIn, unverifiedNumbers } from "@/lib/exhbt/verify";
 
 const ROOT = process.cwd();
@@ -67,6 +68,17 @@ function parseArgs(argv: string[]): Args {
 // Fixtures
 
 type Match = string | string[];
+/**
+ * What a fixture's graph must hold when the model draws one of the expected kind: a table's
+ * headings in order; big-number tiles by value, each with its unit and starting value (none means
+ * none); scatter points as [x, y]. A swapped pair or a unit on the wrong figure fails the run.
+ */
+type GraphExpect = {
+  kind: string;
+  headings?: string[];
+  tiles?: { value: number; unit?: string; from?: number }[];
+  points?: [number, number][];
+};
 type Facts = {
   fixture: string;
   shape: string;
@@ -74,7 +86,7 @@ type Facts = {
   files: string[];
   notesFile: string | null;
   link: string | null;
-  expect: { headlineNumber: boolean; chart: boolean; noNumbers: boolean };
+  expect: { headlineNumber: boolean; chart: boolean; noNumbers: boolean; graph?: GraphExpect };
   keyFacts: { id: string; fact: string; match: Match[] }[];
   forbidden: { id: string; why: string; match: Match[] }[];
   sourceNumbers: string[];
@@ -225,8 +237,44 @@ type Checks = {
   forbiddenHits: { id: string; why: string; matched: string }[];
   style: { banned: string[]; soft: string[]; openers: string[]; exclamations: number; firstPersonPlural: string[]; emDashes: number; usSpellings: string[] };
   shape: { titleChars: number; contextChars: number; skills: number; gapWords: number; flowBoxes: number; flowMaxWords: number; findings: number; findingsMaxWords: number; charts: number; headline: boolean };
-  expectations: { headline: "ok" | "missing" | "unexpected"; chart: "ok" | "missing" | "unexpected"; noNumbers: "ok" | "broken" | "n/a" };
+  expectations: {
+    headline: "ok" | "missing" | "unexpected";
+    chart: "ok" | "missing" | "unexpected";
+    noNumbers: "ok" | "broken" | "n/a";
+    /** n/a: the fixture sets no graph. other: no graph of the expected kind (said, not failed). wrong: fails the run. */
+    graph: { state: "ok" | "n/a" | "other" | "wrong"; why: string[] };
+  };
 };
+
+/** The fixture's graph expectation against the draft's graphs (see GraphExpect). */
+function graphCheck(want: GraphExpect | undefined, charts: Chart[]): Checks["expectations"]["graph"] {
+  if (!want) return { state: "n/a", why: [] };
+  const c = charts.find((x) => x.kind === want.kind);
+  if (!c) return { state: "other", why: [charts.length ? `drew ${charts.map((x) => x.kind).join(", ")}, not ${want.kind}` : `drew no graph, expected ${want.kind}`] };
+  const why: string[] = [];
+  const sq = (t: string) => t.replace(/\s+/g, " ").trim().toLowerCase();
+  if (c.kind === "table" && want.headings) {
+    if (c.columns.map(sq).join(" | ") !== want.headings.map(sq).join(" | ")) why.push(`headings ${JSON.stringify(c.columns)}, expected ${JSON.stringify(want.headings)}`);
+  }
+  if (c.kind === "numbers" && want.tiles) {
+    const units = want.tiles.map((t) => t.unit).filter((u): u is string => !!u);
+    for (const t of want.tiles) {
+      const got = c.tiles.find((x) => x.value === t.value);
+      if (!got) {
+        why.push(`no tile with value ${t.value}`);
+        continue;
+      }
+      const u = got.unit ?? "";
+      if (t.unit && !u.includes(t.unit)) why.push(`tile ${t.value} has unit "${u}", expected "${t.unit}"`);
+      if (!t.unit && units.some((x) => u.includes(x))) why.push(`tile ${t.value} has another figure's unit "${u}"`);
+      if (got.from !== undefined && got.from !== t.from) why.push(`tile ${t.value} starts from ${got.from}, expected ${t.from ?? "nothing"}`);
+    }
+  }
+  if (c.kind === "scatter" && want.points) {
+    for (const [x, y] of want.points) if (!c.points.some((p) => p.x === x && p.y === y)) why.push(`no point [${x}, ${y}]${c.points.some((p) => p.x === y && p.y === x) ? " (it is there the wrong way round)" : ""}`);
+  }
+  return { state: why.length ? "wrong" : "ok", why };
+}
 
 function runChecks(result: DraftResult, source: string, f: Facts, banned: Banned): Checks {
   const d = result.doc;
@@ -289,6 +337,7 @@ function runChecks(result: DraftResult, source: string, f: Facts, banned: Banned
       headline: expectState(f.expect.headlineNumber, !!d.headline),
       chart: expectState(f.expect.chart, chartsOf(d).length > 0),
       noNumbers: f.expect.noNumbers ? (draftNumbers.length ? "broken" : "ok") : "n/a",
+      graph: graphCheck(f.expect.graph, chartsOf(d)),
     },
   };
 }
@@ -412,7 +461,8 @@ async function attempt(rep: number, input: DraftInput, source: string, f: Facts,
     result = await withTimeout(draftExhbt(input), DRAFT_TIMEOUT_MS);
   } catch (e) {
     const error = describeError(e);
-    const errorClass = /timed out/.test(error) ? "timeout" : e instanceof Anthropic.APIError ? "api" : /stop_reason/.test(error) ? "no_output" : "harness";
+    // An AIFailure names its own reason: cut_off is an answer that ran out of room.
+    const errorClass = e instanceof AIFailure ? e.reason : /timed out/.test(error) ? "timeout" : e instanceof Anthropic.APIError ? "api" : "harness";
     return { rep, status: "error", errorClass, error, latencyMs: Date.now() - t0 };
   }
   const latencyMs = Date.now() - t0;
@@ -551,7 +601,7 @@ function summary(runs: FixtureRun[], meta: { started: string; mode: string; judg
       ].filter(Boolean);
       notes.push(`Tone: ${style.join("; ") || "clean"}`);
       const ex = c.expectations;
-      const exp = [ex.headline !== "ok" ? `headline number ${ex.headline}` : "", ex.chart !== "ok" ? `chart ${ex.chart}` : "", ex.noNumbers === "broken" ? "numbers in a draft of number-free material" : ""].filter(Boolean);
+      const exp = [ex.headline !== "ok" ? `headline number ${ex.headline}` : "", ex.chart !== "ok" ? `chart ${ex.chart}` : "", ex.noNumbers === "broken" ? "numbers in a draft of number-free material" : "", ex.graph.state === "wrong" || ex.graph.state === "other" ? `graph ${ex.graph.state === "wrong" ? "WRONG" : "not the expected kind"}: ${ex.graph.why.join("; ")}` : ""].filter(Boolean);
       if (exp.length) notes.push(`Against the answer key's expectations: ${exp.join("; ")}`);
       notes.push(`Code scores: ${(["C1", "C2", "C5", "C8"] as const).map((k) => `${k} ${a.auto[k]}`).join(", ")}`);
       for (const n of notes) lines.push(`- ${n}`);
@@ -711,6 +761,7 @@ async function main() {
       console.log(`  ${f.fixture}${args.reps > 1 ? ` #${rep}` : ""}: ${line}`);
       // Each graph as stored, one JSON line, so the log shows which value sits with which label and unit.
       if (a.status === "ok") for (const c of chartsOf(a.doc)) console.log(`    graph: ${JSON.stringify(c)}`);
+      if (a.status === "ok" && a.checks.expectations.graph.state !== "n/a") console.log(`    graph expectation: ${a.checks.expectations.graph.state}${a.checks.expectations.graph.why.length ? ` (${a.checks.expectations.graph.why.join("; ")})` : ""}`);
     }
     const run: FixtureRun = {
       fixture: f.fixture,
@@ -732,10 +783,11 @@ async function main() {
 
   const total = runs.reduce((n, r) => n + r.attempts.length, 0);
   const failed = runs.reduce((n, r) => n + r.attempts.filter((a) => a.status === "error").length, 0);
-  if (failed === total) {
-    console.error("Every draft failed: see SUMMARY.md.");
-    process.exit(2);
-  }
+  const wrongGraphs = runs.flatMap((r) => r.attempts.flatMap((a) => (a.status === "ok" && a.checks.expectations.graph.state === "wrong" ? [r.fixture] : [])));
+  // Any draft that failed (a cut-off answer included), or a graph that put a value or unit in the wrong place, fails the run.
+  if (failed) console.error(`${failed} of ${total} drafts failed: see above and SUMMARY.md.`);
+  if (wrongGraphs.length) console.error(`A graph was wrong in ${[...new Set(wrongGraphs)].join(", ")}: see the "graph" lines above.`);
+  if (failed || wrongGraphs.length) process.exit(failed === total ? 2 : 1);
 }
 
 main().catch((e) => {

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod/v4";
 import { getStore } from "@/lib/store";
+import { recordAIFailure, tooManyFailures, TOO_MANY_FAILURES } from "@/lib/ai-failures";
 import { getCurrentUser } from "@/lib/auth";
 import { canView } from "@/lib/access";
 import { ENTITLEMENTS, roadmapLimitMessage } from "@/lib/entitlements";
@@ -84,6 +85,9 @@ export async function swapIdea(roadmapId: string, _prev: SwapState, form: FormDa
   if (!replacing) return { error: "We couldn't find that idea. Refresh the page and try again." };
 
   const store = getStore();
+  // Signed out, the roadmap is the key for the failure limit.
+  const who = { userId: user?.id ?? null, key: user?.id ?? `roadmap:${roadmapId}` };
+  if (await tooManyFailures("project_swap", who)) return { error: TOO_MANY_FAILURES };
   let result;
   try {
     result = await generateSwap({
@@ -95,8 +99,8 @@ export async function swapIdea(roadmapId: string, _prev: SwapState, form: FormDa
       round: record.projectSwapsUsed + 1,
     });
   } catch (e) {
-    console.error("project swap failed", (e as Error).message);
-    return { error: "We couldn't swap that idea just now. Try again." };
+    await recordAIFailure("project_swap", who, e, { roadmapId });
+    return { error: "We couldn't swap that idea just now. It didn't use up a swap. Try again." };
   }
   await store.logAICall({
     userId: user?.id ?? null,

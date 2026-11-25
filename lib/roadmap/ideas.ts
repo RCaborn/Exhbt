@@ -1,4 +1,5 @@
 import "server-only";
+import { recordAIFailure } from "@/lib/ai-failures";
 import { getStore, type ProjectIdea, type RoadmapRecord } from "@/lib/store";
 import { generateIdeas } from "@/lib/ai/projects";
 import { runInBackground } from "@/lib/background";
@@ -89,9 +90,8 @@ async function makeIdeas(record: RoadmapRecord, attempt: number): Promise<void> 
     await store.seedProjectIdeas(record.id, result.projects);
     await store.logEvent("ideas_completed", record.userId, { attempt });
   } catch (e) {
-    console.error("project ideas failed", (e as Error).message);
     await store.failIdeasRun(record.id);
-    await store.logEvent("ideas_failed", record.userId, { attempt, message: (e as Error).message.slice(0, 200) });
+    await recordAIFailure("project_ideas", { userId: record.userId }, e, { attempt, roadmapId: record.id });
   }
 }
 

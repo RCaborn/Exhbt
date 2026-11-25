@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { FigurePickUnanswered, pickFigure, type PageImage } from "@/lib/ai/figure-pick";
+import { neverAnswered } from "@/lib/ai/failure";
+import { pickFigure, type PageImage } from "@/lib/ai/figure-pick";
 import { mediaTypeOf } from "@/lib/ai/transcribe";
 import { getCurrentUser } from "@/lib/auth";
 import { DRAFT_WINDOW_HOURS } from "@/lib/drafting";
@@ -8,6 +9,7 @@ import { FIGURE } from "@/lib/figures/rules";
 import { getPlan, limitsFor } from "@/lib/plan";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
+import { recordAIFailure } from "@/lib/ai-failures";
 
 /**
  * Picks the figure for an exhbt being drafted (decisions 0017 and 0025). The draft page sends it,
@@ -21,8 +23,15 @@ import { getStore } from "@/lib/store";
  * person can ask for as many as their plan has drafts in the window, plus a couple for drafts
  * that fail and are tried again. A pick is counted before the AI call, so requests that overlap
  * can't all pass the check while it runs. It is given back when the call failed before the
- * service answered (FigurePickUnanswered), so a failure the person didn't cause doesn't spend a
- * pick. A call the service answered stays counted, even when nothing in the answer could be used.
+ * service answered (neverAnswered in lib/ai/failure.ts: an AIFailure whose reason is "service"),
+ * so a failure the person didn't cause doesn't spend a pick. A call the service answered stays
+ * counted, even when nothing in the answer could be used.
+ *
+ * Every failed pick, given back or not, is also recorded as a failure event with its reason and
+ * tokens and no text (lib/ai-failures.ts), which the admin panel's "Failed AI calls" shows. A pick
+ * doesn't take the day's limit on failed calls that a draft, a rewrite and some other features
+ * have (decision 0029): a failure that cost something stays counted here, and one that is given
+ * back cost nothing.
  *
  * Outside production the answer also carries `debug`: the model that answered, its token counts
  * and its answer before the checks, which the figure eval reads (evals/figure-pick/README.md).
@@ -75,11 +84,12 @@ export async function POST(req: Request) {
   try {
     result = await pickFigure(images);
   } catch (err) {
-    console.error("figure pick failed", (err as Error).message);
     // The service never answered: the person didn't cause that, so their pick is given back. Any other failure stays counted.
-    if (err instanceof FigurePickUnanswered) {
+    if (neverAnswered(err)) {
       await store.returnEvent("figure_picked", user.id, claim).catch((problem: unknown) => console.error("figure pick give-back failed", (problem as Error).message));
     }
+    // Given back or not, the failure is recorded with its reason and tokens, and never any text, for the admin panel.
+    await recordAIFailure("figure_pick", { userId: user.id }, err);
     // Outside production the reason is on the answer too, so the eval can say why a real call failed (never shown to people).
     return fail(process.env.NODE_ENV === "production" ? "We couldn't pick a figure just now." : `We couldn't pick a figure just now. (${(err as Error).message.slice(0, 300)})`, 502);
   }

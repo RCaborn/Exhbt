@@ -161,6 +161,17 @@ test.describe("Draft an exhbt", () => {
     await expect(page.getByTestId("file-status")).toContainText("words");
   });
 
+  test("a scan the AI reader couldn't finish says only the first part was read", async ({ page }) => {
+    await signIn(page, "longscan");
+    await ready(page);
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+    // "long-scan" in the name makes the stand-in reader stop part-way, as a real read does at max_tokens.
+    await page.locator("#files").setInputFiles({ name: "long-scan.png", mimeType: "image/png", buffer: png });
+    await page.getByRole("button", { name: "Read it for me" }).click();
+    await expect(page.getByTestId("file-status")).toContainText("words");
+    await expect(page.getByTestId("file-truncated")).toHaveText(/only the first part was read/);
+  });
+
   test("no accessibility violations on /exhbts/new", async ({ page }) => {
     await signIn(page, "a11y");
     await ready(page);
