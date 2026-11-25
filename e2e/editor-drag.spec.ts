@@ -1156,9 +1156,16 @@ test.describe("the + between sections", () => {
 
     test(`${f}: a new block lands where its + was, with the cursor in it`, async ({ page }) => {
       await open(page, f);
+      // The kinds whose new block takes the cursor. Build's, Before and after's and Event's samples hold a quote, a "What I'd
+      // do next" and every link they may: the quote is taken out first, so there is room for one.
+      const typed = (o: { kind: string; full?: string }) => !o.full && ["quote", "reflection", "link", "pullquote"].includes(o.kind);
+      if (!blockOptions(await docNow(page)).some(typed)) {
+        await page.evaluate((id) => window.__exhbtEditor!.remove(id), (await docNow(page)).sections.find((s) => s.kind === "quote")!.id);
+        await settle(page);
+      }
       const order = await pageOrder(page);
       const doc = await docNow(page);
-      const kind = blockOptions(doc).find((o) => !o.full && ["quote", "reflection", "link", "pullquote"].includes(o.kind))!;
+      const kind = blockOptions(doc).find(typed)!;
       const starts = await page.locator(`${READY} .xe-insert:not([data-end])`).evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-at"))));
       const at = starts[Math.floor(starts.length / 2)]!;
       await page.locator(`${READY} .xe-insert[data-at="${at}"] .xe-plus`).click();
