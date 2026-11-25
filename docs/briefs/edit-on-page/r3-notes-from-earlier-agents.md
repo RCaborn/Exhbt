@@ -474,3 +474,20 @@ Run at the end, on Chromium: `phase2-draft-tools` 28 passed, `editor-smooth` 8, 
 Still open:
 - Nothing here ran on real Safari or an iPhone: the focus rule was the emulation's.
 - A message that a rewrite worked stays in its card under "More actions" until the next rewrite, shown whenever the toolbar is. It has a ground now; whether it should go sooner is a question for Rory.
+
+## From the work-pictures agent, 25 Nov 2026 (branch `phase-2-r2-work-pictures`)
+
+Pictures from Word, PowerPoint and uploads (decision 0025), brought up to date with release 4 and tested for the first time; then long files, read whole or by their start and end (`lib/material.ts`).
+
+- `e2e/work-pictures.spec.ts` was written for the classic editor. In the new one its `li[data-section-id]` and Preview selectors found nothing, so two hostile-zip tests passed without checking anything. It now reads the page as `auto-figure` does (`${READY} article [data-section-id]`), the draft's line from the layout menu, and the picked strip from the label's popover.
+- A picture taken out of a Word or PowerPoint file has no page. Its label over the picture is "A picture from your report", and its strip holds the tick and no crop (`figures/ImageExtras.tsx`). It used to say "From your report, a picture in it" and offer a crop and another page.
+- Limits a draft-page test can meet: a Free account has one draft in 30 days, so a test that drafts twice needs Premium; `/api/files/transcribe` reads 12 files a day from one address, shared by every spec on a CI shard (work-pictures sends 8); the figure route takes at most 12 more pictures, and the draft page now sends only what the layout shows.
+- Don't save files in the worktree while a Playwright run is going. Tailwind 4 scans the whole project, so saving a spec or a doc rebuilds the CSS in the dev server, and a page loading then may not hydrate, or a route may read a half-written manifest ("Unexpected end of JSON input"). Seen once here; with nothing saved during the run it did not come back.
+- Long files: the draft page reads each file whole and gives the draft all of it while the files fit one budget together, otherwise each file's share, the start and the end of a long one, and the file's line says which ("We read all 15,028 words", "We read 39,000 of your 60,000 words: the start and the end"). The AI calls keep the start and end too if a request carries more. A scan read by the AI reader is unchanged: it stops at the reader's own limit.
+
+Run here, Chromium, one worker, the `desktop` project: on 30d792a, `auto-figure` 32, `office-pictures` 14, `work-pictures` 22, `exhbt-page` 16, `phase2-billing-polish` 7, `phase2-draft-tools` 28, `phase2-draft` 12, `phase2-polish-2` 13, `phase2-teammates` 7, `r2-fixes` 27; on ec5790f, `auto-figure` 32, `work-pictures` 22, `long-files` 6, `phase2-draft` 12, `phase2-draft-tools` 28, `phase2-teammates` 7. All passed. Also `npm run eval:figures -- --self-test`, which calls nothing.
+
+Still open:
+- The real model has not seen a Word, PowerPoint or uploaded picture (eval cases 15 to 18), or a long draft: four characters a token is an estimate until a long draft's input tokens are in `ai_call_logs`.
+- Nothing here ran on WebKit or a phone.
+- The new editor's "Take a figure from my report" for Word and PowerPoint files (0025 says what it needs).
