@@ -14,6 +14,12 @@ on:
       - "docs/**"
       - "**/*.md"
 
+# One run per branch at a time. A newer push takes the place of a run still waiting;
+# the run already in progress finishes, so its results are not lost.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
