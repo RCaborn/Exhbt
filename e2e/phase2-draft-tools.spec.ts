@@ -397,9 +397,11 @@ test.describe("An open rewrite form stays up and takes the press", () => {
 
     /** Opens the block's menu, then its form, each checked for its ground; then closes the form. `what` names the case. */
     /**
-     * Presses "Rewrite this block" in the block's open menu from the keyboard, with the pointer off the page first. A card that
-     * comes up under a still pointer can stay marked as hovered in Chromium after the pointer has gone (seen on "No rewrites
-     * left", which nothing styles on hover), and leave() would wait for it in vain.
+     * Presses "Rewrite this block" in the block's open menu from the keyboard, with the pointer off the page first. Chromium's
+     * headless shell, which CI runs, can leave the box that holds the form (data-tools-panel) marked as hovered when what the
+     * pointer was on goes from under it: a rewrite lands, the form goes, and a compact card round it closes. The mark outlasts
+     * the pointer leaving, on that box alone, which nothing styles on hover, so the page is unchanged; but leave() would wait
+     * for it in vain (the Night test, 4 times in 4 there). So these tests make every press in a panel from the keyboard.
      */
     async function rewriteFromKeys(p: Page, block: string) {
       await p.mouse.move(2, 2);
@@ -443,8 +445,9 @@ test.describe("An open rewrite form stays up and takes the press", () => {
       // Free's rewrites run out sooner than Max's, and both pages keep the look they were drawn in (Max's).
       expect((await page.request.get("/dev/plan?plan=free&next=/exhbts")).ok()).toBe(true);
       for (let i = 1; i <= FREE_REWRITES; i++) {
-        await startRewrite(page, "flow");
-        await rewriteNow(page, "flow").click();
+        await openCardMenu(page, "flow");
+        await rewriteFromKeys(page, "flow");
+        await rewriteNow(page, "flow").press("Enter");
         await expect(rewritesLeft(page, "flow")).toContainText(`${FREE_REWRITES - i} of`);
       }
       for (const p of [page, stale]) await p.locator(`${READY} [data-kind="flow"] > .xe-tools`).first().evaluate(hold, null);
