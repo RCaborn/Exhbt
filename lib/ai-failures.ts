@@ -1,5 +1,5 @@
 import "server-only";
-import { AIFailure, failureProps, type AIFeature } from "@/lib/ai/failure";
+import { AIFailure, failureProps, neverAnswered, type AIFeature } from "@/lib/ai/failure";
 import { getStore, type EventName } from "@/lib/store";
 
 /**
@@ -13,6 +13,14 @@ import { getStore, type EventName } from "@/lib/store";
  * 24 hours; after that the feature says so and makes no call until the oldest failure is a day old.
  * The key goes in the event's props as `ipHash`, the field countRecentEvents reads (as the intro's
  * own daily limit does).
+ *
+ * What counts towards that limit is a failure the service answered (cut off, refused, the wrong
+ * shape, empty), which cost something, and a failure nobody foresaw (anything that isn't an
+ * AIFailure), which is the safe side. A call the service never answered (neverAnswered in
+ * lib/ai/failure.ts: the key out of credit, the API down, no connection) does not count: it cost
+ * nothing and isn't the person's doing, and counted, an outage would lock everyone out for a day
+ * and keep them out after the service was back. Its event is recorded without the key, so the
+ * admin panel shows it, with its user and reason, and the limit never sees it.
  *
  * A figure pick records its failures here and takes no part in that limit. It is counted before
  * the call and given back only when the service never answered (neverAnswered in lib/ai/failure.ts,
@@ -47,13 +55,15 @@ export async function recordAIFailure(feature: AIFeature, who: Who, e: unknown, 
   // Not an AIFailure: our own code or setup failed (a missing key, a bug), so the cause goes to the
   // Worker log. It isn't stored in the event, which keeps to the fixed fields.
   if (!(e instanceof AIFailure)) console.error(`${feature} failed: ${(e as Error)?.name ?? "Error"}: ${(e as Error)?.message ?? String(e)}`);
-  const key = who.key ?? who.userId;
+  // The key is what tooManyFailures counts by. A call the service never answered is recorded without it, so it is
+  // shown in the admin panel and not counted towards the day's limit.
+  const key = neverAnswered(e) ? null : (who.key ?? who.userId);
   await getStore()
     .logEvent(event ?? FAILURE_EVENT[feature], who.userId, { ...props, ...extra, ...(key ? { ipHash: key } : {}) })
     .catch((err) => console.error("failure event not logged", (err as Error).message));
 }
 
-/** True when this person (or key) has had FAILURES_PER_DAY failures of this feature in the last 24 hours. */
+/** True when this person (or key) has had FAILURES_PER_DAY counted failures of this feature in the last 24 hours (calls the service never answered aren't counted). */
 export async function tooManyFailures(feature: AIFeature, who: Who, event?: EventName): Promise<boolean> {
   const key = who.key ?? who.userId;
   if (!key) return false;

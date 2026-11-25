@@ -261,6 +261,9 @@ function mockDraft(input: DraftInput): DraftResult {
   // "stand-in: fail" in the notes: the failure a real draft has when it runs out of room, so the
   // failure path (the event, the admin panel, the message) can be seen without an API key.
   if (/stand-in: fail/i.test(input.notes ?? "")) throw new AIFailure("exhbt_draft", "cut_off", { inputTokens: 5000, outputTokens: 16000 });
+  // "stand-in: unanswered": the failure of a call the service never answered, as the API refuses a key
+  // that is out of credit (a 400). It spends nothing and isn't counted towards the day's limit.
+  if (/stand-in: unanswered/i.test(input.notes ?? "")) throw new AIFailure("exhbt_draft", "service", { status: 400 });
   const source = materialText(input).replace(/^File: .*$/gm, "");
   // The stand-in's layout: named in the notes, else research when the material says "hypothesis", else a case study.
   // It ignores the upload signals, and never keys on "method", "results", "aim" or "abstract": other specs upload such files.

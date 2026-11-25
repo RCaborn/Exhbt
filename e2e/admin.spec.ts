@@ -231,6 +231,28 @@ test.describe("Admin panel", () => {
     expect(await stat(page, "ai-failures-total")).toBe(failedBefore + 5);
   });
 
+  test("five drafts the service never answered aren't counted towards that limit: the sixth is still tried, and the panel shows all five", async ({ page }) => {
+    await signIn(page, { admin: true });
+    const why = page.getByRole("table", { name: "Failed AI calls by feature" }).getByRole("row", { name: /^Exhbt drafts/ }).getByRole("cell").nth(2);
+    /** How many of the row's failures were a service error ("ran out of room 6, service error 5"). */
+    const unanswered = async () => Number(/service error (\d+)/.exec(await why.innerText())?.[1] ?? 0);
+    const failedBefore = await stat(page, "ai-failures-total");
+    const unansweredBefore = await unanswered();
+    const draft = (notes: string) =>
+      page.request.post("/api/exhbts/draft", {
+        data: { text: "We timed lunchtime queues at the union cafe for two weeks, then opened a second till at the busiest hour, and the queue fell.", notes },
+      });
+    // "stand-in: unanswered" fails as a call the service never answered does: the key out of credit, the API down.
+    for (let i = 0; i < 5; i++) expect((await draft("stand-in: unanswered")).status()).toBe(502);
+    // That cost nothing and isn't the person's doing, so nobody is locked out: the sixth try makes its call, and this one works.
+    expect((await draft("")).status()).toBe(200);
+
+    // All five are still recorded for the team, as service errors.
+    await page.reload();
+    expect(await stat(page, "ai-failures-total")).toBe(failedBefore + 5);
+    expect(await unanswered()).toBe(unansweredBefore + 5);
+  });
+
   test("a failed figure pick shows in Failed AI calls with its reason, whether its pick was given back or stays counted", async ({ page }) => {
     await signIn(page, { admin: true });
     const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");

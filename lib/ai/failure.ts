@@ -59,10 +59,11 @@ export class AIFailure extends Error {
 }
 
 /**
- * True when the service never answered (reason "service"). A limit that is counted before the call
- * gives its count back for this and for nothing else: a figure pick does
- * (app/api/exhbts/figure-pick/route.ts). Any other AIFailure was answered and paid for, and
- * anything that isn't an AIFailure is a failure nobody foresaw; both stay counted.
+ * True when the service never answered (reason "service"). It cost nothing and the person didn't
+ * cause it, so no limit counts it: a figure pick, counted before the call, is given back for this
+ * and for nothing else (app/api/exhbts/figure-pick/route.ts), and the day's limit on failed calls
+ * leaves it out (lib/ai-failures.ts). Any other AIFailure was answered and paid for, and anything
+ * that isn't an AIFailure is a failure nobody foresaw; both stay counted.
  */
 export const neverAnswered = (e: unknown): boolean => e instanceof AIFailure && e.reason === "service";
 
