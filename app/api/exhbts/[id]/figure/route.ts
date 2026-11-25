@@ -55,7 +55,7 @@ const Body = z.object({
       box: FigureBoxSchema.optional(),
     })
     .optional(),
-  /** More of the person's own uploaded pictures, in the order uploaded: put after the lead where the layout takes pictures (a gallery). */
+  /** More of the person's own uploaded pictures, in the order uploaded: put after the lead where the layout takes pictures (a gallery, a before and after, an event). */
   more: z.array(z.string().max(64)).max(12).default([]),
 });
 
@@ -119,14 +119,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (result.why === "not-wanted") return fail("This layout doesn't take a figure from your files.", 409);
   if (!result.placed) return fail("There's no room for another image on this exhbt.", 409);
   let next = result.doc;
-  // A gallery takes the person's other uploaded pictures too, after the lead, in the order uploaded. Each must be their own image file.
-  const extra: string[] = [];
+  // A layout that takes pictures (a gallery, a before and after, an event) takes the person's other uploaded pictures too,
+  // after the lead, in the order uploaded, as many as it shows (withMoreImages stops at its cap). Each must be their own image file.
+  let extra: string[] = [];
   if (more.length && fromWorkOf(next) === "pictures") {
-    for (const f of more) {
-      const other = await store.getFile(f);
-      if (other && other.userId === user.id && other.kind === "image" && f !== fileId && !extra.includes(f)) extra.push(f);
-    }
-    next = withMoreImages(next, extra);
+    const files = await Promise.all(more.map((f) => store.getFile(f)));
+    const own = more.filter((f, i) => files[i]?.userId === user.id && files[i]?.kind === "image" && f !== fileId && more.indexOf(f) === i);
+    next = withMoreImages(next, own);
+    // Only those that went on are counted and attached here; the draft attached every uploaded file already.
+    extra = own.filter((f) => next.sections.some((s) => s.kind === "image" && s.fileId === f));
   }
 
   // The caption is the AI's words on the page, so its numbers get the draft's check

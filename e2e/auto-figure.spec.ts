@@ -270,7 +270,13 @@ test.describe("The work's own graph wins (decision 0025)", () => {
     expect(kindsOf(withWorkVisual(withPicture, visual("graph")).doc)).toEqual(["findings", "reflection", "image", "image"]);
   });
 
-  test("a layout that takes nothing from the work gets nothing: no layout does yet", () => {
+  test("a layout that takes nothing from the work gets nothing: the essay, and any layout told so", () => {
+    const essay: ExhbtDoc = { ...caseDraft(), format: "essay" };
+    for (const kind of ["graph", "table", "other"] as const) {
+      const r = withWorkVisual(essay, visual(kind));
+      expect(r.doc).toBe(essay);
+      expect(r).toMatchObject({ placed: false, why: "not-wanted", removed: [] });
+    }
     for (const draft of [caseDraft(), researchDraft(), galleryDraft()]) {
       for (const kind of ["graph", "table", "other"] as const) {
         const r = withWorkVisual(draft, visual(kind), { wants: "none" });

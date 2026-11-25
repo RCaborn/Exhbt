@@ -27,7 +27,9 @@ import { opensPanel, Panel } from "./pop";
  *    "Needs a description", after its placeholder's last word, drawn over the page.
  *  - "above": for a figure picked from the person's report, a small label over the picture's top
  *    edge, "From your report, page 3", that opens the classic editor's PickedFigure strip in a native
- *    popover: where it came from, Crop, Choose another page and the tick. Until the tick is ticked the
+ *    popover: where it came from, Crop, Choose another page and the tick. A picture taken whole out of
+ *    a Word or PowerPoint file has no page to crop or swap: its label is "A picture from your report",
+ *    and its strip holds where it came from and the tick (decision 0025). Until the tick is ticked the
  *    label holds it itself ("I may share this", after where it came from), so it is set on the page, where it is seen; the
  *    issue at sections.N.picked.shareOk is on that tick. Nothing here takes room.
  */
@@ -158,19 +160,23 @@ function PickedLabelOf({ s }: { s: SectionOf<"image"> & { picked: Picked } }) {
   const sourceId = p.sourceFileId;
   const sourceUrl = sourceId ? (env.figureSources?.[sourceId] ?? env.reportFiles.find((f) => f.fileId === sourceId)?.url ?? null) : null;
   const tick = (on: boolean) => store.patch(s.id, (x) => (x.kind === "image" && x.picked ? { ...x, picked: { ...x.picked, shareOk: on } } : x));
+  // A page of a PDF can be cropped again or swapped for another page. A picture taken whole out of a Word or PowerPoint file
+  // has no page (decision 0025): its strip offers only the tick, so the label says no more than that.
   const here = whereFrom(p);
-  const where = `From your report, ${here}`;
+  const where = p.page ? `From your report, ${here}` : "A picture from your report";
+  const short = p.page ? here.charAt(0).toUpperCase() + here.slice(1) : "Picture";
+  const offers = p.page ? "crop it, choose another page, or say you may share it" : "say you may share it";
   const label = useRef<HTMLSpanElement>(null);
-  useNarrowLabel(label, [p.shareOk, here]);
+  useNarrowLabel(label, [p.shareOk, where]);
   // The lead image's frame clips what overhangs it (it rounds the picture): there the label sits just inside its top edge.
   const inside = useFrame()?.as === "lead";
   return (
     <span ref={label} className="xe-fig-picked" data-edit-only data-inside={inside ? "" : undefined} data-ticked={p.shareOk ? "" : undefined} data-invalid={issue ? "" : undefined}>
-      <button ref={button} type="button" className="xe-fig-picked-open" {...opensPanel(`${id}-pop`, () => pop.current)} aria-label={`${where}: crop it, choose another page, or say you may share it`}>
+      <button ref={button} type="button" className="xe-fig-picked-open" {...opensPanel(`${id}-pop`, () => pop.current)} aria-label={`${where}: ${offers}`}>
         <FileText aria-hidden size={13} strokeWidth={2.25} />
         <span className="xe-fig-long">{where}</span>
         <span aria-hidden className="xe-fig-short">
-          {here.charAt(0).toUpperCase() + here.slice(1)}
+          {short}
         </span>
       </button>
       {!p.shareOk && (

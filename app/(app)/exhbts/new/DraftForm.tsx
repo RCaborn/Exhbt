@@ -9,6 +9,7 @@ import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { finishUpload } from "@/components/team/finish-upload";
 import { Button } from "@/components/ui/Button";
 import type { Plan } from "@/lib/entitlements";
+import { formatLimits } from "@/lib/exhbt/blocks";
 import { FORMAT_RULES, isFormat } from "@/lib/exhbt/formats";
 import { isLayoutReason, type FigureNews } from "@/lib/exhbt/drafted";
 import type { PdfPages } from "@/lib/figures/pdf";
@@ -42,8 +43,9 @@ import {
  * uploaded and agreed to send; the figure picked is cut out, uploaded and put on the exhbt before
  * the editor opens, in place of the graph the draft drew when it is a graph itself (decisions 0017
  * and 0025, ./figure.ts). A scan's pages, and a picture file, are sent only once the person has
- * agreed. A gallery also gets the person's uploaded pictures, the lead first. The editor then says,
- * once, which layout was chosen and why, and what came of looking for a figure.
+ * agreed. A layout that takes pictures (a gallery, a before and after, an event) also gets the
+ * person's uploaded pictures, the lead first, up to its cap; an essay takes nothing. The editor then
+ * says, once, which layout was chosen and why, and what came of looking for a figure.
  */
 
 /** How long, after the draft is saved, the page waits for the figure before opening the editor without it. */
@@ -318,7 +320,7 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
           return prepareFigure(candidates, stop.signal);
         })().catch((): FigureOutcome => ({ status: "failed" }))
       : null;
-    // The person's own PNG and JPEG uploads, in the order uploaded, for a gallery (decision 0025).
+    // The person's own PNG and JPEG uploads, in the order uploaded, for a layout that takes pictures (decision 0025).
     const ownPictures = items.filter((it) => it.status === "ready" || it.status === "consent").filter((it) => isPlainPicture(it.file) && it.upload === "done" && it.fileId).map((it) => it.fileId!);
     // Counts from the upload for the AI's choice of layout (decision 0024): picture files, PDF pages, and
     // pages with pictures on them. Never the pages. Waits at most two seconds and sends what is known.
@@ -368,11 +370,14 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
         const late = new Promise<FigureOutcome>((r) => setTimeout(() => r({ status: "failed" }), FIGURE_WAIT_MS));
         const fig: FigureOutcome | null = figureJob ? await Promise.race([figureJob, late]) : null;
         let lead: ReadyFigure | null = fig?.status === "ready" ? fig.figure : null;
-        // A gallery is made of the person's pictures: with none chosen, the first uploaded leads, and they write its description.
+        // A layout that takes pictures (a gallery, a before and after, an event) is made of the person's pictures: with none
+        // chosen, the first uploaded leads, and they write its description.
         const own = takes === "pictures" ? ownPictures : [];
         if (!lead && own.length) lead = { fileId: own[0]!, kind: "other", alt: "", caption: "" };
         if (lead) {
-          placed = await placeFigure(data.id, lead, takes === "pictures" ? own.filter((id) => id !== lead!.fileId) : []);
+          // The rest follow the lead, as many as the layout shows (FORMAT_LIMITS): the others stay among the exhbt's files.
+          const room = Math.max(0, formatLimits(format).sections.image - 1);
+          placed = await placeFigure(data.id, lead, own.filter((id) => id !== lead!.fileId).slice(0, room));
           if (!placed) news = "failed";
         } else if (!fig) {
           const files = items.filter((it) => it.status === "ready");

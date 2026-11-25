@@ -146,12 +146,14 @@ export const leadRatio = (s: Pick<SectionOf<"image">, "w" | "h">): number => Mat
 /**
  * The hook for a key figure picked from the person's upload (e.g. the best graph in their PDF,
  * decision 0022): the doc with an image section for `fileId` placed where the layout puts its
- * key picture (decision 0024). A case study: straight after "What I found", so the page draws it
- * beside the findings, or first when there are no findings. A gallery: before the first image
- * (it becomes the lead), or last when there is none. Research: before the first graph or image
- * (it becomes the key figure), or last when there is none. A key figure already there for the same
- * file is left alone. Unchanged when the layout has no room for another image. `picked` notes where
- * it came from; publishing then waits for the person's tick (decision 0017).
+ * key picture (decisions 0024 and 0028). A case study, and a build ("placed as a case study places
+ * it"): straight after "What I found", so the page draws it beside the findings, or first when
+ * there are no findings. A layout that takes the work's pictures (a gallery, a before and after, an
+ * event): before the first image (it becomes the lead, or the first of the pictures), or last when
+ * there is none. Research: before the first graph or image (it becomes the key figure), or last
+ * when there is none. An essay takes nothing, so nothing calls this for one. A key figure already
+ * there for the same file is left alone. Unchanged when the layout has no room for another image.
+ * `picked` notes where it came from; publishing then waits for the person's tick (decision 0017).
  */
 export function withKeyFigure(
   doc: ExhbtDoc,
@@ -169,8 +171,9 @@ export function withKeyFigure(
     ...(figure.picked ? { picked: figure.picked } : {}),
   };
   let at: number;
-  if (f === "gallery" || f === "research") {
-    const first = firstOfKinds(ss, f === "gallery" ? ["image"] : ["graph", "image"]);
+  const pictures = FORMAT_RULES[f].fromWork === "pictures";
+  if (pictures || f === "research") {
+    const first = firstOfKinds(ss, pictures ? ["image"] : ["graph", "image"]);
     at = first < 0 ? Math.min(Math.max(0, instead ?? ss.length), ss.length) : first;
   } else {
     // Straight after the findings; with none, first, or straight after the flowchart on a doc that has its marker (decision 0027).
