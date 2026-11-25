@@ -2,7 +2,7 @@ import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { forgetDevPassword } from "./passwords";
 import type { Project, Roadmap, RoadmapInput } from "./ai/schemas";
-import { normaliseDoc, publicDoc, type ExhbtDoc } from "./exhbt/blocks";
+import { normaliseDoc, publicDoc, validateForPublish, type ExhbtDoc } from "./exhbt/blocks";
 import { fileIdsIn, looksLikeFileId, withoutFiles } from "./exhbt/doc-files";
 import type { Plan } from "./entitlements";
 import { normaliseLayout, type PortfolioLayout } from "./portfolio-layout";
@@ -392,9 +392,12 @@ export interface Store {
   saveExhbtDraft(id: string, userId: string, doc: ExhbtDoc): Promise<boolean>;
   /**
    * Copies the working copy to the live one and marks it published with this slug.
-   * Limits and plan checks happen before this is called (lib/plan.ts, validateForPublish).
+   * The plan check happens before this is called (lib/plan.ts). The doc that is copied is checked here
+   * (validateForPublish, and no flagged numbers left), whatever was checked before, so a save that lands
+   * between the caller's check and this cannot slip past it: false, and nothing is published.
+   * `unchecked` is for the development seeding routes (app/dev/*) only, which publish fixtures as they are.
    */
-  publishExhbt(id: string, userId: string, slug: string): Promise<boolean>;
+  publishExhbt(id: string, userId: string, slug: string, opts?: { unchecked?: boolean }): Promise<boolean>;
   unpublishExhbt(id: string, userId: string): Promise<boolean>;
   /** Sets portfolio order to the order of `ids`. */
   reorderExhbts(userId: string, ids: string[]): Promise<void>;
@@ -1133,11 +1136,12 @@ function supabaseStore(): Store {
       ) as { id: string }[];
       return rows.length > 0;
     },
-    async publishExhbt(id, userId, slug) {
+    async publishExhbt(id, userId, slug, opts) {
       const cur = check(await db.from("exhbts").select("blocks").eq("id", id).eq("user_id", userId).maybeSingle()) as {
         blocks: ExhbtDoc;
       } | null;
       if (!cur) return false;
+      if (!opts?.unchecked && !publishable(cur.blocks)) return false;
       const now = new Date().toISOString();
       check(
         await db
@@ -1905,6 +1909,12 @@ const emptyProfile = (userId: string): PortfolioProfile => ({
   contactEmail: null,
 });
 
+/** Whether a stored doc may be copied to the live page: it passes validateForPublish and has no flagged numbers left. */
+const publishable = (stored: ExhbtDoc): boolean => {
+  const doc = normaliseDoc(stored);
+  return validateForPublish(doc).length === 0 && ((doc as { unverified?: string[] }).unverified ?? []).length === 0;
+};
+
 const EXHBT_COLS = "id, user_id, blocks, published_blocks, status, public_slug, position, confirmed_at, published_at, updated_at, team_of, hidden_on_portfolio";
 type ExhbtRow = {
   id: string;
@@ -2336,9 +2346,10 @@ function memoryStore(): Store {
       e.updatedAt = new Date().toISOString();
       return true;
     },
-    async publishExhbt(id, userId, slug) {
+    async publishExhbt(id, userId, slug, opts) {
       const e = own(id, userId);
       if (!e) return false;
+      if (!opts?.unchecked && !publishable(e.doc)) return false;
       const now = new Date().toISOString();
       Object.assign(e, { published: publicDoc(structuredClone(e.doc)), status: "published", slug, confirmedAt: now, publishedAt: now });
       return true;

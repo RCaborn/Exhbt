@@ -5,8 +5,10 @@ import { mayCarryFormat, OFFERED_FORMATS } from "../lib/exhbt/formats";
 import { withWorkVisual } from "../lib/exhbt/sections";
 import { pathOfNumber, unverifiedNumbers } from "../lib/exhbt/verify";
 import { fitCaption } from "../lib/figures/rules";
-import { fillValid, signInAs, startFromScratch, waitForSaved } from "./editor";
+import * as classicEditor from "./editor-classic-helpers";
+import { fillValid, openPublishSheet, publishSheet, signInAs, startFromScratch, waitForSaved } from "./editor";
 import { uniqueEmail } from "./helpers";
+import { READY } from "./page-editor";
 
 // The fixes from the release 2 review: the server holds the layout line (model-1), the figure route is
 // safe to call at any time (figure-1), the alt text's numbers are checked (figure-2), a pick is counted
@@ -547,7 +549,12 @@ test.describe("A pick is counted before the AI call, and given back when the ser
 
 /* ---------------- The server actions ---------------- */
 
+// The server's answer is the same whichever editor sent the request, so each test runs in both: the edit-on-page
+// editor, which this suite's server serves (EXHBT_EDITOR in playwright.config.ts), and the classic editor, which is
+// what everyone gets until the new one is switched on (DEFAULT_EDITOR in lib/editor-kind.ts). e2e/editor.ts drives
+// the new editor and e2e/editor-classic-helpers.ts the classic one, whose signInAs keeps the browser on it.
 test.describe("A hand-built save or publish can't store a layout nothing offers", () => {
+  const REFUSED = "That layout isn't available yet. Choose another layout and try again.";
   /** Rewrites the body of the next server action that carries an exhbt doc so its layout is `format`. */
   async function forceFormat(page: Page, format: string) {
     const seen = { rewritten: 0 };
@@ -570,31 +577,117 @@ test.describe("A hand-built save or publish can't store a layout nothing offers"
   }
   const storedFormat = async (page: Page, id: string) => ((await (await page.request.get(`/dev/parity?id=${id}`)).json()) as { working: { format?: string } }).working.format;
 
-  test("saving an essay layout is refused and nothing is stored; the same request as a gallery is kept", async ({ page }) => {
-    await signInAs(page, unique("layoutsave"), "premium");
-    const id = await startFromScratch(page);
-    const seen = await forceFormat(page, "essay");
-    await page.locator("#title").fill("A title that triggers a save");
-    await expect(page.getByText("That layout isn't available yet.")).toBeVisible({ timeout: 15_000 });
-    expect(seen.rewritten).toBeGreaterThan(0);
-    expect(await storedFormat(page, id)).toBeUndefined();
-    // An offered layout goes through the same path.
-    await page.unroute("**/exhbts/*/edit");
-    await forceFormat(page, "gallery");
-    await page.locator("#title").fill("A second title");
-    await waitForSaved(page);
-    expect(await storedFormat(page, id)).toBe("gallery");
+  /**
+   * Records what the page's live regions say from now on (role status or alert, or aria-live): each region's words,
+   * every time they change. A region drawn with its words already in it counts as said too.
+   */
+  async function listen(page: Page) {
+    await page.evaluate(() => {
+      const LIVE = '[role="status"], [role="alert"], [aria-live="polite"], [aria-live="assertive"]';
+      const said: string[] = [];
+      const last = new WeakMap<Element, string>();
+      const wordsOf = (el: Element) => (el.textContent ?? "").replace(/\s+/g, " ").trim();
+      for (const region of document.querySelectorAll(LIVE)) last.set(region, wordsOf(region));
+      new MutationObserver(() => {
+        for (const region of document.querySelectorAll(LIVE)) {
+          const words = wordsOf(region);
+          if (words === (last.get(region) ?? "")) continue;
+          last.set(region, words);
+          if (words) said.push(words);
+        }
+      }).observe(document.body, { childList: true, characterData: true, subtree: true });
+      (window as unknown as { __said: string[] }).__said = said;
+    });
+  }
+  /** Everything said since `listen` that holds `words`. */
+  const said = (page: Page, words: string) => page.evaluate((w) => (window as unknown as { __said: string[] }).__said.filter((s) => s.includes(w)), words);
+
+  test.describe("in the new editor", () => {
+    test("saving an essay layout is refused and nothing is stored; the same request as a gallery is kept", async ({ page }) => {
+      await signInAs(page, unique("layoutsave"), "premium");
+      const id = await startFromScratch(page);
+      await expect(page.locator('[data-editor="page"]')).toBeAttached();
+      await listen(page);
+      const seen = await forceFormat(page, "essay");
+      await page.locator("#title").fill("A title that triggers a save");
+      // The reason is drawn in the top bar, beside "Not saved. Retry". It is found by its own class, because the bar's
+      // hidden live region holds the same words: that is where they are said, once.
+      const bar = page.locator(`${READY} [data-topbar]`);
+      await expect(bar.locator(".xe-save-words")).toHaveText(`Kept in this browser. ${REFUSED}`, { timeout: 15_000 });
+      await expect(bar.locator(".xe-save-words")).toBeVisible();
+      await expect(bar.getByRole("button", { name: "Not saved. Retry" })).toBeVisible();
+      await expect.poll(() => said(page, REFUSED)).toEqual([`Not saved. Kept in this browser. ${REFUSED}`]);
+      expect(seen.rewritten).toBeGreaterThan(0);
+      expect(await storedFormat(page, id)).toBeUndefined();
+      // An offered layout goes through the same path.
+      await page.unroute("**/exhbts/*/edit");
+      await forceFormat(page, "gallery");
+      await page.locator("#title").fill("A second title");
+      await waitForSaved(page);
+      expect(await storedFormat(page, id)).toBe("gallery");
+      // The refusal was said the once, and not again by the save that worked.
+      expect(await said(page, REFUSED)).toEqual([`Not saved. Kept in this browser. ${REFUSED}`]);
+    });
+
+    test("publishing an essay layout is refused, and the reason is shown where Publish was pressed", async ({ page }) => {
+      await signInAs(page, unique("layoutpub"), "premium");
+      const id = await startFromScratch(page);
+      await expect(page.locator('[data-editor="page"]')).toBeAttached();
+      await fillValid(page, "A page that could go live");
+      await waitForSaved(page);
+      await forceFormat(page, "build");
+      // The tick and Publish are in the "Review and publish" sheet.
+      await openPublishSheet(page);
+      const sheet = publishSheet(page);
+      await listen(page);
+      await sheet.getByLabel("This is my work, and the numbers are true").check();
+      const publish = sheet.getByRole("button", { name: "Publish", exact: true });
+      await publish.click();
+      await expect(page.getByText("That layout isn't available yet.")).toBeVisible({ timeout: 15_000 });
+      // The whole reason, in the sheet, under the button that was pressed and on screen with it; said once, by the sheet's own status region.
+      const reason = sheet.getByRole("status").getByText(REFUSED, { exact: true });
+      await expect(reason).toBeVisible();
+      await expect(reason).toBeInViewport({ ratio: 1 });
+      await expect(publish).toBeInViewport({ ratio: 1 });
+      expect((await reason.boundingBox())!.y).toBeGreaterThan((await publish.boundingBox())!.y);
+      expect(await said(page, REFUSED)).toEqual([REFUSED]);
+      expect(await storedFormat(page, id)).toBeUndefined();
+      // Nothing went live, and the save status was not touched: the words are in the sheet and nowhere else.
+      await expect(sheet.getByText("It's live.")).toHaveCount(0);
+      await expect(page.locator(`${READY} [data-topbar] .xe-save`)).toHaveText("Saved");
+      expect(await said(page, REFUSED)).toEqual([REFUSED]);
+    });
   });
 
-  test("publishing an essay layout is refused", async ({ page }) => {
-    await signInAs(page, unique("layoutpub"), "premium");
-    const id = await startFromScratch(page);
-    await fillValid(page, "A page that could go live");
-    await waitForSaved(page);
-    await forceFormat(page, "build");
-    await page.getByLabel("This is my work, and the numbers are true").check();
-    await page.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(page.getByText("That layout isn't available yet.")).toBeVisible({ timeout: 15_000 });
-    expect(await storedFormat(page, id)).toBeUndefined();
+  test.describe("in the classic editor", () => {
+    test("saving an essay layout is refused and nothing is stored; the same request as a gallery is kept", async ({ page }) => {
+      await classicEditor.signInAs(page, unique("layoutsave"), "premium");
+      const id = await classicEditor.startFromScratch(page);
+      await expect(page.locator('[data-editor="classic"]')).toBeAttached();
+      const seen = await forceFormat(page, "essay");
+      await page.locator("#title").fill("A title that triggers a save");
+      await expect(page.getByText("That layout isn't available yet.")).toBeVisible({ timeout: 15_000 });
+      expect(seen.rewritten).toBeGreaterThan(0);
+      expect(await storedFormat(page, id)).toBeUndefined();
+      // An offered layout goes through the same path.
+      await page.unroute("**/exhbts/*/edit");
+      await forceFormat(page, "gallery");
+      await page.locator("#title").fill("A second title");
+      await classicEditor.waitForSaved(page);
+      expect(await storedFormat(page, id)).toBe("gallery");
+    });
+
+    test("publishing an essay layout is refused", async ({ page }) => {
+      await classicEditor.signInAs(page, unique("layoutpub"), "premium");
+      const id = await classicEditor.startFromScratch(page);
+      await expect(page.locator('[data-editor="classic"]')).toBeAttached();
+      await classicEditor.fillValid(page, "A page that could go live");
+      await classicEditor.waitForSaved(page);
+      await forceFormat(page, "build");
+      await page.getByLabel("This is my work, and the numbers are true").check();
+      await page.getByRole("button", { name: "Publish", exact: true }).click();
+      await expect(page.getByText("That layout isn't available yet.")).toBeVisible({ timeout: 15_000 });
+      expect(await storedFormat(page, id)).toBeUndefined();
+    });
   });
 });

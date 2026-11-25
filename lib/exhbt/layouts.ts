@@ -459,3 +459,13 @@ export function structureKey(doc: ExhbtDoc): string {
   const part = (it: PageItem) => [it.id, it.kind, stageOf(it) ?? ""];
   return JSON.stringify([formatOf(doc), doc.flowOff === true, pageItems(doc).map(part), keptItems(doc).map(part)]);
 }
+
+/**
+ * The flowchart's steps as a visitor's page draws them: blank boxes left out, so a box just added
+ * doesn't draw as the dark result box or count as a step. If every box is blank (a new exhbt starts
+ * with three) they all show. The classic preview and "See as a visitor" both use this.
+ */
+export const drawnFlow = (flow: FlowStep[]): FlowStep[] => {
+  const filled = flow.filter((s) => s.step.trim() !== "" || (s.detail ?? "").trim() !== "");
+  return filled.length > 0 ? filled : flow;
+};

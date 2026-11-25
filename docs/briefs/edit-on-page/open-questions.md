@@ -4,10 +4,11 @@ Written 19 Nov 2026. Each of these is yours to choose. Each has an answer built 
 
 ## About dragging
 
-**1. Boxes inside the flowchart: carried with a line, or sliding?**
+**1. Boxes inside the flowchart: carried with a line, or sliding?** Answered.
 You said the flowchart works better carried over a still page with a line. When you tried it, though, the boxes inside the flowchart slid in both versions, so you have not yet felt a box carried with a line.
-- Built in: carried with a line, like the flowchart itself.
-- Cost to change: one line of code. You can try both in the real editor and say.
+- Built in at first: carried with a line, like the flowchart itself.
+- **Your answer, 22 Nov 2026:** "Boxes sliding is better." Boxes now slide: the box follows your pointer and the others move aside to show where it will land. The flowchart as a whole section is still carried with a line.
+- Cost to change back: one line of code (`FLOW_BOX_STYLE`). The line stays in the code for this release, since you judged the prototype and have not yet tried the real editor.
 
 **2. Where a section changes size as it lands, keep sliding?**
 You chose sliding for sections. It is exact when things keep their size. When a section is dropped beside the findings and becomes half as wide, the picture while you are still dragging can look wrong (a box lying across words), though it lands correctly. A line would be the clearer picture in just those spots.
@@ -71,7 +72,19 @@ Every picture needs a description for people who cannot see it, and while you ed
 **12. A long results table from the work replaces the AI's chart** (from decision 0025). A picture of a twelve-row table may read worse than the chart the AI drew.
 - Built in: the table wins, as a graph does. If the person removes it, the editor then offers the drafted chart back (never while the table is still on the page).
 - Cost to change: small.
+- Still open after 22 Nov 2026. As built, a picked results table replaces the drafted chart.
 
 **13. Two things I need from you, not decisions.**
 - The GitHub secret `ANTHROPIC_API_KEY`, so the real-AI tests can run (release 1b and release 4 both wait on it).
 - A try of the finished editor in Safari on an iPhone if you have one. Everything here was tested in Chrome only.
+
+## From the release 3 review, answered 22 Nov 2026
+
+**14. The figures sheet covers the graph it edits on a laptop.**
+- **Your answer:** it stays as built.
+
+**15. "Detail (optional)" in every empty flowchart box while editing.**
+- **Your answer:** it stays as built, so nothing moves when a box takes the cursor.
+
+**16. "Block" or "section" in the tray?**
+- **Your answer:** the tray says "section", so the page uses one noun. The tray's words are being changed to match.

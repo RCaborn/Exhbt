@@ -23,7 +23,37 @@ import { referencesFrom } from "../lib/exhbt/references";
 import { fullDoc, GALLERY_IMAGES, galleryDoc, libraryDoc, openBankingDoc, researchDoc, sampleDocs, sampleSeeds } from "../lib/exhbt/sample";
 import { firstOfKinds, layoutNotes, leadRatio, imageRatio, sectionLabel, withKeyFigure } from "../lib/exhbt/sections";
 import { unverifiedNumbers } from "../lib/exhbt/verify";
-import { chooseLayout, layoutGroup, pickImages, previewArticle, sectionsArea, signInAs, startEditor, wordsOnBar } from "./editor";
+import {
+  addSection,
+  card,
+  chooseLayout,
+  closeOpenSheet,
+  closeRewrite,
+  fillPlain,
+  fillRich,
+  framesOf,
+  keptList,
+  layoutGroup,
+  listOrder,
+  menuItem,
+  openAddSectionMenu,
+  openCardMenu,
+  openLayoutMenu,
+  openPublishSheet,
+  openThingsToFix,
+  openWebAddress,
+  pickImages,
+  pressTool,
+  previewArticle,
+  removeSection,
+  sectionField,
+  signInAs,
+  startEditor,
+  waitEditor,
+  waitForSaved,
+  wordsOnBar,
+} from "./editor";
+import { uniqueBytes } from "./unique-bytes";
 
 // Exhbt layouts (decision 0024): case study, gallery and research. One optional field, `format`;
 // no migration; a doc without one (or with one this code doesn't know) is a case study.
@@ -512,12 +542,13 @@ test.describe("Looks and the home page", () => {
 
 /* ---------------- The editor ---------------- */
 
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+const PNG = uniqueBytes(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
 const png = (name: string) => ({ name, mimeType: "image/png", buffer: PNG });
 
 test.describe("The layout choice in the editor", () => {
   test("three radios named Layout; the arrow keys pick Gallery, the preview follows, Undo goes back", async ({ page }) => {
     await startEditor(page, `lay${stamp()}`);
+    await openLayoutMenu(page);
     const group = layoutGroup(page);
     await expect(group.getByRole("radio")).toHaveCount(3);
     await expect(previewArticle(page)).toHaveAttribute("data-format", "case-study");
@@ -525,50 +556,40 @@ test.describe("The layout choice in the editor", () => {
     await page.keyboard.press("ArrowDown");
     await expect(page.getByRole("radio", { name: /^Gallery/ })).toBeChecked();
     await expect(previewArticle(page)).toHaveAttribute("data-format", "gallery");
-    await expect(page.getByText("Switched to Gallery. Nothing was deleted.")).toBeVisible();
+    await expect(page.locator("[data-layout-status]")).toContainText("Laid out as a gallery. Undo restores your order.");
+    await axe(page, "layout picker");
     await page.getByRole("button", { name: /^Undo/ }).click();
+    await openLayoutMenu(page);
     await expect(page.getByRole("radio", { name: /^Case study/ })).toBeChecked();
     await expect(previewArticle(page)).toHaveAttribute("data-format", "case-study");
-    await axe(page, "layout picker");
   });
 
   test("an aim kept in a case study is tagged not shown, and stops counting", async ({ page }) => {
     await startEditor(page, `aim${stamp()}`);
     await chooseLayout(page, "Research");
-    await page.getByRole("button", { name: "Add a section" }).click();
-    await page.getByRole("button", { name: "Add aim or hypothesis", exact: true }).click();
-    await page.getByRole("textbox", { name: "What the study set out to do or test" }).fill("Walkers will recall more words than sitters.");
+    await page.keyboard.press("Escape");
+    await addSection(page, "Add aim or hypothesis");
+    await fillRich(page, sectionField(page, "aim", ".text"), "Walkers will recall more words than sitters.");
     const withAim = await wordsOnBar(page);
     await expect(previewArticle(page).locator("[data-part=aim]")).toHaveCount(1);
     await chooseLayout(page, "Case study");
-    // Kept in the editor, not drawn on the page.
+    await page.keyboard.press("Escape");
+    // Kept in the editor, not drawn on the page: it is in the list of what is kept but not shown.
     await expect(previewArticle(page).locator("[data-part=aim]")).toHaveCount(0);
-    const card = sectionsArea(page).getByRole("region", { name: "Aim or hypothesis", exact: true });
-    await expect(card.getByText("Not shown in this layout. It's kept if you switch back.")).toBeVisible();
+    await expect(keptList(page)).toContainText("Aim or hypothesis");
     expect(await wordsOnBar(page)).toBe(withAim - 7);
     await chooseLayout(page, "Research");
-    await expect(card.getByText("Not shown in this layout")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(keptList(page)).toHaveCount(0);
     expect(await wordsOnBar(page)).toBe(withAim);
     // Each is offered once, then disabled.
-    await page.getByRole("button", { name: "Add a section" }).click();
-    await page.getByRole("button", { name: "Add conclusion", exact: true }).click();
-    await page.getByRole("button", { name: "Add a section" }).click();
-    for (const n of ["Add aim or hypothesis", "Add conclusion"]) {
-      const b = page.getByRole("button", { name: n, exact: true });
+    await addSection(page, "Add conclusion");
+    await openAddSectionMenu(page);
+    for (const [n, why] of [["Add aim or hypothesis", /^One aim or hypothesis/], ["Add conclusion", /^One conclusion/]] as const) {
+      const b = menuItem(page, n);
       await expect(b).toBeDisabled();
-      await expect(b).toHaveAccessibleDescription("Already on the page.");
+      await expect(b).toHaveAccessibleDescription(why);
     }
-  });
-
-  test("Arrange sections is for the case study only", async ({ page }) => {
-    await startEditor(page, `arr${stamp()}`);
-    await page.getByRole("button", { name: "Add a section" }).click();
-    await page.getByRole("button", { name: "Add a quote", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Arrange sections" })).toBeVisible();
-    await chooseLayout(page, "Gallery");
-    await expect(page.getByRole("button", { name: "Arrange sections" })).toHaveCount(0);
-    await chooseLayout(page, "Research");
-    await expect(page.getByRole("button", { name: "Arrange sections" })).toHaveCount(0);
   });
 });
 
@@ -576,36 +597,40 @@ test.describe("Pictures in the editor", () => {
   test("three at once in a gallery: three cards, the first the lead image, the cursor in the first description", async ({ page }) => {
     await startEditor(page, `gal${stamp()}`);
     await chooseLayout(page, "Gallery");
+    await page.keyboard.press("Escape");
     await pickImages(page, [png("a.png"), png("b.png"), png("c.png")]);
-    const area = sectionsArea(page);
-    await expect(area.getByRole("region", { name: "Lead image", exact: true })).toBeVisible();
-    await expect(area.getByRole("region", { name: "Image 2", exact: true })).toBeVisible();
-    await expect(area.getByRole("region", { name: "Image 3", exact: true })).toBeVisible();
+    await expect(card(page, "Lead image")).toBeVisible();
+    await expect(card(page, "Image 2")).toBeVisible();
+    await expect(card(page, "Image 3")).toBeVisible();
     await expect(page.getByText("3 images added. Each one needs a description for people who can't see it.")).toBeVisible();
     await expect(page.locator("#image-0-alt")).toBeFocused();
+    await openPublishSheet(page);
     await page.getByLabel("This is my work, and the numbers are true").check();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(page.getByRole("region", { name: "Things to fix before publishing" }).getByText("Describe the image for people who can't see it.").first()).toBeVisible();
+    await closeOpenSheet(page);
+    await expect((await openThingsToFix(page)).getByText("Describe the image for people who can't see it.").first()).toBeVisible();
   });
 
   test("a case study with no images takes two of three and says so", async ({ page }) => {
     await startEditor(page, `two${stamp()}`);
     await pickImages(page, [png("a.png"), png("b.png"), png("c.png")]);
-    await expect(sectionsArea(page).getByRole("region", { name: /^Image [12]$/ })).toHaveCount(2);
+    await expect(framesOf(page, "image")).toHaveCount(2);
     await expect(page.getByText("Only 2 more fit in this layout. The rest weren't added.")).toBeVisible();
   });
 
   test("a file that isn't a picture is named and skipped", async ({ page }) => {
     await startEditor(page, `bad${stamp()}`);
     await chooseLayout(page, "Gallery");
+    await page.keyboard.press("Escape");
     await pickImages(page, [png("good.png"), { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hi") }, png("good2.png")]);
-    await expect(sectionsArea(page).getByRole("region", { name: /^(Lead image|Image 2)$/ })).toHaveCount(2);
+    await expect(framesOf(page, "image")).toHaveCount(2);
     await expect(page.getByRole("alert").filter({ hasText: "notes.txt: Use a JPEG, PNG, WebP or GIF picture." })).toBeVisible();
   });
 
   test("a big picture is shrunk in the browser before it goes up", async ({ page }) => {
     await startEditor(page, `big${stamp()}`);
     await chooseLayout(page, "Gallery");
+    await page.keyboard.press("Escape");
     const dataUrl = await page.evaluate(() => {
       const c = document.createElement("canvas");
       c.width = 3000;
@@ -629,13 +654,13 @@ test.describe("Pictures in the editor", () => {
   test("Make lead image moves Image 2 to the front, and the preview follows", async ({ page }) => {
     await startEditor(page, `lead${stamp()}`);
     await chooseLayout(page, "Gallery");
+    await page.keyboard.press("Escape");
     await pickImages(page, [png("a.png"), png("b.png"), png("c.png")]);
-    for (const [n, alt] of ["first", "second", "third"].entries()) await page.locator(`#image-${n}-alt`).fill(alt);
+    for (const [n, alt] of ["first", "second", "third"].entries()) await fillPlain(page, page.locator(`#image-${n}-alt`), alt);
     const preview = previewArticle(page).locator("[data-part=lead] img").first();
     await expect(preview).toHaveAttribute("alt", "first");
-    await sectionsArea(page).getByRole("region", { name: "Image 2", exact: true }).getByRole("button", { name: /^Make lead image/ }).click();
+    await pressTool(page, "Image 2", "Make lead image");
     await expect(preview).toHaveAttribute("alt", "second");
-    await expect(page.getByText("That image is now the lead image.")).toBeVisible();
   });
 });
 
@@ -658,20 +683,22 @@ test.describe("The draft suggests a layout", () => {
     // Why: a fixed signal, not the AI's words (decision 0025). The notes named the layout.
     expect(d.formatReason).toBe("notes");
     await page.goto(`/exhbts/${d.id}/edit?drafted=${d.format}&why=${d.formatReason}`);
-    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await waitEditor(page);
+    // The line lives in the layout menu, where the layout is changed.
+    await openLayoutMenu(page);
     await expect(page.getByRole("radio", { name: /^Gallery/ })).toBeChecked();
     const line = page.locator("[data-drafted]");
     await expect(line).toContainText("Laid out as Gallery because your notes name this layout.");
-    await expect(line.getByRole("link", { name: "Change layout" })).toBeVisible();
     await expect(previewArticle(page)).toHaveAttribute("data-format", "gallery");
     // Said once: the editor takes it off the address, so a reload doesn't repeat it, and nor does a plain visit.
     await expect(page).toHaveURL(new RegExp(`/exhbts/${d.id}/edit$`));
     // Switching the layout takes the line's place.
     await page.getByRole("radio", { name: /^Case study/ }).check();
-    await expect(page.getByText("Switched to Case study. Nothing was deleted.")).toBeVisible();
-    await expect(page.getByText("Laid out as")).toHaveCount(0);
+    await expect(page.locator("[data-layout-status]")).toContainText("Laid out as a case study. Undo restores your order.");
+    await expect(page.locator("[data-drafted]")).toHaveCount(0);
     await page.goto(`/exhbts/${d.id}/edit`);
-    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await waitEditor(page);
+    await openLayoutMenu(page);
     await expect(page.locator("[data-drafted]")).toHaveCount(0);
   });
 
@@ -681,11 +708,14 @@ test.describe("The draft suggests a layout", () => {
     expect(d.format).toBe("case-study");
     expect(d.formatReason).toBe("question-findings");
     await page.goto(`/exhbts/${d.id}/edit?drafted=case-study&why=${d.formatReason}`);
+    await waitEditor(page);
+    await openLayoutMenu(page);
     await expect(page.locator("[data-drafted]")).toContainText("Laid out as Case study because your work sets out a question and what you found.");
     // A research reason on a case study, and words typed into the address, say nothing.
     for (const why of ["aim-results", encodeURIComponent("because the AI is always right")]) {
       await page.goto(`/exhbts/${d.id}/edit?drafted=case-study&why=${why}&fig=${encodeURIComponent("we lost your figure")}`);
-      await expect(page.locator("[data-ready=true]")).toBeAttached();
+      await waitEditor(page);
+      await openLayoutMenu(page);
       const line = page.locator("[data-drafted]");
       await expect(line).toContainText("Laid out as Case study.");
       await expect(line).not.toContainText("because");
@@ -693,7 +723,8 @@ test.describe("The draft suggests a layout", () => {
     }
     // The layout named in the address must be the exhbt's own.
     await page.goto(`/exhbts/${d.id}/edit?drafted=research&why=aim-results`);
-    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await waitEditor(page);
+    await openLayoutMenu(page);
     await expect(page.locator("[data-drafted]")).toHaveCount(0);
   });
 
@@ -704,21 +735,22 @@ test.describe("The draft suggests a layout", () => {
     expect(d.format).toBe("research");
     expect(d.formatReason).toBe("aim-results");
     await page.goto(`/exhbts/${d.id}/edit?drafted=research&why=${d.formatReason}`);
-    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await waitEditor(page);
+    await openLayoutMenu(page);
     await expect(page.getByRole("radio", { name: /^Research/ })).toBeChecked();
     await expect(page.locator("[data-drafted]")).toContainText("Laid out as Research because your work has an aim and results.");
-    const area = sectionsArea(page);
-    await expect(area.getByRole("region", { name: "Aim or hypothesis", exact: true })).toBeVisible();
-    await expect(area.getByRole("region", { name: /^Reference/ })).toHaveCount(1);
-    await expect(area.getByLabel("Web address")).toHaveValue("https://example.com/paper");
+    await page.keyboard.press("Escape");
+    await expect(card(page, "Aim or hypothesis")).toBeVisible();
+    await expect(framesOf(page, "link")).toHaveCount(1);
+    await expect(await openWebAddress(page)).toHaveValue("https://example.com/paper");
   });
 
   test("a link that is only in the notes is kept: the notes are material", async ({ page }) => {
     await signInAs(page, `dn${stamp()}`, "max");
     const d = await draft(page, { text: `${PLAIN_MATERIAL} The hypothesis was that a second till helps.`, notes: "Read https://example.com/notes-only too." });
     await page.goto(`/exhbts/${d.id}/edit`);
-    await expect(page.locator("[data-ready=true]")).toBeAttached();
-    await expect(sectionsArea(page).getByLabel("Web address")).toHaveValue("https://example.com/notes-only");
+    await waitEditor(page);
+    await expect(await openWebAddress(page)).toHaveValue("https://example.com/notes-only");
   });
 
   test("plain material is a case study, and its doc has no layout key", async ({ page }) => {
@@ -740,8 +772,12 @@ test.describe("The draft suggests a layout", () => {
 
 test.describe("Pictures keep the order they were picked in", () => {
   test("a big first picture that finishes last is still the lead image", async ({ page }) => {
+    test.setTimeout(150_000); // a held-back upload and a cold route
     await startEditor(page, `ord${stamp()}`);
+    // Compile the upload route before the timing starts (a dev server builds it on the first request), so only the held-back upload is slow.
+    await page.request.post("/api/files/upload-url", { data: {} });
     await chooseLayout(page, "Gallery");
+    await page.keyboard.press("Escape");
     const dataUrl = await page.evaluate(() => {
       const c = document.createElement("canvas");
       c.width = 3000;
@@ -761,11 +797,11 @@ test.describe("Pictures keep the order they were picked in", () => {
     await pickImages(page, [{ name: "big.png", mimeType: "image/png", buffer: big }, png("small.png")]);
     // While the first is held back, the second (already uploaded) is not placed ahead of it.
     await page.waitForTimeout(900);
-    await expect(sectionsArea(page).getByRole("region", { name: /^(Lead image|Image \d)$/ })).toHaveCount(0);
+    await expect(framesOf(page, "image")).toHaveCount(0);
     // The big one (shrunk to 2400 wide) is Image 1, the lead; the 1-pixel one is Image 2.
     const lead = previewArticle(page).locator("[data-part=lead] img").first();
     await expect(lead).toHaveAttribute("width", "2400");
-    await expect(sectionsArea(page).getByRole("region", { name: /^(Lead image|Image 2)$/ })).toHaveCount(2);
+    await expect(framesOf(page, "image")).toHaveCount(2);
     const sizes = await page.locator("[data-part=grid] img").evaluateAll((els) => els.map((e) => e.getAttribute("width")));
     expect(sizes).toEqual(["1"]);
   });
@@ -774,7 +810,10 @@ test.describe("Pictures keep the order they were picked in", () => {
 test.describe("Pictures land as each picked prefix settles", () => {
   test("the first picture lands at once, later ones wait for the held-back one, in picked order", async ({ page }) => {
     await startEditor(page, `pre${stamp()}`);
+    // Compile the upload route before the timing starts (a dev server builds it on the first request), so only the held-back upload is slow.
+    await page.request.post("/api/files/upload-url", { data: {} });
     await chooseLayout(page, "Gallery");
+    await page.keyboard.press("Escape");
     const dataUrl = await page.evaluate(() => {
       const c = document.createElement("canvas");
       c.width = 3000;
@@ -787,17 +826,17 @@ test.describe("Pictures land as each picked prefix settles", () => {
     const big = Buffer.from(dataUrl.split(",")[1]!, "base64");
     await page.route("**/api/files/upload-url", async (route) => {
       const body = route.request().postDataJSON() as { name: string };
-      if (body.name.startsWith("big")) await new Promise((r) => setTimeout(r, 3000));
+      if (body.name.startsWith("big")) await new Promise((r) => setTimeout(r, 9000)); // held long enough that a cold compile of the route cannot let it finish first
       await route.continue();
     });
     await pickImages(page, [png("first.png"), { name: "big.png", mimeType: "image/png", buffer: big }, png("third.png")]);
     // The first is placed without waiting for the slow second; the third waits behind it.
-    await expect(sectionsArea(page).getByRole("region", { name: "Lead image", exact: true })).toBeVisible();
-    await expect(sectionsArea(page).getByRole("region", { name: "Image 2", exact: true })).toHaveCount(0);
-    await expect(sectionsArea(page).getByRole("region", { name: "Image 3", exact: true })).toHaveCount(0);
+    await expect(card(page, "Lead image")).toBeVisible();
+    await expect(card(page, "Image 2")).toHaveCount(0);
+    await expect(card(page, "Image 3")).toHaveCount(0);
     // When the held-back one finishes, it and the third follow, in picked order: 1px, the shrunk big one (2400), 1px.
-    await expect(sectionsArea(page).getByRole("region", { name: "Image 3", exact: true })).toBeVisible();
-    const widths = await sectionsArea(page).locator("[data-kind=image]").evaluateAll((els) => els.length);
+    await expect(card(page, "Image 3")).toBeVisible();
+    const widths = await framesOf(page, "image").evaluateAll((els) => els.length);
     expect(widths).toBe(3);
     await expect(previewArticle(page).locator("[data-part=lead] img").first()).toHaveAttribute("width", "1");
     const grid = await page.locator("[data-part=grid] img").evaluateAll((els) => els.map((e) => e.getAttribute("width")));
@@ -848,16 +887,18 @@ test.describe("Research's figure cap", () => {
   test("the menu says why a figure can't be added, and the picker counts them", async ({ page }) => {
     await startEditor(page, `fig${stamp()}`);
     await chooseLayout(page, "Research");
+    await page.keyboard.press("Escape");
     for (let i = 0; i < 2; i++) {
-      await page.getByRole("button", { name: "Add a section" }).click();
-      await page.getByRole("button", { name: "Add a graph", exact: true }).click();
+      await closeOpenSheet(page);
+      await addSection(page, "Add a graph");
     }
+    await closeOpenSheet(page);
     await pickImages(page, png("one.png"));
-    await expect(sectionsArea(page).getByRole("region", { name: /^Image/ })).toHaveCount(1);
-    await page.getByRole("button", { name: "Add a section" }).click();
-    const add = page.getByRole("button", { name: "Add an image", exact: true });
+    await expect(framesOf(page, "image")).toHaveCount(1);
+    await openAddSectionMenu(page);
+    const add = menuItem(page, "Add an image");
     await expect(add).toBeDisabled();
-    await expect(add).toHaveAccessibleDescription("Up to 3 figures, graphs and images together.");
+    await expect(add).toHaveAccessibleDescription(/^Up to 3 graphs and images together/);
   });
 
   test("switching a case study with four figures to research says so", () => {
@@ -872,27 +913,26 @@ test.describe("Rewrite and wording by layout", () => {
   test("the editor's cards use the layout's words", async ({ page }) => {
     await startEditor(page, `wd${stamp()}`);
     await chooseLayout(page, "Research");
-    await expect(page.getByRole("region", { name: "Your research question and details" })).toBeVisible();
-    await page.getByRole("button", { name: "Add a section" }).click();
-    await page.getByRole("button", { name: /^Add limitations and next steps/ }).click();
-    await expect(sectionsArea(page).getByText("The limits of the study, and what you'd do next", { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Add a section" }).click();
-    await page.getByRole("button", { name: "Add a reference", exact: true }).click();
-    await expect(sectionsArea(page).getByText("A paper or source you used. The page shows the citation, and links to it.")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("textbox", { name: /^Your research question/ })).toBeVisible();
+    await addSection(page, "Add limitations and next steps");
+    await expect(card(page, "Limitations and next steps")).toBeVisible();
+    await addSection(page, "Add a reference");
+    await expect(card(page, "Reference 1")).toBeVisible();
   });
 
   test("the arrange list leaves out a kept aim", async ({ page }) => {
     await startEditor(page, `arl${stamp()}`);
     await chooseLayout(page, "Research");
-    await page.getByRole("button", { name: "Add a section" }).click();
-    await page.getByRole("button", { name: "Add aim or hypothesis", exact: true }).click();
-    await page.getByRole("button", { name: "Add a section" }).click();
-    await page.getByRole("button", { name: "Add a quote", exact: true }).click();
+    await page.keyboard.press("Escape");
+    await addSection(page, "Add aim or hypothesis");
+    await addSection(page, "Add a quote");
     await chooseLayout(page, "Case study");
-    await page.getByRole("button", { name: "Arrange sections" }).click();
-    const list = previewArticle(page).getByRole("list", { name: "Sections in the preview, in page order" });
-    await expect(list.locator("xpath=./li")).toHaveCount(2);
-    await expect(list.getByText("Aim or hypothesis")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    // The page's order (what a person can move) leaves out a kept aim: it is in the kept list, with no frame of its own on the page.
+    expect(await listOrder(page)).toEqual(["findings", "quote"]);
+    await expect(framesOf(page, "aim")).toHaveCount(0);
+    await expect(keptList(page)).toContainText("Aim or hypothesis");
   });
 });
 
@@ -916,8 +956,12 @@ test.describe("Research's row of headings", () => {
 
 test.describe("A picture the person removed mid-batch is not deleted again by the upload", () => {
   test("only the normal drop deletes it, once; the later pictures still land", async ({ page }) => {
+    test.setTimeout(150_000); // two held-back uploads, then leaving the editor
     await startEditor(page, `del${stamp()}`);
+    // Compile the upload route before the timing starts (a dev server builds it on the first request), so only the held-back upload is slow.
+    await page.request.post("/api/files/upload-url", { data: {} });
     await chooseLayout(page, "Gallery");
+    await page.keyboard.press("Escape");
     const deletes: string[] = [];
     page.on("request", (r) => {
       if (r.method() === "DELETE" && /\/api\/files\//.test(r.url())) deletes.push(r.url());
@@ -934,22 +978,26 @@ test.describe("A picture the person removed mid-batch is not deleted again by th
     const big = Buffer.from(dataUrl.split(",")[1]!, "base64");
     await page.route("**/api/files/upload-url", async (route) => {
       const body = route.request().postDataJSON() as { name: string };
-      if (body.name.startsWith("big")) await new Promise((r) => setTimeout(r, 3000));
+      if (body.name.startsWith("big")) await new Promise((r) => setTimeout(r, 9000));
       await route.continue();
     });
     await pickImages(page, [png("first.png"), { name: "big.png", mimeType: "image/png", buffer: big }]);
     // The first lands at once; the person removes it while the big one is still uploading.
-    const lead = sectionsArea(page).getByRole("region", { name: "Lead image", exact: true });
-    await expect(lead).toBeVisible();
-    await lead.getByRole("button", { name: /^Remove/ }).click();
+    await expect(card(page, "Lead image")).toBeVisible();
+    await removeSection(page, "Lead image");
     // The big one lands when it finishes, and becomes the lead.
     await expect(previewArticle(page).locator("[data-part=lead] img").first()).toHaveAttribute("width", "2400");
-    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    await waitForSaved(page);
     await page.waitForTimeout(1500);
-    // One delete, for the removed picture, from the normal drop after the save; nothing from the upload (no second one, no false message).
+    // Nothing is deleted while the visit lasts (Undo can bring the picture back, decision 0026), and the upload deletes nothing (no false message).
+    expect(deletes.length).toBe(0);
+    await expect(page.getByText(/there was no room/)).toHaveCount(0);
+    // One delete, for the removed picture, when the person leaves (by the way back: the page stays alive to be watched).
+    await page.getByRole("link", { name: "Your exhbts", exact: true }).first().click();
+    await expect.poll(() => deletes.length).toBe(1);
+    await page.waitForTimeout(1000);
     expect(deletes.length).toBe(1);
     expect(new Set(deletes).size).toBe(1);
-    await expect(page.getByText(/there was no room/)).toHaveCount(0);
   });
 });
 
@@ -964,14 +1012,16 @@ test.describe("The rewrite names read right in every layout", () => {
     for (const [layout, header] of expected) {
       const d = await draft(page, { text: layout === "research" ? `${PLAIN_MATERIAL} The hypothesis was that a second till helps.` : PLAIN_MATERIAL, ...(layout ? { notes: `stand-in: layout ${layout}` } : {}) });
       await page.goto(`/exhbts/${d.id}/edit`);
-      await expect(page.locator("[data-ready=true]")).toBeAttached();
+      await waitEditor(page);
       for (const block of ["header", "gap", "flow", "findings"]) {
-        await page.getByTestId(`tools-${block}`).getByRole("button", { name: /^More actions for/ }).click();
+        await openCardMenu(page, block);
         await page.getByTestId(`tools-${block}`).getByRole("button", { name: "Rewrite this block" }).click();
         const names = await page.getByTestId(`tools-${block}`).getByRole("button", { name: /^Rewrite the .* now$/ }).evaluateAll((els) => els.map((e) => e.getAttribute("aria-label") ?? ""));
         expect(names.length, `${layout ?? "case"} ${block}`).toBe(1);
         expect(names[0], `${layout ?? "case"} ${block}`).not.toMatch(/\bthe (the|your|my|a)\b/i);
         if (block === "header") expect(names[0]).toBe(`Rewrite the ${header} now`);
+        // An open form stays until it is cancelled or used, over whatever is under it: closed, so the next part can be reached.
+        await closeRewrite(page, block);
       }
     }
   });

@@ -2,7 +2,8 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import Stripe from "stripe";
 import { BILLING_PERIOD, ENTITLEMENTS, PLAN_NAMES, PRICES } from "../lib/entitlements";
-import { signInAs, startFromScratch } from "./editor";
+import { openPublishSheet, signInAs, startFromScratch } from "./editor";
+import { uniqueBytes } from "./unique-bytes";
 
 // Billing polish: Stripe events out of order, the upgrade offer where a limit stops something,
 // the pricing page selling for real with Phase 2 on, and files removed with their exhbt.
@@ -65,6 +66,8 @@ test.describe("Upgrade at the point of need", () => {
   test("publishing on Free shows why, with the billing button", async ({ page }) => {
     await signInAs(page, `pubfree${stamp()}`.slice(0, 28), "free");
     await startFromScratch(page, { waitForContext: false });
+    // "Review and publish" says why, in its sheet.
+    await openPublishSheet(page);
     const prompt = page.getByTestId("upgrade-prompt");
     await expect(prompt).toContainText(`Publishing to your own link comes with ${PLAN_NAMES.premium}.`);
     const upgrade = prompt.getByRole("link", { name: `Upgrade to ${PLAN_NAMES.premium} (${PRICES.premium} a ${BILLING_PERIOD})` });
@@ -138,7 +141,7 @@ test.describe("Clean-up", () => {
     const exhbtId = await startFromScratch(page, { waitForContext: false });
 
     // A tiny PNG, uploaded for this exhbt through the Storage stand-in.
-    const png = Buffer.from("89504e470d0a1a0a0000000d4948445200000001000000010806000000", "hex");
+    const png = uniqueBytes(Buffer.from("89504e470d0a1a0a0000000d4948445200000001000000010806000000", "hex"));
     const ticket = await page.request.post("/api/files/upload-url", {
       data: { name: "chart.png", mime: "image/png", bytes: png.length, kind: "image", exhbtId },
     });

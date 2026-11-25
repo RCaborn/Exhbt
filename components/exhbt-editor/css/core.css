@@ -1,0 +1,928 @@
+/* The edit-on-page editor's core (decision 0026): the fields typed in the page's own type, the
+   frames and their toolbars, the "+" (until F's drag.css), a finding's controls, the skills, the
+   sheets, the status line, and the top bar's height. On the page, every colour and corner is one of
+   the page's --xp-* variables, so the editor holds in every look, dark ones included; the top bar,
+   the sheets and the status line are app chrome, in the app's own tokens. Nothing here may take room
+   on the page but the fields: every control is positioned over the part it belongs to. */
+@layer components {
+  /* The top bar's one fixed height: the loading view (StandIn.tsx) leaves exactly this much room. */
+  [data-editor="page"] {
+    --xe-topbar-h: 3.5rem;
+  }
+
+  /* ---------- The top bar (H's topbar.css takes over its look) ---------- */
+  .xe-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    box-sizing: border-box;
+    height: var(--xe-topbar-h);
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-surface);
+    color: var(--color-ink);
+  }
+  .xe-topbar-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    height: 100%;
+    max-width: 90rem;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+
+  /* ---------- Fields typed in the page's own type ---------- */
+  /* A textarea with no box of its own: the type of whatever it sits in, as tall as its words. */
+  .xe-text {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-align: inherit;
+    text-wrap: inherit;
+    text-transform: inherit;
+    resize: none;
+    overflow: hidden;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    field-sizing: content;
+    min-height: 0;
+  }
+  .xe-text::placeholder {
+    color: var(--xp-muted);
+    opacity: 1;
+  }
+  /* Where the browser has no `field-sizing`: a hidden mirror of the words shares the field's grid cell. */
+  .xe-grow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .xe-grow > * {
+    grid-area: 1 / 1;
+    min-width: 0;
+  }
+  .xe-grow > .xe-text[data-grow="mirror"] {
+    height: 100%;
+    field-sizing: fixed;
+  }
+  .xe-grow-mirror {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /* Words set inline among other words (a quote between its marks): an inline span typed in. */
+  .xe-inline {
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    cursor: text;
+  }
+  .xe-inline:empty::before {
+    content: attr(data-placeholder);
+    color: var(--xp-muted);
+  }
+
+  /* The focus ring is an outline, so nothing moves when a field takes the focus. */
+  .xe-text:focus-visible,
+  .xe-text:focus,
+  .xe-inline:focus,
+  .xe-rich:focus,
+  .xe-rest:focus,
+  .xe-pm:focus,
+  .xe-skill-new:focus {
+    outline: 2px solid var(--xp-link);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* A placeholder on the flowchart's dark last box takes that box's soft colour, which passes on it. */
+  .xp-flow-box[data-last] .xe-text::placeholder,
+  .xp-flow-box[data-last] .xe-inline:empty::before {
+    color: var(--xp-flow-end-soft);
+  }
+
+  /* A formatted field: Tiptap's stylesheet is off (it breaks lines differently and turns ligatures off); these are the rules the field needs. */
+  .xe-rich {
+    position: relative;
+    cursor: text;
+  }
+  /* The resting field (RichField.tsx): the words as the page draws them, typed in before the editor has loaded. */
+  .xe-rest:empty::before {
+    content: attr(data-placeholder);
+    color: var(--xp-muted);
+  }
+  .xp-flow-box[data-last] .xe-rest:empty::before {
+    color: var(--xp-flow-end-soft);
+  }
+  /* The editor before the hand-over: out of the flow and unseen, so nothing moves and the resting field keeps the typing. */
+  .xe-rich-pending {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .xe-rich-cell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .xe-rich-cell > * {
+    grid-area: 1 / 1;
+    min-width: 0;
+  }
+  .xe-rich-ph {
+    color: var(--xp-muted);
+    pointer-events: none;
+  }
+  .xp-flow-box[data-last] .xe-rich-ph {
+    color: var(--xp-flow-end-soft);
+  }
+  .xe-pm {
+    position: relative;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+  .xe-pm p {
+    margin: 0;
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+  }
+
+  /* A formatted field's buttons, while it has the cursor: above the line's right end, or below it on a section's first line. */
+  .xe-format {
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    z-index: 25;
+    display: flex;
+    gap: 0.25rem;
+    padding-bottom: 0.25rem;
+    visibility: hidden;
+  }
+  .xe-format-below {
+    top: 100%;
+    bottom: auto;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  .xe-rich:focus-within > .xe-format {
+    visibility: visible;
+  }
+
+  /* A plain field's own box for its issue's message: the field's box exactly (block, or inline among words). */
+  .xe-field {
+    position: relative;
+    display: block;
+  }
+  .xe-field-inline {
+    position: relative;
+  }
+  /* A field with an issue: an outline in the look's error colour, which takes no room. */
+  .xe-text[aria-invalid="true"],
+  .xe-inline[aria-invalid="true"],
+  .xe-rich[data-invalid] {
+    outline: 2px solid var(--xp-error);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  /* Its message: read out always (aria-describedby), shown under the field only while it has the focus, over the page. */
+  .xe-issue {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    z-index: 26;
+    width: max-content;
+    max-width: min(22rem, 80vw);
+    padding: 0.375rem 0.625rem;
+    border: 1px solid var(--xp-error);
+    border-radius: 8px;
+    background: var(--xp-card);
+    color: var(--xp-error);
+    font: 500 0.8125rem/1.35 var(--xp-font, var(--font-sans));
+    letter-spacing: normal;
+    text-transform: none;
+    text-align: left;
+    white-space: normal;
+    clip-path: inset(50%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .xe-field:focus-within > .xe-issue,
+  .xe-field-inline:focus-within > .xe-issue,
+  .xe-rich:focus-within > .xe-issue {
+    clip-path: none;
+    opacity: 1;
+  }
+
+  /* The field's own address prompt, under it, out of the flow. App chrome. */
+  .xe-link-ask {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    z-index: 40;
+    display: grid;
+    gap: 0.5rem;
+    width: min(22rem, 90vw);
+    padding: 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: 12px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-pack);
+    font: 400 0.875rem/1.4 var(--font-sans);
+  }
+  .xe-link-ask-label {
+    display: grid;
+    gap: 0.25rem;
+    font-weight: 600;
+  }
+  .xe-link-ask input {
+    border: 1px solid var(--color-line);
+    border-radius: 8px;
+    padding: 0.4rem 0.6rem;
+    font-weight: 400;
+  }
+  .xe-link-ask-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .xe-link-ask-actions button {
+    border: 1px solid var(--color-ink);
+    border-radius: 999px;
+    padding: 0.3rem 0.8rem;
+    font-weight: 600;
+  }
+  .xe-link-ask [role="alert"] {
+    color: var(--color-error);
+  }
+
+  /* ---------- A page item's frame and its toolbar ---------- */
+  .xe-frame:hover,
+  .xe-frame:focus-within {
+    outline: 1.5px dashed color-mix(in srgb, var(--xp-link) 55%, transparent);
+    outline-offset: 8px;
+  }
+  .xe-frame:focus-within {
+    outline-color: var(--xp-link);
+  }
+  .xe-tools {
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding-bottom: 0.375rem;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .xe-frame:hover > .xe-tools,
+  .xe-frame:focus-within > .xe-tools {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* A toolbar with a menu open stays, wherever the pointer and the focus are: the compact form's "More
+     actions" (data-open), and in any other place an AI draft's own menu, its rewrite form and "No rewrites
+     left" (BlockTools marks itself data-open; in the compact form it is inside that menu). "Rewrite this
+     block" hides the button that was pressed, so the focus falls to the page, and from then on only the
+     pointer kept the toolbar up. Once the pointer was off the section too (moved away, or the page scrolled
+     under it, as a press on a button below the fold scrolls it) the toolbar went, the form with it, and the
+     section under the form took the press meant for "Rewrite now". */
+  .xe-frame > .xe-tools:is([data-open], :not([data-place="compact"]):has(.xe-more [data-open])) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* Its section is raised with it, in every place and not only where the toolbar is the compact pair: an
+     open menu runs down over the sections after it, which paint later (a toolbar of theirs, a field's
+     formatting buttons or its issue would lie over it). Whatever holds the section in the main column
+     (the page's .@container/main, ProjectView.tsx) is raised too: where a size container makes a stacking
+     context, as the first container queries did, a stack that is one (research's method) keeps all it
+     holds under what follows it. Chromium no longer does; Safari has not been tried. */
+  .\@container\/main :has(.xe-tools[data-open], .xe-tools:not([data-place="compact"]) .xe-more [data-open]) {
+    position: relative;
+    /* Over everything else on the page (a field's issue is 26), and under the top bar (30), which stays over the page as it scrolls. */
+    z-index: 29;
+  }
+  /* One order everywhere, as drawn from left to right: Remove, More actions, the layout's action, Move
+     up, Move down, the grip. So the grip is always at the section's corner, wherever the toolbar sits,
+     and Remove is farthest from it (design round 2, item 2). The reading and Tab order stay the
+     markup's: the grip first. */
+  .xe-tools > [data-grip] {
+    order: 6;
+  }
+  .xe-tools > [data-tool="down"] {
+    order: 5;
+  }
+  .xe-tools > [data-tool="up"] {
+    order: 4;
+  }
+  .xe-tools > [data-tool="action"] {
+    order: 3;
+  }
+  .xe-tools > [data-tool="more"] {
+    order: 2;
+  }
+  .xe-tools > [data-tool="remove"] {
+    order: 1;
+  }
+  /* The compact form's "More actions", and each button's name in words: shown only in that form (below). */
+  .xe-tools > [data-tool="menu"],
+  .xe-tool-name {
+    display: none;
+  }
+  /* Where a section's toolbar sits (Toolbar.tsx measures, all its reads before its writes: data-place).
+     Never over any words, its own section's included, nor over another section or a chip; in this
+     order: a row above the section's top right corner; a row half over its top edge (a little lower
+     where the gap above is short of half of it, a little to the right where its own chips reach the
+     corner: --xe-tools-dy, -dx); a column in the gutter to its right, from the corner down; that column
+     half over its right edge; the compact pair, the grip and "More actions", half over its top edge.
+     Only a picture's sits inside its own top right corner, over the picture, as in the prototype Rory
+     tried ("Grip thing good"), so in the gallery's grid it never lies over the caption of the picture
+     above; where a tile can't hold the row, it is one column down its right edge from the grip, and
+     only where the picture is too short for that, the column goes on in a second (data-shape). The
+     grip is at the section's corner in every one. A phone places its grips itself (phone.css). */
+  @media not all and (max-width: 47.99rem) and (pointer: coarse) {
+    .xe-frame[data-kind="image"] > .xe-tools {
+      top: 0.5rem;
+      right: 0.5rem;
+      bottom: auto;
+      padding-bottom: 0;
+    }
+    /* Down from the grip: grip, move up, move down, the action, more, remove. */
+    .xe-frame > .xe-tools:is([data-shape="column"], [data-shape="wrap"], [data-place="side"], [data-place="rcol"]) {
+      flex-direction: column;
+      align-items: flex-end;
+    }
+    .xe-frame > .xe-tools:is([data-shape="column"], [data-shape="wrap"], [data-place="side"], [data-place="rcol"]) > * {
+      order: 0;
+    }
+    /* A picture too short for one column: it goes on in a second to its left, at the foot, so Remove is
+       still the button farthest from the grip (design round 2, the narrow tile). */
+    .xe-frame > .xe-tools[data-shape="wrap"] {
+      flex-wrap: wrap-reverse;
+      align-content: flex-start;
+      justify-content: flex-end;
+      width: var(--xe-tools-w);
+      max-height: var(--xe-tools-h);
+    }
+    /* Half over the section's top edge: a row of buttons is 36px, 44px on a touch screen. */
+    .xe-frame > .xe-tools:is([data-place="edge"], [data-place="compact"]) {
+      top: calc(-1.125rem + var(--xe-tools-dy, 0px));
+      right: calc(0px - var(--xe-tools-dx, 0px));
+      bottom: auto;
+      padding-bottom: 0;
+    }
+    /* A flowchart's boxes carry their own grip and Remove on their corners (flow.css): the section's toolbar keeps clear of them. */
+    .xe-frame[data-kind="flow"] > .xe-tools:is([data-place="edge"], [data-place="compact"]) {
+      right: calc(2rem - var(--xe-tools-dx, 0px));
+    }
+    /* In the gutter to its right, touching it, so the pointer never leaves the section on its way to the buttons. */
+    .xe-frame > .xe-tools[data-place="side"] {
+      top: 0;
+      right: auto;
+      bottom: auto;
+      left: 100%;
+      padding-bottom: 0;
+      align-items: flex-start;
+    }
+    .xe-frame > .xe-tools[data-place="rcol"] {
+      top: 0;
+      right: -1.125rem;
+      bottom: auto;
+      padding-bottom: 0;
+      align-items: center;
+    }
+    /* The compact pair: "More actions" beside the grip. Open, it is a card over the page, the pair in its
+       top right corner where they were, and under them the toolbar's other buttons, one to a line, each
+       with its name, Move up first and Remove last. */
+    .xe-frame > .xe-tools[data-place="compact"] > [data-tool="menu"] {
+      display: inline-flex;
+    }
+    .xe-frame > .xe-tools[data-place="compact"]:not([data-open]) > [data-tool]:not([data-tool="menu"]) {
+      display: none;
+    }
+    /* Its section is raised with it, over the sections after it (above: every toolbar with a menu open). */
+    .xe-frame > .xe-tools[data-place="compact"][data-open] {
+      z-index: 30;
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      margin: -0.375rem -0.375rem 0 0;
+      padding: 0.375rem;
+      border: 1px solid var(--xp-outline-edge);
+      border-radius: 1.5rem;
+      background: var(--xp-card);
+      box-shadow: var(--shadow-pack);
+    }
+    .xe-frame > .xe-tools[data-place="compact"][data-open] > * {
+      order: 0;
+    }
+    .xe-frame > .xe-tools[data-place="compact"][data-open] > [data-tool="menu"] {
+      grid-area: 1 / 2;
+    }
+    .xe-frame > .xe-tools[data-place="compact"][data-open] > [data-grip] {
+      grid-area: 1 / 3;
+    }
+    .xe-frame > .xe-tools[data-place="compact"][data-open] > [data-tool]:not([data-tool="menu"]) {
+      grid-column: 1 / -1;
+      justify-content: flex-start;
+      gap: 0.5rem;
+      padding-inline: 0.75rem;
+      border-color: transparent;
+    }
+    .xe-frame > .xe-tools[data-place="compact"][data-open] .xe-tool-name {
+      display: inline;
+      white-space: nowrap;
+    }
+    .xe-frame > .xe-tools[data-place="compact"][data-open] > :is([data-tool], [data-grip]):not([data-explain]):is(:hover, :focus-visible)::after {
+      content: none;
+    }
+    /* A figure picked from the report has its label along the picture's top edge (figures.css): the toolbar sits under it. */
+    .xe-frame[data-kind="image"]:has(.xe-fig-picked) > .xe-tools {
+      top: 2.25rem;
+    }
+    .xe-frame[data-kind="image"]:has(.xe-fig-picked[data-stacked]) > .xe-tools {
+      top: 3.5rem;
+    }
+  }
+  .xe-tool {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-width: 2.25rem;
+    height: 2.25rem;
+    padding: 0 0.5rem;
+    border: 1px solid var(--xp-outline-edge);
+    border-radius: 999px;
+    background: var(--xp-card);
+    color: var(--xp-ink);
+    font: 600 0.8125rem/1 var(--xp-font, var(--font-sans));
+    cursor: pointer;
+  }
+  .xe-tool:hover {
+    border-color: var(--xp-link);
+  }
+  .xe-tool:focus-visible {
+    outline: 2px solid var(--xp-link);
+    outline-offset: 2px;
+  }
+  .xe-tool:disabled,
+  .xe-tool[aria-disabled="true"] {
+    color: var(--xp-muted);
+    opacity: 0.55;
+    cursor: default;
+  }
+  .xe-tool[aria-disabled="true"]:hover {
+    border-color: var(--xp-outline-edge);
+  }
+  .xe-tool[aria-pressed="true"] {
+    background: var(--xp-ink);
+    color: var(--xp-card);
+  }
+  .xe-tool-sm {
+    min-width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+  }
+  .xe-grip {
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .xe-more {
+    display: inline-flex;
+  }
+  /* "More actions" sits inside parts drawn in the page's type (the title is large): it keeps the app's own. */
+  .xe-more,
+  .xe-shell-tools {
+    font: 400 1rem/1.5 var(--font-sans);
+    letter-spacing: normal;
+    text-wrap: wrap;
+    text-transform: none;
+    color: var(--color-ink);
+  }
+  /* A shell part's corner toolbar: over the part's top right corner, out of the flow. */
+  .xe-shell-tools {
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    z-index: 20;
+    padding-bottom: 0.25rem;
+    opacity: 0;
+    pointer-events: none;
+  }
+  :hover > .xe-shell-tools,
+  :focus-within > .xe-shell-tools {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* It stays while its menu or its rewrite form is open, as a section's toolbar does (above). */
+  .xe-shell-tools:has([data-open]) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  @media (pointer: coarse) {
+    .xe-shell-tools {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+  /* BlockTools keeps its own margins in the classic editor's cards; over the page it sits in the row. */
+  .xe-more > div {
+    margin: 0;
+  }
+  /* Each toolbar button's tooltip, on hover and on keyboard focus; and a button that is off, pressed,
+     shows why (its tooltip holds the reason) on any screen, until the focus moves on (Toolbar.tsx). */
+  [data-tip]:hover::after,
+  [data-tip]:focus-visible::after,
+  .xe-tool[data-tip][data-explain]::after {
+    content: attr(data-tip);
+    position: absolute;
+    top: calc(100% + 0.375rem);
+    left: 50%;
+    z-index: 50;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 16rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    background: var(--color-ink);
+    color: var(--color-surface);
+    font: 500 0.75rem/1.3 var(--font-sans);
+    pointer-events: none;
+  }
+  /* The reason runs back from the button's right edge: a toolbar sits at the right, and a tooltip off the screen widens the page. */
+  .xe-tool[data-tip][data-explain]::after {
+    right: 0;
+    left: auto;
+    transform: none;
+  }
+  /* So does every tooltip in a section's toolbar: its buttons run in from its right end, the grip at the
+     section's corner, and a tooltip centred under the grip ran past the section's right edge (off a
+     narrow window, widening the page). Down a column, beside its button, so it covers none of the rest. */
+  .xe-tools [data-tip]:is(:hover, :focus-visible)::after {
+    right: 0;
+    left: auto;
+    transform: none;
+  }
+  .xe-tools:is([data-shape="column"], [data-shape="wrap"], [data-place="side"], [data-place="rcol"]) [data-tip]:is(:hover, :focus-visible)::after {
+    top: 50%;
+    right: calc(100% + 0.375rem);
+    transform: translateY(-50%);
+  }
+  /* On a touch screen the toolbar is always shown and its buttons are 44px (a phone shows only the grip: L's phone.css). */
+  @media (pointer: coarse) {
+    .xe-tools {
+      /* With no hover there is nothing to bridge: the toolbar sits on the section's top edge, and fits the 44px gap between sections. */
+      padding-bottom: 0;
+      opacity: 1;
+      pointer-events: auto;
+    }
+    /* A finding's own small controls keep their size: at 44px they would cover its words (L's bar carries them on a phone). */
+    .xe-tool:not(.xe-tool-sm) {
+      min-width: 2.75rem;
+      height: 2.75rem;
+    }
+    /* ...but each takes a 44px press (a tablet: the review's vision-2), and so do the formatting buttons over a field; spaced so
+       that no two presses overlap. */
+    .xe-tool-sm::before {
+      content: "";
+      position: absolute;
+      inset: -0.5rem;
+    }
+    .xe-format {
+      gap: 1rem;
+    }
+  }
+  /* On a tablet the toolbars are always shown, so one that is not in the gap above its section (inside a
+     picture's corner, a tile's in the gallery's grid among them, or on any other's top edge, in the
+     gutter beside it or on its right edge) shows only its grip at rest, in its place, at the corner and
+     clear of words, as the whole toolbar is: five 44px buttons are wider than a tile. The rest show while
+     the section is touched or the focus is in it (its caption, its description, or the grip from the
+     keyboard), running from the grip, which stays where it is. One with a menu open keeps its buttons
+     (above: an AI draft's rewrite form is in one of them). */
+  @media (pointer: coarse) and (min-width: 48rem) {
+    .xe-frame[data-kind="image"]:not(:hover):not(:focus-within) > .xe-tools > [data-tool],
+    .xe-frame:not(:hover):not(:focus-within) > .xe-tools[data-place]:not([data-open], :not([data-place="compact"]):has(.xe-more [data-open])) > [data-tool] {
+      display: none;
+    }
+    /* Half over the top edge: half of a 44px row; half over the right edge, half of a 44px column. */
+    .xe-frame > .xe-tools:is([data-place="edge"], [data-place="compact"]) {
+      top: calc(-1.375rem + var(--xe-tools-dy, 0px));
+    }
+    .xe-frame > .xe-tools[data-place="rcol"] {
+      right: -1.375rem;
+    }
+  }
+
+  /* ---------- The "+": a zero-height place in the gap (F's drag.css draws the button and its menu) ---------- */
+  .xe-insert {
+    position: relative;
+    height: 0;
+    z-index: 15;
+  }
+
+  /* ---------- A finding's controls and "Add a finding" ---------- */
+  /* A finding's controls sit on the rule above it, at its right end: in the padding between two findings, over no words. */
+  .xe-list-tools {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 15;
+    display: flex;
+    gap: 0.125rem;
+    padding: 0 0.125rem;
+    border-radius: 999px;
+    background: var(--xp-ground);
+    transform: translateY(-50%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  li:hover > .xe-list-tools,
+  li:focus-within > .xe-list-tools {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .xe-add-finding {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 15;
+    padding-top: 0.25rem;
+    list-style: none;
+    opacity: 0;
+    pointer-events: none;
+  }
+  section:hover .xe-add-finding,
+  section:focus-within .xe-add-finding {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* "Add a finding" is always shown on a touch screen; a finding's own controls only while it is touched or typed in. */
+  @media (pointer: coarse) {
+    .xe-add-finding {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    /* Room between a finding's controls for each one's 44px press (above). */
+    .xe-list-tools {
+      gap: 1rem;
+    }
+  }
+
+  /* ---------- Edit-only chips over a part ---------- */
+  .xe-over {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 15;
+    display: flex;
+    gap: 0.25rem;
+  }
+  .xe-above {
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    z-index: 15;
+    display: flex;
+    gap: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+  /* Over the part's top left: its top right is the section's toolbar's. On a touch screen it moves
+     along beside the "+", which sits at the left of the gap there (as "Add a finding" does, phone.css).
+     A phone places it itself (phone.css). */
+  @media not all and (max-width: 47.99rem) and (pointer: coarse) {
+    .xe-frame .xe-above {
+      right: auto;
+      left: 0;
+    }
+  }
+  @media (pointer: coarse) and (min-width: 48rem) {
+    .xe-frame .xe-above {
+      left: 3.25rem;
+    }
+  }
+  .xe-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-height: 1.75rem;
+    padding: 0 0.625rem;
+    border: 1px solid var(--xp-outline-edge);
+    border-radius: 999px;
+    background: var(--xp-card);
+    color: var(--xp-ink);
+    font: 600 0.8125rem/1 var(--xp-font, var(--font-sans));
+    white-space: nowrap;
+  }
+  .xe-chip[aria-pressed="true"] {
+    background: var(--xp-ink);
+    color: var(--xp-card);
+  }
+  .xe-chip[data-missing] {
+    border-color: var(--xp-error);
+    color: var(--xp-error);
+  }
+  .xe-chip:disabled {
+    opacity: 0.55;
+  }
+  .xe-popover {
+    margin: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: 12px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-pack);
+    font: 400 0.875rem/1.4 var(--font-sans);
+  }
+  .xe-popover-label {
+    display: block;
+    font-weight: 600;
+  }
+  .xe-popover-input {
+    margin-top: 0.25rem;
+    width: min(20rem, 80vw);
+    border: 1px solid var(--color-line);
+    border-radius: 8px;
+    padding: 0.4rem 0.6rem;
+  }
+
+  /* ---------- The skills ---------- */
+  .xe-pill-remove {
+    position: absolute;
+    top: -0.45rem;
+    right: -0.45rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.125rem;
+    height: 1.125rem;
+    /* Quiet, as a flowchart box's chips are (flow.css): the look's card ground, its ink mark, its outline edge. */
+    border: 1px solid var(--xp-outline-edge);
+    border-radius: 999px;
+    background: var(--xp-card);
+    color: var(--xp-ink);
+    opacity: 0;
+  }
+  .xe-pill-remove:hover {
+    border-color: var(--xp-link);
+  }
+  .xe-pill-remove:focus-visible {
+    outline: 2px solid var(--xp-link);
+    outline-offset: 2px;
+  }
+  .xe-pill:hover > .xe-pill-remove,
+  .xe-pill:focus-within > .xe-pill-remove {
+    opacity: 1;
+  }
+  /* Under a finger: always shown, 18px to the eye and a 44px press, over the pills beside it. */
+  @media (pointer: coarse) {
+    .xe-pill-remove {
+      z-index: 1;
+      opacity: 1;
+    }
+    .xe-pill-remove::before {
+      content: "";
+      position: absolute;
+      inset: -0.8125rem;
+    }
+  }
+  /* The "Add a skill" box: a pill the size of its words (or of "Add a skill"). */
+  .xe-skill-new {
+    field-sizing: content;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .xe-skill-new::placeholder {
+    color: var(--xp-muted);
+    opacity: 1;
+  }
+
+  /* ---------- Kept, not shown in this layout: under the page, in the page's colours ---------- */
+  .xe-kept {
+    margin-top: 2.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px dashed var(--xp-rule);
+    color: var(--xp-ink);
+  }
+  .xe-kept-heading {
+    font: 600 0.9375rem/1.4 var(--xp-font, var(--font-sans));
+  }
+  .xe-kept ul {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+  .xe-kept li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  /* ---------- The backup offer: over the page, under the top bar. App chrome ---------- */
+  .xe-offer {
+    position: fixed;
+    top: calc(var(--xe-topbar-h) + 0.75rem);
+    left: 50%;
+    z-index: 32;
+    width: min(36rem, calc(100vw - 2rem));
+    transform: translateX(-50%);
+    padding: 1rem;
+    border: 1px solid var(--color-ink);
+    border-radius: 16px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-pack);
+  }
+
+  /* ---------- The status line, fixed at the foot of the window, out of the flow ---------- */
+  .xe-status {
+    position: fixed;
+    left: 50%;
+    bottom: 1rem;
+    z-index: 35;
+    display: grid;
+    justify-items: center;
+    gap: 0.25rem;
+    width: max-content;
+    max-width: calc(100vw - 2rem);
+    transform: translateX(-50%);
+    pointer-events: none;
+    font: 500 0.875rem/1.35 var(--font-sans);
+  }
+  .xe-status > p:not(:empty) {
+    padding: 0.4rem 0.8rem;
+    border-radius: 10px;
+    background: var(--color-ink);
+    color: var(--color-surface);
+    white-space: pre-line;
+  }
+  .xe-status > .xe-status-error:not(:empty) {
+    background: var(--color-error);
+  }
+
+  /* ---------- Sheets: native dialogs, at the side on a desktop, full screen under 48rem ---------- */
+  .xe-sheet {
+    position: fixed;
+    inset: 0 0 0 auto;
+    width: min(30rem, 100vw);
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-left: 1px solid var(--color-line);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-pack);
+    overflow: auto;
+  }
+  .xe-sheet::backdrop {
+    background: rgb(14 15 18 / 0.25);
+  }
+  .xe-sheet-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-surface);
+  }
+  .xe-sheet-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 999px;
+  }
+  .xe-sheet-close:hover {
+    background: var(--color-mist);
+  }
+  .xe-sheet-body {
+    padding: 1.25rem;
+  }
+  @media (width < 48rem) {
+    .xe-sheet {
+      width: 100vw;
+      border-left: 0;
+    }
+  }
+}
