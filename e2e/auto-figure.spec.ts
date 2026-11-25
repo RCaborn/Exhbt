@@ -479,7 +479,7 @@ test.describe("Draft from a PDF with a chart", () => {
     const problem = (await openThingsToFix(page)).getByRole("button", { name: `Image 1: ${NEEDS_TICK}` });
     await expect(problem).toBeVisible();
     await expect(problem).toHaveAttribute("data-issue-path", /^sections\.\d+\.picked\.shareOk$/);
-    await expect(page.getByText("It's live.")).toHaveCount(0);
+    await expect(page.getByText(/^(It's live|Your changes are live)\b/)).toHaveCount(0);
 
     await page.keyboard.press("Escape");
     await (await openPicked(page)).getByLabel(TICK).check();

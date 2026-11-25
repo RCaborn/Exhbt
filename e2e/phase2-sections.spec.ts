@@ -470,7 +470,7 @@ test.describe("Sections in the editor", () => {
     await expect(fixes).toContainText(`Keep the whole exhbt to ${LIMITS.totalWords} words (it's ${total + QUOTE + 2}).`);
     // The only word limit is the page's: nothing is listed against the long context line, the findings or the quote.
     await expect(fixes).not.toContainText(/Keep (the context|each finding|the quote) to/);
-    await expect(page.getByText("It's live.")).toHaveCount(0);
+    await expect(page.getByText(/^(It's live|Your changes are live)\b/)).toHaveCount(0);
   });
 
   test("the flowchart stays on every exhbt, with 3 to 6 boxes", async ({ page }) => {

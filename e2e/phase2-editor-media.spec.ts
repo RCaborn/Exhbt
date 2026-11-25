@@ -31,10 +31,10 @@ test.describe("images and the work as a file", () => {
     await page.getByLabel("This is my work, and the numbers are true").check();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
     // The top list says what is wrong and takes you to the field.
-    await expect(page.getByText("It's live.")).toHaveCount(0);
+    await expect(page.getByText(/^(It's live|Your changes are live)\b/)).toHaveCount(0);
     const problems = await openThingsToFix(page);
     await expect(problems.getByRole("button", { name: /Image 1: Describe the image/ })).toBeVisible();
-    await expect(page.getByText("It's live.")).toHaveCount(0);
+    await expect(page.getByText(/^(It's live|Your changes are live)\b/)).toHaveCount(0);
 
     await page.keyboard.press("Escape");
     await fillPlain(page, page.getByLabel(/Image 1: describe it/), "A queue at the cafe till");

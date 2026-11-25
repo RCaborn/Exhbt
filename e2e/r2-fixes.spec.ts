@@ -667,7 +667,7 @@ test.describe("A hand-built save or publish can't store a layout nothing offers"
       expect(await said(page, REFUSED)).toEqual([REFUSED]);
       expect(await storedFormat(page, id)).toBeUndefined();
       // Nothing went live, and the save status was not touched: the words are in the sheet and nowhere else.
-      await expect(sheet.getByText("It's live.")).toHaveCount(0);
+      await expect(sheet.getByText(/^(It's live|Your changes are live)\b/)).toHaveCount(0);
       await expect(page.locator(`${READY} [data-topbar] .xe-save`)).toHaveText("Saved");
       expect(await said(page, REFUSED)).toEqual([REFUSED]);
     });

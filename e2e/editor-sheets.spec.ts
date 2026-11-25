@@ -31,16 +31,24 @@ async function setDoc(page: Page, id: string, doc: ExhbtDoc) {
 const complete = (extra: Partial<ExhbtDoc> = {}): ExhbtDoc => ({ ...openBankingDoc, ...extra }) as ExhbtDoc;
 
 test.describe("review and publish", () => {
-  test("a complete exhbt: tick, Publish, It's live., the address opens; then a change and Publish changes", async ({ page }) => {
+  test("a complete exhbt: the sheet says where it goes; tick, Publish, live on the portfolio, the address and the portfolio open; then a change and Publish changes", async ({ page }) => {
     const user = freshName("pub");
     const id = await openNew(page, user);
     await setDoc(page, id, complete());
     await openPublish(page);
     const s = sheet(page, "publish");
     await expect(s.getByRole("button", { name: "Publish", exact: true })).toBeVisible();
+    // Before publishing it says where the exhbt goes: on the portfolio, with a link of its own (development serves a portfolio at /p/<username>).
+    await expect(s.getByTestId("where-it-goes")).toHaveText(`Publishing puts this exhbt on your portfolio at /p/${user}, with its own link to send with applications.`);
+    await expect(s.getByTestId("where-it-goes").getByRole("link")).toHaveAttribute("href", `/p/${user}`);
     await s.getByLabel("This is my work, and the numbers are true").check();
     await s.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(s.getByText("It's live.")).toBeVisible();
+    await expect(s.getByText("It's live on your portfolio.")).toBeVisible();
+    await expect(s.getByText("Paste this into an application:")).toBeVisible();
+    await expect(s.getByTestId("where-it-goes")).toHaveCount(0);
+    const home = s.getByRole("link", { name: "See your portfolio" });
+    await expect(home).toHaveAttribute("href", `/p/${user}`);
+    expect((await page.request.get(`/p/${user}`)).status()).toBe(200);
     const view = s.getByRole("link", { name: "View it" });
     const href = (await view.getAttribute("href"))!;
     expect(href).toContain(user);
@@ -60,7 +68,7 @@ test.describe("review and publish", () => {
     await openPublish(page);
     await expect(s.getByText(/^Live at /)).toBeVisible();
     await s.getByRole("button", { name: "Publish changes" }).click();
-    await expect(s.getByText("Your changes are live.")).toBeVisible();
+    await expect(s.getByText("Your changes are live on your portfolio.")).toBeVisible();
     const stored = await readStored(page, id);
     expect(stored.published?.title).toContain("Updated.");
   });
@@ -83,7 +91,7 @@ test.describe("review and publish", () => {
     await expect(page.getByText(/^Confirmed by /)).toBeVisible();
   });
 
-  test("one flagged number: it is listed, That's right, the tick, Publish gives It's live.", async ({ page }) => {
+  test("one flagged number: it is listed, That's right, the tick, Publish gives It's live on your portfolio.", async ({ page }) => {
     const id = await openNew(page, freshName("flag"));
     await setDoc(page, id, complete({ unverified: ["18%"] }));
     await openPublish(page);
@@ -94,7 +102,7 @@ test.describe("review and publish", () => {
     await expect(list).toBeHidden();
     await s.getByLabel("This is my work, and the numbers are true").check();
     await s.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(s.getByText("It's live.")).toBeVisible();
+    await expect(s.getByText("It's live on your portfolio.")).toBeVisible();
   });
 
   test("a Free plan sees the preview-only words and no Publish button", async ({ page }) => {
@@ -151,7 +159,7 @@ test.describe("card and link details", () => {
     await expect(s.getByRole("button", { name: "Show me" })).toHaveCount(0);
     await s.getByLabel("This is my work, and the numbers are true").check();
     await s.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(s.getByText("It's live.")).toBeVisible();
+    await expect(s.getByText("It's live on your portfolio.")).toBeVisible();
   });
 });
 

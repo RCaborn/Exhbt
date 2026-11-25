@@ -89,6 +89,7 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
     status: record.status,
     slug: record.slug,
     liveBase,
+    hiddenOnPortfolio: record.hiddenOnPortfolio === true,
     owner: { name: profile.name?.trim() || profile.username || user.email.split("@")[0]!, photoUrl: await signedFileUrl(profile.photoFileId, user.id), bio: profile.headline },
     imageUrls,
     figureSources,

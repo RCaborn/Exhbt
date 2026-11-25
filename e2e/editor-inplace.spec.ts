@@ -685,7 +685,7 @@ test("publishing keeps the order: an arranged doc goes live with its parts in th
   await page.getByRole("button", { name: "Review and publish" }).click();
   await page.getByLabel("This is my work, and the numbers are true").check();
   await page.getByRole("button", { name: /^Publish( changes)?$/ }).click();
-  await expect(page.getByText(/^(It's live\.|Your changes are live\.)$/)).toBeVisible();
+  await expect(page.getByText(/^(It's live|Your changes are live) on your portfolio\.$/)).toBeVisible();
   await page.goto(url);
   expect(await parts()).toEqual(editing);
 });
@@ -1056,7 +1056,7 @@ test("the live status: publishing from the sheet turns the chip to Live, and Unp
   await page.getByRole("button", { name: "Review and publish" }).click();
   await page.getByLabel("This is my work, and the numbers are true").check();
   await page.getByRole("button", { name: "Publish", exact: true }).click();
-  await expect(page.getByText("It's live.")).toBeVisible();
+  await expect(page.getByText("It's live on your portfolio.")).toBeVisible();
   await expect(chip).toHaveText("Live");
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Menu" }).click();
@@ -1175,7 +1175,7 @@ test.describe("the copy kept in this browser (the review's data-safety-3)", () =
     await page.getByRole("button", { name: "Review and publish" }).click();
     await page.getByLabel("This is my work, and the numbers are true").check();
     await page.getByRole("button", { name: /^Publish( changes)?$/ }).click();
-    await expect(page.getByText(/^(It's live|Your changes are live)\.$/)).toBeVisible();
+    await expect(page.getByText(/^(It's live|Your changes are live) on your portfolio\.$/)).toBeVisible();
     await expect(page.getByText(OFFER)).toHaveCount(0);
     expect(await keptNow(page, id)).toBeNull();
     expect((await readStored(page, id)).working.title).not.toBe("From an older visit");

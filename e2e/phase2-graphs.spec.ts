@@ -343,11 +343,11 @@ test.describe("Graphs in the editor and on the page", () => {
     await openPublishSheet(page);
     await page.getByLabel("This is my work, and the numbers are true").check();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(page.getByText("It's live.")).toHaveCount(0);
+    await expect(page.getByText(/^(It's live|Your changes are live)\b/)).toHaveCount(0);
     await closeOpenSheet(page);
     await page.getByRole("button", { name: /things? to fix$/ }).click();
     await expect(page.getByRole("region", { name: "Things to fix before publishing" })).toContainText(`Keep the whole exhbt to ${LIMITS.totalWords} words`);
-    await expect(page.getByText("It's live.")).toHaveCount(0);
+    await expect(page.getByText(/^(It's live|Your changes are live)\b/)).toHaveCount(0);
   });
 
   test("a graph number the AI worked out is flagged; its own figures aren't", async ({ page }) => {
