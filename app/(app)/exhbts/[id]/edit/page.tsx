@@ -126,7 +126,8 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
         )}
         {/* An admin whose editor is the classic one: the way to the new one, and nobody else is sent it. */}
         {admin && kind === "classic" && <TryNewEditor id={record.id} />}
-        <Editor {...editorProps} />
+        {/* The way to the new editor, said beside a layout only it can edit, and only to a person who may use it: one whose editor it is (this visit asked for the classic one), or an admin who can switch it on. */}
+        <Editor {...editorProps} newEditor={kind === "page" ? "visit" : admin ? "switch" : undefined} />
       </div>
     ) : (
       <EditorGate

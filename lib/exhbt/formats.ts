@@ -1,9 +1,9 @@
 import type { ContentSection, ExhbtDoc, Section, SectionKind } from "./blocks";
 
 /**
- * The layouts an exhbt can have (decisions 0024 and 0028): seven, of which three are offered
- * (OFFERED_FORMATS) until release 4. A leaf file: it may import types from ./blocks but no values,
- * because blocks imports values from here.
+ * The layouts an exhbt can have (decisions 0024 and 0028): seven. The new editor offers them all
+ * (OFFERED_FORMATS); the classic editor offers the first three (CLASSIC_FORMATS). A leaf file: it may
+ * import types from ./blocks but no values, because blocks imports values from here.
  *
  * `format` is one optional field in the jsonb doc. No `format`, or one this code doesn't know
  * (written by a later release), reads as a case study, so no page ever breaks.
@@ -11,17 +11,26 @@ import type { ContentSection, ExhbtDoc, Section, SectionKind } from "./blocks";
 
 export const FORMATS = ["case-study", "gallery", "research", "build", "essay", "before-after", "event"] as const;
 export type Format = (typeof FORMATS)[number];
-/** The layouts the picker shows and the AI draft may choose. Three until release 4, then all seven. */
-export const OFFERED_FORMATS: readonly Format[] = ["case-study", "gallery", "research"];
-/** The layouts the AI draft may choose, as a tuple for its schema's enum: the same as OFFERED_FORMATS. */
-export const DRAFT_FORMATS = ["case-study", "gallery", "research"] as const satisfies readonly Format[];
+/**
+ * The three layouts of decision 0024, and the only place they are listed. They are what the classic
+ * editor offers, and what the AI draft chooses among for a person whose editor is the classic one:
+ * that editor has no way to edit what the other four add (My role, the pull quote, the Before and
+ * After marks, a source with no address), so a person there could pick one and never be able to
+ * publish. Goes with the classic editor (release 5).
+ */
+export const CLASSIC_FORMATS = ["case-study", "gallery", "research"] as const satisfies readonly Format[];
+/** The layouts the new editor's menu shows, and the AI draft may choose for a person whose editor it is. Three until release 4, then all seven. */
+export const OFFERED_FORMATS: readonly Format[] = CLASSIC_FORMATS;
+/** The layouts offered to a person, by the editor they get (lib/editor-kind.ts). */
+export const offeredIn = (editor: "page" | "classic"): readonly Format[] => (editor === "classic" ? CLASSIC_FORMATS : OFFERED_FORMATS);
 export const DEFAULT_FORMAT: Format = "case-study";
 /**
- * Whether a save or a publish may carry this layout: one that is offered, or the one already stored
- * for the exhbt (a draft made before a layout was withdrawn keeps working). A hand-built request that
- * names a layout nothing offers yet (build, essay, before and after, event) is not let through.
+ * Whether a save or a publish may carry this layout: one that is offered to the person (`offered`:
+ * offeredIn their editor), or the one already stored for the exhbt (an exhbt made in the new editor
+ * and opened in the classic one keeps its layout). A hand-built request that names a layout the
+ * person's editor doesn't offer is not let through.
  */
-export const mayCarryFormat = (next: Format, stored: Format): boolean => OFFERED_FORMATS.includes(next) || next === stored;
+export const mayCarryFormat = (next: Format, stored: Format, offered: readonly Format[] = OFFERED_FORMATS): boolean => offered.includes(next) || next === stored;
 export const isFormat = (v: unknown): v is Format => typeof v === "string" && (FORMATS as readonly string[]).includes(v);
 export const formatOf = (d: { format?: unknown }): Format => (isFormat(d.format) ? d.format : DEFAULT_FORMAT);
 

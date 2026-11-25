@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
 import { figureSentence, layoutSentence, type FigureNews, type LayoutReason } from "@/lib/exhbt/drafted";
-import { FORMAT_RULES, formatOf, OFFERED_FORMATS, withFormat, type Format } from "@/lib/exhbt/formats";
+import { FORMAT_RULES, formatOf, offeredIn, withFormat, type Format } from "@/lib/exhbt/formats";
 import { layoutNotes } from "@/lib/exhbt/sections";
 
 /**
@@ -16,7 +16,24 @@ import { layoutNotes } from "@/lib/exhbt/sections";
  *
  * Right after a draft it also says, once and quietly, which layout the AI chose and why, and
  * whether a figure was taken from the person's files (decision 0025, lib/exhbt/drafted.ts).
+ *
+ * This editor only ever offers those three (CLASSIC_FORMATS), whatever the new editor offers: it has
+ * no way to edit what the other four add (My role, the pull quote, the Before and After marks, a
+ * source with no address), so a person who picked one here could never publish it. An exhbt that is
+ * already one of the four keeps its layout: it is listed too, selected, with one line saying where
+ * it is edited.
  */
+
+/** The layouts this editor offers. */
+const HERE = offeredIn("classic");
+
+/**
+ * How this person gets from here to the new editor, if they may use it. "visit": their editor is the
+ * new one and this visit asked for the classic one, so a link opens the same exhbt there. "switch": an
+ * admin whose editor is the classic one, who can turn the new one on for themselves (the same form as
+ * TryNewEditor). Left out for everyone else: nobody is sent the way to an editor they can't use.
+ */
+export type NewEditorWay = "visit" | "switch";
 
 const SKETCHES: Partial<Record<Format, React.ReactNode>> = {
   // A title bar, a row of three boxes, two columns.
@@ -57,7 +74,7 @@ const SKETCHES: Partial<Record<Format, React.ReactNode>> = {
  */
 export type Drafted = { format: Format; reason?: LayoutReason; figure?: FigureNews };
 
-export function LayoutPicker({ doc, setDoc, drafted }: { doc: ExhbtDoc; setDoc: React.Dispatch<React.SetStateAction<ExhbtDoc>>; drafted?: Drafted }) {
+export function LayoutPicker({ id, doc, setDoc, drafted, newEditor }: { id: string; doc: ExhbtDoc; setDoc: React.Dispatch<React.SetStateAction<ExhbtDoc>>; drafted?: Drafted; newEditor?: NewEditorWay }) {
   const f = formatOf(doc);
   const name = useId();
   const group = useRef<HTMLDivElement>(null);
@@ -91,7 +108,7 @@ export function LayoutPicker({ doc, setDoc, drafted }: { doc: ExhbtDoc; setDoc: 
         </legend>
         <p className="hint mt-1">How the page reads. Switching never deletes anything.</p>
         <div ref={group} role="radiogroup" aria-label="Layout" className="mt-4 space-y-2">
-          {(OFFERED_FORMATS.includes(f) ? OFFERED_FORMATS : [...OFFERED_FORMATS, f]).map((k) => {
+          {(HERE.includes(f) ? HERE : [...HERE, f]).map((k) => {
             const hint = `${name}-${k}`;
             return (
               <label key={k} className="flex cursor-pointer items-center gap-3 rounded-[12px] border border-line p-3 has-[:checked]:border-ink has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink">
@@ -110,12 +127,35 @@ export function LayoutPicker({ doc, setDoc, drafted }: { doc: ExhbtDoc; setDoc: 
           })}
         </div>
       </fieldset>
+      {!HERE.includes(f) && (
+        <div data-new-editor-layout className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-graphite">
+          {/* Said before the switch, because the server lets this layout be saved only while it is the one stored: once another is saved, this editor can't put it back. */}
+          <span>The {FORMAT_RULES[f].name} layout is edited in the new editor. If you switch layout here, only the new editor can switch it back.</span>
+          {newEditor === "visit" && (
+            // A full page load, so this editor's check for changes not yet saved runs.
+            <a href={`/exhbts/${id}/edit`} className="link font-semibold">
+              Open it in the new editor
+            </a>
+          )}
+          {newEditor === "switch" && (
+            <form method="post" action="/api/exhbts/editor">
+              <input type="hidden" name="kind" value="page" />
+              <input type="hidden" name="exhbt" value={id} />
+              <Button type="submit" size="sm">
+                Open it in the new editor
+              </Button>
+            </form>
+          )}
+        </div>
+      )}
       <div role="status" className="mt-3 space-y-1 text-sm">
         {showSaid && (
           <>
             <p className="flex flex-wrap items-center gap-2">
               <span>{said.from ? `Switched to ${FORMAT_RULES[f].name}. Nothing was deleted.` : `Switched back to ${FORMAT_RULES[f].name}.`}</span>
-              {said.from && (
+              {/* No Undo back to a layout this editor doesn't offer: once the switch is saved, the server would refuse it. */}
+              {said.from && !HERE.includes(said.from) && <span>Only the new editor can switch it back to {FORMAT_RULES[said.from].name}.</span>}
+              {said.from && HERE.includes(said.from) && (
                 <Button size="sm" onClick={undo} label={`Undo: back to ${FORMAT_RULES[said.from].name}`}>
                   Undo
                 </Button>

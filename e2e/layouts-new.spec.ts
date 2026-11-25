@@ -1,15 +1,23 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { LIMITS, validateForPublish, wordCount, type ExhbtDoc } from "../lib/exhbt/blocks";
+import { CLASSIC_FORMATS, FORMAT_RULES, type Format } from "../lib/exhbt/formats";
 import { beforeAfterDoc, buildDoc, essayDoc, eventDoc } from "../lib/exhbt/sample";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
+import * as classicEditor from "./editor-classic-helpers";
+import { freshName, readStored, sampleDoc } from "./page-editor";
 
 /*
  * The four layouts of decision 0028 (brief D): a fictional sample for each, near the 200-word cap
  * and as full as a real one, seeded by /dev/portfolio?with=layouts&plan=max&count=0. Each is
  * checked as a doc (publishable, within the cap), drawn in its usual order, printed on one A4
  * page in every look, axe-clean in every look, and without sideways scroll at 390px.
+ *
+ * Then release 4 (brief M): the classic editor never offers the four and keeps an exhbt that is one.
  */
+
+/** The four layouts of decision 0028. */
+const NEW_FOUR = ["build", "essay", "before-after", "event"] as const satisfies readonly Format[];
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const ids = ["a", "b", "c", "d", "e", "f"];
@@ -115,4 +123,122 @@ test.describe("Every look: one printed A4 page, axe, and no sideways scroll", ()
       });
     }
   }
+});
+
+/* ---------------- The classic editor and the four layouts ---------------- */
+
+// The classic editor has no way to edit what the four layouts add (My role, the pull quote, the Before and After
+// marks, a source with no address), so a person there could pick one and never be able to publish. It therefore
+// never offers them: its picker lists the three of decision 0024 (CLASSIC_FORMATS), plus the exhbt's own layout
+// when that is already one of the four. Every test here pins the classic editor for its browser
+// (/dev/editor?kind=classic stands in for EXHBT_EDITOR), which is the state the live site ships in (DEFAULT_EDITOR).
+test.describe("The classic editor and the four layouts", () => {
+  const CLASSIC_READY = '[data-editor="classic"] [data-ready=true]';
+  const NEW_READY = '[data-editor="page"][data-ready="true"]';
+  const WAY = "Open it in the new editor";
+  const line = (f: Format) => `The ${FORMAT_RULES[f].name} layout is edited in the new editor. If you switch layout here, only the new editor can switch it back.`;
+
+  /** What EXHBT_EDITOR says, for this browser. */
+  async function sayVariable(page: Page, variable: "classic" | "page") {
+    expect(await (await page.request.get(`/dev/editor?kind=${variable}`)).json()).toEqual({ editor: variable });
+  }
+
+  /** Stores a layout's sample for a fresh person, signs them in and returns the exhbt's id. */
+  async function personWith(page: Page, tag: string, f: Format, opts: { admin?: boolean } = {}): Promise<string> {
+    const username = freshName(tag);
+    const res = await page.request.post("/dev/parity", { data: { username, slug: "kept", doc: sampleDoc(f) } });
+    expect(res.status(), await res.text()).toBe(200);
+    const { id } = (await res.json()) as { id: string };
+    await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
+    await expect(page.getByRole("heading", { level: 1, name: "Your exhbts" })).toBeVisible();
+    if (opts.admin) expect((await page.request.get("/dev/admin?role=admin")).status()).toBe(200);
+    return id;
+  }
+
+  const layouts = (page: Page) => page.getByRole("radiogroup", { name: "Layout" }).getByRole("radio");
+  const names = (page: Page) => page.getByRole("radiogroup", { name: "Layout" }).locator("label span.font-semibold").allTextContents();
+
+  test("a case study there is offered the three layouts and no more, whatever the new editor offers", async ({ page }) => {
+    await sayVariable(page, "classic");
+    const id = await personWith(page, "three", "case-study");
+    await page.goto(`/exhbts/${id}/edit`);
+    await expect(page.locator(CLASSIC_READY)).toBeAttached();
+    expect(await names(page)).toEqual(CLASSIC_FORMATS.map((f) => FORMAT_RULES[f].name));
+    await expect(page.locator("[data-new-editor-layout]")).toHaveCount(0);
+  });
+
+  for (const f of NEW_FOUR) {
+    test(`${f}: opened there, it keeps its layout and all its data, is listed with the three, and says where it is edited`, async ({ page }) => {
+      await sayVariable(page, "classic");
+      const id = await personWith(page, `kept${f}`, f);
+      const before = (await readStored(page, id)).working;
+      await page.goto(`/exhbts/${id}/edit`);
+      await expect(page.locator(CLASSIC_READY)).toBeAttached();
+
+      // The three, then its own, which is the one selected.
+      expect(await names(page)).toEqual([...CLASSIC_FORMATS, f].map((k) => FORMAT_RULES[k].name));
+      await expect(layouts(page).nth(3)).toBeChecked();
+      // One plain line, and no way to an editor this person can't use.
+      const said = page.locator("[data-new-editor-layout]");
+      await expect(said).toHaveText(line(f));
+      await expect(page.getByText(WAY)).toHaveCount(0);
+
+      // An edit is saved (the stored layout is let through), and nothing the classic editor can't edit is lost.
+      await page.locator("#title").fill("A new title, typed in the classic editor");
+      await classicEditor.waitForSaved(page);
+      await expect.poll(async () => (await readStored(page, id)).working.title).toBe("A new title, typed in the classic editor");
+      const after = (await readStored(page, id)).working;
+      expect(after.format).toBe(f);
+      expect(after.myRole).toBe(before.myRole);
+      expect(after.sections).toEqual(before.sections);
+      await expect(page.getByText("That layout isn't available yet.")).toHaveCount(0);
+    });
+  }
+
+  test("an admin whose editor is the classic one gets the way there, and it opens the same exhbt in the new editor", async ({ page }) => {
+    await sayVariable(page, "classic");
+    const id = await personWith(page, "adminway", "essay", { admin: true });
+    await page.goto(`/exhbts/${id}/edit`);
+    await expect(page.locator(CLASSIC_READY)).toBeAttached();
+    const said = page.locator("[data-new-editor-layout]");
+    await expect(said).toContainText(line("essay"));
+    await said.getByRole("button", { name: WAY, exact: true }).click();
+    await expect(page.locator(NEW_READY)).toBeAttached();
+    expect(new URL(page.url()).pathname).toBe(`/exhbts/${id}/edit`);
+    expect((await readStored(page, id)).working.format).toBe("essay");
+  });
+
+  test("switching away from one of the four there is said to be one way, offers no Undo the server would refuse, and is saved", async ({ page }) => {
+    await sayVariable(page, "classic");
+    const id = await personWith(page, "oneway", "essay");
+    const before = (await readStored(page, id)).working;
+    await page.goto(`/exhbts/${id}/edit`);
+    await expect(page.locator(CLASSIC_READY)).toBeAttached();
+    await page.getByRole("radiogroup", { name: "Layout" }).getByRole("radio", { name: "Gallery" }).check();
+    const status = page.locator("#card-layout [role=status]");
+    await expect(status).toContainText("Switched to Gallery. Nothing was deleted.");
+    await expect(status).toContainText("Only the new editor can switch it back to Essay.");
+    await expect(status.getByRole("button", { name: /Undo/ })).toHaveCount(0);
+    // The essay is no longer listed: this editor offers the three.
+    expect(await names(page)).toEqual(CLASSIC_FORMATS.map((f) => FORMAT_RULES[f].name));
+    await expect(page.locator("[data-new-editor-layout]")).toHaveCount(0);
+    await classicEditor.waitForSaved(page);
+    await expect.poll(async () => (await readStored(page, id)).working.format).toBe("gallery");
+    // Nothing was deleted: the pull quote and the source with no address are kept, not shown.
+    expect((await readStored(page, id)).working.sections).toEqual(before.sections);
+  });
+
+  test("a person whose editor is the new one, in the classic editor for a visit, gets a link back to it", async ({ page }) => {
+    await sayVariable(page, "page");
+    const id = await personWith(page, "visitway", "event");
+    await page.goto(`/exhbts/${id}/edit?editor=classic`);
+    await expect(page.locator(CLASSIC_READY)).toBeAttached();
+    const said = page.locator("[data-new-editor-layout]");
+    await expect(said).toContainText(line("event"));
+    // The picker is the classic editor's own, so it still offers the three and this exhbt's layout.
+    expect(await names(page)).toEqual([...CLASSIC_FORMATS, "event" as const].map((k) => FORMAT_RULES[k].name));
+    await said.getByRole("link", { name: WAY, exact: true }).click();
+    await expect(page.locator(NEW_READY)).toBeAttached();
+    expect(new URL(page.url()).pathname).toBe(`/exhbts/${id}/edit`);
+  });
 });

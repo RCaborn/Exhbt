@@ -1,11 +1,11 @@
 import { z } from "zod/v4";
 import { LIMITS } from "@/lib/exhbt/blocks";
-import { DRAFT_FORMATS } from "@/lib/exhbt/formats";
+import { CLASSIC_FORMATS } from "@/lib/exhbt/formats";
 import { LAYOUT_REASONS } from "@/lib/exhbt/drafted";
 import { CHART_KINDS, type Chart } from "@/lib/exhbt/charts";
 
 /** The layouts the draft may choose, and the reasons it may give: the schema's enums and repairDraft read these lists. */
-const DRAFT_LAYOUTS: readonly string[] = DRAFT_FORMATS;
+const DRAFT_LAYOUTS: readonly string[] = CLASSIC_FORMATS;
 const REASONS: readonly string[] = LAYOUT_REASONS;
 
 /**
@@ -41,7 +41,7 @@ export const DraftChartSchema = z.object({
 export type DraftChart = z.infer<typeof DraftChartSchema>;
 
 export const DraftSchema = z.object({
-  format: z.enum(DRAFT_FORMATS),
+  format: z.enum(CLASSIC_FORMATS),
   /** Why that layout: a fixed signal, never the model's own words (lib/exhbt/drafted.ts, decision 0025). Non-null, like every field here. */
   formatReason: z.enum(LAYOUT_REASONS),
   title: z.string(),
