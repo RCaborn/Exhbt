@@ -147,6 +147,14 @@ test.describe("Rewrite and back to the AI version", () => {
     await startRewrite(page, "flow");
     await expect(page.getByTestId("tools-flow")).toContainText("No rewrites left on this exhbt.");
     await expect(page.getByTestId("tools-flow").getByRole("link", { name: "See your plan" })).toHaveAttribute("href", "/account/billing");
+    // It holds nothing and has no Cancel: Escape closes it, and gives the focus back to More actions; so does a press anywhere else.
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("tools-flow")).not.toContainText("No rewrites left on this exhbt.");
+    await expect(cardMenuButton(page, "flow")).toBeFocused();
+    await startRewrite(page, "flow");
+    await expect(page.getByTestId("tools-flow")).toContainText("No rewrites left on this exhbt.");
+    await page.mouse.click(4, 600);
+    await expect(page.getByTestId("tools-flow")).not.toContainText("No rewrites left on this exhbt.");
 
     await startRewrite(stale, "flow");
     await stale.getByRole("button", { name: "Rewrite the process now" }).click();
@@ -441,6 +449,66 @@ test.describe("An open rewrite form stays up and takes the press", () => {
       await leave(stale);
       expect(await groundProblems(stale, "flow", "panel"), "a refused rewrite").toEqual([]);
     });
+  });
+
+  /*
+   * An open form stays until it is cancelled or used (above), so a note typed in it is not lost: a press anywhere else, or the
+   * focus going into a field on the page, leaves it, in a toolbar's compact card too, which used to close and hide it (decision
+   * 0026: while it is open its toolbar stays, wherever the pointer and the focus are). Escape closes it, and its menu, and gives
+   * the focus back to "More actions": with the focus in it, and with the focus on nothing, as it is once "Rewrite this block" is
+   * pressed. In the compact card the form's Escape comes first, then the card's.
+   */
+  test.describe("Escape closes an open menu or rewrite form and gives the focus back to More actions; a press outside leaves the form", () => {
+    const noteField = (page: Page, block: string) => page.getByTestId(`tools-${block}`).getByRole("textbox", { name: /^Note for the rewrite/ });
+
+    for (const where of ["the flowchart's toolbar in its own place, the compact card", "the flowchart's toolbar above its corner", "the context line's corner toolbar"] as const) {
+      test(where, async ({ page }) => {
+        await draftAndOpen(page, "escape");
+        const block = where.startsWith("the flowchart") ? "flow" : "gap";
+        const tools = page.locator(`${READY} [data-kind="flow"] > .xe-tools`).first();
+        if (where.includes("above")) await tools.evaluate(hold, null);
+        else if (block === "flow") expect(await tools.getAttribute("data-place")).toBe("compact");
+        const more = cardMenuButton(page, block);
+
+        // The menu.
+        await openCardMenu(page, block);
+        await expect(more).toHaveAttribute("aria-expanded", "true");
+        await page.keyboard.press("Escape");
+        await expect(more, where).toHaveAttribute("aria-expanded", "false");
+        await expect(more, where).toBeFocused();
+
+        // The form, a note typed in it: a press on the page's margin, then in the title, leaves it, with the note.
+        await startRewrite(page, block);
+        await noteField(page, block).fill("shorter");
+        for (const press of ["the margin", "the title"]) {
+          if (press === "the margin") await page.mouse.click(4, 600);
+          else await page.locator(`${READY} #title`).click();
+          await takesThePress(page, block, `${where}, after a press on ${press}`);
+          await expect(noteField(page, block), `${where}, after a press on ${press}`).toHaveValue("shorter");
+        }
+        // Escape with the focus on nothing.
+        await page.mouse.click(4, 600);
+        await expect.poll(() => page.evaluate(() => document.activeElement === document.body)).toBe(true);
+        await page.keyboard.press("Escape");
+        await expect(rewriteNow(page, block), where).toHaveCount(0);
+        await expect(more, where).toBeFocused();
+
+        // Escape with the focus in the form.
+        await startRewrite(page, block);
+        await noteField(page, block).focus();
+        await page.keyboard.press("Escape");
+        await expect(rewriteNow(page, block), where).toHaveCount(0);
+        await expect(more, where).toBeFocused();
+
+        if (block === "flow" && !where.includes("above")) {
+          // The compact card is still open round "More actions"; the next Escape closes it, and the focus goes to its own button.
+          await expect(tools).toHaveAttribute("data-open", "");
+          await page.keyboard.press("Escape");
+          await expect(tools).not.toHaveAttribute("data-open", "");
+          await expect(tools.locator('[data-tool="menu"]')).toBeFocused();
+        }
+      });
+    }
   });
 });
 

@@ -90,9 +90,11 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState(false);
   const [note, setNote] = useState("");
+  const root = useRef<HTMLDivElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const menuId = useId();
+  const noneLeft = dt.left <= 0;
 
   useEffect(() => {
     if (!menu) return;
@@ -113,6 +115,31 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
     };
   }, [menu]);
 
+  // The panel (the rewrite form, or "No rewrites left") closes with Escape and gives the focus back to "More actions": here while
+  // the focus is on nothing, as it is once "Rewrite this block" is pressed (the button goes with its menu), and in onKeyDown below
+  // while it is in the panel. The menu takes its own Escape first, and a panel that isn't drawn (in a card that is closed) is left
+  // alone. A press outside never closes the form, so a note typed in it is not lost (decision 0026: while it is open its toolbar
+  // stays, wherever the pointer and the focus are); it does close "No rewrites left", which holds nothing and has no Cancel.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || menu || !root.current?.getClientRects().length) return;
+      if (document.activeElement && document.activeElement !== document.body) return;
+      e.preventDefault();
+      setOpen(false);
+      trigger.current?.focus();
+    };
+    const onPointer = (e: PointerEvent) => {
+      if (noneLeft && !root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [open, menu, noneLeft]);
+
   if (!dt.enabled) return null;
 
   const name = nameOf(block, formatOf(dt.doc));
@@ -122,14 +149,27 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
   const pending = dt.busy === block;
   const anyBusy = dt.busy !== null;
   const msg = dt.message?.block === block ? dt.message : null;
-  const noneLeft = dt.left <= 0;
   const noteId = `rewrite-note-${block}`;
 
   return (
     // data-open: its menu, or its panel (the rewrite form, or "No rewrites left"), is open. The edit-on-page editor draws
     // this in a toolbar over the page, which otherwise shows only under the pointer or the focus, and keeps that toolbar
     // up while this is set (components/exhbt-editor/css/core.css). Here, in a card, nothing reads it.
-    <div className="mb-3" data-testid={`tools-${block}`} data-open={menu || open ? "" : undefined}>
+    <div
+      ref={root}
+      className="mb-3"
+      data-testid={`tools-${block}`}
+      data-open={menu || open ? "" : undefined}
+      onKeyDown={(e) => {
+        // Escape in the panel, or on "More actions", closes the panel before a toolbar round it hears the key: the edit-on-page
+        // editor's compact card (Toolbar.tsx) would close and hide the form still open in it. The menu takes its own Escape first.
+        if (e.key !== "Escape" || !open || menu) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(false);
+        trigger.current?.focus();
+      }}
+    >
       <div ref={wrap} className="relative flex justify-end">
         <button
           ref={trigger}
