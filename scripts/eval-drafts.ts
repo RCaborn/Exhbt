@@ -34,7 +34,7 @@ import { chartTexts, chartValues, KIND_NAMES, type Chart } from "@/lib/exhbt/cha
 import { AIFailure } from "@/lib/ai/failure";
 import { FORMAT_RULES, formatOf } from "@/lib/exhbt/formats";
 import { unsupportedParts } from "@/lib/exhbt/references";
-import { normaliseNumber, numbersIn, unverifiedNumbers } from "@/lib/exhbt/verify";
+import { misquoted, normaliseNumber, numbersIn, unverifiedNumbers } from "@/lib/exhbt/verify";
 import { markLayout, needsThePerson, type LayoutExpect, type LayoutMark } from "../evals/exhbt-draft/marks";
 
 const ROOT = process.cwd();
@@ -320,10 +320,9 @@ function runChecks(result: DraftResult, source: string, f: Facts, banned: Banned
   const values = new Set(draftNumbers.map(normaliseNumber).filter((v): v is string => v !== null));
 
   // The same number check as app/api/exhbts/draft/route.ts: numbers missing from the material,
-  // and numbers the model listed with a quote that isn't in the material.
-  const flat = squash(source);
+  // and numbers the model listed with a quote that isn't in the material (misquoted, which looks past emphasis marks).
   const unverified = unverifiedNumbers(d, source);
-  const badQuotes = result.numbers.filter((n) => n.sourceQuote.trim() && !flat.includes(squash(n.sourceQuote))).map((n) => n.value.trim());
+  const badQuotes = misquoted(result.numbers, source);
 
   const covered = f.keyFacts.filter((k) => k.match.some((m) => matches(m, text, values))).map((k) => k.id);
   const missing = f.keyFacts.map((k) => k.id).filter((id) => !covered.includes(id));

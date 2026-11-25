@@ -6,6 +6,7 @@ import { FORMAT_RULES, type Format } from "@/lib/exhbt/formats";
 import { checkedReason, type LayoutReason } from "@/lib/exhbt/drafted";
 import { DraftSchema, DraftSchemaSeven, draftSchema, leftOff, repairDraft, toDoc, type Draft, type DraftChart, type DraftLayouts } from "./draft-answer";
 import { DRAFT_TARGETS, draftTargets } from "./draft-targets";
+import { EMPHASIS } from "@/lib/exhbt/emphasis";
 import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
 import { AIFailure, structuredCall } from "./call";
@@ -24,8 +25,10 @@ import { AIFailure, structuredCall } from "./call";
  *
  * A draft chooses among the layouts the person's editor offers (`layouts` on the input):
  *  - "three" (the default): case study, gallery or research, for a person whose editor is the
- *    classic one. Its request is SYSTEM and DraftSchema, word for word and field for field what was
- *    sent before release 4, so what the real model has been proven on is what the live site sends.
+ *    classic one. Its request is SYSTEM and DraftSchema: field for field what was sent before release 4, so the
+ *    answer's shape the real model has been proven on is what the live site sends. Its words are those of before
+ *    release 4 and the emphasis rules added on 25 Nov 2026 (decision 0029, "Emphasis inside the answer"), which no
+ *    run against the real model has checked yet.
  *  - "seven": all seven (decision 0028), for a person whose editor is the new one. SYSTEM_SEVEN and
  *    DraftSchemaSeven: the same rules and fields, the layout rules of 0028 in its order, a note for
  *    each new layout, and the three parts they add (an essay's pull quote and sources, a build's
@@ -95,8 +98,24 @@ const RESEARCH_NOTE = `- For research: gap is the background and the gap, at mos
 const LAST = `- Fields that belong to another layout stay empty.`;
 
 /**
- * The three-layout prompt: what was sent before release 4, unchanged. A person whose editor is the classic one is
- * drafted with this, so nothing about their draft waits on a real-model run of the seven-layout prompt.
+ * What the AI may mark in bold and italics, and where (decision 0029, "Emphasis inside the answer"), for the draft's two
+ * prompts and the rewrite's. `where` names the fields that may carry marks, `each` one of them, and `nowhere` the rest of
+ * the answer. The marks add no field to the answer. lib/exhbt/emphasis.ts holds the answer to these rules whatever the
+ * model sends: change the two together (one phrase of each kind in a field: EMPHASIS.bold.max and EMPHASIS.italic.max).
+ */
+export const emphasisRules = (where: string, each: string, nowhere: string) => `Emphasis, so a recruiter can skim the page. Only in ${where}, mark words inline as **bold** or *italic*, right against the words with no space inside the marks:
+- **bold**: one phrase at most in ${each}, of at most ${EMPHASIS.bold.words} words: the key result or number, e.g. "Average wait fell **from 11 to 4 minutes**." Never a whole sentence, and it can have none.
+- *italic*: rarely, only for a term or the title of a work, one at most in ${each}.
+- Nowhere else: don't mark ${nowhere}. The words the context line highlights are gapHighlight, never bold.
+- Marks change no words and don't count as words. Every sourceQuote is copied from the material as written, with no marks added.`;
+
+const MARKED = "findings, next, aim and conclusion";
+const EACH = "each of those (each finding on its own)";
+
+/**
+ * The three-layout prompt: what was sent before release 4, and since 25 Nov 2026 the emphasis rules (decision 0029,
+ * "Emphasis inside the answer"). A person whose editor is the classic one is drafted with this, so nothing about their
+ * draft waits on a real-model run of the seven-layout prompt; the emphasis rules wait on one for both.
  */
 const SYSTEM = `${HEAD}
 - references: research only, up to ${R.sections.link}. Each is an https address that appears in the material, copied exactly, with "label" the citation as the material gives it (at most ${R.link.labelWords} words). Never make up a DOI or an address. An empty list otherwise.
@@ -110,7 +129,9 @@ Layout (the "format" field):
 - formatReason: why you chose the layout, as one of these signals, and only one that is true of the material. "notes": the person's notes name the layout. "aim-results": research, and the material states an aim and reports results. "hypothesis-results": research, and the material states a hypothesis and reports results. "study": research, an experiment or a study with a method and results, with no aim or hypothesis stated. "visual-work": a gallery, because the work is shown by its pictures. "mostly-pictures": a gallery, because the upload facts say most of the upload is pictures. "question-findings": a case study, because the material sets out a question and what was found. "default": a case study for any other reason, or because you are unsure.
 ${GALLERY_NOTE}
 ${RESEARCH_NOTE}
-${LAST}`;
+${LAST}
+
+${emphasisRules(MARKED, EACH, "the title, summary, context, whereWhen, skills, gap, gapHighlight, flow, charts, quote, references or numbers")}`;
 
 /**
  * The seven-layout prompt (decision 0028, "The AI chooses among seven"). The rules, the fields and the gallery and
@@ -149,7 +170,9 @@ ${RESEARCH_NOTE}
 - For an essay: title is the question the essay answers, as a question, or its thesis as a statement if it asks none; gap is the context: why the question matters, at most ${EW.gapWords} words; flow is how the argument runs, in order; findings are the argument's key points, ${E.findings.min} to ${E.findings.max} bullets, each at most ${EW.findingWords} words; at most ${E.sections.graph} graph, and only from figures the material quotes; next is what the person says they would look at next, at most ${EW.reflectionWords} words; references are its sources. Never add a point or a reading the material doesn't make.
 - For a before and after: title is the plain name of what was redesigned, not a question, e.g. "Redesigning the checkout of a campus cafe's order app"; gap is the problem: what was wrong with it, and for whom, at most ${BAW.gapWords} words, with gapHighlight the problem; flow is what the person did; findings are ${BA.findings.min} to ${BA.findings.max} bullets of what changed and why, each at most ${BAW.findingWords} words; at most ${BA.sections.graph} graph. You never see the pictures: do not describe them, and never say which shows before and which after.
 - For an event: title is the plain name of the event, not a question, e.g. "The Crucible: the Drama Society's spring show"; gap is the brief: what the event was for, and who it was for, at most ${EVW.gapWords} words, with gapHighlight the aim; flow is how it was put on; findings are 0 to ${EV.findings.max} bullets of how it went, each at most ${EVW.findingWords} words, only if the material says how it went, otherwise an empty list; at most ${EV.sections.graph} graph; quote may be a review of it. You never see the pictures: do not describe them.
-${LAST}`;
+${LAST}
+
+${emphasisRules(MARKED, EACH, "the title, summary, context, whereWhen, skills, gap, gapHighlight, flow, charts, quote, references, pullquote, myRole or numbers")}`;
 
 export { DraftSchema, DraftSchemaSeven, toChart, toDoc, type DraftChart, type DraftLayouts } from "./draft-answer";
 /** What the draft call sends as output_config, for each kind of draft. Exported so scripts/probe-ai-shapes.ts checks the very shapes the app sends. */
@@ -270,6 +293,11 @@ export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
  * the notes say "stand-in: invent", it also writes one of each that the material doesn't hold (a
  * pull quote, a source with no address, a link, a role): the mistake toDoc's checks exist for, so
  * each can be seen to be left off without an API key.
+ *
+ * Emphasis (decision 0029, "Emphasis inside the answer"): its placeholder finding marks one word in bold,
+ * as the model may mark a key result. When the notes say "stand-in: bad emphasis", it writes marks the
+ * rules refuse instead: a mark left open, a bold sentence with a pair inside it, and marks in fields that
+ * take none (the title, the summary, a flowchart box). Each comes out as the plain words.
  */
 const STAND_IN_CUES: readonly [Format, RegExp][] = [
   ["research", /\bhypothes[ie]s\b/i],
@@ -310,6 +338,9 @@ function mockDraft(input: DraftInput): DraftResult {
   const named = may.find((f) => f === asked);
   const format: Format = named ?? STAND_IN_CUES.find(([f, cue]) => (f === "research" || may.includes(f)) && cue.test(source))?.[0] ?? "case-study";
   const invent = /stand-in: invent/i.test(input.notes ?? "");
+  const bad = /stand-in: bad emphasis/i.test(input.notes ?? "");
+  /** With "stand-in: bad emphasis", `word` marked bold in a field that takes no marks. */
+  const marked = (field: string, word: string) => (bad ? field.replace(word, `**${word}**`) : field);
   const links = [...new Set((source.match(/https:\/\/[^\s)\]>"'<]+/g) ?? []).map((u) => u.replace(/[.,;:]+$/, "")))];
   const firstSentence = (source.replace(/\s+/g, " ").match(/[^.!?]{12,}[.!?]/)?.[0] ?? source.slice(0, 120)).trim();
   const quote = firstSentence.split(" ").slice(0, LW.findingWords).join(" ");
@@ -368,20 +399,21 @@ function mockDraft(input: DraftInput): DraftResult {
     references,
     pullquote,
     myRole,
-    title: asQuestion ? "Development preview: what would the AI draft from your files?" : `Development preview: ${format === "event" ? "an" : "a"} ${FORMAT_RULES[format].name.toLowerCase()} drafted from your files`,
-    summary: "A placeholder draft, made without an API key.",
+    title: marked(asQuestion ? "Development preview: what would the AI draft from your files?" : `Development preview: ${format === "event" ? "an" : "a"} ${FORMAT_RULES[format].name.toLowerCase()} drafted from your files`, "files"),
+    summary: marked("A placeholder draft, made without an API key.", "placeholder"),
     context: "Placeholder: what the work is",
     whereWhen: "Placeholder: where and when",
     skills: ["Placeholder skill"],
     gap: `No API key is configured, so this draft is placeholder text. Set ${ANTHROPIC_API_KEYS_ENV} to draft from your files.`,
     gapHighlight: "this draft is placeholder text",
     flow: [
-      { step: "Read the material", detail: "" },
+      { step: marked("Read the material", "Read"), detail: "" },
       { step: "Drafted the blocks", detail: "" },
       { step: "Checked every number", detail: "" },
     ],
-    // One where the layout asks for one or more (a gallery, a build, an event); two where it asks for two.
-    findings: formatLimits(format).findings.min < 2 ? [quote] : [quote, "This finding is a placeholder."],
+    // One where the layout asks for one or more (a gallery, a build, an event); two where it asks for two. The second marks
+    // one word in bold; with "stand-in: bad emphasis" the first has a mark left open and the second a bold sentence with a pair inside.
+    findings: [bad ? `**${quote}` : quote, ...(formatLimits(format).findings.min < 2 ? [] : [bad ? "**This finding is a *placeholder*.**" : "This finding is a **placeholder**."])],
     charts,
     quote: feedback ?? { text: "", name: "", role: "" },
     next,

@@ -1,6 +1,7 @@
 import { plain, sectionTexts, type ContentSection, type ExhbtDoc } from "./blocks";
 import { chartTexts, chartValues } from "./charts";
 import { flowShown, isShown } from "./formats";
+import { materialWords, unmarked } from "./emphasis";
 
 /**
  * Every number in an exhbt must come from the person's own material (docs/phase-2.md section 6,
@@ -68,6 +69,21 @@ export function unverifiedNumbers(doc: ExhbtDoc, sourceText: string): string[] {
     out.push(raw);
   }
   return out;
+}
+
+/**
+ * The numbers the AI listed with a source quote that isn't in the material, each one's value without marks. Shared by
+ * the draft (app/api/exhbts/draft/route.ts), the rewrite and the draft eval. A quote is looked for as written, spacing
+ * and case aside, and again with the emphasis marks taken out of both (decision 0029, "Emphasis inside the answer"), so
+ * a mark the AI added, or one a Markdown file has, never makes a true quote look made up.
+ */
+export function misquoted(numbers: readonly { value: string; sourceQuote: string }[], source: string): string[] {
+  const squash = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+  const flat = squash(source);
+  const flatPlain = squash(materialWords(source));
+  return numbers
+    .filter((n) => n.sourceQuote.trim() && !flat.includes(squash(n.sourceQuote)) && !flatPlain.includes(squash(unmarked(n.sourceQuote, source))))
+    .map((n) => unmarked(n.value, source).trim());
 }
 
 /** Each field of a section that a reader sees, with the path validateForPublish gives it. */

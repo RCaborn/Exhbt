@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { loadAiVersion, loadDraftSource, saveAiVersion } from "@/lib/draft-tools";
 import { ExhbtDocSchema } from "@/lib/exhbt/blocks";
 import { blockValue, flagsForBlock, isDraftBlock, replaceBlock, type BlockValue } from "@/lib/exhbt/draft-blocks";
+import { misquoted } from "@/lib/exhbt/verify";
 import { rewriteAllowance } from "@/lib/rewriting";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
@@ -16,8 +17,6 @@ import { recordAIFailure, tooManyFailures, TOO_MANY_FAILURES } from "@/lib/ai-fa
 export type RewriteResult =
   | { ok: true; value: BlockValue; flags: string[]; left: number }
   | { ok: false; error: string; atLimit?: boolean; left?: number };
-
-const squash = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
 
 export async function rewriteBlockAction(id: string, block: string, note: string, rawDoc: unknown): Promise<RewriteResult> {
   if (!isPhase2Enabled()) notFound();
@@ -57,8 +56,7 @@ export async function rewriteBlockAction(id: string, block: string, note: string
   await store.logEvent("exhbt_rewritten", user.id, { exhbtId: id, block, model: result.model });
 
   // Numbers the material doesn't contain, including any whose quoted source isn't really there.
-  const flat = squash(source);
-  const badQuotes = result.numbers.filter((n) => n.sourceQuote.trim() && !flat.includes(squash(n.sourceQuote))).map((n) => n.value.trim());
+  const badQuotes = misquoted(result.numbers, source);
   const next = replaceBlock(doc, block, result.value as never, []);
   const flags = flagsForBlock(next, block, source, badQuotes);
 
