@@ -17,7 +17,7 @@ export function WhereItGoes({ liveBase, hidden, className }: { liveBase: string 
   if (!liveBase) {
     return (
       <p className={className}>
-        Your exhbts go on your own portfolio, at {portfolioHost("yourname")}. You need a username to publish.{" "}
+        You need a username to publish, because your exhbts go on your own portfolio at {portfolioHost("yourname")}.{" "}
         <Link href="/account/portfolio" className="link font-semibold text-ink">
           Choose one
         </Link>

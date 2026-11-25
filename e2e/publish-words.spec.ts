@@ -29,7 +29,7 @@ test.describe("What publishing says about the portfolio", () => {
     await startFromScratch(page);
     await openPublishSheet(page);
     const s = publishSheet(page);
-    await expect(s.getByText("Your exhbts go on your own portfolio, at yourname.exhbt.co.uk. You need a username to publish.")).toBeVisible();
+    await expect(s.getByText("You need a username to publish, because your exhbts go on your own portfolio at yourname.exhbt.co.uk.")).toBeVisible();
     await expect(s.getByRole("link", { name: "Choose one" })).toHaveAttribute("href", "/account/portfolio");
   });
 
