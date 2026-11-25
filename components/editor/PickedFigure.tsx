@@ -22,7 +22,7 @@ export type ReplaceFigure = (file: File, picked: Picked, opts: { describeAgain: 
 
 /** The stored PDF's bytes, fetched once per file while the editor is open. */
 const sources = new Map<string, Promise<Uint8Array>>();
-function sourceBytes(fileId: string, url: string): Promise<Uint8Array> {
+export function sourceBytes(fileId: string, url: string): Promise<Uint8Array> {
   let p = sources.get(fileId);
   if (!p) {
     p = fetch(url).then(async (r) => {
@@ -48,7 +48,7 @@ function pageThumbs(fileId: string, url: string): Promise<PdfPages> {
 }
 
 const stem = (name: string) => name.replace(/\.[^.]+$/, "").replace(/[^\w-]+/g, "-").slice(0, 60) || "report";
-const asFile = (blob: Blob, name: string, page: number) => new File([blob], `${stem(name)}-page-${page}.${blob.type === "image/png" ? "png" : "jpg"}`, { type: blob.type });
+export const asFile = (blob: Blob, name: string, page: number) => new File([blob], `${stem(name)}-page-${page}.${blob.type === "image/png" ? "png" : "jpg"}`, { type: blob.type });
 
 export function PickedFigure({
   s,
@@ -158,7 +158,7 @@ export function PickedFigure({
 }
 
 /** The PDF's first pages as small buttons: a click puts that page in instead. */
-function PagePicker({ fileId, url, name, current, busy, onPick }: { fileId: string; url: string; name: string; current: number; busy: boolean; onPick: (page: number) => void }) {
+export function PagePicker({ fileId, url, name, current, busy, onPick }: { fileId: string; url: string; name: string; current: number; busy: boolean; onPick: (page: number) => void }) {
   const [pages, setPages] = useState<PdfPages | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -217,7 +217,7 @@ const pct = (n: number) => Math.round(n * 1000) / 10;
  * The page with the crop drawn on it. Drag across the page to draw a new box, or set each edge
  * with its slider (the keyboard's way). "Use this crop" cuts the box out at full resolution.
  */
-function Cropper({
+export function Cropper({
   fileId,
   url,
   name,

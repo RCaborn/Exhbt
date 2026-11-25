@@ -13,6 +13,7 @@ import {
   hasData,
   newChart,
   protectModes,
+  untouchedChart,
   type Chart,
   type ChartKind,
   type ChartOf,
@@ -89,7 +90,8 @@ export function ChartEditor({
     <fieldset className={bare ? "min-w-0" : "rounded-[14px] border border-line p-4"}>
       <legend className={bare ? "sr-only" : "px-1 text-sm font-semibold"}>Graph {n}</legend>
 
-      <KindPicker name={`${p}-kind`} n={n} value={c.kind} onChange={(k) => onChange(untouched(c) ? { ...newChart(k), title: c.title } : convertChart(c, k))} />
+      {/* Nothing filled in but perhaps the title: switching kind starts that kind afresh rather than carrying empty rows over. */}
+      <KindPicker name={`${p}-kind`} n={n} value={c.kind} onChange={(k) => onChange(untouchedChart(c) ? { ...newChart(k), title: c.title } : convertChart(c, k))} />
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2">
@@ -138,9 +140,6 @@ export function ChartEditor({
 }
 
 /* ---------------- The kind ---------------- */
-
-/** Nothing filled in but perhaps the title: switching kind starts that kind afresh rather than carrying empty rows over. */
-const untouched = (c: Chart) => JSON.stringify({ ...c, title: "" }) === JSON.stringify({ ...newChart(c.kind), title: "" });
 
 function KindPicker({ name, n, value, onChange }: { name: string; n: number; value: ChartKind; onChange: (k: ChartKind) => void }) {
   return (

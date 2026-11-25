@@ -2,7 +2,7 @@ import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { forgetDevPassword } from "./passwords";
 import type { Project, Roadmap, RoadmapInput } from "./ai/schemas";
-import { normaliseDoc, publicDoc, type ExhbtDoc } from "./exhbt/blocks";
+import { normaliseDoc, publicDoc, validateForPublish, type ExhbtDoc } from "./exhbt/blocks";
 import { fileIdsIn, looksLikeFileId, withoutFiles } from "./exhbt/doc-files";
 import type { Plan } from "./entitlements";
 import { normaliseLayout, type PortfolioLayout } from "./portfolio-layout";
@@ -404,9 +404,12 @@ export interface Store {
   saveExhbtDraft(id: string, userId: string, doc: ExhbtDoc): Promise<boolean>;
   /**
    * Copies the working copy to the live one and marks it published with this slug.
-   * Limits and plan checks happen before this is called (lib/plan.ts, validateForPublish).
+   * The plan check happens before this is called (lib/plan.ts). The doc that is copied is checked here
+   * (validateForPublish, and no flagged numbers left), whatever was checked before, so a save that lands
+   * between the caller's check and this cannot slip past it: false, and nothing is published.
+   * `unchecked` is for the development seeding routes (app/dev/*) only, which publish fixtures as they are.
    */
-  publishExhbt(id: string, userId: string, slug: string): Promise<boolean>;
+  publishExhbt(id: string, userId: string, slug: string, opts?: { unchecked?: boolean }): Promise<boolean>;
   unpublishExhbt(id: string, userId: string): Promise<boolean>;
   /** Sets portfolio order to the order of `ids`. */
   reorderExhbts(userId: string, ids: string[]): Promise<void>;
@@ -434,6 +437,13 @@ export interface Store {
   /* uploads and drafts */
   /** How many events with this name this user had in the last `hours`. For per-user limits (AI drafts). */
   countRecentEventsForUser(name: EventName, userId: string, hours: number): Promise<number>;
+  /**
+   * Takes back the one event of this user's that was logged with `claim` in its props. For a limit
+   * that is counted before the work is done (a figure pick) and given back when the work never
+   * happened. It names its own event by the claim, never "the latest", which with requests that
+   * overlap is another request's. A failure is reported and leaves the event counted.
+   */
+  returnEvent(name: EventName, userId: string, claim: string): Promise<void>;
   /** Records an uploaded (or about-to-be-uploaded) file. The id is chosen by the caller, as it is part of the path. */
   createFile(file: StoredFile & { exhbtId?: string | null }): Promise<void>;
   /** Bytes of every file this user has stored, for the plan's storage cap. */
@@ -1140,11 +1150,12 @@ function supabaseStore(): Store {
       ) as { id: string }[];
       return rows.length > 0;
     },
-    async publishExhbt(id, userId, slug) {
+    async publishExhbt(id, userId, slug, opts) {
       const cur = check(await db.from("exhbts").select("blocks").eq("id", id).eq("user_id", userId).maybeSingle()) as {
         blocks: ExhbtDoc;
       } | null;
       if (!cur) return false;
+      if (!opts?.unchecked && !publishable(cur.blocks)) return false;
       const now = new Date().toISOString();
       check(
         await db
@@ -1261,6 +1272,11 @@ function supabaseStore(): Store {
         .gte("created_at", since(hours));
       if (res.error) throw new Error(res.error.message);
       return res.count ?? 0;
+    },
+    async returnEvent(name, userId, claim) {
+      // As logEvent: it must never break a user flow.
+      const { error } = await db.from("events").delete().eq("name", name).eq("user_id", userId).eq("props->>claim", claim);
+      if (error) console.error("event return failed", error.message);
     },
     async createFile(f) {
       check(
@@ -1907,6 +1923,12 @@ const emptyProfile = (userId: string): PortfolioProfile => ({
   contactEmail: null,
 });
 
+/** Whether a stored doc may be copied to the live page: it passes validateForPublish and has no flagged numbers left. */
+const publishable = (stored: ExhbtDoc): boolean => {
+  const doc = normaliseDoc(stored);
+  return validateForPublish(doc).length === 0 && ((doc as { unverified?: string[] }).unverified ?? []).length === 0;
+};
+
 const EXHBT_COLS = "id, user_id, blocks, published_blocks, status, public_slug, position, confirmed_at, published_at, updated_at, team_of, hidden_on_portfolio";
 type ExhbtRow = {
   id: string;
@@ -2340,9 +2362,10 @@ function memoryStore(): Store {
       e.updatedAt = new Date().toISOString();
       return true;
     },
-    async publishExhbt(id, userId, slug) {
+    async publishExhbt(id, userId, slug, opts) {
       const e = own(id, userId);
       if (!e) return false;
+      if (!opts?.unchecked && !publishable(e.doc)) return false;
       const now = new Date().toISOString();
       Object.assign(e, { published: publicDoc(structuredClone(e.doc)), status: "published", slug, confirmedAt: now, publishedAt: now });
       return true;
@@ -2402,6 +2425,10 @@ function memoryStore(): Store {
     async countRecentEventsForUser(name, userId, hours) {
       const after = Date.now() - hours * 3_600_000;
       return m.events.filter((e) => e.name === name && e.userId === userId && Date.parse(e.at) >= after).length;
+    },
+    async returnEvent(name, userId, claim) {
+      const at = m.events.findIndex((e) => e.name === name && e.userId === userId && e.props.claim === claim);
+      if (at >= 0) m.events.splice(at, 1);
     },
     async createFile(f) {
       files().set(f.id, { ...f, exhbtId: f.exhbtId ?? null, sha256: f.sha256 ?? null, createdAt: new Date().toISOString() });

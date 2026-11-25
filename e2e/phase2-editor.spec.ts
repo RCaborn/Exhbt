@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { slugify, uniqueSlug, SLUG_MAX } from "../lib/exhbt/slug";
 import { docToRuns, runsToDoc } from "../lib/exhbt/richtext-tiptap";
 import { LIMITS } from "../lib/exhbt/blocks";
-import { previewRegion, signInAs, startFromScratch, waitForSave } from "./editor";
+import { addGraphSection, addSkill, box, closeSheet, fieldAt, fillBox, fillContext, fillFinding, fillPlain, fillTitle, fillValid, finding, openPublishSheet, publish, publishSheet, reviewButton, seeAsVisitor, signInAs, startFromScratch, visitorRegion, waitForSave, waitEditor } from "./editor";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -69,56 +69,62 @@ const SLUG = "cutting-queue-times-at-the-student-union-cafe";
 
 test.describe("the exhbt editor", () => {
   test("build from scratch, autosave, publish once the plan and the checks allow, then unpublish", async ({ page }) => {
+    test.setTimeout(180_000); // sign-in, the build, two plan changes and the public pages: cold compiles included
     await signInAs(page, "eddie", "free");
     await startFromScratch(page);
 
-    await page.locator("#title").fill(TITLE);
-    await page.locator("#context").fill("Operations module, Year 2");
-    await page.getByRole("textbox", { name: "Context", exact: true }).fill("Lunchtime queues ran past ten minutes. Would a second till help?");
-    await page.getByLabel("Box 1", { exact: true }).fill("Timed the queue for two weeks");
-    await page.getByLabel("Box 2", { exact: true }).fill("Moved drinks to a second till");
-    await page.getByLabel("Box 3", { exact: true }).fill("Waits fell to four minutes");
+    await fillTitle(page, TITLE);
+    await fillPlain(page, page.locator("#context"), "Operations module, Year 2");
+    await fillContext(page, "Lunchtime queues ran past ten minutes. Would a second till help?");
+    await fillBox(page, 1, "Timed the queue for two weeks");
+    await fillBox(page, 2, "Moved drinks to a second till");
+    await fillBox(page, 3, "Waits fell to four minutes");
 
     // "+" adds a box on the diagram; × takes it away again.
     await page.getByRole("button", { name: "Add a box after box 2" }).click();
-    await expect(page.getByLabel("Box 4", { exact: true })).toHaveValue("Waits fell to four minutes");
-    await expect(page.getByLabel("Box 3", { exact: true })).toHaveValue("");
+    await expect(box(page, 4)).toHaveValue("Waits fell to four minutes");
+    await expect(box(page, 3)).toHaveValue("");
     await page.getByRole("button", { name: "Remove box 3" }).click();
     await page.getByRole("button", { name: "Add a box at the end" }).click();
-    await expect(page.getByLabel("Box 4", { exact: true })).toBeVisible();
+    await expect(box(page, 4)).toBeVisible();
     await page.getByRole("button", { name: "Remove box 4" }).click();
-    await expect(page.getByLabel("Box 4", { exact: true })).toHaveCount(0);
+    await expect(box(page, 4)).toHaveCount(0);
 
-    await page.getByRole("textbox", { name: "Finding 1" }).fill("Average wait fell from 11 to 4 minutes.");
-    await page.getByRole("textbox", { name: "Finding 2" }).fill("Sales held steady, so the till paid for itself.");
-    await page.locator("#skill-new").fill("Process mapping");
-    await page.locator("#skill-new").press("Enter");
-    await expect(page.getByRole("list", { name: "Skills", exact: true }).getByText("Process mapping")).toBeVisible();
-    // The preview redraws as you type.
-    await expect(previewRegion(page).getByText("Moved drinks to a second till")).toBeVisible();
+    await fillFinding(page, 1, "Average wait fell from 11 to 4 minutes.");
+    await fillFinding(page, 2, "Sales held steady, so the till paid for itself.");
+    await addSkill(page, "Process mapping");
+    await expect(page.getByRole("list", { name: "Skills used", exact: true }).getByText("Process mapping")).toBeVisible();
+    // The page is the editor, so what is typed is on it as it is typed; the visitor's view shows the same words.
+    await expect(box(page, 2)).toHaveValue("Moved drinks to a second till");
+    await seeAsVisitor(page, true);
+    await expect(visitorRegion(page).getByText("Moved drinks to a second till")).toBeVisible();
+    await seeAsVisitor(page, false);
     await waitForSave(page);
 
     // Autosave reached the server.
     await page.reload();
+    await waitEditor(page);
     await expect(page.locator("#title")).toHaveValue(TITLE);
     await expect(page.locator("#context")).toHaveValue("Operations module, Year 2");
-    await expect(page.getByRole("textbox", { name: "Context", exact: true })).toContainText("Would a second till help?");
-    await expect(page.getByLabel("Box 3", { exact: true })).toHaveValue("Waits fell to four minutes");
-    await expect(page.getByLabel("Box 4", { exact: true })).toHaveCount(0);
-    await expect(page.getByRole("textbox", { name: "Finding 2" })).toContainText("paid for itself");
-    await expect(page.getByRole("list", { name: "Skills", exact: true }).getByText("Process mapping")).toBeVisible();
+    await expect(fieldAt(page, "gap")).toContainText("Would a second till help?");
+    await expect(box(page, 3)).toHaveValue("Waits fell to four minutes");
+    await expect(box(page, 4)).toHaveCount(0);
+    await expect(finding(page, 2)).toContainText("paid for itself");
+    await expect(page.getByRole("list", { name: "Skills used", exact: true }).getByText("Process mapping")).toBeVisible();
     const editor = page.url();
 
     // Free can build and preview, not publish.
     await expect(page.getByText("Preview only", { exact: true })).toBeVisible();
+    await reviewButton(page).click();
     await expect(page.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: /Upgrade to Premium/ })).toBeVisible();
-    await expect(page.getByText(/comes with Premium/)).toBeVisible();
+    await expect(publishSheet(page).getByRole("link", { name: /Upgrade to Premium/ })).toBeVisible();
+    await expect(publishSheet(page).getByText(/comes with Premium/)).toBeVisible();
     await expect(page.getByText("It's live.")).toHaveCount(0);
 
     // On Premium it still waits for the confirmation.
     await page.goto(`/dev/plan?plan=premium&next=${encodeURIComponent(new URL(editor).pathname)}`);
-    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await waitEditor(page);
+    await openPublishSheet(page);
     await expect(page.getByText(/comes with Premium/)).toHaveCount(0);
     await page.getByRole("button", { name: "Publish", exact: true }).click();
     await expect(page.getByText("Tick the box to confirm this is your work and the numbers are true.")).toBeVisible();
@@ -143,10 +149,11 @@ test.describe("the exhbt editor", () => {
     // Unpublish: nothing is live, so there's no public page. The owner sees a preview of it instead
     // (decision 0016); a visitor gets not found.
     await page.goto(editor);
-    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await waitEditor(page);
+    await openPublishSheet(page);
     await page.getByRole("button", { name: "Unpublish" }).click();
     await page.getByRole("button", { name: "Yes, unpublish" }).click();
-    await expect(page.getByRole("heading", { level: 2, name: "Publish" })).toBeVisible();
+    await expect(publishSheet(page).getByRole("button", { name: "Publish", exact: true })).toBeVisible();
     await page.goto("/p/eddie");
     await expect(page.getByTestId("owner-preview")).toBeVisible();
     const visitor = await page.context().browser()!.newPage();
@@ -163,11 +170,58 @@ test.describe("the exhbt editor", () => {
     await expect(page.getByRole("button", { name: "Start from scratch" })).toHaveCount(0);
   });
 
+  test("See as a visitor draws the article the public page draws: Save as PDF, the checked-on date, the checks link", async ({ page }) => {
+    await signInAs(page, "vera", "premium");
+    await startFromScratch(page);
+    await fillValid(page, "Would a second till help at lunch?");
+    await waitForSave(page);
+    // A draft first: never published, so never checked. The editing page and the preview both say so, with the empty mark.
+    const checked = (root: ReturnType<typeof visitorRegion>) => root.locator('[data-checks] li:has-text("Check")');
+    const editing = page.locator('[data-editor="page"][data-ready="true"] article[data-exhbt-page]').first();
+    await expect(checked(editing)).toHaveText("Checked when published");
+    await expect(checked(editing)).not.toHaveAttribute("data-done");
+    await seeAsVisitor(page, true);
+    await expect(checked(visitorRegion(page))).toHaveText("Checked when published");
+    await expect(checked(visitorRegion(page))).not.toHaveAttribute("data-done");
+    await expect(visitorRegion(page)).not.toContainText("Checked by exhbt");
+    await expect(visitorRegion(page).getByRole("button", { name: /Save as PDF/ })).toBeVisible();
+    await expect(page.locator("[data-visitor-signoff]").getByLabel("Made with exhbt")).toBeVisible();
+    await seeAsVisitor(page, false);
+
+    await publish(page);
+    const live = (await publishSheet(page).getByRole("link", { name: /^\/p\/vera\// }).textContent())!.trim();
+    await closeSheet(page);
+    // Published now: both views say when, as the public page does.
+    const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/London" });
+    await expect(checked(editing)).toHaveText(`Checked by exhbt, ${today}`);
+    await seeAsVisitor(page, true);
+    await expect(checked(visitorRegion(page))).toHaveText(`Checked by exhbt, ${today}`);
+    // What each page is made of: the elements and their classes in order (headings sit one level lower in the editor), and the words.
+    const read = () =>
+      page.locator("article[data-exhbt-page]").evaluate((a) => ({
+        shape: [a, ...a.querySelectorAll("*")].map((e) => `${/^H[1-3]$/.test(e.tagName) ? "H" : e.tagName}.${[...e.classList].sort().join(".")}`),
+        words: (a as HTMLElement).innerText,
+      }));
+    const preview = await read();
+    await page.goto(live);
+    await expect(page.getByRole("heading", { level: 1, name: "Would a second till help at lunch?" })).toBeVisible();
+    const publicPage = await read();
+    expect(publicPage.words).toContain("Save as PDF");
+    expect(publicPage.words).toContain("Checked by exhbt");
+    expect(preview.words).toBe(publicPage.words);
+    expect(preview.shape).toEqual(publicPage.shape);
+  });
+
   test("a title over the limit shows the issue beside it and blocks publishing", async ({ page }) => {
     await signInAs(page, "lena", "premium");
     await startFromScratch(page);
-    await page.locator("#title").fill("A".repeat(LIMITS.titleChars + 5));
-    await expect(page.locator("#title-issues")).toContainText(`Keep the title to ${LIMITS.titleChars} characters.`);
+    // The title field does not cut what is typed or pasted: past the limit it says so, and publishing waits.
+    const long = "A".repeat(LIMITS.titleChars + 5);
+    await page.locator("#title").click();
+    await page.keyboard.type(long);
+    await expect(page.locator("#title")).toHaveValue(long);
+    await expect(page.locator("#title-issue")).toContainText(`Keep the title to ${LIMITS.titleChars} characters.`);
+    await openPublishSheet(page);
     await page.getByLabel("This is my work, and the numbers are true").check();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
     await expect(page.getByText(/^Fix \d+ things first/)).toBeVisible();
@@ -176,11 +230,32 @@ test.describe("the exhbt editor", () => {
     await expect(page.getByRole("listitem").filter({ hasText: "Draft" })).toHaveCount(1);
   });
 
+  for (const [id, limit, label] of [
+    ["context", LIMITS.contextChars, "What it is"],
+    ["whereWhen", LIMITS.whereWhenChars, "Where and when"],
+    ["myRole", LIMITS.myRoleChars, "My role"],
+  ] as const) {
+    test(`${label} over the limit is kept as typed, shows the issue and blocks publishing`, async ({ page }) => {
+      await signInAs(page, `fieldlen${id.toLowerCase()}`, "premium");
+      await startFromScratch(page);
+      const long = "B".repeat(limit + 5);
+      await page.locator(`#${id}`).click();
+      await page.keyboard.type(long);
+      await expect(page.locator(`#${id}`)).toHaveValue(long);
+      await expect(page.locator(`#${id}-issue`)).toContainText(`Keep "${label}" to ${limit} characters.`);
+      await openPublishSheet(page);
+      await page.getByLabel("This is my work, and the numbers are true").check();
+      await page.getByRole("button", { name: "Publish", exact: true }).click();
+      await expect(page.getByText(/^Fix \d+ things? first/)).toBeVisible();
+      await expect(page.getByText("It's live.")).toHaveCount(0);
+    });
+  }
+
   test("the list reorders and deletes", async ({ page }) => {
     await signInAs(page, "rhea", "premium");
     for (const title of ["First project", "Second project"]) {
       await startFromScratch(page);
-      await page.locator("#title").fill(title);
+      await fillTitle(page, title);
       await waitForSave(page);
       await page.goto("/exhbts");
     }
@@ -200,9 +275,8 @@ test.describe("the exhbt editor", () => {
     expect(violations.map((v) => `list ${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
 
     await startFromScratch(page);
-    await page.locator("#title").fill("Forecasting footfall");
-    await page.getByRole("button", { name: "Add a section" }).click();
-    await page.getByRole("button", { name: "Add a graph" }).click();
+    await fillTitle(page, "Forecasting footfall");
+    await addGraphSection(page);
     await expect(page.getByLabel("Graph 1, row 1 group")).toBeVisible();
     ({ violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze());
     expect(violations.map((v) => `editor ${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);

@@ -6,7 +6,7 @@ import type { FigureBox, FigureKind } from "@/lib/exhbt/blocks";
 import { FIGURE_KINDS, isFigureKind, LIMITS } from "@/lib/exhbt/blocks";
 import { boxFromPixels, fitAlt, fitCaption, pixelsFromBox, type PixelSize } from "@/lib/figures/rules";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
-import { structuredCall } from "./call";
+import { AIFailure, structuredCall } from "./call";
 import { repairPick } from "./repair";
 
 /**
@@ -16,6 +16,14 @@ import { repairPick } from "./repair";
  * on the image, and alt text and a caption taken only from what the page shows. Or nothing at
  * all. Part of the draft: it doesn't use a draft or a rewrite from the person's allowance. Logged
  * as its own step, 'figure_pick'.
+ *
+ * A pick that fails throws an AIFailure, as every AI call does (./failure.ts), and its reason says
+ * whether the route gives the person's pick back (app/api/exhbts/figure-pick/route.ts). Reason
+ * "service" is a call the service never answered: no key, no connection, a timeout, or the API
+ * refusing or failing the request. Nothing came back and the person didn't cause it, so only that
+ * one is given back (neverAnswered). Every other failure stays counted: an answer that was cut
+ * off, or wasn't in the shape asked for, was still made and paid for. A failure nobody foresaw
+ * (anything that isn't an AIFailure) stays counted too, which is the safe side for the limit.
  */
 
 /** One image the figure could be on, with its size in pixels (read from the file by the route, not sent by the browser). */
@@ -111,12 +119,16 @@ export async function pickFigure(images: PageImage[]): Promise<FigurePickResult>
   if (!images.length) return { pick: null, model: "none", inputTokens: 0, outputTokens: 0, costUsd: 0, raw: null };
   const apiKey = anthropicApiKey();
   if (!apiKey) {
-    // Never hand real people a placeholder figure.
-    if (process.env.NODE_ENV === "production") throw new Error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
+    // Never hand real people a placeholder figure. No call can be sent, so this is one the service never answered.
+    if (process.env.NODE_ENV === "production") {
+      console.error(`${ANTHROPIC_API_KEYS_ENV} is not set.`);
+      throw new AIFailure("figure_pick", "service", { detail: "no API key" });
+    }
     return mockPick(images);
   }
 
-  // A failure throws an AIFailure with its reason. The route logs it and answers with an error; the draft page then says it couldn't look.
+  // A failure throws an AIFailure with its reason. The route logs it, gives the pick back if the service never
+  // answered, and answers with an error; the draft page then says it couldn't look.
   const { value, model, inputTokens, outputTokens } = await structuredCall({
     feature: "figure_pick",
     client: new Anthropic({ apiKey }),
@@ -140,16 +152,25 @@ const mockKind = (label: string): FigureKind => {
   return has("diagram|photo|poster|screenshot|map") ? "other" : has("table") ? "table" : "graph";
 };
 
+/** How long the stand-in takes over a file named "...pick-slow...": long enough for a test to send more requests while it runs. */
+const MOCK_SLOW_MS = 2000;
+
 /**
  * The stand-in without an API key (development and tests): the first page image sent, which is
  * the first page that draws shapes or pictures (the browser sends no others), with a box that
  * covers the chart in e2e/fixtures/report-with-chart.pdf, and a kind read from the file's name
  * (mockKind), so each path of the rule can be tried. Labelled as a placeholder.
+ *
+ * Three more words in the file's name let the tests see what the route counts (e2e/r2-fixes.spec.ts):
+ * "pick-fails" fails as a call the service never answered does (reason "service"), "pick-unusable"
+ * fails as one it answered with nothing usable (reason "wrong_shape", with the tokens such an answer
+ * spends), and "pick-slow" answers after MOCK_SLOW_MS, so requests overlap.
  */
-function mockPick(images: PageImage[]): FigurePickResult {
+async function mockPick(images: PageImage[]): Promise<FigurePickResult> {
   const first = images[0]!;
-  // A file named "...pick-fails..." makes the stand-in fail, so the tests can see a failed pick isn't counted.
-  if (/pick-fails/i.test(first.label)) throw new Error("The stand-in was asked to fail.");
+  if (/pick-fails/i.test(first.label)) throw new AIFailure("figure_pick", "service");
+  if (/pick-unusable/i.test(first.label)) throw new AIFailure("figure_pick", "wrong_shape", { inputTokens: 1500, outputTokens: 120 });
+  if (/pick-slow/i.test(first.label)) await new Promise((done) => setTimeout(done, MOCK_SLOW_MS));
   const raw: Answer = {
     found: true,
     image: 1,

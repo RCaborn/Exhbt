@@ -126,7 +126,10 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
   const noteId = `rewrite-note-${block}`;
 
   return (
-    <div className="mb-3" data-testid={`tools-${block}`}>
+    // data-open: its menu, or its panel (the rewrite form, or "No rewrites left"), is open. The edit-on-page editor draws
+    // this in a toolbar over the page, which otherwise shows only under the pointer or the focus, and keeps that toolbar
+    // up while this is set (components/exhbt-editor/css/core.css). Here, in a card, nothing reads it.
+    <div className="mb-3" data-testid={`tools-${block}`} data-open={menu || open ? "" : undefined}>
       <div ref={wrap} className="relative flex justify-end">
         <button
           ref={trigger}

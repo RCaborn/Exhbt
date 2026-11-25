@@ -94,7 +94,9 @@ export async function transcribe(data: Uint8Array, mediaType: MediaType, materia
   try {
     response = await client.messages.create(transcribeRequest(data, mediaType, material));
   } catch (e) {
-    throw new AIFailure("file_read", "service", { status: e instanceof Anthropic.APIError ? e.status : undefined });
+    // As structuredCall (./call.ts): reason "service" is the request itself failing, and anything else is passed on as it is.
+    if (e instanceof Anthropic.APIError) throw new AIFailure("file_read", "service", { status: e.status });
+    throw e;
   }
   const { text, truncated } = readTranscript(response);
   const { input_tokens, output_tokens } = response.usage;

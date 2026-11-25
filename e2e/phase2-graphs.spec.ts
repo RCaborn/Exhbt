@@ -6,7 +6,8 @@ import { headlineFor } from "../lib/exhbt/headline";
 import { legacyGpDoc, sampleDocs } from "../lib/exhbt/sample";
 import { slugify } from "../lib/exhbt/slug";
 import { unverifiedNumbers } from "../lib/exhbt/verify";
-import { addGraph, addGraphSection, graph, pickGraphKind, previewRegion, publish, signInAs, startWithBasics } from "./editor";
+import { addGraph, addGraphSection, closeOpenSheet, graph, openAddSectionMenu, openFigures, openPublishSheet, menuItem, pickGraphKind, publish, signInAs, startWithBasics, waitEditor } from "./editor";
+import { READY } from "./page-editor";
 
 // Graphs (decision 0011): a fixed set of kinds, every value typed in and printed, a hidden table
 // for each, the word cap counting every graph word, the number check covering every graph
@@ -190,6 +191,7 @@ const axe = async (page: Page, where: string) => {
 
 test.describe("Graphs in the editor and on the page", () => {
   test("bars and grouped bars: built in the editor, printed on the page with hidden tables, no accessibility violations", async ({ page }) => {
+    test.setTimeout(150_000); // two graphs' worth of typing in the sheet, then the public page cold
     const title = "Graphs one: bars";
     await signInAs(page, "gwen");
     await startWithBasics(page, title);
@@ -209,13 +211,13 @@ test.describe("Graphs in the editor and on the page", () => {
     await fill(g2, [["Graph 2, series 1 name", "Spring"], ["Graph 2, series 2 name", "Autumn"], ["Graph 2, group 1 label", "Sciences"], ["Graph 2, group 1 Spring", "62"], ["Graph 2, group 1 Autumn", "71"]]);
     await g2.getByRole("button", { name: "Add a group to graph 2" }).click();
     await fill(g2, [["Graph 2, group 2 label", "Arts"], ["Graph 2, group 2 Spring", "55"], ["Graph 2, group 2 Autumn", "64"]]);
-    // The live preview redraws as you type, with every value.
-    const preview = previewRegion(page);
-    await expect(preview.locator("figure[data-chart]").filter({ hasText: "Marks by term" }).getByText("64", { exact: true }).first()).toBeVisible();
+    // The page redraws as you type, with every value.
+    await expect(page.locator(`${READY} figure[data-chart]`).filter({ hasText: "Marks by term" }).getByText("64", { exact: true }).first()).toBeVisible();
     // Both graphs are used: the menu says so and won't add a third.
-    await page.getByRole("button", { name: "Add a section" }).click();
-    await expect(page.getByRole("button", { name: "Add a graph" })).toBeDisabled();
-    await expect(page.getByText(`All ${LIMITS.charts.max} used.`)).toBeVisible();
+    await closeOpenSheet(page);
+    await openAddSectionMenu(page);
+    await expect(menuItem(page, "Add a graph")).toBeDisabled();
+    await expect(menuItem(page, "Add a graph")).toContainText(`Up to ${LIMITS.charts.max} graphs in a case study`);
     await page.keyboard.press("Escape");
     await axe(page, "editor");
 
@@ -318,11 +320,12 @@ test.describe("Graphs in the editor and on the page", () => {
 
     await page.goto("/auth/dev?email=lexi@example.com&next=/exhbts");
     await page.getByRole("link", { name: `Edit ${GP.title}` }).click();
-    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await waitEditor(page);
+    await openFigures(page, 1);
     const g = graph(page, 1);
     await expect(g.getByRole("radio", { name: "Before and after", exact: true })).toBeChecked();
     await expect(g.getByLabel("Graph 1, row 2 group")).toHaveValue("Under 30");
-    await expect(previewRegion(page).getByText("11.2%", { exact: true }).first()).toBeVisible();
+    await expect(page.locator(`${READY} figure[data-chart]`).getByText("11.2%", { exact: true }).first()).toBeVisible();
   });
 
   test("graph labels can push an exhbt over 200 words, and then it can't be published", async ({ page }) => {
@@ -337,9 +340,12 @@ test.describe("Graphs in the editor and on the page", () => {
       for (let j = 1; j <= LIMITS.charts.table.rows.max; j++) await g.getByLabel(`Graph 1, row ${j}, column ${k}`).fill("six words in every one cell");
     }
     await expect(page.getByText(/^\d+ words · aim for/)).toContainText(/^2[0-9]{2} words/);
-    await expect(page.getByRole("region", { name: "Graph 1", exact: true }).getByText(/this part has the most/)).toBeVisible();
+    await openPublishSheet(page);
     await page.getByLabel("This is my work, and the numbers are true").check();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
+    await expect(page.getByText("It's live.")).toHaveCount(0);
+    await closeOpenSheet(page);
+    await page.getByRole("button", { name: /things? to fix$/ }).click();
     await expect(page.getByRole("region", { name: "Things to fix before publishing" })).toContainText(`Keep the whole exhbt to ${LIMITS.totalWords} words`);
     await expect(page.getByText("It's live.")).toHaveCount(0);
   });
@@ -358,8 +364,11 @@ test.describe("Graphs in the editor and on the page", () => {
     const { id, unverified } = (await res.json()) as { id: string; unverified: string[] };
     expect(unverified).toEqual(["2820"]);
     await page.goto(`/exhbts/${id}/edit`);
-    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await waitEditor(page);
+    await page.getByRole("button", { name: "1 number to check" }).click();
     await expect(page.getByRole("list", { name: "Numbers to check" })).toContainText("Check this number: 2820");
+    await page.keyboard.press("Escape");
+    await openFigures(page, 1);
     const g = graph(page, 1);
     await expect(g.getByRole("radio", { name: "Bars", exact: true })).toBeChecked();
     await expect(g.getByLabel("Graph 1, bar 3 label")).toHaveValue("Worked-out total");
@@ -401,7 +410,8 @@ test.describe("Graphs in the editor and on the page", () => {
     // The draft keeps what was typed, so it can still be edited.
     await page.goto("/exhbts");
     await page.getByRole("link", { name: `Edit ${title}` }).click();
-    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await waitEditor(page);
+    await openFigures(page, 1);
     await expect(graph(page, 1).getByLabel("Graph 1, point 3 Shop")).toHaveValue("61230");
   });
 });

@@ -18,8 +18,13 @@ export type AIFeature =
 
 /**
  * cut_off: the answer stopped at max_tokens. refused: the model declined. wrong_shape: the answer
- * wasn't the JSON asked for, even after repair. service: the API or the network failed (with the
- * HTTP status when there was one). empty: no answer text at all.
+ * wasn't the JSON asked for, even after repair. empty: no answer text at all. Those four were
+ * answered, and paid for.
+ *
+ * service: the service never answered. The request itself failed (no connection, a timeout, or the
+ * API refusing it or failing, with the HTTP status when there was one), or it couldn't be sent
+ * because no key is set. Nothing came back and the person didn't cause it. This is the one name
+ * for that: see neverAnswered below.
  */
 export type AIFailureReason = "cut_off" | "refused" | "wrong_shape" | "service" | "empty";
 
@@ -37,7 +42,7 @@ export class AIFailure extends Error {
   readonly status?: number;
   readonly inputTokens: number;
   readonly outputTokens: number;
-  /** Where a wrong shape went wrong (field paths and issue codes), never any text. */
+  /** What else is known, in our own words: where a wrong shape went wrong (field paths and issue codes), or that no key was set. Never any text from the person or the model. */
   readonly detail?: string;
 
   constructor(feature: AIFeature, reason: AIFailureReason, o: { status?: number; inputTokens?: number; outputTokens?: number; detail?: string } = {}) {
@@ -51,6 +56,14 @@ export class AIFailure extends Error {
     this.detail = o.detail;
   }
 }
+
+/**
+ * True when the service never answered (reason "service"). A limit that is counted before the call
+ * gives its count back for this and for nothing else: a figure pick does
+ * (app/api/exhbts/figure-pick/route.ts). Any other AIFailure was answered and paid for, and
+ * anything that isn't an AIFailure is a failure nobody foresaw; both stay counted.
+ */
+export const neverAnswered = (e: unknown): boolean => e instanceof AIFailure && e.reason === "service";
 
 /**
  * What a failure event stores: the feature, the reason, the status and the tokens. No text from the

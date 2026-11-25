@@ -1,11 +1,13 @@
 import { expect, test, type Browser } from "@playwright/test";
 import { SCHEMA_VERSION } from "../lib/exhbt/blocks";
-import { fillValid, publish, signInAs, startFromScratch, waitForSaved } from "./editor";
+import { fillPlain, fillValid, pickImages, publish, signInAs, startFromScratch, waitEditor, waitForSaved } from "./editor";
+import { READY } from "./page-editor";
+import { uniqueBytes } from "./unique-bytes";
 
 // A file can only be shown as part of its owner's exhbt. Someone who learns another person's file id
 // can't put it in their own exhbt and get a link to it: the save strips it, and no page signs it.
 
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+const PNG = uniqueBytes(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
 const unique = (tag: string) => `${tag}-${Date.now().toString(36)}${Math.floor(Math.random() * 1e3)}`;
 
 async function asSecondPerson(browser: Browser, baseURL: string | undefined) {
@@ -22,13 +24,13 @@ test("someone else's file id in a draft is stripped on save, and A's own image s
   await signInAs(page, a);
   await startFromScratch(page);
   await fillValid(page, "Queue study with a picture");
-  await page.locator("input[aria-label='Choose an image']").setInputFiles({ name: "queue.png", mimeType: "image/png", buffer: PNG });
-  await page.getByLabel(/Image 1: describe it/).fill("A queue at the cafe till");
+  await pickImages(page, { name: "queue.png", mimeType: "image/png", buffer: PNG });
+  await fillPlain(page, page.getByLabel(/Image 1: describe it/), "A queue at the cafe till");
   await waitForSaved(page);
   await publish(page);
   await page.reload();
-  await expect(page.locator("[data-ready=true]")).toBeAttached();
-  const src = await page.getByRole("region", { name: "Preview" }).locator("img[alt='A queue at the cafe till']").getAttribute("src");
+  await waitEditor(page);
+  const src = await page.locator(`${READY} article img[alt='A queue at the cafe till']`).getAttribute("src");
   const fileId = src?.match(/^\/dev\/files\/([0-9a-f-]{36})$/)?.[1];
   expect(fileId).toBeTruthy();
 
@@ -58,17 +60,21 @@ test("someone else's file id in a draft is stripped on save, and A's own image s
       [exhbtId, smuggled] as const,
     );
     await pb.reload();
-    await expect(pb.locator("[data-ready=true]")).toBeAttached();
+    await waitEditor(pb);
     await pb.getByRole("button", { name: "Restore them" }).click();
     await expect(pb.locator("#title")).toHaveValue("Smuggled");
     await waitForSaved(pb);
 
     // The server dropped both references: nothing of A's is in B's editor after a reload.
     await pb.reload();
-    await expect(pb.locator("[data-ready=true]")).toBeAttached();
+    await waitEditor(pb);
     await expect(pb.locator("#title")).toHaveValue("Smuggled");
     await expect(pb.getByLabel(/Image 1: describe it/)).toHaveCount(0);
+    // The work is gone too: its button offers to add one, and no file is attached.
+    await expect(pb.getByRole("button", { name: "Add the work" })).toBeVisible();
+    await pb.getByRole("button", { name: "Add the work" }).click();
     await expect(pb.getByText("File attached:")).toHaveCount(0);
+    await pb.locator("dialog[open] button.xe-sheet-close").click();
     expect(await pb.content()).not.toContain(fileId!);
 
     // And B's published page never carries a link to it.
