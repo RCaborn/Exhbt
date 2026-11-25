@@ -393,3 +393,29 @@ Still open:
 - The top bar cuts the reason for a failed save at 22rem with an ellipsis. "This couldn't be saved. Reload the page and try again." loses its second half. The whole of it is said to a screen reader. Under 64rem the words are not drawn at all.
 - `store.setAt` still compares a stored value with what a field built as JSON text (`sameValue` in `store-core.ts`). On the live site a formatted field typed in and put back as it was may then count as a change, and be saved once more. Not tested with a doc in the database's key order. The editor's other comparisons of JSON text (the undo list, a layout switch, the toolbar's check of its own words) each set the store's doc against one made from it. Reading them, the database's order should not mislead them; none is tested for it.
 - Not run here: `editor-drag` and `editor-flow`, and nothing on WebKit.
+
+## From agent M, release 4: seven layouts and the AI draft (25 Nov 2026; branch `phase-2-r4-m-ai`)
+
+What is offered, and to whom:
+- The new editor offers all seven layouts (`OFFERED_FORMATS`). The classic editor offers three (`CLASSIC_FORMATS`, the only list of them): it can't edit what the other four add.
+- `offeredIn(editor)` in `lib/exhbt/formats.ts` is the one rule. Three places ask it, each deciding the person's editor as the edit page does (`editorKind(isAdmin)`):
+  - the classic picker (`components/editor/LayoutPicker.tsx`): three, plus the exhbt's own layout when it is one of the four, with a line saying where it is edited. Switching away there is one way, and says so: the server lets one of the four be saved only while it is the layout stored.
+  - the draft route: seven layouts in the new editor, three in the classic one.
+  - `layoutAllowed` (`app/(app)/exhbts/[id]/actions.ts`): one of the four is refused for a classic person unless stored. It reads the layout as sent, so a name the code doesn't know is refused too (it used to be stored as a case study without a word).
+
+The draft:
+- There are two requests. "three" is the default and is byte for byte what was sent before release 4 (39 fields). "seven" is new (41 fields: `pullquote` and `myRole` added). `e2e/layouts-new.spec.ts` holds both counts; the API's limit is about 52 to 56 (decision 0029).
+- `references` holds three things by layout: research's references, an essay's sources (the address may be empty) and a build's links. That is what kept the count down.
+- `toDoc` is now in `lib/ai/draft-answer.ts`, which is pure, so a spec can call it. The checks that keep only what the person supplied are in `lib/exhbt/references.ts`.
+- Nothing here has been sent to the real API, and the eval was not run in any mode: both wait for the owner's say-so. `npm run eval:drafts -- --self-test` and `-- --mock` make no call and are the first things to run.
+
+For tests:
+- The test server is the new editor, so its stand-in drafts among seven. Material holding one of its cue words drafts that layout: "I built", "redesigned", "my role was", "this essay" (and "hypothesis", as before). Check a new test's material for them.
+- `stand-in: layout <name>` in the notes names a layout. `stand-in: invent` makes the stand-in write a pull quote, a source, a link and a role the material doesn't hold, to show each is left off.
+- "Things to fix" leaves out a layout's needs until publishing has been tried. `window.__exhbtUi.setTried(true)` is what a press on Publish does to it.
+- `offered()` now returns seven, so `editor-drag`, `editor-flow`, `editor-inplace`, `editor-smooth`, `editor-phone` and `editor-tablet` loop over seven. None was run here: that is brief Q's.
+
+Still open:
+- The layout rules are decision 0028's, word for word in meaning. Rule 4 (before and after) fits any improvement that gives figures for before and after, not only a redesign shown in pictures; eval fixture 08 is one. Such a draft can't be published until two pictures are marked.
+- `HANDOFF.md` (the layout row) and `DESIGN.md` (lines 130 and 135) still say three layouts, and "not offered until release 4".
+- In the classic picker, one of the four is drawn with the case study's sketch (as brief E asked).

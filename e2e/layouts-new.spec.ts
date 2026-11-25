@@ -8,12 +8,13 @@ import { DraftSchema, DraftSchemaSeven, leftOff, repairDraft, toDoc, type Draft 
 import { formatLimits, LIMITS, validateForPublish, wordCount, words, type ExhbtDoc } from "../lib/exhbt/blocks";
 import { checkedReason, CLASSIC_REASONS, isLayoutReason, LAYOUT_REASONS, layoutSentence } from "../lib/exhbt/drafted";
 import { CLASSIC_FORMATS, FORMAT_RULES, FORMATS, formatOf, type Format } from "../lib/exhbt/formats";
+import { blockOptions } from "../lib/exhbt/layouts";
 import { pullquoteFrom, unsupportedParts } from "../lib/exhbt/references";
 import { beforeAfterDoc, buildDoc, essayDoc, eventDoc, openBankingDoc } from "../lib/exhbt/sample";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
-import { layoutGroup, openLayoutMenu, previewArticle, signInAs, waitEditor } from "./editor";
+import { addSection, framesOf, layoutGroup, openAddSectionMenu, openLayoutMenu, openThingsToFix, pressTool, previewArticle, signInAs, thingsButton, waitEditor } from "./editor";
 import * as classicEditor from "./editor-classic-helpers";
-import { freshName, openDoc, READY, readStored, sampleDoc, waitSaved } from "./page-editor";
+import { docNow, frame, freshName, openDoc, READY, readStored, sampleDoc, waitSaved } from "./page-editor";
 
 /*
  * The four layouts of decision 0028 (brief D): a fictional sample for each, near the 200-word cap
@@ -25,6 +26,9 @@ import { freshName, openDoc, READY, readStored, sampleDoc, waitSaved } from "./p
  *  - the AI draft's answer for seven layouts, read purely: its size against the API's limit, its repair,
  *    and that only what the person supplied reaches a doc (a pull quote, a source, a role, a link);
  *  - the line the editor says after a draft, for each new layout;
+ *  - the draft eval's fixtures and marks (the eval itself is run by hand, with the owner's say-so);
+ *  - with the stand-in AI: a draft of each new layout, by name and by cue, and what it makes up left off;
+ *  - the layout menu's seven, and each new layout in the editor: its rows, its "+" and what it needs to publish;
  *  - the classic editor, which never offers the four and keeps an exhbt that is one.
  */
 
@@ -671,6 +675,167 @@ test.describe("The layout menu offers seven", () => {
     }
     await waitSaved(page, id);
     expect((await stored(page, id)).format).toBeUndefined();
+  });
+});
+
+/* ---------------- Each new layout in the new editor: its rows, its "+" and what it needs to publish ---------------- */
+
+test.describe("Each new layout in the editor", () => {
+  /** The end "+" menu's kinds, as drawn: each with its name, and why it is full where it is. */
+  async function plusMenu(page: Page) {
+    await openAddSectionMenu(page);
+    const got = await page
+      .locator(`${READY} [data-xe-menu] button.xe-plus-item:not([data-block="figure"])`)
+      .evaluateAll((els) => els.map((e) => ({ kind: e.getAttribute("data-block"), name: e.querySelector(".xe-plus-name")?.textContent ?? "", full: e.querySelector(".xe-plus-why")?.textContent ?? null, off: (e as HTMLButtonElement).disabled })));
+    await page.keyboard.press("Escape");
+    return got;
+  }
+  /** What the layout's rules say the "+" offers for the doc as it is now (blockOptions: the kinds it draws, each with its cap). */
+  const offeredNow = async (page: Page) => blockOptions(await docNow(page)).map((o) => ({ kind: o.kind as string, name: o.name, full: o.full ?? null, off: Boolean(o.full) }));
+  /**
+   * What stops publishing, as "Things to fix before publishing" lists it once publishing has been tried (before
+   * that it leaves out parts that are only empty). Nothing to fix: no button, and "".
+   */
+  async function toFix(page: Page): Promise<string> {
+    await page.evaluate(async () => {
+      window.__exhbtUi!.setTried(true);
+      await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    });
+    if ((await thingsButton(page).count()) === 0) return "";
+    const words = (await (await openThingsToFix(page)).innerText()).replace(/\s+/g, " ");
+    await page.keyboard.press("Escape");
+    return words;
+  }
+  const boxOf = async (page: Page, id: string) => (await frame(page, id).boundingBox())!;
+
+  test("build: the lead screenshot, what it does beside the graph, the links as a row of buttons; it needs a screenshot or a link", async ({ page }) => {
+    await openDoc(page, freshName("rowsbuild"), sampleDoc("build"));
+    const art = previewArticle(page);
+    await expect(art).toHaveAttribute("data-format", "build");
+    // The first image is the lead; "What it does" pairs with the graph beside it.
+    await expect(art.locator('[data-part="lead"]')).toHaveCount(1);
+    await expect(art.locator('[data-section-id="image-1"] [data-part="lead"], [data-part="lead"] [data-section-id="image-1"], [data-part="lead"][data-section-id="image-1"]')).toHaveCount(1);
+    const pair = art.locator("[data-found]");
+    await expect(pair.locator('[data-section-id="findings"]')).toHaveCount(1);
+    await expect(pair.locator('[data-section-id="graph-1"]')).toHaveCount(1);
+    // The demo and the code sit side by side, as buttons do.
+    const [demo, code] = [await boxOf(page, "link-1"), await boxOf(page, "link-2")];
+    expect(Math.abs(demo.y - code.y)).toBeLessThan(2);
+    expect(code.x).toBeGreaterThanOrEqual(demo.x + demo.width);
+
+    // The "+" offers a build's kinds with a build's caps: two links and one graph are all it takes, and there is room for two more screenshots.
+    const menu = await plusMenu(page);
+    expect(menu).toEqual(await offeredNow(page));
+    expect(menu.find((o) => o.kind === "link")).toMatchObject({ off: true, full: "Up to 2 links in a build" });
+    expect(menu.find((o) => o.kind === "graph")).toMatchObject({ off: true, full: "One graph in a build" });
+    expect(menu.find((o) => o.kind === "image")).toMatchObject({ off: false });
+    expect(menu.map((o) => o.kind)).not.toContain("pullquote");
+
+    // With no screenshot and no link, it can't be published, and says why in its own words.
+    const NEED = "Add a screenshot or a link, so people can see it working.";
+    expect(await toFix(page)).not.toContain(NEED);
+    await page.evaluate(() => ["image-1", "image-2", "link-1", "link-2"].forEach((id) => window.__exhbtEditor!.remove(id)));
+    expect(await toFix(page)).toContain(NEED);
+    // A link clears it (the link has its own things to fill in).
+    await addSection(page, "Add a link");
+    await expect(framesOf(page, "link")).toHaveCount(1);
+    expect(await toFix(page)).not.toContain(NEED);
+  });
+
+  test("essay: the key points beside the pull quote, the sources as a list; it needs its key points", async ({ page }) => {
+    await openDoc(page, freshName("rowsessay"), sampleDoc("essay"));
+    const art = previewArticle(page);
+    await expect(art).toHaveAttribute("data-format", "essay");
+    const pair = art.locator("[data-found]");
+    await expect(pair.locator('[data-section-id="findings"]')).toHaveCount(1);
+    await expect(pair.locator('[data-section-id="pullquote-1"]')).toHaveCount(1);
+    // The sources are one list under their own heading, the one with no address among them.
+    const sources = art.locator('section[data-part="references"]');
+    await expect(sources).toHaveCount(1);
+    await expect(sources.locator(".xp-label").first()).toHaveText("Sources");
+    await expect(sources.locator("[data-section-id]")).toHaveCount(3);
+    await expect(sources.locator('[data-section-id="link-3"]')).toContainText("Grey's letters, held in the university library");
+
+    // One pull quote is all an essay takes; it has room for a fourth source, which it calls a source.
+    const menu = await plusMenu(page);
+    expect(menu).toEqual(await offeredNow(page));
+    expect(menu.find((o) => o.kind === "pullquote")).toMatchObject({ off: true, full: "One pull quote in an essay" });
+    expect(menu.find((o) => o.kind === "link")).toMatchObject({ off: false, name: "Source" });
+
+    const NEED = "Add your key points.";
+    expect(await toFix(page)).not.toContain(NEED);
+    await page.evaluate(() => window.__exhbtEditor!.remove("findings"));
+    expect(await toFix(page)).toContain(NEED);
+    await openAddSectionMenu(page);
+    await page.locator(`${READY} [data-xe-menu] [data-block="findings"]`).click();
+    await expect(framesOf(page, "findings")).toHaveCount(1);
+    expect(await toFix(page)).not.toContain(NEED);
+  });
+
+  test("before and after: two pictures become a labelled pair once one is marked Before and the other After, and until then it can't be published", async ({ page }) => {
+    // The sample with no picture marked, as an AI draft with the person's pictures added would be.
+    const sample = sampleDoc("before-after");
+    const unmarked: ExhbtDoc = { ...sample, sections: sample.sections.map((s) => (s.kind === "image" ? { ...s, stage: undefined } : s)) };
+    await openDoc(page, freshName("rowsba"), unmarked);
+    const art = previewArticle(page);
+    await expect(art).toHaveAttribute("data-format", "before-after");
+    const pairs = art.getByRole("group", { name: "Before and after" });
+    await expect(pairs).toHaveCount(0);
+    const NEED = "Mark one image Before and one After.";
+    expect(await toFix(page)).toContain(NEED);
+
+    // The marks are the person's: Before on the first picture, After on the second.
+    await pressTool(page, "Image 1", "Before");
+    expect((await docNow(page)).sections.find((s) => s.id === "image-1")).toMatchObject({ stage: "before" });
+    await expect(pairs).toHaveCount(0);
+    await pressTool(page, "Image 2", "After");
+    await expect(pairs).toHaveCount(1);
+    await expect(pairs.locator("[data-section-id]")).toHaveCount(2);
+    await expect(pairs.locator('[data-section-id="image-1"]')).toHaveCount(1);
+    await expect(pairs.locator('[data-section-id="image-2"]')).toHaveCount(1);
+    expect(await toFix(page)).not.toContain(NEED);
+
+    // One link and one graph, and room for more pictures (it has four of six).
+    const menu = await plusMenu(page);
+    expect(menu).toEqual(await offeredNow(page));
+    expect(menu.find((o) => o.kind === "link")).toMatchObject({ off: true, full: "One link in a before and after" });
+    expect(menu.find((o) => o.kind === "image")).toMatchObject({ off: false });
+
+    // Its other two needs, each in its own words: two pictures, and what changed.
+    await page.evaluate(() => ["image-2", "image-3", "image-4", "findings"].forEach((id) => window.__exhbtEditor!.remove(id)));
+    const fix = await toFix(page);
+    expect(fix).toContain("A before and after needs at least 2 images.");
+    expect(fix).toContain("Add what changed and why.");
+  });
+
+  test("event: the poster as the lead, the other pictures in a grid, My role in the sidebar; it needs a picture and a role", async ({ page }) => {
+    await openDoc(page, freshName("rowsevent"), sampleDoc("event"));
+    const art = previewArticle(page);
+    await expect(art).toHaveAttribute("data-format", "event");
+    await expect(art.locator('[data-part="lead"]')).toHaveCount(1);
+    const grid = art.locator('ul[data-part="grid"]');
+    await expect(grid.locator("[data-section-id]")).toHaveCount(2);
+    const role = page.locator(`${READY} #myRole`);
+    await expect(role).toHaveValue("Stage manager");
+
+    const menu = await plusMenu(page);
+    expect(menu).toEqual(await offeredNow(page));
+    expect(menu.find((o) => o.kind === "link")).toMatchObject({ off: true, full: "Up to 2 links in an event" });
+    expect(menu.find((o) => o.kind === "image")).toMatchObject({ off: false });
+
+    // No role: it can't be published, and says so. Typing one clears it.
+    const NEED = "Say what your role was.";
+    expect(await toFix(page)).not.toContain(NEED);
+    await role.fill("");
+    await expect.poll(async () => (await docNow(page)).myRole ?? "").toBe("");
+    expect(await toFix(page)).toContain(NEED);
+    await role.fill("Producer");
+    await expect.poll(async () => (await docNow(page)).myRole).toBe("Producer");
+    expect(await toFix(page)).not.toContain(NEED);
+
+    // And with no picture at all, its other need.
+    await page.evaluate(() => ["image-1", "image-2", "image-3"].forEach((id) => window.__exhbtEditor!.remove(id)));
+    expect(await toFix(page)).toContain("Add at least one picture, such as the poster.");
   });
 });
 
