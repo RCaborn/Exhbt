@@ -1,7 +1,11 @@
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { LIMITS, validateForPublish, wordCount, type ExhbtDoc } from "../lib/exhbt/blocks";
-import { CLASSIC_FORMATS, FORMAT_RULES, type Format } from "../lib/exhbt/formats";
+import { DraftSchema, DraftSchemaSeven, leftOff, repairDraft, toDoc, type Draft } from "../lib/ai/draft-answer";
+import { formatLimits, LIMITS, validateForPublish, wordCount, words, type ExhbtDoc } from "../lib/exhbt/blocks";
+import { checkedReason, CLASSIC_REASONS, isLayoutReason, LAYOUT_REASONS, layoutSentence } from "../lib/exhbt/drafted";
+import { CLASSIC_FORMATS, FORMAT_RULES, FORMATS, formatOf, type Format } from "../lib/exhbt/formats";
+import { pullquoteFrom, unsupportedParts } from "../lib/exhbt/references";
 import { beforeAfterDoc, buildDoc, essayDoc, eventDoc } from "../lib/exhbt/sample";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import * as classicEditor from "./editor-classic-helpers";
@@ -13,7 +17,11 @@ import { freshName, readStored, sampleDoc } from "./page-editor";
  * checked as a doc (publishable, within the cap), drawn in its usual order, printed on one A4
  * page in every look, axe-clean in every look, and without sideways scroll at 390px.
  *
- * Then release 4 (brief M): the classic editor never offers the four and keeps an exhbt that is one.
+ * Then release 4 (brief M), which offers them:
+ *  - the AI draft's answer for seven layouts, read purely: its size against the API's limit, its repair,
+ *    and that only what the person supplied reaches a doc (a pull quote, a source, a role, a link);
+ *  - the line the editor says after a draft, for each new layout;
+ *  - the classic editor, which never offers the four and keeps an exhbt that is one.
  */
 
 /** The four layouts of decision 0028. */
@@ -123,6 +131,306 @@ test.describe("Every look: one printed A4 page, axe, and no sideways scroll", ()
       });
     }
   }
+});
+
+/* ---------------- The AI draft's answer for seven layouts (pure: no browser, no AI) ---------------- */
+
+/** The material the pure tests draft from: everything the person supplied. */
+const MATERIAL = [
+  "This essay argues that the 1832 Reform Act kept the old order standing.",
+  "A reform meant to close a door became the first step through it.",
+  "Sources: Hartley, Reform and Its Limits (2004). Commons debates on the Reform Bill, 1831, https://example.com/commons-debates-1831.",
+  "I built the rota app in React. The demo is at https://example.com/shift-swap-demo and the code at https://example.com/shift-swap-code.",
+  "For the spring show I was the stage manager, and called four performances.",
+].join("\n");
+
+/** A seven-layout answer with nothing in the parts under test. */
+const answer = (over: Partial<Draft> = {}): Draft => ({
+  format: "essay",
+  formatReason: "default",
+  title: "Did the 1832 Reform Act protect the old order or end it?",
+  summary: "It kept the old order standing.",
+  context: "",
+  whereWhen: "",
+  skills: [],
+  gap: "Historians split on what the Act was for.",
+  gapHighlight: "",
+  flow: [{ step: "Read the debates", detail: "" }],
+  findings: ["Grey meant to preserve.", "Few gained the vote."],
+  charts: [],
+  quote: { text: "", name: "", role: "" },
+  next: "",
+  aim: "",
+  aimIsHypothesis: false,
+  conclusion: "",
+  references: [],
+  pullquote: "",
+  myRole: "",
+  numbers: [],
+  ...over,
+});
+const kinds = (doc: ExhbtDoc) => doc.sections.map((s) => s.kind);
+const linksOf = (doc: ExhbtDoc) => doc.sections.flatMap((s) => (s.kind === "link" ? [{ href: s.href, label: s.label }] : []));
+const pullquoteOf = (doc: ExhbtDoc) => doc.sections.flatMap((s) => (s.kind === "pullquote" ? [s.text] : []));
+
+/** How many fields a JSON schema has, counting every property at every depth, and how many are nullable: what the API's grammar limit counts (decision 0029). */
+function sizeOf(schema: unknown): { fields: number; nullable: number } {
+  const out = { fields: 0, nullable: 0 };
+  const walk = (node: unknown): void => {
+    if (typeof node !== "object" || node === null) return;
+    const n = node as { type?: unknown; anyOf?: unknown[]; properties?: Record<string, unknown>; items?: unknown };
+    if ((Array.isArray(n.type) && n.type.includes("null")) || n.anyOf?.some((a) => (a as { type?: unknown }).type === "null")) out.nullable++;
+    out.fields += Object.keys(n.properties ?? {}).length;
+    for (const v of Object.values(n.properties ?? {})) walk(v);
+    walk(n.items);
+    for (const a of n.anyOf ?? []) walk(a);
+  };
+  walk(schema);
+  return out;
+}
+
+test.describe("The draft's answer shape stays inside the API's limit (decision 0029)", () => {
+  // The API refuses an answer shape of about 52 to 56 fields, and a nullable field costs about two. A field
+  // added to either shape changes these numbers: check the new count against that limit before changing them.
+  test("three layouts: 39 fields, as before release 4; seven layouts: 41; neither has a nullable field", () => {
+    expect(sizeOf(zodOutputFormat(DraftSchema).schema)).toEqual({ fields: 39, nullable: 0 });
+    expect(sizeOf(zodOutputFormat(DraftSchemaSeven).schema)).toEqual({ fields: 41, nullable: 0 });
+  });
+
+  test("the seven-layout answer adds a pull quote and a role, and nothing else: sources and links are rows of references", () => {
+    const three = Object.keys(DraftSchema.shape);
+    const seven = Object.keys(DraftSchemaSeven.shape);
+    expect(seven.filter((k) => !three.includes(k))).toEqual(["pullquote", "myRole"]);
+    expect(three.filter((k) => !seven.includes(k))).toEqual([]);
+    // The layout comes first, so everything after it is written knowing it; the numbers come last.
+    expect(seven.slice(0, 2)).toEqual(["format", "formatReason"]);
+    expect(seven.at(-1)).toBe("numbers");
+    expect(DraftSchemaSeven.shape.format.options).toEqual([...FORMATS]);
+    expect(DraftSchema.shape.format.options).toEqual([...CLASSIC_FORMATS]);
+  });
+});
+
+test.describe("The seven-layout answer, repaired", () => {
+  test("one of the four is kept in a seven-layout answer, and becomes a case study in a three-layout one", () => {
+    for (const f of NEW_FOUR) {
+      expect((repairDraft(answer({ format: f }), "seven") as Draft).format).toBe(f);
+      expect(DraftSchemaSeven.safeParse(repairDraft(answer({ format: f }), "seven")).success).toBe(true);
+      expect((repairDraft(answer({ format: f }), "three") as Draft).format).toBe("case-study");
+      expect((repairDraft(answer({ format: f })) as Draft).format).toBe("case-study");
+    }
+  });
+
+  test("a reason for one of the four is kept in a seven-layout answer, and says nothing in a three-layout one", () => {
+    expect((repairDraft(answer({ formatReason: "built-thing" }), "seven") as Draft).formatReason).toBe("built-thing");
+    expect((repairDraft(answer({ formatReason: "built-thing" }), "three") as Draft).formatReason).toBe("default");
+    expect((repairDraft({ ...answer(), formatReason: "it reads like an essay" }, "seven") as Draft).formatReason).toBe("default");
+  });
+
+  test("a pull quote or a role that is missing or isn't text becomes none, and the draft is kept", () => {
+    const raw: Record<string, unknown> = { ...answer(), pullquote: null };
+    delete raw.myRole;
+    expect(DraftSchemaSeven.safeParse(raw).success).toBe(false);
+    const fixed = repairDraft(raw, "seven") as Draft;
+    expect(fixed.pullquote).toBe("");
+    expect(fixed.myRole).toBe("");
+    expect(DraftSchemaSeven.safeParse(fixed).success).toBe(true);
+  });
+});
+
+test.describe("Only what the person supplied reaches a drafted doc", () => {
+  test("a pull quote is kept only when it is in the material word for word, and within its cap", () => {
+    const kept = toDoc(answer({ pullquote: "“A reform meant to close a door became the first step through it.”" }), MATERIAL);
+    expect(pullquoteOf(kept)).toEqual(["A reform meant to close a door became the first step through it."]);
+    // The essay's usual order: the key points, then the pull quote.
+    expect(kinds(kept)).toEqual(["findings", "pullquote"]);
+    // Reworded, or written by the AI: none.
+    expect(pullquoteOf(toDoc(answer({ pullquote: "A reform meant to close a door opened it." }), MATERIAL))).toEqual([]);
+    expect(pullquoteOf(toDoc(answer({ pullquote: "Reform is a door that never closes." }), MATERIAL))).toEqual([]);
+    // In the material, but over the cap: left off, never cut.
+    const long = Array.from({ length: LIMITS.pullquote.words + 1 }, (_, i) => `word${i}`).join(" ");
+    expect(pullquoteOf(toDoc(answer({ pullquote: long }), `${MATERIAL}\n${long}`))).toEqual([]);
+    expect(pullquoteFrom(long.split(" ").slice(1).join(" "), long, LIMITS.pullquote.words)).not.toBeNull();
+  });
+
+  test("a source with no address is kept only when its citation is in the material word for word", () => {
+    const doc = toDoc(
+      answer({
+        references: [
+          { label: "Hartley, Reform and Its Limits (2004)", url: "" },
+          { label: "Invented, A. (2020) A book nobody cited", url: "" },
+          { label: "Hartley, The Limits of Reform (2004)", url: "" },
+        ],
+      }),
+      MATERIAL,
+    );
+    expect(linksOf(doc)).toEqual([{ href: "", label: "Hartley, Reform and Its Limits (2004)" }]);
+  });
+
+  test("a source with an address needs that https address in the material as written; a made-up address is taken off a real citation", () => {
+    const doc = toDoc(
+      answer({
+        references: [
+          { label: "Commons debates on the Reform Bill, 1831", url: "https://example.com/commons-debates-1831" },
+          // A real citation with an address the material doesn't hold: the citation is kept, with no address.
+          { label: "Hartley, Reform and Its Limits (2004)", url: "https://doi.org/10.1000/made-up" },
+          // Neither the address nor the citation is in the material.
+          { label: "A paper nobody cited", url: "https://example.com/nowhere" },
+          { label: "Not https", url: "http://example.com/commons-debates-1831" },
+        ],
+      }),
+      MATERIAL,
+    );
+    expect(linksOf(doc)).toEqual([
+      { href: "https://example.com/commons-debates-1831", label: "Commons debates on the Reform Bill, 1831" },
+      { href: "", label: "Hartley, Reform and Its Limits (2004)" },
+    ]);
+    expect(unsupportedParts(doc, MATERIAL)).toEqual([]);
+  });
+
+  test("an essay keeps at most four sources, and a source's label is cut to the essay's cap", () => {
+    const many = Array.from({ length: 6 }, (_, i) => ({ label: `Source number ${i}`, url: "" }));
+    const material = many.map((m) => m.label).join(". ");
+    expect(linksOf(toDoc(answer({ references: many }), material))).toHaveLength(formatLimits("essay").sections.link);
+    const long = "Hartley Reform and Its Limits a very long citation that runs on past the twelve words allowed";
+    const [cut] = linksOf(toDoc(answer({ references: [{ label: long, url: "" }] }), long));
+    expect(words(cut!.label)).toBe(formatLimits("essay").link.labelWords);
+    expect(long.startsWith(cut!.label)).toBe(true);
+  });
+
+  test("My role is kept only when the material says it, and only on an event", () => {
+    expect(toDoc(answer({ format: "event", myRole: "Stage manager" }), MATERIAL).myRole).toBe("Stage manager");
+    // The material doesn't say it: empty, so the person types it.
+    expect(toDoc(answer({ format: "event", myRole: "Director" }), MATERIAL).myRole).toBeUndefined();
+    expect(toDoc(answer({ format: "event", myRole: "" }), MATERIAL).myRole).toBeUndefined();
+    expect("myRole" in toDoc(answer({ format: "event", myRole: "" }), MATERIAL)).toBe(false);
+    // Over the sidebar's cap: left off, never cut.
+    const long = "stage manager and deputy lighting designer for every one of the four nights";
+    expect(long.length).toBeGreaterThan(LIMITS.myRoleChars);
+    expect(toDoc(answer({ format: "event", myRole: long }), `${MATERIAL} I was ${long}.`).myRole).toBeUndefined();
+    // Another layout doesn't draft it, even when the material says it.
+    expect(toDoc(answer({ format: "case-study", myRole: "Stage manager" }), MATERIAL).myRole).toBeUndefined();
+  });
+
+  test("a build's link is kept only when its https address is in the material, and there are at most two", () => {
+    const doc = toDoc(
+      answer({
+        format: "build",
+        references: [
+          { label: "Try the demo", url: "https://example.com/shift-swap-demo" },
+          { label: "A made-up link", url: "https://example.com/not-in-the-material" },
+          { label: "Source code", url: "https://example.com/shift-swap-code" },
+          { label: "A third real one", url: "https://example.com/commons-debates-1831" },
+          // No address: a build has no use for a citation.
+          { label: "Hartley, Reform and Its Limits (2004)", url: "" },
+        ],
+      }),
+      MATERIAL,
+    );
+    expect(linksOf(doc)).toEqual([
+      { href: "https://example.com/shift-swap-demo", label: "Try the demo" },
+      { href: "https://example.com/shift-swap-code", label: "Source code" },
+    ]);
+    // A build's links come last, after what it does.
+    expect(kinds(doc)).toEqual(["findings", "link", "link"]);
+    expect(unsupportedParts(doc, MATERIAL)).toEqual([]);
+  });
+
+  test("Before and After marks are never drafted, and a part that belongs to another layout is left off", () => {
+    for (const f of FORMATS) {
+      const doc = toDoc(answer({ format: f, pullquote: "A reform meant to close a door became the first step through it.", myRole: "Stage manager", references: [{ label: "Try the demo", url: "https://example.com/shift-swap-demo" }] }), MATERIAL);
+      // No picture is drafted at all, so none can carry a mark.
+      expect(doc.sections.filter((s) => s.kind === "image"), f).toEqual([]);
+      expect(JSON.stringify(doc), f).not.toContain('"stage"');
+      expect(pullquoteOf(doc).length, f).toBe(f === "essay" ? 1 : 0);
+      expect(doc.myRole, f).toBe(f === "event" ? "Stage manager" : undefined);
+      expect(linksOf(doc).length, f).toBe(f === "essay" || f === "build" || f === "research" ? 1 : 0);
+      expect(formatOf(doc), f).toBe(f);
+    }
+  });
+
+  test("a three-layout answer, which has no pull quote or role, still becomes the same doc as before", () => {
+    const three = answer({ format: "research", aim: "To test recall.", conclusion: "It helped.", references: [{ label: "Commons debates", url: "https://example.com/commons-debates-1831" }] });
+    delete three.pullquote;
+    delete three.myRole;
+    const doc = toDoc(three, MATERIAL);
+    expect(kinds(doc)).toEqual(["aim", "findings", "conclusion", "link"]);
+    expect(Object.keys(doc)).toEqual(["schemaVersion", "format", "title", "context", "whereWhen", "summary", "skills", "gap", "flow", "sections"]);
+  });
+
+  test("unsupportedParts names each part a doc holds that its material doesn't", () => {
+    const doc: ExhbtDoc = {
+      ...toDoc(answer(), MATERIAL),
+      myRole: "Director",
+      sections: [
+        { id: "pullquote-1", kind: "pullquote", text: "Reform is a door that never closes." },
+        { id: "link-1", kind: "link", href: "", label: "Invented, A. (2020) A book nobody cited", description: "" },
+        { id: "link-2", kind: "link", href: "https://example.com/nowhere", label: "A link", description: "" },
+        { id: "link-3", kind: "link", href: "https://example.com/commons-debates-1831", label: "Commons debates", description: "" },
+        { id: "link-4", kind: "link", href: "", label: "Hartley, Reform and Its Limits (2004)", description: "" },
+      ],
+    };
+    expect(unsupportedParts(doc, MATERIAL)).toEqual([
+      `My role isn't in the material: "Director"`,
+      `The pull quote isn't in the material: "Reform is a door that never closes."`,
+      `A source with no address isn't in the material: "Invented, A. (2020) A book nobody cited"`,
+      "A link's address isn't in the material: https://example.com/nowhere",
+    ]);
+    // An address the material writes without its closing slash is the same address.
+    expect(unsupportedParts({ sections: [{ kind: "link", href: "https://example.com/", label: "Home" }] }, "See https://example.com.")).toEqual([]);
+  });
+
+  test("leftOff says what the model wrote that the material didn't hold", () => {
+    const essay = answer({ pullquote: "Reform is a door that never closes.", references: [{ label: "Invented, A. (2020)", url: "" }, { label: "Hartley, Reform and Its Limits (2004)", url: "" }] });
+    expect(leftOff(essay, toDoc(essay, MATERIAL))).toEqual(["pull quote", "1 source"]);
+    const event = answer({ format: "event", myRole: "Director" });
+    expect(leftOff(event, toDoc(event, MATERIAL))).toEqual(["My role"]);
+    const fine = answer({ format: "event", myRole: "stage manager" });
+    expect(leftOff(fine, toDoc(fine, MATERIAL))).toEqual([]);
+  });
+});
+
+test.describe("The line after a draft, for the four layouts", () => {
+  const drafted = (over: Partial<Draft>) => toDoc(answer(over), MATERIAL);
+
+  test("each new signal is said only when the draft bears it out", () => {
+    // A built thing with what it does.
+    expect(checkedReason(drafted({ format: "build" }), "built-thing")).toBe("built-thing");
+    expect(checkedReason(drafted({ format: "build", findings: [] }), "built-thing")).toBe("default");
+    // An argument with sources: key points, and a source the material holds.
+    const sourced = { references: [{ label: "Hartley, Reform and Its Limits (2004)", url: "" }] };
+    expect(checkedReason(drafted({ format: "essay", ...sourced }), "argument-sources")).toBe("argument-sources");
+    expect(checkedReason(drafted({ format: "essay" }), "argument-sources")).toBe("default");
+    expect(checkedReason(drafted({ format: "essay", references: [{ label: "Invented, A. (2020)", url: "" }] }), "argument-sources")).toBe("default");
+    // A before and an after: what changed.
+    expect(checkedReason(drafted({ format: "before-after" }), "before-and-after")).toBe("before-and-after");
+    expect(checkedReason(drafted({ format: "before-after", findings: [] }), "before-and-after")).toBe("default");
+    // An event with a role.
+    expect(checkedReason(drafted({ format: "event", myRole: "stage manager" }), "event-role")).toBe("event-role");
+    expect(checkedReason(drafted({ format: "event", myRole: "Director" }), "event-role")).toBe("default");
+  });
+
+  test("a signal never explains a layout it isn't for, and the notes must name the layout", () => {
+    expect(checkedReason(drafted({ format: "essay" }), "built-thing")).toBe("default");
+    expect(checkedReason(drafted({ format: "build" }), "aim-results")).toBe("default");
+    for (const [f, notes] of [["build", "Lay it out as a build."], ["essay", "An essay, please."], ["before-after", "Use the before and after layout."], ["event", "It was an event."]] as const) {
+      expect(checkedReason(drafted({ format: f }), "notes", { notes }), f).toBe("notes");
+      expect(checkedReason(drafted({ format: f }), "notes", { notes: "No layout named here." }), f).toBe("default");
+    }
+  });
+
+  test("the sentence for each is fixed wording, and none of it is the model's", () => {
+    expect(layoutSentence("build", "built-thing")).toBe("Laid out as Build because your work is something you built, and says what it does.");
+    expect(layoutSentence("essay", "argument-sources")).toBe("Laid out as Essay because your work makes an argument and names its sources.");
+    expect(layoutSentence("before-after", "before-and-after")).toBe("Laid out as Before and after because your work says how something was and how it is now.");
+    expect(layoutSentence("event", "event-role")).toBe("Laid out as Event or performance because your work is an event, and says what your part in it was.");
+    expect(layoutSentence("event", "notes")).toBe("Laid out as Event or performance because your notes name this layout.");
+    // A reason that doesn't fit the layout, or none, is left out.
+    expect(layoutSentence("essay", "built-thing")).toBe("Laid out as Essay.");
+    expect(layoutSentence("build", "default")).toBe("Laid out as Build.");
+    // Every signal the draft may give is one the edit page will read from the address.
+    for (const r of LAYOUT_REASONS) expect(isLayoutReason(r)).toBe(true);
+    expect(CLASSIC_REASONS.every((r) => (LAYOUT_REASONS as readonly string[]).includes(r))).toBe(true);
+  });
 });
 
 /* ---------------- The classic editor and the four layouts ---------------- */
