@@ -117,13 +117,14 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
 
   // The panel (the rewrite form, or "No rewrites left") closes with Escape and gives the focus back to "More actions": here while
   // the focus is on nothing, as it is once "Rewrite this block" is pressed (the button goes with its menu), and in onKeyDown below
-  // while it is in the panel. The menu takes its own Escape first, and a panel that isn't drawn (in a card that is closed) is left
-  // alone. A press outside never closes the form, so a note typed in it is not lost (decision 0026: while it is open its toolbar
-  // stays, wherever the pointer and the focus are); it does close "No rewrites left", which holds nothing and has no Cancel.
+  // while it is in the panel. The menu takes its own Escape first, and a panel whose "More actions" isn't drawn (in a card that is
+  // closed) is left alone; the button is asked, not this box, which the phone's bar lays out in its own row and draws no box for.
+  // A press outside never closes the form, so a note typed in it is not lost (decision 0026: while it is open its toolbar stays,
+  // wherever the pointer and the focus are); it does close "No rewrites left", which holds nothing and has no Cancel.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || menu || !root.current?.getClientRects().length) return;
+      if (e.key !== "Escape" || e.defaultPrevented || menu || !trigger.current?.getClientRects().length) return;
       if (document.activeElement && document.activeElement !== document.body) return;
       e.preventDefault();
       setOpen(false);

@@ -428,6 +428,8 @@ test.describe("An open rewrite form stays up and takes the press", () => {
       const stale = await page.context().newPage();
       await stale.goto(page.url());
       await expect(stale.locator(READY)).toBeAttached();
+      // Each page is in front while it is driven: a page in the background is not drawn again, so what is under its pointer would not change.
+      await page.bringToFront();
       // Free's rewrites run out sooner than Max's, and both pages keep the look they were drawn in (Max's).
       expect((await page.request.get("/dev/plan?plan=free&next=/exhbts")).ok()).toBe(true);
       for (let i = 1; i <= FREE_REWRITES; i++) {
@@ -441,7 +443,6 @@ test.describe("An open rewrite form stays up and takes the press", () => {
       await leave(page);
       expect(await groundProblems(page, "flow", "panel"), "No rewrites left").toEqual([]);
 
-      // A page in the background is not drawn again, so what is under its pointer would not change.
       await stale.bringToFront();
       await startRewrite(stale, "flow");
       await rewriteNow(stale, "flow").click();
