@@ -1,0 +1,21 @@
+{
+  "fixture": "19-event-five-a-side",
+  "shape": "A sports tournament write-up as plain text: what it was for, the person's own part, how it was run, how it went in figures and a named person's words.",
+  "tests": "Layout: event, for sport rather than music. My role is the material's own words (tournament organiser). Other people's parts (the food stall, first aid) are not claimed.",
+  "files": ["19-event-five-a-side.txt"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":false,"chart":false,"noNumbers":false,"layout":"event"},
+  "keyFacts": [
+    {"id":"role","fact":"The person was the tournament organiser.","match":["tournament organiser"]},
+    {"id":"teams","fact":"All 16 places were taken and 104 players took part.","match":[["16","104"],"104"]},
+    {"id":"raised","fact":"£778 went to the hospice (£560 in entry fees and £218 from the food stall).","match":["778"]},
+    {"id":"format","fact":"Four groups of four, the top two going through to the quarter-finals.","match":["groups of four","four groups","quarter-finals","quarter finals"]},
+    {"id":"on-time","fact":"The final kicked off at 4.10pm as planned; every game started on time.","match":["on time","as planned","4.10"]}
+  ],
+  "forbidden": [
+    {"id":"others-parts","why":"Two other committee members ran the food stall and first aid, not the person.","match":["ran the food stall","ran first aid","I ran the food"]},
+    {"id":"derived","why":"The material gives the totals and no figure per team or per player.","match":["£48","£7.48","per player","per team raised"]}
+  ],
+  "sourceNumbers": ["8","2026","16","7","£35","10","12","4.10","104","£560","£218","£778"]
+}

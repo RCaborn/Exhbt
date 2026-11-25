@@ -1,0 +1,21 @@
+{
+  "fixture": "14-essay-property-act",
+  "shape": "A history essay in markdown: a question, a stated thesis, three points each resting on a named source, and a list of four sources, two with an https address and two without.",
+  "tests": "Layout: essay. Sources are kept only as the material gives them (an address copied exactly, or a citation word for word); a pull quote only if it is one of the essay's own sentences. No date or figure from outside the essay.",
+  "files": ["14-essay-property-act.md"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":false,"chart":false,"noNumbers":false,"layout":"essay"},
+  "keyFacts": [
+    {"id":"thesis","fact":"The Act changed the law far more than it changed who held property.","match":["changed the law",["law","who held property"],"few women had the means"]},
+    {"id":"wording","fact":"The Act let a wife own, buy and sell property as if unmarried.","match":["as if she were unmarried","own, buy and sell","in her own right","own property"]},
+    {"id":"wealth","fact":"The wealth it protected was thin: the women in Combs's study were shopkeepers' wives, not labourers'.","match":["shopkeepers","probate","money and shares"]},
+    {"id":"courts","fact":"The courts read the Act narrowly: a wife's contract bound only her separate property.","match":["narrowly","separate property"]},
+    {"id":"sources","fact":"Names its sources (Holcombe, Combs, Shanley).","match":["Holcombe","Combs","Shanley"]}
+  ],
+  "forbidden": [
+    {"id":"outside-dates","why":"The essay gives no date for women's suffrage or for any other Act: one written in is from outside the material.","match":["1918","1928","1894","1870 Act"]},
+    {"id":"data","why":"The essay reports no data the person collected and states no percentage.","match":["%","survey"]}
+  ],
+  "sourceNumbers": ["1882","2","2026","1983","1870","2005","1989","65","4","1"]
+}

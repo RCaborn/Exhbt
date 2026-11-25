@@ -4,6 +4,7 @@ import { mediaTypeOf } from "@/lib/ai/transcribe";
 import { callerIpHash } from "@/lib/access";
 import { checkCvText, cleanCvText } from "@/lib/cv-quality";
 import { getStore } from "@/lib/store";
+import { recordAIFailure } from "@/lib/ai-failures";
 
 /**
  * Reads a CV the browser couldn't (a scanned PDF, a photo) by asking the AI to transcribe it.
@@ -56,8 +57,8 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ text });
   } catch (e) {
-    console.error("cv read failed", (e as Error).message);
-    await store.logEvent("cv_read_failed", null, { reason: "error", message: (e as Error).message.slice(0, 200) });
+    // Already bounded: reads are counted before the call (cv_read_ai above). Logged under its old name.
+    await recordAIFailure("file_read", { userId: null, key: ipHash }, e, { mediaType, material: "cv" }, "cv_read_failed");
     return fail("We couldn't read that file just now. Try again in a moment, or paste the text.", 502);
   }
 }

@@ -14,11 +14,11 @@ Remove the old card editor and the switch to it, now that the edit-on-page edito
 
 ## Read first
 
-`docs/decisions/0026-edit-on-page-editor.md` ("The classic editor: the switch, the fallback, the escape"). Then `components/editor/` (every file: some are the classic editor, some are parts the new editor imports), `app/(app)/exhbts/[id]/edit/page.tsx`, `lib/editor-kind.ts`, `components/exhbt-editor/` (search it for imports from `@/components/editor/`).
+`docs/decisions/0026-edit-on-page-editor.md` ("The classic editor: the switch, the fallback, the escape"). Then `components/editor/` (every file: some are the classic editor, some are parts the new editor imports), `app/(app)/exhbts/[id]/edit/page.tsx`, `lib/editor-kind.ts` and `lib/editor-kind-server.ts`, `components/exhbt-editor/` (search it for imports from `@/components/editor/`).
 
 ## You own
 
-In this release, all of: `components/editor/`, `lib/editor-kind.ts`, `app/(app)/exhbts/[id]/edit/page.tsx` and `error.tsx`, `app/dev/editor/`, `app/api/health/route.ts`, `components/exhbt-editor/EditorGate.tsx` (the fallback), `components/exhbt-editor/topbar/` (the menu item only), `components/exhbt-editor/context.ts` (to take in `EditorProps`), `e2e/editor-classic.spec.ts`, `e2e/editor-classic-keeps.spec.ts`, `e2e/editor-switch.spec.ts`, `e2e/editor-classic-helpers.ts`, and the paragraphs of `DESIGN.md`, `docs/MAP.md`, `HANDOFF.md`, `AGENTS.md` and `docs/briefs/edit-on-page/README.md` that mention the classic editor.
+In this release, all of: `components/editor/`, `lib/editor-kind.ts`, `lib/editor-kind-server.ts`, `app/(app)/exhbts/[id]/edit/page.tsx`, `error.tsx` and `TryNewEditor.tsx`, `app/api/exhbts/editor/`, `app/dev/editor/`, `app/api/health/route.ts`, `components/exhbt-editor/EditorGate.tsx` (the fallback), `components/exhbt-editor/topbar/` (the menu item only), `components/exhbt-editor/context.ts` (to take in `EditorProps`), `e2e/editor-classic.spec.ts`, `e2e/editor-classic-keeps.spec.ts`, `e2e/editor-switch.spec.ts`, `e2e/editor-admin-switch.spec.ts`, `e2e/editor-classic-helpers.ts`, the `EXHBT_EDITOR` line in `playwright.config.ts` and in `.env.example`, and the paragraphs of `DESIGN.md`, `docs/MAP.md`, `HANDOFF.md`, `AGENTS.md` and `docs/briefs/edit-on-page/README.md` that mention the classic editor.
 
 ## You must not touch
 
@@ -30,10 +30,10 @@ Commit and push after each.
 
 1. **List what the new editor still imports from `components/editor/`.** Expect: `useAutosave.ts`, `media.ts`, `model.ts`, `ChartEditor.tsx`, `PickedFigure.tsx`, `BlockTools.tsx`, `ConfirmAction.tsx`, `FieldIssues.tsx`, perhaps `parts.tsx` and `SkillsInput.tsx`, and `RichTextField.tsx` if the link prompt still borrows from it. Those stay where they are, with their names.
 2. **Delete the rest:** `Editor.tsx`, `Sections.tsx`, `PreviewArrange.tsx`, `Checklist.tsx`, `LayoutPicker.tsx`, `FlowEditor.tsx`, `RichTextField.tsx` if nothing imports it, and anything else only they used. `EditorProps` is imported by the new editor from `Editor.tsx`: move that type into `components/exhbt-editor/context.ts` first.
-3. **Remove the switch:** delete `lib/editor-kind.ts` (`editorKind` and its development override); `app/dev/editor/`; the `editor` line from `/api/health`; the `?editor=classic` branch and the "You're in the classic editor" line from the edit page; "Use the classic editor" from the menu.
+3. **Remove the switch:** delete `lib/editor-kind.ts` and `lib/editor-kind-server.ts` (the rule, `DEFAULT_EDITOR`, `editorKind`, the admin's own choice and the development cookie); `app/api/exhbts/editor/` (the route that stores an admin's choice in the cookie `exhbt-editor-own`); `TryNewEditor.tsx` and its line on the edit page; `adminSwitch` in `PageEditorProps`; `isAdmin` in `lib/admin.ts` if nothing else calls it by then; `app/dev/editor/`; the `editor` line from `/api/health`; the `?editor=classic` branch and the "You're in the classic editor" line from the edit page; "Use the classic editor" from the menu; `EXHBT_EDITOR` from `playwright.config.ts` and `.env.example`.
 4. **The crash fallback** (`EditorGate.tsx`) can no longer reload into another editor. The error boundary stays: it shows "Something went wrong. Your work is saved." and a button, "Reload", once `flushPending()` has settled. `error.tsx` loses its link to the classic editor and keeps "Reload".
 5. **`sectionsSlot`** on `ProjectView` was for "Arrange sections". If nothing passes it now, say so in your report; removing it is the renderer's change, not yours.
-6. **Tests:** delete the four classic test files (`editor-classic`, `editor-classic-keeps`, `editor-switch`, `editor-classic-helpers`). Search `e2e/` for `data-editor="classic"`, `editor=classic` and `/dev/editor` (but not `/dev/editor-timing`, which stays): nothing should be left.
+6. **Tests:** delete the five classic test files (`editor-classic`, `editor-classic-keeps`, `editor-switch`, `editor-admin-switch`, `editor-classic-helpers`). Search `e2e/` for `data-editor="classic"`, `editor=classic` and `/dev/editor` (but not `/dev/editor-timing`, which stays): nothing should be left.
 7. **Docs:** take the classic editor out of the paragraphs listed above. The decision records are history and are not edited.
 
 ## Tests
@@ -42,7 +42,7 @@ Nothing new. Run: `e2e/editor-inplace.spec.ts`, `e2e/editor-topbar.spec.ts`, `e2
 
 ## Done looks like
 
-The four checks pass; a search of the repo outside `docs/decisions/` and `docs/briefs/` for `EXHBT_EDITOR`, `editorKind` and "classic editor" finds nothing; the named specs pass.
+The four checks pass; a search of the repo outside `docs/decisions/` and `docs/briefs/` for `EXHBT_EDITOR`, `editorKind`, `DEFAULT_EDITOR`, `exhbt-editor-own` and "classic editor" finds nothing; the named specs pass.
 
 ## Report back
 

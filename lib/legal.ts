@@ -3,7 +3,7 @@
  * print them and the sitemap reads them as `lastmod`. Change the date when the wording changes.
  */
 export const LEGAL_UPDATED = {
-  privacy: "2026-11-23",
+  privacy: "2026-11-25",
   terms: "2026-11-16",
   cookies: "2026-11-16",
 } as const;

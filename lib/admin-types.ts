@@ -41,7 +41,7 @@ export type AdminRowMap = {
   }[];
   exhbts: { id: string; userId: string; status: "draft" | "published"; createdAt: string; publishedAt: string | null }[];
   /** Named events except page_view. `cached` is only set on roadmap_completed. */
-  events: { name: string; userId: string | null; at: string; cached: boolean | null }[];
+  events: { name: string; userId: string | null; at: string; cached: boolean | null; reason: string | null; inputTokens: number | null; outputTokens: number | null }[];
   pageViews: { at: string; path: string; referrer: string; isPortfolio: boolean }[];
   aiCalls: { userId: string | null; step: string; model: string; inputTokens: number; outputTokens: number; costUsd: number; at: string }[];
   ideas: { at: string; source: "roadmap" | "swap" }[];

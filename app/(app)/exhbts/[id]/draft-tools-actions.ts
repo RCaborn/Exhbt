@@ -9,6 +9,7 @@ import { blockValue, flagsForBlock, isDraftBlock, replaceBlock, type BlockValue 
 import { rewriteAllowance } from "@/lib/rewriting";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
+import { recordAIFailure, tooManyFailures, TOO_MANY_FAILURES } from "@/lib/ai-failures";
 
 /** "Rewrite this block" (docs/phase-2.md section 6). Every rule is checked here; the card only shows it. */
 
@@ -37,11 +38,12 @@ export async function rewriteBlockAction(id: string, block: string, note: string
   const source = await loadDraftSource(user.id, id);
   if (!source) return { ok: false, error: "There are no files to rewrite from. This exhbt wasn't drafted from your files, or they have expired." };
 
+  if (await tooManyFailures("exhbt_rewrite", { userId: user.id })) return { ok: false, error: TOO_MANY_FAILURES, left: allowance.left };
   let result;
   try {
     result = await aiRewrite({ block, source, doc, note: note.slice(0, MAX_NOTE_CHARS), attempt: allowance.used + 1 });
   } catch (e) {
-    console.error("exhbt rewrite failed", (e as Error).message);
+    await recordAIFailure("exhbt_rewrite", { userId: user.id }, e, { exhbtId: id, block });
     return { ok: false, error: "We couldn't rewrite that just now. Nothing was changed and it didn't use up a rewrite. Try again in a moment.", left: allowance.left };
   }
   await store.logAICall({

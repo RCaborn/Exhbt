@@ -13,6 +13,7 @@ import { canMakeJobLinks, getPlan, limitsFor } from "@/lib/plan";
 import { isPhase2Enabled } from "@/lib/site";
 import { jobLinkSlug, takenSlugs, type SlugStyle } from "@/lib/slugs";
 import { getStore, type JobLink, type JobLinkPick } from "@/lib/store";
+import { recordAIFailure, tooManyFailures, TOO_MANY_FAILURES } from "@/lib/ai-failures";
 
 /**
  * Everything that changes a job link, from /job-links, /job-links/new and the edit page.
@@ -88,11 +89,12 @@ export async function createJobLink(input: CreateJobLinkInput): Promise<CreateJo
   const exhbts = await pickableExhbts(user.id);
   if (exhbts.length === 0) return { ok: false, error: "Publish an exhbt first. A job link shows your live exhbts." };
 
+  if (await tooManyFailures("job_match", { userId: user.id })) return { ok: false, error: TOO_MANY_FAILURES };
   let match;
   try {
     match = await matchExhbtsToJob({ company, roleTitle, description, candidates: exhbts.map(toCandidate) });
   } catch (e) {
-    console.error("job match failed", (e as Error).message);
+    await recordAIFailure("job_match", { userId: user.id }, e);
     return { ok: false, error: "We couldn't pick your exhbts just now. Try again in a moment." };
   }
   await store.logAICall({
@@ -194,5 +196,5 @@ export async function deleteJobLink(id: string) {
   const user = await signedIn("/job-links");
   await getStore().deleteJobLink(id, user.id);
   revalidatePath("/job-links");
-  redirect("/job-links");
+  redirect("/portfolio#job-links");
 }

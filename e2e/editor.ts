@@ -1,65 +1,62 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { uniqueEmail } from "./helpers";
+import { chooseAll, focusedPath, READY, textbox, waitSaved as waitSavedNow } from "./page-editor";
+
+export { keepClassic } from "./editor-classic-helpers";
 
 /**
- * Everything the browser tests know about the exhbt editor (`/exhbts/[id]/edit`, `components/editor/`).
- * Specs import from here and never reach for editor selectors themselves, so a rewrite of the editor
- * changes this file and nothing else. See docs/briefs/edit-on-page/test-contract.md for which of these
- * the new editor is meant to keep.
+ * Everything the browser tests know about the exhbt editor (`/exhbts/[id]/edit`, `components/exhbt-editor/`:
+ * the edit-on-page editor, decision 0026). Specs import from here and never reach for editor selectors
+ * themselves, so a change to the editor changes this file and nothing else. The classic editor's page object
+ * is `e2e/editor-classic-helpers.ts`; the new editor's own page object is `e2e/page-editor.ts` (G's, reused here).
+ *
+ * The page IS the editor: there are no form cards and no preview pane. A part is found by its `data-path`, a
+ * section by its frame (`data-section-id`, `data-kind`), and what the classic editor called a card is that frame.
  */
 
 /* ------------------------------------------------------------------------------------------------
  * SELECTORS: the one place the editor's field ids, roles, labels, text and test ids are written down.
- * Change a value here and every helper below follows. Helpers never repeat these literals.
  * ---------------------------------------------------------------------------------------------- */
 export const SEL = {
-  /** The page after /exhbts: the signed-in list with its heading and the button that makes a blank exhbt. */
   listHeading: { level: 1 as const, name: "Your exhbts" },
   startFromScratchButton: "Start from scratch",
-  /** The draft page (/exhbts/new) and the editor page's own heading. */
   draftHeading: { level: 1 as const, name: "Draft an exhbt" },
   draftForm: "form[data-ready=true]",
+  /** The editor's h1 (visually hidden until a wide window). */
   editHeading: { level: 1 as const, name: "Edit exhbt" },
   editUrl: /\/exhbts\/[0-9a-f-]{36}\/edit$/,
   editUrlId: /\/exhbts\/([0-9a-f-]{36})\/edit$/,
-  /** Set once the editor has hydrated. */
-  ready: "[data-ready=true]",
-  /** Fields by id, label or accessible name. */
+  /** The editor, ready. */
+  ready: READY,
   titleField: "#title",
-  contextField: { role: "textbox" as const, name: "Context" },
+  /** The "What it is" field in the sidebar. */
+  whatItIsField: "#context",
+  /** The context line, a formatted field (named "Context" in a case study). */
+  gapPath: "gap",
   boxLabel: (n: number) => `Box ${n}`,
-  findingField: (n: number) => ({ role: "textbox" as const, name: `Finding ${n}` }),
   addSectionButton: "#add-section",
-  addSectionMenuButton: "Add a section",
   imageInput: "input[aria-label='Choose an image']",
-  /** The cards and the preview. */
-  sectionsRegion: "Sections",
+  /** The page being edited: the article, and the visitor's view of it. */
+  editingArticle: `${READY} article[data-exhbt-page]`,
   previewRegion: "Preview",
   previewArticle: "article[data-exhbt-page]",
-  sectionOrderList: 'ol[aria-label="Sections, in page order"] > li',
   sectionKindAttr: "data-kind",
   partAttr: "data-part",
   articlePart: "article [data-part]",
-  /** The layout choice. */
   layoutGroup: "Layout",
-  /** Save status text. */
   saving: "Saving…",
   saved: "Saved",
-  /** The word bar. */
   wordBar: "[data-word-bar]",
-  /** Publishing. */
   publishConfirm: "This is my work, and the numbers are true",
   publishButton: "Publish",
   liveText: "It's live.",
   liveOrChangedText: /^(It's live\.|Your changes are live\.)$/,
-  /** The rewrite tools on a drafted exhbt: test ids on each card's tools, and the card names. */
   toolsTestId: (block: string) => `tools-${block}`,
   rewritesLeftTestId: "rewrites-left",
   rewriteThisBlock: "Rewrite this block",
   backToAiVersion: "Back to the AI version",
   cardMenuButton: (cardName: string) => `More actions for ${cardName}`,
   cards: { header: "Your question and details", skills: "Skills", gap: "Context", flow: "Process", findings: "Findings" } as Record<string, string>,
-  /** The graph card: a group named "Graph N" with a radio per kind. */
   graphGroup: (n: number) => `Graph ${n}`,
   addGraphButton: "Add a graph",
 };
@@ -85,20 +82,22 @@ export async function signInAs(page: Page, username: string, plan: Plan = "premi
   await expect(page.getByRole("heading", SEL.listHeading)).toBeVisible();
 }
 
+/** Waits for the new editor to be up (the loading view has no `data-ready`). */
+export const waitEditor = (page: Page) => expect(page.locator(READY)).toBeAttached();
+
 /**
  * Presses "Start from scratch" on the list and waits for the editor; returns the new exhbt's id.
- * `waitForContext` (default true) also waits for the Context field, which loads in its own chunk after the page;
- * pass false for the tests that never waited for it.
+ * `waitForContext` (default true) also waits for the context line's field.
  */
 export async function startFromScratch(page: Page, opts: { waitForContext?: boolean } = {}): Promise<string> {
   await page.getByRole("button", { name: SEL.startFromScratchButton }).click();
   await page.waitForURL(SEL.editUrl);
-  await expect(page.locator(SEL.ready)).toBeAttached();
-  if (opts.waitForContext !== false) await expect(page.getByRole(SEL.contextField.role, { name: SEL.contextField.name, exact: true })).toBeVisible();
+  await waitEditor(page);
+  if (opts.waitForContext !== false) await expect(contextField(page)).toBeVisible();
   return page.url().match(SEL.editUrlId)![1]!;
 }
 
-/** signInAs, then startFromScratch without waiting for the Context field (as the layout tests always did). */
+/** signInAs, then startFromScratch without waiting for the context line (as the layout tests always did). */
 export async function startEditor(page: Page, username: string) {
   await signInAs(page, username, "premium");
   await startFromScratch(page, { waitForContext: false });
@@ -106,15 +105,14 @@ export async function startEditor(page: Page, username: string) {
 
 /** Signs in as a new address and waits for the "Draft an exhbt" page and its form. */
 export async function signInToDraft(page: Page, tag: string) {
-  await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(tag))}&next=/exhbts/new`);
+  await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(tag))}&next=${encodeURIComponent("/exhbts/new")}`);
   await expect(page.getByRole("heading", SEL.draftHeading)).toBeVisible();
   await expect(page.locator(SEL.draftForm)).toBeAttached();
 }
 
 /**
  * Signs in, drafts through the API (the placeholder AI) and opens the editor; returns the new exhbt's id.
- * `waitForForm` (default true) waits for the draft form to hydrate before drafting, as the draft-tools tests do;
- * pass false for the tests that only waited for the heading.
+ * `waitForForm` (default true) waits for the draft form to hydrate before drafting.
  */
 export async function draftAndOpen(page: Page, tag: string, opts: { waitForForm?: boolean } = {}): Promise<string> {
   if (opts.waitForForm !== false) await signInToDraft(page, tag);
@@ -126,29 +124,96 @@ export async function draftAndOpen(page: Page, tag: string, opts: { waitForForm?
   expect(res.status()).toBe(200);
   const { id } = (await res.json()) as { id: string };
   await page.goto(`/exhbts/${id}/edit`);
-  await expect(page.getByRole("heading", SEL.editHeading)).toBeVisible();
-  await expect(page.locator(SEL.ready).first()).toBeAttached();
+  await expect(page.getByRole("heading", SEL.editHeading)).toBeAttached();
+  await waitEditor(page);
   return id;
 }
 
 /* ------------------------------------------------------------------------------------------------
- * Filling and saving
+ * Fields: finding them, filling them, reading them
  * ---------------------------------------------------------------------------------------------- */
 
-const contextField = (page: Page) => page.getByRole(SEL.contextField.role, { name: SEL.contextField.name, exact: true });
-const box = (page: Page, n: number) => page.getByLabel(SEL.boxLabel(n), { exact: true });
+/** The editor's root. */
+export const editorRoot = (page: Page) => page.locator(READY);
+
+/** The element that carries a field path. */
+export const fieldAt = (page: Page, path: string) => page.locator(`${READY} [data-path="${path}"]`);
+
+/** The context line (path "gap"): the formatted field, whatever its words are now. */
+export const contextField = (page: Page) => textbox(page, "gap");
+
+/** The process box `n` (1-based): the plain field named "Box n". */
+export const box = (page: Page, n: number) => page.locator(`${READY}`).getByLabel(SEL.boxLabel(n), { exact: true });
+
+/** The first finding is path `sections.<findings>.items.0`: the field named "Finding n" (1-based), whatever the findings' section index. */
+export const finding = (page: Page, n: number) => page.locator(`${READY} [data-kind="findings"] [data-path$=".items.${n - 1}"]`).first();
+
+/** The findings field with the cursor in it as a person would: its words, replaced with `words` (a formatted field starts its editor on a click). */
+export async function fillRich(page: Page, f: Locator, words: string) {
+  await f.scrollIntoViewIfNeeded();
+  await f.click();
+  const editor = f.locator(".ProseMirror");
+  await expect(editor).toBeFocused();
+  await chooseAll(page);
+  await page.keyboard.press("Backspace");
+  if (words) await page.keyboard.type(words);
+}
+
+/** Fills a plain field (a textarea or an inline span) by clicking in, selecting and typing: the same for both. */
+export async function fillPlain(page: Page, f: Locator, words: string) {
+  await f.scrollIntoViewIfNeeded();
+  await f.click();
+  await chooseAll(page);
+  await page.keyboard.press("Backspace");
+  if (words) await page.keyboard.type(words);
+}
+
+/** The words in a field now: a textarea's value, or a formatted/inline field's text. */
+export async function wordsIn(f: Locator): Promise<string> {
+  const target = f.locator("textarea").or(f.locator(".ProseMirror"));
+  const inner = (await target.count()) ? target.first() : f;
+  const tag = await inner.evaluate((e) => e.tagName);
+  return tag === "TEXTAREA" ? ((await inner.inputValue()) ?? "") : ((await inner.innerText()) ?? "");
+}
+
+/** Which field has the cursor, by path. */
+export { focusedPath };
+
+/** Fills the title. */
+export const fillTitle = (page: Page, words: string) => fillPlain(page, page.locator(`${READY} ${SEL.titleField}`), words);
+
+/** Fills the context line. */
+export const fillContext = (page: Page, words: string) => fillRich(page, fieldAt(page, "gap"), words);
+
+/** Fills process box `n`. */
+export const fillBox = (page: Page, n: number, words: string) => fillPlain(page, box(page, n), words);
+
+/** Fills finding `n`. */
+export const fillFinding = (page: Page, n: number, words: string) => fillRich(page, finding(page, n), words);
+
+/** Adds a skill by its box: types it and presses Enter. */
+export async function addSkill(page: Page, words: string) {
+  const f = page.locator(`${READY} #skill-new`);
+  await f.scrollIntoViewIfNeeded();
+  await f.click();
+  await page.keyboard.type(words);
+  await page.keyboard.press("Enter");
+}
+
+/** The skills' pills. */
+export const skillsList = (page: Page) => page.getByRole("list", { name: "Skills used", exact: true });
 
 /** Fills the title, the question and three process boxes (the lunch-queue text most tests use). */
 export async function fillCore(page: Page, title: string) {
-  await page.locator(SEL.titleField).fill(title);
-  await contextField(page).fill("Lunch queues ran long. Would a second till help?");
-  for (const [i, text] of ["Timed the queue", "Opened a second till", "Timed it again"].entries()) await box(page, i + 1).fill(text);
+  await fillTitle(page, title);
+  await fillContext(page, "Lunch queues ran long. Would a second till help?");
+  for (const [i, text] of ["Timed the queue", "Opened a second till", "Timed it again"].entries()) await fillBox(page, i + 1, text);
 }
 
 /** Fills the two findings. The default text is the longer pair the sections tests use. */
 export async function fillFindings(page: Page, findings: [string, string] = ["Average wait fell from 11 to 4 minutes.", "Sales held steady, so the till paid for itself."]) {
-  await page.getByRole(SEL.findingField(1).role, { name: SEL.findingField(1).name }).fill(findings[0]);
-  await page.getByRole(SEL.findingField(2).role, { name: SEL.findingField(2).name }).fill(findings[1]);
+  await fillFinding(page, 1, findings[0]);
+  await fillFinding(page, 2, findings[1]);
 }
 
 /** startFromScratch, then fillCore (the sections tests' start). */
@@ -165,73 +230,172 @@ export async function startWithBasics(page: Page, title: string) {
 
 /** Fills everything a publish needs, apart from images and the work (title, question, three boxes, two findings). */
 export async function fillValid(page: Page, title: string) {
-  await page.locator(SEL.titleField).fill(title);
-  await contextField(page).fill("Queues ran long at lunch. Would a second till help?");
-  await box(page, 1).fill("Timed the queue");
-  await box(page, 2).fill("Added a second till");
-  await box(page, 3).fill("Waits fell");
+  await fillTitle(page, title);
+  await fillContext(page, "Queues ran long at lunch. Would a second till help?");
+  await fillBox(page, 1, "Timed the queue");
+  await fillBox(page, 2, "Added a second till");
+  await fillBox(page, 3, "Waits fell");
   await fillFindings(page, ["Waits fell from 11 to 4 minutes.", "Sales held steady."]);
 }
 
-/** Waits for the autosave after the last change: "Saving…" must appear, then "Saved". Pass `mustSeeSaving: false` to wait for "Saved" only. */
+/**
+ * Waits for the autosave after the last change. The status words are "Saving…" then "Saved";
+ * the save can land before the first looks, so `mustSeeSaving` defaults to false here.
+ */
 export async function waitForSave(page: Page, opts: { mustSeeSaving?: boolean } = {}) {
-  if (opts.mustSeeSaving !== false) await expect(page.getByText(SEL.saving)).toBeVisible();
-  await expect(page.getByText(SEL.saved, { exact: true })).toBeVisible();
+  if (opts.mustSeeSaving) await expect(page.locator(`${READY} .xe-save`, { hasText: SEL.saving })).toBeVisible();
+  await waitSavedNow(page);
 }
 
-/** Waits for "Saved" without requiring "Saving…" to have shown (the save may already have landed). */
+/** Waits for "Saved". */
 export const waitForSaved = (page: Page) => waitForSave(page, { mustSeeSaving: false });
 
+/* ------------------------------------------------------------------------------------------------
+ * Publishing: "Review and publish", a sheet
+ * ---------------------------------------------------------------------------------------------- */
+
+/** The top bar's "Review and publish" button. */
+export const reviewButton = (page: Page) => page.getByRole("button", { name: "Review and publish" });
+
+/** The publish sheet. */
+export const publishSheet = (page: Page) => page.locator('dialog[data-sheet="publish"]');
+
+/** Opens the publish sheet (if it is not open). */
+export async function openPublishSheet(page: Page) {
+  if (!(await publishSheet(page).evaluate((d) => (d as HTMLDialogElement).open))) await closeOpenSheet(page);
+  if (!(await publishSheet(page).evaluate((d) => (d as HTMLDialogElement).open))) await reviewButton(page).click();
+  await expect(publishSheet(page)).toBeVisible();
+}
+
 /**
- * Ticks the confirmation, presses Publish and waits for the live message.
+ * Opens "Review and publish", ticks the confirmation, presses Publish and waits for the live message.
  * By default the button is exactly "Publish" and the message is "It's live."; pass `changes: true` to accept
  * "Publish changes" and "Your changes are live." too (a republish).
  */
 export async function publish(page: Page, opts: { changes?: boolean } = {}) {
-  await page.getByLabel(SEL.publishConfirm).check();
+  await openPublishSheet(page);
+  const sheet = publishSheet(page);
+  await sheet.getByLabel(SEL.publishConfirm).check();
   if (opts.changes) {
-    await page.getByRole("button", { name: /^Publish( changes)?$/ }).click();
-    await expect(page.getByText(SEL.liveOrChangedText)).toBeVisible();
+    await sheet.getByRole("button", { name: /^Publish( changes)?$/ }).click();
+    await expect(sheet.getByText(SEL.liveOrChangedText)).toBeVisible();
   } else {
-    await page.getByRole("button", { name: SEL.publishButton, exact: true }).click();
-    await expect(page.getByText(SEL.liveText)).toBeVisible();
+    await sheet.getByRole("button", { name: SEL.publishButton, exact: true }).click();
+    await expect(sheet.getByText(SEL.liveText)).toBeVisible();
   }
 }
 
 /* ------------------------------------------------------------------------------------------------
- * Layout, images, preview
+ * Layout, images, the visitor's view
  * ---------------------------------------------------------------------------------------------- */
 
-/** Picks a layout radio by the start of its name. */
-export const chooseLayout = (page: Page, name: "Case study" | "Gallery" | "Research") => page.getByRole("radio", { name: new RegExp(`^${name}`) }).check();
+/** The top bar's layout button ("Layout: Case study"). */
+export const layoutButton = (page: Page) => page.getByRole("button", { name: /^Layout:/ });
 
-/** The radiogroup named "Layout". */
+/** Opens the layout menu (it is a popover) if it is not open. */
+export async function openLayoutMenu(page: Page) {
+  if (!(await layoutGroup(page).isVisible())) await layoutButton(page).click();
+  await expect(layoutGroup(page)).toBeVisible();
+}
+
+/** Picks a layout radio by the start of its name (opens the layout menu first). */
+export async function chooseLayout(page: Page, name: "Case study" | "Gallery" | "Research") {
+  await openLayoutMenu(page);
+  await layoutGroup(page).getByRole("radio", { name: new RegExp(`^${name}`) }).check();
+}
+
+/** The radiogroup named "Layout" (in the layout menu: open it first with openLayoutMenu). */
 export const layoutGroup = (page: Page) => page.getByRole("radiogroup", { name: SEL.layoutGroup });
 
-/** The Sections area of the editor (all the cards). */
-export const sectionsArea = (page: Page) => page.getByRole("region", { name: SEL.sectionsRegion, exact: true });
+/** The page's main column: where the classic editor had the Sections area. The page's sections are its frames. */
+export const sectionsArea = (page: Page) => page.locator(`${READY} article[data-exhbt-page]`);
 
-/** One card inside the Sections area, by its name. */
-export const card = (page: Page, name: string) => sectionsArea(page).getByRole("region", { name, exact: true });
+/** The frame of a section, by its name on the page's toolbar ("Findings", "Graph 1", "Quote"). */
+export const card = (page: Page, name: string) =>
+  page.locator(`${READY} [data-section-id]`).filter({ has: page.getByRole("toolbar", { name: `${name}: tools`, exact: true }) });
 
-/** The Preview region. */
-export const previewRegion = (page: Page) => page.getByRole("region", { name: SEL.previewRegion });
+/**
+ * Where a section's toolbar is the compact pair, the grip and "More actions" (decision 0026: a new exhbt's flowchart, a
+ * flowchart of three boxes in one row), its other buttons and an AI draft's own More actions are in that menu: opens it.
+ */
+export async function openCompactTools(toolbar: Locator) {
+  if ((await toolbar.getAttribute("data-place")) === "compact" && (await toolbar.getAttribute("data-open")) === null) await toolbar.locator('[data-tool="menu"]').click();
+}
 
-/** The drawn exhbt inside the Preview region (carries data-format). */
-export const previewArticle = (page: Page) => previewRegion(page).locator(SEL.previewArticle);
+/** Presses one of a section's toolbar buttons ("Remove Image 1", "Move Quote up"): the toolbar shows when the pointer is over the frame. */
+export async function pressTool(page: Page, label: string, name: string) {
+  await card(page, label).hover();
+  const toolbar = page.getByRole("toolbar", { name: `${label}: tools`, exact: true });
+  await openCompactTools(toolbar);
+  await toolbar.getByRole("button", { name, exact: true }).click();
+}
+
+/** Removes a section by its name on the page ("Image 1"). */
+export const removeSection = (page: Page, label: string) => pressTool(page, label, `Remove ${label}`);
+
+/** The frames of one kind ("image", "link", "aim"). */
+export const framesOf = (page: Page, kind: string) => page.locator(`${READY} article [data-section-id][data-kind="${kind}"]`);
+
+/** A section's formatted or plain field by its kind and the end of its path (".text", ".caption", ".items.0"): the first of that kind. */
+export const sectionField = (page: Page, kind: string, pathEnd: string) => framesOf(page, kind).first().locator(`[data-path$="${pathEnd}"]`).first();
+
+/** The "Kept, not shown in this layout" list at the foot of the page. */
+export const keptList = (page: Page) => page.getByRole("region", { name: "Kept, not shown in this layout" });
+
+/**
+ * A link's "Web address" field: its button ("Web address: <label>") over the link opens a popover holding the field.
+ * Opens the popover of link `n` (1-based) and returns the field.
+ */
+export async function openWebAddress(page: Page, n = 1): Promise<Locator> {
+  const frame = framesOf(page, "link").nth(n - 1);
+  const field = frame.locator('input[data-path$=".href"]');
+  // A link just added already has its popover open: pressing the chip then would close it.
+  if (!(await field.isVisible())) await frame.getByRole("button", { name: /^Web address:/ }).click();
+  await expect(field).toBeVisible();
+  return field;
+}
+
+/** Every frame, in page order. */
+export const frames = (page: Page) => page.locator(`${READY} article [data-section-id]`);
+
+/** "See as a visitor" on or off. */
+export async function seeAsVisitor(page: Page, on = true) {
+  const open = await page.locator(`${READY} section[aria-label="Preview"]`).count();
+  if (Boolean(open) === on) return;
+  // The real button: in the top bar, or on a phone in the editor's own Menu (not the site header's menu, which has the same name).
+  const bar = page.locator(`${READY} [data-topbar]`);
+  const button = bar.getByRole("button", { name: "See as a visitor" });
+  if (!(await button.isVisible())) await bar.getByRole("button", { name: "Menu", exact: true }).click();
+  await button.click();
+  await (on ? expect(page.locator(`${READY} section[aria-label="Preview"]`)).toBeVisible() : expect(page.locator(`${READY} section[aria-label="Preview"]`)).toHaveCount(0));
+}
+
+/**
+ * Where the classic editor drew the page as a visitor sees it (the Preview region). The editing page draws the same
+ * page, so this is the editing page's main column: text in a field is a field's value, not text on the page, so
+ * a test that reads words off the page uses `visitorRegion` after `seeAsVisitor`.
+ */
+export const previewRegion = (page: Page) => page.locator(`${READY} article[data-exhbt-page]`).locator("xpath=..");
+
+/** The drawn exhbt (carries data-format) on the editing page. */
+export const previewArticle = (page: Page) => page.locator(`${READY} ${SEL.previewArticle}`).first();
+
+/** The visitor's view: the region named "Preview", once "See as a visitor" is on. */
+export const visitorRegion = (page: Page) => page.getByRole("region", { name: SEL.previewRegion });
 
 /** The hidden file inputs for images. */
 export const images = (page: Page) => page.locator(SEL.imageInput);
 
-/** Chooses image files as a person would: focus is in the sections (after "Add a section" > "Add an image") when they are picked. */
+/** Chooses image files as a person would: through the picker's file input (it is added to the end of the page). */
 export async function pickImages(page: Page, files: Parameters<ReturnType<typeof images>["setInputFiles"]>[0]) {
-  await page.locator(SEL.addSectionButton).focus();
-  await images(page).setInputFiles(files);
+  // After the browser's own chooser the focus is on the page, not on a button: the editor puts the cursor in the first new description only then.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await images(page).first().setInputFiles(files);
 }
 
 /** The figure on the word bar ("N words ..."). */
 export async function wordsOnBar(page: Page): Promise<number> {
-  const t = await page.locator(SEL.wordBar).innerText();
+  const t = await page.locator(`${READY} ${SEL.wordBar}`).innerText();
   return Number(t.match(/^(\d+) words/)?.[1]);
 }
 
@@ -239,27 +403,64 @@ export async function wordsOnBar(page: Page): Promise<number> {
  * Sections
  * ---------------------------------------------------------------------------------------------- */
 
-/** Opens the "Add a section" menu. */
-export const openAddSectionMenu = (page: Page) => page.getByRole("button", { name: SEL.addSectionMenuButton }).click();
-
-/** Opens the menu and adds a section by its button name (for example "Add a quote"). */
-export async function addSection(page: Page, name: string) {
-  await openAddSectionMenu(page);
-  await page.getByRole("button", { name, exact: true }).click();
+/** Opens the end "+" ("Add a section") menu. */
+export async function openAddSectionMenu(page: Page) {
+  const plus = page.locator(`${READY} ${SEL.addSectionButton}`);
+  await plus.scrollIntoViewIfNeeded();
+  if ((await plus.getAttribute("aria-expanded")) !== "true") await plus.click();
+  await expect(page.locator(`${READY} [data-xe-menu]`)).toBeVisible();
 }
 
-/** The kinds in the editor's list of sections, in order (data-kind on each list item). */
-export const listOrder = (page: Page) => page.locator(SEL.sectionOrderList).evaluateAll((lis, attr) => lis.map((li) => li.getAttribute(attr)), SEL.sectionKindAttr);
+/** The block kinds the classic editor's "Add a ..." buttons stood for, as the menu names them (`data-block`). */
+const BLOCK_OF_BUTTON: Record<string, string> = {
+  "Add a graph": "graph",
+  "Add a quote": "quote",
+  "A quote": "quote",
+  "Add what I'd do next": "reflection",
+  "Add a link": "link",
+  "Add an image": "image",
+  "Add a pull quote": "pullquote",
+  "Add aim or hypothesis": "aim",
+  "Add conclusion": "conclusion",
+  "Add a reference": "link",
+  "Add limitations and next steps": "reflection",
+};
+
+/** One entry of the open menu by its classic button name ("Add a quote") or by its words in the menu. */
+export function menuItem(page: Page, name: string): Locator {
+  const kind = BLOCK_OF_BUTTON[name];
+  const menu = page.locator(`${READY} [data-xe-menu]`);
+  return kind ? menu.locator(`[data-block="${kind}"]`) : menu.locator("button.xe-plus-item", { hasText: name.replace(/^Add (a |an )?/, "") });
+}
+
+/** Opens the end "+" menu and adds a section (for example "Add a quote"). */
+export async function addSection(page: Page, name: string) {
+  await openAddSectionMenu(page);
+  await menuItem(page, name).click();
+}
+
+/** The kinds of the page's sections, in page order, leaving out the flowchart (the classic list had no card for it). */
+export const listOrder = async (page: Page): Promise<string[]> => (await frames(page).evaluateAll((els) => els.map((e) => e.getAttribute("data-kind") ?? ""))).filter((k) => k !== "flow");
 
 /** The parts of a drawn exhbt below the title, in order: the flowchart, then each section's kind (data-part, ProjectView). */
 export const pageOrder = (scope: Locator) => scope.locator(SEL.articlePart).evaluateAll((els, attr) => els.map((e) => e.getAttribute(attr) ?? ""), SEL.partAttr);
 
 /* ------------------------------------------------------------------------------------------------
- * Graph cards
+ * Graphs: the figures sheet
  * ---------------------------------------------------------------------------------------------- */
 
-/** The graph card, a group named "Graph N". */
-export const graph = (page: Page, n: number) => page.getByRole("group", { name: SEL.graphGroup(n), exact: true });
+/** The figures sheet (a native dialog). */
+export const chartSheet = (page: Page) => page.locator('dialog[data-sheet="chart"]');
+
+/** The graph's group "Graph N", in the open figures sheet. */
+export const graph = (page: Page, n: number) => chartSheet(page).getByRole("group", { name: SEL.graphGroup(n), exact: true });
+
+/** Opens the figures sheet of the graph section `id`-th graph (1-based) by its "Edit figures" button, if it is not open. */
+export async function openFigures(page: Page, n: number) {
+  if (await chartSheet(page).evaluate((d) => (d as HTMLDialogElement).open)) return;
+  await page.locator(`${READY} [data-kind="graph"]`).nth(n - 1).getByRole("button", { name: /^Edit figures/ }).click();
+  await expect(chartSheet(page)).toBeVisible();
+}
 
 /** Picks a kind in a graph's type picker by clicking its tile, then checks the radio took it. */
 export async function pickGraphKind(g: Locator, kind: string) {
@@ -268,13 +469,14 @@ export async function pickGraphKind(g: Locator, kind: string) {
   await expect(radio).toBeChecked();
 }
 
-/** Opens "Add a section" and adds a graph (decision 0015). */
+/** Adds a graph through the end "+" (a graph just added opens its figures sheet). */
 export async function addGraphSection(page: Page) {
-  await openAddSectionMenu(page);
-  await page.getByRole("button", { name: SEL.addGraphButton }).click();
+  await closeOpenSheet(page);
+  await addSection(page, SEL.addGraphButton);
+  await expect(chartSheet(page)).toBeVisible();
 }
 
-/** Adds a graph section, picks its kind and gives it a title; returns the graph card. */
+/** Adds a graph section, picks its kind and gives it a title; returns the graph's group in the open sheet. */
 export async function addGraph(page: Page, n: number, kind: string, title: string): Promise<Locator> {
   await addGraphSection(page);
   const g = graph(page, n);
@@ -283,21 +485,50 @@ export async function addGraph(page: Page, n: number, kind: string, title: strin
   return g;
 }
 
+/** Closes whatever sheet is open (a sheet is modal: the top bar and the "+" can't be pressed behind it); nothing when none is. */
+export async function closeOpenSheet(page: Page) {
+  if (await page.locator("dialog[open]").count()) await closeSheet(page);
+}
+
+/** Closes the open sheet (its "Close" button). */
+export async function closeSheet(page: Page) {
+  await page.locator("dialog[open] button.xe-sheet-close").click();
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+}
+
 /* ------------------------------------------------------------------------------------------------
  * AI rewrite tools (a drafted exhbt)
  * ---------------------------------------------------------------------------------------------- */
 
-/** The Finding 1 field. */
-export const findingsField = (page: Page) => page.getByRole(SEL.findingField(1).role, { name: SEL.findingField(1).name });
+/** The first finding's field (Finding 1). */
+export const findingsField = (page: Page) => finding(page, 1);
 
-/** The "N of M rewrites left" line inside a block's tools (visible once the card's menu is open). */
+/** The "N of M rewrites left" line inside a block's tools (visible once its "More actions" is open). */
 export const rewritesLeft = (page: Page, block: string) => page.getByTestId(SEL.toolsTestId(block)).getByTestId(SEL.rewritesLeftTestId);
 
-/** The "More actions for <card>" button on a drafted block's card. */
-export const cardMenuButton = (page: Page, block: string) => page.getByRole("button", { name: SEL.cardMenuButton(SEL.cards[block]!) });
+/** The "More actions for <block's name>" button on a drafted block (inside the block's tools, whatever the layout calls the block). */
+export const cardMenuButton = (page: Page, block: string) => page.getByTestId(SEL.toolsTestId(block)).getByRole("button", { name: /^More actions for/ });
 
-/** Opens a block's "More actions" menu. */
-export const openCardMenu = (page: Page, block: string) => cardMenuButton(page, block).click();
+/** What to put the pointer on to show a block's tools: a section's toolbar shows over its frame, a shell part's corner toolbar over the part. */
+const HOVER_FOR: Record<string, string> = {
+  header: '[data-path="title"]',
+  gap: '[data-path="gap"]',
+  skills: '[data-path="skills"]',
+  flow: '[data-kind="flow"]',
+  findings: '[data-kind="findings"]',
+};
+
+/** Puts the pointer on a block, so its tools show, and opens its toolbar's own More actions where that is the compact pair. */
+export async function revealCardMenu(page: Page, block: string) {
+  await page.locator(`${READY} ${HOVER_FOR[block]!}`).first().hover();
+  if (block === "flow" || block === "findings") await openCompactTools(page.locator(`${READY} [data-kind="${block}"] > .xe-tools`).first());
+}
+
+/** Opens a block's "More actions" menu (a section's, from its toolbar's own More actions where that is the compact pair). */
+export async function openCardMenu(page: Page, block: string) {
+  await revealCardMenu(page, block);
+  await cardMenuButton(page, block).click();
+}
 
 /** Opens the block's menu and presses "Rewrite this block". */
 export async function startRewrite(page: Page, block: string) {
@@ -305,5 +536,46 @@ export async function startRewrite(page: Page, block: string) {
   await page.getByTestId(SEL.toolsTestId(block)).getByRole("button", { name: SEL.rewriteThisBlock }).click();
 }
 
+/**
+ * Closes a block's open rewrite form (its Cancel), and its toolbar's own More actions where that is the compact pair. An open form
+ * stays until it is cancelled or used, over whatever is under it (css/core.css), so a test closes it before it goes on to a part
+ * the form lies over, as a person would.
+ */
+export async function closeRewrite(page: Page, block: string) {
+  const tools = page.getByTestId(SEL.toolsTestId(block));
+  await tools.getByRole("button", { name: "Cancel" }).click();
+  await expect(tools.getByRole("button", { name: /^Rewrite the .+ now$/ })).toHaveCount(0);
+  const menu = page.locator(`${READY} .xe-tools[data-open] > [data-tool="menu"]`);
+  if (await menu.count()) await menu.click();
+  await expect(page.locator(`${READY} .xe-tools[data-open]`)).toHaveCount(0);
+}
+
 /** The "Back to the AI version" button inside a block's tools. */
-export const backToAiVersion = (page: Page, block: string) => page.getByTestId(SEL.toolsTestId(block)).getByRole("button", { name: SEL.backToAiVersion });
+export const backToAiVersion =(page: Page, block: string) => page.getByTestId(SEL.toolsTestId(block)).getByRole("button", { name: SEL.backToAiVersion });
+
+/* ------------------------------------------------------------------------------------------------
+ * The work, and the things to fix
+ * ---------------------------------------------------------------------------------------------- */
+
+/** The sheet that holds the work (a link or a file). */
+export const workSheet = (page: Page) => page.locator('dialog[data-sheet="work"]');
+
+/** Opens the work sheet from the sidebar's button ("Add the work", or "See the work: <name>"), if it is not open. */
+export async function openWorkSheet(page: Page) {
+  if (await workSheet(page).evaluate((d) => (d as HTMLDialogElement).open)) return;
+  await closeOpenSheet(page);
+  await page.locator(`${READY} [data-path="evidence"] button`).click();
+  await expect(workSheet(page)).toBeVisible();
+}
+
+/** The top bar's "N things to fix" / "N numbers to check" button. */
+export const thingsButton = (page: Page) => page.getByRole("button", { name: /(things? to fix|numbers? to check)$/ });
+
+/** Opens "Things to fix before publishing" and returns the region. */
+export async function openThingsToFix(page: Page) {
+  await closeOpenSheet(page);
+  const region = page.getByRole("region", { name: "Things to fix before publishing" });
+  if (!(await region.isVisible())) await thingsButton(page).click();
+  await expect(region).toBeVisible();
+  return region;
+}

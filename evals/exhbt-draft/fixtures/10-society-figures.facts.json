@@ -5,11 +5,11 @@
   "files": ["10-society-figures.txt"],
   "notesFile": "10-society-figures.notes.txt",
   "link": null,
-  "expect": {"headlineNumber":false,"chart":true,"noNumbers":false},
+  "expect": {"headlineNumber":false,"chart":true,"noNumbers":false,"graph":{"kind":"numbers","tiles":[{"value":186},{"value":2450,"unit":"£"},{"value":6},{"value":91,"unit":"%","from":64}]},"layout":"case-study"},
   "keyFacts": [
     {"id":"members","fact":"186 paid members, the most the society has had.","match":["186"]},
     {"id":"money","fact":"Sponsorship and two fundraising swims raised £2,450, paying for spring pool hire.","match":["2,450","2450"]},
-    {"id":"coaches","fact":"Six members qualified as Level 1 swimming teachers.","match":["Level 1","six","6"]},
+    {"id":"coaches","fact":"6 members qualified as Level 1 swimming teachers.","match":[["6","teacher"],["6","Level 1"]]},
     {"id":"satisfaction","fact":"91% happy with sessions, up from 64% the year before.","match":[["91","64"],"91%"]},
     {"id":"how","fact":"Split the committee into three small teams with weekly to-do lists and Monday check-ins.","match":["three","teams"]}
   ],
@@ -17,5 +17,5 @@
     {"id":"growth","why":"The material gives no earlier membership figure, so no rise in members can be stated.","match":["members, up","up from 1","increase in members","grew membership by"]},
     {"id":"derived","why":"No change in points or percentage rise is stated for satisfaction.","match":["27 points","27-point","42%"]}
   ],
-  "sourceNumbers": ["2025","2026","186","£2,450","1","91%","64%"]
+  "sourceNumbers": ["2025","2026","186","£2,450","6","1","91%","64%"]
 }

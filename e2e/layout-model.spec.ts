@@ -18,7 +18,7 @@ import {
   type Section,
   type SectionKind,
 } from "../lib/exhbt/blocks";
-import { FORMAT_RULES, FORMATS, fromWorkOf, hiddenSections, OFFERED_FORMATS, shownSections, withFormat, type Format } from "../lib/exhbt/formats";
+import { FORMAT_RULES, FORMATS, fromWorkOf, hiddenSections, OFFERED_FORMATS, offeredIn, shownSections, withFormat, type Format } from "../lib/exhbt/formats";
 import { tileFromDoc } from "../lib/exhbt/headline";
 import { adopt, applyTemplate, blockOptions, flowShown, hasMarker, insertBlock, insertImage, isArranged, keptItems, moveItem, pageItems, removeItem, restoreFlow, rowsFor, structureKey, type Cell, type ItemCell, type Row } from "../lib/exhbt/layouts";
 import { layoutNotes, newSection, roomFor, sectionLabel, sectionName, withKeyFigure, withWorkVisual } from "../lib/exhbt/sections";
@@ -104,9 +104,11 @@ test.describe("The model: the marker and the new fields", () => {
     expect(imagesOf(odd)[0]!.stage).toBeUndefined();
   });
 
-  test("only the three layouts are offered or drafted; the four new ones say what they take from the work", () => {
+  test("all seven layouts are offered since release 4, the classic editor keeps to three, and the four new ones say what they take from the work", () => {
     expect(FORMATS).toEqual(["case-study", "gallery", "research", "build", "essay", "before-after", "event"]);
-    expect(OFFERED_FORMATS).toEqual(["case-study", "gallery", "research"]);
+    expect(OFFERED_FORMATS).toEqual([...FORMATS]);
+    expect(offeredIn("page")).toEqual([...FORMATS]);
+    expect(offeredIn("classic")).toEqual(["case-study", "gallery", "research"]);
     expect(FORMATS.map((f) => fromWorkOf({ format: f }))).toEqual(["figure", "pictures", "figure", "figure", "none", "pictures", "pictures"]);
     expect(FORMATS.map((f) => FORMAT_RULES[f].flowRemovable)).toEqual([false, true, false, true, true, true, true]);
   });

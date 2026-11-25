@@ -8,11 +8,11 @@ const noSideScroll = (page: import("@playwright/test").Page) =>
   page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 
 test.describe("Landing: header and footer", () => {
-  test("the header has the two buttons and no employers or universities links", async ({ page }) => {
+  test("the header has the roadmap button in the nav, and no exhbt button", async ({ page }) => {
     await page.goto("/");
     const header = page.getByRole("banner");
-    await expect(header.getByRole("link", { name: "Build your exhbt" })).toHaveAttribute("href", "/exhbts/new");
-    await expect(header.getByRole("link", { name: "Build your roadmap" })).toHaveAttribute("href", "/roadmap/new");
+    await expect(header.getByRole("link", { name: "Build your exhbt" })).toHaveCount(0);
+    await expect(header.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Build your roadmap" })).toHaveAttribute("href", "/roadmap/new");
     await expect(header.getByRole("link", { name: "Log in" })).toBeVisible();
     await expect(header.getByRole("link", { name: "What is an exhbt?" })).toBeVisible();
     await expect(header.getByRole("link", { name: /For employers/ })).toHaveCount(0);
@@ -74,13 +74,13 @@ test.describe("Landing: phone", () => {
     }
   });
 
-  test("the menu has both buttons, and the roadmap one goes to the builder", async ({ page }) => {
+  test("the menu has the roadmap button, and not the exhbt button", async ({ page }) => {
     await page.goto("/");
     const header = page.getByRole("banner");
     await header.getByRole("button", { name: "Menu" }).click();
     const menu = header.getByRole("navigation", { name: "Main menu" });
     await expect(menu.getByRole("link", { name: "What is an exhbt?" })).toBeVisible();
-    await expect(header.getByRole("link", { name: "Build your exhbt" })).toBeVisible();
+    await expect(header.getByRole("link", { name: "Build your exhbt" })).toHaveCount(0);
     await expect(header.getByRole("link", { name: "Build your roadmap" })).toBeVisible();
     await expect(menu.getByRole("link", { name: /For employers|For universities/ })).toHaveCount(0);
     expect(await noSideScroll(page)).toBe(true);

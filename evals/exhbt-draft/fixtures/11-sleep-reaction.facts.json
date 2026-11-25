@@ -5,7 +5,7 @@
   "files": ["11-sleep-reaction.txt"],
   "notesFile": null,
   "link": null,
-  "expect": {"headlineNumber":false,"chart":true,"noNumbers":false},
+  "expect": {"headlineNumber":false,"chart":true,"noNumbers":false,"graph":{"kind":"scatter","points":[[4.5,312],[5,298],[6,281],[7,262],[9,248]]},"layout":"research"},
   "keyFacts": [
     {"id":"aim","fact":"Whether students who slept less have slower reaction times.","match":["sleep"]},
     {"id":"method","fact":"Eight volunteers, self-reported sleep, five ruler-drop tests each, mean taken.","match":["ruler","eight","8 volunteers","five"]},

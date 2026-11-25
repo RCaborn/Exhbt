@@ -1,0 +1,21 @@
+{
+  "fixture": "15-essay-prorogation",
+  "shape": "A law essay as plain text: a question, a thesis, an argument in three steps resting on two cases and two commentators, the strongest objection answered, and four sources, one with an https address.",
+  "tests": "Layout: essay, for law rather than history. Case citations are kept only word for word. Nothing about the case that the essay doesn't say (how many judges sat, whether they agreed).",
+  "files": ["15-essay-prorogation.txt"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":false,"chart":false,"noNumbers":false,"layout":"essay"},
+  "keyFacts": [
+    {"id":"thesis","fact":"Review is justified, but only on the narrow ground of the effect on Parliament, not the minister's motive.","match":[["effect","motive"],["narrow","effect"],"effect on Parliament"]},
+    {"id":"prerogative","fact":"Prorogation is a prerogative power, reviewable since the GCHQ case by subject matter.","match":["prerogative","GCHQ"]},
+    {"id":"miller","fact":"Miller (No 2): unlawful if it frustrates Parliament's constitutional functions without reasonable justification.","match":["Miller","frustrates","constitutional functions"]},
+    {"id":"objection","fact":"Loughlin's objection: the court invented a limit the constitution never contained.","match":["Loughlin","invented a limit","new limit","limit was new"]},
+    {"id":"next","fact":"Would compare the Canadian courts' treatment of the 2008 prorogation.","match":["Canad"]}
+  ],
+  "forbidden": [
+    {"id":"outside-facts","why":"The essay doesn't say how many justices sat or that they agreed: either is from outside the material.","match":["unanimous","eleven justices","11 justices","11-0"]},
+    {"id":"data","why":"The essay reports no data and no percentage.","match":["%","survey"]}
+  ],
+  "sourceNumbers": ["2","2025","2019","1985","374","41","2020","2008"]
+}

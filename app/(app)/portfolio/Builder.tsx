@@ -159,11 +159,16 @@ export function Builder(props: Props) {
       <div className="mx-auto max-w-[84rem] px-4 pt-8 pb-16 sm:px-8 lg:pt-10">
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
           <h1>Build your portfolio</h1>
-          {viewHref && (
-            <a href={viewHref} className="link text-sm font-semibold">
-              View my portfolio
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <a href="#job-links" className="link text-sm font-semibold">
+              Job links
             </a>
-          )}
+            {viewHref && (
+              <a href={viewHref} className="link text-sm font-semibold">
+                View my portfolio
+              </a>
+            )}
+          </div>
         </div>
 
         <nav aria-label="Steps" className="mt-6">

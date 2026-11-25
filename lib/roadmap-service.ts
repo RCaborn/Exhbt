@@ -1,4 +1,5 @@
 import "server-only";
+import { recordAIFailure, tooManyFailures } from "@/lib/ai-failures";
 import { generateRoadmap } from "./ai/roadmap";
 import { findJobProfile } from "./jobs";
 import { getStore, type RoadmapRecord } from "./store";
@@ -24,6 +25,9 @@ export async function ensureRoadmap(record: RoadmapRecord, userId: string | null
     roadmap = await store.findCachedOutput(record.inputHash);
     const fromCache = roadmap !== null;
     if (!roadmap) {
+      // "Try again" on a roadmap that keeps failing makes no more calls after the day's limit.
+      const who = { userId, key: userId ?? `roadmap:${record.id}` };
+      if (await tooManyFailures("roadmap", who)) throw new GenerationError("roadmap failed too often today");
       try {
         const job = await findJobProfile(record.input.targetRole);
         const result = await generateRoadmap(record.input, job);
@@ -37,11 +41,16 @@ export async function ensureRoadmap(record: RoadmapRecord, userId: string | null
           costUsd: result.costUsd,
         });
       } catch (e) {
-        await store.logEvent("roadmap_failed", userId, { message: (e as Error).message.slice(0, 200) });
+        await recordAIFailure("roadmap", who, e, { roadmapId: record.id });
         throw new GenerationError((e as Error).message);
       }
     }
-    await store.saveRoadmapOutput(record.id, roadmap);
+    if (!(await store.saveRoadmapOutput(record.id, roadmap))) {
+      // Another generation of this roadmap (a reload, a second tab) saved first. Its result stands,
+      // and that call sends the email and starts the ideas: this one only hands back what was saved.
+      const stored = (await store.getRoadmap(record.id))?.output;
+      if (stored) return stored;
+    }
     await store.logEvent("roadmap_completed", userId, { cached: fromCache });
   }
   // Start the project ideas now, in the background, so they're ready by the time the person

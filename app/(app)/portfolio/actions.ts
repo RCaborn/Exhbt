@@ -14,6 +14,7 @@ import { ProfileDraftSchema } from "@/lib/portfolio-profile";
 import { themeById, themeFor } from "@/lib/portfolio-themes";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
+import { recordAIFailure, tooManyFailures, TOO_MANY_FAILURES } from "@/lib/ai-failures";
 import { deleteFile } from "@/lib/uploads";
 
 /**
@@ -241,11 +242,12 @@ export async function suggestIntroAction(draft: unknown): Promise<IntroSuggestio
   if (!hasIntroFacts(facts)) {
     return { ok: false, error: "There isn't enough to go on yet. Add a headline, build a roadmap with your CV, or start an exhbt, then try again." };
   }
+  if (await tooManyFailures("portfolio_intro", { userId: user.id })) return { ok: false, error: TOO_MANY_FAILURES };
   let result;
   try {
     result = await suggestIntro(facts);
   } catch (e) {
-    console.error("intro suggestion failed", (e as Error).message);
+    await recordAIFailure("portfolio_intro", { userId: user.id }, e);
     return { ok: false, error: "We couldn't write a suggestion just now. Try again in a moment." };
   }
   await store.logAICall({ userId: user.id, step: "portfolio_intro", model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, costUsd: result.costUsd });

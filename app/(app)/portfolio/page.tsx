@@ -14,6 +14,7 @@ import { PORTFOLIO_THEMES, themeById, themeFor } from "@/lib/portfolio-themes";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
 import { Builder } from "./Builder";
+import { JobLinksSection } from "./JobLinksSection";
 import { isStep, type BuilderProject, type Step, type ThemeLock } from "./steps";
 
 export const metadata: Metadata = { title: "Build your portfolio", robots: { index: false } };
@@ -87,6 +88,7 @@ export default async function BuildPortfolioPage({ searchParams }: { searchParam
   const address = canClaimUsername(plan);
 
   return (
+    <>
     <Builder
       step={step}
       initial={{ profile: draftFromProfile(profile), arrangement }}
@@ -112,5 +114,7 @@ export default async function BuildPortfolioPage({ searchParams }: { searchParam
       savedButLocked={storedTheme && storedTheme.id !== shown.id ? storedTheme.name : null}
       viewHref={profile.username ? portfolioHref(profile.username, host) : null}
     />
+    <JobLinksSection userId={user.id} />
+    </>
   );
 }

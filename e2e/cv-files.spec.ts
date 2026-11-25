@@ -3,6 +3,7 @@ import { checkCvText, cleanCvText } from "../lib/cv-quality";
 import { decodeText, detectKind, odtXmlToText, rtfToText, scrapeBinaryDoc, wordXmlToText } from "../lib/cv-client";
 import { makeDoc, makeDocx, makeOdt, makePdf, toRtf } from "./doc-fixtures";
 import { waitForBuilder } from "./helpers";
+import { uniqueBytes } from "./unique-bytes";
 
 // The CV readers (lib/cv-client.ts, lib/cv-quality.ts) and the upload step. Fixtures are
 // generated in e2e/doc-fixtures.ts, so no binary files live in the repo.
@@ -103,7 +104,7 @@ test.describe("CV upload", () => {
       if (r.url().includes("/api/cv/read")) sent = true;
     });
     await openCvStep(page);
-    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+    const png = uniqueBytes(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64"));
     await upload(page, "cv.png", "image/png", png);
     await expect(page.getByText("That's a photo")).toBeVisible();
     await page.getByRole("button", { name: "Paste the text instead" }).click();

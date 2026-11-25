@@ -1,9 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /** Runs in both the desktop and mobile projects (see playwright.config.ts). */
-test("home: the start form is fully visible without scrolling", async ({ page }) => {
+test("home: the exhbt button is fully visible without scrolling", async ({ page }) => {
   await page.goto("/");
-  const form = page.locator("form:has(#start-hero)");
+  const form = page.getByRole("button", { name: "Build your exhbt" });
   await expect(form).toBeVisible();
   const box = (await form.boundingBox())!;
   const viewport = page.viewportSize()!;

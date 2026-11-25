@@ -2,7 +2,7 @@ import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { forgetDevPassword } from "./passwords";
 import type { Project, Roadmap, RoadmapInput } from "./ai/schemas";
-import { normaliseDoc, publicDoc, type ExhbtDoc } from "./exhbt/blocks";
+import { normaliseDoc, publicDoc, validateForPublish, type ExhbtDoc } from "./exhbt/blocks";
 import { fileIdsIn, looksLikeFileId, withoutFiles } from "./exhbt/doc-files";
 import type { Plan } from "./entitlements";
 import { normaliseLayout, type PortfolioLayout } from "./portfolio-layout";
@@ -244,7 +244,15 @@ export type EventName =
   | "intro_suggested"
   | "referral_recorded"
   | "referral_credited"
-  | "page_view";
+  | "page_view"
+  // Failed AI calls (lib/ai-failures.ts, decision 0029): feature, reason, status and tokens, never any text.
+  | "exhbt_draft_failed"
+  | "exhbt_rewrite_failed"
+  | "figure_pick_failed"
+  | "job_match_failed"
+  | "intro_failed"
+  | "swap_failed"
+  | "file_read_failed";
 
 /** A Stripe subscription as we keep it (the `subscriptions` table). No amounts or card details. */
 export type SubscriptionRecord = {
@@ -327,7 +335,11 @@ export interface Store {
   getRoadmap(id: string): Promise<RoadmapRecord | null>;
   latestRoadmapFor(userId: string): Promise<RoadmapRecord | null>;
   findCachedOutput(inputHash: string): Promise<Roadmap | null>;
-  saveRoadmapOutput(id: string, output: Roadmap): Promise<void>;
+  /**
+   * Saves a roadmap's output if it has none yet. Returns false, and changes nothing, when another
+   * generation saved one first (a reload or a second tab): the first result saved wins.
+   */
+  saveRoadmapOutput(id: string, output: Roadmap): Promise<boolean>;
   /** Atomically marks the roadmap email as sent. Returns false if it was already sent. */
   markEmailSent(id: string): Promise<boolean>;
   setMarketingOptIn(email: string, optIn: boolean): Promise<void>;
@@ -392,9 +404,12 @@ export interface Store {
   saveExhbtDraft(id: string, userId: string, doc: ExhbtDoc): Promise<boolean>;
   /**
    * Copies the working copy to the live one and marks it published with this slug.
-   * Limits and plan checks happen before this is called (lib/plan.ts, validateForPublish).
+   * The plan check happens before this is called (lib/plan.ts). The doc that is copied is checked here
+   * (validateForPublish, and no flagged numbers left), whatever was checked before, so a save that lands
+   * between the caller's check and this cannot slip past it: false, and nothing is published.
+   * `unchecked` is for the development seeding routes (app/dev/*) only, which publish fixtures as they are.
    */
-  publishExhbt(id: string, userId: string, slug: string): Promise<boolean>;
+  publishExhbt(id: string, userId: string, slug: string, opts?: { unchecked?: boolean }): Promise<boolean>;
   unpublishExhbt(id: string, userId: string): Promise<boolean>;
   /** Sets portfolio order to the order of `ids`. */
   reorderExhbts(userId: string, ids: string[]): Promise<void>;
@@ -422,6 +437,13 @@ export interface Store {
   /* uploads and drafts */
   /** How many events with this name this user had in the last `hours`. For per-user limits (AI drafts). */
   countRecentEventsForUser(name: EventName, userId: string, hours: number): Promise<number>;
+  /**
+   * Takes back the one event of this user's that was logged with `claim` in its props. For a limit
+   * that is counted before the work is done (a figure pick) and given back when the work never
+   * happened. It names its own event by the claim, never "the latest", which with requests that
+   * overlap is another request's. A failure is reported and leaves the event counted.
+   */
+  returnEvent(name: EventName, userId: string, claim: string): Promise<void>;
   /** Records an uploaded (or about-to-be-uploaded) file. The id is chosen by the caller, as it is part of the path. */
   createFile(file: StoredFile & { exhbtId?: string | null }): Promise<void>;
   /** Bytes of every file this user has stored, for the plan's storage cap. */
@@ -776,7 +798,9 @@ function supabaseStore(): Store {
       return (check(res) as { output_json: Roadmap } | null)?.output_json ?? null;
     },
     async saveRoadmapOutput(id, output) {
-      check(await db.from("roadmaps").update({ output_json: output }).eq("id", id));
+      // Conditional update: only the first generation to finish saves its output.
+      const rows = check(await db.from("roadmaps").update({ output_json: output }).eq("id", id).is("output_json", null).select("id")) as { id: string }[];
+      return rows.length === 1;
     },
     async markEmailSent(id) {
       // Conditional update: only one caller wins, so the email is sent once.
@@ -1126,11 +1150,12 @@ function supabaseStore(): Store {
       ) as { id: string }[];
       return rows.length > 0;
     },
-    async publishExhbt(id, userId, slug) {
+    async publishExhbt(id, userId, slug, opts) {
       const cur = check(await db.from("exhbts").select("blocks").eq("id", id).eq("user_id", userId).maybeSingle()) as {
         blocks: ExhbtDoc;
       } | null;
       if (!cur) return false;
+      if (!opts?.unchecked && !publishable(cur.blocks)) return false;
       const now = new Date().toISOString();
       check(
         await db
@@ -1247,6 +1272,11 @@ function supabaseStore(): Store {
         .gte("created_at", since(hours));
       if (res.error) throw new Error(res.error.message);
       return res.count ?? 0;
+    },
+    async returnEvent(name, userId, claim) {
+      // As logEvent: it must never break a user flow.
+      const { error } = await db.from("events").delete().eq("name", name).eq("user_id", userId).eq("props->>claim", claim);
+      if (error) console.error("event return failed", error.message);
     },
     async createFile(f) {
       check(
@@ -1893,6 +1923,12 @@ const emptyProfile = (userId: string): PortfolioProfile => ({
   contactEmail: null,
 });
 
+/** Whether a stored doc may be copied to the live page: it passes validateForPublish and has no flagged numbers left. */
+const publishable = (stored: ExhbtDoc): boolean => {
+  const doc = normaliseDoc(stored);
+  return validateForPublish(doc).length === 0 && ((doc as { unverified?: string[] }).unverified ?? []).length === 0;
+};
+
 const EXHBT_COLS = "id, user_id, blocks, published_blocks, status, public_slug, position, confirmed_at, published_at, updated_at, team_of, hidden_on_portfolio";
 type ExhbtRow = {
   id: string;
@@ -2082,7 +2118,9 @@ function memoryStore(): Store {
     },
     async saveRoadmapOutput(id, output) {
       const r = m.roadmaps.get(id);
-      if (r) r.output = output;
+      if (!r || r.output) return false;
+      r.output = output;
+      return true;
     },
     async markEmailSent(id) {
       const r = m.roadmaps.get(id);
@@ -2324,9 +2362,10 @@ function memoryStore(): Store {
       e.updatedAt = new Date().toISOString();
       return true;
     },
-    async publishExhbt(id, userId, slug) {
+    async publishExhbt(id, userId, slug, opts) {
       const e = own(id, userId);
       if (!e) return false;
+      if (!opts?.unchecked && !publishable(e.doc)) return false;
       const now = new Date().toISOString();
       Object.assign(e, { published: publicDoc(structuredClone(e.doc)), status: "published", slug, confirmedAt: now, publishedAt: now });
       return true;
@@ -2386,6 +2425,10 @@ function memoryStore(): Store {
     async countRecentEventsForUser(name, userId, hours) {
       const after = Date.now() - hours * 3_600_000;
       return m.events.filter((e) => e.name === name && e.userId === userId && Date.parse(e.at) >= after).length;
+    },
+    async returnEvent(name, userId, claim) {
+      const at = m.events.findIndex((e) => e.name === name && e.userId === userId && e.props.claim === claim);
+      if (at >= 0) m.events.splice(at, 1);
     },
     async createFile(f) {
       files().set(f.id, { ...f, exhbtId: f.exhbtId ?? null, sha256: f.sha256 ?? null, createdAt: new Date().toISOString() });
@@ -2763,7 +2806,15 @@ function memAdminRows(m: Mem, table: AdminTable, since: string | null): AdminRow
       case "events":
         return m.events
           .filter((e) => e.name !== "page_view" && after(e.at))
-          .map((e) => ({ name: e.name, userId: e.userId, at: e.at, cached: typeof e.props.cached === "boolean" ? e.props.cached : null }));
+          .map((e) => ({
+            name: e.name,
+            userId: e.userId,
+            at: e.at,
+            cached: typeof e.props.cached === "boolean" ? e.props.cached : null,
+            reason: typeof e.props.reason === "string" ? e.props.reason : null,
+            inputTokens: typeof e.props.inputTokens === "number" ? e.props.inputTokens : null,
+            outputTokens: typeof e.props.outputTokens === "number" ? e.props.outputTokens : null,
+          }));
       case "pageViews":
         return m.events
           .filter((e) => e.name === "page_view" && after(e.at))

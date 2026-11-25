@@ -1,0 +1,479 @@
+/* The edit-on-page editor's top bar (decision 0026, "The chrome"): H's. App chrome, so only the app's own
+   tokens, never the page's --xp-* variables. The row is exactly --xe-topbar-h tall (core.css) and never
+   scrolls sideways: what does not fit is shortened in steps (100rem, 88rem, 64rem), and under 48rem the row
+   keeps the way back, the word count, the things to fix, the save status and "Review and publish", with the
+   rest in the menu. */
+@layer components {
+  .xe-topbar .xe-topbar-row {
+    gap: 0.5rem;
+    min-width: 0;
+    /* The whole width of the window, so the steps below (by window width) are the room the row has. */
+    max-width: none;
+  }
+  .xe-topbar .xe-topbar-row > * {
+    flex: none;
+  }
+  .xe-spacer {
+    flex: 1 1 0 !important;
+    min-width: 0;
+  }
+
+  /* The way back. */
+  .xe-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2rem;
+    padding-right: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .xe-back:hover {
+    color: var(--color-graphite);
+  }
+
+  /* The heading and the chip. */
+  .xe-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .xe-title-h1 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    font-size: 1.0625rem;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  /* Every button in the row: one height, the shorter text on a narrow row, a tap target on a phone. */
+  .xe-topbar .xe-tb {
+    min-height: 2rem;
+    white-space: nowrap;
+  }
+  .xe-tb-text {
+    white-space: nowrap;
+  }
+  .xe-topbar [aria-disabled="true"].xe-tb {
+    opacity: 0.55;
+    cursor: default;
+  }
+  .xe-topbar [aria-pressed="true"].xe-tb {
+    background: var(--color-wash);
+    border-color: var(--color-jade);
+    color: var(--color-ink);
+  }
+  .xe-undo-text {
+    display: inline-flex;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .xe-undo-for {
+    display: none;
+    max-width: 11rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* The word bar. */
+  .xe-wordbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.8125rem;
+    color: var(--color-graphite);
+    white-space: nowrap;
+  }
+  .xe-wordbar:focus-visible {
+    outline: 3px solid var(--color-jade);
+    outline-offset: 2px;
+  }
+  .xe-wordbar-limits {
+    display: none;
+  }
+  .xe-wordbar-bar {
+    position: relative;
+    display: none;
+    width: 4rem;
+    height: 0.5rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--color-line);
+  }
+
+  /* Things to fix: the count alone until there is room for the words. */
+  .xe-fix-button {
+    color: var(--color-error);
+  }
+  .xe-fix-words {
+    display: none;
+  }
+  .xe-fix-count {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The save status. */
+  .xe-save {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--color-graphite);
+    white-space: nowrap;
+  }
+  .xe-save-bad {
+    color: var(--color-error);
+  }
+  /* Why a save failed, whole, while saves fail: a card that hangs from the bar under the status, as the bar's
+     panels hang under their buttons, out of the flow, so the bar keeps its one row and nothing on the page moves;
+     as wide as the screen on a phone (below). In the row it was cut at 22rem with an ellipsis, and even so pushed
+     "Review and publish" off a 1440px window; under 64rem it was not drawn at all. The live region says it once,
+     as before (SaveStatus.tsx). */
+  .xe-save-bad {
+    position: relative;
+    align-self: stretch;
+  }
+  .xe-save-words {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    right: 0;
+    width: max-content;
+    max-width: min(24rem, calc(100vw - 1rem));
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-pack);
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    white-space: normal;
+    text-wrap: pretty;
+  }
+
+  /* The panels: a card under the button that opened them. */
+  .xe-pop {
+    position: relative;
+  }
+  .xe-pop-panel {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    z-index: 40;
+    box-sizing: border-box;
+    min-width: 16rem;
+    max-width: calc(100vw - 1rem);
+    max-height: calc(100dvh - var(--xe-topbar-h) - 1rem);
+    overflow: auto;
+    padding: 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-pack);
+    font-size: 0.9375rem;
+  }
+  .xe-pop-panel:focus-visible {
+    outline: 3px solid var(--color-jade);
+    outline-offset: -3px;
+  }
+  .xe-pop-inline > .xe-pop-panel {
+    position: static;
+    max-width: none;
+    max-height: none;
+    margin-top: 0.5rem;
+    box-shadow: none;
+  }
+  .xe-menu .xe-pop-panel,
+  .xe-fix .xe-pop-panel {
+    left: auto;
+    right: 0;
+  }
+  .xe-menu-items {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  .xe-menu-items > * {
+    justify-content: flex-start;
+  }
+  .xe-topbar .xe-menu-items .xe-tb .xe-tb-text,
+  .xe-topbar .xe-menu-items .xe-tb .xe-undo-for {
+    display: inline;
+  }
+  .xe-menu-items [role="group"] {
+    justify-content: flex-start;
+  }
+
+  /* The layout menu. */
+  .xe-layout-panel {
+    width: 24rem;
+  }
+  .xe-layout-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+  .xe-layout-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: 2.75rem;
+    padding: 0.375rem 0.625rem;
+    border: 1px solid var(--color-line);
+    border-radius: 12px;
+    cursor: pointer;
+  }
+  .xe-layout-row:has(:checked) {
+    border-color: var(--color-ink);
+  }
+  .xe-layout-row:has(:focus-visible) {
+    outline: 3px solid var(--color-jade);
+    outline-offset: 2px;
+  }
+  .xe-layout-text {
+    display: block;
+    min-width: 0;
+  }
+  .xe-layout-name {
+    display: block;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .xe-layout-line {
+    display: block;
+    font-size: 0.8125rem;
+    color: var(--color-graphite);
+    white-space: nowrap;
+  }
+  .xe-layout-best {
+    margin: 0.625rem 0 0;
+    min-height: 2.5rem;
+    font-size: 0.8125rem;
+    color: var(--color-graphite);
+  }
+  .xe-layout-status {
+    font-size: 0.875rem;
+  }
+  .xe-layout-status > p {
+    margin: 0.25rem 0 0;
+  }
+
+  /* Things to fix. */
+  .xe-fix-panel {
+    width: 28rem;
+  }
+  .xe-fix-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .xe-fix-list + .xe-fix-list {
+    margin-top: 0.75rem;
+  }
+  .xe-fix-number {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-error);
+    border-radius: 12px;
+  }
+  .xe-fix-actions {
+    display: inline-flex;
+    gap: 0.5rem;
+  }
+  .xe-fix-issue {
+    display: block;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: 12px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .xe-fix-issue:hover {
+    background: var(--color-mist);
+  }
+  .xe-fix-more {
+    margin: 0.75rem 0 0;
+    font-size: 0.8125rem;
+    color: var(--color-graphite);
+  }
+
+  /* "Review and publish": never narrower than its words. One line from 48rem up; on a phone two lines
+     at most, inside the pill (below). */
+  .xe-publish {
+    white-space: nowrap;
+  }
+  .xe-topbar .xe-publish,
+  .xe-topbar .xe-publish * {
+    font-size: 0.8125rem;
+  }
+
+  /* The kept steps, from the widest down. */
+  @media (width < 64rem) {
+    .xe-topbar .xe-undo-button .xe-tb-text {
+      display: none;
+    }
+    /* "Review and publish" stays on one line (design round 2, item 3), so the row makes room for it, and
+       for a failed save's Retry, down to a 48rem window: tighter gaps, a little less padding round its
+       words, and the layout's name in its button's accessible name only (as Undo's is). */
+    .xe-topbar .xe-topbar-row {
+      gap: 0.25rem;
+    }
+    .xe-topbar .xe-publish {
+      padding-inline: 0.625rem;
+    }
+    .xe-topbar .xe-layout-button .xe-tb-text {
+      display: none;
+    }
+  }
+  .xe-back-text,
+  .xe-chip-state {
+    display: none;
+  }
+  .xe-topbar .xe-visitor .xe-tb-text,
+  .xe-topbar .xe-card-button .xe-tb-text {
+    display: none;
+  }
+  @media (width >= 64rem) {
+    .xe-back-text,
+    .xe-chip-state {
+      display: inline-flex;
+    }
+  }
+  @media (width >= 88rem) {
+    .xe-topbar .xe-visitor .xe-tb-text {
+      display: inline;
+    }
+    .xe-wordbar-limits {
+      display: inline;
+    }
+    .xe-fix-words {
+      display: inline;
+    }
+    .xe-fix-count {
+      display: none;
+    }
+  }
+  @media (width >= 100rem) {
+    .xe-title-h1 {
+      position: static;
+      width: auto;
+      height: auto;
+      overflow: visible;
+      clip-path: none;
+    }
+    .xe-undo-for {
+      display: inline;
+    }
+    .xe-wordbar-bar {
+      display: block;
+    }
+    .xe-topbar .xe-card-button .xe-tb-text {
+      display: inline;
+    }
+  }
+
+  /* A phone: the row keeps its short list, every control 44px, and the panels are as wide as the screen. */
+  @media (width < 48rem) {
+    .xe-topbar .xe-topbar-row {
+      gap: 0.25rem;
+      padding: 0 0.5rem;
+    }
+    .xe-topbar .xe-tb,
+    .xe-back {
+      min-height: 2.75rem;
+    }
+    .xe-back {
+      min-width: 2.75rem;
+      justify-content: center;
+      padding: 0;
+    }
+    .xe-chip-state {
+      display: none;
+    }
+    .xe-topbar .xe-tb-icon,
+    .xe-topbar .xe-fix-button {
+      min-width: 2.75rem;
+      padding-inline: 0.5rem;
+    }
+    .xe-wordbar {
+      font-size: 0.75rem;
+    }
+    .xe-topbar .xe-publish,
+    .xe-topbar .xe-publish * {
+      white-space: normal;
+      line-height: 1.1;
+      text-align: center;
+    }
+    .xe-topbar .xe-publish {
+      height: auto;
+      padding-inline: 0.625rem;
+      max-width: 6.25rem;
+    }
+    .xe-fix-words {
+      display: none;
+    }
+    .xe-fix-count {
+      display: inline;
+    }
+    .xe-save {
+      font-size: 0.75rem;
+    }
+    /* Why a save failed: under the bar, as wide as the screen, as the panels are here. */
+    .xe-save-bad {
+      position: static;
+    }
+    .xe-save-bad .xe-save-words {
+      right: 0.5rem;
+      left: 0.5rem;
+      width: auto;
+      max-width: none;
+    }
+    .xe-topbar-row:has(.xe-save-bad) .xe-wordbar {
+      display: none;
+    }
+    .xe-pop {
+      position: static;
+    }
+    /* Under the bar (the header is the sticky box they hang from), as wide as the screen. */
+    .xe-pop-panel {
+      position: absolute;
+      top: calc(100% + 0.25rem);
+      left: 0.5rem;
+      right: 0.5rem;
+      width: auto;
+      min-width: 0;
+      max-width: none;
+    }
+    .xe-pop-inline {
+      position: relative;
+    }
+    .xe-pop-inline > .xe-pop-panel {
+      position: static;
+    }
+    .xe-menu-items .xe-tb {
+      min-height: 2.75rem;
+    }
+    .xe-layout-panel,
+    .xe-fix-panel {
+      width: auto;
+    }
+  }
+}

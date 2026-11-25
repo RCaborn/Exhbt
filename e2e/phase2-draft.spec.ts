@@ -7,6 +7,7 @@ import { emptyDoc, text } from "../lib/exhbt/blocks";
 import { unverifiedNumbers } from "../lib/exhbt/verify";
 import { makeDocx, makePdf } from "./doc-fixtures";
 import { uniqueEmail } from "./helpers";
+import { uniqueBytes } from "./unique-bytes";
 
 // Upload → AI draft (docs/phase-2.md section 6): the readers, the number check, and /exhbts/new
 // end to end with the placeholder AI (no API key in tests) and the in-memory Storage stand-in.
@@ -152,12 +153,23 @@ test.describe("Draft an exhbt", () => {
   test("a photo asks before it's read by the AI", async ({ page }) => {
     await signIn(page, "photo");
     await ready(page);
-    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+    const png = uniqueBytes(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64"));
     await page.locator("#files").setInputFiles({ name: "whiteboard.png", mimeType: "image/png", buffer: png });
     await expect(page.getByText("That's a photo")).toBeVisible();
     await page.getByRole("button", { name: "Read it for me" }).click();
     // Without an API key the reader returns a labelled placeholder.
     await expect(page.getByTestId("file-status")).toContainText("words");
+  });
+
+  test("a scan the AI reader couldn't finish says only the first part was read", async ({ page }) => {
+    await signIn(page, "longscan");
+    await ready(page);
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+    // "long-scan" in the name makes the stand-in reader stop part-way, as a real read does at max_tokens.
+    await page.locator("#files").setInputFiles({ name: "long-scan.png", mimeType: "image/png", buffer: png });
+    await page.getByRole("button", { name: "Read it for me" }).click();
+    await expect(page.getByTestId("file-status")).toContainText("words");
+    await expect(page.getByTestId("file-truncated")).toHaveText(/only the first part was read/);
   });
 
   test("no accessibility violations on /exhbts/new", async ({ page }) => {

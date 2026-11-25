@@ -1,0 +1,258 @@
+/* The flowchart on the editing page (decision 0026): K's. Each box's grip and Remove, the "+" in each
+   arrow and after the last box, the line and the carried copy, and the count issue's outline and
+   message. Nothing here takes room on the page: every control is positioned over the flowchart, so the
+   boxes and arrows sit where the visitor's page draws them. Colours and corners are the page's --xp-*
+   only, so the controls hold in every look, on the dark last box too: each sits on its own chip.
+   Nothing here animates; the drop's motion is set in script and skipped under reduced motion. */
+@layer components {
+  /* ---------- The list ---------- */
+  /* What MethodFlow's <ol> sits in: the anchor "Things to fix" jumps to for the count issue. */
+  .xe-flow {
+    position: relative;
+  }
+  .xe-flow:focus {
+    outline: none;
+  }
+  /* The count issue ("The flowchart needs at least 3 boxes."): an outline in the look's error colour, taking no room. */
+  .xe-flow[data-invalid] {
+    outline: 2px solid var(--xp-error);
+    outline-offset: 6px;
+    border-radius: var(--xp-radius-box);
+  }
+  /* Its message (core.css's .xe-issue): read out always, shown under the list while the list or a box in it has the focus. */
+  .xe-flow:focus-within > .xe-issue {
+    clip-path: none;
+    opacity: 1;
+  }
+
+  /* ---------- The chips: a box's grip and Remove, and the "+" ---------- */
+  .xe-flow-chip {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 1px solid var(--xp-outline-edge);
+    border-radius: 999px;
+    background: var(--xp-card);
+    color: var(--xp-ink);
+    cursor: pointer;
+  }
+  .xe-flow-chip:hover {
+    border-color: var(--xp-link);
+  }
+  .xe-flow-chip:focus-visible {
+    outline: 2px solid var(--xp-link);
+    outline-offset: 2px;
+  }
+  .xe-flow-chip[aria-disabled="true"] {
+    color: var(--xp-muted);
+    cursor: default;
+  }
+  .xe-flow-chip[aria-disabled="true"]:hover {
+    border-color: var(--xp-outline-edge);
+  }
+  /* The icon is never a press's target, so a finger keeps its events on the button. */
+  .xe-flow-chip > svg {
+    pointer-events: none;
+  }
+  /* A press on the grip is the drag's: no scrolling from it, no text selection, no long-press menu. */
+  .xe-flow-grip {
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* A box's tools, half over its edge: in a column, stacked on its right edge by its middle (the gaps
+     above and below a column hold the sections' own "+" and toolbars); in a row, side by side on its
+     foot at its right end (the arrow beside it holds the "+"). */
+  .xe-flow-tools {
+    position: absolute;
+    z-index: 16;
+    display: flex;
+    gap: 0.25rem;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .xe-flow[data-axis="column"] .xe-flow-tools {
+    top: 50%;
+    right: 0;
+    flex-direction: column;
+    transform: translate(50%, -50%);
+  }
+  .xe-flow[data-axis="row"] .xe-flow-tools {
+    right: 0.5rem;
+    bottom: 0;
+    transform: translateY(50%);
+  }
+  [data-flow-step]:hover > .xp-flow-box > .xe-flow-tools,
+  .xp-flow-box:focus-within > .xe-flow-tools {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* The "+" over each arrow, in its middle. Shown while the pointer is over the flowchart. */
+  .xe-flow-add {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 16;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  /* After the last box: under it in a column, a little into its foot so it stays clear of the section "+" in the gap below; on its right edge in a row. */
+  .xe-flow[data-axis="column"] .xe-flow-add[data-end] {
+    top: calc(100% - 0.375rem);
+  }
+  .xe-flow[data-axis="row"] .xe-flow-add[data-end] {
+    left: 100%;
+  }
+  .xe-flow:hover .xe-flow-add,
+  .xe-flow-add:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* With no boxes at all: the one button, in the flow, is the empty flowchart's placeholder. */
+  .xe-flow-first {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2.25rem;
+    padding: 0 0.875rem;
+    border: 1px dashed var(--xp-outline-edge);
+    border-radius: var(--xp-radius-box);
+    background: transparent;
+    color: var(--xp-ink);
+    font: 600 0.8125rem/1 var(--xp-font, var(--font-sans));
+  }
+  .xe-flow-first:hover {
+    border-color: var(--xp-link);
+  }
+
+  /* On a touch screen there is no hover: the tools and the "+" are always there, 28px to the eye and
+     44px to the finger. In a row (a tablet) a box shows its tools while it has the focus. */
+  @media (pointer: coarse) {
+    .xe-flow-tools,
+    .xe-flow-add {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .xe-flow-chip::before {
+      content: "";
+      position: absolute;
+      inset: -0.5rem;
+    }
+    /* Remove sits on the box's top left corner and the grip on its top right, each centred on the corner,
+       straddling both edges: so each clears the box's words by 6px and more (the words start 13px in and
+       below the top: design round 2, item 5), and each fits in the page's 16px gutter. The gap under the
+       flowchart holds the next section's toolbar at the right and its "+" at the left, and both stay clear
+       of the boxes' chips, at their tops. Each larger press reaches up and along the top edge, into the
+       box's corner but never down to its words and never past the page's edge. The "+" above a box keeps
+       clear of it (Toolbar.tsx moves it). In a column (a phone, a tablet's column) and in a row (a tablet,
+       four boxes or fewer from 36rem of column: MethodFlow, as all four new samples are): on a row's
+       foot the chips hung into the gap under the flowchart, where at 810px the next section's toolbar
+       then had nowhere clear, and a box's two sat 4px apart, so Remove's press took 12px of the grip's. */
+    .xe-flow:is([data-axis="column"], [data-axis="row"]) .xe-flow-tools {
+      inset: 0;
+      display: block;
+      transform: none;
+      pointer-events: none;
+    }
+    .xe-flow:is([data-axis="column"], [data-axis="row"]) .xe-flow-tools > .xe-flow-chip {
+      position: absolute;
+      top: 0;
+      pointer-events: auto;
+    }
+    .xe-flow:is([data-axis="column"], [data-axis="row"]) .xe-flow-tools > .xe-flow-grip {
+      right: 0;
+      transform: translate(50%, -50%);
+    }
+    .xe-flow:is([data-axis="column"], [data-axis="row"]) .xe-flow-tools > [data-flow-remove] {
+      left: 0;
+      transform: translate(-50%, -50%);
+    }
+    .xe-flow:is([data-axis="column"], [data-axis="row"]) .xe-flow-tools > .xe-flow-grip::before {
+      inset: -1rem 0 0 -1rem;
+    }
+    .xe-flow:is([data-axis="column"], [data-axis="row"]) .xe-flow-tools > [data-flow-remove]::before {
+      inset: -1rem -1rem 0 0;
+    }
+    /* In a row only the box with the focus, or the one just touched, shows them: one box's grip and the next
+       one's Remove, across the arrow between them, are nearer than a press. The touch keeps them up while it
+       lasts: on Safari a press on a button takes the focus from the box, and the chip would go under it. */
+    .xe-flow[data-axis="row"] [data-flow-step]:not(:hover) > .xp-flow-box:not(:focus-within) > .xe-flow-tools {
+      opacity: 0;
+    }
+    .xe-flow[data-axis="row"] [data-flow-step]:not(:hover) > .xp-flow-box:not(:focus-within) > .xe-flow-tools > .xe-flow-chip {
+      pointer-events: none;
+    }
+  }
+
+  /* ---------- While a box is carried ---------- */
+  /* Nothing else offers itself: no tools, no "+" (nor while the drag board carries a section). */
+  .xe-flow[data-flow-drag] .xe-flow-tools,
+  .xe-flow[data-flow-drag] .xe-flow-add,
+  [data-xe-drag] .xe-flow-tools,
+  [data-xe-drag] .xe-flow-add {
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  /* A chip that takes the pointer itself (a phone's, placed on its own) takes none then either. */
+  .xe-flow[data-flow-drag] .xe-flow-tools > .xe-flow-chip,
+  [data-xe-drag] .xe-flow-tools > .xe-flow-chip {
+    pointer-events: none !important;
+  }
+  /* From the keyboard the grip keeps the focus, and shows it. */
+  .xe-flow[data-flow-drag="keys"] [data-dragging] > .xp-flow-box > .xe-flow-tools {
+    opacity: 1 !important;
+  }
+  /* Line style, by pointer: the box stays where it is, faint, and its copy is carried. */
+  .xe-flow[data-flow-style="line"][data-flow-drag="pointer"] [data-dragging] {
+    opacity: 0.4;
+  }
+  /* The copy, the box lifted from the keyboard, and the box carried in slide style: its own card, the
+     pack shadow and an outline in the look's link colour. Never scaled. */
+  .xe-flow[data-flow-drag="keys"] [data-dragging] > .xp-flow-box,
+  .xe-flow[data-flow-style="slide"] [data-dragging] > .xp-flow-box,
+  .xe-flow-copy {
+    outline: 2px solid var(--xp-link);
+    box-shadow: var(--shadow-pack);
+  }
+  .xe-flow[data-flow-style="slide"] [data-dragging] {
+    z-index: 15;
+  }
+  /* What the copy and the line are drawn in: in the look's wrapper, over the page. */
+  .xe-flow-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 40;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
+  /* The line, in the gap the box would go into: above the copy, which hangs from the pointer right where the line is. */
+  .xe-flow-line {
+    position: absolute;
+    z-index: 2;
+    border-radius: 999px;
+    background: var(--xp-link);
+  }
+  /* The copy: the size of the box's place in the list, with the box where it sits in it. */
+  .xe-flow-carried {
+    position: relative;
+    font-family: var(--xp-font, var(--font-sans));
+    cursor: grabbing;
+  }
+  .xe-flow-copy {
+    position: absolute;
+    overflow: hidden;
+  }
+}

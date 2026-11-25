@@ -3,7 +3,8 @@ import { z } from "zod/v4";
 import { getCurrentUser } from "@/lib/auth";
 import { loadAiVersion, loadDraftSource, saveAiVersion } from "@/lib/draft-tools";
 import { FIGURE_KINDS, FigureBoxSchema, formatLimits, normaliseDoc, type Section } from "@/lib/exhbt/blocks";
-import { FORMAT_RULES, formatOf } from "@/lib/exhbt/formats";
+import { graphsAsDrafted } from "@/lib/exhbt/draft-blocks";
+import { formatOf, fromWorkOf } from "@/lib/exhbt/formats";
 import { withMoreImages, withWorkVisual } from "@/lib/exhbt/sections";
 import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { clampBox, fitAlt, fitCaption } from "@/lib/figures/rules";
@@ -89,9 +90,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     doc = { ...doc, sections: doc.sections.filter((s) => !isPicked(s)) };
   }
   // Fresh draft: no figure picked yet (just made sure) and every graph is one the draft drew. Otherwise any graph may be the person's.
+  // Compared as graphs, not as JSON text: the database hands the exhbt back with its keys in another order (graphsAsDrafted).
   const ai = await loadAiVersion(user.id, id).catch(() => null);
-  const drewIt = (c: unknown) => (ai?.drafted ?? []).some((d) => JSON.stringify(d) === JSON.stringify(c));
-  const fresh = !replaces && doc.sections.every((s) => s.kind !== "graph" || drewIt(s.chart));
+  const fresh = !replaces && graphsAsDrafted(doc, ai?.drafted);
   // The caption is cut to the layout's cap; withWorkVisual applies the rule and puts the picture where the layout wants it.
   const shown = fitCaption(caption, formatLimits(formatOf(doc)).images.captionWords);
   const result = withWorkVisual(doc, {
@@ -120,7 +121,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   let next = result.doc;
   // A gallery takes the person's other uploaded pictures too, after the lead, in the order uploaded. Each must be their own image file.
   const extra: string[] = [];
-  if (more.length && FORMAT_RULES[formatOf(next)].fromWork === "pictures") {
+  if (more.length && fromWorkOf(next) === "pictures") {
     for (const f of more) {
       const other = await store.getFile(f);
       if (other && other.userId === user.id && other.kind === "image" && f !== fileId && !extra.includes(f)) extra.push(f);

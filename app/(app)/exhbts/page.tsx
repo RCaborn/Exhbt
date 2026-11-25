@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import { createFromScratch, deleteExhbt, moveExhbt } from "./[id]/actions";
 import { leaveAction, makeOwnAction } from "@/app/(app)/team/actions";
 import { ConfirmAction } from "@/components/editor/ConfirmAction";
+import { DeleteExhbt } from "@/components/editor/DeleteExhbt";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { getCurrentUser } from "@/lib/auth";
@@ -171,14 +172,7 @@ export default async function ExhbtsPage({ searchParams }: { searchParams: Promi
                     <Button href={`/exhbts/${e.id}/team`} size="sm" label={`Teammates for ${title}`}>
                       Team
                     </Button>
-                    <ConfirmAction
-                      label="Delete"
-                      accessibleLabel={`Delete ${title}`}
-                      variant="danger"
-                      question="Delete it for good?"
-                      confirmLabel="Yes, delete"
-                      action={deleteExhbt.bind(null, e.id)}
-                    />
+                    <DeleteExhbt id={e.id} label="Delete" accessibleLabel={`Delete ${title}`} action={deleteExhbt.bind(null, e.id)} />
                   </div>
                 </li>
               );

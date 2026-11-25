@@ -458,6 +458,11 @@ const cleanTable = (t: string, max: number) => t.replace(/\u0000/g, "").trim().s
 
 /** Asks a server AI reader (`endpoint`) for the text of a scan or photo. The person has agreed to send it. */
 export async function readOnServer(file: File, endpoint: string): Promise<string> {
+  return (await readOnServerFull(file, endpoint)).text;
+}
+
+/** As readOnServer, and whether the reader stopped before the end of the file (`truncated`). */
+export async function readOnServerFull(file: File, endpoint: string): Promise<{ text: string; truncated: boolean }> {
   const body = new FormData();
   body.set("file", file);
   let res: Response;
@@ -466,9 +471,9 @@ export async function readOnServer(file: File, endpoint: string): Promise<string
   } catch {
     throw new DocError("We couldn't reach our reader. Check your connection, or paste the text.");
   }
-  const data = (await res.json().catch(() => ({}))) as { text?: string; error?: string };
+  const data = (await res.json().catch(() => ({}))) as { text?: string; error?: string; truncated?: boolean };
   if (!res.ok || !data.text) throw new DocError(data.error ?? "We couldn't read that file. Paste the text instead.");
-  return data.text;
+  return { text: data.text, truncated: data.truncated === true };
 }
 
 /** Words in a piece of text, as shown beside each file. */

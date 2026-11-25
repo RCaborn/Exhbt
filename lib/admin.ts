@@ -5,6 +5,21 @@ import { getCurrentUser, type SessionUser } from "./auth";
 import { accountPlan, ALL_TIME_TABLES, type AdminAccountDetail, type AdminAccountsPage, type AdminRowMap, type AdminTable } from "./admin-types";
 import type { Plan } from "./entitlements";
 import { getStore, LIVE_SUBSCRIPTION_STATUSES } from "./store";
+import { FAILURE_WORDS, type AIFailureReason } from "./ai/failure";
+import { costUsd } from "./ai/model";
+
+/** The admin panel's failed-AI table: each feature and the events its failures are logged as (lib/ai-failures.ts). */
+const FAILURE_ROWS: { feature: string; label: string; events: string[] }[] = [
+  { feature: "roadmap", label: "Roadmaps", events: ["roadmap_failed"] },
+  { feature: "project_ideas", label: "Project ideas", events: ["ideas_failed"] },
+  { feature: "project_swap", label: "Idea swaps", events: ["swap_failed"] },
+  { feature: "exhbt_draft", label: "Exhbt drafts", events: ["exhbt_draft_failed"] },
+  { feature: "exhbt_rewrite", label: "Rewrites", events: ["exhbt_rewrite_failed"] },
+  { feature: "portfolio_intro", label: "Portfolio intros", events: ["intro_failed"] },
+  { feature: "job_match", label: "Job matches", events: ["job_match_failed"] },
+  { feature: "figure_pick", label: "Figure picks", events: ["figure_pick_failed"] },
+  { feature: "file_read", label: "File reads (scans, photos and CVs)", events: ["file_read_failed", "cv_read_failed"] },
+];
 
 /**
  * The admin panel's reads (decision 0021). Only accounts whose profiles.role is exhbt_admin get
@@ -19,6 +34,22 @@ export const requireAdmin = cache(async (): Promise<SessionUser> => {
   if (!user || !(await getStore().isAdmin(user.id))) notFound();
   return user;
 });
+
+/**
+ * Whether this person is an admin, for a page that draws something extra for one and is otherwise the
+ * same for everyone (the edit page's own editor switch, lib/editor-kind.ts). It is the check requireAdmin
+ * makes, profiles.role is exhbt_admin, read on every call. It never throws and never sends anyone to the
+ * 404 page: with nobody signed in, or when the role cannot be read, the answer is no.
+ */
+export async function isAdmin(user: SessionUser | null): Promise<boolean> {
+  if (!user) return false;
+  try {
+    return await getStore().isAdmin(user.id);
+  } catch (e) {
+    console.error("admin: could not read the role, so this person is treated as not an admin:", (e as Error).message);
+    return false;
+  }
+}
 
 export const RANGES = ["7d", "30d", "90d", "all"] as const;
 export type Range = (typeof RANGES)[number];
@@ -71,6 +102,17 @@ export type Overview = {
     failures: number;
   }>;
   ideas: Section<{ generated: number; swaps: number; saved: number; failures: number; roadmapsFailed: number | null }>;
+  /**
+   * Failed AI calls, one row per feature (decision 0029): how many, why (cut off, refused, wrong shape,
+   * service error, empty) and the tokens they spent, which the call log (successes only) leaves out.
+   */
+  aiFailures: Section<{
+    total: number;
+    inputTokens: number;
+    outputTokens: number;
+    costUsd: number;
+    features: { feature: string; label: string; failures: number; reasons: string; inputTokens: number; outputTokens: number; costUsd: number }[];
+  }>;
   exhbts: Section<{ drafted: number; published: number; people: number; perPerson: { one: number; two: number; threePlus: number }; aiDrafts: number; aiRewrites: number }>;
   ai: Section<{
     calls: number;
@@ -189,6 +231,29 @@ export async function adminOverview(range: Range, now = Date.now()): Promise<Ove
     };
   });
 
+  const failureSection = build([events], () => {
+    const features = FAILURE_ROWS.map(({ feature, label, events: names }) => {
+      const fs = evs.filter((e) => names.includes(e.name));
+      const reasons = new Map<string, number>();
+      for (const f of fs) reasons.set(f.reason ?? "not recorded", (reasons.get(f.reason ?? "not recorded") ?? 0) + 1);
+      const inputTokens = fs.reduce((n, f) => n + (f.inputTokens ?? 0), 0);
+      const outputTokens = fs.reduce((n, f) => n + (f.outputTokens ?? 0), 0);
+      return {
+        feature,
+        label,
+        failures: fs.length,
+        reasons: [...reasons.entries()].map(([r, k]) => `${FAILURE_WORDS[r as AIFailureReason] ?? r} ${k}`).join(", "),
+        inputTokens,
+        outputTokens,
+        // Priced call by call: a long prompt is priced higher (lib/ai/model.ts).
+        costUsd: fs.reduce((n, f) => n + costUsd(f.inputTokens ?? 0, f.outputTokens ?? 0), 0),
+      };
+    });
+    const inputTokens = features.reduce((n, f) => n + f.inputTokens, 0);
+    const outputTokens = features.reduce((n, f) => n + f.outputTokens, 0);
+    return { total: features.reduce((n, f) => n + f.failures, 0), inputTokens, outputTokens, costUsd: features.reduce((n, f) => n + f.costUsd, 0), features };
+  });
+
   const exhbtSection = build([exhbts, events], () => {
     const es = rowsOf(exhbts);
     const per = new Map<string, number>();
@@ -276,6 +341,7 @@ export async function adminOverview(range: Range, now = Date.now()): Promise<Ove
     accounts,
     roadmaps: roadmapSection,
     ideas: ideasSection,
+    aiFailures: failureSection,
     exhbts: exhbtSection,
     ai: aiSection,
     subscriptions: subsSection,
