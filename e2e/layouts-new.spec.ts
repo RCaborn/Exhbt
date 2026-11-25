@@ -6,10 +6,11 @@ import { formatLimits, LIMITS, validateForPublish, wordCount, words, type ExhbtD
 import { checkedReason, CLASSIC_REASONS, isLayoutReason, LAYOUT_REASONS, layoutSentence } from "../lib/exhbt/drafted";
 import { CLASSIC_FORMATS, FORMAT_RULES, FORMATS, formatOf, type Format } from "../lib/exhbt/formats";
 import { pullquoteFrom, unsupportedParts } from "../lib/exhbt/references";
-import { beforeAfterDoc, buildDoc, essayDoc, eventDoc } from "../lib/exhbt/sample";
+import { beforeAfterDoc, buildDoc, essayDoc, eventDoc, openBankingDoc } from "../lib/exhbt/sample";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
+import { layoutGroup, openLayoutMenu, previewArticle, signInAs, waitEditor } from "./editor";
 import * as classicEditor from "./editor-classic-helpers";
-import { freshName, readStored, sampleDoc } from "./page-editor";
+import { freshName, openDoc, READY, readStored, sampleDoc, waitSaved } from "./page-editor";
 
 /*
  * The four layouts of decision 0028 (brief D): a fictional sample for each, near the 200-word cap
@@ -430,6 +431,152 @@ test.describe("The line after a draft, for the four layouts", () => {
     // Every signal the draft may give is one the edit page will read from the address.
     for (const r of LAYOUT_REASONS) expect(isLayoutReason(r)).toBe(true);
     expect(CLASSIC_REASONS.every((r) => (LAYOUT_REASONS as readonly string[]).includes(r))).toBe(true);
+  });
+});
+
+/* ---------------- Drafted by the stand-in, in the new editor (this suite's server: EXHBT_EDITOR is "page") ---------------- */
+
+/** Material with none of the stand-in's cues in it: on its own it drafts a case study. */
+const PLAIN = "We timed lunchtime queues at the union cafe for two weeks, then tried a second till at the busiest hour. The queue fell, and staff said the rush felt calmer.";
+/** Drafts through the API (the stand-in AI), as the draft page does. */
+async function draftOf(page: Page, data: Record<string, string>) {
+  const res = await page.request.post("/api/exhbts/draft", { data });
+  expect(res.status(), await res.text()).toBe(200);
+  return (await res.json()) as { id: string; format: string; formatReason: string };
+}
+const stored = async (page: Page, id: string) => (await readStored(page, id)).working;
+
+test.describe("A draft may choose any of the seven layouts in the new editor", () => {
+  for (const f of NEW_FOUR) {
+    test(`${f}: notes that name it draft it, and the editor opens on it and says so`, async ({ page }) => {
+      await signInAs(page, freshName(`named${f}`), "max");
+      const d = await draftOf(page, { text: PLAIN, notes: `stand-in: layout ${f}` });
+      expect(d).toMatchObject({ format: f, formatReason: "notes" });
+      await page.goto(`/exhbts/${d.id}/edit?drafted=${d.format}&why=${d.formatReason}`);
+      await waitEditor(page);
+      const said = `Laid out as ${FORMAT_RULES[f].name} because your notes name this layout.`;
+      await expect(previewArticle(page)).toHaveAttribute("data-format", f);
+      // Said once, aloud, and kept in the layout menu, where the layout is changed.
+      await expect(page.locator("[data-said]")).toContainText(said);
+      await openLayoutMenu(page);
+      await expect(layoutGroup(page).getByRole("radio", { name: new RegExp(`^${FORMAT_RULES[f].name}`) })).toBeChecked();
+      await expect(page.locator("[data-drafted]")).toContainText(said);
+      await expect(page).toHaveURL(new RegExp(`/exhbts/${d.id}/edit$`));
+    });
+  }
+
+  test("one plain cue each: a built thing, a redesign, an event with a role and an essay, each with its own reason and parts", async ({ page }) => {
+    await signInAs(page, freshName("cues"), "max");
+    const built = `${PLAIN} I built the timer as a small web app, and the code is at https://example.com/queue-timer.`;
+    const build = await draftOf(page, { text: built });
+    expect(build).toMatchObject({ format: "build", formatReason: "built-thing" });
+    const buildStored = await stored(page, build.id);
+    expect(linksOf(buildStored).map((l) => l.href)).toEqual(["https://example.com/queue-timer"]);
+    expect(unsupportedParts(buildStored, built)).toEqual([]);
+
+    const redesign = await draftOf(page, { text: `${PLAIN} We then redesigned the counter so the tills face the door.` });
+    expect(redesign).toMatchObject({ format: "before-after", formatReason: "before-and-after" });
+    // No picture is drafted, so nothing is marked Before or After.
+    expect(JSON.stringify(await stored(page, redesign.id))).not.toContain('"stage"');
+
+    const staged = `${PLAIN} My role was shift lead for the fortnight.`;
+    const event = await draftOf(page, { text: staged });
+    expect(event).toMatchObject({ format: "event", formatReason: "event-role" });
+    const eventStored = await stored(page, event.id);
+    expect(eventStored.myRole).toBe("shift lead for the fortnight");
+    expect(unsupportedParts(eventStored, staged)).toEqual([]);
+
+    const argued = `This essay argues that a second till pays for itself at lunchtime.\n${PLAIN}\nSource: Hartley, Queues and Their Limits (2004)`;
+    const essay = await draftOf(page, { text: argued });
+    expect(essay).toMatchObject({ format: "essay", formatReason: "argument-sources" });
+    const essayStored = await stored(page, essay.id);
+    expect(pullquoteOf(essayStored)).toEqual(["This essay argues that a second till pays for itself at lunchtime."]);
+    expect(linksOf(essayStored)).toEqual([{ href: "", label: "Hartley, Queues and Their Limits (2004)" }]);
+    expect(unsupportedParts(essayStored, argued)).toEqual([]);
+  });
+
+  test("what the AI makes up is left off the exhbt: a pull quote, a source with no address, a link and a role", async ({ page }) => {
+    // "stand-in: invent": the stand-in writes one of each that the material doesn't hold, as a real model might.
+    const INVENTED = ["A sentence the person never wrote.", "A book nobody cited", "not-in-the-material", "Director of everything"];
+    await signInAs(page, freshName("invent"), "max");
+    const essay = await draftOf(page, { text: `${PLAIN}\nSource: Hartley, Queues and Their Limits (2004)`, notes: "stand-in: layout essay. stand-in: invent" });
+    expect(essay.format).toBe("essay");
+    const essayStored = await stored(page, essay.id);
+    expect(pullquoteOf(essayStored)).toEqual([]);
+    expect(linksOf(essayStored)).toEqual([{ href: "", label: "Hartley, Queues and Their Limits (2004)" }]);
+
+    const event = await draftOf(page, { text: PLAIN, notes: "stand-in: layout event. stand-in: invent" });
+    expect(event.format).toBe("event");
+    // My role is empty when the material doesn't say: the person types it, and the reason given is the notes', not a role's.
+    expect((await stored(page, event.id)).myRole).toBeUndefined();
+    expect(event.formatReason).toBe("notes");
+
+    const build = await draftOf(page, { text: `${PLAIN} The code is at https://example.com/queue-timer.`, notes: "stand-in: layout build. stand-in: invent" });
+    expect(build.format).toBe("build");
+    expect(linksOf(await stored(page, build.id)).map((l) => l.href)).toEqual(["https://example.com/queue-timer"]);
+
+    for (const d of [essay, event, build]) for (const made of INVENTED) expect(JSON.stringify(await stored(page, d.id)), made).not.toContain(made);
+  });
+
+  test("a person whose editor is the classic one is drafted one of the three, whatever the notes and the material say", async ({ page }) => {
+    // Every cue the stand-in knows, and notes that name one of the four.
+    const text = `This essay argues that a second till pays. I built a timer, we redesigned the counter, and my role was shift lead. ${PLAIN}`;
+    await classicEditor.signInAs(page, freshName("classicdraft"), "max");
+    const d = await draftOf(page, { text, notes: "stand-in: layout essay" });
+    expect(d).toMatchObject({ format: "case-study", formatReason: "question-findings" });
+    const doc = await stored(page, d.id);
+    expect(doc.format).toBeUndefined();
+    expect(kinds(doc).filter((k) => k === "pullquote" || k === "link")).toEqual([]);
+    expect(doc.myRole).toBeUndefined();
+    // The three still draft as they did: a gallery by name, research by its cue.
+    expect((await draftOf(page, { text, notes: "stand-in: layout gallery" })).format).toBe("gallery");
+    expect((await draftOf(page, { text: `${PLAIN} Our hypothesis was that a second till helps.` })).format).toBe("research");
+
+    // It follows the person's editor, as the edit page decides it. An admin who turns the new editor on for themselves is drafted among seven...
+    expect((await page.request.get("/dev/admin?role=admin")).status()).toBe(200);
+    expect((await page.request.post("/api/exhbts/editor", { form: { kind: "page" } })).status()).toBe(200);
+    expect((await draftOf(page, { text, notes: "stand-in: layout essay" })).format).toBe("essay");
+    // ...and the same choice from a person who is not an admin counts for nothing.
+    expect((await page.request.get("/dev/admin?role=user")).status()).toBe(200);
+    expect((await draftOf(page, { text, notes: "stand-in: layout essay" })).format).toBe("case-study");
+  });
+});
+
+test.describe("The layout menu offers seven", () => {
+  /** "Laid out as ...", as the menu says it after a switch. */
+  const AS: Record<Format, string> = { "case-study": "a case study", gallery: "a gallery", research: "research", build: "a build", essay: "an essay", "before-after": "a before and after", event: "an event" };
+
+  test("each has its own line and sketch; each of the four can be chosen, is saved, and Undo gives the layout back", async ({ page }) => {
+    const { id } = await openDoc(page, freshName("menuseven"), openBankingDoc);
+    await openLayoutMenu(page);
+    const group = layoutGroup(page);
+    await expect(group.getByRole("radio")).toHaveCount(FORMATS.length);
+    expect(await group.locator(".xe-layout-name").allTextContents()).toEqual(FORMATS.map((f) => FORMAT_RULES[f].name));
+    // One short line each, at most 40 characters (a row stays on one line on a phone: e2e/editor-topbar.spec.ts), no two the same.
+    const lines = await group.locator(".xe-layout-line").allTextContents();
+    for (const l of lines) expect(l.length > 0 && l.length <= 40, l).toBe(true);
+    expect(new Set(lines).size).toBe(FORMATS.length);
+    // Research no longer says it is for essays: an essay has its own layout.
+    expect(lines[FORMATS.indexOf("research")]).not.toMatch(/essay/i);
+    const sketches = await group.locator("label svg").evaluateAll((els) => els.map((e) => e.innerHTML));
+    expect(new Set(sketches).size).toBe(FORMATS.length);
+
+    const undo = page.locator(`${READY} [data-topbar]`).getByRole("button", { name: /^Undo/ });
+    for (const f of NEW_FOUR) {
+      await openLayoutMenu(page);
+      await group.getByRole("radio", { name: new RegExp(`^${FORMAT_RULES[f].name}`) }).check();
+      await expect(previewArticle(page)).toHaveAttribute("data-format", f);
+      await expect(page.locator("[data-layout-status]")).toContainText(`Laid out as ${AS[f]}. Undo restores your order.`);
+      // The server stores it: all seven are offered to a person whose editor is the new one.
+      await waitSaved(page, id);
+      expect((await stored(page, id)).format).toBe(f);
+      await page.keyboard.press("Escape");
+      await expect(group).toHaveCount(0);
+      await undo.click();
+      await expect(previewArticle(page)).toHaveAttribute("data-format", "case-study");
+    }
+    await waitSaved(page, id);
+    expect((await stored(page, id)).format).toBeUndefined();
   });
 });
 

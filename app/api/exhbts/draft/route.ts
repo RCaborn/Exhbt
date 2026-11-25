@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { draftExhbt, materialText, MAX_MATERIAL_CHARS } from "@/lib/ai/exhbt-draft";
+import { isAdmin } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth";
+import { editorKind } from "@/lib/editor-kind-server";
 import { saveAiVersion, saveDraftSource } from "@/lib/draft-tools";
 import { draftVerdict } from "@/lib/drafting";
 import { aiVersionOf } from "@/lib/exhbt/draft-blocks";
@@ -20,6 +22,7 @@ import { canDraftInto } from "@/lib/team";
  * Body: { text, notes?, link?, fileIds?, signals? } → { id, unverified, format, formatReason }. `signals` are counts from the
  * upload (picture files, PDF pages, pages with pictures), so the AI can choose a layout; never the pages.
  * `formatReason` is why that layout: one of a fixed set of signals, said once in the editor (lib/exhbt/drafted.ts).
+ * Which layouts it may choose follows the person's editor (lib/editor-kind-server.ts): seven in the new one, three in the classic one.
  */
 
 const Body = z.object({
@@ -61,9 +64,12 @@ export async function POST(req: Request) {
   if (!verdict.ok) return fail(verdict.reason, verdict.status, { upgradeTo: verdict.upgradeTo ?? null });
 
   if (await tooManyFailures("exhbt_draft", { userId: user.id })) return fail(TOO_MANY_FAILURES, 429);
+  // The draft chooses among the layouts this person's editor offers, decided as the edit page decides it: all seven
+  // in the new editor, the three of decision 0024 in the classic one, which can't edit what the other four add.
+  const layouts = (await editorKind(await isAdmin(user))) === "page" ? "seven" : "three";
   let result;
   try {
-    result = await draftExhbt({ text, notes, link, signals: parsed.data.signals });
+    result = await draftExhbt({ text, notes, link, signals: parsed.data.signals, layouts });
   } catch (e) {
     // Recorded with its reason and tokens; it doesn't use up a draft.
     await recordAIFailure("exhbt_draft", { userId: user.id }, e);

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { aiVersionOf, applyBlock, readAiVersion } from "../lib/exhbt/draft-blocks";
 import { emptyDoc, SCHEMA_VERSION, text, words, type Chart, type ExhbtDoc, type Section } from "../lib/exhbt/blocks";
-import { CLASSIC_FORMATS, mayCarryFormat, OFFERED_FORMATS, offeredIn } from "../lib/exhbt/formats";
+import { CLASSIC_FORMATS, FORMATS, mayCarryFormat, OFFERED_FORMATS, offeredIn } from "../lib/exhbt/formats";
 import { withWorkVisual } from "../lib/exhbt/sections";
 import { pathOfNumber, unverifiedNumbers } from "../lib/exhbt/verify";
 import { fitCaption } from "../lib/figures/rules";
@@ -320,7 +320,10 @@ test.describe("A caption is cut to its limit without changing what it says", () 
 
 test.describe("The server holds the layout line", () => {
   test("only a layout the person's editor offers, or the one already stored, may be saved or published", () => {
-    expect(OFFERED_FORMATS).toEqual(["case-study", "gallery", "research"]);
+    // The new editor offers all seven, so a person whose editor it is may store any of them.
+    expect(OFFERED_FORMATS).toEqual([...FORMATS]);
+    expect(offeredIn("page")).toBe(OFFERED_FORMATS);
+    for (const f of FORMATS) expect(mayCarryFormat(f, "case-study", offeredIn("page"))).toBe(true);
     const classic = offeredIn("classic");
     expect(classic).toEqual(["case-study", "gallery", "research"]);
     expect(classic).toBe(CLASSIC_FORMATS);

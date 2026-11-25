@@ -19,8 +19,8 @@ export type Format = (typeof FORMATS)[number];
  * publish. Goes with the classic editor (release 5).
  */
 export const CLASSIC_FORMATS = ["case-study", "gallery", "research"] as const satisfies readonly Format[];
-/** The layouts the new editor's menu shows, and the AI draft may choose for a person whose editor it is. Three until release 4, then all seven. */
-export const OFFERED_FORMATS: readonly Format[] = CLASSIC_FORMATS;
+/** The layouts the new editor's menu shows, and the AI draft may choose for a person whose editor it is: all seven since release 4. */
+export const OFFERED_FORMATS: readonly Format[] = FORMATS;
 /** The layouts offered to a person, by the editor they get (lib/editor-kind.ts). */
 export const offeredIn = (editor: "page" | "classic"): readonly Format[] => (editor === "classic" ? CLASSIC_FORMATS : OFFERED_FORMATS);
 export const DEFAULT_FORMAT: Format = "case-study";

@@ -142,11 +142,16 @@ test.describe("Picked figure rules", () => {
 });
 
 test.describe("The work's own graph wins (decision 0025)", () => {
-  test("every layout says what it takes from the work, and today each takes a visual", () => {
+  test("every layout says what it takes from the work: a visual, except an essay, which takes none", () => {
     expect(OFFERED_FORMATS.map((f) => [f, FORMAT_RULES[f].fromWork])).toEqual([
       ["case-study", "figure"],
       ["gallery", "pictures"],
       ["research", "figure"],
+      // The four of decision 0028, offered since release 4.
+      ["build", "figure"],
+      ["essay", "none"],
+      ["before-after", "pictures"],
+      ["event", "pictures"],
     ]);
     expect(fromWorkOf({})).toBe("figure");
     expect(fromWorkOf({ format: "something-later" })).toBe("figure");
