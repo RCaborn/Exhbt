@@ -5,7 +5,7 @@ import { z } from "zod/v4";
 import { findingsOf, formatLimits, LIMITS, type Limits, plain, text, withHighlight, type ExhbtDoc } from "@/lib/exhbt/blocks";
 import { formatOf, type Format } from "@/lib/exhbt/formats";
 import { BLOCK_NAMES, type BlockValue, type BlockValues, type DraftBlock } from "@/lib/exhbt/draft-blocks";
-import { MAX_MATERIAL_CHARS } from "./exhbt-draft";
+import { keepStartAndEnd, LEFT_OUT_OF_MATERIAL, MAX_MATERIAL_CHARS } from "@/lib/material";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
 import { structuredCall } from "./call";
 
@@ -102,7 +102,7 @@ export function rewriteRequest(input: RewriteInput) {
       {
         role: "user" as const,
         content: [
-          `<material>\n${input.source.trim().slice(0, MAX_MATERIAL_CHARS)}\n</material>`,
+          `<material>\n${keepStartAndEnd(input.source.trim(), MAX_MATERIAL_CHARS, LEFT_OUT_OF_MATERIAL)}\n</material>`,
           `<exhbt_now>\n${docAsText(input.doc)}\n</exhbt_now>`,
           `Rewrite only this part: ${input.block === "header" ? "the title, summary, what it is, and where and when" : input.block === "gap" ? "the context line and its highlighted gap" : `the ${BLOCK_NAMES[input.block]}`}.`,
           note ? `<note>\n${note}\n</note>` : "No note.",

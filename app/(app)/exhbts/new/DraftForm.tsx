@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Circle, FileText, Loader2, Upload, X } from "lucide-react";
 import { DOC_ACCEPT, DocError, DocNeedsServer, countWords, extractTextInBrowser, readOnServerFull } from "@/lib/doc-readers";
+import { filesBudget, keepStartAndEnd, LEFT_OUT, sharesOf } from "@/lib/material";
 import { removeFile } from "@/components/editor/media";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { finishUpload } from "@/components/team/finish-upload";
@@ -35,7 +36,10 @@ import {
 /**
  * The upload step: files are read on the device as they're added (scans and photos ask before
  * being sent to the AI reader), uploaded straight to Storage with a signed URL, then "Draft my
- * exhbt" sends the text, notes and link to /api/exhbts/draft and opens the editor.
+ * exhbt" sends the text, notes and link to /api/exhbts/draft and opens the editor. Each file is
+ * read whole; the draft gets all of it while the files fit the material budget together, and
+ * otherwise each file's share, the start and the end of a long one (lib/material.ts). Each file's
+ * line says which.
  *
  * A PDF read on the device also has its first pages drawn small, and a Word or PowerPoint file has
  * its pictures read out of it. While the draft is written, the pages and pictures that may hold a
@@ -171,7 +175,9 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
   /** Reads a file on the device; then uploads it, unless it's already stored (a team file). */
   async function read(key: string, file: File, uploadAfter: boolean) {
     try {
-      const text = await extractTextInBrowser(file);
+      // The whole file, so its words can be counted and its end kept: what the draft reads of it is its share of the
+      // budget, worked out below with the other files (lib/material.ts).
+      const text = await extractTextInBrowser(file, { maxChars: Number.POSITIVE_INFINITY });
       patch(key, { status: "ready", text });
       if (uploadAfter) void upload(key, file);
       // Read on the device, so its pages can be drawn here for picking a figure. A scan's are drawn only once the person agrees to send it (readOnServerFor).
@@ -258,7 +264,17 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
 
   const working = items.some((it) => it.status === "reading" || it.status === "transcribing" || it.upload === "uploading");
   const material = items.filter((it) => it.status === "ready" && it.text);
-  const totalWords = material.reduce((n, it) => n + countWords(it.text), 0) + countWords(notes);
+  // What the draft reads of each file (lib/material.ts): all of it while the files fit the budget together; otherwise each
+  // file its share, the longest cut to their start and their end. Each file's line says which, and that is what is sent.
+  const reading = useMemo(() => {
+    const ready = items.filter((it) => it.status === "ready" && it.text);
+    const shares = sharesOf(
+      ready.map((it) => it.text.length),
+      filesBudget(ready.map((it) => it.file.name)),
+    );
+    return new Map(ready.map((it, i) => [it.key, readingOf(it.text, shares[i]!)]));
+  }, [items]);
+  const totalWords = material.reduce((n, it) => n + (reading.get(it.key)?.keptWords ?? 0), 0) + countWords(notes);
   const canDraft = ready && !working && !busy && totalWords >= MIN_WORDS;
 
   async function submit(e?: React.FormEvent) {
@@ -339,7 +355,7 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          text: material.map((it) => `File: ${it.file.name}\n${it.text}`).join("\n\n"),
+          text: material.map((it) => `File: ${it.file.name}\n${reading.get(it.key)?.kept ?? it.text}`).join("\n\n"),
           notes,
           link: link.trim() || undefined,
           fileIds: items.filter((it) => it.upload === "done" && it.fileId).map((it) => it.fileId),
@@ -452,7 +468,7 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
                     <span className="shrink-0 text-sm font-normal text-graphite">{sizeLabel(it.file.size)}</span>
                   </p>
                   <p className="mt-0.5 text-sm" data-testid="file-status">
-                    {statusText(it)}
+                    {statusText(it, reading.get(it.key))}
                   </p>
                   {it.truncated && (
                     <p className="mt-0.5 text-sm text-error" data-testid="file-truncated">
@@ -561,19 +577,34 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
   );
 }
 
-function statusText(it: Item): React.ReactNode {
+/** What the draft reads of one file: the text it is sent, the file's words and the words sent, and whether that is all of it. */
+type Reading = { kept: string; whole: boolean; words: number; keptWords: number };
+
+function readingOf(text: string, share: number): Reading {
+  const kept = keepStartAndEnd(text, share);
+  const words = countWords(text);
+  return kept === text ? { kept, whole: true, words, keptWords: words } : { kept, whole: false, words, keptWords: countWords(kept.replace(LEFT_OUT, "")) };
+}
+
+/** What the draft reads of a file, said plainly: all of it, its start and its end, or, for a scan the AI reader stopped part-way through, its first part. */
+function whatWasRead(it: Item, r: Reading): string {
+  const count = (x: number) => x.toLocaleString("en-GB");
+  if (it.truncated) return `We read the first ${count(r.keptWords)} words`;
+  return r.whole ? `We read all ${count(r.words)} words` : `We read ${count(r.keptWords)} of your ${count(r.words)} words: the start and the end`;
+}
+
+function statusText(it: Item, read: Reading | undefined): React.ReactNode {
   if (it.status === "reading") return "Reading…";
   if (it.status === "transcribing") return "Reading it with the AI reader. Scans can take up to 30 seconds…";
   if (it.status === "consent") return "Not read yet";
   if (it.status === "error") return null;
-  const words = countWords(it.text);
   const uploaded = it.kept ? " · from the team project" : it.upload === "uploading" ? " · uploading…" : it.upload === "done" ? " · uploaded" : "";
   return (
     <span className="inline-flex items-center gap-1.5">
-      {words > 0 && (
+      {read && read.keptWords > 0 && (
         <Tick size="xs" />
       )}
-      {words > 0 ? `${words.toLocaleString("en-GB")} words` : "Not read"}
+      {read && read.keptWords > 0 ? whatWasRead(it, read) : "Not read"}
       {uploaded}
     </span>
   );

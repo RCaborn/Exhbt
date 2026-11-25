@@ -108,7 +108,7 @@ Phase 2 builds on all of this rather than starting again.
 - Prompt rule as everywhere: use only the user's material. Every number in the draft must carry a `sourceQuote` from the material.
 - On the server, `lib/exhbt/verify.ts` checks each number in the draft appears in the extracted source text. Any that don't are flagged in the editor: "We couldn't find 18% in your files — check it."
 - Uploaded images are offered as figure candidates. A chart is only proposed when the numbers came from the files.
-- Cost: around 10–30k input tokens per draft, under $0.01 at Haiku's price (estimate). Each draft is logged in `ai_call_logs` with step `exhbt_draft`, which is already allowed.
+- Cost: around 10–30k input tokens per draft, and up to about 65k for the longest material a draft reads (`lib/material.ts`), under $0.01 at Haiku's price (estimate). Each draft is logged in `ai_call_logs` with step `exhbt_draft`, which is already allowed.
 
 **Layout and blocks** (`lib/exhbt/blocks.ts`, zod). Rory, 12 Nov 2026: a recruiter skims, so every part is short and snappy, mostly bullets. **150–200 words in all**: 200 is the hard limit on publish and covers every word on the page (header, skills, headline, graph titles and labels included; only image alt text is left out), and the editor's guide aims at 150.
 
