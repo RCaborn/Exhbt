@@ -91,33 +91,36 @@ const AXIS: Partial<Record<Format, "row" | "column">> = { "case-study": "row", g
 
 /** Presses the mouse on a box's grip and moves past the 6px threshold. Returns where the pointer is. */
 async function pickUp(page: Page, i: number) {
+  await listen(page, i, "at the start");
   await box(page, i).hover();
   const g = (await gripOf(page, i).boundingBox())!;
   const at = { x: g.x + g.width / 2, y: g.y + g.height / 2 };
   await page.mouse.move(at.x, at.y);
-  await listen(page, i, at);
+  await listen(page, i, "before the press", at);
   await page.mouse.down();
   // Under 6px it is still a click on the grip.
   await page.mouse.move(at.x + 2, at.y + 2, { steps: 2 });
   expect(await list(page).getAttribute("data-flow-drag")).toBeNull();
   await page.mouse.move(at.x + 6, at.y + 6, { steps: 3 });
+  const heard = () => page.evaluate(() => (window as Window & { __press?: string[] }).__press ?? []).catch(() => ["(the page could not be read)"]);
   try {
     await expect(list(page)).toHaveAttribute("data-flow-drag", "pointer");
   } catch (e) {
-    const heard = await page.evaluate(() => (window as Window & { __press?: string[] }).__press ?? []).catch(() => ["(the page could not be read)"]);
-    throw new Error(`The box did not lift. What the press met, in order:\n${heard.join("\n")}\n${(e as Error).message}`);
+    throw new Error(`The box did not lift. What the press met, in order:\n${(await heard()).join("\n")}\n${(e as Error).message}`);
   }
+  // TEMPORARY, while WebKit's runs are read: every pick-up's account, lifted or not, so the two groups can be compared.
+  console.log(`[lift] ${test.info().titlePath.slice(-2).join(" › ").slice(0, 70)}, box ${i + 1}, ${process.env.E2E_FOCUS || "no rule"}\n${(await heard()).filter((l) => /at the start|before the press|mousedown done/.test(l)).join("\n")}`);
   return { x: at.x + 6, y: at.y + 6 };
 }
 
 /**
- * What a press on box `i`'s grip at `at` meets, kept in the page for a pick-up that does not lift: a WebKit run's log is
- * all that a machine without WebKit sees of it. First what lies at the grip's middle, where the focus is, and whether
- * the box is under the pointer with its tools shown; then each thing the page hears from the press on.
+ * What a press on box `i`'s grip meets, kept in the page for a pick-up that does not lift: a WebKit run's log is all
+ * that a machine without WebKit sees of it. At each `stage`, where the focus is, whether the box is under the pointer
+ * with its tools shown and, given the grip's middle `at`, what lies there; then each thing the page hears from the press on.
  */
-function listen(page: Page, i: number, at: { x: number; y: number }) {
+function listen(page: Page, i: number, stage: string, at?: { x: number; y: number }) {
   return page.evaluate(
-    ({ i, at, BOX, LIST }) => {
+    ({ i, stage, at, BOX, LIST }) => {
       type Heard = Window & { __press?: string[]; __pressFrom?: number; __pressListening?: boolean };
       const w = window as Heard;
       const name = (t: EventTarget | null): string => {
@@ -129,13 +132,16 @@ function listen(page: Page, i: number, at: { x: number; y: number }) {
         const cls = [...t.classList].find((c) => c.startsWith("xe-") || c.startsWith("xp-"));
         return `${tag}${cls ? `.${cls}` : ""}${mark ? `[${mark}=${t.getAttribute(mark)}]` : ""}`;
       };
-      w.__press = [];
-      w.__pressFrom = performance.now();
+      if (!at || !w.__press) {
+        w.__press = [];
+        w.__pressFrom = performance.now();
+      }
       const ms = () => `${Math.round(performance.now() - (w.__pressFrom ?? 0))}ms`;
       const li = document.querySelectorAll(BOX)[i];
       const tools = li?.querySelector(".xe-flow-tools");
       const s = tools ? getComputedStyle(tools) : null;
-      w.__press.push(`  ${ms()} before the press: at the grip's middle ${document.elementsFromPoint(at.x, at.y).slice(0, 3).map(name).join(" over ")}; the focus on ${name(document.activeElement)}; the box hovered ${li?.matches(":hover")}; its tools ${s?.opacity}/${s?.pointerEvents}`);
+      const there = at ? `at the grip's middle ${document.elementsFromPoint(at.x, at.y).slice(0, 3).map(name).join(" over ")}; ` : "";
+      w.__press.push(`  ${ms()} ${stage}: ${there}the focus on ${name(document.activeElement)}; the box hovered ${li?.matches(":hover")}, its words ${li?.querySelector(".xp-flow-box")?.matches(":hover")}; its tools ${s?.opacity}/${s?.pointerEvents}`);
       if (w.__pressListening) return;
       w.__pressListening = true;
       let moves = { on: "", n: 0, at: "" };
@@ -160,13 +166,13 @@ function listen(page: Page, i: number, at: { x: number; y: number }) {
         window.addEventListener(type, (e) => say(`${type} on ${name(e.target)}`), true);
       for (const type of ["focusin", "focusout"]) window.addEventListener(type, (e) => say(`${type} on ${name(e.target)}, from or to ${name((e as FocusEvent).relatedTarget)}`), true);
       // After the page's own handlers and Safari's focus rule (e2e/editor-test.ts), which listens on the window too.
-      window.addEventListener("mousedown", (e) => say(`  the mousedown done: prevented ${e.defaultPrevented}, the focus on ${name(document.activeElement)}`));
+      window.addEventListener("mousedown", (e) => say(`  the mousedown done: prevented ${e.defaultPrevented}, taken by the drag ${"dndKit" in e}, the focus on ${name(document.activeElement)}`));
       const flow = document.querySelector(LIST);
       if (flow) new MutationObserver(() => say(`data-flow-drag is ${flow.getAttribute("data-flow-drag")}`)).observe(flow, { attributes: true, attributeFilter: ["data-flow-drag"] });
       const region = document.querySelector('[data-editor="page"] [data-said]');
       if (region) new MutationObserver(() => say(`said: ${region.textContent}`)).observe(region, { childList: true, characterData: true, subtree: true });
     },
-    { i, at, BOX, LIST },
+    { i, stage, at, BOX, LIST },
   );
 }
 
