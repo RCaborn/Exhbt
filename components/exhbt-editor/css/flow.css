@@ -137,64 +137,60 @@
   }
 
   /* On a touch screen there is no hover: the tools and the "+" are always there, 28px to the eye and
-     44px to the finger. In a row (a tablet) a box shows its tools while it has the focus, since the
-     last box's would sit under the next section's toolbar. */
+     44px to the finger. In a row (a tablet) a box shows its tools while it has the focus. */
   @media (pointer: coarse) {
     .xe-flow-tools,
     .xe-flow-add {
       opacity: 1;
       pointer-events: auto;
     }
-    .xe-flow[data-axis="row"] .xe-flow-tools {
-      opacity: 0;
-      pointer-events: none;
-    }
-    .xe-flow[data-axis="row"] .xp-flow-box:focus-within > .xe-flow-tools {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    /* Side by side, 16px apart, so each one's 44px press (below) is its own: 4px apart, Remove's took 12px of the grip's.
-       A flowchart of four boxes or fewer is a row on a tablet from 36rem of column (MethodFlow), as Build's, Before and
-       after's and Event's are. */
-    .xe-flow[data-axis="row"] .xe-flow-tools {
-      gap: 1rem;
-    }
     .xe-flow-chip::before {
       content: "";
       position: absolute;
       inset: -0.5rem;
     }
-    /* In a column (a phone, or a tablet's column), Remove sits on the box's top left corner and the grip
-       on its top right, each centred on the corner, straddling both edges: so each clears the box's
-       words by 6px and more (the words start 13px in and below the top: design round 2, item 5), and
-       each fits in the page's 16px gutter. The gap under a column holds the next section's toolbar at
-       the right and its "+" at the left, and both stay clear of the last box's chips, at its top. Each
-       larger press reaches up and along the top edge, into the box's corner but never down to its words
-       and never past the page's edge. The "+" above a box keeps clear of it (Toolbar.tsx moves it). */
-    .xe-flow[data-axis="column"] .xe-flow-tools {
+    /* Remove sits on the box's top left corner and the grip on its top right, each centred on the corner,
+       straddling both edges: so each clears the box's words by 6px and more (the words start 13px in and
+       below the top: design round 2, item 5), and each fits in the page's 16px gutter. The gap under the
+       flowchart holds the next section's toolbar at the right and its "+" at the left, and both stay clear
+       of the boxes' chips, at their tops. Each larger press reaches up and along the top edge, into the
+       box's corner but never down to its words and never past the page's edge. The "+" above a box keeps
+       clear of it (Toolbar.tsx moves it). In a column (a phone, a tablet's column) and in a row (a tablet,
+       four boxes or fewer from 36rem of column: MethodFlow, as all four new samples are): on a row's
+       foot the chips hung into the gap under the flowchart, where at 810px the next section's toolbar
+       then had nowhere clear, and a box's two sat 4px apart, so Remove's press took 12px of the grip's. */
+    .xe-flow:is([data-axis="column"], [data-axis="row"]) .xe-flow-tools {
       inset: 0;
       display: block;
       transform: none;
       pointer-events: none;
     }
-    .xe-flow[data-axis="column"] .xe-flow-tools > .xe-flow-chip {
+    .xe-flow:is([data-axis="column"], [data-axis="row"]) .xe-flow-tools > .xe-flow-chip {
       position: absolute;
       top: 0;
       pointer-events: auto;
     }
-    .xe-flow[data-axis="column"] .xe-flow-tools > .xe-flow-grip {
+    .xe-flow:is([data-axis="column"], [data-axis="row"]) .xe-flow-tools > .xe-flow-grip {
       right: 0;
       transform: translate(50%, -50%);
     }
-    .xe-flow[data-axis="column"] .xe-flow-tools > [data-flow-remove] {
+    .xe-flow:is([data-axis="column"], [data-axis="row"]) .xe-flow-tools > [data-flow-remove] {
       left: 0;
       transform: translate(-50%, -50%);
     }
-    .xe-flow[data-axis="column"] .xe-flow-tools > .xe-flow-grip::before {
+    .xe-flow:is([data-axis="column"], [data-axis="row"]) .xe-flow-tools > .xe-flow-grip::before {
       inset: -1rem 0 0 -1rem;
     }
-    .xe-flow[data-axis="column"] .xe-flow-tools > [data-flow-remove]::before {
+    .xe-flow:is([data-axis="column"], [data-axis="row"]) .xe-flow-tools > [data-flow-remove]::before {
       inset: -1rem -1rem 0 0;
+    }
+    /* In a row only the box with the focus shows them: one box's grip and the next one's Remove, across the
+       arrow between them, are nearer than a press. */
+    .xe-flow[data-axis="row"] .xp-flow-box:not(:focus-within) > .xe-flow-tools {
+      opacity: 0;
+    }
+    .xe-flow[data-axis="row"] .xp-flow-box:not(:focus-within) > .xe-flow-tools > .xe-flow-chip {
+      pointer-events: none;
     }
   }
 

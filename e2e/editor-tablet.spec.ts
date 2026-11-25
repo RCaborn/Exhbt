@@ -85,8 +85,8 @@ for (const f of offered()) {
     // Nor may a "+" (design round 2, item 4: research's first gap held a 44px "+" over the H of "Hypothesis").
     expect(await plusClashes(page)).toEqual([]);
     // A flowchart box's chips, on its top corners, keep clear of its words, and each takes a 44px press (design round 2, item 5).
-    // Four boxes or fewer make a row at this width (Build's, Before and after's and Event's): there a box shows its chips, on
-    // its foot, while it has the focus (flow.css), so each box's are checked with the focus in it.
+    // Four boxes or fewer make a row at this width (all four new samples'): there a box shows its chips, on its top corners
+    // as in a column, only while it has the focus (flow.css), so each box's are checked with the focus in it.
     if ((await page.locator(`${READY} .xe-flow`).evaluateAll((els) => els[0]?.getAttribute("data-axis") ?? null)) === "row") {
       for (const step of await page.locator(`${READY} .xp-flow-box [data-path$=".step"]`).all()) {
         await step.focus();
