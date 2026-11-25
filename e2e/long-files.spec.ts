@@ -192,3 +192,24 @@ test.describe("A long file on the draft page", () => {
     expect(doc).not.toContain("Ashfield");
   });
 });
+
+test.describe("A request with more than the budget", () => {
+  test("only a hand-built one can carry it: the route takes it, and the draft keeps its start and its end", async ({ page }) => {
+    await signIn(page, "longapi");
+    // About 300,000 characters. The server keeps about the first 160,000 and the last 80,000: paragraph 380 is left out.
+    const paragraphs = Array.from({ length: 600 }, (_, i) => paragraph(i + 1));
+    paragraphs[379] = `${paragraphs[379]} ${MIDDLE}`;
+    paragraphs[599] = LAST;
+    const text = paragraphs.join("\n\n");
+    expect(text.length).toBeGreaterThan(MAX_MATERIAL_CHARS);
+    // The route's limit follows the budget (twice it); the old one, 160,000 characters, refused a request this long.
+    expect(text.length).toBeGreaterThan(160_000);
+    const res = await page.request.post("/api/exhbts/draft", { data: { text } });
+    expect(res.status(), await res.text()).toBe(200);
+    const { id } = (await res.json()) as { id: string };
+    const working = ((await (await page.request.get(`/dev/parity?id=${id}`)).json()) as { working: unknown }).working;
+    // The stand-in drafts "What I'd do next" from the first sentence starting "Next time" in what it was given.
+    expect(JSON.stringify(working)).toContain("Bramley");
+    expect(JSON.stringify(working)).not.toContain("Ashfield");
+  });
+});
