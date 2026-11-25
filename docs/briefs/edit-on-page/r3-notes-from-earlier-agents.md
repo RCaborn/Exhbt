@@ -403,11 +403,14 @@ Five rough edges, fixed before the editor is switched on for everyone. Each has 
   - On the editing page both take the compact card's ground, edge and shadow (`--xp-card`, `--xp-outline-edge`), and the look's ink, secondary text and error colour. In the app's ink the words could not be read on Night's well, in the compact card too.
   - Outside the compact card the box is a card of its own under "More actions", out of the flow (to its left down a column, clear of Remove), so the toolbar keeps its size and place. A shell part with an open form is raised to 29, as a section is.
   - An open form now lies over the first words of its own section, not over the section above. The axe test in `phase2-draft-tools` types before it opens its forms.
+  - Chromium can leave the card marked as hovered after the pointer has gone, when it came up under a still pointer. Nothing styles it on hover, so the page is unchanged, but `leave()` in `phase2-draft-tools` waits for no hover in the article. The Night "No rewrites left" test failed 2 or 3 times in 6 to 8 that way. The ground tests now press "Rewrite this block" from the keyboard with the pointer away (`rewriteFromKeys`); `leave()` is unchanged.
   - Tests: one per look, under "An open menu or rewrite form has a ground of its own" in `phase2-draft-tools`. `takesThePress` checks the card as well as the button.
 - Closing it, as 0026 has it ("it stays, wherever the pointer and the focus are"):
   - Escape closes the AI menu, the form and "No rewrites left", and gives the focus to "More actions". It works with the focus in the form or on nothing, as after "Rewrite this block", and on the phone's bar. In the compact card the form's Escape comes first, then the card's.
   - A press outside never closes the form. The compact card no longer closes round an open form at a press outside or when the focus moves on (`rewriteOpenIn` in `Toolbar.tsx`); before, it hid the form with it.
   - My choice, for Rory to undo if he wants: "No rewrites left" holds nothing and has no Cancel, so a press outside closes it, as it closes the menu. Before, nothing but a reload could.
+  - While a rewrite runs, Escape leaves the form, as Cancel is off then.
+  - The same BlockTools serves the classic editor: there the form is drawn where it was, in the app's colours, and Escape works the same way.
 - Why a save failed (`topbar.css`): a small card hanging from the bar under the status, out of the flow, and as wide as the screen on a phone. At 1440 the cut reason had also pushed "Review and publish" off the window. The live region is unchanged. `r2-fixes` still says the reason sits beside "Not saved. Retry"; its assertions hold.
 - The edit page's error page: a new `layout.tsx` for the route tells it which editor the switch serves (`editorServed` in `lib/editor-kind-server.ts`, `served.tsx`), so the classic editor is named, with Reload, whether it was asked for or served. Before, everyone on the live site was told the new editor had failed. It asks who is signed in only when an admin's own-choice cookie is there.
 - The Safari picture file (`files.ts`, `Autosave.tsx`):
@@ -416,8 +419,18 @@ Five rough edges, fixed before the editor is switched on for everyone. Each has 
   - The rule now keeps whatever a save still on its way points at, until a task after its answer. The original test then passed 10 of 10 there.
   - A new test holds that save and orders the DELETE behind it, so the race is made rather than waited for.
 
-Run at the end, on Chromium: `phase2-draft-tools` 28 passed, `editor-smooth` 8, `editor-topbar` 17, `editor-classic` 11, `editor-tablet` 12 (tablet), `editor-phone` 40 (touch), and `editor-inplace` with `-g "toolbar|menu|undo|save"` 28. Also `editor-admin-switch` 20, the two `r2-fixes` refused-save tests and the rewrite tests in `phase2-formats` and `phase2-polish-2`.
+Run at the end, on Chromium: `phase2-draft-tools` 29 passed, `editor-smooth` 8, `editor-topbar` 17, `editor-classic` 11, `editor-tablet` 12 (tablet), `editor-phone` 40 (touch), and `editor-inplace` with `-g "toolbar|menu|undo|save"` 28. Also run:
+- `editor-admin-switch` (20 passed), and the two `r2-fixes` refused-save tests;
+- the rewrite tests in `phase2-formats` and `phase2-polish-2`;
+- every spec that checks stored files, whole: `data-safety`, `editor-figures`, `phase2-editor-media`, `file-ownership` and `editor-inplace` (141 passed, 1 skipped as before);
+- the new top bar, classic and phone tests on the `safari` and `iphone` projects, under `E2E_WEBKIT=chromium E2E_FOCUS=safari E2E_TOUCH=page`.
+
+For whoever merges this with release 4:
+- `Toolbar.tsx` has two guards in the compact card's own close handlers (`rewriteOpenIn`), with no change to placement.
+- `phone.css` and `topbar.css` had existing rules rewritten, not only new ones added: the "More actions" selectors in the former, the save status in the latter.
+- Decision 0026 is not amended for the new Escape, the compact card staying open round a form, or the error page's words.
 
 Still open:
-- Nothing here ran on real Safari or an iPhone: the focus rule was the emulation's.
+- Nothing here ran on real Safari or an iPhone, nor on WebKit: the focus rule was the emulation's.
+- The existing "An open rewrite form stays up and takes the press" tests still open their forms with the pointer, and so could meet the same stale hover. They passed in every run here.
 - A message that a rewrite worked stays in its card under "More actions" until the next rewrite, shown whenever the toolbar is. It has a ground now; whether it should go sooner is a question for Rory.
