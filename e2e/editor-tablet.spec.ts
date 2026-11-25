@@ -85,8 +85,19 @@ for (const f of offered()) {
     // Nor may a "+" (design round 2, item 4: research's first gap held a 44px "+" over the H of "Hypothesis").
     expect(await plusClashes(page)).toEqual([]);
     // A flowchart box's chips, on its top corners, keep clear of its words, and each takes a 44px press (design round 2, item 5).
-    expect(await flowChipsNearWords(page, 4)).toEqual([]);
-    expect(await smallPresses(page, `${READY} .xp-flow-box .xe-flow-chip`)).toEqual([]);
+    // Four boxes or fewer make a row at this width (Build's, Before and after's and Event's): there a box shows its chips, on
+    // its foot, while it has the focus (flow.css), so each box's are checked with the focus in it.
+    if ((await page.locator(`${READY} .xe-flow`).evaluateAll((els) => els[0]?.getAttribute("data-axis") ?? null)) === "row") {
+      for (const step of await page.locator(`${READY} .xp-flow-box [data-path$=".step"]`).all()) {
+        await step.focus();
+        expect(await flowChipsNearWords(page, 4)).toEqual([]);
+        expect(await smallPresses(page, `${READY} .xp-flow-box:focus-within .xe-flow-chip`)).toEqual([]);
+      }
+      await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    } else {
+      expect(await flowChipsNearWords(page, 4)).toEqual([]);
+      expect(await smallPresses(page, `${READY} .xp-flow-box .xe-flow-chip`)).toEqual([]);
+    }
     // Touched, each toolbar that shows its grip alone at rest opens where it is, still clear of every word, its own section's included (23 Nov).
     for (const id of await page.locator(`${READY} article [data-section-id]:not([data-kind="image"]) > .xe-tools[data-place]`).evaluateAll((ts) => ts.map((t) => t.parentElement!.dataset.sectionId!))) {
       await grip(page, id).focus();

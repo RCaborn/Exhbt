@@ -722,6 +722,12 @@ test.describe("Each new layout in the editor", () => {
     const [demo, code] = [await boxOf(page, "link-1"), await boxOf(page, "link-2")];
     expect(Math.abs(demo.y - code.y)).toBeLessThan(2);
     expect(code.x).toBeGreaterThanOrEqual(demo.x + demo.width);
+    // Each one's "Web address" is under its line, not on it: on the line it took the press meant for the line's field.
+    for (const id of ["link-1", "link-2"]) {
+      const line = (await frame(page, id).locator('[data-path$=".description"]').boundingBox())!;
+      const chip = (await frame(page, id).getByRole("button", { name: /^Web address/ }).boundingBox())!;
+      expect(chip.y, id).toBeGreaterThanOrEqual(line.y + line.height);
+    }
 
     // The "+" offers a build's kinds with a build's caps: two links and one graph are all it takes, and there is room for two more screenshots.
     const menu = await plusMenu(page);
