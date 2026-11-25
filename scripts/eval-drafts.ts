@@ -8,6 +8,13 @@
  *   npm run eval:drafts                           # real drafts (needs ANTHROPIC_API_KEYS or ANTHROPIC_API_KEY)
  *   npm run eval:drafts -- --model-judge          # plus AI-judged rubric scores
  *   npm run eval:drafts -- --only 01,08 --reps 3  # some fixtures, three drafts each
+ *   npm run eval:drafts -- --classic              # the three-layout draft, as a person in the classic editor gets
+ *
+ * A draft chooses among all seven layouts unless --classic is given (the app asks for seven only for
+ * a person whose editor is the new one: app/api/exhbts/draft/route.ts). Each answer key may name the
+ * layout a good draft chooses (expect.layout); a draft that chooses another, or that holds a pull
+ * quote, a source, a link or a role its material doesn't, fails the run (evals/exhbt-draft/marks.ts,
+ * lib/exhbt/references.ts).
  *
  * Runs under `tsx --conditions=react-server` so the `server-only` import in the draft module is
  * a no-op. It measures; it never changes the prompt or the app. See evals/exhbt-draft/README.md.
@@ -24,7 +31,10 @@ import { extractTextInBrowser } from "@/lib/doc-readers";
 import { chartsOf, findingsOf, LIMITS, normaliseDoc, plain, sectionTexts, validateForPublish, wordCount, words, type ExhbtDoc, type Issue, type RichText } from "@/lib/exhbt/blocks";
 import { chartTexts, chartValues, KIND_NAMES, type Chart } from "@/lib/exhbt/charts";
 import { AIFailure } from "@/lib/ai/failure";
+import { FORMAT_RULES, formatOf } from "@/lib/exhbt/formats";
+import { unsupportedParts } from "@/lib/exhbt/references";
 import { normaliseNumber, numbersIn, unverifiedNumbers } from "@/lib/exhbt/verify";
+import { markLayout, needsThePerson, type LayoutExpect, type LayoutMark } from "../evals/exhbt-draft/marks";
 
 const ROOT = process.cwd();
 const EVAL_DIR = join(ROOT, "evals/exhbt-draft");
@@ -42,19 +52,20 @@ type Criterion = (typeof CRITERIA)[number];
 // ---------------------------------------------------------------------------------------------
 // Arguments
 
-type Args = { mock: boolean; judge: boolean; selfTest: boolean; only: string[]; reps: number };
+type Args = { mock: boolean; judge: boolean; selfTest: boolean; classic: boolean; only: string[]; reps: number };
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { mock: false, judge: false, selfTest: false, only: [], reps: 1 };
+  const args: Args = { mock: false, judge: false, selfTest: false, classic: false, only: [], reps: 1 };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--mock") args.mock = true;
     else if (a === "--model-judge") args.judge = true;
     else if (a === "--self-test") args.selfTest = true;
+    else if (a === "--classic") args.classic = true;
     else if (a === "--only") args.only = (argv[++i] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
     else if (a === "--reps") args.reps = Math.max(1, Math.min(10, Number(argv[++i]) || 1));
     else if (a === "--help" || a === "-h") {
-      console.log("Usage: npm run eval:drafts -- [--mock] [--model-judge] [--only 01,08] [--reps N] | --self-test");
+      console.log("Usage: npm run eval:drafts -- [--mock] [--model-judge] [--classic] [--only 01,08] [--reps N] | --self-test");
       process.exit(0);
     } else {
       console.error(`Unknown option ${a}. Try --help.`);
@@ -86,7 +97,10 @@ type Facts = {
   files: string[];
   notesFile: string | null;
   link: string | null;
-  expect: { headlineNumber: boolean; chart: boolean; noNumbers: boolean; graph?: GraphExpect };
+  /** `layout`: the layout a good draft chooses among seven (decision 0028), or a list where more than one is right. Absent: the choice is shown, not marked. */
+  expect: { headlineNumber: boolean; chart: boolean; noNumbers: boolean; graph?: GraphExpect; layout?: LayoutExpect };
+  /** The upload's counts, as the draft page sends them, for a fixture that stands for an upload of pictures. */
+  signals?: { imageFiles: number; pdfPages: number; pdfPicturePages: number };
   keyFacts: { id: string; fact: string; match: Match[] }[];
   forbidden: { id: string; why: string; match: Match[] }[];
   sourceNumbers: string[];
@@ -113,7 +127,7 @@ function loadFixtures(only: string[]): Facts[] {
  * (lib/doc-readers.ts, the same function the upload page calls), joined as DraftForm.tsx joins
  * them, plus the notes box.
  */
-async function loadInput(f: Facts): Promise<{ input: DraftInput; perFile: { name: string; chars: number; words: number }[] }> {
+async function loadInput(f: Facts, layouts: DraftInput["layouts"] = "seven"): Promise<{ input: DraftInput; perFile: { name: string; chars: number; words: number }[] }> {
   const parts: string[] = [];
   const perFile: { name: string; chars: number; words: number }[] = [];
   for (const name of f.files) {
@@ -125,7 +139,7 @@ async function loadInput(f: Facts): Promise<{ input: DraftInput; perFile: { name
     parts.push(`File: ${name}\n${text}`);
   }
   const notes = f.notesFile ? readFileSync(join(FIXTURES, f.notesFile), "utf8").trim() : undefined;
-  return { input: { text: parts.join("\n\n"), notes, link: f.link ?? undefined }, perFile };
+  return { input: { text: parts.join("\n\n"), notes, link: f.link ?? undefined, signals: f.signals, layouts }, perFile };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -138,6 +152,7 @@ function docStrings(d: ExhbtDoc): string[] {
   return [
     d.title,
     d.context,
+    d.myRole ?? "",
     d.headline ? `${d.headline.value} ${d.headline.label}` : "",
     ...d.skills,
     plain(d.gap),
@@ -148,9 +163,12 @@ function docStrings(d: ExhbtDoc): string[] {
 
 /** The draft as a reader would see it, for the summary and the judge. */
 function renderDoc(d: ExhbtDoc): string {
+  const linked = d.sections.flatMap((s) => (s.kind === "link" ? [`  - ${s.label}${s.href ? ` -> ${s.href}` : " (no address)"}`] : []));
   const lines = [
+    `Layout: ${FORMAT_RULES[formatOf(d)].name}`,
     `Title: ${d.title}`,
     `Context: ${d.context || "(empty)"}`,
+    ...(d.myRole ? [`My role: ${d.myRole}`] : []),
     `Headline: ${d.headline ? `${d.headline.value} (${d.headline.label})` : "(none)"}`,
     `Skills: ${d.skills.join(" | ") || "(none)"}`,
     `Gap: ${plain(d.gap) || "(empty)"}`,
@@ -169,6 +187,8 @@ function renderDoc(d: ExhbtDoc): string {
       // Other kinds: the words and the values, as the page prints them.
       return `  ${KIND_NAMES[c.kind]}: ${chartTexts(c).filter(Boolean).join(" | ")} | values: ${chartValues(c).join(", ")}`;
     }),
+    ...d.sections.flatMap((s) => (s.kind === "pullquote" ? [`Pull quote: ${s.text}`] : [])),
+    ...(linked.length ? [`${FORMAT_RULES[formatOf(d)].name === "Essay" ? "Sources" : "Links"}:`, ...linked] : []),
   ];
   return lines.join("\n");
 }
@@ -229,7 +249,15 @@ const US_SPELLINGS = /\b(analyz\w*|optimiz\w*|organiz\w*|color\w*|behavior\w*|fa
 
 type Checks = {
   wordCount: number;
+  /** Everything that would stop publishing. `needsPerson` is the part of it no draft can clear (pictures, Before and After marks): left out of C2. */
   publishIssues: Issue[];
+  needsPerson: Issue[];
+  /** The layout chosen, against the answer key's. */
+  layout: LayoutMark;
+  /** A pull quote, a role, a source or a link on the draft that its material doesn't hold: fails C1 and the run. */
+  unsupported: string[];
+  /** What the model wrote for those parts that the app left off because the material didn't hold it: a measure of the prompt. */
+  leftOff: string[];
   unverified: string[];
   badQuotes: string[];
   numbersInDraft: string[];
@@ -276,9 +304,12 @@ function graphCheck(want: GraphExpect | undefined, charts: Chart[]): Checks["exp
   return { state: why.length ? "wrong" : "ok", why };
 }
 
-function runChecks(result: DraftResult, source: string, f: Facts, banned: Banned): Checks {
+function runChecks(result: DraftResult, source: string, f: Facts, banned: Banned, layouts: DraftInput["layouts"] = "seven"): Checks {
   const d = result.doc;
-  const text = squash(docStrings(d).join("\n"));
+  // What the answer key's facts are looked for in: every word a reader sees, and each link's address.
+  const hrefs = d.sections.flatMap((s) => (s.kind === "link" && s.href ? [s.href] : []));
+  const text = squash([...docStrings(d), ...hrefs].join("\n"));
+  const publishIssues = validateForPublish(d);
   const draftNumbers = docStrings(d).flatMap(numbersIn);
   const values = new Set(draftNumbers.map(normaliseNumber).filter((v): v is string => v !== null));
 
@@ -306,7 +337,12 @@ function runChecks(result: DraftResult, source: string, f: Facts, banned: Banned
 
   return {
     wordCount: wordCount(d),
-    publishIssues: validateForPublish(d),
+    publishIssues,
+    needsPerson: publishIssues.filter((i) => needsThePerson(i, d)),
+    // The answer keys name the layout among seven: a three-layout draft's choice is shown, not marked.
+    layout: markLayout(d, layouts === "seven" ? f.expect.layout : undefined),
+    unsupported: unsupportedParts(d, source),
+    leftOff: result.leftOff,
     unverified,
     badQuotes: [...new Set(badQuotes)],
     numbersInDraft: [...new Set(draftNumbers)],
@@ -344,9 +380,11 @@ function runChecks(result: DraftResult, source: string, f: Facts, banned: Banned
 
 /** The criteria code can score (RUBRIC.md says which, and how). */
 function autoScores(c: Checks): Partial<Record<Criterion, number>> {
-  const factsOk = c.unverified.length === 0 && c.badQuotes.length === 0 && c.expectations.noNumbers !== "broken";
-  const onlyTotal = c.publishIssues.length === 1 && c.publishIssues[0]!.path === "";
-  const C2 = c.publishIssues.length === 0 ? (c.wordCount <= 180 ? 2 : 1) : onlyTotal && c.wordCount <= LIMITS.totalWords + 20 ? 1 : 0;
+  const factsOk = c.unverified.length === 0 && c.badQuotes.length === 0 && c.expectations.noNumbers !== "broken" && c.unsupported.length === 0;
+  // What only the person can clear (pictures, Before and After marks) says nothing about the draft.
+  const issues = c.publishIssues.filter((i) => !c.needsPerson.includes(i));
+  const onlyTotal = issues.length === 1 && issues[0]!.path === "";
+  const C2 = issues.length === 0 ? (c.wordCount <= 180 ? 2 : 1) : onlyTotal && c.wordCount <= LIMITS.totalWords + 20 ? 1 : 0;
   const C5 = c.coverage.fraction >= 0.75 ? 2 : c.coverage.fraction >= 0.4 ? 1 : 0;
   const s = c.style;
   const hardTone = s.banned.length + s.openers.length + s.exclamations + s.firstPersonPlural.length;
@@ -471,7 +509,7 @@ async function attempt(rep: number, input: DraftInput, source: string, f: Facts,
   if (!result.model.startsWith(expected)) {
     return { rep, status: "error", errorClass: "served_model_mismatch", error: `served by ${result.model}, expected ${expected}`, latencyMs };
   }
-  const checks = runChecks(result, source, f, ctx.banned);
+  const checks = runChecks(result, source, f, ctx.banned, input.layouts);
   const out: Attempt = {
     rep,
     status: "ok",
@@ -507,7 +545,10 @@ const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.l
 const fmt = (x: number, dp = 1) => (Number.isFinite(x) ? (Number.isInteger(x) ? String(x) : x.toFixed(dp)) : "–");
 const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, " ");
 
-function summary(runs: FixtureRun[], meta: { started: string; mode: string; judge: boolean; reps: number; commit: string; seconds: number }): string {
+/** "essay", or "essay, not event" when the answer key expected another. */
+const layoutWords = (m: LayoutMark) => (m.state === "wrong" ? `${m.got}, not ${m.want.join(" or ")}` : m.got);
+
+function summary(runs: FixtureRun[], meta: { started: string; mode: string; judge: boolean; reps: number; commit: string; seconds: number; layouts: string }): string {
   const oks = runs.flatMap((r) => r.attempts.filter((a): a is Extract<Attempt, { status: "ok" }> => a.status === "ok"));
   const errors = runs.flatMap((r) => r.attempts.filter((a) => a.status === "error"));
   const draftCost = oks.reduce((n, a) => n + a.usage.costUsd, 0);
@@ -520,6 +561,14 @@ function summary(runs: FixtureRun[], meta: { started: string; mode: string; judg
   lines.push(`- Mode: **${meta.mode}**${meta.mode === "mock" ? " (the labelled placeholder draft, not the model: a null baseline for the checks)" : ""}`);
   lines.push(`- Draft model: ${meta.mode === "mock" ? "mock" : AI_MODEL}. Judge: ${meta.judge ? `${AI_MODEL} (scores marked AI-judged)` : "off"}`);
   lines.push(`- Fixtures: ${runs.length}, drafts per fixture: ${meta.reps}, scored drafts: ${oks.length}, failed attempts: ${errors.length}`);
+  const marked = oks.filter((a) => a.checks.layout.state !== "n/a");
+  lines.push(
+    `- Layouts the draft may choose: ${meta.layouts}. ` +
+      (marked.length ? `Layout right in ${marked.filter((a) => a.checks.layout.state === "ok").length} of ${marked.length} drafts whose answer key names one.` : "No layout is marked in this run (the answer keys name the layout among seven)."),
+  );
+  const unsupported = oks.filter((a) => a.checks.unsupported.length).length;
+  const leftOff = oks.filter((a) => a.checks.leftOff.length).length;
+  lines.push(`- Drafts holding a pull quote, a role, a source or a link their material doesn't: ${unsupported} (any fails the run). Drafts where the model wrote one and the app left it off: ${leftOff}.`);
   lines.push(`- Commit: ${meta.commit}. Wall clock: ${meta.seconds}s`);
   lines.push(
     `- Tokens (drafts): ${oks.reduce((n, a) => n + a.usage.inputTokens, 0)} in / ${oks.reduce((n, a) => n + a.usage.outputTokens, 0)} out, $${draftCost.toFixed(4)}` +
@@ -530,7 +579,7 @@ function summary(runs: FixtureRun[], meta: { started: string; mode: string; judg
   if (meta.reps > 1) lines.push(`Figures are means over the ${meta.reps} drafts of each fixture.`);
   lines.push("");
 
-  const head = ["Fixture", "OK", "Words", "Publish issues", "Unverified numbers", "Key facts", "Banned / soft", "C1", "C2", "C5", "C8", "Code /8"];
+  const head = ["Fixture", "OK", "Layout", "Words", "Publish issues", "Unverified numbers", "Key facts", "Banned / soft", "C1", "C2", "C5", "C8", "Code /8"];
   if (meta.judge) head.push("AI-judged /16");
   head.push("Tokens in/out", "Cost $");
   lines.push(`| ${head.join(" | ")} |`);
@@ -543,8 +592,11 @@ function summary(runs: FixtureRun[], meta: { started: string; mode: string; judg
     const row = [
       r.fixture,
       `${ok.length}/${r.attempts.length}`,
+      // Each layout chosen, once; "WRONG" where the answer key expected another.
+      [...new Set(ok.map((a) => `${a.checks.layout.state === "wrong" ? "WRONG: " : ""}${layoutWords(a.checks.layout)}`))].join("; ") || "–",
       fmt(m((a) => a.checks.wordCount)),
-      fmt(m((a) => a.checks.publishIssues.length)),
+      // Without what only the person can clear (pictures, Before and After marks).
+      fmt(m((a) => a.checks.publishIssues.length - a.checks.needsPerson.length)),
       fmt(m((a) => a.checks.unverified.length + a.checks.badQuotes.length)),
       ok.length ? `${fmt(m((a) => a.checks.coverage.covered.length))}/${r.keyFacts}` : "–",
       `${fmt(m((a) => a.checks.style.banned.length + a.checks.style.openers.length))} / ${fmt(m((a) => a.checks.style.soft.length + a.checks.style.emDashes + a.checks.style.usSpellings.length))}`,
@@ -584,7 +636,12 @@ function summary(runs: FixtureRun[], meta: { started: string; mode: string; judg
       lines.push("```");
       lines.push("");
       const notes: string[] = [];
-      if (c.publishIssues.length) notes.push(`Publish issues: ${c.publishIssues.map((i) => `${i.path || "page"}: ${i.message}`).join("; ")}`);
+      notes.push(`Layout: ${layoutWords(c.layout)} (reason kept: ${a.formatReason})${c.layout.state === "wrong" ? ". WRONG" : c.layout.state === "n/a" ? ". Not marked" : ""}`);
+      if (c.unsupported.length) notes.push(`NOT IN THE MATERIAL: ${c.unsupported.join("; ")}`);
+      if (c.leftOff.length) notes.push(`The model wrote, and the app left off because the material doesn't hold it: ${c.leftOff.join(", ")}`);
+      const draftable = c.publishIssues.filter((i) => !c.needsPerson.includes(i));
+      if (draftable.length) notes.push(`Publish issues: ${draftable.map((i) => `${i.path || "page"}: ${i.message}`).join("; ")}`);
+      if (c.needsPerson.length) notes.push(`Only the person can clear (not scored): ${c.needsPerson.map((i) => i.message).join("; ")}`);
       if (c.unverified.length) notes.push(`Numbers not found in the material: ${c.unverified.join(", ")}`);
       if (c.badQuotes.length) notes.push(`Numbers whose source quote isn't in the material: ${c.badQuotes.join(", ")}`);
       notes.push(`Key facts covered: ${c.coverage.covered.join(", ") || "none"}. Missing: ${c.coverage.missing.join(", ") || "none"}`);
@@ -662,17 +719,33 @@ async function selfTest(banned: Banned): Promise<boolean> {
   const source = materialText(input);
   const asResult = (doc: ExhbtDoc): DraftResult => ({ doc, formatReason: "default", leftOff: [], numbers: [], model: "self-test", inputTokens: 0, outputTokens: 0, costUsd: 0 });
   const empty: ExhbtDoc = { ...ORACLE_08, title: "", headline: undefined, skills: [], gap: [], flow: [], sections: [] };
-  const cases: { name: string; doc: ExhbtDoc; want: Partial<Record<Criterion, number>> }[] = [
-    { name: "oracle", doc: ORACLE_08, want: { C1: 2, C2: 2, C5: 2, C8: 2 } },
+  // The oracle in two of the new layouts. As a before and after it lacks only what the person adds (two pictures and
+  // their marks), which must not cost it C2. As an essay with a pull quote and a source the material doesn't hold, it
+  // must fail C1, and the answer key's layout (fixture 08 names none, so one is given here) must be marked.
+  const three = withFindings(ORACLE_08, findingsOf(ORACLE_08).slice(0, 3));
+  const beforeAfter: ExhbtDoc = { ...three, format: "before-after" };
+  const madeUp: ExhbtDoc = {
+    ...ORACLE_08,
+    format: "essay",
+    sections: [...ORACLE_08.sections, { id: "pullquote-1", kind: "pullquote", text: "A larder is a queue with a roof." }, { id: "link-1", kind: "link", href: "", label: "Invented, A. (2020) A book nobody cited", description: "" }],
+  };
+  const cases: { name: string; doc: ExhbtDoc; want: Partial<Record<Criterion, number>>; layout?: LayoutExpect; wantLayout?: LayoutMark["state"]; wantUnsupported?: number; wantNeedsPerson?: number }[] = [
+    { name: "oracle", doc: ORACLE_08, want: { C1: 2, C2: 2, C5: 2, C8: 2 }, wantLayout: "n/a", wantUnsupported: 0, wantNeedsPerson: 0 },
     { name: "bad", doc: BAD_08, want: { C1: 0, C2: 0, C5: 1, C8: 0 } },
     { name: "empty", doc: empty, want: { C2: 0, C5: 0 } },
+    { name: "before and after, no pictures yet", doc: beforeAfter, want: { C1: 2, C2: 2 }, layout: "before-after", wantLayout: "ok", wantNeedsPerson: 2 },
+    { name: "layout the answer key doesn't expect", doc: beforeAfter, want: { C1: 2 }, layout: ["case-study", "research"], wantLayout: "wrong" },
+    { name: "a pull quote and a source not in the material", doc: madeUp, want: { C1: 0 }, layout: "essay", wantLayout: "ok", wantUnsupported: 2 },
   ];
   let ok = true;
   for (const c of cases) {
-    const checks = runChecks(asResult(c.doc), source, f, banned);
+    const checks = runChecks(asResult(c.doc), source, { ...f, expect: { ...f.expect, layout: c.layout } }, banned);
     const got = autoScores(checks);
-    const wrong = Object.entries(c.want).filter(([k, v]) => got[k as Criterion] !== v);
-    console.log(`  ${c.name}: ${JSON.stringify(got)}${wrong.length ? `  FAIL, expected ${JSON.stringify(c.want)}` : "  ok"}`);
+    const wrong = Object.entries(c.want).filter(([k, v]) => got[k as Criterion] !== v).map(([k, v]) => `${k} ${v}`);
+    if (c.wantLayout !== undefined && checks.layout.state !== c.wantLayout) wrong.push(`layout ${c.wantLayout}, got ${checks.layout.state}`);
+    if (c.wantUnsupported !== undefined && checks.unsupported.length !== c.wantUnsupported) wrong.push(`${c.wantUnsupported} parts not in the material, got ${checks.unsupported.length}`);
+    if (c.wantNeedsPerson !== undefined && checks.needsPerson.length !== c.wantNeedsPerson) wrong.push(`${c.wantNeedsPerson} issues only the person can clear, got ${checks.needsPerson.length}`);
+    console.log(`  ${c.name}: ${JSON.stringify(got)}, layout ${checks.layout.state}${wrong.length ? `  FAIL, expected ${wrong.join("; ")}` : "  ok"}`);
     if (wrong.length) ok = false;
   }
   return ok;
@@ -737,11 +810,12 @@ async function main() {
     // Not a checkout (or no git): leave it as unknown.
   }
 
-  console.log(`Exhbt draft eval: ${fixtures.length} fixtures x ${args.reps}, ${args.mock ? "mock drafts" : AI_MODEL}${args.judge ? `, judged by ${AI_MODEL}` : ""}`);
+  const layouts = args.classic ? "three" : "seven";
+  console.log(`Exhbt draft eval: ${fixtures.length} fixtures x ${args.reps}, ${args.mock ? "mock drafts" : AI_MODEL}${args.judge ? `, judged by ${AI_MODEL}` : ""}, choosing among ${layouts} layouts`);
   const t0 = Date.now();
   const runs: FixtureRun[] = [];
   for (const f of fixtures) {
-    const { input, perFile } = await loadInput(f);
+    const { input, perFile } = await loadInput(f, layouts);
     const source = materialText(input);
     const materialWords = words(source);
     if (materialWords < MIN_WORDS) throw new Error(`${f.fixture}: only ${materialWords} words after extraction; the app would refuse to draft.`);
@@ -755,12 +829,14 @@ async function main() {
       attempts.push(a);
       const line =
         a.status === "ok"
-          ? `${a.doc.format ?? "case-study"} (${a.formatReason}), ${a.checks.wordCount} words, ${a.checks.publishIssues.length} publish issues, ${a.checks.unverified.length + a.checks.badQuotes.length} unverified${a.checks.unverified.length + a.checks.badQuotes.length ? ` (${[...a.checks.unverified.map((n) => `${n} not in the material`), ...a.checks.badQuotes.map((n) => `${n}: its quote isn't`)].join("; ")})` : ""}, key facts ${a.checks.coverage.covered.length}/${f.keyFacts.length}` +
+          ? `${a.checks.layout.state === "wrong" ? "WRONG LAYOUT: " : ""}${layoutWords(a.checks.layout)} (${a.formatReason}), ${a.checks.wordCount} words, ${a.checks.publishIssues.length - a.checks.needsPerson.length} publish issues, ${a.checks.unverified.length + a.checks.badQuotes.length} unverified${a.checks.unverified.length + a.checks.badQuotes.length ? ` (${[...a.checks.unverified.map((n) => `${n} not in the material`), ...a.checks.badQuotes.map((n) => `${n}: its quote isn't`)].join("; ")})` : ""}, key facts ${a.checks.coverage.covered.length}/${f.keyFacts.length}` +
             (a.judge ? (a.judge.status === "ok" ? `, AI-judged ${judgeTotal(a.judge)}/16` : `, judge failed: ${a.judge.error}`) : "")
           : `failed (${a.errorClass}): ${a.error}`;
       console.log(`  ${f.fixture}${args.reps > 1 ? ` #${rep}` : ""}: ${line}`);
       // Each graph as stored, one JSON line, so the log shows which value sits with which label and unit.
       if (a.status === "ok") for (const c of chartsOf(a.doc)) console.log(`    graph: ${JSON.stringify(c)}`);
+      if (a.status === "ok" && a.checks.unsupported.length) console.log(`    NOT IN THE MATERIAL: ${a.checks.unsupported.join("; ")}`);
+      if (a.status === "ok" && a.checks.leftOff.length) console.log(`    left off (the model wrote it, the material doesn't hold it): ${a.checks.leftOff.join(", ")}`);
       if (a.status === "ok" && a.checks.expectations.graph.state !== "n/a") console.log(`    graph expectation: ${a.checks.expectations.graph.state}${a.checks.expectations.graph.why.length ? ` (${a.checks.expectations.graph.why.join("; ")})` : ""}`);
     }
     const run: FixtureRun = {
@@ -778,16 +854,25 @@ async function main() {
   }
 
   const seconds = Math.round((Date.now() - t0) / 1000);
-  writeFileSync(join(runDir, "SUMMARY.md"), summary(runs, { started, mode: args.mock ? "mock" : "live", judge: args.judge, reps: args.reps, commit, seconds }));
+  writeFileSync(join(runDir, "SUMMARY.md"), summary(runs, { started, mode: args.mock ? "mock" : "live", judge: args.judge, reps: args.reps, commit, seconds, layouts }));
   console.log(`\nWrote ${runDir}/SUMMARY.md`);
 
   const total = runs.reduce((n, r) => n + r.attempts.length, 0);
   const failed = runs.reduce((n, r) => n + r.attempts.filter((a) => a.status === "error").length, 0);
   const wrongGraphs = runs.flatMap((r) => r.attempts.flatMap((a) => (a.status === "ok" && a.checks.expectations.graph.state === "wrong" ? [r.fixture] : [])));
-  // Any draft that failed (a cut-off answer included), or a graph that put a value or unit in the wrong place, fails the run.
+  const okOf = (r: FixtureRun) => r.attempts.filter((a): a is Extract<Attempt, { status: "ok" }> => a.status === "ok");
+  const notInMaterial = runs.filter((r) => okOf(r).some((a) => a.checks.unsupported.length)).map((r) => r.fixture);
+  const wrongLayouts = runs.flatMap((r) => okOf(r).flatMap((a) => (a.checks.layout.state === "wrong" ? [`${r.fixture} (${layoutWords(a.checks.layout)})`] : [])));
+  const markedDrafts = runs.flatMap((r) => okOf(r).filter((a) => a.checks.layout.state !== "n/a"));
+  if (markedDrafts.length) console.log(`Layout right in ${markedDrafts.length - wrongLayouts.length} of ${markedDrafts.length} drafts whose answer key names one.`);
+  // Any draft that failed (a cut-off answer included), a graph that put a value or unit in the wrong place, a part the
+  // material doesn't hold, or a layout the answer key doesn't expect fails the run. A mock run is a null baseline: the
+  // stand-in picks its layout from a cue word, not from the work, so its layouts are shown and never fail it.
   if (failed) console.error(`${failed} of ${total} drafts failed: see above and SUMMARY.md.`);
   if (wrongGraphs.length) console.error(`A graph was wrong in ${[...new Set(wrongGraphs)].join(", ")}: see the "graph" lines above.`);
-  if (failed || wrongGraphs.length) process.exit(failed === total ? 2 : 1);
+  if (notInMaterial.length) console.error(`A draft holds a pull quote, a role, a source or a link that isn't in its material in ${notInMaterial.join(", ")}: see "NOT IN THE MATERIAL" above.`);
+  if (wrongLayouts.length) console.error(`${args.mock ? "(mock: not a failure) " : ""}The layout was not the one the answer key expects in ${wrongLayouts.join(", ")}.`);
+  if (failed || wrongGraphs.length || notInMaterial.length || (wrongLayouts.length && !args.mock)) process.exit(failed === total ? 2 : 1);
 }
 
 main().catch((e) => {

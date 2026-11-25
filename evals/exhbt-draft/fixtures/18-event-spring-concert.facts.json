@@ -1,0 +1,21 @@
+{
+  "fixture": "18-event-spring-concert",
+  "shape": "A concert write-up in markdown: the brief, the person's own part stated plainly, how it was put on, how it went in figures, a named review and a recording's address.",
+  "tests": "Layout: event. My role is the material's own words (concert manager), not a bigger one (the person did not conduct). No percentage of seats is worked out.",
+  "files": ["18-event-spring-concert.md"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":false,"chart":true,"noNumbers":false,"layout":"event"},
+  "keyFacts": [
+    {"id":"role","fact":"The person was the concert manager.","match":["concert manager"]},
+    {"id":"seats","fact":"212 of 240 seats sold.","match":[["212","240"]]},
+    {"id":"town","fact":"96 tickets went to people who were not students, against 31 the year before.","match":[["96","31"],"96"]},
+    {"id":"money","fact":"The concert made £613 for the society (income £1,484, costs £871).","match":["613"]},
+    {"id":"brief","fact":"A public concert that paid for itself and brought in people from the town, on a budget of £900.","match":["paid for itself","from the town","900"]}
+  ],
+  "forbidden": [
+    {"id":"bigger-role","why":"The material says the person did not conduct or choose the music.","match":["conductor","conducted the","musical director of","chose the music"]},
+    {"id":"derived","why":"The material gives seats sold and no percentage, and the concert did not sell out.","match":["88%","sold out","sell-out"]}
+  ],
+  "sourceNumbers": ["2026","21","£900","14","6.30","7.30","9.15","212","240","96","31","£1,484","£871","£613"]
+}

@@ -5,7 +5,7 @@
   "files": ["05-eng-lab-report.pdf"],
   "notesFile": null,
   "link": null,
-  "expect": {"headlineNumber":true,"chart":false,"noNumbers":false},
+  "expect": {"headlineNumber":true,"chart":false,"noNumbers":false,"layout":"research"},
   "keyFacts": [
     {"id":"aim","fact":"Measure Young's modulus of a 6082 aluminium bar by cantilever deflection.","match":["Young's modulus","Young’s modulus","cantilever"]},
     {"id":"method","fact":"300 mm cantilever loaded 0 to 5.0 N in 0.5 N steps, dial gauge deflection, three runs.","match":["300 mm","dial gauge","0.5 N","three runs"]},

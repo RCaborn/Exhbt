@@ -1,0 +1,21 @@
+{
+  "fixture": "17-before-after-form",
+  "shape": "A print redesign as plain text: a paper form as it was and as it is now, with what the person did between and what changed.",
+  "tests": "Layout: before and after, for a printed thing rather than a screen. The counts are kept as counts (3 of 28, 16 of 30), not turned into percentages.",
+  "files": ["17-before-after-form.txt"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":false,"chart":true,"noNumbers":false,"layout":"before-after"},
+  "keyFacts": [
+    {"id":"fields","fact":"41 fields on two sides of A4 before; 22 fields on one side after.","match":[["41","22"]]},
+    {"id":"health-first","fact":"The health questions now come first, so coaches get them on the day.","match":["health questions",["health","first"]]},
+    {"id":"missing","fact":"3 of 28 forms came back with something missing, against 16 of 30 before.","match":[["3","28"],["16","30"]]},
+    {"id":"time","fact":"Filling it in took about 4 minutes, down from about 9.","match":[["4","9","minutes"]]},
+    {"id":"method","fact":"Marked up 30 completed forms and tested a draft with 6 new members.","match":[["30","forms"],["6","new members"],"completed forms"]}
+  ],
+  "forbidden": [
+    {"id":"derived","why":"The material gives counts and no percentage.","match":["53%","11%","halved","46%"]},
+    {"id":"pictures","why":"The AI never sees the pictures, so it can't say what a photograph shows.","match":["the photograph shows","as the photos show","pictured"]}
+  ],
+  "sourceNumbers": ["2","2026","41","30","6","22","3","28","16","4","9"]
+}

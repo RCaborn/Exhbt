@@ -1,0 +1,18 @@
+Should the courts be able to review a minister's advice to prorogue Parliament?
+LLB Law, Year 2 public law essay. Wexcombe University, autumn term 2025.
+
+The question matters because prorogation ends a session of Parliament on the government's advice, and until 2019 no court had said whether that advice could be challenged. My thesis is that review is justified, but only on the narrow ground the Supreme Court chose: the effect on Parliament's ability to do its job, not the minister's motive.
+
+The argument runs in three steps. First, the power to prorogue is a prerogative power, and since the GCHQ case the courts have reviewed prerogative powers according to their subject matter, not their source (Council of Civil Service Unions v Minister for the Civil Service [1985] AC 374). Second, in Miller (No 2) the Supreme Court held that a prorogation is unlawful if it frustrates, without reasonable justification, Parliament's ability to carry out its constitutional functions (R (Miller) v The Prime Minister [2019] UKSC 41). That test looks at effect. It does not ask a judge to decide whether the Prime Minister acted for a bad reason. Third, the objection that this draws judges into politics is weaker than it looks, because the test leaves the length and timing of an ordinary prorogation alone (Elliott 2020).
+
+The strongest point against my view is Loughlin's: that the court invented a limit the constitution had never contained (Loughlin 2019). I accept that the limit was new. But a power with no legal limit at all would let a government suspend the body that holds it to account.
+
+A test based on effect lets the courts protect Parliament without judging politics.
+
+Next I would compare how the Canadian courts treated the prorogation of 2008.
+
+Sources
+Council of Civil Service Unions v Minister for the Civil Service [1985] AC 374
+R (Miller) v The Prime Minister [2019] UKSC 41, https://example.org/uksc-2019-41
+Elliott, M. (2020) "Constitutional Adjudication and Constitutional Politics", Public Law
+Loughlin, M. (2019) The Case of Prorogation, Policy Exchange

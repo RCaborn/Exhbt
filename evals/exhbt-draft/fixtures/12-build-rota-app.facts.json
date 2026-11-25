@@ -1,0 +1,22 @@
+{
+  "fixture": "12-build-rota-app",
+  "shape": "A software project write-up in markdown: a web app that works, what it does, how it was built, a demo link and a code link, and one page the report only cites.",
+  "tests": "Layout: build. The two links to the thing itself are kept and the cited checklist is not made a link. No change is worked out from the two call counts.",
+  "files": ["12-build-rota-app.md"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":false,"chart":true,"noNumbers":false,"layout":"build"},
+  "keyFacts": [
+    {"id":"what-it-does","fact":"Volunteers pick open shifts from a weekly calendar; the coordinator sees unfilled shifts.","match":["calendar","open shifts","unfilled shifts"]},
+    {"id":"stack","fact":"Built in React and Node.js with a PostgreSQL database.","match":["React","Node","PostgreSQL"]},
+    {"id":"tested","fact":"Tested with 12 volunteers over three weeks.","match":[["12","volunteers"]]},
+    {"id":"calls","fact":"The coordinator made 4 phone calls to fill gaps, down from 23.","match":[["4","23"]]},
+    {"id":"demo","fact":"The demo's address, as a link.","match":["larder-rota-demo"]},
+    {"id":"code","fact":"The code's address, as a link.","match":["larder-rota-code"]}
+  ],
+  "forbidden": [
+    {"id":"cited-page","why":"A build's links are the thing itself (the demo, the code), never a page the report only cites.","match":["accessibility-checklist"]},
+    {"id":"derived","why":"The material gives the two counts and no percentage or difference.","match":["83%","82%","19 fewer"]}
+  ],
+  "sourceNumbers": ["2","2026","38","12","4","23"]
+}

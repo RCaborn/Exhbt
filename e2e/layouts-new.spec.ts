@@ -1,6 +1,9 @@
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { markLayout, needsThePerson } from "../evals/exhbt-draft/marks";
 import { DraftSchema, DraftSchemaSeven, leftOff, repairDraft, toDoc, type Draft } from "../lib/ai/draft-answer";
 import { formatLimits, LIMITS, validateForPublish, wordCount, words, type ExhbtDoc } from "../lib/exhbt/blocks";
 import { checkedReason, CLASSIC_REASONS, isLayoutReason, LAYOUT_REASONS, layoutSentence } from "../lib/exhbt/drafted";
@@ -431,6 +434,97 @@ test.describe("The line after a draft, for the four layouts", () => {
     // Every signal the draft may give is one the edit page will read from the address.
     for (const r of LAYOUT_REASONS) expect(isLayoutReason(r)).toBe(true);
     expect(CLASSIC_REASONS.every((r) => (LAYOUT_REASONS as readonly string[]).includes(r))).toBe(true);
+  });
+});
+
+/* ---------------- The draft eval, made ready for seven layouts (nothing here calls the AI or runs the eval) ---------------- */
+
+type AnswerKey = {
+  fixture: string;
+  files: string[];
+  notesFile: string | null;
+  expect: { layout?: string | string[] };
+  keyFacts: { id: string; match: (string | string[])[] }[];
+  sourceNumbers: string[];
+};
+const FIXTURES_DIR = join(process.cwd(), "evals/exhbt-draft/fixtures");
+const answerKeys = (): AnswerKey[] =>
+  readdirSync(FIXTURES_DIR)
+    .filter((n) => n.endsWith(".facts.json"))
+    .sort()
+    .map((n) => JSON.parse(readFileSync(join(FIXTURES_DIR, n), "utf8")) as AnswerKey);
+
+test.describe("The draft eval's fixtures and marks for seven layouts", () => {
+  test("two made-up pieces of work for each new layout, and decision 0028's three near misses, each naming the layout expected", () => {
+    const keys = answerKeys();
+    const near = keys.filter((k) => k.fixture.includes("-near-"));
+    // Release 4's own fixtures are numbered from 12 (the older history essay, 06, is now expected to be an essay too).
+    for (const f of NEW_FOUR) {
+      const made = keys.filter((k) => k.expect.layout === f && !near.includes(k) && Number(k.fixture.slice(0, 2)) >= 12).map((k) => k.fixture);
+      expect(made.length, `${f}: ${made.join(", ")}`).toBe(2);
+    }
+    // A humanities dissertation with survey data is research; a poster for an event with nothing about the
+    // person's part is a gallery; a redesign that describes only the result is a case study.
+    expect(Object.fromEntries(near.map((k) => [k.fixture, k.expect.layout]))).toEqual({
+      "20-near-dissertation-survey": "research",
+      "21-near-event-poster": "gallery",
+      "22-near-redesign-result-only": "case-study",
+    });
+    for (const k of keys) {
+      const where = k.fixture;
+      for (const file of [...k.files, ...(k.notesFile ? [k.notesFile] : [])]) expect(existsSync(join(FIXTURES_DIR, file)), `${where}: ${file}`).toBe(true);
+      expect(existsSync(join(FIXTURES_DIR, `${k.fixture}.facts.json`)), `${where}: the answer key is named after the fixture`).toBe(true);
+      for (const l of k.expect.layout === undefined ? [] : [k.expect.layout].flat()) expect((FORMATS as readonly string[]).includes(l), `${where}: ${l}`).toBe(true);
+    }
+  });
+
+  test("each new answer key asks only for what its material says, and lists the material's numbers", () => {
+    const flat = (t: string) => t.replace(/[’‘]/g, "'").replace(/\s+/g, " ").trim().toLowerCase();
+    for (const k of answerKeys().filter((x) => Number(x.fixture.slice(0, 2)) >= 12)) {
+      const material = flat(k.files.map((f) => readFileSync(join(FIXTURES_DIR, f), "utf8")).join("\n"));
+      // At least one way of saying each key fact is in the material itself, so a faithful draft can score it.
+      for (const fact of k.keyFacts) {
+        const found = fact.match.some((alt) => [alt].flat().every((part) => material.includes(flat(part))));
+        expect(found, `${k.fixture}: ${fact.id}`).toBe(true);
+      }
+      // `npm run eval:fixtures` wrote the material's numbers (an empty list here means it was not run).
+      expect(k.sourceNumbers.length, k.fixture).toBeGreaterThan(0);
+      for (const n of k.sourceNumbers) expect(material.includes(flat(n)), `${k.fixture}: ${n}`).toBe(true);
+    }
+  });
+
+  test("a layout is marked right, wrong, or not at all when the answer key names none", () => {
+    expect(markLayout({ format: "essay" }, "essay")).toEqual({ state: "ok", got: "essay", want: ["essay"] });
+    expect(markLayout({ format: "research" }, "essay")).toEqual({ state: "wrong", got: "research", want: ["essay"] });
+    // No format is a case study; a list means more than one is right.
+    expect(markLayout({}, ["case-study", "research"]).state).toBe("ok");
+    expect(markLayout({ format: "before-after" }, ["case-study", "research"]).state).toBe("wrong");
+    expect(markLayout({ format: "gallery" }, undefined)).toEqual({ state: "n/a", got: "gallery", want: [] });
+  });
+
+  test("what only the person can clear (pictures, Before and After marks) is told apart from what a draft got wrong", () => {
+    // A drafted before and after: no pictures yet, so nothing is marked. Its three points on what changed are there.
+    const drafted = toDoc(answer({ format: "before-after", findings: ["The total is on one screen.", "Buttons are bigger.", "Repeat orders take two taps."] }), MATERIAL);
+    const issues = validateForPublish(drafted);
+    const person = issues.filter((i) => needsThePerson(i, drafted)).map((i) => i.message);
+    expect(person).toEqual(["A before and after needs at least 2 images.", "Mark one image Before and one After."]);
+    // Without its findings, the missing "what changed" is the draft's own failing.
+    const thin = toDoc(answer({ format: "before-after", findings: [] }), MATERIAL);
+    const thinIssues = validateForPublish(thin).filter((i) => !needsThePerson(i, thin)).map((i) => i.message);
+    expect(thinIssues).toContain("Add what changed and why.");
+    // An event's poster is the person's to add; its role is the draft's to find in the material.
+    const event = toDoc(answer({ format: "event", myRole: "" }), MATERIAL);
+    const eventIssues = validateForPublish(event);
+    expect(eventIssues.filter((i) => needsThePerson(i, event)).map((i) => i.message)).toEqual(["Add at least one picture, such as the poster."]);
+    expect(eventIssues.filter((i) => !needsThePerson(i, event)).map((i) => i.message)).toContain("Say what your role was.");
+    // A gallery's two pictures, and a build's screenshot or link.
+    const gallery = toDoc(answer({ format: "gallery" }), MATERIAL);
+    expect(validateForPublish(gallery).filter((i) => needsThePerson(i, gallery)).map((i) => i.message)).toEqual(["A gallery needs at least 2 images."]);
+    const build = toDoc(answer({ format: "build" }), MATERIAL);
+    expect(validateForPublish(build).filter((i) => needsThePerson(i, build)).map((i) => i.message)).toEqual(["Add a screenshot or a link, so people can see it working."]);
+    // Research's key figure can be drafted from the material's figures, so it stays the draft's.
+    const research = toDoc(answer({ format: "research", aim: "To test it.", conclusion: "It held." }), MATERIAL);
+    expect(validateForPublish(research).filter((i) => needsThePerson(i, research))).toEqual([]);
   });
 });
 
