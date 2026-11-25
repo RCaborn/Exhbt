@@ -5,7 +5,7 @@
   "files": ["10-society-figures.txt"],
   "notesFile": "10-society-figures.notes.txt",
   "link": null,
-  "expect": {"headlineNumber":false,"chart":true,"noNumbers":false,"graph":{"kind":"numbers","tiles":[{"value":186},{"value":2450,"unit":"£"},{"value":6},{"value":91,"unit":"%","from":64}]}},
+  "expect": {"headlineNumber":false,"chart":true,"noNumbers":false,"graph":{"kind":"numbers","tiles":[{"value":186},{"value":2450,"unit":"£"},{"value":6},{"value":91,"unit":"%","from":64}]},"layout":"case-study"},
   "keyFacts": [
     {"id":"members","fact":"186 paid members, the most the society has had.","match":["186"]},
     {"id":"money","fact":"Sponsorship and two fundraising swims raised £2,450, paying for spring pool hire.","match":["2,450","2450"]},

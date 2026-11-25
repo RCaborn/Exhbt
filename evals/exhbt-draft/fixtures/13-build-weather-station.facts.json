@@ -1,0 +1,22 @@
+{
+  "fixture": "13-build-weather-station",
+  "shape": "A hardware project as plain text: a device that works, what it measures, how it was designed and built, one link to its files and a named person's words about it.",
+  "tests": "Layout: build, for a device rather than software. The calibration figure is not turned into an accuracy claim. The quote is kept only word for word, with its speaker.",
+  "files": ["13-build-weather-station.txt"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":false,"chart":false,"noNumbers":false,"layout":"build"},
+  "keyFacts": [
+    {"id":"measures","fact":"Measures temperature, humidity, pressure, wind speed and rainfall every 5 minutes.","match":[["temperature","rainfall"],"every 5 minutes",["5","minutes"]]},
+    {"id":"power","fact":"Runs from a solar panel and a battery.","match":["solar"]},
+    {"id":"built","fact":"Circuit drawn in KiCad, firmware in C on an ESP32, receiver software in Python, housing 3D-printed.","match":["KiCad","ESP32","Python","3D-printed","3D printed"]},
+    {"id":"calibration","fact":"After calibration it agreed with the reference thermometer to within 0.3 degrees C.","match":["0.3"]},
+    {"id":"readings","fact":"21,400 readings logged since 2 March 2026, with 3 gaps longer than an hour.","match":["21,400","21400"]},
+    {"id":"files","fact":"The design files and firmware, as a link.","match":["roof-station-files"]}
+  ],
+  "forbidden": [
+    {"id":"accuracy","why":"The material gives one calibration figure for temperature and no accuracy percentage or uptime.","match":["99%","99.9","uptime of","accurate to 0.1"]},
+    {"id":"airport","why":"The airport's data is what the station replaced, not something it uses.","match":["uses data from an airport","airport data to"]}
+  ],
+  "sourceNumbers": ["3","2026","2024","30","5","24","20","360","0.3","14","2","21,400"]
+}

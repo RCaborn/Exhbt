@@ -1,4 +1,7 @@
-import { devices, expect, test, type APIRequestContext, type Page } from "@playwright/test";
+// `test` from ./editor-test, as every editor spec takes it: on WebKit it keeps next dev's hot-reload client quiet, which
+// otherwise reloads a page being left when the server builds a route for the first time ("Navigation … is interrupted by
+// another navigation"). With Playwright's own, two tests here failed that way on WebKit on 25 Nov, at random.
+import { devices, expect, test, type APIRequestContext, type Page } from "./editor-test";
 import { SCHEMA_VERSION, text, type ExhbtDoc } from "../lib/exhbt/blocks";
 import { decideEditor, decideForEveryone, DEFAULT_EDITOR, EDITOR_OWN_COOKIE, type EditorFacts, type EditorKind } from "../lib/editor-kind";
 

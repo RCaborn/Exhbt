@@ -1,6 +1,6 @@
 import { findingsOf, imagesOf, plain, sectionsOf, type ExhbtDoc } from "./blocks";
 import { FIGURE } from "@/lib/figures/rules";
-import { FORMAT_RULES, formatOf, type Format } from "./formats";
+import { FORMAT_RULES, FORMATS, formatOf, type Format } from "./formats";
 
 /**
  * What the editor says, once, when it opens after a draft (decision 0025): which layout the AI
@@ -14,7 +14,24 @@ import { FORMAT_RULES, formatOf, type Format } from "./formats";
  * claim an aim the draft doesn't have, or notes that don't name the layout. Anything else is
  * "default", which gives no reason at all. Pure, so the server, the editor and the tests share it.
  */
-export const LAYOUT_REASONS = ["notes", "aim-results", "hypothesis-results", "study", "visual-work", "mostly-pictures", "question-findings", "default"] as const;
+
+/** The signals a draft that chooses among the three layouts of decision 0024 may give (the classic editor's draft): the list its request has always sent. */
+export const CLASSIC_REASONS = ["notes", "aim-results", "hypothesis-results", "study", "visual-work", "mostly-pictures", "question-findings", "default"] as const;
+/** Every signal: those, and one for each of the four layouts of decision 0028 (a built thing, an argument with sources, a before and an after, an event with a role). */
+export const LAYOUT_REASONS = [
+  "notes",
+  "aim-results",
+  "hypothesis-results",
+  "study",
+  "visual-work",
+  "mostly-pictures",
+  "question-findings",
+  "built-thing",
+  "argument-sources",
+  "before-and-after",
+  "event-role",
+  "default",
+] as const;
 export type LayoutReason = (typeof LAYOUT_REASONS)[number];
 export const isLayoutReason = (v: unknown): v is LayoutReason => typeof v === "string" && (LAYOUT_REASONS as readonly string[]).includes(v);
 
@@ -27,24 +44,39 @@ const BECAUSE: Record<LayoutReason, string | null> = {
   "visual-work": "your work is something to look at, so the pictures come first",
   "mostly-pictures": "most of what you uploaded is pictures",
   "question-findings": "your work sets out a question and what you found",
+  "built-thing": "your work is something you built, and says what it does",
+  "argument-sources": "your work makes an argument and names its sources",
+  "before-and-after": "your work says how something was and how it is now",
+  "event-role": "your work is an event, and says what your part in it was",
   default: null,
 };
 
 /** The layouts a signal can explain. */
 const FITS: Record<LayoutReason, readonly Format[]> = {
-  notes: ["case-study", "gallery", "research"],
+  notes: FORMATS,
   "aim-results": ["research"],
   "hypothesis-results": ["research"],
   study: ["research"],
   "visual-work": ["gallery"],
   "mostly-pictures": ["gallery"],
   "question-findings": ["case-study"],
-  default: ["case-study", "gallery", "research"],
+  "built-thing": ["build"],
+  "argument-sources": ["essay"],
+  "before-and-after": ["before-after"],
+  "event-role": ["event"],
+  default: FORMATS,
 };
 
 /** How a layout's name is written in a person's notes. */
-/** Keyed by the layouts the AI may draft (DRAFT_FORMATS). */
-const NAMED: Partial<Record<Format, RegExp>> = { "case-study": /case[\s-]?stud(?:y|ies)/i, gallery: /gallery/i, research: /research/i };
+const NAMED: Record<Format, RegExp> = {
+  "case-study": /case[\s-]?stud(?:y|ies)/i,
+  gallery: /gallery/i,
+  research: /research/i,
+  build: /\bbuild\b/i,
+  essay: /\bessay\b/i,
+  "before-after": /before[\s-]?(?:and[\s-]?)?after/i,
+  event: /\bevent\b|\bperformance\b/i,
+};
 
 export type UploadSignals = { imageFiles: number; pdfPages: number; pdfPicturePages: number };
 
@@ -57,6 +89,12 @@ export type UploadSignals = { imageFiles: number; pdfPages: number; pdfPicturePa
  *  - "mostly-pictures": pictures are more than half of the upload (picture files and PDF pages with
  *    pictures on them, out of picture files and all PDF pages).
  *  - "question-findings": the title is a question and there are findings.
+ *  - "built-thing": a build whose draft says what it does (its findings).
+ *  - "argument-sources": an essay whose draft has key points and at least one source. A source is
+ *    only ever on a draft when the material holds it (lib/exhbt/references.ts).
+ *  - "before-and-after": a before and after whose draft says what changed (its findings). Which
+ *    picture is which is never drafted: the person marks them.
+ *  - "event-role": an event whose draft has My role, which is only ever there when the material says it.
  */
 export function checkedReason(doc: ExhbtDoc, claimed: unknown, facts: { notes?: string; signals?: UploadSignals } = {}): LayoutReason {
   const f = formatOf(doc);
@@ -64,7 +102,7 @@ export function checkedReason(doc: ExhbtDoc, claimed: unknown, facts: { notes?: 
   const hasFindings = findingsOf(doc).some((it) => plain(it).trim());
   switch (reason) {
     case "notes":
-      return NAMED[f]?.test(facts.notes ?? "") ? "notes" : "default";
+      return NAMED[f].test(facts.notes ?? "") ? "notes" : "default";
     case "aim-results":
     case "hypothesis-results":
     case "study": {
@@ -83,6 +121,13 @@ export function checkedReason(doc: ExhbtDoc, claimed: unknown, facts: { notes?: 
     }
     case "question-findings":
       return doc.title.trim().endsWith("?") && hasFindings ? "question-findings" : "default";
+    case "built-thing":
+    case "before-and-after":
+      return hasFindings ? reason : "default";
+    case "argument-sources":
+      return hasFindings && sectionsOf(doc, "link").length > 0 ? "argument-sources" : "default";
+    case "event-role":
+      return (doc.myRole ?? "").trim() ? "event-role" : "default";
     default:
       return reason;
   }

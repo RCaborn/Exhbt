@@ -1,0 +1,21 @@
+{
+  "fixture": "21-near-event-poster",
+  "shape": "A near miss for the event layout: a short note sent with six pictures of a concert's poster, flyer and programme. It names an event at a time and place and says nothing about any part the person took in it.",
+  "tests": "Layout: gallery, never event. An event needs the person's own part in it (decision 0028); this is visual work shown by its pictures. No role is drafted, the pictures are not described beyond what the note says, and nothing is said about how the concert went.",
+  "files": ["21-near-event-poster.txt"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":false,"chart":false,"noNumbers":false,"layout":"gallery"},
+  "signals": {"imageFiles":6,"pdfPages":0,"pdfPicturePages":0},
+  "keyFacts": [
+    {"id":"what","fact":"A poster, flyer and programme for the Harbour Singers' summer concert, Songs of the Sea.","match":["Songs of the Sea","Harbour Singers"]},
+    {"id":"print","fact":"A single linocut of a fishing boat, printed in dark blue on cream paper.","match":["linocut","fishing boat"]},
+    {"id":"type","fact":"The title in a condensed serif that follows the line of the hull; type set in Affinity Publisher.","match":["serif","Affinity Publisher","hull"]},
+    {"id":"run","fact":"150 posters and 400 flyers were printed.","match":[["150","400"]]}
+  ],
+  "forbidden": [
+    {"id":"how-it-went","why":"The note is written before the concert and says nothing of how it went.","match":["sold out","audience of","attended","tickets sold"]},
+    {"id":"role","why":"The note states no part the person took in the concert.","match":["organised the concert","performed","sang in","concert manager"]}
+  ],
+  "sourceNumbers": ["2026","18","7.30","£8","£5","150","400"]
+}

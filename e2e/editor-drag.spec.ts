@@ -600,9 +600,12 @@ test.describe("dragging with a mouse", () => {
       const words = page.locator(`${READY} [data-section-id="flow"] [data-path="flow.0.step"]`);
       await words.scrollIntoViewIfNeeded();
       const t = (await words.boundingBox())!;
-      await page.mouse.move(t.x + 4, t.y + t.height / 2);
+      // Along the middle of its first line. The middle of the box is no line's when the words wrap onto two (the essay's first
+      // box): it is the edge between them, where the browser may take either line, and the drag selected nothing.
+      const y = t.y + (await words.evaluate((el) => parseFloat(getComputedStyle(el).paddingTop) + Math.min(el.clientHeight, parseFloat(getComputedStyle(el).lineHeight) || 18) / 2));
+      await page.mouse.move(t.x + 4, y);
       await page.mouse.down();
-      await page.mouse.move(t.x + t.width * 0.6, t.y + t.height / 2, { steps: 8 });
+      await page.mouse.move(t.x + t.width * 0.6, y, { steps: 8 });
       await page.mouse.up();
       await expect(lifting(page)).toHaveCount(0);
       expect(await page.evaluate(() => {
@@ -822,7 +825,9 @@ test.describe("dragging with a mouse", () => {
 
       const mid = L.y + Math.min(L.h, R.h) / 2;
       await restOnBoundary({ x: L.x + L.w * 0.55, y: mid }, { x: R.x + R.w * 0.45, y: mid }, "beside a pair, across its gap");
-      await restOnBoundary({ x: L.x + L.w * 0.2, y: L.y + L.h * 0.3 }, { x: L.x + L.w * 0.2, y: L.y + L.h + 30 }, "down the side of a pair");
+      // Down past the pair's foot, which is the foot of its taller side: in Event's sample the stack beside the flowchart is the
+      // taller, and 30px under the flowchart is still beside the graph, in the pair's own row.
+      await restOnBoundary({ x: L.x + L.w * 0.2, y: L.y + L.h * 0.3 }, { x: L.x + L.w * 0.2, y: Math.max(L.y + L.h, R.y + R.h) + 30 }, "down the side of a pair");
       // Beside a stack: at the height of a stacked part, across from the other side; and between two stacked parts.
       const stacked = rows.flatMap((r) => (r.row === "pair" ? [r.left, r.right].filter((c) => c.cell === "stack").map((c) => ({ stack: ids(c), other: ids(c === r.left ? r.right : r.left) })) : []));
       for (const { stack, other } of stacked) {
@@ -840,9 +845,10 @@ test.describe("dragging with a mouse", () => {
         const ts = tiles.items.map((c) => at[c.item.id]!);
         const k = ts.findIndex((t, i) => i > 0 && Math.abs(t.y - ts[i - 1]!.y) < 1);
         const [t1, t2] = [ts[k - 1]!, ts[k]!];
-        const below = ts.find((t) => t.y > t1.y + t1.h)!;
+        // Event's grid is two pictures on one row, under the poster: no second row to rest between.
+        const below = ts.find((t) => t.y > t1.y + t1.h);
         await restOnBoundary({ x: t1.x + t1.w * 0.3, y: t1.y + t1.h / 2 }, { x: t2.x + t2.w * 0.7, y: t1.y + t1.h / 2 }, "along a row of the grid");
-        await restOnBoundary({ x: t1.x + t1.w / 2, y: t1.y + t1.h * 0.6 }, { x: below.x + below.w / 2, y: below.y + below.h * 0.4 }, "between two rows of the grid");
+        if (below) await restOnBoundary({ x: t1.x + t1.w / 2, y: t1.y + t1.h * 0.6 }, { x: below.x + below.w / 2, y: below.y + below.h * 0.4 }, "between two rows of the grid");
       }
       await page.keyboard.press("Escape");
       await expect(lifting(page)).toHaveCount(0);
@@ -1156,9 +1162,16 @@ test.describe("the + between sections", () => {
 
     test(`${f}: a new block lands where its + was, with the cursor in it`, async ({ page }) => {
       await open(page, f);
+      // The kinds whose new block takes the cursor. Build's, Before and after's and Event's samples hold a quote, a "What I'd
+      // do next" and every link they may: the quote is taken out first, so there is room for one.
+      const typed = (o: { kind: string; full?: string }) => !o.full && ["quote", "reflection", "link", "pullquote"].includes(o.kind);
+      if (!blockOptions(await docNow(page)).some(typed)) {
+        await page.evaluate((id) => window.__exhbtEditor!.remove(id), (await docNow(page)).sections.find((s) => s.kind === "quote")!.id);
+        await settle(page);
+      }
       const order = await pageOrder(page);
       const doc = await docNow(page);
-      const kind = blockOptions(doc).find((o) => !o.full && ["quote", "reflection", "link", "pullquote"].includes(o.kind))!;
+      const kind = blockOptions(doc).find(typed)!;
       const starts = await page.locator(`${READY} .xe-insert:not([data-end])`).evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-at"))));
       const at = starts[Math.floor(starts.length / 2)]!;
       await page.locator(`${READY} .xe-insert[data-at="${at}"] .xe-plus`).click();

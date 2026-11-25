@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import { unverifiedOf } from "@/components/editor/model";
 import { canView } from "@/lib/access";
-import { getCurrentUser } from "@/lib/auth";
+import { isAdmin } from "@/lib/admin";
+import { getCurrentUser, type SessionUser } from "@/lib/auth";
+import { editorKind } from "@/lib/editor-kind-server";
 import { emptyDoc, ExhbtDocSchema, LIMITS, text, validateForPublish, type ExhbtDoc } from "@/lib/exhbt/blocks";
-import { formatOf, mayCarryFormat, OFFERED_FORMATS } from "@/lib/exhbt/formats";
+import { formatOf, isFormat, mayCarryFormat, offeredIn } from "@/lib/exhbt/formats";
 import { slugify, uniqueSlug } from "@/lib/exhbt/slug";
 import { canCreateExhbt, canPublish, getPlan } from "@/lib/plan";
 import { takenSlugs } from "@/lib/slugs";
@@ -40,14 +42,25 @@ function readDoc(raw: unknown): ExhbtDoc | null {
 const LAYOUT_NOT_OFFERED = "That layout isn't available yet. Choose another layout and try again.";
 
 /**
- * Whether the doc's layout may be stored for this exhbt: an offered one, or the one it already has.
- * The page only offers three, but the schema reads all seven, so the server holds the line (release 2).
+ * Whether the layout a save or a publish names may be stored for this exhbt. The page only offers what
+ * the person's editor can edit, but a request can be built by hand, so the server holds the line:
+ *  - A layout name this code doesn't know is refused. Reading a stored doc, such a name is a case study
+ *    (normaliseDoc); a request that asks for one would otherwise be stored as a case study and say nothing.
+ *    So this looks at `raw`, the doc as it was sent.
+ *  - The three the classic editor offers are let through for everyone, with nothing looked up.
+ *  - One of the other four is let through for a person whose editor is the new one (decided as the edit
+ *    page decides it), and for anyone when it is the layout the exhbt already has: an exhbt made in the
+ *    new editor and opened in the classic one keeps its layout.
  */
-async function layoutAllowed(id: string, userId: string, doc: ExhbtDoc): Promise<boolean> {
+async function layoutAllowed(id: string, user: SessionUser, raw: unknown, doc: ExhbtDoc): Promise<boolean> {
+  const named = (raw as { format?: unknown } | null)?.format;
+  if (named !== undefined && named !== null && !isFormat(named)) return false;
   const f = formatOf(doc);
-  if (OFFERED_FORMATS.includes(f)) return true;
+  if (offeredIn("classic").includes(f)) return true;
+  const offered = offeredIn(await editorKind(await isAdmin(user)));
+  if (offered.includes(f)) return true;
   const stored = await getStore().getExhbt(id);
-  return !!stored && stored.userId === userId && mayCarryFormat(f, formatOf(stored.doc));
+  return !!stored && stored.userId === user.id && mayCarryFormat(f, formatOf(stored.doc), offered);
 }
 
 /** "Start from scratch" on the list: an empty exhbt, if the plan has room. */
@@ -152,7 +165,7 @@ export async function saveDraft(id: string, raw: unknown): Promise<SaveResult> {
   const user = await signedIn();
   const doc = readDoc(raw);
   if (!doc) return { ok: false, error: "This couldn't be saved. Reload the page and try again." };
-  if (!(await layoutAllowed(id, user.id, doc))) return { ok: false, error: LAYOUT_NOT_OFFERED };
+  if (!(await layoutAllowed(id, user, raw, doc))) return { ok: false, error: LAYOUT_NOT_OFFERED };
   const ok = await getStore().saveExhbtDraft(id, user.id, doc);
   return ok ? { ok: true, savedAt: new Date().toISOString() } : { ok: false, error: "This exhbt isn't yours to edit." };
 }
@@ -168,7 +181,7 @@ export async function publishExhbt(id: string, raw: unknown, confirmed: boolean)
   const store = getStore();
   const doc = readDoc(raw);
   if (!doc) return { ok: false, reasons: ["This couldn't be saved. Reload the page and try again."] };
-  if (!(await layoutAllowed(id, user.id, doc))) return { ok: false, reasons: [LAYOUT_NOT_OFFERED] };
+  if (!(await layoutAllowed(id, user, raw, doc))) return { ok: false, reasons: [LAYOUT_NOT_OFFERED] };
   if (!(await store.saveExhbtDraft(id, user.id, doc))) return { ok: false, reasons: ["This exhbt isn't yours to publish."] };
 
   const [plan, all, profile] = await Promise.all([getPlan(user.id), store.listExhbts(user.id), store.getPortfolioProfile(user.id)]);

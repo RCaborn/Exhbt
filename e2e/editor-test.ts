@@ -69,7 +69,9 @@ export function safariFocus() {
     e.preventDefault();
     let next = first.parentElement?.closest<HTMLElement>(TAKES) ?? null;
     while (next && next.matches(SHY)) next = next.parentElement?.closest<HTMLElement>(TAKES) ?? null;
-    if (next) next.focus();
+    // Without a scroll: a press moves the focus where it is, and never scrolls the page. Scrolled, the page moved under the
+    // pointer between the press and its release, and the click landed elsewhere (the layout menu at 390px, 25 Nov).
+    if (next) next.focus({ preventScroll: true });
     else if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) document.activeElement.blur();
   });
 }

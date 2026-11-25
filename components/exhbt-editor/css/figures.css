@@ -91,6 +91,13 @@
     right: 0;
     bottom: -1.5625rem;
   }
+  /* A link drawn as a button (Build's demo and code) has no card either, and its line runs to its foot: the chip
+     sits just under that line, in the gap below the row, clear of the button's words and the line's. On its foot
+     it lay over the line, and a press on the line's field opened the address instead. */
+  .xe-frame[data-as="button"] .xe-fig-link > .xe-fig-corner {
+    right: 0;
+    bottom: -1.875rem;
+  }
 
   /* ---------- A picture's description: "Needs a description" just after the placeholder's last word ---------- */
   .xe-fig-needs-line {
@@ -346,6 +353,13 @@
       right: auto;
       left: 50%;
       transform: translateX(-50%);
+    }
+    /* Under a button link, at its start: on a phone the buttons wrap one to a line, and the next one's grip is at its own
+       right end, half over its top edge, just under this chip. Centred, the chip met it. */
+    .xe-frame[data-as="button"] .xe-fig-link > .xe-fig-corner {
+      right: auto;
+      left: 0;
+      transform: none;
     }
     .xe-fig-chip::after,
     .xe-fig-picked-open::after,

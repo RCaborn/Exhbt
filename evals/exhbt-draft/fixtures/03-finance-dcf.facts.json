@@ -5,7 +5,7 @@
   "files": ["03-finance-dcf.docx"],
   "notesFile": null,
   "link": null,
-  "expect": {"headlineNumber":true,"chart":false,"noNumbers":false},
+  "expect": {"headlineNumber":true,"chart":false,"noNumbers":false,"layout":"case-study"},
   "keyFacts": [
     {"id":"task","fact":"DCF valuation of Harrowgate Outdoor plc (fictional) from its accounts.","match":["Harrowgate","DCF","discounted cash flow"]},
     {"id":"value","fact":"Value per share £3.68 against a market price of £3.10.","match":[["3.68","3.10"],"3.68"]},

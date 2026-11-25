@@ -1,0 +1,21 @@
+{
+  "fixture": "16-before-after-timetable",
+  "shape": "A web page redesign in markdown: how the page was, what the person did, how it is now, and what changed, with timings before and after.",
+  "tests": "Layout: before and after. What changed is said with the figures as written; no percentage is worked out. The pictures are mentioned in the material and never described or marked by the draft.",
+  "files": ["16-before-after-timetable.md"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":false,"chart":true,"noNumbers":false,"layout":"before-after"},
+  "keyFacts": [
+    {"id":"before","fact":"The old page was a scanned timetable shown as one image, too small to read on a phone.","match":["scanned","one image","too small","zoom"]},
+    {"id":"after","fact":"The new page shows the next three departures from the chosen stop, at the top.","match":["next three departures","next three","next departures"]},
+    {"id":"timing","fact":"Looking up the next bus took a median of 48 seconds before and 9 seconds after.","match":[["48","9"]]},
+    {"id":"gave-up","fact":"3 of 9 students gave up on the old page; all 9 finished on the new one.","match":[["3","9","gave up"],"all 9"]},
+    {"id":"emails","fact":"Emails asking for bus times fell from about 30 a week to about 8.","match":[["30","8"]]}
+  ],
+  "forbidden": [
+    {"id":"derived","why":"The material gives the before and after figures and no percentage change.","match":["81%","73%","five times","5 times faster"]},
+    {"id":"pictures","why":"The AI never sees the pictures, so it can't say what a screenshot shows.","match":["the screenshot shows","as the screenshots show","pictured"]}
+  ],
+  "sourceNumbers": ["3","2026","30","9","48","8"]
+}

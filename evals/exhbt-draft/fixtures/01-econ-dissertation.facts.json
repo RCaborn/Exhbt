@@ -5,7 +5,7 @@
   "files": ["01-econ-dissertation.pdf"],
   "notesFile": null,
   "link": null,
-  "expect": {"headlineNumber":true,"chart":false,"noNumbers":false},
+  "expect": {"headlineNumber":true,"chart":false,"noNumbers":false,"layout":"research"},
   "keyFacts": [
     {"id":"question","fact":"Asks whether living further from a university campus lowers the chance of entering higher education by 19.","match":["distance","further from","km from"]},
     {"id":"data","fact":"4,812 young people in 312 local areas from the (fictional) Brackenford Household Panel.","match":["4,812","Brackenford Household Panel"]},
