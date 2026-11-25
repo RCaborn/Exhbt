@@ -95,13 +95,79 @@ async function pickUp(page: Page, i: number) {
   const g = (await gripOf(page, i).boundingBox())!;
   const at = { x: g.x + g.width / 2, y: g.y + g.height / 2 };
   await page.mouse.move(at.x, at.y);
+  await listen(page, i, at);
   await page.mouse.down();
   // Under 6px it is still a click on the grip.
   await page.mouse.move(at.x + 2, at.y + 2, { steps: 2 });
   expect(await list(page).getAttribute("data-flow-drag")).toBeNull();
   await page.mouse.move(at.x + 6, at.y + 6, { steps: 3 });
-  await expect(list(page)).toHaveAttribute("data-flow-drag", "pointer");
+  try {
+    await expect(list(page)).toHaveAttribute("data-flow-drag", "pointer");
+  } catch (e) {
+    const heard = await page.evaluate(() => (window as Window & { __press?: string[] }).__press ?? []).catch(() => ["(the page could not be read)"]);
+    throw new Error(`The box did not lift. What the press met, in order:\n${heard.join("\n")}\n${(e as Error).message}`);
+  }
   return { x: at.x + 6, y: at.y + 6 };
+}
+
+/**
+ * What a press on box `i`'s grip at `at` meets, kept in the page for a pick-up that does not lift: a WebKit run's log is
+ * all that a machine without WebKit sees of it. First what lies at the grip's middle, where the focus is, and whether
+ * the box is under the pointer with its tools shown; then each thing the page hears from the press on.
+ */
+function listen(page: Page, i: number, at: { x: number; y: number }) {
+  return page.evaluate(
+    ({ i, at, BOX, LIST }) => {
+      type Heard = Window & { __press?: string[]; __pressFrom?: number; __pressListening?: boolean };
+      const w = window as Heard;
+      const name = (t: EventTarget | null): string => {
+        if (t === window) return "window";
+        if (t === document) return "document";
+        if (!(t instanceof Element)) return String(t);
+        const tag = t.tagName.toLowerCase();
+        const mark = ["data-flow-grip", "data-flow-remove", "data-flow-add", "data-flow-step", "data-path", "data-section-id", "data-tool"].find((a) => t.hasAttribute(a));
+        const cls = [...t.classList].find((c) => c.startsWith("xe-") || c.startsWith("xp-"));
+        return `${tag}${cls ? `.${cls}` : ""}${mark ? `[${mark}=${t.getAttribute(mark)}]` : ""}`;
+      };
+      w.__press = [];
+      w.__pressFrom = performance.now();
+      const ms = () => `${Math.round(performance.now() - (w.__pressFrom ?? 0))}ms`;
+      const li = document.querySelectorAll(BOX)[i];
+      const tools = li?.querySelector(".xe-flow-tools");
+      const s = tools ? getComputedStyle(tools) : null;
+      w.__press.push(`  ${ms()} before the press: at the grip's middle ${document.elementsFromPoint(at.x, at.y).slice(0, 3).map(name).join(" over ")}; the focus on ${name(document.activeElement)}; the box hovered ${li?.matches(":hover")}; its tools ${s?.opacity}/${s?.pointerEvents}`);
+      if (w.__pressListening) return;
+      w.__pressListening = true;
+      let moves = { on: "", n: 0, at: "" };
+      const flush = () => {
+        if (moves.n) w.__press?.push(`  ${moves.n} mousemove on ${moves.on}, the last at ${moves.at}`);
+        moves = { on: "", n: 0, at: "" };
+      };
+      const say = (s: string) => {
+        flush();
+        w.__press?.push(`  ${ms()} ${s}`);
+      };
+      window.addEventListener(
+        "mousemove",
+        (e) => {
+          const on = `${name(e.target)} buttons ${e.buttons}`;
+          if (moves.on !== on) flush();
+          moves = { on, n: moves.n + 1, at: `${e.clientX},${e.clientY}` };
+        },
+        true,
+      );
+      for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click", "pointercancel", "dragstart", "resize", "scroll", "visibilitychange", "keydown"])
+        window.addEventListener(type, (e) => say(`${type} on ${name(e.target)}`), true);
+      for (const type of ["focusin", "focusout"]) window.addEventListener(type, (e) => say(`${type} on ${name(e.target)}, from or to ${name((e as FocusEvent).relatedTarget)}`), true);
+      // After the page's own handlers and Safari's focus rule (e2e/editor-test.ts), which listens on the window too.
+      window.addEventListener("mousedown", (e) => say(`  the mousedown done: prevented ${e.defaultPrevented}, the focus on ${name(document.activeElement)}`));
+      const flow = document.querySelector(LIST);
+      if (flow) new MutationObserver(() => say(`data-flow-drag is ${flow.getAttribute("data-flow-drag")}`)).observe(flow, { attributes: true, attributeFilter: ["data-flow-drag"] });
+      const region = document.querySelector('[data-editor="page"] [data-said]');
+      if (region) new MutationObserver(() => say(`said: ${region.textContent}`)).observe(region, { childList: true, characterData: true, subtree: true });
+    },
+    { i, at, BOX, LIST },
+  );
 }
 
 /** The point `share` of the way along box `i` (along the flowchart's axis), across its middle. */
