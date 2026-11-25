@@ -95,6 +95,8 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
   const trigger = useRef<HTMLButtonElement>(null);
   const menuId = useId();
   const noneLeft = dt.left <= 0;
+  // A rewrite is running (this block's or another's): Cancel is off, and so is Escape.
+  const anyBusy = dt.busy !== null;
 
   useEffect(() => {
     if (!menu) return;
@@ -124,7 +126,7 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || menu || !trigger.current?.getClientRects().length) return;
+      if (e.key !== "Escape" || e.defaultPrevented || menu || anyBusy || !trigger.current?.getClientRects().length) return;
       if (document.activeElement && document.activeElement !== document.body) return;
       e.preventDefault();
       setOpen(false);
@@ -139,7 +141,7 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("pointerdown", onPointer);
     };
-  }, [open, menu, noneLeft]);
+  }, [open, menu, noneLeft, anyBusy]);
 
   if (!dt.enabled) return null;
 
@@ -148,7 +150,6 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
   const ai = dt.ai.blocks[block];
   const edited = ai !== undefined && !sameBlock(current, ai);
   const pending = dt.busy === block;
-  const anyBusy = dt.busy !== null;
   const msg = dt.message?.block === block ? dt.message : null;
   const noteId = `rewrite-note-${block}`;
 
@@ -167,6 +168,7 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
         if (e.key !== "Escape" || !open || menu) return;
         e.preventDefault();
         e.stopPropagation();
+        if (anyBusy) return;
         setOpen(false);
         trigger.current?.focus();
       }}

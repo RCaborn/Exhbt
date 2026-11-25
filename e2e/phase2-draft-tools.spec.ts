@@ -510,6 +510,38 @@ test.describe("An open rewrite form stays up and takes the press", () => {
         }
       });
     }
+
+    test("while a rewrite runs, Escape leaves its form, as Cancel is off; the rewrite closes it", async ({ page }) => {
+      await draftAndOpen(page, "escapebusy");
+      // The rewrite (the server action given the block's name) is held on its way.
+      let release = () => {};
+      const out = new Promise<void>((r) => (release = r));
+      let holding = false;
+      await page.route(/\/exhbts\/[0-9a-f-]{36}\/edit/, async (route) => {
+        const req = route.request();
+        let args: unknown[] = [];
+        try {
+          args = JSON.parse(req.postData() ?? "[]") as unknown[];
+        } catch {}
+        if (req.method() !== "POST" || !req.headers()["next-action"] || args[1] !== "flow") return route.continue();
+        holding = true;
+        await out;
+        return route.continue();
+      });
+      await startRewrite(page, "flow");
+      await rewriteNow(page, "flow").click();
+      await expect.poll(() => holding).toBe(true);
+      await expect(page.getByTestId("tools-flow").getByRole("button", { name: "Cancel" })).toBeDisabled();
+      for (const where of ["on nothing", "in the form"]) {
+        if (where === "on nothing") await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+        else await noteField(page, "flow").focus();
+        await page.keyboard.press("Escape");
+        await expect(noteField(page, "flow"), `the focus ${where}`).toBeVisible();
+      }
+      release();
+      await expect(rewritesLeft(page, "flow")).toContainText(`${FREE_REWRITES - 1} of`);
+      await expect(noteField(page, "flow")).toHaveCount(0);
+    });
   });
 });
 
