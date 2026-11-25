@@ -13,6 +13,11 @@ import { getStore, type EventName } from "@/lib/store";
  * 24 hours; after that the feature says so and makes no call until the oldest failure is a day old.
  * The key goes in the event's props as `ipHash`, the field countRecentEvents reads (as the intro's
  * own daily limit does).
+ *
+ * A figure pick records its failures here and takes no part in that limit. It is counted before
+ * the call and given back only when the service never answered (neverAnswered in lib/ai/failure.ts,
+ * app/api/exhbts/figure-pick/route.ts), so a failed pick that cost something stays counted against
+ * the person's picks, and that bounds it.
  */
 
 /** The event each feature's failure is logged as. Roadmaps, ideas and CV reads keep their old names. */

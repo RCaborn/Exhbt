@@ -1,7 +1,8 @@
 /**
  * How an AI call failed, as the app records it (decision 0029). Pure, so pages and tests can use
- * it. Thrown by structuredCall (./call.ts) and transcribe (./transcribe.ts); each caller logs it as
- * a failure event (failureProps) and the admin panel counts them.
+ * it. Thrown by structuredCall (./call.ts) and transcribe (./transcribe.ts), and by pickFigure
+ * (./figure-pick.ts) when no key is set; each caller logs it as a failure event (failureProps) and
+ * the admin panel counts them.
  */
 
 /** Every AI feature, as named in failure events and the admin panel. */
