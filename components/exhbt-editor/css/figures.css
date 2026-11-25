@@ -91,6 +91,13 @@
     right: 0;
     bottom: -1.5625rem;
   }
+  /* A link drawn as a button (Build's demo and code) has no card either, and its line runs to its foot: the chip
+     sits just under that line, in the gap below the row, clear of the button's words and the line's. On its foot
+     it lay over the line, and a press on the line's field opened the address instead. */
+  .xe-frame[data-as="button"] .xe-fig-link > .xe-fig-corner {
+    right: 0;
+    bottom: -1.875rem;
+  }
 
   /* ---------- A picture's description: "Needs a description" just after the placeholder's last word ---------- */
   .xe-fig-needs-line {
@@ -341,7 +348,7 @@
     /* The gap under a part holds the "+" at its left and the next section's toolbar at its right on a touch
        screen (both always shown there): the chip sits in the middle of the part's bottom edge. */
     .xe-fig-corner,
-    .xe-frame[data-as="listed"] .xe-fig-link > .xe-fig-corner {
+    .xe-frame:is([data-as="listed"], [data-as="button"]) .xe-fig-link > .xe-fig-corner {
       position: absolute;
       right: auto;
       left: 50%;
