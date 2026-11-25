@@ -551,6 +551,9 @@ export function useRoving(ref: React.RefObject<HTMLElement | null>) {
   }, [ref]);
 }
 
+/** Whether an AI draft's rewrite form is open in toolbar `bar` (BlockTools, in its "More actions"). */
+const rewriteOpenIn = (bar: HTMLElement | null) => Boolean(bar?.querySelector('[data-tool="more"] form'));
+
 /** Why the flowchart can't be removed in layout `f` (decision 0026; the review's vision-3), or null where it can. */
 export function whyFlowStays(f: Format): string | null {
   if (FORMAT_RULES[f].flowRemovable) return null;
@@ -572,7 +575,7 @@ export function Toolbar() {
   const why = useId();
   // The compact form's "More actions" (css/core.css: data-place="compact"): open, it shows the toolbar's other buttons under the
   // pair, by name, and its first takes the focus; Escape, the focus going to something else, a press outside it, or one of them
-  // pressed closes it.
+  // pressed closes it. While an AI draft's rewrite form is open in it, neither the focus going elsewhere nor a press outside does.
   const [open, setOpen] = useState(false);
   const openNow = useRef(open);
   useEffect(() => {
@@ -585,9 +588,10 @@ export function Toolbar() {
     const items = [...(ref.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])];
     items.find((b) => b !== menu.current && !b.hasAttribute("data-grip") && !b.disabled && b.getClientRects().length > 0)?.focus();
     // A press anywhere else closes it (the focus leaving to nowhere does not: an AI draft's own menu, inside it, hides the button
-    // that had the focus when it opens its rewrite form).
+    // that had the focus when it opens its rewrite form). Not while that form is open in it, which stays until it is cancelled
+    // or used, so a note typed in it is not lost (BlockTools).
     const away = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      if (!ref.current?.contains(e.target as Node) && !rewriteOpenIn(ref.current)) setOpen(false);
     };
     document.addEventListener("pointerdown", away, true);
     return () => document.removeEventListener("pointerdown", away, true);
@@ -636,7 +640,7 @@ export function Toolbar() {
         menu.current?.focus();
       }}
       onBlur={(e) => {
-        if (open && e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false);
+        if (open && e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node) && !rewriteOpenIn(e.currentTarget)) setOpen(false);
       }}
       onClick={(e) => {
         const b = (e.target as HTMLElement).closest("button");

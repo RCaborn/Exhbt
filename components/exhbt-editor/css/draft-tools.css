@@ -1,0 +1,76 @@
+/* An AI draft's "More actions" over the page (components/editor/BlockTools.tsx, the classic editor's, drawn as
+   it is; decision 0026): in a section's toolbar (Toolbar.tsx; where that is the compact pair, inside its card)
+   and in the corner toolbar of the title, the context line and the skills (adapter.tsx). On a phone it is on the
+   bar at the foot of the screen instead, which is app chrome in the app's own colours (phone.css).
+   Unlayered, because BlockTools colours itself with Tailwind utilities, which outrank the components layer: the
+   same reason as for the shared parts a look recolours at the end of app/globals.css. */
+
+/* Its menu, and its panel (the rewrite form, "No rewrites left" and the line that says how a rewrite went), are
+   on the compact card's ground, the look's well (--xp-card), in the look's own words: its ink, its secondary text
+   and its error colour each pass 4.5:1 on the well in every look (contrastPairs in lib/portfolio-themes.ts). In
+   the app's ink they could not be read on Night's dark well, not even in the compact card. The note field and
+   the two buttons keep the app's own colours, on grounds of their own. */
+[data-editor="page"] :is(.xe-tools .xe-more, .xe-shell-tools) [data-tools-menu] {
+  border-color: var(--xp-outline-edge);
+  background: var(--xp-card);
+  color: var(--xp-ink);
+}
+[data-editor="page"] :is(.xe-tools .xe-more, .xe-shell-tools) [data-tools-menu] button:not(:disabled):hover {
+  background: var(--xp-ground);
+}
+[data-editor="page"] :is(.xe-tools .xe-more, .xe-shell-tools) [data-tools-panel] {
+  color: var(--xp-ink);
+}
+[data-editor="page"] :is(.xe-tools .xe-more, .xe-shell-tools) :is([data-tools-menu], [data-tools-panel]) :is(.text-ink, .link) {
+  color: var(--xp-ink);
+}
+[data-editor="page"] :is(.xe-tools .xe-more, .xe-shell-tools) :is([data-tools-menu], [data-tools-panel]) :is(.text-graphite, .hint) {
+  color: var(--xp-muted);
+}
+[data-editor="page"] :is(.xe-tools .xe-more, .xe-shell-tools) [data-tools-panel] .text-error {
+  color: var(--xp-error);
+}
+/* The form's own box. */
+[data-editor="page"] :is(.xe-tools .xe-more, .xe-shell-tools) [data-tools-panel] > :not([role="status"]) {
+  border-color: var(--xp-outline-edge);
+}
+
+/* Outside the compact card the panel was drawn in the toolbar's row, straight over the page's words: squeezed to
+   the width of a column of buttons in the gutter, with the toolbar's other buttons moved down to its middle, and a
+   toolbar above its section grew upwards, under the top bar. Now it is a card of its own under "More actions", as
+   its menu is, with the compact card's ground, edge and shadow, and out of the flow: the toolbar keeps its size
+   and its place. It is drawn only while it holds something. */
+[data-editor="page"] :is(.xe-tools:not([data-place="compact"]) .xe-more, .xe-shell-tools) > :has(> [data-tools-panel]) {
+  position: relative;
+}
+[data-editor="page"] :is(.xe-tools:not([data-place="compact"]) .xe-more, .xe-shell-tools) [data-tools-panel]:is(:has(> :not([role="status"])), :has(> [role="status"] > *)) {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  /* Over the toolbar's other buttons, where it meets one. */
+  z-index: 1;
+  width: min(22rem, calc(100vw - 2rem));
+  padding: 0.375rem;
+  border: 1px solid var(--xp-outline-edge);
+  border-radius: calc(12px + 0.375rem);
+  background: var(--xp-card);
+  box-shadow: var(--shadow-pack);
+  text-align: left;
+}
+/* Down a column of buttons (in the gutter, or on the section's right edge) it opens to the left of "More actions",
+   level with it, so it covers none of the column's other buttons: Remove is under "More actions" there. */
+[data-editor="page"] .xe-tools:is([data-place="side"], [data-place="rcol"]) .xe-more [data-tools-panel]:is(:has(> :not([role="status"])), :has(> [role="status"] > *)) {
+  top: 0;
+  right: calc(100% + 0.375rem);
+}
+/* The line that says how a rewrite went sits in from the card's edges, as the form's box does. */
+[data-editor="page"] :is(.xe-tools:not([data-place="compact"]) .xe-more, .xe-shell-tools) [data-tools-panel] > [role="status"] > p {
+  margin: 0.375rem 0.625rem;
+}
+
+/* A shell part whose menu or form is open is drawn over what follows it, as a section is (core.css), and under the
+   top bar (30). */
+[data-editor="page"] .\@container\/main > :has(> .xe-shell-tools [data-open]) {
+  position: relative;
+  z-index: 29;
+}

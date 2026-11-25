@@ -446,3 +446,31 @@ Still open:
 - `editor-inplace`'s picture-deletion test on WebKit under Safari's rule is the other agent's, as before.
 - On a tablet, in the first three layouts, a section's grip can cover "Remove finding 1" (seen by the main session). Left as it was: it did not fall out of these fixes. A finding's controls (`.xe-list-tools`) are not among `CHIPS`; adding them would be the next step, then every layout's placement checked again.
 - Not run here: anything on real WebKit or a real iPhone; `E2E_WEBKIT=chromium` covered the Safari sizes and the focus rule only.
+
+## From the polish agent, 25 Nov 2026 (branch `phase-2-r3-polish`)
+
+Five rough edges, fixed before the editor is switched on for everyone. Each has a test that failed before its fix.
+
+- The rewrite form's ground (`components/exhbt-editor/css/draft-tools.css`, new, unlayered for the reason given at the end of `app/globals.css`):
+  - BlockTools now holds the form, "No rewrites left" and its status line in one box (`data-tools-panel`), and marks its menu (`data-tools-menu`). The classic editor draws them as before; `phone.css` follows the new box.
+  - On the editing page both take the compact card's ground, edge and shadow (`--xp-card`, `--xp-outline-edge`), and the look's ink, secondary text and error colour. In the app's ink the words could not be read on Night's well, in the compact card too.
+  - Outside the compact card the box is a card of its own under "More actions", out of the flow (to its left down a column, clear of Remove), so the toolbar keeps its size and place. A shell part with an open form is raised to 29, as a section is.
+  - An open form now lies over the first words of its own section, not over the section above. The axe test in `phase2-draft-tools` types before it opens its forms.
+  - Tests: one per look, under "An open menu or rewrite form has a ground of its own" in `phase2-draft-tools`. `takesThePress` checks the card as well as the button.
+- Closing it, as 0026 has it ("it stays, wherever the pointer and the focus are"):
+  - Escape closes the AI menu, the form and "No rewrites left", and gives the focus to "More actions". It works with the focus in the form or on nothing, as after "Rewrite this block", and on the phone's bar. In the compact card the form's Escape comes first, then the card's.
+  - A press outside never closes the form. The compact card no longer closes round an open form at a press outside or when the focus moves on (`rewriteOpenIn` in `Toolbar.tsx`); before, it hid the form with it.
+  - My choice, for Rory to undo if he wants: "No rewrites left" holds nothing and has no Cancel, so a press outside closes it, as it closes the menu. Before, nothing but a reload could.
+- Why a save failed (`topbar.css`): a small card hanging from the bar under the status, out of the flow, and as wide as the screen on a phone. At 1440 the cut reason had also pushed "Review and publish" off the window. The live region is unchanged. `r2-fixes` still says the reason sits beside "Not saved. Retry"; its assertions hold.
+- The edit page's error page: a new `layout.tsx` for the route tells it which editor the switch serves (`editorServed` in `lib/editor-kind-server.ts`, `served.tsx`), so the classic editor is named, with Reload, whether it was asked for or served. Before, everyone on the live site was told the new editor had failed. It asks who is signed in only when an admin's own-choice cookie is there.
+- The Safari picture file (`files.ts`, `Autosave.tsx`):
+  - Under the focus rule, the blur at the press on Remove saved a doc with the picture. The removal then fell off the undo list while that save was out, and the DELETE was sent.
+  - If the save landed first, the server kept the file and the editor forgot it. That was 5 failures in 10 under `E2E_WEBKIT=chromium E2E_FOCUS=safari`.
+  - The rule now keeps whatever a save still on its way points at, until a task after its answer. The original test then passed 10 of 10 there.
+  - A new test holds that save and orders the DELETE behind it, so the race is made rather than waited for.
+
+Run at the end, on Chromium: `phase2-draft-tools` 28 passed, `editor-smooth` 8, `editor-topbar` 17, `editor-classic` 11, `editor-tablet` 12 (tablet), `editor-phone` 40 (touch), and `editor-inplace` with `-g "toolbar|menu|undo|save"` 28. Also `editor-admin-switch` 20, the two `r2-fixes` refused-save tests and the rewrite tests in `phase2-formats` and `phase2-polish-2`.
+
+Still open:
+- Nothing here ran on real Safari or an iPhone: the focus rule was the emulation's.
+- A message that a rewrite worked stays in its card under "More actions" until the next rewrite, shown whenever the toolbar is. It has a ground now; whether it should go sooner is a question for Rory.

@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "./editor-test";
 import { validateForPublish, type ExhbtDoc } from "../lib/exhbt/blocks";
-import { FORMAT_RULES } from "../lib/exhbt/formats";
+import { FORMAT_RULES, FORMATS, OFFERED_FORMATS } from "../lib/exhbt/formats";
 import { openBankingDoc } from "../lib/exhbt/sample";
 import { canon, docNow, field, focusedPath, freshName, offered, openDoc, openNew, pageOrder, READY, typeIn, undoLabel, waitReady, waitSaved } from "./page-editor";
 
@@ -219,6 +219,80 @@ test.describe("the top bar", () => {
     await expect(bar(page).locator("div[role=status].sr-only")).toHaveText("The editor was updated. Reload to carry on; your changes are kept in this browser.");
     await expect(bar(page).getByRole("button", { name: "Reload" })).toBeVisible();
     await expect(bar(page).getByRole("button", { name: /Not saved/ })).toHaveCount(0);
+  });
+
+  // Why a save failed was cut at 22rem with an ellipsis ("Kept in this browser. That layout isn't available..."), and under
+  // 64rem not drawn at all. It is drawn whole now: on two lines beside its button where the row has room, and on a line of
+  // its own under the bar where it has not. The one announcement in the live region is as it was.
+  test("why a save failed can be read whole, at 1440 and at 390, and is said once", async ({ page }) => {
+    // A layout nothing offers (the server refuses it with its reason); once every layout is offered, a doc the server can't read.
+    const bad = FORMATS.find((f) => !OFFERED_FORMATS.includes(f));
+    const reason = bad ? "That layout isn't available yet. Choose another layout and try again." : "This couldn't be saved. Reload the page and try again.";
+    const id = await openNew(page, freshName("tbwhy"));
+    await page.route(`**/exhbts/${id}/edit`, async (route) => {
+      const req = route.request();
+      const body = req.postData();
+      if (req.method() !== "POST" || !body || !req.headers()["next-action"]) return route.continue();
+      const args = JSON.parse(body) as unknown[];
+      const doc = args.find((a) => typeof a === "object" && a !== null && "schemaVersion" in a) as Record<string, unknown> | undefined;
+      if (!doc) return route.continue();
+      if (bad) doc.format = bad;
+      else doc.title = 42;
+      return route.continue({ postData: JSON.stringify(args) });
+    });
+    // Everything the page's live regions say from now on.
+    await page.evaluate(() => {
+      const said: string[] = [];
+      const last = new WeakMap<Element, string>();
+      const LIVE = '[role="status"], [role="alert"], [aria-live="polite"], [aria-live="assertive"]';
+      const wordsOf = (el: Element) => (el.textContent ?? "").replace(/\s+/g, " ").trim();
+      for (const region of document.querySelectorAll(LIVE)) last.set(region, wordsOf(region));
+      new MutationObserver(() => {
+        for (const region of document.querySelectorAll(LIVE)) {
+          const w = wordsOf(region);
+          if (w === (last.get(region) ?? "")) continue;
+          last.set(region, w);
+          if (w) said.push(w);
+        }
+      }).observe(document.body, { childList: true, characterData: true, subtree: true });
+      (window as unknown as { __said: string[] }).__said = said;
+    });
+    await typeIn(page, "title", "Would a second till help?");
+    const why = bar(page).locator(".xe-save-words");
+    await expect(why).toHaveText(`Kept in this browser. ${reason}`, { timeout: 15_000 });
+    await expect(bar(page).getByRole("button", { name: "Not saved. Retry" })).toBeVisible();
+
+    /** What keeps the reason from being read whole: hidden, cut, off the screen, clipped, or under something else. */
+    const unread = () =>
+      why.evaluate((el) => {
+        const problems: string[] = [];
+        const r = el.getBoundingClientRect();
+        if (getComputedStyle(el).clipPath !== "none" || r.width < 8 || r.height < 8) problems.push(`hidden (${Math.round(r.width)} by ${Math.round(r.height)})`);
+        if (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1) problems.push(`cut (${el.scrollWidth} by ${el.scrollHeight} in ${el.clientWidth} by ${el.clientHeight})`);
+        if (r.left < 0 || r.right > window.innerWidth || r.top < 0 || r.bottom > window.innerHeight) problems.push("off the screen");
+        for (let a = el.parentElement; a; a = a.parentElement) {
+          if (getComputedStyle(a).overflow === "visible") continue;
+          const o = a.getBoundingClientRect();
+          if (r.left < o.left - 1 || r.right > o.right + 1 || r.top < o.top - 1 || r.bottom > o.bottom + 1) problems.push(`clipped by ${a.tagName.toLowerCase()}.${a.className}`);
+        }
+        for (let y = r.top + 2; y < r.bottom - 1; y += 4) {
+          for (let x = r.left + 2; x < r.right - 1; x += 8) {
+            const at = document.elementFromPoint(x, y);
+            if (at && !el.contains(at)) return [...problems, `${at.tagName.toLowerCase()}.${String(at.className).slice(0, 40)} lies over it`];
+          }
+        }
+        return problems;
+      });
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: width > 400 ? 900 : 844 });
+      await expect.poll(unread, { message: `at ${width}px` }).toEqual([]);
+      // The bar is still one row of its own height, and nothing scrolls sideways.
+      expect(await bar(page).evaluate((b) => Math.round(b.getBoundingClientRect().height)), `at ${width}px`).toBe(56);
+      expect(await bar(page).locator(".xe-topbar-row").evaluate((el) => el.scrollWidth <= el.clientWidth), `at ${width}px`).toBe(true);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `at ${width}px`).toBe(true);
+    }
+    // Said once, whole, in the live region that was there from the start.
+    expect(await page.evaluate(() => (window as unknown as { __said: string[] }).__said.filter((s) => s.includes("Kept in this browser")))).toEqual([`Not saved. Kept in this browser. ${reason}`]);
   });
 
   test("See as a visitor shows a region named Preview with no fields, and pressing again brings them back", async ({ page }) => {

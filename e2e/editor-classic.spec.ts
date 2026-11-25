@@ -1,7 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from "./editor-test";
 import { SCHEMA_VERSION, text, type ExhbtDoc } from "../lib/exhbt/blocks";
 import { flushPending, notePending, registerSender } from "../components/exhbt-editor/pending";
-import { SEL } from "./editor-classic-helpers";
+import { keepClassic, SEL } from "./editor-classic-helpers";
 
 // The way back to the classic editor (decision 0026, "The classic editor: the switch, the fallback, the escape";
 // docs/briefs/edit-on-page/README.md, "The kill switch, and how it is tested"): the switch (EXHBT_EDITOR, which
@@ -224,5 +224,37 @@ test.describe("the crash fallback", () => {
     await expect(page.getByText("Something went wrong with the classic editor. Your work is saved.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Reload" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Use the classic editor" })).toHaveCount(0);
+  });
+
+  // The live site serves the classic editor to everyone until the new one is switched on, with nothing in the address. The
+  // error page went by the address alone, so it told them the new editor had failed, and offered them the one they were in.
+  test("in the classic editor the switch serves, with nothing in the address, the route's error page names it and offers Reload", async ({ page }) => {
+    const CLASSIC_NOTICE = "Something went wrong with the classic editor. Your work is saved.";
+    const { edit } = await seed(page, "serverswitch");
+    const id = edit.split("/")[2]!;
+    const saysClassic = async (why: string) => {
+      await page.goto(`${edit}?crash=server`);
+      await expect(page.getByText(CLASSIC_NOTICE), why).toBeVisible();
+      await expect(page.getByRole("button", { name: "Reload" }), why).toBeVisible();
+      await expect(page.getByText(NOTICE), why).toHaveCount(0);
+      await expect(page.getByRole("link", { name: "Use the classic editor" }), why).toHaveCount(0);
+    };
+
+    // What everyone gets: here the cookie stands in for EXHBT_EDITOR, in this browser only.
+    await keepClassic(page);
+    expect(await served(page, edit)).toBe("classic");
+    await saysClassic("the classic editor for everyone");
+
+    // An admin's own choice, while everyone else gets the new editor; and the new editor's words once they choose it.
+    expect(await (await page.request.get("/dev/editor?kind=page")).json()).toEqual({ editor: "page" });
+    expect((await page.request.get("/dev/admin?role=admin")).status()).toBe(200);
+    expect((await page.request.post("/api/exhbts/editor", { form: { kind: "classic", exhbt: id }, maxRedirects: 0 })).status()).toBe(303);
+    expect(await served(page, edit)).toBe("classic");
+    await saysClassic("an admin who chose the classic editor");
+    expect((await page.request.post("/api/exhbts/editor", { form: { kind: "page", exhbt: id }, maxRedirects: 0 })).status()).toBe(303);
+    expect(await served(page, edit)).toBe("page");
+    await page.goto(`${edit}?crash=server`);
+    await expect(page.getByText(NOTICE)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Use the classic editor" })).toHaveAttribute("href", `${edit}?editor=classic`);
   });
 });

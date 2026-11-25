@@ -75,6 +75,12 @@ export type FilesController = Methods & {
   pickAt(): number;
   /** A save landed: the server holds this doc. Runs the rule. */
   noteSaved(doc: ExhbtDoc): void;
+  /**
+   * A save of `doc` is on its way to the server: until the function this returns is called, no run of the rule deletes
+   * a file `doc` points at. A save that lands after the rule has deleted a file it points at would leave the file
+   * behind for good: the server keeps it (it deletes nothing a working copy points at) and this visit forgets it.
+   */
+  sending(doc: ExhbtDoc): () => void;
   /** Runs the rule that deletes files. `ending`: the visit is over (the page goes for good, or the editor unmounts), so its undo list, which goes with it, no longer keeps a file; `keepalive` lets the requests outlive the page. */
   settle(opts?: { keepalive?: boolean; ending?: boolean }): void;
 };
@@ -99,6 +105,8 @@ export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: nu
   const seen = new Set([...fileIdsOf(opts.initialDoc), ...opts.liveFileIds]);
   // Uploaded but not yet placed or given up: seen, but never deleted by the rule while held.
   const held = new Set<string>();
+  // Saves on their way to the server, one entry each: the server may yet hold what they point at.
+  const inFlight = new Set<{ doc: ExhbtDoc }>();
   const hold = (fileId: string) => {
     seen.add(fileId);
     held.add(fileId);
@@ -108,11 +116,16 @@ export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: nu
   const set = (patch: Partial<State> | ((s: State) => Partial<State>)) => state.set((s) => ({ ...s, ...(typeof patch === "function" ? patch(s) : patch) }));
   const addUrl = (fileId: string, blob: Blob) => set((s) => ({ imageUrls: { ...s.imageUrls, [fileId]: URL.createObjectURL(blob) } }));
 
-  /** The four-part rule (decision 0026). An upload still waiting to be placed is never touched, not even when the visit ends. */
+  /**
+   * The four-part rule (decision 0026). An upload still waiting to be placed is never touched, not even when the visit ends.
+   * "The last doc the server saved" counts every save still on its way, which may land after this run: until it is answered,
+   * what it points at is kept, and the run after it lands decides.
+   */
   function settle(o: { keepalive?: boolean; ending?: boolean } = {}) {
     for (const f of fileIdsOf(store.get())) seen.add(f);
     const undoable = o.ending ? [] : store.entries().flatMap((e) => e.files);
-    const keep = new Set([...fileIdsOf(serverDoc), ...live, ...fileIdsOf(store.get()), ...undoable]);
+    const sent = [...inFlight].flatMap((s) => fileIdsOf(s.doc));
+    const keep = new Set([...fileIdsOf(serverDoc), ...sent, ...live, ...fileIdsOf(store.get()), ...undoable]);
     for (const f of [...seen]) {
       if (!f || keep.has(f) || held.has(f)) continue;
       seen.delete(f);
@@ -294,6 +307,11 @@ export function createFiles(opts: { store: Store; exhbtId: string; maxFileMb: nu
     noteSaved(doc) {
       serverDoc = doc;
       settle();
+    },
+    sending(doc) {
+      const save = { doc };
+      inFlight.add(save);
+      return () => void inFlight.delete(save);
     },
     settle,
   };
