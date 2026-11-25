@@ -107,8 +107,13 @@ function boxWords(el: HTMLTextAreaElement | HTMLInputElement): Box | null {
 }
 
 const OUT_OF_PAGE = ".xe-insert, .xe-measure, .xe-drag-overlay, [data-edit-only]";
-/** Edit-only chips and labels that may reach out of their section. */
-const CHIPS = ".xe-fig-chip, .xe-fig-picked, .xe-chip, .xe-above";
+/**
+ * Edit-only chips and labels that may reach out of their section. A flowchart box's grip and Remove are among them: in a
+ * row they hang half under its foot, into the gap where the next section's toolbar goes (Build, Essay and Before and after
+ * each pair their findings under a three-box flowchart, so the middle box's chips sat under that toolbar). With a mouse
+ * they show only on their box, but a toolbar over them would take the press meant for them.
+ */
+const CHIPS = ".xe-fig-chip, .xe-fig-picked, .xe-chip, .xe-above, .xe-flow-chip";
 /** Kinds whose toolbar is always inside the corner (css/core.css): a picture, which has no words there. */
 const INSIDE_KINDS = new Set(["image"]);
 /** The gap between a toolbar's buttons (css/core.css). */
@@ -348,7 +353,8 @@ const BY_PLUS = ".xe-flow-chip, .xe-chip, .xe-above, .xe-fig-chip, .xe-tools > *
  * the left of a pair has its grip at its corner, by the middle of the gap.
  */
 function placePluses(main: HTMLElement, coarse: boolean) {
-  const inserts = [...main.querySelectorAll<HTMLElement>(":scope > .xe-insert:not([data-end])")];
+  // The one after the last row too: a last section's "Web address" hangs into the page's foot, where it sits (Build's demo and code).
+  const inserts = [...main.querySelectorAll<HTMLElement>(":scope > .xe-insert")];
   // Each control as a finger finds it: a flowchart chip's press reaches 16px along its box's edge (flow.css); the others, their own box.
   // With a mouse a flowchart's chips show only while the pointer is on their box, which is never in a gap.
   const controls = [...main.querySelectorAll<HTMLElement>(BY_PLUS)]
@@ -368,8 +374,12 @@ function placePluses(main: HTMLElement, coarse: boolean) {
     const reach = coarse && small ? 6 : 0;
     const left = coarse ? at.x : at.x + at.w / 2 - size / 2;
     const plus = { x: left - reach, y: at.y + (small ? 16 : 22) - size / 2 - reach, w: size + 2 * reach, h: size + 2 * reach };
-    const hit = controls.filter((c) => overlap(plus, c));
-    const shift = hit.length ? Math.ceil(Math.max(...hit.map((c) => c.x + c.w)) + reach + (coarse ? 0 : 4) - left) : 0;
+    // Past the controls it meets, and again past any it meets there: two links side by side in a narrow column (Build at 700px)
+    // put the second one's toolbar just past the first's. Each step goes further right, so it ends.
+    let shift = 0;
+    for (let hit = controls.filter((c) => overlap(plus, c)); hit.length; hit = controls.filter((c) => overlap({ ...plus, x: plus.x + shift }, c))) {
+      shift = Math.ceil(Math.max(...hit.map((c) => c.x + c.w)) + reach + (coarse ? 0 : 4) - left);
+    }
     return () => {
       attr(insert, "data-small", small ? "" : null);
       prop(insert, "--xe-plus-shift", shift ? `${shift}px` : null);
