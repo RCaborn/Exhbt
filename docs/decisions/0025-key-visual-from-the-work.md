@@ -25,14 +25,14 @@ When the figure is placed:
 
 - **A graph or a table** removes every graph section the draft made, then goes where the layout wants its key figure. The exhbt has the real graph and no drawn one.
 - **Another visual** goes in the same place, and the drafted graphs stay while the layout has room for both. When it hasn't, the picked visual comes first: graphs go, last first, until it fits.
-- **In research, a drafted graph that stays is still the key figure**, and a picked diagram or photo goes straight after it (decided in the build, 19 Nov 2026; open for Rory to confirm). Research is read figure first, and its key figure should be the results. With no graph on the exhbt, the picked visual is the key figure. A case study and a gallery are as above.
+- **In research, a drafted graph that stays is still the key figure**, and a picked diagram or photo goes straight after it (decided in the build, 19 Nov 2026; open for Rory to confirm). Research is read figure first, and its key figure should be the results. With no graph on the exhbt, the picked visual is the key figure. Every other layout is as above.
 - **Nothing picked**: the drafted graph stays. It is the fallback, so `lib/ai/exhbt-draft.ts` still drafts it every time.
 - A person's own pictures are never taken off to make room. A layout whose images are full is left as it was, graphs included.
 - A case study needs findings or a graph before it can be published. The work's own graph or table, picked in place of the drafted graph, now counts as that graph (`validateForPublish`), so a draft with a graph and no findings can still be published after the swap. A picked photo or diagram doesn't count, and nor does a figure once the person has chosen another page, since its kind goes with it.
 
 The rule is `withWorkVisual` in `lib/exhbt/sections.ts`. It runs in `/api/exhbts/[id]/figure`, where the figure is placed, because the draft and the pick run side by side and neither knows the other's answer until then. It runs once, straight after the draft and before the editor opens, so every graph on the exhbt at that moment is one the draft made. A number flagged "check this" that was only on a graph it removed leaves the list, since it is no longer on the page.
 
-With the three layouts as they are and a fresh draft, room is never short: a case study and a gallery draft no images, and research drafts at most two graphs against a cap of three figures. The short-of-room branch is there for a later layout and for a figure placed on an exhbt that has been edited. Model-level tests cover it.
+With the seven layouts as they are and a fresh draft, room is never short: no draft has an image, every layout that takes something from the work allows at least two, and research, the one layout with a cap on graphs and images together, drafts at most two graphs against a cap of three. The short-of-room branch is there for a figure placed on an exhbt that has been edited. Model-level tests cover it.
 
 A kind the route doesn't recognise is refused. A request with no kind is treated as "other", which removes nothing, so a browser running an older copy of the page gets the old behaviour, not a lost graph.
 
@@ -43,14 +43,18 @@ Each layout says what it takes from the person's own files, beside its other rul
 | Layout | Takes | Where it goes |
 |---|---|---|
 | Case study | `figure`: its one key figure | straight after What I found |
-| Gallery | `pictures`: the work's pictures | the lead image |
+| Gallery | `pictures`: the work's pictures | the lead image, then the person's other pictures |
 | Research | `figure` | a graph or table: the key figure, where the drafted graph was. Another visual: straight after the drafted graph, which stays the key figure |
+| Build | `figure` | as a case study places it (0028): straight after What it does. The page draws a build's first picture as its lead |
+| Essay | `none`: nothing | nothing is looked for or placed |
+| Before and after | `pictures` | the first picture, then the person's other pictures. None is marked Before or After: the person marks them |
+| Event or performance | `pictures` | the lead image (the poster), then the person's other pictures |
 
-The third value is `none`: nothing is looked for and nothing is placed. No layout uses it yet. The essay layout that is coming will. A layout that says `none` gets no placement (the route refuses it and the page deletes the picture it uploaded) and nothing is said about a figure.
+The third value is `none`: nothing is looked for and nothing is placed. The essay (decision 0028) is the layout that uses it. A layout that says `none` gets no placement (the route refuses it, and the page never asks and deletes any figure it cut out) and nothing is said about a figure.
 
-The pick itself can't always be avoided for such a layout. The draft chooses the layout, and the pick runs beside the draft to save the person twenty seconds, so the pages may already have been sent when the layout is known. The page drops the pick as soon as the draft answers. If the layout is ever chosen before drafting (0024 lists that as not done), the same rule can stop the pick being sent at all. In practice an essay rarely gets that far: a page of plain text is never sent, and the prompt tells the model that an essay has no figure.
+The pick itself can't always be avoided for such a layout. The draft chooses the layout, and the pick runs beside the draft to save the person twenty seconds, so the pages may already have been sent when the layout is known. The page drops the pick as soon as the draft answers. If the layout is ever chosen before drafting (0024 lists that as not done), the same rule can stop the pick being sent at all. A page of plain text is never sent, and the prompt tells the model that an essay has no figure, but the pictures in a Word or PowerPoint file, and pictures the person agreed to send, go before the layout is known, and are dropped when the draft answers essay.
 
-`pictures` places the lead as `figure` does. It is a separate value because a gallery takes several: the person's own uploaded pictures follow the lead (see "Pictures from Word, PowerPoint and uploads").
+`pictures` places the lead as `figure` does. It is a separate value because a gallery, a before and after and an event take several: the person's own uploaded pictures follow the lead (see "Pictures from Word, PowerPoint and uploads"). Decision 0028 says a before and after and an event take one visual. `FORMAT_RULES` gives both `pictures`, the code follows it, and so they take the person's pictures as a gallery does.
 
 ## The pick: what it is asked
 
@@ -82,13 +86,14 @@ Those are a separate job. To leave room for it, the code that gathers the images
 
 ## Pictures from Word, PowerPoint and uploads
 
-Built 23 Nov 2026. Three functions in `app/(app)/exhbts/new/figure.ts` return Candidates and nothing else: `pdfCandidates`, `officeCandidates` and `pictureCandidates`. Everything after them (the caps, the request, the cut, the upload, the placement) is as it was.
+Built 23 Nov 2026. Brought up to date with release 4 (seven layouts, hotfix 3's AI calls, the graph patch) on 25 Nov 2026, when its tests were first run (`e2e/work-pictures.spec.ts`, `e2e/office-pictures.spec.ts`). Three functions in `app/(app)/exhbts/new/figure.ts` return Candidates and nothing else: `pdfCandidates`, `officeCandidates` and `pictureCandidates`. Everything after them (the caps, the request, the cut, the upload, the placement) is as it was.
 
 **Word (.docx) and PowerPoint (.pptx).** The draft page reads the file on the device as it reads a PDF. A .pptx is now accepted as material to draft from: its slides' text is read in slide order, with the speaker notes under each slide (`lib/doc-readers.ts`), and it is stored like a Word file (`lib/uploads.ts`). The pictures in `word/media/` or `ppt/media/` are offered as candidates (`lib/figures/office.ts`). A picture is left out if it is a logo or tiny (short side under 100 pixels, under 60,000 pixels in all, under 3 KB, or a banner more than six times as long as it is high), if only a header, footer, slide master or slide layout points at it, if it is on more than two slides, or if it repeats a picture already offered. Each is labelled "File 2, slide 3" or "File 1, picture 2", without the file's name (a PDF page's label still holds it: see above). The cut is taken from the picture itself at full size, a PNG or a JPEG.
 
-**Pictures uploaded with the work (PNG or JPEG).** They go on to the exhbt as images, up to the layout's cap, and the AI chooses which leads.
-- A **gallery** gets the lead first, then the others in the order they were uploaded. The lead has the description the AI wrote from what is printed on it. The others have none: the person writes them, and publishing already asks for one. With no pick (the person kept the pictures without sending them), the first uploaded leads and all the descriptions are empty.
-- A **case study or research** gets one figure: the picture the AI chose.
+**Pictures uploaded with the work (PNG or JPEG).** They go on to the exhbt as images, up to the layout's cap, and the AI chooses which leads. What each layout gets follows `fromWork` (`fromWorkOf` in `lib/exhbt/formats.ts`):
+- A layout that takes `pictures` (a **gallery**, a **before and after**, an **event or performance**) gets the lead first, then the others in the order they were uploaded, as many as it shows: 8, 6 and 6 images (`FORMAT_LIMITS`). The rest stay among the exhbt's files, for the person to add by hand. The lead has the description the AI wrote from what is printed on it. The others have none: the person writes them, and publishing already asks for one. With no pick (the person kept the pictures without sending them), the first uploaded leads and all the descriptions are empty. In a before and after none is marked Before or After: the AI has not been told which is which, so the person marks them, as 0028 has it.
+- A layout that takes a `figure` (a **case study**, **research**, a **build**) gets one figure: the picture the AI chose. An **essay** (`none`) gets none of them.
+- The lead goes where the layout wants its first picture (`withKeyFigure` in `lib/exhbt/sections.ts`): before any picture already on the exhbt in a layout that takes pictures, straight after the findings in a case study and a build, and as research's rule above says. The others go straight after the lead (`withMoreImages`). The draft page sends only as many as the layout shows, and the route places no more than that.
 - A picture the person uploaded themselves is placed like an image they added by hand: no "I may share this figure" tick, nothing marked as picked. A picture cut out of a Word or PowerPoint file carries the tick, as one from a PDF does, because it may not be theirs to share. **Decided in the build, for Rory to confirm.**
 - An uploaded picture is sent to the AI only if the person chooses "Read it for me" on its card, which now says it is also looked at for the picture to lead the exhbt. "Keep it as a picture" sends nothing, and the picture still goes on a gallery. **Decided in the build, for Rory to confirm.**
 - Even when the AI calls an uploaded picture a graph or a table, it takes no drafted graph off: the work's own graph rule (above) is for figures cut from the work's files, and a picture the person uploaded carries no kind. The drafted graph stays beside it. **Decided in the build, for Rory to confirm.**
@@ -105,7 +110,7 @@ A file that breaks a cap is skipped, and the draft goes ahead without it. The se
 
 **What is sent.** Only candidates worth sending, under the same caps as PDF pages (30 images, 1.5 MB each, 6 MB in all). The privacy policy says so (`app/(marketing)/legal/[doc]/page.tsx`).
 
-**Release 3's editor.** Its "Take a figure from my report" sheet draws a PDF's pages from the stored file and cuts a crop; it does not call `/api/exhbts/[id]/figure` and was not changed. To offer these candidates it would need a list of the pictures in a stored Word or PowerPoint file (`readOfficePictures` on the stored bytes), a picker over them in place of the page picker (a picture is chosen whole, then optionally cropped, with `pictureCut`), the file's `media` path stored in `picked` instead of a page, and its `reportFiles` list to include .docx and .pptx files. Its `canTakeFigure` needs no change.
+**Release 3's editor.** Its "Take a figure from my report" sheet draws a PDF's pages from the stored file and cuts a crop; it does not call `/api/exhbts/[id]/figure` and was not changed. To offer these candidates it would need a list of the pictures in a stored Word or PowerPoint file (`readOfficePictures` on the stored bytes), a picker over them in place of the page picker (a picture is chosen whole, then optionally cropped, with `pictureCut`), the file's `media` path stored in `picked` instead of a page, and its `reportFiles` list to include .docx and .pptx files. Its `canTakeFigure` needs no change. Not built. What the editor does show, for a picture picked from a Word or PowerPoint file, is the label over the picture, "A picture from your report", whose strip holds where it came from and the tick. There is no page to crop again or swap, so neither is offered (`components/exhbt-editor/figures/ImageExtras.tsx`; until 25 Nov it read "From your report, a picture in it" and offered both).
 
 ## Three limits: the share tick, removing a figure, and what counts as a fresh draft
 
@@ -127,7 +132,7 @@ With `replaces: true` the numbers flagged for the old figure now leave the list 
 
 ## What the person is told
 
-When the editor opens after a draft it says one quiet line under the layout choice (`components/editor/LayoutPicker.tsx`, wording in `lib/exhbt/drafted.ts`):
+When the editor opens after a draft it says one quiet line under the layout choice (`components/editor/LayoutPicker.tsx` in the classic editor; in the new editor's layout menu, `components/exhbt-editor/topbar/LayoutMenu.tsx`; wording in `lib/exhbt/drafted.ts`):
 
 > Laid out as Research because your work has an aim and results. Change layout. The figure is from page 3 of report.pdf. Tick that you may share it before you publish.
 
@@ -157,7 +162,9 @@ A report passes when the pick is on the right page and is the right kind, and th
 
 It drives the app's own code in a real browser: the pages drawn at the app's size and quality, the choice of which to send, `/api/exhbts/figure-pick` with its checks, the real prompt, the server's checks on the answer, and the cut. It doesn't cover the upload or the placement (the e2e spec does, with the stand-in), the production runtime, or real people's files.
 
-It runs in the existing workflow, `.github/workflows/eval-drafts.yml`, with the suite set to `figures`. Each run makes thirteen model calls (the plain essay sends no page, so it makes none), with 24 page images between them. By the prices in `lib/ai/model.ts` that should come to well under a penny; each line of the results carries the cost the API reported.
+It runs in the existing workflow, `.github/workflows/eval-drafts.yml`, with the suite set to `figures`. Each run makes thirteen model calls for the reports (the plain essay sends no page, so it makes none), with 24 page images between them. By the prices in `lib/ai/model.ts` that should come to well under a penny; each line of the results carries the cost the API reported.
+
+Four more cases are Word, PowerPoint and picture files (15 to 18, `fixtures/build-office.mjs`, `cases-office.json`): a chart pasted into Word as a picture, a deck with a chart and a photo, three uploaded pictures of which the finished poster should lead, and a Word chart that can't be lifted. They add three calls and seven images (the last sends nothing). Their marking passes the eval's self-test (`npm run eval:figures -- --self-test`, which calls nothing). They have never run against the real model: real-API runs were stopped before they could be.
 
 ## Consequences
 
@@ -171,13 +178,14 @@ It runs in the existing workflow, `.github/workflows/eval-drafts.yml`, with the 
 - **Research ordering.** In a research layout, a drafted graph stays first as the key figure and a picked diagram or photo follows it. This was decided in the build on 19 Nov 2026 and Rory has not confirmed it.
 - **Putting the drafted graph back.** When someone removes a picked graph they can't share, should the graph the draft drew come back? It would need the removed graph to be kept with the exhbt and its numbers checked again. It isn't built, because the brief asked for no new editor controls and a graph parked out of sight would escape the number check.
 - **A results table from the work.** It is treated like a graph: the picture of the table goes on and the drafted graph comes off. If the table is long, the drafted graph may read better at a glance than a picture of twelve rows. The kind is recorded, so this can be changed for tables alone.
+- **Three choices from the Word, PowerPoint and pictures build** (23 Nov 2026), each marked above: a picture the person uploaded carries no share tick, while one cut out of a Word or PowerPoint file does; an uploaded picture is sent to the AI only when the person chooses "Read it for me" on its card; and an uploaded picture the AI calls a graph or a table takes no drafted graph off.
 
 ## Not done yet
 
 - A chart drawn natively in Word or PowerPoint can't be lifted. Turning it into a picture would need rendering the file, which the browser can't do.
 - The release 3 editor's "Take a figure from my report" for Word and PowerPoint files (see above).
-- The essay layout that takes nothing.
+- Several pictures from a deck: a layout that takes pictures places the person's uploaded PNG and JPEG files, but a Word or PowerPoint file gives only the one picture the AI picked (0028 lists this too).
 - Stopping the pick before it is sent when the layout is known first.
-- Marking the alt text and caption in the eval, and running each report more than once.
+- Marking the alt text and caption in the eval, and running each report more than once. The four Word, PowerPoint and picture cases have not run against the real model at all, so how well it chooses among a file's pictures, and what the prompt's paragraph on them does, is not measured.
 
-Code: `lib/exhbt/sections.ts` (`withWorkVisual`), `lib/exhbt/formats.ts` (`fromWork`), `lib/exhbt/blocks.ts` (`FIGURE_KINDS`, `picked.kind`), `lib/exhbt/drafted.ts`, `lib/ai/figure-pick.ts`, `lib/ai/exhbt-draft.ts` (`formatReason`), `lib/figures/rules.ts` (`boxFromPixels`), `lib/figures/caption.ts`, `lib/figures/image-size.ts`, `lib/figures/pdf.ts` (`marksOf`), `lib/exhbt/draft-blocks.ts` (`graphsAsDrafted`), `lib/json.ts`, `app/api/exhbts/[id]/figure/route.ts`, `app/api/exhbts/figure-pick/route.ts`, `app/(app)/exhbts/new/DraftForm.tsx` and `figure.ts`, `lib/figures/office.ts` and `pictures.ts`, `lib/doc-readers.ts` (`readPptx`), `components/editor/LayoutPicker.tsx`, `app/dev/figure-eval/`. Tests: `e2e/auto-figure.spec.ts`, `e2e/phase2-formats.spec.ts`, `e2e/r2-fixes.spec.ts`, `e2e/key-order.spec.ts`, `e2e/office-pictures.spec.ts`, `e2e/work-pictures.spec.ts`. Eval: `evals/figure-pick/`, `scripts/eval-figures.ts`.
+Code: `lib/exhbt/sections.ts` (`withWorkVisual`, `withKeyFigure`, `withMoreImages`), `lib/exhbt/formats.ts` (`fromWork`, `fromWorkOf`), `lib/exhbt/blocks.ts` (`FIGURE_KINDS`, `picked.kind`), `lib/exhbt/drafted.ts`, `lib/ai/figure-pick.ts`, `lib/ai/exhbt-draft.ts` (`formatReason`), `lib/figures/rules.ts` (`boxFromPixels`), `lib/figures/caption.ts`, `lib/figures/image-size.ts`, `lib/figures/pdf.ts` (`marksOf`), `lib/exhbt/draft-blocks.ts` (`graphsAsDrafted`), `lib/json.ts`, `app/api/exhbts/[id]/figure/route.ts`, `app/api/exhbts/figure-pick/route.ts`, `app/(app)/exhbts/new/DraftForm.tsx` and `figure.ts`, `lib/figures/office.ts` and `pictures.ts`, `lib/doc-readers.ts` (`readPptx`), `components/editor/LayoutPicker.tsx`, `components/exhbt-editor/topbar/LayoutMenu.tsx` and `figures/ImageExtras.tsx`, `app/dev/figure-eval/`. Tests: `e2e/auto-figure.spec.ts`, `e2e/phase2-formats.spec.ts`, `e2e/r2-fixes.spec.ts`, `e2e/key-order.spec.ts`, `e2e/office-pictures.spec.ts`, `e2e/work-pictures.spec.ts`. Eval: `evals/figure-pick/`, `scripts/eval-figures.ts`.
