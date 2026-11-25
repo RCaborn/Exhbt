@@ -10,6 +10,7 @@ import { EMPHASIS } from "@/lib/exhbt/emphasis";
 import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
 import { AIFailure, structuredCall } from "./call";
+import { keepStartAndEnd, LEFT_OUT_OF_MATERIAL, MAX_MATERIAL_CHARS } from "@/lib/material";
 
 /**
  * Drafts an exhbt from the person's own material (docs/phase-2.md section 6, decision 0007):
@@ -51,8 +52,8 @@ const BW = draftTargets("build");
 const EW = draftTargets("essay");
 const BAW = draftTargets("before-after");
 const EVW = draftTargets("event");
-/** Roughly 15-20k tokens of material: enough for a report, and keeps a draft well under a penny. */
-export const MAX_MATERIAL_CHARS = 80_000;
+/** Everything a draft reads, the files, notes and link together: lib/material.ts has the figure and why. */
+export { MAX_MATERIAL_CHARS };
 
 /** The rules, and the fields every draft has whichever layouts it may choose. Shared by both prompts, word for word. */
 const HEAD = `You draft "exhbts": short, checked write-ups of a UK student's or graduate's project, read by recruiters in about 30 seconds.
@@ -208,10 +209,10 @@ export type DraftResult = {
 
 /** Everything the model may draw on, as one string. Also what the numbers are checked against. */
 export function materialText({ text, notes, link }: DraftInput): string {
-  return [text.trim(), notes?.trim() ? `Notes:\n${notes.trim()}` : "", link?.trim() ? `Link: ${link.trim()}` : ""]
+  const all = [text.trim(), notes?.trim() ? `Notes:\n${notes.trim()}` : "", link?.trim() ? `Link: ${link.trim()}` : ""]
     .filter(Boolean)
-    .join("\n\n")
-    .slice(0, MAX_MATERIAL_CHARS);
+    .join("\n\n");
+  return keepStartAndEnd(all, MAX_MATERIAL_CHARS, LEFT_OUT_OF_MATERIAL);
 }
 
 /** The whole draft request, so a script can send exactly what the app sends. */
@@ -228,7 +229,7 @@ export function draftRequest(input: DraftInput) {
       {
         role: "user" as const,
         content: [
-          `<material>\n${input.text.trim().slice(0, MAX_MATERIAL_CHARS) || "(no files)"}\n</material>`,
+          `<material>\n${keepStartAndEnd(input.text.trim(), MAX_MATERIAL_CHARS, LEFT_OUT_OF_MATERIAL) || "(no files)"}\n</material>`,
           input.notes?.trim() ? `<notes>\n${input.notes.trim()}\n</notes>` : "No notes.",
           input.link?.trim() ? `Link to the work: ${input.link.trim()}` : "No link.",
           ...(input.signals

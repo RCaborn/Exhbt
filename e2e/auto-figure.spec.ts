@@ -270,7 +270,13 @@ test.describe("The work's own graph wins (decision 0025)", () => {
     expect(kindsOf(withWorkVisual(withPicture, visual("graph")).doc)).toEqual(["findings", "reflection", "image", "image"]);
   });
 
-  test("a layout that takes nothing from the work gets nothing: no layout does yet", () => {
+  test("a layout that takes nothing from the work gets nothing: the essay, and any layout told so", () => {
+    const essay: ExhbtDoc = { ...caseDraft(), format: "essay" };
+    for (const kind of ["graph", "table", "other"] as const) {
+      const r = withWorkVisual(essay, visual(kind));
+      expect(r.doc).toBe(essay);
+      expect(r).toMatchObject({ placed: false, why: "not-wanted", removed: [] });
+    }
     for (const draft of [caseDraft(), researchDraft(), galleryDraft()]) {
       for (const kind of ["graph", "table", "other"] as const) {
         const r = withWorkVisual(draft, visual(kind), { wants: "none" });
@@ -359,7 +365,8 @@ test.describe("What the editor says after a draft (decision 0025)", () => {
     expect(FIGURE.maxPages).toBe(30);
     expect(FIGURE.maxImages).toBe(30);
     expect(figureSentence(caseDraft(), "failed")).toBe("We couldn't look for a figure in your files this time. You can add an image yourself.");
-    expect(figureSentence(caseDraft(), "unread")).toBe("A figure can only be taken from a PDF for now.");
+    expect(figureSentence(caseDraft(), "unread")).toBe("We take a figure from a PDF, a Word or PowerPoint file, or a PNG or JPEG picture, and none of your files was one.");
+    expect(figureSentence(caseDraft(), "chart")).toBe("We couldn't lift the chart from this file. Save it as a PDF and we'll take it from that.");
     expect(figureSentence(caseDraft(), undefined)).toBeNull();
   });
 });
@@ -708,7 +715,7 @@ test.describe("Drafts with no figure", () => {
     await expect(draftedLine(page)).toContainText("No figure was found in your files");
   });
 
-  test("a file that isn't a PDF: nothing is sent, and the line says a figure needs a PDF", async ({ page }) => {
+  test("a file we can't take a figure from: nothing is sent, and the line says which files we can", async ({ page }) => {
     await signInFree(page, "fignopdf");
     const seen = countPicks(page);
     const report = "Final-year project on GP appointment reminders. Missed appointments fell from 7.9% to 6.5% across all patients, and from 11.2% to 8.4% for patients under 30, over six weeks at two practices in Leeds.";
@@ -717,7 +724,8 @@ test.describe("Drafts with no figure", () => {
     await draft(page);
     expect(seen.picks).toBe(0);
     expect(await sectionKinds(page)).toContain("graph");
-    await expect(draftedLine(page)).toContainText("A figure can only be taken from a PDF for now.");
+    await expect(draftedLine(page)).toContainText("We take a figure from a PDF, a Word or PowerPoint file, or a PNG or JPEG picture, and none of your files was one.");
+    await expect(draftedLine(page)).not.toContainText("only be taken from a PDF");
   });
 });
 

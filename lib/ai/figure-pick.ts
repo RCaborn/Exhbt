@@ -50,7 +50,7 @@ What to choose, in this order:
 
 Never choose a page or a block of plain text, a logo, a cover or title page, a contents page, a page header or footer, decoration, a photo of a person, an equation, a form or a list of references. If no image has a visual worth showing, set "found" to false: an essay or a report of plain text has none, and nothing is better than a logo or a page of text.
 
-The pages may be scans or photos of pages, or slides. Treat them the same way.
+The images may be pages, scans or photos of pages, or slides. An image may also be a single picture taken out of a Word or PowerPoint file, or a picture the person uploaded with their work: then the whole image may be the visual, and the box is its edges or the chart within it. Treat them all the same way. A picture that is only a logo, a crest or an icon is never the answer. When several of the person's own pictures are sent, choose the finished piece, not a sketch, a draft or a photo of the work being made.
 
 Your answer:
 - "found": true when you chose a visual, false when there is none.

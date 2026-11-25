@@ -9,7 +9,11 @@
 
 export const MIN_CV_CHARS = 80;
 
-/** Characters kept from one file of project material (CVs keep 20,000). Here so server code can read it without the browser readers. */
+/**
+ * Characters kept from a scan or photo of project material that the AI reader turned into text (/api/files/transcribe), and the
+ * browser readers' default. The draft page reads a file whole and cuts it to its share of the material budget itself
+ * (lib/material.ts); CVs keep 20,000. Here so server code can read it without the browser readers.
+ */
 export const MAX_DOC_CHARS = 60_000;
 
 /** Common words in English CVs. Real CV text always contains several of them. */

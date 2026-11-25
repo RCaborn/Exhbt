@@ -5,8 +5,8 @@ import { loadAiVersion, loadDraftSource, saveAiVersion } from "@/lib/draft-tools
 import { draftTargets } from "@/lib/ai/draft-targets";
 import { FIGURE_KINDS, FigureBoxSchema, normaliseDoc, type Section } from "@/lib/exhbt/blocks";
 import { graphsAsDrafted } from "@/lib/exhbt/draft-blocks";
-import { formatOf } from "@/lib/exhbt/formats";
-import { withWorkVisual } from "@/lib/exhbt/sections";
+import { formatOf, fromWorkOf } from "@/lib/exhbt/formats";
+import { withMoreImages, withWorkVisual } from "@/lib/exhbt/sections";
 import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { clampBox, fitAlt, fitCaption } from "@/lib/figures/rules";
 import { isPhase2Enabled } from "@/lib/site";
@@ -43,13 +43,21 @@ const Body = z.object({
   kind: z.enum(FIGURE_KINDS).default("other"),
   /** True when the new figure takes the place of the one already picked from the work. */
   replaces: z.boolean().default(false),
-  picked: z.object({
-    from: z.string().max(200),
-    sourceFileId: z.string().max(64).optional(),
-    page: z.number().int().min(1).max(10_000).optional(),
-    media: z.string().max(200).optional(),
-    box: FigureBoxSchema.optional(),
-  }),
+  /**
+   * Where it was picked from: a page of a PDF, or a picture inside a Word or PowerPoint file. Absent for a picture the person
+   * uploaded themselves: that is placed like an image they added by hand, with no mark and no tick (decision 0025).
+   */
+  picked: z
+    .object({
+      from: z.string().max(200),
+      sourceFileId: z.string().max(64).optional(),
+      page: z.number().int().min(1).max(10_000).optional(),
+      media: z.string().max(200).optional(),
+      box: FigureBoxSchema.optional(),
+    })
+    .optional(),
+  /** More of the person's own uploaded pictures, in the order uploaded: put after the lead where the layout takes pictures (a gallery, a before and after, an event). */
+  more: z.array(z.string().max(64)).max(12).default([]),
 });
 
 const fail = (error: string, status: number) => NextResponse.json({ error }, { status });
@@ -60,14 +68,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!user) return fail("Sign in first.", 401);
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return fail("That request wasn't complete.", 400);
-  const { fileId, alt, caption, kind, picked, replaces } = parsed.data;
+  const { fileId, alt, caption, picked, replaces, more } = parsed.data;
+  // A picture the person uploaded (no `picked`) takes nothing off the exhbt: it is theirs, not the work's own graph.
+  const kind = picked ? parsed.data.kind : "other";
 
   const store = getStore();
   const { id } = await params;
   const [exhbt, file] = await Promise.all([store.getExhbt(id), store.getFile(fileId)]);
   if (!exhbt || exhbt.userId !== user.id) return fail("Exhbt not found.", 404);
   if (!file || file.userId !== user.id || file.kind !== "image") return fail("Picture not found.", 404);
-  if (picked.sourceFileId) {
+  if (picked?.sourceFileId) {
     const source = await store.getFile(picked.sourceFileId);
     if (!source || source.userId !== user.id) return fail("Source file not found.", 404);
   }
@@ -91,21 +101,35 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     kind,
     alt: fitAlt(alt),
     caption: shown,
-    picked: {
-      from: picked.from.trim() || "your file",
-      ...(picked.sourceFileId ? { sourceFileId: picked.sourceFileId } : {}),
-      ...(picked.page ? { page: picked.page } : {}),
-      ...(picked.media ? { media: picked.media } : {}),
-      ...(picked.box ? { box: clampBox(picked.box) } : {}),
-      // Never ticked for them: publishing waits until they say they may share it.
-      shareOk: false,
-    },
+    ...(picked
+      ? {
+          picked: {
+            from: picked.from.trim() || "your file",
+            ...(picked.sourceFileId ? { sourceFileId: picked.sourceFileId } : {}),
+            ...(picked.page ? { page: picked.page } : {}),
+            ...(picked.media ? { media: picked.media } : {}),
+            ...(picked.box ? { box: clampBox(picked.box) } : {}),
+            // Never ticked for them: publishing waits until they say they may share it.
+            shareOk: false,
+          },
+        }
+      : {}),
   }, { keepGraphs: !fresh });
   if (result.why === "already") return new NextResponse(null, { status: 204 });
   // The layout takes nothing from the work, or its images are full. The page deletes the picture it uploaded.
   if (result.why === "not-wanted") return fail("This layout doesn't take a figure from your files.", 409);
   if (!result.placed) return fail("There's no room for another image on this exhbt.", 409);
-  const next = result.doc;
+  let next = result.doc;
+  // A layout that takes pictures (a gallery, a before and after, an event) takes the person's other uploaded pictures too,
+  // after the lead, in the order uploaded, as many as it shows (withMoreImages stops at its cap). Each must be their own image file.
+  let extra: string[] = [];
+  if (more.length && fromWorkOf(next) === "pictures") {
+    const files = await Promise.all(more.map((f) => store.getFile(f)));
+    const own = more.filter((f, i) => files[i]?.userId === user.id && files[i]?.kind === "image" && f !== fileId && more.indexOf(f) === i);
+    next = withMoreImages(next, own);
+    // Only those that went on are counted and attached here; the draft attached every uploaded file already.
+    extra = own.filter((f) => next.sections.some((s) => s.kind === "image" && s.fileId === f));
+  }
 
   // The caption is the AI's words on the page, so its numbers get the draft's check
   // (lib/exhbt/verify.ts): any not in the person's material is flagged in the editor to confirm.
@@ -131,7 +155,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       console.error("ai version graphs save failed", (e as Error).message);
     }
   }
-  await store.attachFiles(user.id, id, [fileId]);
-  await store.logEvent("figure_added", user.id, { exhbtId: id, from: picked.page ? "pdf" : "office", kind, graphsRemoved: result.removed.length });
+  await store.attachFiles(user.id, id, [fileId, ...extra]);
+  await store.logEvent("figure_added", user.id, {
+    exhbtId: id,
+    from: !picked ? "picture" : picked.page ? "pdf" : "office",
+    kind,
+    graphsRemoved: result.removed.length,
+    pictures: extra.length,
+  });
   return new NextResponse(null, { status: 204 });
 }
