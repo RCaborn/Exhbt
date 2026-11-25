@@ -142,7 +142,7 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
         >
           <MoreHorizontal aria-hidden size={18} strokeWidth={2.25} />
         </button>
-        <div id={menuId} hidden={!menu} className="absolute top-full right-0 z-10 mt-1 w-64 rounded-[12px] border border-line bg-surface p-1.5 shadow-pack">
+        <div id={menuId} hidden={!menu} data-tools-menu className="absolute top-full right-0 z-10 mt-1 w-64 rounded-[12px] border border-line bg-surface p-1.5 shadow-pack">
           <button
             type="button"
             className={ITEM}
@@ -173,62 +173,67 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
         </div>
       </div>
 
-      {open && (
-        <div className="mt-2 rounded-[12px] border border-line px-3 py-2">
-          {noneLeft ? (
-            <p className="text-sm">
-              No rewrites left on this exhbt.{" "}
-              <Link href="/account/billing" className="link font-semibold text-ink">
-                See your plan
-              </Link>
+      {/* The form, "No rewrites left" and the line that says how a rewrite went, in one box. Here, in a card, it is drawn in the
+          flow; the edit-on-page editor draws it over the page, as a card of its own under the button, in the person's look
+          (data-tools-menu and data-tools-panel: components/exhbt-editor/css/draft-tools.css). */}
+      <div data-tools-panel>
+        {open && (
+          <div className="mt-2 rounded-[12px] border border-line px-3 py-2">
+            {noneLeft ? (
+              <p className="text-sm">
+                No rewrites left on this exhbt.{" "}
+                <Link href="/account/billing" className="link font-semibold text-ink">
+                  See your plan
+                </Link>
+              </p>
+            ) : (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (await dt.rewrite(block, note)) {
+                    setOpen(false);
+                    setNote("");
+                  }
+                }}
+              >
+                <label htmlFor={noteId} className="label">
+                  Note for the rewrite <span className="font-normal text-graphite">(optional)</span>
+                </label>
+                <input
+                  id={noteId}
+                  className="field"
+                  maxLength={200}
+                  value={note}
+                  placeholder="e.g. shorter, focus on the regression"
+                  onChange={(e) => setNote(e.target.value)}
+                />
+                <p className="hint mt-1">It only steers the wording. It still draws only on your files.{edited && ` This replaces your edits to the ${name}.`}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button type="submit" variant="primary" size="sm" loading={pending} disabled={anyBusy} label={`Rewrite the ${name} now`}>
+                    Rewrite now
+                  </Button>
+                  <Button size="sm" disabled={anyBusy} onClick={() => setOpen(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+
+        <div role="status" aria-live="polite" className="text-sm" data-testid="tools-status">
+          {pending && <p className="mt-2 text-graphite">Rewriting the {name}…</p>}
+          {msg && !pending && (
+            <p className={`mt-2 ${msg.ok ? "font-semibold text-ink" : "text-error"}`}>
+              {msg.text}{" "}
+              {msg.atLimit && (
+                <Link href="/account/billing" className="link font-semibold text-ink">
+                  See your plan
+                </Link>
+              )}
             </p>
-          ) : (
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (await dt.rewrite(block, note)) {
-                  setOpen(false);
-                  setNote("");
-                }
-              }}
-            >
-              <label htmlFor={noteId} className="label">
-                Note for the rewrite <span className="font-normal text-graphite">(optional)</span>
-              </label>
-              <input
-                id={noteId}
-                className="field"
-                maxLength={200}
-                value={note}
-                placeholder="e.g. shorter, focus on the regression"
-                onChange={(e) => setNote(e.target.value)}
-              />
-              <p className="hint mt-1">It only steers the wording. It still draws only on your files.{edited && ` This replaces your edits to the ${name}.`}</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Button type="submit" variant="primary" size="sm" loading={pending} disabled={anyBusy} label={`Rewrite the ${name} now`}>
-                  Rewrite now
-                </Button>
-                <Button size="sm" disabled={anyBusy} onClick={() => setOpen(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
           )}
         </div>
-      )}
-
-      <div role="status" aria-live="polite" className="text-sm" data-testid="tools-status">
-        {pending && <p className="mt-2 text-graphite">Rewriting the {name}…</p>}
-        {msg && !pending && (
-          <p className={`mt-2 ${msg.ok ? "font-semibold text-ink" : "text-error"}`}>
-            {msg.text}{" "}
-            {msg.atLimit && (
-              <Link href="/account/billing" className="link font-semibold text-ink">
-                See your plan
-              </Link>
-            )}
-          </p>
-        )}
       </div>
     </div>
   );

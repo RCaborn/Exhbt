@@ -217,9 +217,11 @@
   }
 
   /* "More actions" (components/editor/BlockTools.tsx, drawn as it is): its trigger in the row at 44px;
-     its menu opens upwards; the rewrite form and the message take a line of their own above the row. */
+     its menu opens upwards; the rewrite form and the message (in BlockTools' one box for both,
+     data-tools-panel) take a line of their own above the row. */
   .xe-bar-more,
-  .xe-bar-more > [data-testid] {
+  .xe-bar-more > [data-testid],
+  .xe-bar-more > [data-testid] > [data-tools-panel] {
     display: contents;
   }
   .xe-bar-more > [data-testid] > .relative {
@@ -246,14 +248,14 @@
   .xe-bar-more form input {
     min-height: 2.75rem;
   }
-  .xe-bar-more > [data-testid] > :not(.relative) {
+  .xe-bar-more > [data-testid] > [data-tools-panel] > * {
     flex: 0 0 100%;
     order: -2;
   }
-  .xe-bar-more > [data-testid] > [role="status"] {
+  .xe-bar-more > [data-testid] > [data-tools-panel] > [role="status"] {
     order: -1;
   }
-  .xe-bar-more > [data-testid] > [role="status"]:empty {
+  .xe-bar-more > [data-testid] > [data-tools-panel] > [role="status"]:empty {
     display: none;
   }
   .xe-bar-row > :not(.xe-bar-more) {
