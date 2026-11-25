@@ -44,7 +44,7 @@ their email. Updates the wizard, server-side step mapping and tests.
 npm run check   # typecheck, lint, build and all end-to-end tests
 ```
 
-CI runs the same on every push and pull request. Don't merge with it red. Never skip or delete a test to make it pass; fix the cause, or ask.
+CI runs the same on every push and pull request. A newer push replaces a run still waiting on the same branch. Don't merge with it red. Never skip or delete a test to make it pass; fix the cause, or ask.
 
 ## Database changes
 

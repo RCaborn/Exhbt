@@ -396,10 +396,22 @@ test.describe("An open rewrite form stays up and takes the press", () => {
       }, part);
 
     /** Opens the block's menu, then its form, each checked for its ground; then closes the form. `what` names the case. */
+    /**
+     * Presses "Rewrite this block" in the block's open menu from the keyboard, with the pointer off the page first. Chromium's
+     * headless shell, which CI runs, can leave the box that holds the form (data-tools-panel) marked as hovered when what the
+     * pointer was on goes from under it: a rewrite lands, the form goes, and a compact card round it closes. The mark outlasts
+     * the pointer leaving, on that box alone, which nothing styles on hover, so the page is unchanged; but leave() would wait
+     * for it in vain (the Night test, 4 times in 4 there). So these tests make every press in a panel from the keyboard.
+     */
+    async function rewriteFromKeys(p: Page, block: string) {
+      await p.mouse.move(2, 2);
+      await p.getByTestId(`tools-${block}`).getByRole("button", { name: "Rewrite this block" }).press("Enter");
+    }
+
     async function eachOnItsOwnGround(page: Page, block: string, what: string) {
       await openCardMenu(page, block);
       expect(await groundProblems(page, block, "menu"), `${what}: the menu`).toEqual([]);
-      await page.getByTestId(`tools-${block}`).getByRole("button", { name: "Rewrite this block" }).click();
+      await rewriteFromKeys(page, block);
       await leave(page);
       await expect(rewriteNow(page, block)).toBeVisible();
       expect(await groundProblems(page, block, "panel"), `${what}: the form`).toEqual([]);
@@ -433,19 +445,22 @@ test.describe("An open rewrite form stays up and takes the press", () => {
       // Free's rewrites run out sooner than Max's, and both pages keep the look they were drawn in (Max's).
       expect((await page.request.get("/dev/plan?plan=free&next=/exhbts")).ok()).toBe(true);
       for (let i = 1; i <= FREE_REWRITES; i++) {
-        await startRewrite(page, "flow");
-        await rewriteNow(page, "flow").click();
+        await openCardMenu(page, "flow");
+        await rewriteFromKeys(page, "flow");
+        await rewriteNow(page, "flow").press("Enter");
         await expect(rewritesLeft(page, "flow")).toContainText(`${FREE_REWRITES - i} of`);
       }
       for (const p of [page, stale]) await p.locator(`${READY} [data-kind="flow"] > .xe-tools`).first().evaluate(hold, null);
-      await startRewrite(page, "flow");
+      await openCardMenu(page, "flow");
+      await rewriteFromKeys(page, "flow");
       await expect(page.getByTestId("tools-flow")).toContainText("No rewrites left on this exhbt.");
       await leave(page);
       expect(await groundProblems(page, "flow", "panel"), "No rewrites left").toEqual([]);
 
       await stale.bringToFront();
-      await startRewrite(stale, "flow");
-      await rewriteNow(stale, "flow").click();
+      await openCardMenu(stale, "flow");
+      await rewriteFromKeys(stale, "flow");
+      await rewriteNow(stale, "flow").press("Enter");
       await expect(stale.getByTestId("tools-flow").getByTestId("tools-status")).toContainText(`You've used all ${FREE_REWRITES} rewrites`);
       await leave(stale);
       expect(await groundProblems(stale, "flow", "panel"), "a refused rewrite").toEqual([]);
@@ -510,6 +525,38 @@ test.describe("An open rewrite form stays up and takes the press", () => {
         }
       });
     }
+
+    test("while a rewrite runs, Escape leaves its form, as Cancel is off; the rewrite closes it", async ({ page }) => {
+      await draftAndOpen(page, "escapebusy");
+      // The rewrite (the server action given the block's name) is held on its way.
+      let release = () => {};
+      const out = new Promise<void>((r) => (release = r));
+      let holding = false;
+      await page.route(/\/exhbts\/[0-9a-f-]{36}\/edit/, async (route) => {
+        const req = route.request();
+        let args: unknown[] = [];
+        try {
+          args = JSON.parse(req.postData() ?? "[]") as unknown[];
+        } catch {}
+        if (req.method() !== "POST" || !req.headers()["next-action"] || args[1] !== "flow") return route.continue();
+        holding = true;
+        await out;
+        return route.continue();
+      });
+      await startRewrite(page, "flow");
+      await rewriteNow(page, "flow").click();
+      await expect.poll(() => holding).toBe(true);
+      await expect(page.getByTestId("tools-flow").getByRole("button", { name: "Cancel" })).toBeDisabled();
+      for (const where of ["on nothing", "in the form"]) {
+        if (where === "on nothing") await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+        else await noteField(page, "flow").focus();
+        await page.keyboard.press("Escape");
+        await expect(noteField(page, "flow"), `the focus ${where}`).toBeVisible();
+      }
+      release();
+      await expect(rewritesLeft(page, "flow")).toContainText(`${FREE_REWRITES - 1} of`);
+      await expect(noteField(page, "flow")).toHaveCount(0);
+    });
   });
 });
 
