@@ -396,10 +396,20 @@ test.describe("An open rewrite form stays up and takes the press", () => {
       }, part);
 
     /** Opens the block's menu, then its form, each checked for its ground; then closes the form. `what` names the case. */
+    /**
+     * Presses "Rewrite this block" in the block's open menu from the keyboard, with the pointer off the page first. A card that
+     * comes up under a still pointer can stay marked as hovered in Chromium after the pointer has gone (seen on "No rewrites
+     * left", which nothing styles on hover), and leave() would wait for it in vain.
+     */
+    async function rewriteFromKeys(p: Page, block: string) {
+      await p.mouse.move(2, 2);
+      await p.getByTestId(`tools-${block}`).getByRole("button", { name: "Rewrite this block" }).press("Enter");
+    }
+
     async function eachOnItsOwnGround(page: Page, block: string, what: string) {
       await openCardMenu(page, block);
       expect(await groundProblems(page, block, "menu"), `${what}: the menu`).toEqual([]);
-      await page.getByTestId(`tools-${block}`).getByRole("button", { name: "Rewrite this block" }).click();
+      await rewriteFromKeys(page, block);
       await leave(page);
       await expect(rewriteNow(page, block)).toBeVisible();
       expect(await groundProblems(page, block, "panel"), `${what}: the form`).toEqual([]);
@@ -438,14 +448,16 @@ test.describe("An open rewrite form stays up and takes the press", () => {
         await expect(rewritesLeft(page, "flow")).toContainText(`${FREE_REWRITES - i} of`);
       }
       for (const p of [page, stale]) await p.locator(`${READY} [data-kind="flow"] > .xe-tools`).first().evaluate(hold, null);
-      await startRewrite(page, "flow");
+      await openCardMenu(page, "flow");
+      await rewriteFromKeys(page, "flow");
       await expect(page.getByTestId("tools-flow")).toContainText("No rewrites left on this exhbt.");
       await leave(page);
       expect(await groundProblems(page, "flow", "panel"), "No rewrites left").toEqual([]);
 
       await stale.bringToFront();
-      await startRewrite(stale, "flow");
-      await rewriteNow(stale, "flow").click();
+      await openCardMenu(stale, "flow");
+      await rewriteFromKeys(stale, "flow");
+      await rewriteNow(stale, "flow").press("Enter");
       await expect(stale.getByTestId("tools-flow").getByTestId("tools-status")).toContainText(`You've used all ${FREE_REWRITES} rewrites`);
       await leave(stale);
       expect(await groundProblems(stale, "flow", "panel"), "a refused rewrite").toEqual([]);
