@@ -29,8 +29,9 @@ import { recordAIFailure } from "@/lib/ai-failures";
  *
  * Every failed pick, given back or not, is also recorded as a failure event with its reason and
  * tokens and no text (lib/ai-failures.ts), which the admin panel's "Failed AI calls" shows. A pick
- * doesn't take the day's limit on failed calls that the other AI features have (decision 0029):
- * a failure that cost something stays counted here, and one that is given back cost nothing.
+ * doesn't take the day's limit on failed calls that a draft, a rewrite and some other features
+ * have (decision 0029): a failure that cost something stays counted here, and one that is given
+ * back cost nothing.
  *
  * Outside production the answer also carries `debug`: the model that answered, its token counts
  * and its answer before the checks, which the figure eval reads (evals/figure-pick/README.md).
