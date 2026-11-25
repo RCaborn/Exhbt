@@ -90,9 +90,11 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState(false);
   const [note, setNote] = useState("");
+  const root = useRef<HTMLDivElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const menuId = useId();
+  const noneLeft = dt.left <= 0;
 
   useEffect(() => {
     if (!menu) return;
@@ -113,6 +115,32 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
     };
   }, [menu]);
 
+  // The panel (the rewrite form, or "No rewrites left") closes with Escape and gives the focus back to "More actions": here while
+  // the focus is on nothing, as it is once "Rewrite this block" is pressed (the button goes with its menu), and in onKeyDown below
+  // while it is in the panel. The menu takes its own Escape first, and a panel whose "More actions" isn't drawn (in a card that is
+  // closed) is left alone; the button is asked, not this box, which the phone's bar lays out in its own row and draws no box for.
+  // A press outside never closes the form, so a note typed in it is not lost (decision 0026: while it is open its toolbar stays,
+  // wherever the pointer and the focus are); it does close "No rewrites left", which holds nothing and has no Cancel.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || menu || !trigger.current?.getClientRects().length) return;
+      if (document.activeElement && document.activeElement !== document.body) return;
+      e.preventDefault();
+      setOpen(false);
+      trigger.current?.focus();
+    };
+    const onPointer = (e: PointerEvent) => {
+      if (noneLeft && !root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [open, menu, noneLeft]);
+
   if (!dt.enabled) return null;
 
   const name = nameOf(block, formatOf(dt.doc));
@@ -122,14 +150,27 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
   const pending = dt.busy === block;
   const anyBusy = dt.busy !== null;
   const msg = dt.message?.block === block ? dt.message : null;
-  const noneLeft = dt.left <= 0;
   const noteId = `rewrite-note-${block}`;
 
   return (
     // data-open: its menu, or its panel (the rewrite form, or "No rewrites left"), is open. The edit-on-page editor draws
     // this in a toolbar over the page, which otherwise shows only under the pointer or the focus, and keeps that toolbar
     // up while this is set (components/exhbt-editor/css/core.css). Here, in a card, nothing reads it.
-    <div className="mb-3" data-testid={`tools-${block}`} data-open={menu || open ? "" : undefined}>
+    <div
+      ref={root}
+      className="mb-3"
+      data-testid={`tools-${block}`}
+      data-open={menu || open ? "" : undefined}
+      onKeyDown={(e) => {
+        // Escape in the panel, or on "More actions", closes the panel before a toolbar round it hears the key: the edit-on-page
+        // editor's compact card (Toolbar.tsx) would close and hide the form still open in it. The menu takes its own Escape first.
+        if (e.key !== "Escape" || !open || menu) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(false);
+        trigger.current?.focus();
+      }}
+    >
       <div ref={wrap} className="relative flex justify-end">
         <button
           ref={trigger}
@@ -142,7 +183,7 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
         >
           <MoreHorizontal aria-hidden size={18} strokeWidth={2.25} />
         </button>
-        <div id={menuId} hidden={!menu} className="absolute top-full right-0 z-10 mt-1 w-64 rounded-[12px] border border-line bg-surface p-1.5 shadow-pack">
+        <div id={menuId} hidden={!menu} data-tools-menu className="absolute top-full right-0 z-10 mt-1 w-64 rounded-[12px] border border-line bg-surface p-1.5 shadow-pack">
           <button
             type="button"
             className={ITEM}
@@ -173,62 +214,67 @@ export function BlockTools({ dt, block }: { dt: DraftTools; block: DraftBlock })
         </div>
       </div>
 
-      {open && (
-        <div className="mt-2 rounded-[12px] border border-line px-3 py-2">
-          {noneLeft ? (
-            <p className="text-sm">
-              No rewrites left on this exhbt.{" "}
-              <Link href="/account/billing" className="link font-semibold text-ink">
-                See your plan
-              </Link>
+      {/* The form, "No rewrites left" and the line that says how a rewrite went, in one box. Here, in a card, it is drawn in the
+          flow; the edit-on-page editor draws it over the page, as a card of its own under the button, in the person's look
+          (data-tools-menu and data-tools-panel: components/exhbt-editor/css/draft-tools.css). */}
+      <div data-tools-panel>
+        {open && (
+          <div className="mt-2 rounded-[12px] border border-line px-3 py-2">
+            {noneLeft ? (
+              <p className="text-sm">
+                No rewrites left on this exhbt.{" "}
+                <Link href="/account/billing" className="link font-semibold text-ink">
+                  See your plan
+                </Link>
+              </p>
+            ) : (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (await dt.rewrite(block, note)) {
+                    setOpen(false);
+                    setNote("");
+                  }
+                }}
+              >
+                <label htmlFor={noteId} className="label">
+                  Note for the rewrite <span className="font-normal text-graphite">(optional)</span>
+                </label>
+                <input
+                  id={noteId}
+                  className="field"
+                  maxLength={200}
+                  value={note}
+                  placeholder="e.g. shorter, focus on the regression"
+                  onChange={(e) => setNote(e.target.value)}
+                />
+                <p className="hint mt-1">It only steers the wording. It still draws only on your files.{edited && ` This replaces your edits to the ${name}.`}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button type="submit" variant="primary" size="sm" loading={pending} disabled={anyBusy} label={`Rewrite the ${name} now`}>
+                    Rewrite now
+                  </Button>
+                  <Button size="sm" disabled={anyBusy} onClick={() => setOpen(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+
+        <div role="status" aria-live="polite" className="text-sm" data-testid="tools-status">
+          {pending && <p className="mt-2 text-graphite">Rewriting the {name}…</p>}
+          {msg && !pending && (
+            <p className={`mt-2 ${msg.ok ? "font-semibold text-ink" : "text-error"}`}>
+              {msg.text}{" "}
+              {msg.atLimit && (
+                <Link href="/account/billing" className="link font-semibold text-ink">
+                  See your plan
+                </Link>
+              )}
             </p>
-          ) : (
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (await dt.rewrite(block, note)) {
-                  setOpen(false);
-                  setNote("");
-                }
-              }}
-            >
-              <label htmlFor={noteId} className="label">
-                Note for the rewrite <span className="font-normal text-graphite">(optional)</span>
-              </label>
-              <input
-                id={noteId}
-                className="field"
-                maxLength={200}
-                value={note}
-                placeholder="e.g. shorter, focus on the regression"
-                onChange={(e) => setNote(e.target.value)}
-              />
-              <p className="hint mt-1">It only steers the wording. It still draws only on your files.{edited && ` This replaces your edits to the ${name}.`}</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Button type="submit" variant="primary" size="sm" loading={pending} disabled={anyBusy} label={`Rewrite the ${name} now`}>
-                  Rewrite now
-                </Button>
-                <Button size="sm" disabled={anyBusy} onClick={() => setOpen(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
           )}
         </div>
-      )}
-
-      <div role="status" aria-live="polite" className="text-sm" data-testid="tools-status">
-        {pending && <p className="mt-2 text-graphite">Rewriting the {name}…</p>}
-        {msg && !pending && (
-          <p className={`mt-2 ${msg.ok ? "font-semibold text-ink" : "text-error"}`}>
-            {msg.text}{" "}
-            {msg.atLimit && (
-              <Link href="/account/billing" className="link font-semibold text-ink">
-                See your plan
-              </Link>
-            )}
-          </p>
-        )}
       </div>
     </div>
   );

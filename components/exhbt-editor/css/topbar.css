@@ -129,10 +129,30 @@
   .xe-save-bad {
     color: var(--color-error);
   }
+  /* Why a save failed, whole, while saves fail: a card that hangs from the bar under the status, as the bar's
+     panels hang under their buttons, out of the flow, so the bar keeps its one row and nothing on the page moves;
+     as wide as the screen on a phone (below). In the row it was cut at 22rem with an ellipsis, and even so pushed
+     "Review and publish" off a 1440px window; under 64rem it was not drawn at all. The live region says it once,
+     as before (SaveStatus.tsx). */
+  .xe-save-bad {
+    position: relative;
+    align-self: stretch;
+  }
   .xe-save-words {
-    max-width: 22rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    right: 0;
+    width: max-content;
+    max-width: min(24rem, calc(100vw - 1rem));
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-pack);
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    white-space: normal;
+    text-wrap: pretty;
   }
 
   /* The panels: a card under the button that opened them. */
@@ -312,8 +332,7 @@
     }
     /* "Review and publish" stays on one line (design round 2, item 3), so the row makes room for it, and
        for a failed save's Retry, down to a 48rem window: tighter gaps, a little less padding round its
-       words, the layout's name in its button's accessible name only (as Undo's is), and a failed save's
-       words said and kept for screen readers, with Retry on the row, as on a phone. */
+       words, and the layout's name in its button's accessible name only (as Undo's is). */
     .xe-topbar .xe-topbar-row {
       gap: 0.25rem;
     }
@@ -322,13 +341,6 @@
     }
     .xe-topbar .xe-layout-button .xe-tb-text {
       display: none;
-    }
-    .xe-save-bad .xe-save-words {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
     }
   }
   .xe-back-text,
@@ -424,12 +436,15 @@
     .xe-save {
       font-size: 0.75rem;
     }
+    /* Why a save failed: under the bar, as wide as the screen, as the panels are here. */
+    .xe-save-bad {
+      position: static;
+    }
     .xe-save-bad .xe-save-words {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
+      right: 0.5rem;
+      left: 0.5rem;
+      width: auto;
+      max-width: none;
     }
     .xe-topbar-row:has(.xe-save-bad) .xe-wordbar {
       display: none;

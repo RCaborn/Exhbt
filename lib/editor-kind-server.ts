@@ -1,6 +1,8 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { decideEditor, decideForEveryone, EDITOR_KIND_COOKIE, EDITOR_OWN_COOKIE, type EditorFacts, type EditorKind } from "./editor-kind";
+import { isAdmin } from "./admin";
+import { getCurrentUser } from "./auth";
+import { decideEditor, decideForEveryone, EDITOR_KIND_COOKIE, EDITOR_OWN_COOKIE, isEditorKind, type EditorFacts, type EditorKind } from "./editor-kind";
 
 /*
  * The request's side of the editor switch: what lib/editor-kind.ts decides from. It is a file of its own,
@@ -32,4 +34,15 @@ export async function editorForEveryone(): Promise<EditorKind> {
  */
 export async function editorKind(admin: boolean): Promise<EditorKind> {
   return decideEditor({ ...(await facts()), admin });
+}
+
+/**
+ * The same, for code that has no signed-in person to hand (the edit route's layout, for its error page): it
+ * asks who is signed in, and whether they are an admin, only when their own choice is there to count, since
+ * asking is a call to the sign-in service on the live site.
+ */
+export async function editorServed(): Promise<EditorKind> {
+  const f = await facts();
+  if (!isEditorKind(f.own)) return decideForEveryone(f);
+  return decideEditor({ ...f, admin: await isAdmin(await getCurrentUser()) });
 }

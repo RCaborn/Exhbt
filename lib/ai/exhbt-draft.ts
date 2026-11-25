@@ -1,12 +1,10 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { formatLimits, LIMITS, SCHEMA_VERSION, text, withHighlight, words, type ExhbtDoc, type Section } from "@/lib/exhbt/blocks";
-import { isFormat } from "@/lib/exhbt/formats";
+import { formatLimits, LIMITS, type ExhbtDoc } from "@/lib/exhbt/blocks";
+import { FORMAT_RULES, type Format } from "@/lib/exhbt/formats";
 import { checkedReason, type LayoutReason } from "@/lib/exhbt/drafted";
-import { hasData, type Chart } from "@/lib/exhbt/charts";
-import { DraftSchema, repairDraft, toChart, type Draft, type DraftChart } from "./draft-answer";
-import { referencesFrom, squash } from "@/lib/exhbt/references";
+import { DraftSchema, DraftSchemaSeven, draftSchema, leftOff, repairDraft, toDoc, type Draft, type DraftChart, type DraftLayouts } from "./draft-answer";
 import { normaliseNumber, numbersIn } from "@/lib/exhbt/verify";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "./model";
 import { AIFailure, structuredCall } from "./call";
@@ -22,15 +20,29 @@ import { AIFailure, structuredCall } from "./call";
  * Every number must be quoted from the material. The model lists each one with the quote it
  * came from, and lib/exhbt/verify.ts checks the draft against the source text anyway. A quote
  * is kept only when its words and the speaker's name are in the material as written.
+ *
+ * A draft chooses among the layouts the person's editor offers (`layouts` on the input):
+ *  - "three" (the default): case study, gallery or research, for a person whose editor is the
+ *    classic one. Its request is SYSTEM and DraftSchema, word for word and field for field what was
+ *    sent before release 4, so what the real model has been proven on is what the live site sends.
+ *  - "seven": all seven (decision 0028), for a person whose editor is the new one. SYSTEM_SEVEN and
+ *    DraftSchemaSeven: the same rules and fields, the layout rules of 0028 in its order, a note for
+ *    each new layout, and the three parts they add (an essay's pull quote and sources, a build's
+ *    links, an event's role), each kept only when the material holds it (toDoc in ./draft-answer.ts).
  */
 
 const L = LIMITS;
 const G = formatLimits("gallery");
 const R = formatLimits("research");
+const B = formatLimits("build");
+const E = formatLimits("essay");
+const BA = formatLimits("before-after");
+const EV = formatLimits("event");
 /** Roughly 15-20k tokens of material: enough for a report, and keeps a draft well under a penny. */
 export const MAX_MATERIAL_CHARS = 80_000;
 
-const SYSTEM = `You draft "exhbts": short, checked write-ups of a UK student's or graduate's project, read by recruiters in about 30 seconds.
+/** The rules, and the fields every draft has whichever layouts it may choose. Shared by both prompts, word for word. */
+const HEAD = `You draft "exhbts": short, checked write-ups of a UK student's or graduate's project, read by recruiters in about 30 seconds.
 
 Rules:
 - Use only facts in the material you are given (text from their files, their notes, a link they gave). Never invent results, numbers, methods, tools, organisations or dates.
@@ -63,7 +75,20 @@ Fields:
 - quote: feedback someone gave on the work (a supervisor, a client, a user), only if the material contains it: "text" copied word for word from the material, at most ${L.quote.words} words; "name" as the material gives it; "role" as the material gives it, or empty. Never write, shorten, join or reword a quote; if the only one is longer than ${L.quote.words} words, or nobody is named, or there is none, leave text, name and role all empty.
 - next: what the person says they would do next or do differently, at most ${L.reflection.words} words, only if the material says so. Empty otherwise.
 - aim: research only. The aim or hypothesis as the material states it, at most ${R.aim.words} words, empty if the material states none. aimIsHypothesis is true only if the material itself calls it a hypothesis.
-- conclusion: research only. What the material itself concludes, at most ${R.conclusion.words} words. Never a conclusion the material doesn't draw. Empty otherwise.
+- conclusion: research only. What the material itself concludes, at most ${R.conclusion.words} words. Never a conclusion the material doesn't draw. Empty otherwise.`;
+
+/** What each field is in a gallery and in research: the same in both prompts. */
+const GALLERY_NOTE = `- For a gallery: gap is the brief (what was asked, and for whom), at most ${G.gapWords} words, with gapHighlight the ask; findings are 0 to ${G.findings.max} bullets of what happened, each at most ${G.findings.wordsEach} words, only if the material says what happened, otherwise an empty list; at most ${G.sections.graph} graph. aim, conclusion and references stay empty. You never see the pictures: do not describe them.`;
+
+const RESEARCH_NOTE = `- For research: gap is the background and the gap, at most ${R.gapWords} words; findings are the results, ${R.findings.min} to ${R.findings.max} bullets, each at most ${R.findings.wordsEach} words; next holds the limitations the material itself states and what the person would do next, at most ${R.reflection.words} words. Never invent a limitation: leave it empty if the material states none.`;
+
+const LAST = `- Fields that belong to another layout stay empty.`;
+
+/**
+ * The three-layout prompt: what was sent before release 4, unchanged. A person whose editor is the classic one is
+ * drafted with this, so nothing about their draft waits on a real-model run of the seven-layout prompt.
+ */
+const SYSTEM = `${HEAD}
 - references: research only, up to ${R.sections.link}. Each is an https address that appears in the material, copied exactly, with "label" the citation as the material gives it (at most ${R.link.labelWords} words). Never make up a DOI or an address. An empty list otherwise.
 - In total, aim for about ${L.targetWords} words across everything you write (graph labels, the quote and its name included), ${R.targetWords} for research, and never more than ${L.totalWords}.
 
@@ -73,13 +98,52 @@ Layout (the "format" field):
 - "case-study" otherwise, and whenever you are unsure.
 - If the person's notes name a layout, use that one. The subject of the course alone is not evidence of a layout.
 - formatReason: why you chose the layout, as one of these signals, and only one that is true of the material. "notes": the person's notes name the layout. "aim-results": research, and the material states an aim and reports results. "hypothesis-results": research, and the material states a hypothesis and reports results. "study": research, an experiment or a study with a method and results, with no aim or hypothesis stated. "visual-work": a gallery, because the work is shown by its pictures. "mostly-pictures": a gallery, because the upload facts say most of the upload is pictures. "question-findings": a case study, because the material sets out a question and what was found. "default": a case study for any other reason, or because you are unsure.
-- For a gallery: gap is the brief (what was asked, and for whom), at most ${G.gapWords} words, with gapHighlight the ask; findings are 0 to ${G.findings.max} bullets of what happened, each at most ${G.findings.wordsEach} words, only if the material says what happened, otherwise an empty list; at most ${G.sections.graph} graph. aim, conclusion and references stay empty. You never see the pictures: do not describe them.
-- For research: gap is the background and the gap, at most ${R.gapWords} words; findings are the results, ${R.findings.min} to ${R.findings.max} bullets, each at most ${R.findings.wordsEach} words; next holds the limitations the material itself states and what the person would do next, at most ${R.reflection.words} words. Never invent a limitation: leave it empty if the material states none.
-- Fields that belong to another layout stay empty.`;
+${GALLERY_NOTE}
+${RESEARCH_NOTE}
+${LAST}`;
 
-export { DraftSchema, toChart, type DraftChart } from "./draft-answer";
-/** What the draft call sends as output_config. Exported so scripts/probe-ai-shapes.ts checks the very shape the app sends. */
+/**
+ * The seven-layout prompt (decision 0028, "The AI chooses among seven"). The rules, the fields and the gallery and
+ * research notes are the three-layout prompt's own words. What differs:
+ *  - `references` also holds an essay's sources and a build's links, and there are two more fields, `pullquote` and `myRole`;
+ *  - the layout rules are 0028's list, in its order, with its tie-break;
+ *  - four more signals for formatReason, and a note for each new layout saying what its title, context line and
+ *    findings are (0028's table; the caps are read from FORMAT_LIMITS, so they can't drift from the editor's).
+ */
+const SYSTEM_SEVEN = `${HEAD}
+- references: research, essay and build only; an empty list in any other layout. Each has "label" and "url".
+  - research: up to ${R.sections.link}. Each is an https address that appears in the material, copied exactly, with "label" the citation as the material gives it (at most ${R.link.labelWords} words). Never make up a DOI or an address.
+  - essay: the sources the material cites, up to ${E.sections.link}. "label" is the citation, copied word for word from the material, at most ${E.link.labelWords} words: from a longer one, copy the run of words that names the author and the title. "url" is its https address if the material gives one, copied exactly, otherwise an empty string. Never make up a source or an address.
+  - build: up to ${B.sections.link} links to the thing itself, such as a demo and the code, only where the material gives the https address, copied exactly. "label" says what the link is in at most ${B.link.labelWords} words, e.g. "Try the demo" or "Source code". Never a paper or a page the material only cites.
+- pullquote: essay only. One sentence of the person's own from the material that carries the argument, copied word for word, at most ${E.pullquote.words} words. Never write, shorten, join or reword one, and never use a source's words or anyone else's; if no sentence in the material will do, leave it empty.
+- myRole: event only. The person's own part in the event, in the material's own words, copied exactly, at most ${L.myRoleChars} characters, e.g. "Stage manager". Empty if the material doesn't say what their part was.
+- In total, aim for about ${L.targetWords} words across everything you write (graph labels, the quote and its name included), ${R.targetWords} for research and for an essay, and never more than ${L.totalWords}.
+
+Layout (the "format" field). Go down this list and take the first that is true of the material:
+1. The person's notes name a layout: use that one.
+2. "research": an experiment, a lab report, a study or a dissertation, with a research question or hypothesis, a method and results from data.
+3. "build": the person made a thing that works (software, an app, a device, a structure, a tool), and the material says what it does and how it was made.
+4. "before-after": an existing thing was redesigned or improved, and the material describes both how it was and how it is now.
+5. "event": something that happened at a time and place (a concert, a production, a tournament, a society's event), and the material says what the person's own part in it was.
+6. "essay": an argument in prose with a thesis and sources, and no data the person collected.
+7. "gallery": mostly visual work (a campaign, posters, a brand, a design, drawings, a building, a film, a product), and what came of it is shown by the work itself. Many pictures and little text in the upload facts point that way.
+8. "case-study": anything else, and whenever you are unsure.
+- Where two fit, the earlier in the list wins, with one exception: data the person collected (a survey, interviews, measurements, an experiment) always means "research" and never "essay".
+- A layout needs everything its line asks for. A redesign whose material describes only the result, or an event whose material doesn't say what the person's part was, is not that layout: carry on down the list.
+- The subject of the course alone is never evidence of a layout.
+- formatReason: why you chose the layout, as one of these signals, and only one that is true of the material. "notes": the person's notes name the layout. "aim-results": research, and the material states an aim and reports results. "hypothesis-results": research, and the material states a hypothesis and reports results. "study": research, an experiment or a study with a method and results, with no aim or hypothesis stated. "built-thing": a build, because the person made a thing that works and the material says what it does. "before-and-after": a before and after, because the material describes how the thing was and how it is now. "event-role": an event, because the material says what the person's part in it was. "argument-sources": an essay, because the material argues a case and names its sources. "visual-work": a gallery, because the work is shown by its pictures. "mostly-pictures": a gallery, because the upload facts say most of the upload is pictures. "question-findings": a case study, because the material sets out a question and what was found. "default": any other reason, or because you are unsure.
+${GALLERY_NOTE}
+${RESEARCH_NOTE}
+- For a build: title is the plain name of what was built and what it is, not a question, e.g. "Shift Swap: a web app for the Students' Union bar rota"; gap is the problem it solves, and for whom, at most ${B.gapWords} words, with gapHighlight the problem; flow is how it was built; findings are 0 to ${B.findings.max} bullets of what it does, each at most ${B.findings.wordsEach} words, only what the material says it does, otherwise an empty list; skills are what it was built with; at most ${B.sections.graph} graph; next is what the person says they would add or change next; references are its links.
+- For an essay: title is the question the essay answers, as a question, or its thesis as a statement if it asks none; gap is the context: why the question matters, at most ${E.gapWords} words; flow is how the argument runs, in order; findings are the argument's key points, ${E.findings.min} to ${E.findings.max} bullets, each at most ${E.findings.wordsEach} words; at most ${E.sections.graph} graph, and only from figures the material quotes; next is what the person says they would look at next, at most ${E.reflection.words} words; references are its sources. Never add a point or a reading the material doesn't make.
+- For a before and after: title is the plain name of what was redesigned, not a question, e.g. "Redesigning the checkout of a campus cafe's order app"; gap is the problem: what was wrong with it, and for whom, at most ${BA.gapWords} words, with gapHighlight the problem; flow is what the person did; findings are ${BA.findings.min} to ${BA.findings.max} bullets of what changed and why, each at most ${BA.findings.wordsEach} words; at most ${BA.sections.graph} graph. You never see the pictures: do not describe them, and never say which shows before and which after.
+- For an event: title is the plain name of the event, not a question, e.g. "The Crucible: the Drama Society's spring show"; gap is the brief: what the event was for, and who it was for, at most ${EV.gapWords} words, with gapHighlight the aim; flow is how it was put on; findings are 0 to ${EV.findings.max} bullets of how it went, each at most ${EV.findings.wordsEach} words, only if the material says how it went, otherwise an empty list; at most ${EV.sections.graph} graph; quote may be a review of it. You never see the pictures: do not describe them.
+${LAST}`;
+
+export { DraftSchema, DraftSchemaSeven, toChart, toDoc, type DraftChart, type DraftLayouts } from "./draft-answer";
+/** What the draft call sends as output_config, for each kind of draft. Exported so scripts/probe-ai-shapes.ts checks the very shapes the app sends. */
 export const DRAFT_OUTPUT_CONFIG = { effort: "low" as const, format: zodOutputFormat(DraftSchema) };
+export const DRAFT_OUTPUT_CONFIG_SEVEN = { effort: "low" as const, format: zodOutputFormat(DraftSchemaSeven) };
 
 export type DraftInput = {
   text: string;
@@ -87,12 +151,20 @@ export type DraftInput = {
   link?: string;
   /** Counts from the upload (never the pages themselves), so the AI can tell mostly-pictures material from text. */
   signals?: { imageFiles: number; pdfPages: number; pdfPicturePages: number };
+  /**
+   * The layouts the draft may choose: "seven" for a person whose editor is the new one, "three" for one whose
+   * editor is the classic one, which can't edit what the other four add (lib/exhbt/formats.ts, offeredIn).
+   * Three when not said, so nothing drafts among seven without asking to.
+   */
+  layouts?: DraftLayouts;
 };
 export type DraftNumber = { value: string; sourceQuote: string };
 export type DraftResult = {
   doc: ExhbtDoc;
   /** Why the layout was chosen: the model's signal, kept only if the draft, the notes and the upload counts bear it out. */
   formatReason: LayoutReason;
+  /** What the model wrote for a pull quote, a role, a source or a link that the material didn't hold, so it isn't on the doc. For the draft eval; never shown. */
+  leftOff: string[];
   numbers: DraftNumber[];
   model: string;
   inputTokens: number;
@@ -110,13 +182,14 @@ export function materialText({ text, notes, link }: DraftInput): string {
 
 /** The whole draft request, so a script can send exactly what the app sends. */
 export function draftRequest(input: DraftInput) {
+  const seven = input.layouts === "seven";
   return {
     model: AI_MODEL,
     // The model thinks before it answers: roughly 1,400 to 4,900 tokens on the eval fixtures,
     // and up to 5,800 tokens in all. At 4,000 most drafts were cut off mid-answer (decision 0029).
     max_tokens: 16000,
-    output_config: DRAFT_OUTPUT_CONFIG,
-    system: SYSTEM,
+    output_config: seven ? DRAFT_OUTPUT_CONFIG_SEVEN : DRAFT_OUTPUT_CONFIG,
+    system: seven ? SYSTEM_SEVEN : SYSTEM,
     messages: [
       {
         role: "user" as const,
@@ -141,17 +214,19 @@ export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
     return mockDraft(input);
   }
 
+  const layouts = input.layouts ?? "three";
   const { value: draft, model, inputTokens, outputTokens } = await structuredCall({
     feature: "exhbt_draft",
     client: new Anthropic({ apiKey }),
     request: draftRequest(input),
-    schema: DraftSchema,
-    repair: repairDraft,
+    schema: draftSchema(layouts),
+    repair: (raw) => repairDraft(raw, layouts),
   });
   const doc = toDoc(draft, materialText(input));
   return {
     doc,
     formatReason: checkedReason(doc, draft.formatReason, input),
+    leftOff: leftOff(draft, doc),
     numbers: draft.numbers,
     model,
     inputTokens,
@@ -159,92 +234,6 @@ export async function draftExhbt(input: DraftInput): Promise<DraftResult> {
     costUsd: costUsd(inputTokens, outputTokens),
   };
 }
-
-/** For comparing a quote with the material: one space, straight quotes, no case. */
-
-/**
- * The quote the model proposed, if it's really in the material: its words as written there, and
- * the name too. Anything else is dropped rather than flagged: a quote can't be checked like a
- * number, and an invented one would put words in someone's mouth.
- */
-export function quoteFrom(q: Draft["quote"] | null, source: string): { text: string; name: string; role: string } | null {
-  if (!q) return null;
-  const text = q.text.trim().replace(/^["“‘']+|["”’']+$/g, "").trim();
-  const name = q.name.trim();
-  const flat = squash(source);
-  if (!text || !name || words(text) > L.quote.words || !flat.includes(squash(text)) || !flat.includes(squash(name))) return null;
-  const role = q.role.trim();
-  return { text, name: name.slice(0, L.quote.nameChars), role: role && flat.includes(squash(role)) ? role.slice(0, L.quote.roleChars) : "" };
-}
-
-/**
- * The model's strings as an ExhbtDoc, trimmed to the block counts. Word limits are left to the
- * editor (drafts may run over; publishing may not), but counts are clamped so the layout holds.
- * `source` is the material (materialText), for the quote check.
- */
-export function toDoc(d: Draft, source: string): ExhbtDoc {
-  const nonEmpty = (s: string) => s.trim().length > 0;
-  // The layout the draft chose; the caps are that layout's (decision 0024).
-  const f = isFormat(d.format) ? d.format : "case-study";
-  const FL = formatLimits(f);
-  const findings = d.findings.map((x) => x.trim()).filter(nonEmpty).slice(0, FL.findings.max).map(text);
-  const charts = d.charts
-    .map(toChart)
-    .filter((c): c is Chart => c !== null && hasData(c))
-    .slice(0, FL.sections.graph);
-  const quote = quoteFrom(d.quote, source);
-  const next = d.next.trim();
-  const findingsSection: Section[] = findings.length ? [{ id: "findings", kind: "findings" as const, items: findings }] : [];
-  const graphs: Section[] = charts.map((chart, i) => ({ id: `graph-${i + 1}`, kind: "graph" as const, chart }));
-  const quoteSection: Section[] = quote ? [{ id: "quote-1", kind: "quote" as const, ...quote }] : [];
-  const nextSection: Section[] = next ? [{ id: "reflection-1", kind: "reflection" as const, text: text(next) }] : [];
-  let sections: Section[];
-  if (f === "research") {
-    // Research poster order: the aim, the results, the graphs, the conclusion, feedback, limitations, then the references.
-    const aim = d.aim.trim();
-    const conclusion = d.conclusion.trim();
-    const refs = referencesFrom(d.references, source, FL.sections.link);
-    sections = [
-      ...(aim ? [{ id: "aim-1", kind: "aim" as const, text: text(aim), ...(d.aimIsHypothesis ? { heading: "hypothesis" as const } : {}) }] : []),
-      ...findingsSection,
-      ...graphs,
-      ...(conclusion ? [{ id: "conclusion-1", kind: "conclusion" as const, text: text(conclusion) }] : []),
-      ...quoteSection,
-      ...nextSection,
-      ...refs.map((r, i) => ({
-        id: `link-${i + 1}`,
-        kind: "link" as const,
-        href: r.href,
-        label: r.label.split(/\s+/).slice(0, FL.link.labelWords).join(" "),
-        description: "",
-      })),
-    ];
-  } else {
-    // Below the flowchart, in this order (decision 0015): findings, the graphs, the quote, what I'd do next.
-    // A gallery or a case study keeps nothing for the aim, the conclusion or references: they aren't stored hidden.
-    sections = [...findingsSection, ...graphs, ...quoteSection, ...nextSection];
-  }
-  return {
-    schemaVersion: SCHEMA_VERSION,
-    // Only when it isn't a case study, so a case-study draft is the same doc as before layouts.
-    ...(f === "case-study" ? {} : { format: f }),
-    title: d.title.trim().slice(0, L.titleChars),
-    // What it is and where and when sit in the sidebar (decision 0022); the summary goes on portfolio cards.
-    context: d.context.trim().slice(0, L.contextChars),
-    // Always written, empty or not, so "Back to the AI version" of the header restores them too.
-    whereWhen: d.whereWhen.trim().slice(0, L.whereWhenChars),
-    summary: d.summary.trim(),
-    skills: d.skills.map((s) => s.trim()).filter(nonEmpty).slice(0, L.skills.max),
-    // The highlighted gap only when its words are really in the line.
-    gap: withHighlight(d.gap, d.gapHighlight),
-    flow: d.flow
-      .filter((s) => nonEmpty(s.step))
-      .slice(0, L.flow.max)
-      .map((s) => (s.detail.trim() ? { step: s.step.trim(), detail: s.detail.trim() } : { step: s.step.trim() })),
-    sections,
-  };
-}
-
 
 /**
  * Local development without an API key: a clearly labelled placeholder built from the
@@ -256,7 +245,46 @@ export function toDoc(d: Draft, source: string): ExhbtDoc {
  * material doesn't state: the mistake the number check exists for, so its flag can be seen
  * without an API key. A sentence in double quotes followed by a name (and ", role") becomes the
  * quote; a sentence starting "Next time" or "If I did this again" becomes what I'd do next.
+ *
+ * Its layout is the one the notes name ("stand-in: layout essay"), or else the first of these cues
+ * the material holds, in the order the prompt gives its rules, or else a case study. It chooses
+ * only among the layouts the draft may (`layouts`): a three-layout draft knows research's cue and
+ * the names gallery and research, as it always has, and nothing else. It ignores the upload
+ * signals, and never keys on "method", "results", "aim" or "abstract": other specs upload such files.
+ *
+ * For the parts the four layouts add it does what the real draft is asked to: an essay's pull
+ * quote is the material's first sentence, when that fits; its sources are the material's lines
+ * that start "Source:" (a citation, with its https address if the line has one); a build's links
+ * are the https addresses in the material; an event's role is what follows "my role was". When
+ * the notes say "stand-in: invent", it also writes one of each that the material doesn't hold (a
+ * pull quote, a source with no address, a link, a role): the mistake toDoc's checks exist for, so
+ * each can be seen to be left off without an API key.
  */
+const STAND_IN_CUES: readonly [Format, RegExp][] = [
+  ["research", /\bhypothes[ie]s\b/i],
+  ["build", /\bI built\b/i],
+  ["before-after", /\bredesigned\b/i],
+  ["event", /\bmy role was\b/i],
+  ["essay", /\bthis essay\b/i],
+];
+/** The signal each layout's stand-in draft gives when the notes didn't name it: the one its own draft is meant to bear out. */
+const STAND_IN_REASON: Record<Format, LayoutReason> = {
+  "case-study": "question-findings",
+  gallery: "visual-work",
+  research: "aim-results",
+  build: "built-thing",
+  essay: "argument-sources",
+  "before-after": "before-and-after",
+  event: "event-role",
+};
+/** What the stand-in writes with "stand-in: invent": none of it is in any material. */
+const INVENTED = {
+  pullquote: "A sentence the person never wrote.",
+  source: "Invented, A. (2020) A book nobody cited",
+  link: "https://example.com/not-in-the-material",
+  role: "Director of everything",
+};
+
 function mockDraft(input: DraftInput): DraftResult {
   // "stand-in: fail" in the notes: the failure a real draft has when it runs out of room, so the
   // failure path (the event, the admin panel, the message) can be seen without an API key.
@@ -265,10 +293,12 @@ function mockDraft(input: DraftInput): DraftResult {
   // that is out of credit (a 400). It spends nothing and isn't counted towards the day's limit.
   if (/stand-in: unanswered/i.test(input.notes ?? "")) throw new AIFailure("exhbt_draft", "service", { status: 400 });
   const source = materialText(input).replace(/^File: .*$/gm, "");
-  // The stand-in's layout: named in the notes, else research when the material says "hypothesis", else a case study.
-  // It ignores the upload signals, and never keys on "method", "results", "aim" or "abstract": other specs upload such files.
-  const named = input.notes?.match(/stand-in: layout (gallery|research)/i)?.[1]?.toLowerCase();
-  const format: Draft["format"] = named === "gallery" || named === "research" ? named : /\bhypothes[ie]s\b/i.test(source) ? "research" : "case-study";
+  // The layouts this draft may choose (see above): the name in the notes, else the first cue, else a case study.
+  const may: readonly Format[] = input.layouts === "seven" ? ["gallery", "research", "build", "essay", "before-after", "event"] : ["gallery", "research"];
+  const asked = input.notes?.match(/stand-in: layout ([a-z-]+)/i)?.[1]?.toLowerCase();
+  const named = may.find((f) => f === asked);
+  const format: Format = named ?? STAND_IN_CUES.find(([f, cue]) => (f === "research" || may.includes(f)) && cue.test(source))?.[0] ?? "case-study";
+  const invent = /stand-in: invent/i.test(input.notes ?? "");
   const links = [...new Set((source.match(/https:\/\/[^\s)\]>"'<]+/g) ?? []).map((u) => u.replace(/[.,;:]+$/, "")))];
   const firstSentence = (source.replace(/\s+/g, " ").match(/[^.!?]{12,}[.!?]/)?.[0] ?? source.slice(0, 120)).trim();
   const quote = firstSentence.split(" ").slice(0, L.findings.wordsEach).join(" ");
@@ -298,32 +328,54 @@ function mockDraft(input: DraftInput): DraftResult {
           },
         ]
       : [];
+  // The rows of `references`, by layout: research's references, an essay's sources, a build's links.
+  const cited = [...source.matchAll(/^Source:[ \t]*(.+)$/gim)].map((m) => {
+    const line = m[1]!.trim();
+    const url = line.match(/https:\/\/[^\s)\]>"'<]+/)?.[0]?.replace(/[.,;:]+$/, "") ?? "";
+    return { label: (url ? line.replace(url, "") : line).replace(/[\s.,;:]+$/, "").trim(), url };
+  });
+  const references =
+    format === "research"
+      ? links.map((url) => ({ label: "Placeholder: a reference from your files", url }))
+      : format === "essay"
+        ? [...(invent ? [{ label: INVENTED.source, url: "" }] : []), ...cited]
+        : format === "build"
+          ? [...(invent ? [{ label: "Placeholder: a made-up link", url: INVENTED.link }] : []), ...links.map((url) => ({ label: "Placeholder: a link from your files", url }))]
+          : [];
+  const pullquote = format !== "essay" ? "" : invent ? INVENTED.pullquote : firstSentence.split(" ").length <= E.pullquote.words ? firstSentence : "";
+  const myRole = format !== "event" ? "" : invent ? INVENTED.role : (source.match(/\bmy role was ([^.\n]{2,60})/i)?.[1]?.trim() ?? "");
   // The stand-in's reason for its layout: the notes when they named it, else the signal its own draft bears out.
-  const formatReason: LayoutReason = named ? "notes" : format === "research" ? "aim-results" : "question-findings";
-  const doc = toDoc({
-      format,
-      formatReason,
-      aim: format === "research" ? "Placeholder aim: what the material set out to test." : "",
-      aimIsHypothesis: false,
-      conclusion: format === "research" ? "Placeholder conclusion." : "",
-      references: format === "research" ? links.map((url) => ({ label: "Placeholder: a reference from your files", url })) : [],
-      title: format === "gallery" ? "Development preview: a gallery drafted from your files" : "Development preview: what would the AI draft from your files?",
-      summary: "A placeholder draft, made without an API key.",
-      context: "Placeholder: what the work is",
-      whereWhen: "Placeholder: where and when",
-      skills: ["Placeholder skill"],
-      gap: `No API key is configured, so this draft is placeholder text. Set ${ANTHROPIC_API_KEYS_ENV} to draft from your files.`,
-      gapHighlight: "this draft is placeholder text",
-      flow: [
-        { step: "Read the material", detail: "" },
-        { step: "Drafted the blocks", detail: "" },
-        { step: "Checked every number", detail: "" },
-      ],
-      findings: format === "gallery" ? [quote] : [quote, "This finding is a placeholder."],
-      charts,
-      quote: feedback ?? { text: "", name: "", role: "" },
-      next,
-      numbers,
-    }, materialText(input));
-  return { model: "mock", inputTokens: 0, outputTokens: 0, costUsd: 0, numbers, doc, formatReason: checkedReason(doc, formatReason, input) };
+  const formatReason: LayoutReason = named ? "notes" : STAND_IN_REASON[format];
+  // A question where the layout's title is one; elsewhere the plain name of the thing.
+  const asQuestion = format === "case-study" || format === "research" || format === "essay";
+  const draft: Draft = {
+    format,
+    formatReason,
+    aim: format === "research" ? "Placeholder aim: what the material set out to test." : "",
+    aimIsHypothesis: false,
+    conclusion: format === "research" ? "Placeholder conclusion." : "",
+    references,
+    pullquote,
+    myRole,
+    title: asQuestion ? "Development preview: what would the AI draft from your files?" : `Development preview: ${format === "event" ? "an" : "a"} ${FORMAT_RULES[format].name.toLowerCase()} drafted from your files`,
+    summary: "A placeholder draft, made without an API key.",
+    context: "Placeholder: what the work is",
+    whereWhen: "Placeholder: where and when",
+    skills: ["Placeholder skill"],
+    gap: `No API key is configured, so this draft is placeholder text. Set ${ANTHROPIC_API_KEYS_ENV} to draft from your files.`,
+    gapHighlight: "this draft is placeholder text",
+    flow: [
+      { step: "Read the material", detail: "" },
+      { step: "Drafted the blocks", detail: "" },
+      { step: "Checked every number", detail: "" },
+    ],
+    // One where the layout asks for one or more (a gallery, a build, an event); two where it asks for two.
+    findings: formatLimits(format).findings.min < 2 ? [quote] : [quote, "This finding is a placeholder."],
+    charts,
+    quote: feedback ?? { text: "", name: "", role: "" },
+    next,
+    numbers,
+  };
+  const doc = toDoc(draft, materialText(input));
+  return { model: "mock", inputTokens: 0, outputTokens: 0, costUsd: 0, numbers, doc, formatReason: checkedReason(doc, formatReason, input), leftOff: leftOff(draft, doc) };
 }

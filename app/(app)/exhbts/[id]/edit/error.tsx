@@ -5,16 +5,21 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useEditorServed } from "./served";
 
 /**
  * The edit page's own error page (decision 0026, "The crash fallback"): for what the new editor's
- * boundary cannot see, the page failing on the server. It says what the boundary says and links to
- * the classic editor for this visit; when the classic editor was the one asked for, it offers Reload.
- * The link is a full page load: a client navigation that only changes the query would keep this page.
+ * boundary cannot see, the page failing on the server. In the new editor it says what the boundary says
+ * and links to the classic editor for this visit. In the classic editor, whether the address asked for it
+ * or the switch serves it (as it does everyone until the new editor is switched on), it names the classic
+ * editor and offers Reload: the route's layout says which (served.tsx), since the address alone told the
+ * live site's classic editor that the new one had failed. The link is a full page load: a client
+ * navigation that only changes the query would keep this page.
  */
 export default function EditError({ error }: { error: Error & { digest?: string }; reset: () => void }) {
   const pathname = usePathname();
-  const classicAsked = useSearchParams().get("editor") === "classic";
+  const served = useEditorServed();
+  const classicAsked = useSearchParams().get("editor") === "classic" || served === "classic";
   useEffect(() => {
     console.error(error);
   }, [error]);

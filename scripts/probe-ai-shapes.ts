@@ -8,7 +8,7 @@
  * a one-line prompt and a tiny max_tokens, and reports accepted or refused with the API's message.
  * A few pence a year: the answers are cut off after a handful of tokens.
  *
- *   npm run probe:ai               # every shape the app sends, plus "draft with planned growth"
+ *   npm run probe:ai               # every shape the app sends, plus the seven-layout draft with room to spare
  *   npm run probe:ai -- --dry      # no API calls: the size of each schema only (no key needed)
  *   npm run probe:ai -- --explore  # also the measuring variants (what each construct costs)
  *   npm run probe:ai -- --warn-unchecked  # only a definite refusal fails
@@ -26,7 +26,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
-import { DRAFT_OUTPUT_CONFIG, DraftSchema } from "@/lib/ai/exhbt-draft";
+import { DRAFT_OUTPUT_CONFIG, DRAFT_OUTPUT_CONFIG_SEVEN, DraftSchemaSeven } from "@/lib/ai/exhbt-draft";
 import { rewriteOutputConfig } from "@/lib/ai/exhbt-rewrite";
 import { FIGURE_PICK_OUTPUT_CONFIG } from "@/lib/ai/figure-pick";
 import { JOB_MATCH_OUTPUT_CONFIG } from "@/lib/ai/job-match";
@@ -35,8 +35,6 @@ import { IDEAS_OUTPUT_CONFIG, SWAP_OUTPUT_CONFIG } from "@/lib/ai/projects";
 import { ROADMAP_OUTPUT_CONFIG } from "@/lib/ai/roadmap";
 import { AI_MODEL, anthropicApiKey } from "@/lib/ai/model";
 import { DRAFT_BLOCKS } from "@/lib/exhbt/draft-blocks";
-import { LAYOUT_REASONS } from "@/lib/exhbt/drafted";
-import { FORMATS } from "@/lib/exhbt/formats";
 
 type Json = Record<string, unknown>;
 type OutputConfig = { effort: "low" | "medium" | "high"; format: { type: "json_schema"; schema: Json } };
@@ -44,9 +42,14 @@ type Shape = { name: string; config: OutputConfig; kind: "app" | "growth" | "exp
 
 const cfg = (c: { effort: "low"; format: { type: "json_schema"; schema: Json } }): OutputConfig => ({ effort: c.effort, format: { type: "json_schema", schema: c.format.schema } });
 
-/** Every structured answer the app asks for, as the app sends it. */
+/**
+ * Every structured answer the app asks for, as the app sends it. The draft has two: "draft" chooses among the
+ * three layouts of the classic editor and is what was sent before release 4; "draft: seven layouts" is sent
+ * for a person whose editor is the new one (lib/ai/exhbt-draft.ts).
+ */
 const APP_SHAPES: Shape[] = [
   { name: "draft", config: cfg(DRAFT_OUTPUT_CONFIG), kind: "app" },
+  { name: "draft: seven layouts", config: cfg(DRAFT_OUTPUT_CONFIG_SEVEN), kind: "app" },
   ...DRAFT_BLOCKS.map((b) => ({ name: `rewrite: ${b}`, config: cfg(rewriteOutputConfig(b)), kind: "app" as const })),
   { name: "figure pick", config: cfg(FIGURE_PICK_OUTPUT_CONFIG), kind: "app" },
   { name: "job match", config: cfg(JOB_MATCH_OUTPUT_CONFIG), kind: "app" },
@@ -57,25 +60,18 @@ const APP_SHAPES: Shape[] = [
 ];
 
 /**
- * The draft as it will be once the work already built or decided has landed, so a release can't
- * take the schema over the limit unseen. Release 2's formatReason is in the real schema now; on
- * top of it, release 4 (decision 0028) lets the draft choose any of the 7 layouts (FORMATS) and
- * adds: a fixed reason for each new layout, so about 12 reasons; a pull quote and a "my role"
- * line; an essay's sources, each a citation with an optional address (kept apart from research's
- * references here, the larger case); and the demo and code links of a build, each with a label,
- * an address and a short description. Before and After marks on images are never drafted (0028),
- * so they are not here.
- * Release 4's own schema isn't on a branch yet, so its field names and new reasons here are stand-ins.
+ * The seven-layout draft with room to spare, so a release can't take it to the edge of the limit unseen.
+ * Release 4 (decision 0028) was first modelled here at 48 fields, with a list of its own for an essay's
+ * sources and another for a build's links; that shape was accepted on 23 Nov 2026 with 4 more fields but not
+ * 6 (decision 0029). The schema that shipped holds both in `references` and is 41 fields. This rung is the
+ * shipped schema with those two lists put back: 7 fields more than the app sends. While it is accepted, the
+ * draft has at least that much room.
  */
-const PlannedGrowth = (DraftSchema as unknown as z.ZodObject<z.ZodRawShape>).extend({
-  format: z.enum(FORMATS),
-  formatReason: z.enum([...LAYOUT_REASONS, "built-thing", "argument-sources", "before-and-after", "event-role"]),
-  pullQuote: z.string(),
-  myRole: z.string(),
+const WithRoom = (DraftSchemaSeven as unknown as z.ZodObject<z.ZodRawShape>).extend({
   sources: z.array(z.object({ label: z.string(), url: z.string() })),
   links: z.array(z.object({ label: z.string(), url: z.string(), description: z.string() })),
 });
-const GROWTH: Shape = { name: "draft with planned growth", config: cfg({ effort: "low", format: zodOutputFormat(PlannedGrowth) }), kind: "growth" };
+const GROWTH: Shape = { name: "draft: seven layouts, with room for 7 more fields", config: cfg({ effort: "low", format: zodOutputFormat(WithRoom) }), kind: "growth" };
 
 // ---------------------------------------------------------------------------------------------
 // Schema surgery for the explore variants. They work on the JSON schema the app sends.
@@ -128,18 +124,20 @@ const STR = { type: "string" };
 const NSTR = { type: ["string", "null"] };
 
 /**
- * Measurements, not checks: how many more fields fit on top of the draft and of the planned
- * growth (decision 0029 has the numbers). A rung that flips from accepted to refused places the limit.
+ * Measurements, not checks: how many more fields fit on top of each draft and of the seven-layout
+ * draft with room (decision 0029 has the numbers). A rung that flips from accepted to refused places the limit.
  */
 function exploreShapes(): Shape[] {
   const draft = DRAFT_OUTPUT_CONFIG.format.schema as Json;
+  const seven = DRAFT_OUTPUT_CONFIG_SEVEN.format.schema as Json;
   const growth = GROWTH.config.format.schema;
   const v = (name: string, schema: Json): Shape => ({ name: `explore: ${name}`, config: { effort: "low", format: { type: "json_schema", schema } }, kind: "explore" });
   return [
     ...[4, 8, 12, 16, 20, 24].map((n) => v(`draft + ${n} strings`, plus(draft, n, STR, "s"))),
     ...[1, 2, 4, 8].map((n) => v(`draft + ${n} nullable strings`, plus(draft, n, NSTR, "n"))),
-    ...[2, 4, 6, 8, 10, 12, 16].map((n) => v(`draft with planned growth + ${n} strings`, plus(growth, n, STR, "s"))),
-    v("draft with planned growth, enums sent as real enums", realEnums(growth)),
+    ...[4, 8, 12, 16].map((n) => v(`draft: seven layouts + ${n} strings`, plus(seven, n, STR, "s"))),
+    ...[2, 4, 6, 8, 10, 12, 16].map((n) => v(`draft: seven layouts, with room + ${n} strings`, plus(growth, n, STR, "s"))),
+    v("draft: seven layouts, with room, enums sent as real enums", realEnums(growth)),
   ];
 }
 
@@ -230,7 +228,7 @@ async function main() {
   const unchecked = failed.filter((r) => r.status === "unchecked");
   if (refused.length) console.log(`\n${refused.length} shape(s) refused by the API: ${refused.map((r) => r.shape.name).join(", ")}`);
   if (unchecked.length) console.log(`\n${unchecked.length} shape(s) could not be checked (not a refusal; run again): ${unchecked.map((r) => r.shape.name).join(", ")}`);
-  if (!failed.length) console.log("\nEvery shape the app sends was accepted, and the planned growth fits.");
+  if (!failed.length) console.log("\nEvery shape the app sends was accepted, and the seven-layout draft has room to spare.");
   if (refused.length) process.exit(1);
   if (unchecked.length) {
     if (warnUnchecked) console.log(`::warning::${unchecked.length} AI request shape(s) could not be checked (not a refusal).`);

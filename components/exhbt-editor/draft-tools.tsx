@@ -1,5 +1,6 @@
 "use client";
 
+import "./css/draft-tools.css";
 import { createContext, useContext, useMemo, useSyncExternalStore } from "react";
 import { rewriteBlockAction } from "@/app/(app)/exhbts/[id]/draft-tools-actions";
 import { BlockTools, type DraftTools, type DraftToolsInit } from "@/components/editor/BlockTools";

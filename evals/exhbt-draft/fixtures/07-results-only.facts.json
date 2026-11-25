@@ -5,7 +5,7 @@
   "files": ["07-results-only.csv"],
   "notesFile": "07-results-only.notes.txt",
   "link": null,
-  "expect": {"headlineNumber":true,"chart":true,"noNumbers":false},
+  "expect": {"headlineNumber":true,"chart":true,"noNumbers":false,"layout":"case-study"},
   "keyFacts": [
     {"id":"test","fact":"A four-week A/B test of when a revision app sends study reminders, at an ed-tech start-up internship.","match":["A/B","reminder"]},
     {"id":"completion","fact":"Evening reminders gave the highest completion rate: 46.7% against 38.1% with no reminder.","match":[["46.7","38.1"],"46.7"]},

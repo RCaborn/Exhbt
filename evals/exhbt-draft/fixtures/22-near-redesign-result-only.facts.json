@@ -1,0 +1,20 @@
+{
+  "fixture": "22-near-redesign-result-only",
+  "shape": "A near miss for the before and after layout: a redesign written up in markdown that describes only the new sheet and what came of it. Nothing says how the old one was.",
+  "tests": "Layout: case study, never before and after. That layout needs both how the thing was and how it is now (decision 0028). No 'before' is invented: no earlier figure, no claim of improvement over the old sheet.",
+  "files": ["22-near-redesign-result-only.md"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":false,"chart":false,"noNumbers":false,"layout":"case-study"},
+  "keyFacts": [
+    {"id":"sheet","fact":"One side of A4 with three boxes for anything urgent: repairs, welfare concerns and lost keys.","match":["three boxes",["repairs","welfare"],"urgent"]},
+    {"id":"trial","fact":"Trialled for four weeks, counting what happened to every urgent item.","match":["four weeks","trial"]},
+    {"id":"result","fact":"57 urgent items were written on it; 52 were dealt with before midday the next day.","match":[["57","52"]]},
+    {"id":"adopted","fact":"The hall manager adopted the sheet for all four halls from January 2026.","match":["all four halls","adopted"]}
+  ],
+  "forbidden": [
+    {"id":"invented-before","why":"The material never says how the old sheet was or how long things took before.","match":["down from","up from","used to take","previously took","compared with the old","than the old sheet"]},
+    {"id":"derived","why":"The material gives 52 of 57 and no percentage.","match":["91%","91.2"]}
+  ],
+  "sourceNumbers": ["2","2025","57","52","2026"]
+}

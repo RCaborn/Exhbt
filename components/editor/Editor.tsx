@@ -16,7 +16,7 @@ import { drawnFlow, isArranged, restoreFlow } from "@/lib/exhbt/layouts";
 import { hasData } from "@/lib/exhbt/charts";
 import { newImageSection, roomFor } from "@/lib/exhbt/sections";
 import { sameJson } from "@/lib/json";
-import { LayoutPicker, type Drafted } from "./LayoutPicker";
+import { LayoutPicker, type Drafted, type NewEditorWay } from "./LayoutPicker";
 import { BlockTools, useDraftTools, type DraftToolsInit } from "./BlockTools";
 import { ConfirmAction } from "./ConfirmAction";
 import { DeleteExhbt } from "./DeleteExhbt";
@@ -94,7 +94,7 @@ const GUIDE_KEY = "exhbt-guide-hidden";
 /** Whether `now` is the very copy `offered` (the same time and the same doc). */
 const sameCopy = (now: Backup | null, offered: Backup) => Boolean(now && now.at === offered.at && JSON.stringify(now.doc) === JSON.stringify(offered.doc));
 
-export function Editor(props: EditorProps) {
+export function Editor(props: EditorProps & { /** This editor only: how this person gets to the new editor, if they may use it (LayoutPicker). */ newEditor?: NewEditorWay }) {
   const { id, status, slug, liveBase, owner, planBlock, canGoLive, maxFileMb } = props;
   const [doc, setDoc] = useState<ExhbtDoc>(props.initialDoc);
   // What the draft page passed on, kept from the first render: it comes off the address below, so a
@@ -534,7 +534,7 @@ export function Editor(props: EditorProps) {
                 }}
               />
             )}
-            <LayoutPicker doc={doc} setDoc={setDoc} drafted={drafted} />
+            <LayoutPicker id={id} doc={doc} setDoc={setDoc} drafted={drafted} newEditor={props.newEditor} />
             <Card id="card-header" title={copy.header} words={cw.header} flagged={flaggedBy("header")} heaviest={heaviest === "header"}>
               {flags.length > 0 && (
                 <ul aria-label="Numbers to check" className="mb-4 space-y-2">

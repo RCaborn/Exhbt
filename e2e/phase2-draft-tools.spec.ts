@@ -3,8 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { ENTITLEMENTS } from "../lib/entitlements";
 import { emptyDoc, text, type ExhbtDoc, type RichText } from "../lib/exhbt/blocks";
 import { aiVersionOf, blockValue, replaceBlock, sameBlock } from "../lib/exhbt/draft-blocks";
+import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import { backToAiVersion, cardMenuButton, chooseLayout, closeRewrite, DRAFT_PROJECT as PROJECT, draftAndOpen, findingsField, openCardMenu, previewArticle, revealCardMenu, rewritesLeft, signInToDraft, startRewrite, waitForSaved } from "./editor";
-import { READY } from "./page-editor";
+import { freshName, READY } from "./page-editor";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -146,6 +147,14 @@ test.describe("Rewrite and back to the AI version", () => {
     await startRewrite(page, "flow");
     await expect(page.getByTestId("tools-flow")).toContainText("No rewrites left on this exhbt.");
     await expect(page.getByTestId("tools-flow").getByRole("link", { name: "See your plan" })).toHaveAttribute("href", "/account/billing");
+    // It holds nothing and has no Cancel: Escape closes it, and gives the focus back to More actions; so does a press anywhere else.
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("tools-flow")).not.toContainText("No rewrites left on this exhbt.");
+    await expect(cardMenuButton(page, "flow")).toBeFocused();
+    await startRewrite(page, "flow");
+    await expect(page.getByTestId("tools-flow")).toContainText("No rewrites left on this exhbt.");
+    await page.mouse.click(4, 600);
+    await expect(page.getByTestId("tools-flow")).not.toContainText("No rewrites left on this exhbt.");
 
     await startRewrite(stale, "flow");
     await stale.getByRole("button", { name: "Rewrite the process now" }).click();
@@ -157,14 +166,15 @@ test.describe("Rewrite and back to the AI version", () => {
 
   test("no accessibility violations on the editor with the rewrite controls open", async ({ page }) => {
     await draftAndOpen(page, "a11y");
-    await startRewrite(page, "findings");
-    await startRewrite(page, "gap");
-    // Make "Back to the AI version" show on the findings card too, so it is scanned, with its menu open.
+    // Make "Back to the AI version" show on the findings card too, so it is scanned, with its menu open. Typed before the
+    // forms open: an open form is a card over the first words of its section (css/draft-tools.css), and stays there.
     await findingsField(page).click();
     // The click starts the field's editor; keys typed before it has the cursor go nowhere (fillRich waits the same way).
     await expect(findingsField(page).locator(".ProseMirror")).toBeFocused();
     await page.keyboard.press("End");
     await page.keyboard.type(" extra");
+    await startRewrite(page, "findings");
+    await startRewrite(page, "gap");
     await openCardMenu(page, "findings");
     await expect(backToAiVersion(page, "findings")).toBeVisible();
     const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
@@ -202,14 +212,24 @@ test.describe("An open rewrite form stays up and takes the press", () => {
       // Drawn, not only laid out (Playwright counts a see-through button as visible).
       for (let e: Element | null = tools; e; e = e.parentElement) if (getComputedStyle(e).opacity !== "1") return `see-through at ${name(e)}`;
       // Every point of it that is on screen, under the editor's top bar, is its own: nothing later on the page is drawn over it.
-      const r = tools.getBoundingClientRect();
-      const top = Math.max(r.top, document.querySelector("[data-topbar]")?.getBoundingClientRect().bottom ?? 0);
+      // Its button, and the form: in a card of its own under the button, out of the button's box, outside the compact card
+      // (css/draft-tools.css).
+      const panel = tools.querySelector("[data-tools-panel]");
+      const parts = [tools, ...(panel && getComputedStyle(panel).position === "absolute" ? [panel] : [])];
       let seen = 0;
-      for (let y = top + 2; y < Math.min(r.bottom, window.innerHeight) - 1; y += 6) {
-        for (let x = Math.max(r.left, 0) + 2; x < Math.min(r.right, window.innerWidth) - 1; x += 6) {
-          const at = document.elementFromPoint(x, y);
-          if (!at || !tools.contains(at)) return `${at ? name(at) : "nothing"} is over it at ${Math.round(x - r.left)}, ${Math.round(y - r.top)} of ${Math.round(r.width)} by ${Math.round(r.height)}`;
-          seen++;
+      for (const part of parts) {
+        const r = part.getBoundingClientRect();
+        // A press outside a rounded corner is not the card's.
+        const round = parseFloat(getComputedStyle(part).borderTopLeftRadius) || 0;
+        const corner = (x: number, y: number) => (x < r.left + round || x > r.right - round) && (y < r.top + round || y > r.bottom - round);
+        const top = Math.max(r.top, document.querySelector("[data-topbar]")?.getBoundingClientRect().bottom ?? 0);
+        for (let y = top + 2; y < Math.min(r.bottom, window.innerHeight) - 1; y += 6) {
+          for (let x = Math.max(r.left, 0) + 2; x < Math.min(r.right, window.innerWidth) - 1; x += 6) {
+            if (corner(x, y)) continue;
+            const at = document.elementFromPoint(x, y);
+            if (!at || !tools.contains(at)) return `${at ? name(at) : "nothing"} is over it at ${Math.round(x - r.left)}, ${Math.round(y - r.top)} of ${Math.round(r.width)} by ${Math.round(r.height)}`;
+            seen++;
+          }
         }
       }
       return seen > 50 ? "drawn, on top" : `only ${seen} points of it are on screen`;
@@ -289,6 +309,207 @@ test.describe("An open rewrite form stays up and takes the press", () => {
       return { levelWithTheBar: r.top < bar.bottom && r.bottom > bar.top, theBarIsOverIt: Boolean(found?.closest("[data-topbar]")) };
     });
     expect(at).toEqual({ levelWithTheBar: true, theBarIsOverIt: true });
+  });
+
+  /*
+   * Outside the compact card, an open form was drawn straight over the page's words, with no ground of its own; and in
+   * the app's ink it could not be read on a dark look's well, in the compact card too. Now the menu and the panel (the
+   * form, "No rewrites left" and the line that says how a rewrite went) are on the compact card's ground, the look's
+   * well, in the look's own words (css/draft-tools.css).
+   */
+  test.describe("An open menu or rewrite form has a ground of its own, in every place and every look", () => {
+    const PLACES = ["above", "edge", "side", "rcol", "compact"] as const;
+
+    /** Signs in as a new person on Max (which has every look) in look `id`, drafts through the API and opens the editor. */
+    async function draftInLook(page: Page, id: string) {
+      const user = freshName(`ground${id}`);
+      await page.goto(`/dev/portfolio?username=${user}&plan=max&count=0&look=${id}`);
+      await page.goto(`/auth/dev?email=${user}@example.com&next=${encodeURIComponent("/exhbts/new")}`);
+      await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
+      const res = await page.request.post("/api/exhbts/draft", { data: { text: PROJECT } });
+      expect(res.status()).toBe(200);
+      const { id: exhbt } = (await res.json()) as { id: string };
+      await page.goto(`/exhbts/${exhbt}/edit`);
+      await expect(page.locator(READY)).toBeAttached();
+      await expect(page.locator(`${READY} [data-theme="${id}"]`).first()).toBeAttached();
+    }
+
+    /**
+     * What is wrong with the ground under the open menu or panel of a block's "More actions", or nothing. Its ground (the first
+     * opaque ground under it) is the compact card's, the look's well; and every word in it, and the note field's placeholder,
+     * lies inside an opaque ground that belongs to its toolbar (its own card, the compact card, or a button or field of its
+     * own), drawn at full strength, at 4.5:1 or more against that ground.
+     */
+    const groundProblems = (page: Page, block: string, part: "menu" | "panel") =>
+      page.getByTestId(`tools-${block}`).evaluate((root, part) => {
+        const scope = root.querySelector(part === "menu" ? "[data-tools-menu]" : "[data-tools-panel]")!;
+        const bar = root.closest(".xe-tools, .xe-shell-tools")!;
+        const name = (e: Element) => `${e.tagName.toLowerCase()}.${(e.getAttribute("class") ?? "").split(/\s+/).slice(0, 3).join(".")}`;
+        const parse = (c: string) => {
+          const n = (c.match(/-?[\d.]+(e-?\d+)?/g) ?? []).map(Number);
+          if (c.startsWith("color(")) return { r: n[0]! * 255, g: n[1]! * 255, b: n[2]! * 255, a: n[3] ?? 1 };
+          return { r: n[0]!, g: n[1]!, b: n[2]!, a: c.startsWith("rgba") ? n[3]! : 1 };
+        };
+        const lum = (c: { r: number; g: number; b: number }) =>
+          [c.r, c.g, c.b].map((v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4)).reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i]!, 0);
+        const ratio = (fg: string, bg: { r: number; g: number; b: number }) => {
+          const f = parse(fg);
+          // A see-through colour is drawn over its ground.
+          const on = { r: f.r * f.a + bg.r * (1 - f.a), g: f.g * f.a + bg.g * (1 - f.a), b: f.b * f.a + bg.b * (1 - f.a) };
+          const [x, y] = [lum(on), lum(bg)].sort((p, q) => q - p);
+          return (x! + 0.05) / (y! + 0.05);
+        };
+        const groundOf = (el: Element) => {
+          for (let e: Element | null = el; e; e = e.parentElement) {
+            const c = parse(getComputedStyle(e).backgroundColor);
+            if (c.a > 0) return { e, c };
+          }
+          return null;
+        };
+        const well = (() => {
+          const probe = document.createElement("span");
+          probe.style.backgroundColor = "var(--xp-card)";
+          root.appendChild(probe);
+          const c = getComputedStyle(probe).backgroundColor;
+          probe.remove();
+          return c;
+        })();
+        const problems: string[] = [];
+        const own = groundOf(scope);
+        if (!own || getComputedStyle(own.e).backgroundColor !== well) problems.push(`its ground is ${own ? `${getComputedStyle(own.e).backgroundColor} (${name(own.e)})` : "nothing"}, not the compact card's ${well}`);
+        const check = (el: Element, what: string, colour: string) => {
+          const g = groundOf(el);
+          if (!g || !bar.contains(g.e)) return problems.push(`${what} is drawn straight over ${g ? name(g.e) : "nothing"}, not on a ground of its own`);
+          if (g.c.a < 1) return problems.push(`${what} is on a see-through ground (${name(g.e)})`);
+          const [r, o] = [el.getBoundingClientRect(), g.e.getBoundingClientRect()];
+          if (r.left < o.left - 1 || r.right > o.right + 1 || r.top < o.top - 1 || r.bottom > o.bottom + 1) return problems.push(`${what} runs out of its ground (${name(g.e)})`);
+          for (let e: Element | null = el; e; e = e.parentElement) if (getComputedStyle(e).opacity !== "1") return problems.push(`${what} is faded at ${name(e)}`);
+          const c = ratio(colour, g.c);
+          if (c < 4.5) problems.push(`${what} is ${c.toFixed(2)}:1 on ${name(g.e)}`);
+        };
+        for (const el of scope.querySelectorAll("*")) {
+          const words = [...el.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent ?? "").join("").trim();
+          if (words && el.getClientRects().length > 0) check(el, `"${words.slice(0, 40)}"`, getComputedStyle(el).color);
+        }
+        for (const field of scope.querySelectorAll("input")) check(field, "the note field's placeholder", getComputedStyle(field, "::placeholder").color);
+        return problems;
+      }, part);
+
+    /** Opens the block's menu, then its form, each checked for its ground; then closes the form. `what` names the case. */
+    async function eachOnItsOwnGround(page: Page, block: string, what: string) {
+      await openCardMenu(page, block);
+      expect(await groundProblems(page, block, "menu"), `${what}: the menu`).toEqual([]);
+      await page.getByTestId(`tools-${block}`).getByRole("button", { name: "Rewrite this block" }).click();
+      await leave(page);
+      await expect(rewriteNow(page, block)).toBeVisible();
+      expect(await groundProblems(page, block, "panel"), `${what}: the form`).toEqual([]);
+      await takesThePress(page, block, what);
+      await closeRewrite(page, block);
+    }
+
+    // One test per look, so a busy machine can't run one out of time.
+    for (const look of PORTFOLIO_THEMES) {
+      test(`in the ${look.name || look.id} look: the flowchart's in each place a section's toolbar can be, and the title's, the context line's and the skills'`, async ({ page }) => {
+        test.setTimeout(150_000);
+        await draftInLook(page, look.id);
+        const tools = page.locator(`${READY} [data-kind="flow"] > .xe-tools`).first();
+        for (const place of PLACES) {
+          await tools.evaluate(hold, place === "above" ? null : place);
+          await eachOnItsOwnGround(page, "flow", `${look.id}, the flowchart's toolbar ${place}`);
+        }
+        for (const block of ["header", "gap", "skills"] as const) await eachOnItsOwnGround(page, block, `${look.id}, ${block}`);
+      });
+    }
+
+    test(`in the Night look: "No rewrites left", and the reason a rewrite was refused`, async ({ page }) => {
+      test.setTimeout(150_000);
+      await draftInLook(page, "night");
+      // A second tab that doesn't know the count has changed.
+      const stale = await page.context().newPage();
+      await stale.goto(page.url());
+      await expect(stale.locator(READY)).toBeAttached();
+      // Each page is in front while it is driven: a page in the background is not drawn again, so what is under its pointer would not change.
+      await page.bringToFront();
+      // Free's rewrites run out sooner than Max's, and both pages keep the look they were drawn in (Max's).
+      expect((await page.request.get("/dev/plan?plan=free&next=/exhbts")).ok()).toBe(true);
+      for (let i = 1; i <= FREE_REWRITES; i++) {
+        await startRewrite(page, "flow");
+        await rewriteNow(page, "flow").click();
+        await expect(rewritesLeft(page, "flow")).toContainText(`${FREE_REWRITES - i} of`);
+      }
+      for (const p of [page, stale]) await p.locator(`${READY} [data-kind="flow"] > .xe-tools`).first().evaluate(hold, null);
+      await startRewrite(page, "flow");
+      await expect(page.getByTestId("tools-flow")).toContainText("No rewrites left on this exhbt.");
+      await leave(page);
+      expect(await groundProblems(page, "flow", "panel"), "No rewrites left").toEqual([]);
+
+      await stale.bringToFront();
+      await startRewrite(stale, "flow");
+      await rewriteNow(stale, "flow").click();
+      await expect(stale.getByTestId("tools-flow").getByTestId("tools-status")).toContainText(`You've used all ${FREE_REWRITES} rewrites`);
+      await leave(stale);
+      expect(await groundProblems(stale, "flow", "panel"), "a refused rewrite").toEqual([]);
+    });
+  });
+
+  /*
+   * An open form stays until it is cancelled or used (above), so a note typed in it is not lost: a press anywhere else, or the
+   * focus going into a field on the page, leaves it, in a toolbar's compact card too, which used to close and hide it (decision
+   * 0026: while it is open its toolbar stays, wherever the pointer and the focus are). Escape closes it, and its menu, and gives
+   * the focus back to "More actions": with the focus in it, and with the focus on nothing, as it is once "Rewrite this block" is
+   * pressed. In the compact card the form's Escape comes first, then the card's.
+   */
+  test.describe("Escape closes an open menu or rewrite form and gives the focus back to More actions; a press outside leaves the form", () => {
+    const noteField = (page: Page, block: string) => page.getByTestId(`tools-${block}`).getByRole("textbox", { name: /^Note for the rewrite/ });
+
+    for (const where of ["the flowchart's toolbar in its own place, the compact card", "the flowchart's toolbar above its corner", "the context line's corner toolbar"] as const) {
+      test(where, async ({ page }) => {
+        await draftAndOpen(page, "escape");
+        const block = where.startsWith("the flowchart") ? "flow" : "gap";
+        const tools = page.locator(`${READY} [data-kind="flow"] > .xe-tools`).first();
+        if (where.includes("above")) await tools.evaluate(hold, null);
+        else if (block === "flow") expect(await tools.getAttribute("data-place")).toBe("compact");
+        const more = cardMenuButton(page, block);
+
+        // The menu.
+        await openCardMenu(page, block);
+        await expect(more).toHaveAttribute("aria-expanded", "true");
+        await page.keyboard.press("Escape");
+        await expect(more, where).toHaveAttribute("aria-expanded", "false");
+        await expect(more, where).toBeFocused();
+
+        // The form, a note typed in it: a press on the page's margin, then in the title, leaves it, with the note.
+        await startRewrite(page, block);
+        await noteField(page, block).fill("shorter");
+        for (const press of ["the margin", "the title"]) {
+          if (press === "the margin") await page.mouse.click(4, 600);
+          else await page.locator(`${READY} #title`).click();
+          await takesThePress(page, block, `${where}, after a press on ${press}`);
+          await expect(noteField(page, block), `${where}, after a press on ${press}`).toHaveValue("shorter");
+        }
+        // Escape with the focus on nothing.
+        await page.mouse.click(4, 600);
+        await expect.poll(() => page.evaluate(() => document.activeElement === document.body)).toBe(true);
+        await page.keyboard.press("Escape");
+        await expect(rewriteNow(page, block), where).toHaveCount(0);
+        await expect(more, where).toBeFocused();
+
+        // Escape with the focus in the form.
+        await startRewrite(page, block);
+        await noteField(page, block).focus();
+        await page.keyboard.press("Escape");
+        await expect(rewriteNow(page, block), where).toHaveCount(0);
+        await expect(more, where).toBeFocused();
+
+        if (block === "flow" && !where.includes("above")) {
+          // The compact card is still open round "More actions"; the next Escape closes it, and the focus goes to its own button.
+          await expect(tools).toHaveAttribute("data-open", "");
+          await page.keyboard.press("Escape");
+          await expect(tools).not.toHaveAttribute("data-open", "");
+          await expect(tools.locator('[data-tool="menu"]')).toBeFocused();
+        }
+      });
+    }
   });
 });
 

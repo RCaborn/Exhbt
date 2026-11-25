@@ -393,3 +393,84 @@ Still open:
 - The top bar cuts the reason for a failed save at 22rem with an ellipsis. "This couldn't be saved. Reload the page and try again." loses its second half. The whole of it is said to a screen reader. Under 64rem the words are not drawn at all.
 - `store.setAt` still compares a stored value with what a field built as JSON text (`sameValue` in `store-core.ts`). On the live site a formatted field typed in and put back as it was may then count as a change, and be saved once more. Not tested with a doc in the database's key order. The editor's other comparisons of JSON text (the undo list, a layout switch, the toolbar's check of its own words) each set the store's doc against one made from it. Reading them, the database's order should not mislead them; none is tested for it.
 - Not run here: `editor-drag` and `editor-flow`, and nothing on WebKit.
+
+## From agent M, release 4: seven layouts and the AI draft (25 Nov 2026; branch `phase-2-r4-m-ai`)
+
+What is offered, and to whom:
+- The new editor offers all seven layouts (`OFFERED_FORMATS`). The classic editor offers three (`CLASSIC_FORMATS`, the only list of them): it can't edit what the other four add.
+- `offeredIn(editor)` in `lib/exhbt/formats.ts` is the one rule. Three places ask it, each deciding the person's editor as the edit page does (`editorKind(isAdmin)`):
+  - the classic picker (`components/editor/LayoutPicker.tsx`): three, plus the exhbt's own layout when it is one of the four, with a line saying where it is edited. Switching away there is one way, and says so: the server lets one of the four be saved only while it is the layout stored.
+  - the draft route: seven layouts in the new editor, three in the classic one.
+  - `layoutAllowed` (`app/(app)/exhbts/[id]/actions.ts`): one of the four is refused for a classic person unless stored. It reads the layout as sent, so a name the code doesn't know is refused too (it used to be stored as a case study without a word).
+
+The draft:
+- There are two requests. "three" is the default and is byte for byte what was sent before release 4 (39 fields). "seven" is new (41 fields: `pullquote` and `myRole` added). `e2e/layouts-new.spec.ts` holds both counts; the API's limit is about 52 to 56 (decision 0029).
+- `references` holds three things by layout: research's references, an essay's sources (the address may be empty) and a build's links. That is what kept the count down.
+- `toDoc` is now in `lib/ai/draft-answer.ts`, which is pure, so a spec can call it. The checks that keep only what the person supplied are in `lib/exhbt/references.ts`.
+- Nothing here has been sent to the real API, and the eval was not run in any mode: both wait for the owner's say-so. `npm run eval:drafts -- --self-test` and `-- --mock` make no call and are the first things to run.
+
+For tests:
+- The test server is the new editor, so its stand-in drafts among seven. Material holding one of its cue words drafts that layout: "I built", "redesigned", "my role was", "this essay" (and "hypothesis", as before). Check a new test's material for them.
+- `stand-in: layout <name>` in the notes names a layout. `stand-in: invent` makes the stand-in write a pull quote, a source, a link and a role the material doesn't hold, to show each is left off.
+- "Things to fix" leaves out a layout's needs until publishing has been tried. `window.__exhbtUi.setTried(true)` is what a press on Publish does to it.
+- `offered()` now returns seven, so `editor-drag`, `editor-flow`, `editor-inplace`, `editor-smooth`, `editor-phone` and `editor-tablet` loop over seven. None was run in this first run; the second run below ran them and fixed what failed.
+
+Still open:
+- The layout rules are decision 0028's, word for word in meaning. Rule 4 (before and after) fits any improvement that gives figures for before and after, not only a redesign shown in pictures; eval fixture 08 is one. Such a draft can't be published until two pictures are marked.
+- `HANDOFF.md` (the layout row) and `DESIGN.md` (lines 130 and 135) still say three layouts, and "not offered until release 4".
+- In the classic picker, one of the four is drawn with the case study's sketch (as brief E asked).
+
+## From agent M's second run: CI with seven layouts (25 Nov 2026; branch `phase-2-r4-m-ai`)
+
+Once `offered()` held seven, the editor's specs ran the four new samples through every placement and drag check. What failed, and what changed. Each was a fault in the editor unless it says the test was wrong.
+- Toolbars (`Toolbar.tsx`):
+  - A flowchart box's grip and Remove now count as chips (`CHIPS`), as agent Y's note above asked. In a row of boxes they hang half under the box's foot, and Build, Essay and Before and after put their findings straight under a three-box flowchart: the findings' toolbar sat on the middle box's chips.
+  - A section's own words count just round its box too. An essay's pull quote, a large face set close, draws its first line a pixel above its box, and on a tablet a row above the corner (no strip under it there) lay on it. Only the buttons count against its own words, not the strip under them.
+- The "+" (`placePluses`): it moves on until nothing is under it (at 700px Build's two links sit side by side, and it stopped on the second link's grip); the one after the last row is moved too (it lay on the last link's "Web address"); and under a finger a chip counts by its 44px press, not its box (that press took 3px of the "+").
+- The drag's hidden copy (`drag/measure.ts`) keeps each of Build's buttons at its width. An empty box in a flex row has none, so every button after the first was measured at the row's start.
+- A link drawn as a button (Build's demo and code) has its "Web address" just under its line (`figures.css`), not on it: there it took the press meant for the line's own field (`editor-smooth`, `editor-inplace`). Under a finger it is at the link's start: on a phone the buttons wrap one to a line, and centred it met the next one's grip.
+- A flowchart of four boxes or fewer is a row on a tablet (MethodFlow), as the four new samples' are. Under a finger a row's box now has its grip and Remove on its top corners, as a column's has (`flow.css`), still shown only while the box has the focus. On its foot they were 4px apart (Remove's press took 12px of the grip's), they came within 4px of a box's second line, and they hung into the gap under the flowchart, so at 810px (an iPad), and on CI's tablet, the findings' toolbar after it had nowhere clear and its compact pair lay on the heading. The box just touched keeps them up too (`:hover`, as before): under Safari's rule a press on Remove takes the focus from the box, and without that the chip went from under the tap and nothing was removed (checked at the tablet's size with `safariFocus`).
+- Tests that were wrong, each said in its commit:
+  - `editor-drag`, "a new block lands where its + was": Build's, Before and after's and Event's samples have no room for a quote, a "What I'd do next", a link or a pull quote. It takes the quote out first.
+  - `editor-drag`, "a click on a grip…": it pressed at the middle of the first flowchart box. The essay's first box wraps onto two lines, and the middle is the edge between them, where the drag selected nothing. It presses along the first line.
+  - `editor-drag`, "no flicker…", down the side of a pair: it walked to 30px under the left side. In Event's sample the stack on the right is taller, so that is still inside the pair's row. It walks to 30px under the row. And Event's grid is one row of two, so the step between two rows of the grid runs only where there are two.
+  - `editor-tablet`: it pressed every flowchart chip at rest. A row's chips show only while their box has the focus, so in a row each box's are pressed with the focus in it.
+  - `auto-figure`, "a text-only PDF printed by a browser": the PDF says "this essay", so in the new editor the stand-in drafts an essay, which takes nothing from the work and never looks for a figure. Its notes name research now, so the PDF is looked through.
+  - `phase2-formats`, "three radios named Layout": it drives the new editor, so the count is `OFFERED_FORMATS`.
+  - `editor-admin-switch` took `test` from Playwright, not `./editor-test`, so on WebKit next dev's hot-reload client broke two of its navigations at random.
+  - `safariFocus` (`e2e/editor-test.ts`) moved the focus with a scroll. A press never scrolls the page; here it scrolled 38px between the press and its release, and the click on a layout in the 390px menu landed elsewhere (`editor-topbar`, under Safari's rule only). It moves the focus with `preventScroll` now. That a press moves the focus without a scroll on a Mac or an iPhone is how Chromium and WebKit treat a press elsewhere; it has not been seen on a real Safari.
+
+Still open:
+- On a phone Build's buttons wrap one to a line, 12px apart (the page's own row gap). The first link's "Web address", under its line, then lies over the top of the second button, and its 44px press takes a tap on the middle of the second button's words: on the Pixel 7 that tap opens Link 1's address. It is the fault `editor-smooth` found on WebKit, moved to a phone: before, the chip lay on the first link's own line, on every pointer. Every place for it between two wrapped buttons meets something, and more room between them would change the visitor's page too. Rory's call.
+- With seven layouts the narrow menu (390px) is taller than the screen under the bar while the page is at its top: the layout list ends below the fold.
+- `editor-inplace`'s picture-deletion test on WebKit under Safari's rule is the other agent's, as before.
+- On a tablet, in the first three layouts, a section's grip can cover "Remove finding 1" (seen by the main session). Left as it was: it did not fall out of these fixes. A finding's controls (`.xe-list-tools`) are not among `CHIPS`; adding them would be the next step, then every layout's placement checked again.
+- Not run here: anything on real WebKit or a real iPhone; `E2E_WEBKIT=chromium` covered the Safari sizes and the focus rule only.
+
+## From the polish agent, 25 Nov 2026 (branch `phase-2-r3-polish`)
+
+Five rough edges, fixed before the editor is switched on for everyone. Each has a test that failed before its fix.
+
+- The rewrite form's ground (`components/exhbt-editor/css/draft-tools.css`, new, unlayered for the reason given at the end of `app/globals.css`):
+  - BlockTools now holds the form, "No rewrites left" and its status line in one box (`data-tools-panel`), and marks its menu (`data-tools-menu`). The classic editor draws them as before; `phone.css` follows the new box.
+  - On the editing page both take the compact card's ground, edge and shadow (`--xp-card`, `--xp-outline-edge`), and the look's ink, secondary text and error colour. In the app's ink the words could not be read on Night's well, in the compact card too.
+  - Outside the compact card the box is a card of its own under "More actions", out of the flow (to its left down a column, clear of Remove), so the toolbar keeps its size and place. A shell part with an open form is raised to 29, as a section is.
+  - An open form now lies over the first words of its own section, not over the section above. The axe test in `phase2-draft-tools` types before it opens its forms.
+  - Tests: one per look, under "An open menu or rewrite form has a ground of its own" in `phase2-draft-tools`. `takesThePress` checks the card as well as the button.
+- Closing it, as 0026 has it ("it stays, wherever the pointer and the focus are"):
+  - Escape closes the AI menu, the form and "No rewrites left", and gives the focus to "More actions". It works with the focus in the form or on nothing, as after "Rewrite this block", and on the phone's bar. In the compact card the form's Escape comes first, then the card's.
+  - A press outside never closes the form. The compact card no longer closes round an open form at a press outside or when the focus moves on (`rewriteOpenIn` in `Toolbar.tsx`); before, it hid the form with it.
+  - My choice, for Rory to undo if he wants: "No rewrites left" holds nothing and has no Cancel, so a press outside closes it, as it closes the menu. Before, nothing but a reload could.
+- Why a save failed (`topbar.css`): a small card hanging from the bar under the status, out of the flow, and as wide as the screen on a phone. At 1440 the cut reason had also pushed "Review and publish" off the window. The live region is unchanged. `r2-fixes` still says the reason sits beside "Not saved. Retry"; its assertions hold.
+- The edit page's error page: a new `layout.tsx` for the route tells it which editor the switch serves (`editorServed` in `lib/editor-kind-server.ts`, `served.tsx`), so the classic editor is named, with Reload, whether it was asked for or served. Before, everyone on the live site was told the new editor had failed. It asks who is signed in only when an admin's own-choice cookie is there.
+- The Safari picture file (`files.ts`, `Autosave.tsx`):
+  - Under the focus rule, the blur at the press on Remove saved a doc with the picture. The removal then fell off the undo list while that save was out, and the DELETE was sent.
+  - If the save landed first, the server kept the file and the editor forgot it. That was 5 failures in 10 under `E2E_WEBKIT=chromium E2E_FOCUS=safari`.
+  - The rule now keeps whatever a save still on its way points at, until a task after its answer. The original test then passed 10 of 10 there.
+  - A new test holds that save and orders the DELETE behind it, so the race is made rather than waited for.
+
+Run at the end, on Chromium: `phase2-draft-tools` 28 passed, `editor-smooth` 8, `editor-topbar` 17, `editor-classic` 11, `editor-tablet` 12 (tablet), `editor-phone` 40 (touch), and `editor-inplace` with `-g "toolbar|menu|undo|save"` 28. Also `editor-admin-switch` 20, the two `r2-fixes` refused-save tests and the rewrite tests in `phase2-formats` and `phase2-polish-2`.
+
+Still open:
+- Nothing here ran on real Safari or an iPhone: the focus rule was the emulation's.
+- A message that a rewrite worked stays in its card under "More actions" until the next rewrite, shown whenever the toolbar is. It has a ground now; whether it should go sooner is a question for Rory.

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { aiVersionOf, applyBlock, readAiVersion } from "../lib/exhbt/draft-blocks";
 import { emptyDoc, SCHEMA_VERSION, text, words, type Chart, type ExhbtDoc, type Section } from "../lib/exhbt/blocks";
-import { mayCarryFormat, OFFERED_FORMATS } from "../lib/exhbt/formats";
+import { CLASSIC_FORMATS, FORMATS, mayCarryFormat, OFFERED_FORMATS, offeredIn } from "../lib/exhbt/formats";
 import { withWorkVisual } from "../lib/exhbt/sections";
 import { pathOfNumber, unverifiedNumbers } from "../lib/exhbt/verify";
 import { fitCaption } from "../lib/figures/rules";
@@ -319,16 +319,23 @@ test.describe("A caption is cut to its limit without changing what it says", () 
 });
 
 test.describe("The server holds the layout line", () => {
-  test("only an offered layout, or the one already stored, may be saved or published", () => {
-    expect(OFFERED_FORMATS).toEqual(["case-study", "gallery", "research"]);
+  test("only a layout the person's editor offers, or the one already stored, may be saved or published", () => {
+    // The new editor offers all seven, so a person whose editor it is may store any of them.
+    expect(OFFERED_FORMATS).toEqual([...FORMATS]);
+    expect(offeredIn("page")).toBe(OFFERED_FORMATS);
+    for (const f of FORMATS) expect(mayCarryFormat(f, "case-study", offeredIn("page"))).toBe(true);
+    const classic = offeredIn("classic");
+    expect(classic).toEqual(["case-study", "gallery", "research"]);
+    expect(classic).toBe(CLASSIC_FORMATS);
     for (const f of ["build", "essay", "before-after", "event"] as const) {
-      expect(mayCarryFormat(f, "case-study")).toBe(false);
-      expect(mayCarryFormat(f, "gallery")).toBe(false);
-      // Already stored as that layout: kept working (a seed, or a draft made when it was offered).
-      expect(mayCarryFormat(f, f)).toBe(true);
+      // The classic editor can't edit these, so a person whose editor it is may not store one...
+      expect(mayCarryFormat(f, "case-study", classic)).toBe(false);
+      expect(mayCarryFormat(f, "gallery", classic)).toBe(false);
+      // ...unless the exhbt is already stored as that layout (made in the new editor): it keeps working.
+      expect(mayCarryFormat(f, f, classic)).toBe(true);
     }
-    expect(mayCarryFormat("gallery", "case-study")).toBe(true);
-    expect(mayCarryFormat("case-study", "essay")).toBe(true);
+    expect(mayCarryFormat("gallery", "case-study", classic)).toBe(true);
+    expect(mayCarryFormat("case-study", "essay", classic)).toBe(true);
   });
 });
 
@@ -549,12 +556,19 @@ test.describe("A pick is counted before the AI call, and given back when the ser
 
 /* ---------------- The server actions ---------------- */
 
-// The server's answer is the same whichever editor sent the request, so each test runs in both: the edit-on-page
-// editor, which this suite's server serves (EXHBT_EDITOR in playwright.config.ts), and the classic editor, which is
-// what everyone gets until the new one is switched on (DEFAULT_EDITOR in lib/editor-kind.ts). e2e/editor.ts drives
-// the new editor and e2e/editor-classic-helpers.ts the classic one, whose signInAs keeps the browser on it.
+// Each test runs in both editors: the edit-on-page editor, which this suite's server serves (EXHBT_EDITOR in
+// playwright.config.ts), and the classic editor, which is what everyone gets until the new one is switched on
+// (DEFAULT_EDITOR in lib/editor-kind.ts). e2e/editor.ts drives the new editor and e2e/editor-classic-helpers.ts the
+// classic one, whose signInAs keeps the browser on it.
+//
+// What is refused depends on the person's editor (layoutAllowed in app/(app)/exhbts/[id]/actions.ts). A layout name
+// this code doesn't know is refused for everyone. One of the four of decision 0028 is refused for a person whose
+// editor is the classic one, which can't edit them, unless the exhbt already has that layout (that case, and the
+// classic editor's picker, are in e2e/layouts-new.spec.ts).
 test.describe("A hand-built save or publish can't store a layout nothing offers", () => {
   const REFUSED = "That layout isn't available yet. Choose another layout and try again.";
+  /** A layout name no editor offers. In a stored doc it would read as a case study; asked for by a save or a publish, it is refused. */
+  const UNKNOWN = "zine";
   /** Rewrites the body of the next server action that carries an exhbt doc so its layout is `format`. */
   async function forceFormat(page: Page, format: string) {
     const seen = { rewritten: 0 };
@@ -603,12 +617,12 @@ test.describe("A hand-built save or publish can't store a layout nothing offers"
   const said = (page: Page, words: string) => page.evaluate((w) => (window as unknown as { __said: string[] }).__said.filter((s) => s.includes(w)), words);
 
   test.describe("in the new editor", () => {
-    test("saving an essay layout is refused and nothing is stored; the same request as a gallery is kept", async ({ page }) => {
+    test("saving a layout nothing offers is refused and nothing is stored; the same request as a gallery is kept", async ({ page }) => {
       await signInAs(page, unique("layoutsave"), "premium");
       const id = await startFromScratch(page);
       await expect(page.locator('[data-editor="page"]')).toBeAttached();
       await listen(page);
-      const seen = await forceFormat(page, "essay");
+      const seen = await forceFormat(page, UNKNOWN);
       await page.locator("#title").fill("A title that triggers a save");
       // The reason is drawn in the top bar, beside "Not saved. Retry". It is found by its own class, because the bar's
       // hidden live region holds the same words: that is where they are said, once.
@@ -629,13 +643,13 @@ test.describe("A hand-built save or publish can't store a layout nothing offers"
       expect(await said(page, REFUSED)).toEqual([`Not saved. Kept in this browser. ${REFUSED}`]);
     });
 
-    test("publishing an essay layout is refused, and the reason is shown where Publish was pressed", async ({ page }) => {
+    test("publishing a layout nothing offers is refused, and the reason is shown where Publish was pressed", async ({ page }) => {
       await signInAs(page, unique("layoutpub"), "premium");
       const id = await startFromScratch(page);
       await expect(page.locator('[data-editor="page"]')).toBeAttached();
       await fillValid(page, "A page that could go live");
       await waitForSaved(page);
-      await forceFormat(page, "build");
+      await forceFormat(page, UNKNOWN);
       // The tick and Publish are in the "Review and publish" sheet.
       await openPublishSheet(page);
       const sheet = publishSheet(page);
@@ -659,6 +673,7 @@ test.describe("A hand-built save or publish can't store a layout nothing offers"
     });
   });
 
+  // A person whose editor is the classic one: the four layouts it can't edit are refused by hand too.
   test.describe("in the classic editor", () => {
     test("saving an essay layout is refused and nothing is stored; the same request as a gallery is kept", async ({ page }) => {
       await classicEditor.signInAs(page, unique("layoutsave"), "premium");
@@ -677,7 +692,18 @@ test.describe("A hand-built save or publish can't store a layout nothing offers"
       expect(await storedFormat(page, id)).toBe("gallery");
     });
 
-    test("publishing an essay layout is refused", async ({ page }) => {
+    test("saving a layout nothing offers is refused there too", async ({ page }) => {
+      await classicEditor.signInAs(page, unique("layoutzine"), "premium");
+      const id = await classicEditor.startFromScratch(page);
+      await expect(page.locator('[data-editor="classic"]')).toBeAttached();
+      const seen = await forceFormat(page, UNKNOWN);
+      await page.locator("#title").fill("A title that triggers a save");
+      await expect(page.getByText("That layout isn't available yet.")).toBeVisible({ timeout: 15_000 });
+      expect(seen.rewritten).toBeGreaterThan(0);
+      expect(await storedFormat(page, id)).toBeUndefined();
+    });
+
+    test("publishing a build layout is refused", async ({ page }) => {
       await classicEditor.signInAs(page, unique("layoutpub"), "premium");
       const id = await classicEditor.startFromScratch(page);
       await expect(page.locator('[data-editor="classic"]')).toBeAttached();

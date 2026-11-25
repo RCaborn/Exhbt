@@ -1,0 +1,16 @@
+Roof weather station for the Geography department
+BEng Electronic Engineering, Year 3 individual project. Ashdown University, May 2026.
+
+The department's old weather station stopped working in 2024, so first-year practicals used data from an airport 30 km away. I designed and built a replacement that sits on the roof of the Geography building.
+
+What it does. It measures air temperature, humidity, pressure, wind speed and rainfall every 5 minutes. It sends the readings by radio to a receiver in the lab, which stores them and shows the last 24 hours on a web page. It runs from a 20 W solar panel and a battery, and kept running through a test week with four overcast days.
+
+How I built it. I chose the sensors and drew the circuit in KiCad. I had a two-layer circuit board made and soldered it by hand. I wrote the firmware in C for an ESP32 microcontroller and the receiver's software in Python. I designed the housing in Fusion 360 and 3D-printed it. I calibrated the temperature sensor against the lab's reference thermometer: after calibration the two agreed to within 0.3 degrees C across 14 paired readings.
+
+It has run on the roof since 2 March 2026 and has logged 21,400 readings with 3 gaps longer than an hour, all during one storm.
+
+The design files and the firmware are at https://example.com/roof-station-files
+
+Dr Helen Marsh, who runs the first-year practicals, said: "The students finally work with weather they stood in that morning."
+
+Next I would add a heater to the rain gauge, because it froze twice in March.

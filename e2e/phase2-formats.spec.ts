@@ -16,7 +16,7 @@ import {
   type Section,
 } from "../lib/exhbt/blocks";
 import { applyBlock } from "../lib/exhbt/draft-blocks";
-import { formatOf, hiddenSections, OFFERED_FORMATS, shownSections, withFormat } from "../lib/exhbt/formats";
+import { CLASSIC_FORMATS, formatOf, hiddenSections, OFFERED_FORMATS, shownSections, withFormat } from "../lib/exhbt/formats";
 import { fitCaption } from "../lib/figures/rules";
 import { keyFigureOf } from "../lib/portfolio-home";
 import { referencesFrom } from "../lib/exhbt/references";
@@ -156,7 +156,9 @@ test.describe("model: the layout field", () => {
       expect(withFormat(there, "case-study")).toEqual(withFormat(doc, "case-study"));
     }
     for (const doc of sampleDocs) expect(withFormat(withFormat(withFormat(doc, "case-study"), "gallery"), "case-study")).toEqual(doc);
-    expect(OFFERED_FORMATS).toEqual(["case-study", "gallery", "research"]);
+    // All seven are offered since release 4; the classic editor keeps to the first three (e2e/layouts-new.spec.ts).
+    expect(OFFERED_FORMATS).toEqual(["case-study", "gallery", "research", "build", "essay", "before-after", "event"]);
+    expect(CLASSIC_FORMATS).toEqual(["case-study", "gallery", "research"]);
   });
 });
 
@@ -546,11 +548,13 @@ const PNG = uniqueBytes(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcS
 const png = (name: string) => ({ name, mimeType: "image/png", buffer: PNG });
 
 test.describe("The layout choice in the editor", () => {
-  test("three radios named Layout; the arrow keys pick Gallery, the preview follows, Undo goes back", async ({ page }) => {
+  // The new editor (startEditor opens it: e2e/editor.ts), so one radio for each layout it offers, seven since release 4. The
+  // classic picker's three are tested in e2e/layouts-new.spec.ts.
+  test("a radio for each offered layout, named Layout; the arrow keys pick Gallery, the preview follows, Undo goes back", async ({ page }) => {
     await startEditor(page, `lay${stamp()}`);
     await openLayoutMenu(page);
     const group = layoutGroup(page);
-    await expect(group.getByRole("radio")).toHaveCount(3);
+    await expect(group.getByRole("radio")).toHaveCount(OFFERED_FORMATS.length);
     await expect(previewArticle(page)).toHaveAttribute("data-format", "case-study");
     await page.getByRole("radio", { name: /^Case study/ }).focus();
     await page.keyboard.press("ArrowDown");

@@ -15,25 +15,34 @@ import { Popover } from "./Popover";
  * the layout's name opens a panel with one radio for each layout the editor offers, each with a small
  * sketch and one short line. Choosing one switches at once (store.setLayout, one undo entry) and says what
  * was kept and what is over; the longer "best for" line of the radio that has the focus is under the list.
- * M adds four layouts to MENU_LINES, SKETCHES and LAID_OUT_AS in release 4.
+ * All seven layouts since release 4 (decision 0028): each has its line, its phrase and its sketch here.
  */
 
 /** One short line for each layout, at most 40 characters, so a row stays on one line on a phone. */
-export const MENU_LINES: Partial<Record<Format, string>> = {
+export const MENU_LINES: Record<Format, string> = {
   "case-study": "Question, method, result: data, code",
   gallery: "Pictures first: design, film, campaigns",
-  research: "Aim, method, findings: studies, essays",
+  // Not "essays" since release 4: an essay has a layout of its own.
+  research: "Aim, method, results: labs and studies",
+  build: "Something that works: apps, hardware",
+  essay: "An argument and sources: law, history",
+  "before-after": "A redesign, then and now: UX, product",
+  event: "An event you were part of: music, sport",
 };
 
 /** "Laid out as ...": the layout in a phrase that reads after "as". */
-const LAID_OUT_AS: Partial<Record<Format, string>> = {
+const LAID_OUT_AS: Record<Format, string> = {
   "case-study": "a case study",
   gallery: "a gallery",
   research: "research",
+  build: "a build",
+  essay: "an essay",
+  "before-after": "a before and after",
+  event: "an event",
 };
 
-/* Copied from the classic editor's LayoutPicker (decision 0026: it is deleted in release 5). */
-const SKETCHES: Partial<Record<Format, ReactNode>> = {
+/* The first three are copied from the classic editor's LayoutPicker (decision 0026: it is deleted in release 5). */
+const SKETCHES: Record<Format, ReactNode> = {
   // A title bar, a row of three boxes, two columns.
   "case-study": (
     <>
@@ -64,9 +73,49 @@ const SKETCHES: Partial<Record<Format, ReactNode>> = {
       <rect x="30" y="28" width="24" height="10" rx="1" />
     </>
   ),
+  // The lead screenshot, what it does beside a figure, a row of two buttons.
+  build: (
+    <>
+      <rect x="2" y="2" width="52" height="16" rx="1" />
+      <rect x="2" y="22" width="24" height="9" rx="1" />
+      <rect x="30" y="22" width="24" height="9" rx="1" />
+      <rect x="2" y="34" width="15" height="4" rx="2" />
+      <rect x="21" y="34" width="15" height="4" rx="2" />
+    </>
+  ),
+  // A title bar, the key points beside a pull quote set large, the lines of the sources.
+  essay: (
+    <>
+      <rect x="2" y="2" width="30" height="5" rx="1" />
+      <rect x="2" y="11" width="24" height="15" rx="1" />
+      <path d="M31 14h23M31 19h23M31 24h14" strokeWidth="2.5" />
+      <path d="M2 31h52M2 35h40" />
+    </>
+  ),
+  // Two frames side by side, each with its label over it, two columns under.
+  "before-after": (
+    <>
+      <path d="M2 3h9M30 3h9" />
+      <rect x="2" y="6" width="24" height="18" rx="1" />
+      <rect x="30" y="6" width="24" height="18" rx="1" />
+      <rect x="2" y="28" width="24" height="10" rx="1" />
+      <rect x="30" y="28" width="24" height="10" rx="1" />
+    </>
+  ),
+  // A tall poster, two blocks beside it, a row of small frames.
+  event: (
+    <>
+      <rect x="2" y="2" width="18" height="24" rx="1" />
+      <rect x="24" y="2" width="30" height="10" rx="1" />
+      <rect x="24" y="16" width="30" height="10" rx="1" />
+      <rect x="2" y="30" width="16" height="8" rx="1" />
+      <rect x="22" y="30" width="14" height="8" rx="1" />
+      <rect x="40" y="30" width="14" height="8" rx="1" />
+    </>
+  ),
 };
 
-const laidOutAs = (f: Format) => LAID_OUT_AS[f] ?? FORMAT_RULES[f].name.toLowerCase();
+const laidOutAs = (f: Format) => LAID_OUT_AS[f];
 
 export function LayoutMenu({ inline = false }: { inline?: boolean } = {}): ReactNode {
   const f = useDoc(formatOf);
@@ -127,11 +176,11 @@ function LayoutPanel(): ReactNode {
               className="size-4 shrink-0 accent-jade"
             />
             <svg aria-hidden width="40" height="29" viewBox="0 0 56 40" fill="none" stroke="currentColor" strokeWidth="1.75" className="shrink-0 text-graphite">
-              {SKETCHES[k] ?? SKETCHES["case-study"]}
+              {SKETCHES[k]}
             </svg>
             <span className="xe-layout-text">
               <span className="xe-layout-name">{FORMAT_RULES[k].name}</span>
-              <span className="xe-layout-line">{MENU_LINES[k] ?? ""}</span>
+              <span className="xe-layout-line">{MENU_LINES[k]}</span>
             </span>
             <span id={`${group}-${k}`} className="sr-only">
               {FORMAT_RULES[k].bestFor}

@@ -1,0 +1,21 @@
+{
+  "fixture": "20-near-dissertation-survey",
+  "shape": "A near miss for the essay layout: a history dissertation in markdown, in a humanities subject and with a reading list, but built on a questionnaire and interviews the person ran.",
+  "tests": "Layout: research, never essay. Data the person collected always means research (decision 0028), whatever the subject. The hypothesis, the method and the results are kept, and no significance is claimed.",
+  "files": ["20-near-dissertation-survey.md"],
+  "notesFile": null,
+  "link": null,
+  "expect": {"headlineNumber":false,"chart":true,"noNumbers":false,"layout":"research"},
+  "keyFacts": [
+    {"id":"sample","fact":"143 of 410 history undergraduates replied to the questionnaire.","match":[["143","410"],"143"]},
+    {"id":"use","fact":"87% had used Wikipedia for a university essay; 6% had cited it.","match":[["87","6"],"87%"]},
+    {"id":"ratings","fact":"Weekly users rated its reliability 3.4 out of 5, against 2.6 for the rest.","match":[["3.4","2.6"]]},
+    {"id":"hypothesis","fact":"The hypothesis (heavy users rate it as more reliable) was supported.","match":["hypothesis","supported","more reliable"]},
+    {"id":"limits","fact":"Those who replied chose to, and all were at one university.","match":["chose to","one university","self-selected","volunteered"]}
+  ],
+  "forbidden": [
+    {"id":"significance","why":"The material reports means and no significance test.","match":["statistically significant","p <","p<","p ="]},
+    {"id":"derived","why":"The material gives 143 of 410 and no response rate.","match":["35%","34.9","response rate of"]}
+  ],
+  "sourceNumbers": ["3","2026","12","2025","143","410","8","20","1","5","87%","6%","3.4","2.6","7","2006","93"]
+}

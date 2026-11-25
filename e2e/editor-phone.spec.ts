@@ -899,6 +899,32 @@ test("a drafted part: the bar offers its More actions, and the menu opens above 
   await expect(form).toHaveCount(0);
 });
 
+// Escape closes a rewrite form on the bar too, with the focus on nothing as with it in the form, and gives the focus back to More
+// actions. The bar lays out More actions' parts in its own row (display: contents), so their wrapper has no box of its own.
+test("a drafted part's rewrite form on the bar closes with Escape, and the focus goes back to More actions", async ({ page }) => {
+  await page.goto(`/auth/dev?email=${freshName("phoneescape")}@example.com&next=/exhbts/new`);
+  await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
+  const res = await page.request.post("/api/exhbts/draft", { data: { text: "Final-year project on lunch queues. I timed the queue for two weeks, added a second till, and timed it again. Waits fell from 11 to 4 minutes." } });
+  expect(res.status()).toBe(200);
+  const { id } = (await res.json()) as { id: string };
+  await page.goto(`/exhbts/${id}/edit`);
+  await expect(page.locator(READY)).toBeAttached();
+  await waitLive(page);
+  await choose(page, (await docNow(page)).sections.find((s) => s.kind === "findings")!.id);
+  const more = onBar(page, "More actions for Findings");
+  const form = bar(page).locator("form");
+  for (const where of ["on nothing", "in the form"]) {
+    await more.tap();
+    await bar(page).getByRole("button", { name: "Rewrite this block" }).tap();
+    await expect(form).toBeVisible();
+    if (where === "on nothing") await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    else await form.getByRole("textbox").focus();
+    await page.keyboard.press("Escape");
+    await expect(form, `the focus ${where}`).toHaveCount(0);
+    await expect(more, `the focus ${where}`).toBeFocused();
+  }
+});
+
 /* ------------------------------------------------------------------------------------------------
  * At 390px: J's figures, pictures and links; the figures sheet; the top bar's menu
  * ---------------------------------------------------------------------------------------------- */

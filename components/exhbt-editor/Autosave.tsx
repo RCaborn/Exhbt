@@ -7,7 +7,7 @@ import { useAutosave, type SaveResult } from "@/components/editor/useAutosave";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
 import { STALE_EDITOR, useRuntime, type SaveApi } from "./context";
 import { noteSaved, registerSender } from "./pending";
-import { useFilesController } from "./files";
+import { useFilesController, type FilesController } from "./files";
 import { useDoc } from "./store";
 
 /*
@@ -42,14 +42,30 @@ async function send(id: string, doc: ExhbtDoc): Promise<SaveResult> {
   }
 }
 
+/**
+ * Sends a save, and keeps the rule that deletes files off what it points at until it is answered (files.ts, `sending`).
+ * A save still on its way can land after the rule has run: in Safari a press on Remove gives the button no focus, so the
+ * field the focus leaves saves at once, the picture still in its doc, and an Undo entry falling off the list meanwhile
+ * sent the picture's DELETE before that save landed. The server kept the file and this visit forgot it. The hold ends a
+ * task after the answer, once useAutosave has noted the doc that landed as the server's.
+ */
+async function held(files: FilesController, doc: ExhbtDoc, go: () => Promise<SaveResult>): Promise<SaveResult> {
+  const done = files.sending(doc);
+  try {
+    return await go();
+  } finally {
+    setTimeout(done, 0);
+  }
+}
+
 /** Development only: a save in place of the server action (the timing harness, app/dev/editor-timing, saves nothing). */
 export const SaveOverride = createContext<((doc: ExhbtDoc) => Promise<SaveResult>) | null>(null);
 
 export function Autosave() {
   const override = useContext(SaveOverride);
   const { env, save } = useRuntime();
-  const saveDoc = (d: ExhbtDoc) => (override ? override(d) : send(env.id, d));
   const files = useFilesController();
+  const saveDoc = (d: ExhbtDoc) => held(files, d, () => (override ? override(d) : send(env.id, d)));
   const doc = useDoc((d) => d);
   const a = useAutosave({ id: env.id, doc, initial: env.initialDoc, save: saveDoc,
     // The server has it: noted for the crash fallback, and the rule that deletes files runs.
@@ -77,10 +93,10 @@ export function Autosave() {
     () =>
       registerSender({
         id: env.id,
-        send: async (d) => (await (override ? override(d) : send(env.id, d))).ok,
+        send: async (d) => (await held(files, d, () => (override ? override(d) : send(env.id, d)))).ok,
         settled: () => latest.current.settled(),
       }),
-    [env.id, override],
+    [env.id, override, files],
   );
   return null;
 }

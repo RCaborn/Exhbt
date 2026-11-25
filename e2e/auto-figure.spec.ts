@@ -142,11 +142,16 @@ test.describe("Picked figure rules", () => {
 });
 
 test.describe("The work's own graph wins (decision 0025)", () => {
-  test("every layout says what it takes from the work, and today each takes a visual", () => {
+  test("every layout says what it takes from the work: a visual, except an essay, which takes none", () => {
     expect(OFFERED_FORMATS.map((f) => [f, FORMAT_RULES[f].fromWork])).toEqual([
       ["case-study", "figure"],
       ["gallery", "pictures"],
       ["research", "figure"],
+      // The four of decision 0028, offered since release 4.
+      ["build", "figure"],
+      ["essay", "none"],
+      ["before-after", "pictures"],
+      ["event", "pictures"],
     ]);
     expect(fromWorkOf({})).toBe("figure");
     expect(fromWorkOf({ format: "something-later" })).toBe("figure");
@@ -694,6 +699,9 @@ test.describe("Drafts with no figure", () => {
     await signInFree(page, "figclip");
     const seen = countPicks(page);
     await addFile(page, PRINTED_ESSAY_PDF);
+    // Its own words say "this essay", so in the new editor the stand-in drafts an essay, which takes nothing from the work
+    // (decision 0028) and never looks for a figure. The notes name a layout that does, so the PDF is looked through.
+    await page.getByLabel("Notes").fill("stand-in: layout research");
     await draft(page);
     expect(seen.picks).toBe(0);
     expect(await sectionKinds(page)).not.toContain("image");
