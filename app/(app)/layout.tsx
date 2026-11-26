@@ -1,4 +1,5 @@
-import { SiteHeader } from "@/components/site/SiteHeader";
+import { AppShell } from "@astryxdesign/core/AppShell";
+import { SiteTopNav } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { getCurrentUser } from "@/lib/auth";
 import { portfolioServed } from "@/lib/portfolio-kind-server";
@@ -15,8 +16,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const portfolio = await portfolioServed();
   return (
     <>
-      <SiteHeader signedIn={Boolean(user)} phase2={phase2} portfolio={portfolio} />
-      <main id="main">{children}</main>
+      {/* The frame, as the marketing layout has it (components/site/shell.css). */}
+      <AppShell
+        height="auto"
+        contentPadding={0}
+        variant="surface"
+        mobileNav={false}
+        className="site-shell"
+        topNav={<SiteTopNav signedIn={Boolean(user)} phase2={phase2} portfolio={portfolio} />}
+      >
+        <div id="main" tabIndex={-1} className="outline-none">
+          {children}
+        </div>
+      </AppShell>
       <SiteFooter />
     </>
   );

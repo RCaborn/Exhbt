@@ -18,7 +18,7 @@ const PHONE = { width: 390, height: 844 };
 /** The header's box and what in it can be seen, read as soon as the page's HTML is in. */
 async function headerNow(page: Page) {
   return page.evaluate(() => {
-    const banner = document.querySelector("header")!;
+    const banner = document.querySelector("[role=banner], header")!;
     const b = banner.getBoundingClientRect();
     const seen = (el: Element) => {
       const r = el.getBoundingClientRect();

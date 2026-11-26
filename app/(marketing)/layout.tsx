@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import { AppShell } from "@astryxdesign/core/AppShell";
 import { JsonLd } from "@/components/seo/JsonLd";
-import { SiteHeader } from "@/components/site/SiteHeader";
+import { SiteTopNav } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SITE_ORIGIN, siteLd } from "@/lib/seo";
 
@@ -13,8 +14,19 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
     <>
       {/* Organization and WebSite describe the whole site, so they sit here and are on each marketing page. */}
       <JsonLd data={siteLd()} />
-      <SiteHeader />
-      <main id="main">{children}</main>
+      {/* The frame (components/site/shell.css says what it changes in AppShell and why). */}
+      <AppShell
+        height="auto"
+        contentPadding={0}
+        variant="surface"
+        mobileNav={false}
+        className="site-shell"
+        topNav={<SiteTopNav />}
+      >
+        <div id="main" tabIndex={-1} className="outline-none">
+          {children}
+        </div>
+      </AppShell>
       <SiteFooter />
     </>
   );
