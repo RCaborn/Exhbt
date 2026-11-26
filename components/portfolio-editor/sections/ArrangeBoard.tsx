@@ -9,6 +9,8 @@ import type { SectionKey } from "@/lib/portfolio-layout";
 import { useEditingHome } from "../home";
 import { usePortfolioApi, usePortfolioState, useRuntime } from "../runtime";
 import { moveSection } from "./arrange";
+import { usePhone } from "@/components/exhbt-editor/phone/usePhone";
+import { useOfferUndo } from "../phone/PhoneUndo";
 import { announcementsFor, DraggingContext, EASE, MOVE_MS, useDragSensors, useReducedMotion } from "./drag";
 import { SectionPicture } from "./Picture";
 import { sectionName, W } from "./words";
@@ -25,6 +27,8 @@ export function ArrangeBoard({ children }: { children: ReactNode }): ReactNode {
   const api = usePortfolioApi();
   const rt = useRuntime();
   const sensors = useDragSensors();
+  const phone = usePhone();
+  const offerUndo = useOfferUndo();
   const reduced = useReducedMotion();
   const [active, setActive] = useState<SectionKey | null>(null);
   const dragging = useRef(false);
@@ -41,6 +45,9 @@ export function ArrangeBoard({ children }: { children: ReactNode }): ReactNode {
     const key = a.id as SectionKey;
     const to = rt.state.get().arrangement.sections.indexOf(over.id as SectionKey);
     api.change((s) => moveSection(s, key, to), W.moved(sectionName(key)));
+    // On a phone a drop gets the one-tap Undo the More sheet's moves get (phone/PhoneUndo.tsx): an
+    // accidental drag is the main reason a phone needs one.
+    if (phone) offerUndo();
   }
   function onCancel() {
     dragging.current = false;

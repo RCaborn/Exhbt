@@ -40,10 +40,10 @@ type Placed = { spot: Spot | "none"; x: number; y: number; compact: boolean };
 
 /**
  * Places Suggest an intro where it meets no word (placeTool): first at its full size, then as an icon
- * alone; if neither fits anywhere, as an icon above the intro. Again when the page's words, its look or
- * the window change.
+ * alone; if neither fits anywhere, as an icon above the intro. Again when its look or the window
+ * changes, and once typing pauses after the page's words change (useReplace).
  */
-function useIntroPlace(span: React.RefObject<HTMLSpanElement | null>, size: "sm" | "md", deps: unknown[]): Placed {
+function useIntroPlace(span: React.RefObject<HTMLSpanElement | null>, size: "sm" | "md", deps: unknown[], words: unknown[]): Placed {
   const [placed, setPlaced] = useState<Placed>({ spot: "none", x: 0, y: 0, compact: false });
   const full = useRef<{ w: number; h: number } | null>(null);
   const place = useCallback(() => {
@@ -68,35 +68,75 @@ function useIntroPlace(span: React.RefObject<HTMLSpanElement | null>, size: "sm"
   const placedRef = useRef(placed);
   placedRef.current = placed;
 
-  useReplace(span, place, deps);
+  useReplace(span, place, deps, words);
   return placed;
 }
 
-/** Runs `place` before the first paint and whenever `deps` change, and again when the page changes size, a key is typed on it, or its fonts arrive. */
-function useReplace(span: React.RefObject<HTMLSpanElement | null>, place: () => void, deps: unknown[]): void {
+/** How long typing must pause before the tools are placed again: placing measures the page's words. */
+const QUIET_MS = 180;
+
+type Idle = { request(fn: () => void, o: { timeout: number }): number; cancel(id: number): void };
+const idle: Idle =
+  typeof window !== "undefined" && "requestIdleCallback" in window
+    ? { request: (fn, o) => window.requestIdleCallback(fn, o), cancel: (id) => window.cancelIdleCallback(id) }
+    : { request: (fn) => window.setTimeout(fn, 0), cancel: (id) => window.clearTimeout(id) };
+
+/**
+ * Runs `place` before the first paint and whenever `deps` change (the look, the controls' size), and in
+ * the next frame when the page's width changes (the window, the fonts). Typing never places it in the
+ * key's own frame (brief I): a key on the page, a change to `words` (the person's words, typed or put in
+ * by Suggest an intro) or a change of the page's height only asks for it once typing has paused, when the
+ * browser is idle.
+ */
+function useReplace(span: React.RefObject<HTMLSpanElement | null>, place: () => void, deps: unknown[], words: unknown[]): void {
   useLayoutEffect(() => {
     place();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [place, ...deps]);
 
+  const later = useRef<() => void>(() => {});
   useEffect(() => {
     const page = span.current?.closest("[data-portfolio-home]");
     if (!page) return;
     let frame = 0;
-    const soon = () => {
+    let timer = 0;
+    let waiting = 0;
+    const stop = () => {
       cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+      idle.cancel(waiting);
+    };
+    const soon = () => {
+      stop();
       frame = requestAnimationFrame(place);
     };
-    const seen = new ResizeObserver(soon);
+    const quiet = () => {
+      stop();
+      timer = window.setTimeout(() => (waiting = idle.request(place, { timeout: 500 })), QUIET_MS);
+    };
+    later.current = quiet;
+    let width = page.getBoundingClientRect().width;
+    const seen = new ResizeObserver(() => {
+      const w = page.getBoundingClientRect().width;
+      if (Math.abs(w - width) < 0.5) return quiet();
+      width = w;
+      soon();
+    });
     seen.observe(page);
-    page.addEventListener("input", soon, true);
+    page.addEventListener("input", quiet, true);
     document.fonts?.ready.then(soon).catch(() => {});
     return () => {
-      cancelAnimationFrame(frame);
+      stop();
+      later.current = () => {};
       seen.disconnect();
-      page.removeEventListener("input", soon, true);
+      page.removeEventListener("input", quiet, true);
     };
   }, [span, place]);
+
+  useEffect(() => {
+    later.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, words);
 }
 
 function SuggestIntro(): ReactNode {
@@ -106,7 +146,7 @@ function SuggestIntro(): ReactNode {
   const filled = profile.bio.trim().length > 0;
   const size = useBarSize();
   const span = useRef<HTMLSpanElement>(null);
-  const placed = useIntroPlace(span, size, [profile, themeId, filled]);
+  const placed = useIntroPlace(span, size, [themeId], [profile, filled]);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ text: string; error: boolean } | null>(null);
 
@@ -180,7 +220,7 @@ function YourLinks(): ReactNode {
     const next = placeLinks(section, tool, { w: b.width, h: b.height }, bar) ?? { x: section.getBoundingClientRect().width - b.width, y: bar + 16 };
     setAt((now) => (now && Math.abs(now.x - next.x) < 0.5 && Math.abs(now.y - next.y) < 0.5 ? now : next));
   }, [size]);
-  useReplace(span, place, [themeId, profile]);
+  useReplace(span, place, [themeId], [profile]);
   return (
     <span
       ref={span}
