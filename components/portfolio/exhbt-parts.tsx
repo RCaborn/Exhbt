@@ -57,7 +57,14 @@ function wordsOf(plainWords: string, runs: RichTextValue | undefined): React.Rea
  * none once they have cleared it. On the editing page it is the editor's field, in the heading's own element
  * and classes, there even when cleared so the title can come back. `name` is what the part is called.
  */
-function Title({ Sub, id, className, own, layout, path, name, ctx }: { Sub: Sub; id: string; className: string; own: string | undefined; layout: string; path: string; name: string; ctx?: PageCtx }): React.ReactNode {
+/**
+ * A part's own title may be one long word (a hashtag, an event's name in capitals): it breaks where it must rather
+ * than run off a phone's screen. The same on the editing page and the visitor's, so the two stay box for box.
+ */
+export const TITLE_WRAP = "wrap-anywhere";
+
+function Title({ Sub, id, className: given, own, layout, path, name, ctx }: { Sub: Sub; id: string; className: string; own: string | undefined; layout: string; path: string; name: string; ctx?: PageCtx }): React.ReactNode {
+  const className = cx(given, TITLE_WRAP);
   if (ctx?.edit) return ctx.edit.title({ Sub, id, className, path, fallback: layout, label: `${name}: title` });
   const shown = titleShown(own, layout);
   return shown ? (

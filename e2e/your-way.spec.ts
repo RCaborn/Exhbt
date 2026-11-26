@@ -487,6 +487,40 @@ test.describe("A part's title, typed in place", () => {
     });
   }
 
+  test("a title that is one long word breaks inside the page at 390px, on the editing page and the visitor's", async ({ page }) => {
+    // From the review of 26 Nov: a hashtag or a name in capitals has no space to break at, and ran off a phone's screen.
+    const WORD = "MENTALHEALTHAWARENESSWEEK".slice(0, LIMITS.sectionTitleChars);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openTiming(page, "gallery", { full: true });
+    await page.evaluate((title) => {
+      window.__exhbtEditor!.patchDoc((d) => ({ ...d, flowTitle: title, refsTitle: title, sections: d.sections.map((s) => (s.kind === "findings" || s.kind === "quote" || s.kind === "reflection" ? { ...s, title } : s)) }));
+    }, WORD);
+    await settle(page);
+    const outside = (where: string) =>
+      page.evaluate(
+        ({ where, word }) => {
+          const width = document.documentElement.clientWidth;
+          const out: string[] = [];
+          const root = document.querySelector(where)!;
+          for (const el of root.querySelectorAll<HTMLElement>("[data-title], h1, h2, h3, h4, h5")) {
+            const words = el.querySelector<HTMLTextAreaElement>("textarea")?.value ?? el.textContent ?? "";
+            if (words !== word) continue;
+            const range = document.createRange();
+            range.selectNodeContents(el.querySelector("textarea") ?? el);
+            const right = Math.max(el.getBoundingClientRect().right, ...[...range.getClientRects()].map((r) => r.right));
+            if (right > width + 0.5) out.push(`${el.id || el.tagName} reaches ${Math.round(right)}px of ${width}`);
+          }
+          if (document.documentElement.scrollWidth > width) out.push(`the page is ${document.documentElement.scrollWidth}px wide`);
+          return out;
+        },
+        { where, word: WORD },
+      );
+    expect(await outside(`${READY} article`)).toEqual([]);
+    await seeAsVisitor(page, true);
+    await settle(page);
+    expect(await outside(`${READY} section[aria-label="Preview"] article`)).toEqual([]);
+  });
+
   test("a full page with a long title over every part still prints on one A4 page", async ({ page }) => {
     const title = "Summary of what we measured most months".slice(0, LIMITS.sectionTitleChars).trimEnd();
     const long: ExhbtDoc = { ...fullDoc, flowTitle: title, sections: fullDoc.sections.map((s) => (s.kind === "findings" || s.kind === "quote" || s.kind === "reflection" ? { ...s, title } : s)) };

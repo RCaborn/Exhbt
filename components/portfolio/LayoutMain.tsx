@@ -3,7 +3,7 @@ import { filledFlow, isBlank, type ContentSection, type ExhbtDoc } from "@/lib/e
 import { FORMAT_COPY, refsHeading, titleShown } from "@/lib/exhbt/formats";
 import { pageItems, rowsFor, type Cell, type ItemAs, type ItemCell, type PageItem, type Row, type StackCell } from "@/lib/exhbt/layouts";
 import { imageRatio } from "@/lib/exhbt/sections";
-import { AimStacked, ButtonLink, ClosingBlock, Figure, Findings, FlowPart, KeyFigure, LeadImage, PlainSection, RefLine, StagedImage, TileImage } from "./exhbt-parts";
+import { AimStacked, ButtonLink, ClosingBlock, Figure, Findings, FlowPart, KeyFigure, LeadImage, PlainSection, RefLine, StagedImage, TileImage, TITLE_WRAP } from "./exhbt-parts";
 import { cellClass, cellItemClass, rowClass, stackClass, stackEditClass, stackIsRow, stackItemClass } from "./layout-rows";
 import type { ImageUrls, PageCtx } from "./page-ctx";
 
@@ -149,9 +149,9 @@ export function LayoutMain({ doc, ctx }: { doc: ExhbtDoc; ctx: PageCtx }) {
             return (
               <section {...(shown ? { "aria-labelledby": id } : { "aria-label": layout })} data-part="references" className={rc}>
                 {edit ? (
-                  edit.title({ Sub: ctx.Sub, id, className: "xp-label", path: "refsTitle", fallback: layout, label: `${layout}: title` })
+                  edit.title({ Sub: ctx.Sub, id, className: cx("xp-label", TITLE_WRAP), path: "refsTitle", fallback: layout, label: `${layout}: title` })
                 ) : shown ? (
-                  <ctx.Sub id={id} className="xp-label">
+                  <ctx.Sub id={id} className={cx("xp-label", TITLE_WRAP)}>
                     {shown}
                   </ctx.Sub>
                 ) : null}
