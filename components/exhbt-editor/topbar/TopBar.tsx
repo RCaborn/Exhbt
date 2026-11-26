@@ -1,11 +1,13 @@
 "use client";
 
 import "../css/topbar.css";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Eye, IdCard } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useEnv, useLive, useUi } from "../context";
+import { flushPending } from "../pending";
 import { LayoutMenu, useDraftedLine } from "./LayoutMenu";
 import { MenuButton } from "./MenuButton";
 import { useNarrow } from "./Popover";
@@ -30,6 +32,17 @@ export function TopBar(): ReactNode {
   // The live status, not the page's props, so publishing and unpublishing change it without a reload.
   const live = useLive();
   const chip = !env.canGoLive ? "Preview only" : live.status === "published" ? "Live" : "Draft";
+  const router = useRouter();
+  // Portfolio first (decision 0031, "Continuity with the exhbt editor"): back to this exhbt's tile on the
+  // portfolio, once the last change has landed, so the tile never shows an old title. Without the switch,
+  // today's link to the exhbts list.
+  const back = env.portfolioFirst ? { href: `/portfolio?at=${encodeURIComponent(env.id)}`, text: "Your portfolio" } : { href: "/exhbts", text: "Your exhbts" };
+  const waitThenGo = (e: MouseEvent<HTMLAnchorElement>) => {
+    // A new tab or window keeps the browser's own behaviour.
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    void flushPending().then(() => router.push(back.href));
+  };
 
   const visitor = (
     <Button size="sm" className="xe-tb xe-visitor" label="See as a visitor" aria-pressed={ui.visitor} onClick={() => ui.setVisitor(!ui.visitor)}>
@@ -55,9 +68,9 @@ export function TopBar(): ReactNode {
   return (
     <header className="xe-topbar" data-topbar>
       <div className="xe-topbar-row">
-        <Link href="/exhbts" className="xe-back" aria-label="Your exhbts">
+        <Link href={back.href} className="xe-back" aria-label={back.text} onClick={env.portfolioFirst ? waitThenGo : undefined}>
           <ArrowLeft aria-hidden size={16} strokeWidth={2.25} />
-          <span className="xe-back-text">Your exhbts</span>
+          <span className="xe-back-text">{back.text}</span>
         </Link>
         <div className="xe-title">
           <h1 id={HEADING_ID} tabIndex={-1} className="xe-title-h1">
