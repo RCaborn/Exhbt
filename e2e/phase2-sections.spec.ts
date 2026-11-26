@@ -638,11 +638,12 @@ test.describe("Sections in the editor: blank boxes as a visitor sees them", () =
     await expect(list.getByRole("listitem").last()).toContainText("Wrote it up");
   });
 
-  test("with every box blank (a new exhbt) the page still lists them", async ({ page }) => {
+  test("with every box blank (a new exhbt) the editing page lists them, and a visitor is shown no flowchart", async ({ page }) => {
     await signInAs(page, "blankall");
     await startFromScratch(page, { waitForContext: false });
     await expect(page.getByRole("list", { name: "Methodology" }).getByRole("listitem")).toHaveCount(3);
+    // Decision 0032: a flowchart with no box filled in is not drawn for a visitor. Until then every blank box was shown.
     await seeAsVisitor(page);
-    await expect(methodology(page).getByRole("listitem")).toHaveCount(3);
+    await expect(methodology(page)).toHaveCount(0);
   });
 });
