@@ -143,6 +143,31 @@ test.describe("Sections", () => {
     await expect(textbox(page, "arrangement.tiles.experience.lines.0", { part: "label" })).toHaveValue("Shift supervisor, campus cafe");
   });
 
+  test("the last section cannot be removed: its Remove is off with the reason, and nothing changes", async ({ page }) => {
+    await openEditor(page, withLayout("lone", ["work"]));
+    expect(await sections(page)).toEqual(["work"]);
+    await pointAt(page, "work");
+    const remove = tools(page, "work").getByRole("button", { name: "Remove More of my work" });
+    await expect(remove).toHaveAttribute("aria-disabled", "true");
+    await remove.hover();
+    await expect(page.getByRole("tooltip").filter({ hasText: "Your portfolio keeps at least one section." })).toBeVisible();
+    await remove.click({ force: true });
+    // The keyboard: Enter and Space on it do nothing either.
+    await remove.focus();
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Space");
+    expect(await sections(page)).toEqual(["work"]);
+    expect(await undoLabel(page)).toBe(null);
+    // With two, Remove works, and Undo brings it back as before.
+    await page.locator(`${READY} [data-path="arrangement.sections"]`).getByRole("button", { name: "Add a section" }).click();
+    await page.getByRole("menu").getByRole("menuitem", { name: /About me/ }).click();
+    await pointAt(page, "about");
+    await tools(page, "about").getByRole("button", { name: "Remove About me" }).click();
+    expect(await sections(page)).toEqual(["work"]);
+    await page.getByRole("button", { name: "Undo: removed About me" }).click();
+    expect(await sections(page)).toEqual(["work", "about"]);
+  });
+
   test("Add a section lists the six, dims those on the page, and puts a new one at the end with the cursor in it", async ({ page }) => {
     await openEditor(page, withLayout("add", ["featured", "work", "about", "contact"]));
     await page.locator(`${READY} [data-path="arrangement.sections"]`).getByRole("button", { name: "Add a section" }).click();
