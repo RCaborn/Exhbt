@@ -13,7 +13,7 @@ import { ItemMore, type ItemAction } from "../phone/ItemMore";
 import { usePortfolioApi } from "../runtime";
 import { hideTile, moveTile, setStar } from "../sections/arrange";
 import { EASE, gripAttributes, MOVE_MS, useReducedMotion } from "../sections/drag";
-import { placeTile, useSpot } from "../sections/place";
+import { placeRow, placeTile, useSpot } from "../sections/place";
 import { refocus } from "../sections/SectionFrame";
 import { ToolRow } from "../sections/ToolRow";
 import { W } from "../sections/words";
@@ -81,8 +81,10 @@ function WorkTile({ id, where, index, count, children }: HomeTileSlot & { childr
       const box = wrap?.getBoundingClientRect() ?? new DOMRect(0, 0, window.innerWidth, window.innerHeight);
       const pad = wrap ? parseFloat(getComputedStyle(wrap).paddingRight) || 0 : 0;
       const bounds = new DOMRect(box.left, box.top, box.width - pad, box.height);
-      const neighbours = list ? [...list.children].filter((li) => !li.contains(el)) : [];
-      return placeTile(el, t, bounds, neighbours);
+      const neighboursOf = (f: HTMLElement) => (list ? [...list.children].filter((li) => !li.contains(f)) : []);
+      if (where !== "row") return placeTile(el, t, bounds, neighboursOf(el));
+      const rows = list ? [...list.querySelectorAll<HTMLElement>(":scope > li > [data-tile-frame]")] : [el];
+      return placeRow(el, t, bounds, rows, neighboursOf);
     },
     [id, index, count, phone, where],
   );

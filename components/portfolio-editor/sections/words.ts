@@ -23,6 +23,7 @@ export const W = {
   sectionMore: (n: string) => `More for ${n}`,
   firstAlready: (n: string) => `${n} is already at the top`,
   lastAlready: (n: string) => `${n} is already at the bottom`,
+  keepOne: "Your portfolio keeps at least one section.",
   moved: (n: string) => `moved ${n}`,
   removed: (n: string) => `removed ${n}`,
   added: (n: string) => `added ${n}`,
