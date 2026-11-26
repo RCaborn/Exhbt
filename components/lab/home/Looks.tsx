@@ -144,7 +144,7 @@ export function Looks() {
             </div>
             <div className="hl-looks-plans">
               <Text as="p" display="block" type="supporting">
-                {plansLine()}
+                {plansLine()} {me.yours ? "Your name is on a made-up example page." : `${me.person.name} and her projects are made up.`}
               </Text>
             </div>
             <div className="hl-looks-work">

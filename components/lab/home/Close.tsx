@@ -32,7 +32,7 @@ export function Close() {
           <div className="hl-close-act">
             <Button label="Start your portfolio" href={`${LAB_PATH}/app`} variant="primary" size="lg" />
             <Text type="supporting" color="secondary">
-              Free to start. You pay to put it online.
+              Next: a free account, then your page. You pay only to put it online.
             </Text>
           </div>
         </div>

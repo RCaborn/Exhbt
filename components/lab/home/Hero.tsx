@@ -121,7 +121,7 @@ export function Hero() {
         <div className="hl-hero-act">
           <Button label="Start your portfolio" href={`${LAB_PATH}/app`} variant="primary" size="lg" />
           <Text as="p" display="block" type="supporting">
-            Free to start. You pay to put it online.
+            Next: a free account, then your page. You pay only to put it online.
           </Text>
         </div>
 

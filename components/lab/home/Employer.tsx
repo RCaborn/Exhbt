@@ -1,7 +1,6 @@
 import { Heading } from "@astryxdesign/core/Heading";
 import { Link } from "@astryxdesign/core/Link";
 import { Text } from "@astryxdesign/core/Text";
-import { Tick } from "@/components/ui/Tick";
 import { CHECKS_GUIDE } from "@/components/brand/Seal";
 import { Frame } from "../Frame";
 import { exhbtOf, sample, SampleExhbt } from "../samples";
@@ -67,13 +66,12 @@ export function Employer() {
             <ul className="hl-sees-list">
               {SEES.map((s) => (
                 <li key={s}>
-                  <Tick size="sm" />
                   <Text>{s}</Text>
                 </li>
               ))}
             </ul>
             <Text as="p" display="block" type="supporting">
-              <Link href={CHECKS_GUIDE}>How employers read an exhbt</Link>
+              {sample.owner.name}, her CV and her projects are made up. <Link href={CHECKS_GUIDE}>How employers read an exhbt</Link>
             </Text>
           </div>
         </div>

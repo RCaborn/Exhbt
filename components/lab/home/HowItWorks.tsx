@@ -78,6 +78,11 @@ export function HowItWorks() {
           <StepWords {...STEPS.live} />
         </li>
       </ol>
+      <div className="lab-content hl-steps-note">
+        <Text as="p" display="block" type="supporting">
+          {sample.owner.name} and her project are made up.
+        </Text>
+      </div>
 
       <Film file={file} />
     </section>

@@ -48,8 +48,7 @@ export function Roadmap() {
             Not sure what to make? Build your roadmap.
           </Heading>
           <Text as="p" display="block" type="large" color="secondary">
-            It&rsquo;s free. Say which job you want: we chart the skills it asks for, where you stand on each, and projects that would close the gaps. You see
-            it before we ask for anything.
+            Free, and no account needed: say which job you want and see what it asks for, where you stand, and projects that would close the gaps.
           </Text>
           <form action="/roadmap/new" method="get" className="hl-roadmap-form">
             <TextInput label="The job you want" htmlName="role" value={role} onChange={setRole} size="lg" placeholder="Junior data analyst" autoComplete="organization-title" />

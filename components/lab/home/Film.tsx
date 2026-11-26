@@ -34,6 +34,9 @@ export function Film({ file }: { file: string }) {
               </li>
             ))}
           </ol>
+          <p className="hl-film-note">
+            <Text type="supporting">{sample.owner.name} and her project are made up.</Text>
+          </p>
           <div className="hl-film-screen">
             <div className="hl-film-window">
               <span className="hl-film-file" aria-hidden>

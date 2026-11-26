@@ -471,7 +471,11 @@
     line-height: 1.15;
     letter-spacing: -0.01em;
     color: var(--color-text-primary);
-    transition: color var(--duration-fast) var(--ease-standard);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    [data-motion="on"] .hl-look-name {
+      transition: color var(--duration-fast) var(--ease-standard);
+    }
   }
   .hl-looks .astryx-radio-list-item:not([data-selected]) .hl-look-name {
     color: var(--color-slate);
@@ -641,17 +645,17 @@
       zoom: 0.6;
     }
   }
+  /* What an employer sees: ruled rows, as the parts of an exhbt are named. Mint stays for the checks themselves. */
   .hl-sees-list {
     display: grid;
-    gap: 0.75rem;
+    border-bottom: 1px solid var(--color-line);
   }
   .hl-sees-list > li {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
+    border-top: 1px solid var(--color-line);
+    padding-block: 0.75rem;
   }
-  .hl-sees-list > li > [data-tick] {
-    margin-top: 0.125rem;
+  .hl-steps-note {
+    margin-top: 2rem;
   }
 
   /* ── 5. How it works ──────────────────────────────────────────────────── */
@@ -948,10 +952,18 @@
   .hl-film-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "caps" "screen" "note";
     gap: 1.25rem;
   }
   .hl-film-captions {
+    grid-area: caps;
     display: grid;
+  }
+  .hl-film-note {
+    grid-area: note;
+  }
+  .hl-film-screen {
+    grid-area: screen;
   }
   /* The three scenes' words share one place; the film shows one at a time. */
   .hl-film-captions > li {
@@ -1010,8 +1022,16 @@
   @media (width >= 1024px) {
     .hl-film-grid {
       grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
-      gap: 4rem;
+      grid-template-rows: 1fr 1fr;
+      grid-template-areas: "caps screen" "note screen";
+      gap: 1.5rem 4rem;
       align-items: center;
+    }
+    .hl-film-captions {
+      align-self: end;
+    }
+    .hl-film-note {
+      align-self: start;
     }
     .hl-film-page {
       zoom: 0.56;
