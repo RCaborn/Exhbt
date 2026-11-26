@@ -120,7 +120,7 @@ Phase 2 (portfolios, the exhbt editor, uploads and AI drafts, paid plans) is on 
 | **Phase 2 switch** | `EXHBT_PHASE2=1`, a runtime variable (not a build one) | Always on in development and tests. In production, Phase 2 pages return 404 until it's set, so turning it off hides them without a redeploy |
 | **Stripe** (checkout, billing portal, webhook) | Secrets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`. Price ids `STRIPE_PRICE_PREMIUM`, `STRIPE_PRICE_MAX` in `wrangler.jsonc` `vars` (not secret) | Billing page can't take payments. The e2e suite sets test values in `playwright.config.ts` |
 | **Supabase Storage** | Buckets `sources` and `evidence`, both private, created by `supabase/migrations/20261114000000_phase2_schema.sql`. Uses the Supabase keys above | Uploads go to an in-memory stand-in (`/dev/upload`, `/dev/files`) |
-| **The editor switch** | `EXHBT_EDITOR`, a runtime variable set in the Cloudflare dashboard, never in `wrangler.jsonc` or `next.config.ts`: `page` or `classic`, for everyone | `DEFAULT_EDITOR` in `lib/editor-kind.ts` decides: the classic editor (below, "The editor switch") |
+| **The editor switch** | `EXHBT_EDITOR`, a runtime variable set in the Cloudflare dashboard, never in `wrangler.jsonc` or `next.config.ts`: `page` or `classic`, for everyone | `DEFAULT_EDITOR` in `lib/editor-kind.ts` decides: the new editor, `page` (below, "The editor switch") |
 
 `/api/health` reports these under `phase2`: each Stripe setting (present or not, never the value), whether the Stripe key and both price ids work, and whether both buckets exist and are private. None of it changes the overall `ok` yet. Fold it in when payments are meant to be live.
 
@@ -135,9 +135,9 @@ Development pages for Phase 2 (all 404 in production and when Supabase is connec
 
 ### The editor switch
 
-The edit-on-page editor (decision 0026) is on the live site switched off: everyone gets the classic editor. Rory decided to launch it this way on 24 Nov 2026, because three iPhone behaviours cannot be tested without a real iPhone. He tries it on his own iPhone, and it is switched on for everyone the same day. The rule and its one constant are `lib/editor-kind.ts`; decision 0026 has the detail, under "The classic editor: the switch, the fallback, the escape" and "Going live: switched off, then on".
+The edit-on-page editor (decision 0026) is the default for everyone. It was switched on for everyone on 26 Nov 2026; setting `EXHBT_EDITOR=classic` on the Worker (named "terna" in Cloudflare) puts everyone back without a deploy. Rory had decided on 24 Nov 2026 to launch it switched off, because three iPhone behaviours cannot be tested without a real iPhone. The rule and its one constant are `lib/editor-kind.ts`; decision 0026 has the detail, under "The classic editor: the switch, the fallback, the escape" and "Going live: switched off, then on".
 
-- **Switched off by default.** `DEFAULT_EDITOR` in `lib/editor-kind.ts` is `"classic"`. `/api/health` reports what an ordinary person gets, as `editor`.
+- **Switched on by default.** `DEFAULT_EDITOR` in `lib/editor-kind.ts` is `"page"` (it was `"classic"` until 26 Nov 2026). `/api/health` reports what an ordinary person gets, as `editor`.
 - **An admin's own switch.** An admin can turn the new editor on for themselves. On a phone:
   1. Log in with your own account, and stay on the host the address bar then shows (`www.exhbt.co.uk`, or `app.exhbt.co.uk` once `EXHBT_TOOL_HOST` has moved the tool there). Sign-in and this choice are both kept per host.
   2. Open `/admin` on that host. If the overview opens, the account is an admin there; if the page is not found, it is not, and the button will not be there.
@@ -147,7 +147,7 @@ The edit-on-page editor (decision 0026) is on the live site switched off: everyo
   6. To go back: the three dots at the end of the editor's own bar (not Menu in the site's header), then "Use the classic editor", the last item. That is remembered too.
 
   Nobody who is not an admin is sent the button, and the cookie that remembers the choice counts for nothing in their browser: whether the person signed in is an admin is checked on every request.
-- **On for everyone.** With no deploy, set `EXHBT_EDITOR` to `page` on the live Worker in the Cloudflare dashboard. `keep_vars` in `wrangler.jsonc` keeps a variable set there through a deploy; if it were ever lost, everyone would be back on the default, so read `editor` in `/api/health` after a deploy. Or in the code: change `DEFAULT_EDITOR` to `"page"`, and `SHIPPED_DEFAULT` at the top of `e2e/editor-admin-switch.spec.ts` to match (the one test that pins the default), then deploy.
+- **On for everyone.** Done on 26 Nov 2026 in the code: `DEFAULT_EDITOR` is `"page"` and `SHIPPED_DEFAULT` at the top of `e2e/editor-admin-switch.spec.ts` matches it (the one test that pins the default). `EXHBT_EDITOR=page` on the live Worker in the Cloudflare dashboard would do the same with no deploy. `keep_vars` in `wrangler.jsonc` keeps a variable set there through a deploy; read `editor` in `/api/health` after a deploy.
 - **Everyone back to the classic editor.** Set `EXHBT_EDITOR` to `classic`. It needs no deploy and works after either way of switching on. An admin's own choice still comes first.
 
 `npm run dev` serves the classic editor, as the live site does. To work on the new one, put `EXHBT_EDITOR=page` in `.env.local`, or open `/dev/editor?kind=page` once in the browser.
