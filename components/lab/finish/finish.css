@@ -24,6 +24,21 @@
     gap: 0.875rem;
     max-width: 44rem;
   }
+  /* The states: one Selector on a phone, tabs from a tablet up (StateTabs). */
+  .fin-tabs-wide {
+    display: none;
+  }
+  .fin-tabs-narrow {
+    max-width: 22rem;
+  }
+  @media (width >= 640px) {
+    .fin-tabs-wide {
+      display: block;
+    }
+    .fin-tabs-narrow {
+      display: none;
+    }
+  }
   @media (width >= 640px) {
     .fin-head {
       gap: 2rem;

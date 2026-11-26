@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { BottomSheet } from "@astryxdesign/core/BottomSheet";
 import { Button } from "@astryxdesign/core/Button";
@@ -92,6 +92,24 @@ export function FinishStage({
     setBeat(false);
   };
 
+  // A first publish opens on its finish, already published, so the event is the first thing seen
+  // (in the lab and in every capture of it); "Play it again" goes back to the draft and runs it from
+  // "Review and publish". Opened after the page has loaded, never in the server's HTML, and without
+  // maximal's flight: the ticks and the stroke play once, or with less motion are simply there.
+  useEffect(() => {
+    if (state !== "first") return;
+    setLive(true);
+    setUnsent(false);
+    setSaid(`${words.title} is live at ${words.link}`);
+    setStep("finish");
+  }, [state, words.title, words.link]);
+
+  function replay() {
+    setLive(false);
+    setUnsent(true);
+    open();
+  }
+
   function publish() {
     if (!confirmed) {
       setTried(true);
@@ -104,7 +122,7 @@ export function FinishStage({
       showToast({
         body: words.changedLine,
         uniqueID: "fin-changes",
-        endContent: <Button label="View it" variant="secondary" size="sm" href={words.viewHref} />,
+        endContent: <Button label="View it" variant="secondary" size="lg" href={words.viewHref} />,
       });
       return;
     }
@@ -174,6 +192,11 @@ export function FinishStage({
       <h2 id="fin-stage-title" className="sr-only">
         The exhbt editor, a stand-in
       </h2>
+      {state === "first" && (
+        <div className="fin-replay">
+          <Button label="Play it again" variant="secondary" size="lg" onClick={replay} />
+        </div>
+      )}
       <div className="fin-window">
         <div className="fin-bar">
           <span className="fin-bar-narrow">

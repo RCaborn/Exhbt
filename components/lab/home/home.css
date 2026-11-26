@@ -35,7 +35,7 @@
     }
   }
   .hl-section {
-    padding-block: clamp(4.5rem, 9vw, 8.5rem);
+    padding-block: clamp(3.5rem, 6vw, 5.5rem);
   }
   .hl-section-head {
     display: grid;
@@ -91,11 +91,12 @@
   .hl-hero-roadmap {
     flex-basis: 100%;
   }
-  /* An inline link given a finger-sized target (44px tall) without changing how its words sit. */
+  /* A link given a finger-sized target (44px tall) without changing how its words sit: the padding
+     makes the target, the matching negative margin keeps the line where it was. */
   .hl-hit {
-    display: inline-flex;
-    align-items: center;
-    min-height: 2.75rem;
+    display: inline-block;
+    padding-block: 0.75rem;
+    margin-block: -0.75rem;
   }
   .hl-hero-work {
     grid-area: work;
@@ -520,8 +521,13 @@
       transition: color var(--duration-fast) var(--ease-standard);
     }
   }
+  /* Not chosen: graphite, which still reads against white (slate didn't, at the smaller sizes). */
   .hl-looks .astryx-radio-list-item:not([data-selected]) .hl-look-name {
-    color: var(--color-slate);
+    color: var(--color-graphite);
+  }
+  /* Each look's row is a finger-sized target: the whole row picks it (Astryx's pressable row). */
+  .hl-looks .astryx-radio-list-item {
+    min-height: 2.75rem;
   }
   /* On a phone the eight names sit in two columns, so the stage fits one screen. */
   .hl-looks-list [role="radiogroup"] {
@@ -726,6 +732,10 @@
     display: grid;
     gap: 0.75rem;
   }
+  /* The draft's window, tagged Draft on its bar as the editor tags it, so it can't be taken for the live page beside it. */
+  .hl-step-window {
+    position: relative;
+  }
   .hl-step-arrow {
     display: flex;
     justify-content: center;
@@ -866,11 +876,17 @@
         animation-name: hl-film-in;
         animation-range: contain 62% contain 70%;
       }
-      /* The file arrives from the side and drops into the frame. */
+      /* The file sits in the middle of the window while its bar fills, then gives way to the page being written. */
       [data-level="maximal"][data-motion="on"] .hl-film-file {
         animation-name: hl-film-file;
-        animation-timing-function: linear;
-        animation-range: contain 0% contain 28%;
+        animation-timing-function: var(--ease-standard);
+        animation-range: contain 24% contain 30%;
+      }
+      [data-level="maximal"][data-motion="on"] .hl-film-read .astryx-progress-bar-fill {
+        animation: hl-film-fill linear both;
+        animation-timeline: --hl-film;
+        animation-range: contain 2% contain 20%;
+        transform-origin: left center;
       }
       /* The page writes itself, in reading order, under the editor's note. */
       [data-level="maximal"][data-motion="on"] .hl-film .xp-aside {
@@ -974,22 +990,14 @@
     }
   }
   @keyframes hl-film-file {
-    0% {
+    to {
       opacity: 0;
-      translate: -55vw 0;
+      scale: 0.92;
     }
-    20% {
-      opacity: 1;
-    }
-    62% {
-      opacity: 1;
-      translate: 0 0;
-      scale: 1;
-    }
-    100% {
-      opacity: 0;
-      translate: 0 6rem;
-      scale: 0.55;
+  }
+  @keyframes hl-film-fill {
+    from {
+      scale: 0 1;
     }
   }
   .hl-film-grid {
@@ -1020,12 +1028,32 @@
     display: grid;
     gap: 1rem;
   }
+  /* The upload: only in the film, where it covers the window until the page starts to be written. */
   .hl-film-file {
-    position: absolute;
-    top: 30%;
-    left: 50%;
-    z-index: 2;
-    margin-left: -8rem;
+    display: none;
+  }
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      [data-lab-root][data-level="maximal"][data-motion="on"] .hl-film-file {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 1.25rem;
+        pointer-events: none;
+      }
+    }
+  }
+  .hl-film-file .hl-file {
+    justify-self: center;
+    scale: 1.35;
+  }
+  .hl-film-read {
+    display: block;
+    width: min(18rem, 60vw);
+    margin-top: 0.75rem;
   }
   .hl-film-window {
     position: relative;
@@ -1100,6 +1128,10 @@
   .hl-roadmap-form > :last-child {
     justify-self: start;
   }
+  /* The radar's Now / After switch, finger-sized here (the chart itself is today's component, unchanged). */
+  .hl-roadmap-radar button {
+    min-height: 2.75rem;
+  }
   .hl-roadmap-radar {
     border: 1px solid var(--color-line);
     border-radius: var(--radius-container);
@@ -1170,5 +1202,44 @@
     align-items: center;
     gap: 0.75rem 1.25rem;
     padding-top: 0.5rem;
+  }
+  .hl-close-work {
+    display: none;
+  }
+  @media (width >= 1024px) {
+    .hl-close {
+      overflow: clip;
+    }
+    .hl-close-inner {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+      grid-template-areas: "title title" "words work" "act work" ". work";
+      grid-template-rows: auto auto auto 1fr;
+      column-gap: 4rem;
+      padding-bottom: 0;
+    }
+    .hl-close-inner > h2 {
+      grid-area: title;
+    }
+    .hl-close-words {
+      grid-area: words;
+    }
+    .hl-close-act {
+      grid-area: act;
+      align-self: start;
+    }
+    /* The frame runs on past the band's foot, so only its top is seen: the address bar and the name. */
+    .hl-close-work {
+      grid-area: work;
+      display: block;
+      margin-bottom: -4rem;
+      /* Her page's own hidden parts (skip links, screen-reader text) stay inside the picture. */
+      contain: paint;
+    }
+    .hl-close-crop {
+      height: 22rem;
+    }
+    .hl-close-page {
+      zoom: 0.5;
+    }
   }
 }

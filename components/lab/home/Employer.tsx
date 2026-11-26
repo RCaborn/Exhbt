@@ -71,7 +71,7 @@ export function Employer() {
               ))}
             </ul>
             <Text as="p" display="block" type="supporting">
-              {sample.owner.name}, her CV and her projects are made up. <Link href={CHECKS_GUIDE}>How employers read an exhbt</Link>
+              {sample.owner.name}, her CV and her projects are made up. <Link className="hl-hit" href={CHECKS_GUIDE}>How employers read an exhbt</Link>
             </Text>
           </div>
         </div>

@@ -54,7 +54,7 @@ export function Assemble() {
             ))}
           </dl>
           <Text as="p" display="block" type="supporting">
-            {sample.owner.name} and her projects are made up. <Link href={`/demo/${gp!.slug}`}>Open this exhbt</Link>
+            {sample.owner.name} and her projects are made up. <Link className="hl-hit" href={`/demo/${gp!.slug}`}>Open this exhbt</Link>
           </Text>
         </div>
         <div className="hl-assemble-work">

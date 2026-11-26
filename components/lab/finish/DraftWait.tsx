@@ -99,8 +99,8 @@ export function DraftWait({ words, draftPage }: { words: FinishWords; draftPage:
         Add an exhbt, while the draft is written
       </h2>
       <div className="fin-replay">
-        {!arrived && <Button label="Skip the wait" variant="ghost" size="sm" onClick={() => setArrived(true)} />}
-        <Button label="Play it again" variant="secondary" size="sm" onClick={() => setRun((n) => n + 1)} />
+        {!arrived && <Button label="Skip the wait" variant="ghost" size="lg" onClick={() => setArrived(true)} />}
+        <Button label="Play it again" variant="secondary" size="lg" onClick={() => setRun((n) => n + 1)} />
       </div>
       {/* In reading order for a phone (the line, the page, then the steps or what to do next); on a
           wide window the page moves to the right of the words (finish.css, grid areas). */}

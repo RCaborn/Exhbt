@@ -3,6 +3,7 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Heading } from "@astryxdesign/core/Heading";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
+import { Token } from "@astryxdesign/core/Token";
 import { APP_HOST } from "@/lib/hosts";
 import { Frame } from "../Frame";
 import { Address, sample, SampleExhbt } from "../samples";
@@ -50,9 +51,14 @@ export function HowItWorks() {
           <div className="hl-step-picture">
             {/* The note is the editor's, so it is app chrome in the proposed theme, outside the person's page. */}
             <Banner status="info" title={DRAFT_NOTE.title} description={DRAFT_NOTE.description} />
-            <Frame url={`${APP_HOST}/exhbts`} label="The first draft in the editor, its ticks still empty" page="hl-step-page">
-              <SampleExhbt slug={gp!.slug} checked={false} className="p-6" />
-            </Frame>
+            <div className="hl-step-window">
+              <Frame url={`${APP_HOST}/exhbts`} label="The first draft in the editor, its ticks still empty" page="hl-step-page">
+                <SampleExhbt slug={gp!.slug} checked={false} className="p-6" />
+              </Frame>
+              <span className="hl-frame-tag">
+                <Token label="Draft" size="sm" icon={<StatusDot variant="neutral" label="Draft" />} />
+              </span>
+            </div>
           </div>
           <StepWords {...STEPS.draft} />
         </li>

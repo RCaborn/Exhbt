@@ -20,7 +20,7 @@ export function Prices() {
         <div className="hl-prices-words">
           <Text as="p" display="block" type="large">
             The roadmap is free, and so is making your first exhbt. {PLAN_NAMES.premium} is {PRICES.premium} a {BILLING_PERIOD} and {PLAN_NAMES.max} is{" "}
-            {PRICES.max} a {BILLING_PERIOD}. <Link href="/pricing">Compare plans</Link>
+            {PRICES.max} a {BILLING_PERIOD}. <Link className="hl-hit" href="/pricing">Compare plans</Link>
           </Text>
           <ul className="hl-states">
             <li>

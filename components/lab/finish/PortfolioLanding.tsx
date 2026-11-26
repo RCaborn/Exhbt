@@ -82,7 +82,7 @@ export function PortfolioLanding({
           <Button
             label="Copy link"
             variant="primary"
-            size="sm"
+            size="lg"
             onClick={() => {
               navigator.clipboard
                 .writeText(`https://${words.link}`)
@@ -109,7 +109,7 @@ export function PortfolioLanding({
         Her portfolio, a stand-in for the portfolio editor
       </h2>
       <div className="fin-replay">
-        <Button label="Play it again" variant="secondary" size="sm" onClick={() => setRun((n) => n + 1)} />
+        <Button label="Play it again" variant="secondary" size="lg" onClick={() => setRun((n) => n + 1)} />
       </div>
       <div className="fin-window">
         <div className="fin-bar">
