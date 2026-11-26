@@ -154,10 +154,12 @@
     color: inherit;
   }
 
-  /* A formatted field's buttons, while it has the cursor: above the line's right end, or below it on a section's first line. */
+  /* A formatted field's buttons, while it has the cursor: above the line's right end, or below it on a section's first line.
+     Where a section's toolbar lies there (the last finding's, under its line, meet the toolbar of the section below on its top
+     edge), they move to the left, clear of it (fields/RichEditor.tsx: --xe-format-dx). */
   .xe-format {
     position: absolute;
-    right: 0;
+    right: var(--xe-format-dx, 0px);
     bottom: 100%;
     z-index: 25;
     display: flex;
@@ -633,11 +635,13 @@
   }
 
   /* ---------- A finding's controls and "Add a finding" ---------- */
-  /* A finding's controls sit on the rule above it, at its right end: in the padding between two findings, over no words. */
+  /* A finding's controls sit on the rule above it, at its right end: in the padding between two findings, over no words.
+     Where their section's toolbar lies over that place, they go along the rule to the left, clear of it (Toolbar.tsx,
+     listsClear: --xe-list-dx). */
   .xe-list-tools {
     position: absolute;
     top: 0;
-    right: 0;
+    right: var(--xe-list-dx, 0px);
     z-index: 15;
     display: flex;
     gap: 0.125rem;

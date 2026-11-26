@@ -72,6 +72,7 @@ export default function RichEditor({ slot, id, issue, live, onReady }: Props) {
   path.current = slot.path;
   const [asking, setAsking] = useState(false);
   const [below, setBelow] = useState(false);
+  const [aside, setAside] = useState(0);
   const cell = useRef<HTMLDivElement>(null);
   // Tiptap compares its options on every render and hands the editor new ones when any differ, which
   // updates the whole view. The words and the attributes it starts with are kept from the first render,
@@ -91,7 +92,11 @@ export default function RichEditor({ slot, id, issue, live, onReady }: Props) {
     content: start.content,
     editorProps: start.editorProps,
     onUpdate: ({ editor: e }) => store.setAt(path.current, docToRuns(e.getJSON() as TiptapNode)),
-    onFocus: () => setBelow(onFirstLine(cell.current)),
+    onFocus: () => {
+      const under = onFirstLine(cell.current);
+      setBelow(under);
+      setAside(clearOfToolbars(cell.current, under));
+    },
   });
 
   // The field's name, its placeholder and its issue follow its place ("Finding 2" becomes "Finding 1" when the first is removed).
@@ -185,7 +190,14 @@ export default function RichEditor({ slot, id, issue, live, onReady }: Props) {
   return (
     <>
       {content}
-      <div role="toolbar" aria-label="Formatting" className={cx("xe-format", below && "xe-format-below")} data-edit-only onMouseDown={keep}>
+      <div
+        role="toolbar"
+        aria-label="Formatting"
+        className={cx("xe-format", below && "xe-format-below")}
+        style={aside ? ({ "--xe-format-dx": `${aside}px` } as React.CSSProperties) : undefined}
+        data-edit-only
+        onMouseDown={keep}
+      >
         {slot.highlight ? (
           <button type="button" className="xe-chip" aria-pressed={bold} onClick={() => editor.chain().focus().toggleBold().run()}>
             <Highlighter aria-hidden size={14} strokeWidth={2.5} /> Highlight
@@ -219,6 +231,37 @@ function onFirstLine(cell: HTMLElement | null): boolean {
   const frame = field.closest(".xe-frame");
   if (!frame) return false;
   return field.getBoundingClientRect().top - frame.getBoundingClientRect().top < 48;
+}
+
+/**
+ * How far the formatting buttons go to the left of the line's right end so that they, and their presses under a finger,
+ * keep clear of every section's toolbar as Toolbar.tsx placed it (`below`: under the line, else above it). The last
+ * finding's go under its line, into the gap where the section below has its toolbar on its top edge (an essay with its
+ * findings moved to the top). The toolbar keeps its place, its grip at its section's corner. 0 where nothing is in the way.
+ */
+function clearOfToolbars(cell: HTMLElement | null, below: boolean): number {
+  const field = cell?.closest<HTMLElement>(".xe-rich");
+  const bar = field?.querySelector<HTMLElement>(".xe-format");
+  const first = bar?.querySelector<HTMLElement>("button");
+  if (!field || !bar || !first) return 0;
+  const f = field.getBoundingClientRect();
+  const w = bar.offsetWidth;
+  const h = first.offsetHeight;
+  // Under a finger each takes a 44px press, 8px round it (css/core.css, .xe-tool-sm).
+  const reach = window.matchMedia("(pointer: coarse)").matches ? 8 : 0;
+  // Under the line it starts at the line's foot; above it, 0.25rem over the line (the bar's own padding).
+  const top = below ? f.bottom : f.top - 4 - h;
+  const tools = [...document.querySelectorAll<HTMLElement>('[data-editor="page"] .xe-tools > *')].filter((t) => t.getClientRects().length > 0).map((t) => t.getBoundingClientRect());
+  let dx = 0;
+  // Past the toolbar it meets, and again past any it meets there; each step goes further left, so it ends.
+  for (let tries = 0; tries < 4; tries++) {
+    const left = f.right - dx - w - reach;
+    const right = f.right - dx + reach;
+    const hit = tools.filter((t) => Math.min(right, t.right) - Math.max(left, t.left) > 0.5 && Math.min(top + h + reach, t.bottom) - Math.max(top - reach, t.top) > 0.5);
+    if (!hit.length) return f.right - dx - w < f.left ? 0 : dx;
+    dx = Math.ceil(f.right + reach - Math.min(...hit.map((t) => t.left)) + 4);
+  }
+  return 0;
 }
 
 /** The field's own address prompt, as the classic editor's formatted field asks: an https address, or an error. Out of the flow, under the field. */

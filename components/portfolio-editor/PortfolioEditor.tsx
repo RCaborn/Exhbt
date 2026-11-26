@@ -3,7 +3,7 @@
 import "@/components/exhbt-editor/css/core.css";
 import "./css/core.css";
 import { memo, useEffect, useState, type ReactNode } from "react";
-import { unstable_isUnrecognizedActionError } from "next/navigation";
+import { unstable_isUnrecognizedActionError, useRouter } from "next/navigation";
 import { savePortfolioAction } from "@/app/(app)/portfolio/actions";
 import { problemOf } from "@/app/(app)/portfolio/builder-state";
 import type { PortfolioData } from "@/app/(app)/portfolio/load";
@@ -15,7 +15,7 @@ import { Said } from "@/components/exhbt-editor/ui/Said";
 import { EditorBar } from "./bar/EditorBar";
 import { FirstRun } from "./bar/FirstRun";
 import { Canvas } from "./Canvas";
-import { hasPending, noteSaved, registerSender } from "./pending";
+import { hasPending, noteSaved, noteSending, registerSender } from "./pending";
 import { DataContext, RuntimeContext, usePortfolioState, useRuntime, type PortfolioEditorApi, type PortfolioUi, type Runtime, type SaveView } from "./runtime";
 import { createRuntime, type Host } from "./runtime-core";
 import { STALE_EDITOR } from "./ui/SaveStatus";
@@ -69,18 +69,18 @@ type SaveResult = { ok: true } | { ok: false; error: string };
 type Visit = {
   rt: Runtime;
   host: Host;
+  /** The state and the person the editor was opened with: what the server had then. */
+  loaded: BuilderState;
+  owner: string;
   /** The save `useBuilder` calls. */
   save(state: BuilderState): Promise<SaveResult>;
   /** The crash fallback's own send, through the same action. */
   send(state: BuilderState): Promise<boolean>;
-  /** Resolves when the save in flight, if there is one, has been answered. */
-  settled(): Promise<void>;
 };
 
-function startVisit(initial: BuilderState): Visit {
+function startVisit(loaded: BuilderState, owner: string): Visit {
   const host: Host = { change: () => {}, retry: () => {} };
-  const rt = createRuntime(initial, host);
-  let inflight: Promise<void> = Promise.resolve();
+  const rt = createRuntime(loaded, host);
 
   async function send(state: BuilderState): Promise<SaveResult> {
     try {
@@ -88,8 +88,8 @@ function startVisit(initial: BuilderState): Visit {
       if (devParam("save") === "fail") return { ok: false, error: "The save was told to fail (?save=fail, development only)." };
       const r = await savePortfolioAction(state);
       if (!r.ok) return { ok: false, error: r.error };
-      // The server has it: noted for the crash fallback.
-      noteSaved(state);
+      // The server has it, as of its own clock: noted for the crash fallback and for the gate (pending.ts).
+      noteSaved(state, r.savedAt);
       return { ok: true };
     } catch (e) {
       // Anything else is thrown on to useBuilder, which says the server could not be reached.
@@ -99,33 +99,28 @@ function startVisit(initial: BuilderState): Visit {
       return { ok: false, error: STALE_EDITOR };
     }
   }
-
-  return {
-    rt,
-    host,
-    save(state) {
-      const run = send(state);
-      inflight = run.then(
-        () => {},
-        () => {},
-      );
-      return run;
-    },
-    send: async (state) => (await send(state).catch(() => ({ ok: false as const }))).ok,
-    settled: () => inflight,
+  /** Every save is noted while it is on its way: the gate and the crash fallback wait for it (pending.ts). */
+  const tracked = (state: BuilderState) => {
+    const run = send(state);
+    noteSending(run);
+    return run;
   };
+
+  return { rt, host, loaded, owner, save: tracked, send: async (state) => (await tracked(state).catch(() => ({ ok: false as const }))).ok };
 }
 
 export function PortfolioEditor({ data, team, jobLinks }: PortfolioEditorProps): ReactNode {
   if (devParam("crash") === "render") throw new Error("The portfolio editor was told to fail (?crash=render, development only).");
-  const initial = data.builder.initial;
-  const [visit] = useState(() => startVisit(initial));
+  // The visit starts from the page as it was loaded. A later refresh brings new data (a photo, an address,
+  // a publish in another tab) and never resets what the person has typed.
+  const [visit] = useState(() => startVisit(data.builder.initial, data.owner));
   const { rt } = visit;
-  const builder = useBuilder<BuilderState>(initial, visit.save, problemOf);
+  const builder = useBuilder<BuilderState>(visit.loaded, visit.save, problemOf);
   // The runtime's one way to change the state and to send it: useBuilder's own.
   visit.host.change = builder.change;
   visit.host.retry = builder.retry;
   const [ready, setReady] = useState(false);
+  const router = useRouter();
   // An iPhone zooms in on a field under 16px, and much of the page's own type is under it.
   useNoZoomOnFocus();
 
@@ -139,9 +134,20 @@ export function PortfolioEditor({ data, team, jobLinks }: PortfolioEditorProps):
     setReady(true);
     // Development only: the browser tests read the editor's state and call its actions (e2e/portfolio-editor.ts).
     if (process.env.NODE_ENV !== "production") window.__portfolioEditor = { state: rt.state.get, ui: rt.ui.get, save: rt.save.get, undoLabel: () => rt.undo.get().label, waiting: hasPending, api: rt.api };
-    // The crash fallback sends the newest state through the same action, after any save in flight.
-    return registerSender({ send: visit.send, settled: visit.settled }, initial);
-  }, [rt, visit, initial]);
+    // The crash fallback sends the newest state through the same action. Registered once, with what the
+    // server had when the editor opened: a refresh must not make it forget a change that is still waiting.
+    return registerSender({ send: visit.send }, visit.owner, visit.loaded);
+  }, [rt, visit]);
+
+  // The browser's Back, bringing this document back whole from its own cache: what other pages did since
+  // (an exhbt's title, a publish) is fetched. The editor's state is as the person left it.
+  useEffect(() => {
+    const shown = (e: PageTransitionEvent) => {
+      if (e.persisted) router.refresh();
+    };
+    window.addEventListener("pageshow", shown);
+    return () => window.removeEventListener("pageshow", shown);
+  }, [router]);
 
   return (
     <RuntimeContext value={rt}>
