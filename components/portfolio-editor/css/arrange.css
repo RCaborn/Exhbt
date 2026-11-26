@@ -166,7 +166,8 @@
   /* The lines' controls: just under the list's bottom edge, at its right (in the section's own bottom
      padding, clear of the last line's year), without the rows' hairline. */
   [data-editor="portfolio"] .pe-line-tools {
-    /* A fixed point that takes no room and never changes size: its body is drawn from it. */
+    /* A fixed point at the list's bottom right, after the </dl> in the page's wrapper: it takes no room
+       and never changes size; its body is drawn from it. */
     position: absolute;
     right: 0;
     bottom: 0;
@@ -198,7 +199,7 @@
   [data-editor="portfolio"] .pe-line-tools-body:not(:has(button, .pe-lines-issue)) {
     display: none;
   }
-  [data-editor="portfolio"] dl:is(:hover, :focus-within) > .pe-line-tools > .pe-line-tools-body > .pe-tools {
+  [data-editor="portfolio"] [data-lines-box]:is(:hover, :focus-within) > .pe-line-tools > .pe-line-tools-body > .pe-tools {
     opacity: 1;
     pointer-events: auto;
   }
