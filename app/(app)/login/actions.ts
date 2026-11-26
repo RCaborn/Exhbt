@@ -7,6 +7,9 @@ import { safeNext, sendMagicLink } from "@/lib/auth";
 import { createAccount, saveNewPassword, sendPasswordReset, signInWithIdentifier } from "@/lib/password-auth";
 import { loginIdentifierProblem, passwordProblem } from "@/lib/passwords";
 import { getStore, type EventName } from "@/lib/store";
+import { landingAfterSignIn } from "@/lib/landing";
+import { portfolioKindForEveryone } from "@/lib/portfolio-kind-server";
+import { isPhase2Enabled } from "@/lib/site";
 
 /**
  * Attempts per connection per hour. Real people mistype; this slows guessing.
@@ -41,7 +44,7 @@ export async function login(_prev: FormState, form: FormData): Promise<FormState
   if (!password) return { error: "Enter your password." };
   const blocked = await tooMany("login_attempt", ATTEMPTS_PER_HOUR, "Too many attempts from this connection. Please try again in an hour.");
   if (blocked) return { error: blocked };
-  const next = safeNext(String(form.get("next") ?? ""));
+  const next = safeNext(String(form.get("next") ?? ""), landingAfterSignIn("log-in", await portfolioKindForEveryone(), isPhase2Enabled()));
   let devLogin: string | undefined;
   try {
     const result = await signInWithIdentifier(identifier, password);
@@ -64,7 +67,7 @@ export async function signup(_prev: FormState, form: FormData): Promise<FormStat
   if (problem) return { error: problem };
   const blocked = await tooMany("login_attempt", ATTEMPTS_PER_HOUR, "Too many attempts from this connection. Please try again in an hour.");
   if (blocked) return { error: blocked };
-  const next = safeNext(String(form.get("next") ?? ""), "/account");
+  const next = safeNext(String(form.get("next") ?? ""), landingAfterSignIn("sign-up", await portfolioKindForEveryone(), isPhase2Enabled()));
   let pending = false;
   let devLogin: string | undefined;
   try {
@@ -115,8 +118,9 @@ export async function savePassword(_prev: FormState, form: FormData): Promise<Fo
     console.error("save password failed", (e as Error).message);
     return { error: LATER };
   }
-  if (devLogin) return { continueTo: devLoginUrl(devLogin, "/account") };
-  return { continueTo: "/account" };
+  const next = landingAfterSignIn("password", await portfolioKindForEveryone(), isPhase2Enabled());
+  if (devLogin) return { continueTo: devLoginUrl(devLogin, next) };
+  return { continueTo: next };
 }
 
 /** The fallback: a one-time sign-in link by email. Same reply whether or not the address has an account. */
@@ -125,7 +129,7 @@ export async function requestLink(_prev: FormState, form: FormData): Promise<For
   if (!email.success) return { error: "Enter a valid email address." };
   const blocked = await tooMany("login_link_sent", EMAILS_PER_HOUR, "Too many sign-in emails from this connection. Please try again in an hour.");
   if (blocked) return { error: blocked };
-  const next = safeNext(String(form.get("next") ?? ""));
+  const next = safeNext(String(form.get("next") ?? ""), landingAfterSignIn("log-in", await portfolioKindForEveryone(), isPhase2Enabled()));
   let devLink: string | undefined;
   try {
     ({ devLink } = await sendMagicLink(email.data, next));

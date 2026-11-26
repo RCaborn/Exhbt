@@ -3,13 +3,16 @@ import Link from "next/link";
 import { LoginForm } from "./LoginForm";
 import { GoogleOrEmail } from "./GoogleOrEmail";
 import { safeNext } from "@/lib/auth";
+import { landingAfterSignIn } from "@/lib/landing";
+import { portfolioKindForEveryone } from "@/lib/portfolio-kind-server";
+import { isPhase2Enabled } from "@/lib/site";
 import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "Log in", robots: { index: false } };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
   const { next: rawNext, error } = await searchParams;
-  const next = safeNext(rawNext);
+  const next = safeNext(rawNext, landingAfterSignIn("log-in", await portfolioKindForEveryone(), isPhase2Enabled()));
   const create = `/login/new?next=${encodeURIComponent(next)}`;
   return (
     <div className="mx-auto max-w-md px-4 pt-16 sm:px-8 lg:pt-24">
