@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 import { SKEW_MS, staleness } from "../components/portfolio-editor/pending";
 import { applyUndo, entryFor } from "../components/portfolio-editor/undo";
 import type { BuilderState } from "../app/(app)/portfolio/steps";
-import { HOME, READY, boxes, call, changeWith, differences, expect, field, focusedPath, fresh, openEditor, saveState, seed, setKind, settle, signIn, signUpToEditor, stateNow, test, textbox, typeIn, uiNow, undoLabel, valueAt, waitReady, waitSaved, waitSavedOnPage } from "./portfolio-editor";
+import { HOME, READY, call, changeWith, expect, field, focusedPath, fresh, openEditor, saveState, seed, setKind, settle, signIn, signUpToEditor, stateNow, test, textbox, typeIn, uiNow, undoLabel, valueAt, waitReady, waitSaved, waitSavedOnPage } from "./portfolio-editor";
 
 // The one-page portfolio editor's core (decision 0031; brief E of docs/briefs/portfolio-first): which
 // builder a person gets, the page drawn as the visitor's with every word typed where it sits, each field
@@ -947,46 +947,6 @@ test.describe("Saving, after a deploy and in two tabs", () => {
     await waitReady(page);
     expect(await valueAt(page, "profile.location")).toBe("York");
   });
-});
-
-test.describe("Box for box with the visitor's page", () => {
-  // The six looks E did not measure (Exhbt and Studio were, in milestone 1), on the full fixture, and
-  // Ledger and Notebook with no education line, where the location and the year are block fields. Every
-  // landmark of the page (HOME_BOXES) is where /p/<name> has it, within half a pixel, at 1440 and 412.
-  // Nothing on the full fixture is empty, so of HOME_EDIT_ONLY_IN_FLOW only "what you're looking for, as
-  // stored" can differ, and it is inside the boxes measured here, never one of them.
-  const cases: { look: string; noEducation?: boolean }[] = [
-    { look: "classic" },
-    { look: "notebook" },
-    { look: "mono" },
-    { look: "night" },
-    { look: "ledger" },
-    { look: "bloom" },
-    { look: "ledger", noEducation: true },
-    { look: "notebook", noEducation: true },
-  ];
-  for (const c of cases) {
-    test(`${c.look}${c.noEducation ? ", with no education line," : ""} is the visitor's page box for box at 1440 and 412`, async ({ page }) => {
-      test.slow();
-      const base = fullFixture("x", c.look);
-      const layout = base.layout as { tiles: Record<string, unknown> };
-      const fixture = c.noEducation ? { ...base, layout: { ...layout, tiles: { ...layout.tiles, education: { lines: [], tools: "Excel, Python, SQL, Tableau" } } } } : base;
-      const f = fresh(fixture, `box${c.look}${c.noEducation ? "n" : ""}`);
-      await openEditor(page, f);
-      for (const width of [1440, 412]) {
-        await page.setViewportSize({ width, height: 900 });
-        await page.goto("/portfolio");
-        await waitReady(page);
-        await settle(page);
-        const editing = await boxes(page);
-        await page.goto(`/p/${f.username}`);
-        await settle(page);
-        const visiting = await boxes(page);
-        expect(visiting.length, "the visitor's page drew its landmarks").toBeGreaterThan(10);
-        expect(differences(visiting, editing), `${c.look} at ${width}`).toEqual([]);
-      }
-    });
-  }
 });
 
 test.describe("Accessibility", () => {

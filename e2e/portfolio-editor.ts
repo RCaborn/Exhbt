@@ -359,6 +359,7 @@ export const HOME_EDIT_ONLY_IN_FLOW: { name: string; selector: string; allow: "r
   { name: "an empty intro", selector: '[data-intro]:has([data-path="profile.bio"][data-empty])', allow: "remove" },
   { name: "where you're based, empty", selector: ':is(span, dl > div):has(> * [data-path="profile.location"][data-empty], > [data-path="profile.location"][data-empty])', allow: "remove" },
   { name: "what you're looking for, empty", selector: ':is([data-looking-for], dl > div):has([data-path="profile.lookingFor"][data-empty])', allow: "remove" },
+  { name: "the line of where you're based and what you're looking for, both empty", selector: 'p:has([data-path="profile.location"][data-empty]):has([data-path="profile.lookingFor"][data-empty])', allow: "remove" },
   { name: "About me's words, empty", selector: '[data-path="arrangement.tiles.about.text"][data-empty] [data-para-box]', allow: "remove" },
   { name: "a line of education or experience with no words", selector: "dl > div:has([data-part=label] [data-empty]):has([data-part=year] [data-empty])", allow: "remove" },
   { name: "a line's year, empty", selector: "[data-part=year]:has([data-empty])", allow: "remove" },
