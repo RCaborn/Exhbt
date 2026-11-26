@@ -18,6 +18,7 @@ import { isFormat } from "@/lib/exhbt/formats";
 import { isDraftHelperFile, loadAiVersion, loadDraftSource } from "@/lib/draft-tools";
 import { signedFileUrl } from "@/lib/files";
 import { parseHost, portfolioHost } from "@/lib/hosts";
+import { portfolioHref } from "@/lib/portfolio-links";
 import { canPublish, getPlan } from "@/lib/plan";
 import { mediaFor, portfolioLook } from "@/lib/portfolio";
 import { themeFor } from "@/lib/portfolio-themes";
@@ -71,9 +72,10 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
   for (const sourceId of new Set(imagesOf(record.doc).flatMap((im) => (im.picked?.sourceFileId ? [im.picked.sourceFileId] : [])))) {
     figureSources[sourceId] = await signedFileUrl(sourceId, user.id);
   }
-  // Production shows the real address (alex.exhbt.co.uk); development and previews serve portfolios at /p/alex.
-  const onAppHost = parseHost((await headers()).get("host")).kind === "app";
-  const liveBase = profile.username ? (onAppHost ? `https://${portfolioHost(profile.username)}` : `/p/${profile.username}`) : null;
+  // portfolioHref gives the real address (alex.exhbt.co.uk) on any exhbt.co.uk host, www included, and /p/alex in development and previews.
+  const reqHeaders = await headers();
+  const onAppHost = parseHost(reqHeaders.get("host")).kind === "app";
+  const liveBase = profile.username ? portfolioHref(profile.username, reqHeaders.get("x-forwarded-host") ?? reqHeaders.get("host")) : null;
 
   // Rewrite and "Back to the AI version" need the source text kept from the draft.
   const hasSource = (await loadDraftSource(user.id, id)) !== null;
