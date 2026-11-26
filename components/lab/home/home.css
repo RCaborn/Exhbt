@@ -19,11 +19,18 @@
     position: relative;
     z-index: 2;
   }
-  .hl-nav-links {
+  .hl-nav-links,
+  .hl-nav-start {
     display: none;
   }
+  .hl-nav-end {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
   @media (width >= 768px) {
-    .hl-nav-links {
+    .hl-nav-links,
+    .hl-nav-start {
       display: contents;
     }
   }
@@ -225,26 +232,36 @@
       zoom: 0.6;
     }
   }
+  /*
+   * On a wide screen the exhbt takes the whole width, shown large, with its four parts named in a row
+   * under it: a different shape from the hero's words-and-picture, so the page doesn't repeat one split.
+   */
   @media (width >= 1024px) {
     .hl-assemble-grid {
-      grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
-      grid-template-rows: auto 1fr;
-      grid-template-areas: "head work" "parts work";
-      gap: 2rem 4rem;
-      align-items: start;
+      gap: 2.5rem;
+    }
+    .hl-assemble-head {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      align-items: end;
+      gap: 1rem 4rem;
     }
     .hl-assemble-page {
-      zoom: 0.6;
+      zoom: 0.72;
     }
   }
   .hl-parts {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
   }
-  @media (width >= 640px) and (width < 1024px) {
+  @media (width >= 640px) {
     .hl-parts {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       column-gap: 2rem;
+    }
+  }
+  @media (width >= 1024px) {
+    .hl-parts {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
   .hl-part {
@@ -288,13 +305,13 @@
         background-size: 100% 100%;
         animation-name: hl-mark;
         animation-timing-function: linear;
-        animation-range: cover 18% cover 30%;
+        animation-range: cover 14% cover 24%;
       }
       /* How you did it: the boxes arrive one by one, then the last turns ink. */
       [data-motion="on"] .hl-assemble-work .xp-flow > li {
         animation-name: hl-arrive;
         animation-timing-function: var(--ease-entrance);
-        animation-range: cover calc(26% + var(--hl-n, 0) * 3.5%) cover calc(32% + var(--hl-n, 0) * 3.5%);
+        animation-range: cover calc(22% + var(--hl-n, 0) * 3.2%) cover calc(27% + var(--hl-n, 0) * 3.2%);
       }
       .hl-assemble-work .xp-flow > li:nth-child(2) {
         --hl-n: 1;
@@ -314,26 +331,26 @@
       [data-motion="on"] .hl-assemble-work .xp-flow > li:last-child > .xp-flow-box {
         animation-name: hl-ink;
         animation-timing-function: var(--ease-standard);
-        animation-range: cover 45% cover 48%;
+        animation-range: cover 40% cover 43%;
       }
       /* What you found: the graph's line runs from before to after, then the after dot and the change arrive. */
       [data-motion="on"] .hl-assemble-work [data-part="graph"] [role="img"] > div > .relative > :nth-child(2) {
         transform-origin: right center;
         animation-name: hl-run;
         animation-timing-function: var(--ease-move);
-        animation-range: cover 44% cover 50%;
+        animation-range: cover 38% cover 44%;
       }
       [data-motion="on"] .hl-assemble-work [data-part="graph"] [role="img"] > div > .relative > :nth-child(4),
       [data-motion="on"] .hl-assemble-work [data-part="graph"] [role="img"] > div > span:last-child {
         animation-name: hl-pop;
         animation-timing-function: var(--ease-entrance);
-        animation-range: cover 49% cover 52%;
+        animation-range: cover 43% cover 46%;
       }
       /* The proof: the ticks fill, one after another. */
       [data-motion="on"] .hl-assemble-work [data-checks] .xp-tick {
         animation-name: hl-pop;
         animation-timing-function: var(--ease-entrance);
-        animation-range: cover calc(51% + var(--hl-n, 0) * 2%) cover calc(54% + var(--hl-n, 0) * 2%);
+        animation-range: cover calc(45% + var(--hl-n, 0) * 2%) cover calc(48% + var(--hl-n, 0) * 2%);
       }
       .hl-assemble-work [data-checks] li:nth-child(2) .xp-tick {
         --hl-n: 1;
@@ -352,19 +369,19 @@
       }
       [data-motion="on"] .hl-part[data-part-name="question"]::before,
       [data-motion="on"] .hl-part[data-part-name="question"] dt {
-        animation-range: cover 18% cover 30%;
+        animation-range: cover 14% cover 24%;
       }
       [data-motion="on"] .hl-part[data-part-name="method"]::before,
       [data-motion="on"] .hl-part[data-part-name="method"] dt {
-        animation-range: cover 26% cover 48%;
+        animation-range: cover 22% cover 43%;
       }
       [data-motion="on"] .hl-part[data-part-name="found"]::before,
       [data-motion="on"] .hl-part[data-part-name="found"] dt {
-        animation-range: cover 44% cover 52%;
+        animation-range: cover 38% cover 46%;
       }
       [data-motion="on"] .hl-part[data-part-name="proof"]::before,
       [data-motion="on"] .hl-part[data-part-name="proof"] dt {
-        animation-range: cover 51% cover 58%;
+        animation-range: cover 45% cover 52%;
       }
     }
   }

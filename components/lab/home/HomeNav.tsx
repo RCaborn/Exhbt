@@ -1,13 +1,15 @@
 import { Button } from "@astryxdesign/core/Button";
 import { TopNav, TopNavItem } from "@astryxdesign/core/TopNav";
 import { Logo } from "@/components/brand/Logo";
+import { LAB_PATH } from "../lab";
 
 /**
- * Home's top bar, as a signed-out visitor has it: the brand, three links into the page's own story
- * and "Log in". No button in it: the page's one mint button is the hero's, so the bar never offers
- * a second way in (the journey review's first finding). Astryx TopNav in the proposed theme, which
- * pads it to the same content line as the page under it. On a phone the links go and the brand and
- * "Log in" stay; the links are sections of this page, a scroll away.
+ * Home's top bar, as a signed-out visitor has it: the brand, three links into the page's own story,
+ * "Log in", and the hero's one action again, under the same label (the appeal plan's job 6a: the
+ * header's button says what the hero's says, so there is one way in, not two). It is the quiet
+ * button, not mint: the page's one mint button is the hero's. Astryx TopNav in the proposed theme,
+ * which pads it to the same content line as the page under it. On a phone the links and the button
+ * go and the brand and "Log in" stay; the hero's button is in the first screen there.
  */
 export function HomeNav() {
   return (
@@ -21,7 +23,14 @@ export function HomeNav() {
           <TopNavItem label="Pricing" href="#prices" />
         </span>
       }
-      endContent={<Button label="Log in" href="/login" variant="ghost" />}
+      endContent={
+        <span className="hl-nav-end">
+          <Button label="Log in" href="/login" variant="ghost" />
+          <span className="hl-nav-start">
+            <Button label="Start your portfolio" href={`${LAB_PATH}/app`} variant="secondary" />
+          </span>
+        </span>
+      }
     />
   );
 }

@@ -9,7 +9,7 @@ The agreed story is decision 0033's seven beats (`docs/design/for-rory-appeal.md
 | # | Beat | The proof on screen | File |
 |---|---|---|---|
 | 1 | A website of your own, built from your projects. | Her real portfolio (`PortfolioHome`) in the first screen at both widths; from confident, your name in its address | `Hero.tsx` |
-| 2 | One project, one page. | One real exhbt (`ProjectView`) that puts itself together as it scrolls into view, beside its four parts | `Assemble.tsx` |
+| 2 | One project, one page. | One real exhbt (`ProjectView`), the width of the page, that puts itself together as it scrolls into view, its four parts named in a row under it | `Assemble.tsx` |
 | 3 | One page, eight looks. | The same page, with your name, through the eight looks; the names are the control | `Looks.tsx` |
 | 4 | A CV says it. An exhbt shows it. | A CV's line beside that project's exhbt, and what an employer sees | `Employer.tsx` |
 | 5 | Start with the file you already have. | The file, the first draft with its note, the page live at its address (a film at maximal) | `HowItWorks.tsx`, `Film.tsx`, `steps.tsx` |
@@ -30,6 +30,7 @@ The level's own token values (type sizes, curves, durations, the frame's shadow)
 | "Your name" in the hero, the address and the page take it | | yes | yes |
 | The eight looks pinned and led by the scroll | | yes | yes |
 | "How it works" as a film the scroll plays | | | yes |
+| The hero's page works: its best project opens into its exhbt, the title travelling (a shared-element view transition) | | | yes |
 
 At restrained the looks are still there, picked by hand only. With Motion off (the lab bar), the device's reduced-motion setting, or a browser without scroll timelines, everything rests in its finished state: the exhbt whole, the looks unpinned, the still steps instead of the film.
 
@@ -39,6 +40,7 @@ At restrained the looks are still there, picked by hand only. With Motion off (t
 - **The exhbt assembles** (`.hl-assemble`): one named view timeline, `--hl-exhbt`, on the frame's wrapper (the frame's own clipping boxes would capture a plain `view()`), read through `timeline-scope` by the parts' names beside it. The targets are hooks the page already has: `.xp-mark`, `.xp-flow > li` and the last box, the graph's connector and after dot under `[data-part="graph"]`, and `.xp-tick`. `ProjectView` isn't touched.
 - **The looks** (`Looks.tsx`): `position: sticky` on the stage, one marker per look in the track behind it, one `IntersectionObserver` watching the middle of the screen, and `document.startViewTransition` (type `hl-look`) that names only the page in the frame, so the rest of the page stays live while it scrolls. A radio pressed by hand latches: the scroll leaves the look alone until the scene has left the screen. Nothing advances by itself.
 - **The film** (`Film.tsx`): a section several screens tall whose stage sticks; one named view timeline, `--hl-film`, and its `contain` range (the stretch while the stage is stuck) split into scenes.
+- **The tile** (`HeroPage.tsx`, maximal): the hero's frame becomes a working window. Its links are caught; "See how I did it" swaps the page for the exhbt inside `document.startViewTransition` (type `hl-open`), with the band's title and the exhbt's title given one `view-transition-name`, so the title travels; "All of her work" comes back. Only the frame's page is captured, so the rest of the page stays live.
 - **The name** (`address.ts`, `HomeName.tsx`): lower case, accents and apostrophes dropped, ł, ø, ß and the like spelt out, a hyphen between words, at most 30 characters cut at a word, then `usernameProblem()` from `lib/hosts.ts`. An address the rule refuses is never shown; the pictures keep the made-up person's and a line says what the address needs. The address is read out by Astryx's `useAnnounce` once typing pauses.
 
 ## Promoting it
