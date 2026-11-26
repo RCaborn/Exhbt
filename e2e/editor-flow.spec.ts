@@ -4,7 +4,7 @@ import { lineAt, moved, placeAt, within } from "../components/exhbt-editor/flow/
 import { formatLimits, validateForPublish, type ExhbtDoc, type FlowStep } from "../lib/exhbt/blocks";
 import { FORMAT_RULES, type Format } from "../lib/exhbt/formats";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
-import { allowEditOnly, boxes, EMPTY_PART, differences, docNow, field, finger, focusedPath, freshName, full, offered, openDoc, openTiming, READY, renders, sampleDoc, SAMPLES, seeAsVisitor, settle, undoLabel, waitLive, waitReady } from "./page-editor";
+import { allowEditOnly, boxes, differences, docNow, field, finger, focusedPath, freshName, full, offered, openDoc, openTiming, READY, renders, sampleDoc, SAMPLES, seeAsVisitor, settle, undoLabel, waitLive, waitReady } from "./page-editor";
 
 /*
  * The flowchart edited where it sits (decision 0026; docs/briefs/edit-on-page/r3-k-flowchart.md): type
@@ -803,7 +803,7 @@ test.describe("an empty flowchart", () => {
       await openDoc(page, freshName("flowemptyparity"), { ...sampleDoc(f), flow: [] });
       await waitLive(page);
       const taken = await allowEditOnly(page, "all");
-      expect(taken.some((t) => t.startsWith(EMPTY_PART)), taken.join("; ")).toBe(true);
+      expect(taken.some((t) => t.startsWith("the empty flowchart's row (")), taken.join("; ")).toBe(true);
       await settle(page);
       const editing = await boxes(page);
       await seeAsVisitor(page, true);
@@ -811,6 +811,31 @@ test.describe("an empty flowchart", () => {
       expect(differences(await boxes(page), editing), `with these taken out: ${taken.join("; ")}`).toEqual([]);
     });
   }
+
+  test("only the first Add a box moves the rows: typing in a blank box moves nothing round the flowchart", async ({ page }) => {
+    // A gallery pairs "What I did" with "What happened". With no boxes the flowchart has a row of its own and the findings
+    // are the visitor's, the width of the page; the first box puts the flowchart back in its pair (a press, as adding a section is).
+    await page.setViewportSize(TALL);
+    await openDoc(page, freshName("flowemptyrows"), { ...sampleDoc("gallery"), flow: [] });
+    await settle(page);
+    const findings = page.locator(`${READY} article [data-section-id="findings"]`);
+    const alone = (await findings.boundingBox())!;
+    await page.locator(`${LIST} [data-flow-add]`).click();
+    await expect.poll(() => focusedPath(page)).toBe("flow.0.step");
+    await settle(page);
+    const paired = (await findings.boundingBox())!;
+    expect(paired.width).toBeLessThan(alone.width - 100);
+    // From here the flowchart has a box, blank: it keeps its place in the rows whatever is typed in it.
+    const round = async () => (await boxes(page)).filter((b) => !b.key.startsWith("flowchart box"));
+    const before = await round();
+    await page.keyboard.type("T");
+    await settle(page);
+    expect(differences(before, await round())).toEqual([]);
+    await page.keyboard.press("Backspace");
+    await settle(page);
+    expect(differences(before, await round())).toEqual([]);
+    expect(await stepsNow(page)).toEqual([""]);
+  });
 });
 
 /* ------------------------------------------------------------------------------------------------

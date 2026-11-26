@@ -495,6 +495,9 @@ export const EDIT_ONLY_IN_FLOW: { name: string; selector: string; always: boolea
   { name: "an empty title", selector: '[data-path="title"][data-empty]', always: false },
   { name: "an empty flowchart box", selector: '[data-path$=".step"][data-empty]', always: false },
   { name: "an empty finding", selector: '[data-path*=".items."][data-empty]', always: false },
+  // A flowchart with no boxes, which a visitor is not shown (decision 0032): the editor draws it as a row of its own in its
+  // place, with "Add a box" as its placeholder, and lays out the rows round it as a visitor's are (LayoutMain.tsx).
+  { name: "the empty flowchart's row", selector: "[data-empty-flow]", always: false },
 ];
 
 /** The name of the allowance below: a part with nothing in it. */
@@ -509,7 +512,8 @@ export const EMPTY_PART = "a part with nothing in it, which a visitor is not sho
 async function emptyParts(page: Page): Promise<typeof EDIT_ONLY_IN_FLOW> {
   const doc = await docNow(page);
   return pageItems(doc)
-    .filter((it) => (it.kind === "flow" ? filledFlow(it.steps).length === 0 : isBlank(it.s)))
+    // A flowchart with no boxes at all has its own row, above; one with blank boxes is a part in the rows, as any other.
+    .filter((it) => (it.kind === "flow" ? it.steps.length > 0 && filledFlow(it.steps).length === 0 : isBlank(it.s)))
     .map((it) => ({ name: EMPTY_PART, selector: `[data-section-id="${it.id}"]`, always: false }));
 }
 
