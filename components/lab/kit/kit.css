@@ -339,6 +339,13 @@
   .kit-ground[data-ground="line"] {
     border: 1px solid var(--color-line);
   }
+  /* An ink band, drawn as a panel. The same box for today's and the proposed one. */
+  .kit-ink {
+    border-radius: 20px;
+    background: var(--color-ink);
+    color: #fff;
+    padding: clamp(1.5rem, 5vw, 3.5rem);
+  }
   /* Behind the work: plain mist, with room for the frame's shadow. */
   .kit-ground[data-ground="work"] {
     border-radius: 24px;

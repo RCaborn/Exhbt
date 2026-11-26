@@ -405,14 +405,31 @@ export const exhbtNextTheme = defineTheme({
     divider: { base: { borderColor: LINE } },
   },
 
-  // On ink (a toast, a tooltip, an ink band): the ring and the accent are mint, which reads there.
+  // On ink (a toast, a tooltip, an ink band under Astryx's MediaTheme). Astryx flips the colour
+  // scheme there and turns the accent white. This theme has one scheme, so what changes on ink is
+  // said here: the accent stays mint, the ring, links and accents are mint, quiet text is the
+  // site's on-ink grey, and a hover is a white tint. Type, links, buttons and dividers are what
+  // goes on ink; a card, a token, a banner or a field keeps its light ground.
   onDark: {
     tokens: {
+      "--color-accent": MINT,
+      "--color-on-accent": INK,
       "--focus-outline-color": MINT,
       "--color-text-accent": MINT,
       "--color-icon-accent": MINT,
       "--color-text-secondary": ON_INK,
+      "--color-icon-secondary": ON_INK,
       "--color-border": "rgb(255 255 255 / 0.16)",
+      "--color-overlay-hover": "rgb(255 255 255 / 0.14)",
+      "--color-overlay-pressed": "rgb(255 255 255 / 0.22)",
+    },
+    components: {
+      // The second button on ink is an outline: a white pill would outshine the mint one.
+      button: { "variant:secondary": { backgroundColor: "transparent", color: WHITE, borderColor: WHITE } },
+      link: {
+        base: { textDecorationColor: `color-mix(in srgb, ${MINT} 55%, transparent)`, ":hover": { textDecorationColor: MINT } },
+      },
+      divider: { base: { borderColor: "rgb(255 255 255 / 0.16)" } },
     },
   },
 

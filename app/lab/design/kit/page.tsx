@@ -5,6 +5,7 @@ import { ProjectView } from "@/components/portfolio/ProjectView";
 import { Frame } from "@/components/lab/Frame";
 import { ButtonsKit, CardsKit, ChoosingKit, FieldsKit } from "@/components/lab/kit/ControlsKit";
 import { FrameKit } from "@/components/lab/kit/FrameKit";
+import { InkKit } from "@/components/lab/kit/InkKit";
 import { KitRail } from "@/components/lab/kit/KitRail";
 import { LevelFacts } from "@/components/lab/kit/LevelFacts";
 import { MotionKit } from "@/components/lab/kit/MotionKit";
@@ -100,6 +101,7 @@ export default function LabKit() {
                 ))}
               </div>
             </KitBlock>
+            <InkKit />
           </KitSection>
 
           <ButtonsKit />

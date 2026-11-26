@@ -1032,12 +1032,38 @@ export const exhbtNextTheme = {
       "color-scheme": "dark",
       "--color-text-primary": "var(--color-on-dark)",
       "--color-icon-primary": "var(--color-on-dark)",
-      "--color-accent": "var(--color-on-dark)",
+      "--color-accent": "#4FE9B4",
+      "--color-on-accent": "#0E0F12",
       "--focus-outline-color": "#4FE9B4",
       "--color-text-accent": "#4FE9B4",
       "--color-icon-accent": "#4FE9B4",
       "--color-text-secondary": "#C9CBCF",
-      "--color-border": "rgb(255 255 255 / 0.16)"
+      "--color-icon-secondary": "#C9CBCF",
+      "--color-border": "rgb(255 255 255 / 0.16)",
+      "--color-overlay-hover": "rgb(255 255 255 / 0.14)",
+      "--color-overlay-pressed": "rgb(255 255 255 / 0.22)"
+    },
+    "components": {
+      "button": {
+        "variant:secondary": {
+          "backgroundColor": "transparent",
+          "color": "#FFFFFF",
+          "borderColor": "#FFFFFF"
+        }
+      },
+      "link": {
+        "base": {
+          "textDecorationColor": "color-mix(in srgb, #4FE9B4 55%, transparent)",
+          ":hover": {
+            "textDecorationColor": "#4FE9B4"
+          }
+        }
+      },
+      "divider": {
+        "base": {
+          "borderColor": "rgb(255 255 255 / 0.16)"
+        }
+      }
     }
   },
   __onLight: {

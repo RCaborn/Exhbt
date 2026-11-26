@@ -1425,13 +1425,47 @@
     color-scheme: dark;
     --color-text-primary: var(--color-on-dark);
     --color-icon-primary: var(--color-on-dark);
-    --color-accent: var(--color-on-dark);
+    --color-accent: #4FE9B4;
+    --color-on-accent: #0E0F12;
     --focus-outline-color: #4FE9B4;
     --color-text-accent: #4FE9B4;
     --color-icon-accent: #4FE9B4;
     --color-text-secondary: #C9CBCF;
+    --color-icon-secondary: #C9CBCF;
     --color-border: rgb(255 255 255 / 0.16);
+    --color-overlay-hover: rgb(255 255 255 / 0.14);
+    --color-overlay-pressed: rgb(255 255 255 / 0.22);
   }
+
+  :is([data-astryx-media="dark"]) :is(.astryx-button[data-variant="secondary"]) {
+    background-color: transparent;
+    color: #FFFFFF;
+    border-color: #FFFFFF;
+  }
+
+  :is([data-astryx-media="dark"]) :is(.astryx-link) {
+    text-decoration-color: color-mix(in srgb, #4FE9B4 55%, transparent);
+  }
+
+  :is([data-astryx-media="dark"]) :is(.astryx-link):hover:where(:not(:disabled,[aria-disabled="true"])) {
+    text-decoration-color: #4FE9B4;
+  }
+
+  :is([data-astryx-media="dark"]) :is(.astryx-divider) {
+    border-color: rgb(255 255 255 / 0.16);
+  }
+
+  :is([data-astryx-media="dark"]) :is(.astryx-link[data-color="primary"]) { color: var(--color-text-primary); }
+
+  :is([data-astryx-media="dark"]) :is(.astryx-link[data-color="secondary"]) { color: var(--color-text-secondary); }
+
+  :is([data-astryx-media="dark"]) :is(.astryx-link[data-color="disabled"]) { color: var(--color-text-disabled); }
+
+  :is([data-astryx-media="dark"]) :is(.astryx-link[data-color="placeholder"]) { color: var(--color-text-secondary); }
+
+  :is([data-astryx-media="dark"]) :is(.astryx-link[data-color="accent"]) { color: var(--color-text-accent); }
+
+  :is([data-astryx-media="dark"]) :is(.astryx-link[data-color="inherit"]) { color: inherit; }
 
   [data-astryx-media="light"] {
     color-scheme: light;
