@@ -18,7 +18,7 @@ export default async function LabIndex() {
             Choose how Exhbt should look.
           </Heading>
           <div className="mt-6 max-w-[38rem]">
-            <Text as="p" type="large" color="secondary">
+            <Text as="p" display="block" type="large" color="secondary">
               This is the design lab: mock-ups of the next look, built with the real components on made-up data. Each screen
               can be seen at three levels, restrained, confident and maximal, with the switch in the bar above. Nothing here is
               live, and nothing you do here is saved.

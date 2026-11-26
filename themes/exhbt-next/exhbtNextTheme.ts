@@ -30,6 +30,10 @@ const ERROR_WASH = "#FBEBEB";
 
 const both = (v: string): [string, string] => [v, v];
 
+/** Text colours as tokens, for a component's own rule: Astryx flips them on an ink ground. */
+const TEXT = "var(--color-text-primary)";
+const TEXT_2 = "var(--color-text-secondary)";
+
 /** One hue, so a Token or Badge asked for a colour the brand doesn't have comes out grey. */
 const GREYED = ["blue", "cyan", "orange", "pink", "purple", "teal", "yellow", "gray"] as const;
 const greyed = Object.fromEntries(
@@ -41,17 +45,28 @@ const greyed = Object.fromEntries(
   ]),
 );
 
-/** The edge of a field or a choice: 1.5px, grey at rest (3.5:1), ink on hover, jade with a wash halo on focus. */
+/**
+ * The edge of a field or a choice: 1.5px, grey at rest (3.5:1), ink under the pointer, jade with a
+ * mint halo when it has focus. The width is set through Astryx's --border-width on the control
+ * itself, so the parts of an input group still join edge to edge.
+ */
 const EDGE = "1.5px";
 const HALO = `0 0 0 3px color-mix(in srgb, ${MINT} 38%, ${WHITE})`;
 const field = {
-  borderWidth: EDGE,
+  "--border-width": EDGE,
   borderColor: FIELD,
   backgroundColor: WHITE,
   ":hover": { borderColor: INK, boxShadow: "none" },
   ":focus-within": { borderColor: JADE, boxShadow: HALO },
 };
 const fieldStatus = (colour: string) => ({ borderColor: colour, ":hover": { borderColor: colour }, ":focus-within": { borderColor: colour } });
+const fieldStates = {
+  base: field,
+  "status:error": fieldStatus(ERROR),
+  "status:success": fieldStatus(JADE),
+  "status:warning": fieldStatus(INK),
+  disabled: { borderColor: FIELD, ":hover": { borderColor: FIELD } },
+};
 
 /**
  * What the type scale can't say: display steps are semibold and set tight, headings a little
@@ -121,7 +136,7 @@ export const exhbtNextTheme = defineTheme({
     // over the page for a moment: menus and popovers (low), toasts (medium). Dialogs and sheets take high.
     "--shadow-low": "0 1px 2px rgb(14 15 18 / 0.06), 0 6px 16px rgb(14 15 18 / 0.08)",
     "--shadow-med": "0 1px 2px rgb(14 15 18 / 0.06), 0 10px 28px rgb(14 15 18 / 0.12)",
-    "--shadow-high": "0 1px 2px rgb(14 15 18 / 0.05), 0 12px 32px rgb(14 15 18 / 0.08)",
+    "--shadow-high": "0 1px 2px rgb(14 15 18 / 0.06), 0 20px 48px -12px rgb(14 15 18 / 0.2)",
     // The rings Astryx documents for inputs, in the brand (its own defaults are blue).
     "--shadow-inset-hover": `inset 0 0 0 2px color-mix(in srgb, ${INK} 16%, transparent)`,
     "--shadow-inset-selected": `inset 0 0 0 2px ${INK}`,
@@ -160,6 +175,7 @@ export const exhbtNextTheme = defineTheme({
     "--color-border-warning": both(INK),
     "--color-error-muted": both(ERROR_WASH),
     "--color-on-error": both(WHITE),
+    "--color-background-error-inverted": both(ERROR),
     "--color-on-error-muted": both(ERROR),
     "--color-icon-error": both(ERROR),
     // The categorical colours: green is the brand's own pair, red is the error pair, the rest are grey.
@@ -173,7 +189,9 @@ export const exhbtNextTheme = defineTheme({
     "--color-icon-red": both(ERROR),
     "--color-text-red": both(ERROR),
 
-    // Grounds and lines the neutral theme leaves tinted.
+    // Grounds and lines the neutral theme leaves tinted. The stronger edge (a field's, a switch's
+    // track) is the site's field grey, 3.5:1 on white; today's theme makes it ink.
+    "--color-border-emphasized": both(FIELD),
     "--color-background-popover": both(WHITE),
     "--color-background-inverted": both(INK),
     "--color-neutral": both(MIST),
@@ -214,7 +232,6 @@ export const exhbtNextTheme = defineTheme({
     // ── Buttons: today's pill and its variants (inherited), with a press that answers ──────
     button: {
       "variant:primary": { ":hover": { backgroundColor: MINT_PRESS } },
-      "variant:ghost": { color: INK },
       "variant:destructive": { backgroundColor: ERROR_WASH, color: ERROR },
     },
 
@@ -226,30 +243,23 @@ export const exhbtNextTheme = defineTheme({
     section: { base: { padding: "var(--spacing-6)" } },
     "selectable-card": {
       base: { borderRadius: "var(--radius-container)", borderWidth: EDGE, borderColor: LINE, ":hover": { borderColor: INK } },
-      // Chosen: an ink edge and ring. Mint is kept for the tick inside it.
-      selected: { borderColor: INK, boxShadow: `inset 0 0 0 1.5px ${INK}` },
+      // Chosen: an ink edge and ring (Astryx's own is the accent, which is mint here and 1.5:1 on white).
+      // Mint is kept for the tick inside it. `selected` is a prop with a value on this component, not a state.
+      "selected:true": { borderColor: INK, boxShadow: `inset 0 0 0 1.5px ${INK}` },
     },
     "clickable-card": {
       base: { borderRadius: "var(--radius-container)", borderColor: LINE, ":hover": { borderColor: INK } },
     },
 
     // ── Fields: they lie flat ────────────────────────────────────────────────
-    "field-label": { base: { fontWeight: "var(--font-weight-semibold)", color: INK } },
-    "text-input": {
-      base: field,
-      "status:error": fieldStatus(ERROR),
-      "status:success": fieldStatus(JADE),
-      "status:warning": fieldStatus(INK),
-    },
-    "text-area": {
-      base: field,
-      "status:error": fieldStatus(ERROR),
-      "status:success": fieldStatus(JADE),
-      "status:warning": fieldStatus(INK),
-    },
-    "input-group": { base: field },
-    selector: { base: field },
-    "number-input": { base: field },
+    "field-label": { base: { fontWeight: "var(--font-weight-semibold)" } },
+    "text-input": fieldStates,
+    "text-area": fieldStates,
+    selector: fieldStates,
+    "number-input": fieldStates,
+    // A field with a fixed part beside it (name + .exhbt.co.uk): one box, the fixed part on mist.
+    "input-group": { base: { "--border-width": EDGE } },
+    "input-group-text": { base: { backgroundColor: MIST, color: GRAPHITE, borderColor: FIELD } },
     "checkbox-indicator": {
       base: { borderWidth: EDGE, borderColor: FIELD, borderRadius: "6px" },
       checked: { backgroundColor: MINT, borderColor: INK, color: INK },
@@ -258,24 +268,27 @@ export const exhbtNextTheme = defineTheme({
       base: { borderWidth: EDGE, borderColor: FIELD },
       checked: { backgroundColor: MINT, borderColor: INK, color: INK },
     },
+    // Off is grey; on is mint with an ink edge and an ink thumb (a white thumb is lost on mint).
     switch: {
-      checked: { backgroundColor: MINT, borderColor: INK },
+      base: { "--color-background-gray": FIELD },
+      checked: { backgroundColor: MINT, boxShadow: `inset 0 0 0 ${EDGE} ${INK}` },
     },
+    "switch-thumb": { checked: { backgroundColor: INK } },
     // The label is part of the press target, so it is as tall as a control (44px).
     "switch-label": { base: { paddingBlock: "calc((var(--size-element-md) - 1lh) / 2)" } },
 
     // ── Choosing a view: tabs underline in ink; the segmented control is a pill with an ink choice ──
     tab: {
-      base: { color: GRAPHITE, fontWeight: "var(--font-weight-medium)", ":hover": { color: INK } },
-      selected: { color: INK, fontWeight: "var(--font-weight-semibold)" },
+      base: { color: TEXT_2, fontWeight: "var(--font-weight-medium)", ":hover": { color: TEXT } },
+      selected: { color: TEXT, fontWeight: "var(--font-weight-semibold)" },
     },
-    "tab-indicator": { selected: { backgroundColor: INK } },
+    "tab-indicator": { selected: { backgroundColor: TEXT } },
     // The track is the control's height and each choice 4px less, so at the large size a choice is a 44px press target.
     "segmented-control": {
       base: { borderRadius: "var(--radius-full)", backgroundColor: MIST, padding: "var(--spacing-0-5)" },
     },
     "segmented-control-item": {
-      base: { borderRadius: "var(--radius-full)", color: GRAPHITE, fontWeight: "var(--font-weight-medium)" },
+      base: { borderRadius: "var(--radius-full)", color: TEXT_2, fontWeight: "var(--font-weight-medium)" },
       "size:sm": { height: "calc(var(--size-element-sm) - 4px)" },
       "size:md": { height: "calc(var(--size-element-md) - 4px)" },
       "size:lg": { height: "calc(var(--size-element-lg) - 4px)" },
@@ -295,15 +308,30 @@ export const exhbtNextTheme = defineTheme({
       "variant:destructive": { color: ERROR },
     },
     "context-menu": { base: { ...floating, borderRadius: "var(--radius-element)" } },
-    tooltip: {
-      base: { backgroundColor: INK, color: WHITE, borderRadius: "var(--radius-inner)", fontWeight: "var(--font-weight-medium)" },
-    },
+    // A tooltip and a toast are ink already (the text and inverted-ground tokens), and Astryx
+    // switches what is inside them to its on-dark colours by measuring the ground. So only their
+    // shape is set here. An error toast is the one red: white reads on it at 5.6:1, but ink would
+    // read at 3.4:1 too, which stops Astryx switching, so its text and icons are set to white here.
+    tooltip: { base: { borderRadius: "var(--radius-inner)", fontWeight: "var(--font-weight-medium)" } },
     toast: {
-      base: { backgroundColor: INK, color: WHITE, borderRadius: "var(--radius-element)" },
-      "type:error": { backgroundColor: ERROR, color: WHITE },
+      base: { borderRadius: "var(--radius-element)" },
+      "type:error": {
+        color: WHITE,
+        "--color-text-primary": WHITE,
+        "--color-text-secondary": WHITE,
+        "--color-icon-primary": WHITE,
+        "--color-icon-secondary": WHITE,
+        "--color-overlay-hover": "rgb(255 255 255 / 0.14)",
+        "--color-overlay-pressed": "rgb(255 255 255 / 0.22)",
+        "--focus-outline-color": WHITE,
+      },
     },
 
     // ── Status and progress ──────────────────────────────────────────────────
+    "banner-icon": {
+      "status:success": { color: JADE },
+      "status:error": { color: ERROR },
+    },
     banner: {
       base: { borderRadius: "var(--radius-element)" },
       "status:info": { backgroundColor: MIST, color: INK },
@@ -312,17 +340,23 @@ export const exhbtNextTheme = defineTheme({
       "status:error": { backgroundColor: ERROR_WASH, color: INK },
     },
     token: {
-      base: { borderRadius: "var(--radius-full)", fontWeight: "var(--font-weight-semibold)" },
+      base: { borderRadius: "var(--radius-full)", fontWeight: "var(--font-weight-semibold)", paddingInline: "var(--spacing-3)", gap: "var(--spacing-1-5)" },
     },
+    // Live is a mint dot with a jade edge (mint alone is 1.5:1 on white); a draft is grey.
     "status-dot": {
-      "variant:success": { backgroundColor: MINT, boxShadow: `0 0 0 1.5px ${JADE}` },
-      "variant:accent": { backgroundColor: MINT, boxShadow: `0 0 0 1.5px ${JADE}` },
+      "variant:success": { backgroundColor: MINT, boxShadow: `inset 0 0 0 1.5px ${JADE}` },
+      "variant:accent": { backgroundColor: MINT, boxShadow: `inset 0 0 0 1.5px ${JADE}` },
       "variant:neutral": { backgroundColor: FIELD },
       "variant:warning": { backgroundColor: INK },
     },
+    // Steps: the track and the step you are on are ink (Astryx draws both in the accent, and mint
+    // can't be read as a line). A finished step is given the site's own tick where it is used.
+    stepper: { base: { "--color-accent": INK, "--color-on-accent": WHITE } },
     "step-indicator": {
       base: { fontWeight: "var(--font-weight-semibold)" },
     },
+    // Progress is a line that has to be read, so its fill is jade, on a hairline-grey track.
+    "progress-bar": { base: { "--color-background-muted": LINE } },
     "progress-bar-fill": { base: { backgroundColor: JADE } },
     skeleton: { base: { borderRadius: "var(--radius-inner)" } },
 
@@ -330,16 +364,25 @@ export const exhbtNextTheme = defineTheme({
     "empty-state-title": {
       base: { fontFamily: "var(--font-family-heading)", letterSpacing: "-0.02em" },
     },
-    "empty-state-description": { base: { color: GRAPHITE } },
+    "empty-state-description": { base: { color: TEXT_2 } },
 
     // ── The frame of the app ─────────────────────────────────────────────────
     "top-nav": { base: { backgroundColor: WHITE, borderBottomWidth: "1px", borderBottomStyle: "solid", borderBottomColor: LINE } },
     "top-nav-item": {
-      base: { color: GRAPHITE, fontWeight: "var(--font-weight-medium)", borderRadius: "var(--radius-full)", ":hover": { color: INK } },
-      selected: { color: INK, fontWeight: "var(--font-weight-semibold)" },
+      base: { color: TEXT_2, fontWeight: "var(--font-weight-medium)", borderRadius: "var(--radius-full)", ":hover": { color: TEXT } },
+      selected: { color: TEXT, fontWeight: "var(--font-weight-semibold)" },
     },
     "app-shell": { base: { backgroundColor: WHITE } },
-    link: { base: { textDecorationThickness: "2px", textUnderlineOffset: "4px" } },
+    // Links as the site draws them now: jade, a 2px underline that darkens under the pointer.
+    link: {
+      base: {
+        textDecorationLine: "underline",
+        textDecorationThickness: "2px",
+        textUnderlineOffset: "4px",
+        textDecorationColor: `color-mix(in srgb, ${JADE} 40%, transparent)`,
+        ":hover": { textDecorationColor: JADE },
+      },
+    },
     divider: { base: { borderColor: LINE } },
   },
 
