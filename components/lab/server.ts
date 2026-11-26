@@ -1,6 +1,7 @@
 import "server-only";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
 import { DEFAULT_LEVEL, isBar, isLevel, LAB_COOKIE, type LabState } from "./lab";
 
 /**
@@ -9,6 +10,16 @@ import { DEFAULT_LEVEL, isBar, isLevel, LAB_COOKIE, type LabState } from "./lab"
  * it is never set and every lab address is not found. The same rule as app/dev/editor-timing.
  */
 export const labEnabled = () => process.env.NODE_ENV !== "production" || process.env.EXHBT_LAB === "1";
+
+/**
+ * The gate itself, for the first line of every lab page: not found where the lab is switched off.
+ * The layout calls it too, but that alone isn't enough. Next draws a page alongside its layout,
+ * so a page that doesn't stop itself is still drawn where the lab is off, and its words go out in
+ * the source of the not-found answer.
+ */
+export function labGate(): void {
+  if (!labEnabled()) notFound();
+}
 
 /**
  * A lab page's title, for `export const generateMetadata = labMetadata("Home")`. Where the lab is

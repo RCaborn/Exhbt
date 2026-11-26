@@ -14,7 +14,7 @@ import { EmptyKit, ProgressKit, RingsKit, StatusKit } from "@/components/lab/kit
 import { TokenValue } from "@/components/lab/kit/TokenValue";
 import { TypeKit } from "@/components/lab/kit/TypeKit";
 import { sample, SampleExhbt, SamplePortfolio } from "@/components/lab/samples";
-import { labMetadata } from "@/components/lab/server";
+import { labGate, labMetadata } from "@/components/lab/server";
 import "@/components/lab/kit/kit.css";
 
 export const generateMetadata = labMetadata("Kit");
@@ -41,6 +41,7 @@ const GREYS = [
  * real theme: every figure on it is read from the stylesheets, not typed.
  */
 export default function LabKit() {
+  labGate();
   const [featured] = sample.exhbts;
   return (
     <main id="main" className="kit">

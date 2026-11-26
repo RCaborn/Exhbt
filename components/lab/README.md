@@ -4,7 +4,9 @@ Design mock-ups for Rory and Alex to choose from (26 Nov 2026): real pages built
 
 ## Where it answers
 
-Only in development, and where `EXHBT_LAB=1` (the preview Worker, set in `wrangler.jsonc`). On the live site every lab address is not found. The rule is `labEnabled()` in `server.ts`, called by `app/lab/design/layout.tsx` on each request. The layout also marks every lab page noindex.
+Only in development, and where `EXHBT_LAB=1` (the preview Worker, set in `wrangler.jsonc`). On the live site every lab address is not found. The rule is `labEnabled()` in `server.ts`, read on each request. The layout also marks every lab page noindex.
+
+The gate is in two places, and both are needed: `app/lab/design/layout.tsx`, and the first line of every page under it, `labGate()`. Next draws a page alongside its layout, so a page without the line is still drawn where the lab is off, and its words go out in the source of the not-found answer. To check a page: make a production build, start it without `EXHBT_LAB`, ask for the page with `curl`, and search the answer for a phrase from it.
 
 No sign-in, no database, no AI. Sample data only: `samples.tsx`.
 
@@ -18,7 +20,7 @@ A page under `app/lab/design/` is already inside:
 
 So a page starts at `<main id="main">` and uses Astryx components directly. It never renders `Theme` itself and never imports the theme. (A page built on Astryx's `AppShell` leaves out its own `<main>`: the shell draws one, and the skip link.)
 
-A page's title is `export const generateMetadata = labMetadata("Home")` (`server.ts`), not a plain `metadata` export, which would put the lab's name on the live site's not-found page.
+Every page has two lines of its own (`server.ts`): `labGate()` first in its component, and its title as `export const generateMetadata = labMetadata("Home")`, not a plain `metadata` export, which would put the lab's name on the live site's not-found page.
 
 ## Level and motion
 
@@ -72,7 +74,7 @@ The voice has one owner: `themes/exhbt-next/`, `lab.css`, `LabFrame.tsx`, `LabBa
 | File | What it is |
 |---|---|
 | `lab.ts` | Levels, cookie names, the list of screens. Plain data. |
-| `server.ts` | `labEnabled()`, `readLab()`, `labMetadata()`. Server only. |
+| `server.ts` | `labEnabled()`, `labGate()`, `labMetadata()`, `readLab()`. Server only. |
 | `LabFrame.tsx` | `LabFrame`, `useLab()`, `Today`, `PersonPage`. |
 | `LabBar.tsx` | The lab bar. |
 | `lab.css` | The lab's root, the three levels' tokens, Motion off, the bar. |

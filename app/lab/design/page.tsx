@@ -2,13 +2,14 @@ import Link from "next/link";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Text } from "@astryxdesign/core/Text";
 import { LAB_SCREENS, LEVEL_NOTE, LEVELS } from "@/components/lab/lab";
-import { readLab } from "@/components/lab/server";
+import { labGate, readLab } from "@/components/lab/server";
 
 /**
  * The lab's index: what the lab is, in three sentences, and its four screens. The level list is
  * drawn on the server from the level cookie (readLab), so it marks the one the bar is set to.
  */
 export default async function LabIndex() {
+  labGate();
   const { level } = await readLab();
   return (
     <main id="main" className="mx-auto max-w-[72rem] px-4 pt-12 pb-24 sm:px-8 sm:pt-20">
