@@ -4,6 +4,7 @@ import type { HomeEdit } from "@/components/portfolio/home-ctx";
 import { PortfolioHome } from "@/components/portfolio/PortfolioHome";
 import { lookAttrs, themeStyle } from "@/components/portfolio/themeFonts";
 import { BAR_H, GROUND } from "./geometry";
+import { StripStandIn } from "./bar/strip";
 import { editingHome } from "./home-props";
 
 /*
@@ -67,6 +68,7 @@ export function StandInPage({ data, state }: { data: PortfolioData; state?: Buil
   return (
     <>
       <div aria-hidden className="border-b border-line bg-surface" style={{ height: BAR_H }} />
+      <StripStandIn data={data} state={state ?? data.builder.initial} />
       <div {...lookAttrs(home.theme)} style={themeStyle(home.theme)} className={GROUND} data-canvas="stand-in" inert>
         <PortfolioHome {...home} edit={standInAdapter()} />
       </div>

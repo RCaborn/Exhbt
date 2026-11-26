@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/Button";
 import { DEFAULT_THEME } from "@/lib/portfolio-themes";
 import type { PortfolioEditorApi } from "../runtime";
 
+export { writeStripHidden } from "./strip-cookie";
+
 /*
  * The first-run strip's words, its steps and how it is drawn, with no hooks and no state, so the
  * loading view (StandIn.tsx, in the gate's own chunk) can draw the same strip, inert, where the
@@ -195,10 +197,10 @@ export function StripView({ facts, current, narrow, size, on }: { facts: Facts; 
  * The strip as the loading view draws it (StandIn.tsx, under the empty bar): the strip the editor will
  * draw first, inert and hidden from assistive technology. The server knows neither the window's width
  * nor the pointer, so each of the four is drawn and CSS shows the one that applies (css/bar.css). Draws
- * nothing when the editor's strip would not show. A person who chose "Hide this" (kept in the browser)
- * gets the strip's room here, and it closes when the editor arrives.
+ * nothing when the editor's strip would not show, "Hide this" included (STRIP_COOKIE, read by the server).
  */
 export function StripStandIn({ data, state }: { data: PortfolioData; state: BuilderState }): ReactNode {
+  if (data.stripHidden) return null;
   const facts = factsOf(data, { name: state.profile.name, headline: state.profile.headline, themeId: state.arrangement.themeId });
   if (allDone(facts)) return null;
   const current = stepShown(facts);

@@ -49,6 +49,8 @@ export type PortfolioData = {
   jobLinks: boolean;
   /** Whether the person is an admin, as /admin recognises one: the bar's menu offers an admin the step builder for good (decision 0031, "The admin trial"). */
   admin: boolean;
+  /** The person hid the first-run strip in this browser (its cookie, read by page.tsx; components/portfolio-editor/bar/strip.tsx). */
+  stripHidden?: boolean;
 };
 
 /** An exhbt as the home page draws it, from `doc`, with its picture's address signed when its key figure is one. */

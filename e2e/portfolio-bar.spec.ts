@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { FULL, fullFixture } from "./fixtures/portfolio-pages";
-import { READY, call, expect, focusedPath, fresh, openEditor, setKind, stateNow, test, valueAt, waitReady, waitSaved } from "./portfolio-editor";
+import { HOME, READY, call, expect, focusedPath, fresh, openEditor, setKind, settle, stateNow, test, valueAt, waitReady, waitSaved } from "./portfolio-editor";
 
 // The portfolio editor's bar and everything it opens (brief G of docs/briefs/portfolio-first; decision
 // 0031, "The bar" and "What is edited where"): the chip, Look, See as a visitor, Job links, the menu and
@@ -200,6 +200,39 @@ test.describe("The first minute", () => {
     await page.reload();
     await waitReady(page);
     await expect(page.locator("[data-first-run]")).toHaveCount(0);
+  });
+
+  test("once hidden, the strip is in its cookie, so neither the loading view nor the editor draws it, and nothing moves", async ({ page, context }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    // Another account's "Hide this" in the same browser hides nothing of this person's.
+    await context.addCookies([{ name: "exhbt_strip_hidden", value: "someone-else", url: "http://localhost" }]);
+    await newPerson(page, "strip-cookie", "premium");
+    await expect(page.locator('[data-first-run="wide"]')).toBeVisible();
+    await page.locator("[data-first-run]").getByRole("button", { name: "Hide this" }).click();
+    await expect(page.locator("[data-first-run]")).toHaveCount(0);
+    const cookie = (await context.cookies()).find((c) => c.name === "exhbt_strip_hidden");
+    expect(cookie?.value).not.toBe("someone-else");
+    expect(cookie?.sameSite).toBe("Lax");
+    expect(cookie!.expires - Date.now() / 1000).toBeGreaterThan(360 * 24 * 3600);
+    // The next visit, with the editor's chunk held back as a slow connection holds it.
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    await page.route(/PortfolioEditor/, async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.goto("/portfolio");
+    const loading = page.locator('[data-editor="portfolio"][data-loading]');
+    await expect(loading.locator(HOME)).toBeVisible();
+    await expect(page.locator("[data-first-run-stand-in]")).toHaveCount(0);
+    await settle(page);
+    const top = () => page.locator(HOME).first().evaluate((el) => el.getBoundingClientRect().y + window.scrollY);
+    const before = await top();
+    release();
+    await waitReady(page);
+    await settle(page);
+    await expect(page.locator("[data-first-run]")).toHaveCount(0);
+    expect(await top()).toBe(before);
   });
 
   test("someone with a name, a headline, a look of their own and exhbts sees no strip", async ({ page }) => {
