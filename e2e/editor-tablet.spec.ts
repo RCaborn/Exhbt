@@ -408,3 +408,83 @@ test("Reorder sections is in the top bar's menu, and its sheet moves sections by
   expect(box.y).toBeGreaterThanOrEqual(0);
   expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize()!.height);
 });
+
+/* ------------------------------------------------------------------------------------------------
+ * TEMPORARY (branch phase-2-safari-hover, 26 Nov 2026): a flowchart box in a row, dropped by touch and picked up
+ * again at once, read from WebKit's runs ("[probe]" lines in the job's log). It fails nothing; it goes once read.
+ * ---------------------------------------------------------------------------------------------- */
+
+test.describe("TEMPORARY probe: a row's flowchart chips after a touch drop", () => {
+  for (const f of offered()) {
+    test(`TEMPORARY probe, ${f}: a box in a row dropped by touch, then picked up again at once`, async ({ page }) => {
+      await openTiming(page, f);
+      await waitLive(page);
+      const RULE = process.env.E2E_FOCUS === "safari" ? "rule" : "no rule";
+      const FLOW = `${READY} article .xe-flow`;
+      const BOX = `${READY} article [data-flow-step]`;
+      const axis = await page.locator(FLOW).getAttribute("data-axis");
+      const out = [`[probe] case 2, ${f}, ${RULE}, ${test.info().project.name}: a ${axis}`];
+      if (axis !== "row") return console.log(out.join("\n"));
+      const touch = await finger(page);
+      const boxAt = (i: number) => page.locator(BOX).nth(i);
+      const lifted = () => page.locator(`${FLOW}[data-flow-drag="pointer"]`).waitFor({ state: "attached", timeout: 2500 }).then(() => true, () => false);
+      const chips = (i: number) =>
+        page.evaluate(
+          ({ i, BOX }) => {
+            const li = document.querySelectorAll(BOX)[i];
+            const t = li?.querySelector(".xe-flow-tools");
+            const g = li?.querySelector<HTMLElement>("[data-flow-grip]");
+            const r = g?.getBoundingClientRect();
+            const there = r ? document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) : null;
+            const name = (e: Element | null) => (e ? `${e.tagName.toLowerCase()}${typeof e.className === "string" ? `.${e.className.split(" ").find((c) => c.startsWith("xe-") || c.startsWith("xp-")) ?? ""}` : ""}${e.hasAttribute("data-flow-grip") ? "[grip]" : ""}` : "nothing");
+            return `hovered ${li?.matches(":hover")}; tools ${t ? getComputedStyle(t).opacity : "?"}, grip ${g ? `${getComputedStyle(g).opacity}/${getComputedStyle(g).pointerEvents}` : "?"}; focus on ${name(document.activeElement)}${document.activeElement?.closest("[data-flow-step]") === li ? " (in the box)" : ""}; at the grip's middle ${name(there)}`;
+          },
+          { i, BOX },
+        );
+      await boxAt(1).evaluate((el) => el.scrollIntoView({ block: "center" }));
+      await page.waitForTimeout(300);
+      let at = 0;
+      let held = false;
+      // As a finger does on a tablet: a tap on the box's words first, which puts the focus in it, so its chips show.
+      await boxAt(at).locator('[data-path$=".step"]').focus();
+      for (let round = 0; round < 4; round++) {
+        const to = at === 0 ? 2 : 0;
+        const g = (await boxAt(at).locator("[data-flow-grip]").boundingBox())!;
+        const from = { x: g.x + g.width / 2, y: g.y + g.height / 2 };
+        if (!held) {
+          await touch.down(from.x, from.y);
+          await page.waitForTimeout(220);
+          await touch.move(from.x, from.y + 2);
+          if (!(await lifted())) {
+            out.push(`  round ${round}: the first pick-up did not lift; ${await chips(at)}`);
+            await touch.up();
+            break;
+          }
+        }
+        const r = (await boxAt(to).locator(".xp-flow-box").boundingBox())!;
+        const share = to > at ? 0.7 : 0.3;
+        const p = { x: r.x + r.width * share, y: r.y + r.height / 2 };
+        await touch.slide(from, p, 14);
+        await page.waitForTimeout(150);
+        await touch.up();
+        await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => null))));
+        await page.waitForTimeout(100);
+        at = to;
+        out.push(`  round ${round}: dropped in place ${to + 1}; the box: ${await chips(at)}`);
+        const g2 = (await boxAt(at).locator("[data-flow-grip]").boundingBox())!;
+        const again = { x: g2.x + g2.width / 2, y: g2.y + g2.height / 2 };
+        await touch.down(again.x, again.y);
+        await page.waitForTimeout(220);
+        await touch.move(again.x, again.y + 2);
+        held = await lifted();
+        out.push(`    pressed again on its grip: ${held ? "LIFTED" : "NOT LIFTED"}`);
+        if (!held) {
+          await touch.up();
+          await boxAt(at).locator('[data-path$=".step"]').focus();
+        }
+      }
+      if (held) await touch.up();
+      console.log(out.join("\n"));
+    });
+  }
+});
