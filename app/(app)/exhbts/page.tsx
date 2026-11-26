@@ -8,10 +8,12 @@ import { DeleteExhbt } from "@/components/editor/DeleteExhbt";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { JoinRequests, TeamProjects } from "@/components/team/TeamPanel";
 import { Button } from "@/components/ui/Button";
+import { isAdmin } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { ENTITLEMENTS, PLAN_NAMES } from "@/lib/entitlements";
 import { headlineFor } from "@/lib/exhbt/headline";
 import { canCreateExhbt, getPlan, limitsFor } from "@/lib/plan";
+import { portfolioKind } from "@/lib/portfolio-kind-server";
 import { portfolioHref } from "@/lib/portfolio-links";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
@@ -27,6 +29,13 @@ export default async function ExhbtsPage({ searchParams }: { searchParams: Promi
   if (!isPhase2Enabled()) notFound();
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/exhbts");
+  // Portfolio first: the list's jobs live on the portfolio now, so its address sends people there, query kept
+  // (?full, ?joined, ?left; the browser keeps #team-projects). The address stays for good: sent emails use it.
+  if ((await portfolioKind(await isAdmin(user))) === "page") {
+    const kept = new URLSearchParams();
+    for (const [k, v] of Object.entries(await searchParams)) for (const one of ([] as string[]).concat(v ?? [])) kept.append(k, one);
+    redirect(kept.size ? `/portfolio?${kept}` : "/portfolio");
+  }
   const store = getStore();
   const [plan, exhbts, profile, host, q] = await Promise.all([
     getPlan(user.id),
