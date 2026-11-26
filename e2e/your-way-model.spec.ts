@@ -22,6 +22,7 @@ import {
   type ExhbtDoc,
   type Section,
 } from "../lib/exhbt/blocks";
+import { settlePlace } from "../components/exhbt-editor/fields/bar-place";
 import { flowHeading, FORMAT_RULES, FORMATS, refsHeading, sectionHeading, titleShown, type Format } from "../lib/exhbt/formats";
 import { applyTemplate, blockOptions, flowShown, insertBlock, pageItems, removeItem, restoreFlow } from "../lib/exhbt/layouts";
 import { sectionWords } from "../lib/exhbt/sections";
@@ -384,5 +385,18 @@ test.describe("The published copy holds only what a visitor is shown", () => {
     const none = publicDoc(core([findings(), FLOW, quote()], undefined, { flow: [{ step: "" }, { step: " " }] }));
     expect(none.sections.map((s) => s.id)).toEqual(["findings", "flow", "quote-1"]);
     expect(none.flow).toEqual([]);
+  });
+});
+
+test.describe("The selection bar's place settles", () => {
+  test("a place on a half pixel is stored once and then kept, so placing it after every render stops", () => {
+    // The words' centre on a half pixel: before 26 Nov the stored place (rounded) was compared with the unrounded one,
+    // never matched, and the editor stopped with "Maximum update depth exceeded" (pull request 52).
+    const first = settlePlace(null, 410.5, 200.5);
+    expect(first).toEqual({ x: 411, y: 201 });
+    expect(settlePlace(first, 410.5, 200.5)).toBe(first);
+    expect(settlePlace(first, 410.7, 200.6)).toBe(first);
+    // A move to another whole pixel is a new place.
+    expect(settlePlace(first, 412, 201)).toEqual({ x: 412, y: 201 });
   });
 });
