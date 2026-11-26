@@ -1,0 +1,773 @@
+/*
+ * The lab's Home screen (app/lab/design/home). Layered, like everything in the lab
+ * (components/lab/lab.css says why). Sizes, colours and timings come from the proposed theme's
+ * tokens and the site's Tailwind tokens; the lengths written here are this page's own layout.
+ *
+ * Motion. The resting style of everything here is its finished state. Every animation is inside
+ *   @media (prefers-reduced-motion: no-preference) and [data-motion="on"] (the lab's switch),
+ * and the scroll-driven ones inside @supports (animation-timeline: view()) as well, so with less
+ * motion, Motion off or an older browser the page is the finished page. Nothing loops.
+ *
+ * What each level adds (README.md beside this file): restrained has the stroke drawn once on load
+ * and the exhbt assembling; confident adds the name field and the pinned looks; maximal adds the
+ * film. The level's own token values (type sizes, curves, durations) come from lab.css.
+ */
+
+@layer components {
+  /* ── The page ─────────────────────────────────────────────────────────── */
+  .hl-header {
+    position: relative;
+    z-index: 2;
+  }
+  .hl-nav-links {
+    display: none;
+  }
+  @media (width >= 768px) {
+    .hl-nav-links {
+      display: contents;
+    }
+  }
+  .hl-section {
+    padding-block: clamp(4.5rem, 9vw, 8.5rem);
+  }
+  .hl-section-head {
+    display: grid;
+    gap: 1.25rem;
+    max-width: 48rem;
+    margin-bottom: clamp(2.5rem, 5vw, 4rem);
+  }
+  /* Grid children are as wide as their column, never their widest child. */
+  .hl-hero-grid > *,
+  .hl-assemble-grid > *,
+  .hl-looks-grid > *,
+  .hl-employer-grid > *,
+  .hl-roadmap-grid > *,
+  .hl-prices-grid > *,
+  .hl-film-grid > * {
+    min-width: 0;
+  }
+
+  /* ── 1. The first screen ──────────────────────────────────────────────── */
+  .hl-hero {
+    padding-block: clamp(1.5rem, 3.5vw, 3.25rem) clamp(4rem, 8vw, 7rem);
+  }
+  .hl-hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "title" "work" "name" "act" "hint" "lead";
+    row-gap: 1.25rem;
+  }
+  .hl-hero:not([data-field]) .hl-hero-grid {
+    grid-template-areas: "title" "work" "act" "lead";
+  }
+  .hl-hero-title {
+    grid-area: title;
+  }
+  .hl-hero-lead {
+    grid-area: lead;
+    max-width: 34rem;
+  }
+  .hl-hero-name {
+    grid-area: name;
+    display: grid;
+    gap: 0.625rem;
+    max-width: 30rem;
+  }
+  .hl-hero-hint {
+    grid-area: hint;
+    max-width: 30rem;
+  }
+  .hl-hero-act {
+    grid-area: act;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
+  }
+  .hl-hero-work {
+    grid-area: work;
+    position: relative;
+  }
+  /* The address the name gives, in display type: it breaks after the name's dot, or at a hyphen in a long name. */
+  .hl-hero-address {
+    overflow-wrap: anywhere;
+    padding-top: 0.25rem;
+  }
+  /* The tag on the frame's bar: an example, or a preview with your name. */
+  .hl-frame-tag {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.625rem;
+    z-index: 1;
+    pointer-events: none;
+  }
+  /* The page in the frame: zoomed, so it lays out as a laptop shows it. The window is an Astryx AspectRatio. */
+  .hl-hero-page {
+    zoom: 0.44;
+  }
+  .hl-hero-work .astryx-aspect-ratio {
+    aspect-ratio: 16 / 10;
+  }
+  @media (width >= 640px) {
+    .hl-hero-page {
+      zoom: 0.56;
+    }
+    .hl-hero-work .astryx-aspect-ratio {
+      aspect-ratio: 3 / 2;
+    }
+  }
+  @media (width >= 1024px) {
+    .hl-hero-grid {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      grid-template-rows: auto auto auto auto auto 1fr;
+      grid-template-areas: "title title" "lead work" "name work" "hint work" "act work" ". work";
+      column-gap: clamp(2.5rem, 5vw, 4.5rem);
+      row-gap: 1.75rem;
+    }
+    .hl-hero:not([data-field]) .hl-hero-grid {
+      grid-template-areas: "title title" "lead work" "act work" ". work" ". work" ". work";
+    }
+    .hl-hero-title {
+      margin-bottom: 0.75rem;
+    }
+    .hl-hero-page {
+      zoom: 0.52;
+    }
+    .hl-hero-work .astryx-aspect-ratio {
+      aspect-ratio: 4 / 3;
+    }
+  }
+
+  /* The stroke under the line's second half: the site's flat mint highlight, one span a word. */
+  @media (prefers-reduced-motion: no-preference) {
+    [data-motion="on"] .hl-stroke {
+      --hl-draw: calc(var(--duration-slow) * 1.25);
+      animation: hl-stroke-draw calc(var(--hl-draw) * var(--hl-len)) linear both;
+      animation-delay: calc(var(--duration-medium) + var(--hl-draw) * var(--hl-at));
+    }
+  }
+  @keyframes hl-stroke-draw {
+    from {
+      background-size: 0% 0.42em;
+    }
+  }
+
+  /* ── 2. One project, one page: the exhbt assembles ───────────────────── */
+  .hl-assemble {
+    /* The frame's timeline is read by the parts' names too, which sit outside the frame. */
+    timeline-scope: --hl-exhbt;
+  }
+  .hl-assemble-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "head" "work" "parts";
+    gap: 2.5rem;
+  }
+  .hl-assemble-head {
+    grid-area: head;
+    display: grid;
+    gap: 1.25rem;
+    align-content: start;
+  }
+  .hl-assemble-parts {
+    grid-area: parts;
+    display: grid;
+    gap: 1.5rem;
+    align-content: start;
+  }
+  .hl-assemble-work {
+    grid-area: work;
+    /* The subject of the assembly's timeline: outside the frame, whose clipping boxes would capture a plain view(). */
+    view-timeline: --hl-exhbt block;
+  }
+  /* The whole page in view: zoomed so it lays out as a laptop shows it, its sidebar beside it. */
+  .hl-assemble-page {
+    zoom: 0.4;
+  }
+  @media (width >= 640px) {
+    .hl-assemble-page {
+      zoom: 0.6;
+    }
+  }
+  @media (width >= 1024px) {
+    .hl-assemble-grid {
+      grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+      grid-template-rows: auto 1fr;
+      grid-template-areas: "head work" "parts work";
+      gap: 2rem 4rem;
+      align-items: start;
+    }
+    .hl-assemble-page {
+      zoom: 0.6;
+    }
+  }
+  .hl-parts {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @media (width >= 640px) and (width < 1024px) {
+    .hl-parts {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 2rem;
+    }
+  }
+  .hl-part {
+    position: relative;
+    display: grid;
+    gap: 0.25rem;
+    border-top: 1px solid var(--color-line);
+    padding-block: 0.875rem 1rem;
+  }
+  /* An ink rule over each part's name: drawn as its part arrives. */
+  .hl-part::before {
+    content: "";
+    position: absolute;
+    inset: -1px 0 auto;
+    height: 2px;
+    background: var(--color-ink);
+    transform-origin: left center;
+  }
+
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      [data-motion="on"] .hl-assemble-work .xp-mark,
+      [data-motion="on"] .hl-assemble-work .xp-flow > li,
+      [data-motion="on"] .hl-assemble-work .xp-flow > li:last-child > .xp-flow-box,
+      [data-motion="on"] .hl-assemble-work [data-part="graph"] [role="img"] > div > .relative > :nth-child(2),
+      [data-motion="on"] .hl-assemble-work [data-part="graph"] [role="img"] > div > .relative > :nth-child(4),
+      [data-motion="on"] .hl-assemble-work [data-part="graph"] [role="img"] > div > span:last-child,
+      [data-motion="on"] .hl-assemble-work [data-checks] .xp-tick,
+      [data-motion="on"] .hl-part::before,
+      [data-motion="on"] .hl-part dt {
+        animation-timeline: --hl-exhbt;
+        animation-fill-mode: both;
+        animation-duration: auto;
+      }
+
+      /* The question: the highlighter draws under the gap, left to right on each line. */
+      [data-motion="on"] .hl-assemble-work .xp-mark {
+        background-color: transparent;
+        background-image: linear-gradient(var(--xp-highlight), var(--xp-highlight));
+        background-repeat: no-repeat;
+        background-size: 100% 100%;
+        animation-name: hl-mark;
+        animation-timing-function: linear;
+        animation-range: cover 18% cover 30%;
+      }
+      /* How you did it: the boxes arrive one by one, then the last turns ink. */
+      [data-motion="on"] .hl-assemble-work .xp-flow > li {
+        animation-name: hl-arrive;
+        animation-timing-function: var(--ease-entrance);
+        animation-range: cover calc(26% + var(--hl-n, 0) * 3.5%) cover calc(32% + var(--hl-n, 0) * 3.5%);
+      }
+      .hl-assemble-work .xp-flow > li:nth-child(2) {
+        --hl-n: 1;
+      }
+      .hl-assemble-work .xp-flow > li:nth-child(3) {
+        --hl-n: 2;
+      }
+      .hl-assemble-work .xp-flow > li:nth-child(4) {
+        --hl-n: 3;
+      }
+      .hl-assemble-work .xp-flow > li:nth-child(5) {
+        --hl-n: 4;
+      }
+      .hl-assemble-work .xp-flow > li:nth-child(6) {
+        --hl-n: 5;
+      }
+      [data-motion="on"] .hl-assemble-work .xp-flow > li:last-child > .xp-flow-box {
+        animation-name: hl-ink;
+        animation-timing-function: var(--ease-standard);
+        animation-range: cover 45% cover 48%;
+      }
+      /* What you found: the graph's line runs from before to after, then the after dot and the change arrive. */
+      [data-motion="on"] .hl-assemble-work [data-part="graph"] [role="img"] > div > .relative > :nth-child(2) {
+        transform-origin: right center;
+        animation-name: hl-run;
+        animation-timing-function: var(--ease-move);
+        animation-range: cover 44% cover 50%;
+      }
+      [data-motion="on"] .hl-assemble-work [data-part="graph"] [role="img"] > div > .relative > :nth-child(4),
+      [data-motion="on"] .hl-assemble-work [data-part="graph"] [role="img"] > div > span:last-child {
+        animation-name: hl-pop;
+        animation-timing-function: var(--ease-entrance);
+        animation-range: cover 49% cover 52%;
+      }
+      /* The proof: the ticks fill, one after another. */
+      [data-motion="on"] .hl-assemble-work [data-checks] .xp-tick {
+        animation-name: hl-pop;
+        animation-timing-function: var(--ease-entrance);
+        animation-range: cover calc(51% + var(--hl-n, 0) * 2%) cover calc(54% + var(--hl-n, 0) * 2%);
+      }
+      .hl-assemble-work [data-checks] li:nth-child(2) .xp-tick {
+        --hl-n: 1;
+      }
+      .hl-assemble-work [data-checks] li:nth-child(3) .xp-tick {
+        --hl-n: 2;
+      }
+      /* Each part's name lights as its part arrives: its rule draws and its words turn ink. */
+      [data-motion="on"] .hl-part::before {
+        animation-name: hl-rule;
+        animation-timing-function: var(--ease-standard);
+      }
+      [data-motion="on"] .hl-part dt {
+        animation-name: hl-name-on;
+        animation-timing-function: var(--ease-standard);
+      }
+      [data-motion="on"] .hl-part[data-part-name="question"]::before,
+      [data-motion="on"] .hl-part[data-part-name="question"] dt {
+        animation-range: cover 18% cover 30%;
+      }
+      [data-motion="on"] .hl-part[data-part-name="method"]::before,
+      [data-motion="on"] .hl-part[data-part-name="method"] dt {
+        animation-range: cover 26% cover 48%;
+      }
+      [data-motion="on"] .hl-part[data-part-name="found"]::before,
+      [data-motion="on"] .hl-part[data-part-name="found"] dt {
+        animation-range: cover 44% cover 52%;
+      }
+      [data-motion="on"] .hl-part[data-part-name="proof"]::before,
+      [data-motion="on"] .hl-part[data-part-name="proof"] dt {
+        animation-range: cover 51% cover 58%;
+      }
+    }
+  }
+  @keyframes hl-mark {
+    from {
+      background-size: 0% 100%;
+    }
+  }
+  @keyframes hl-arrive {
+    from {
+      opacity: 0;
+      translate: 0 0.75rem;
+      scale: 0.96;
+    }
+  }
+  @keyframes hl-ink {
+    from {
+      background-color: var(--xp-flow-ground);
+      border-color: var(--xp-flow-edge);
+      color: var(--xp-flow-ink);
+    }
+  }
+  @keyframes hl-run {
+    from {
+      scale: 0 1;
+    }
+  }
+  @keyframes hl-pop {
+    from {
+      opacity: 0;
+      scale: 0.3;
+    }
+  }
+  @keyframes hl-rule {
+    from {
+      scale: 0 1;
+    }
+  }
+  @keyframes hl-name-on {
+    from {
+      color: var(--color-slate);
+    }
+  }
+
+  /* ── 3. One page, eight looks ─────────────────────────────────────────── */
+  .hl-looks-track {
+    position: relative;
+  }
+  .hl-looks-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+  .hl-looks-words {
+    display: grid;
+    gap: 1rem;
+    align-content: start;
+  }
+  /* Each look's name, large, in its own face (set on the element). Not chosen: the quiet text colour. */
+  .hl-look-name {
+    display: block;
+    font-size: 1.25rem;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--color-text-primary);
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+  .hl-looks .astryx-radio-list-item:not([data-selected]) .hl-look-name {
+    color: var(--color-text-secondary);
+  }
+  /* On a phone the eight names sit in two columns, so the stage fits one screen. */
+  .hl-looks-list [role="radiogroup"] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem 1rem;
+  }
+  .hl-looks-page {
+    zoom: 0.44;
+  }
+  .hl-looks-work .astryx-aspect-ratio {
+    aspect-ratio: 16 / 11;
+  }
+  @media (width >= 640px) {
+    .hl-looks-page {
+      zoom: 0.56;
+    }
+  }
+  @media (width >= 1024px) {
+    .hl-looks-grid {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      gap: 4rem;
+      align-items: center;
+    }
+    .hl-looks-list [role="radiogroup"] {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.125rem;
+    }
+    .hl-look-name {
+      font-size: clamp(1.75rem, 2.4vw, 2.25rem);
+      line-height: 1.12;
+    }
+    .hl-looks-page {
+      zoom: 0.52;
+    }
+    .hl-looks-work .astryx-aspect-ratio {
+      aspect-ratio: 4 / 3;
+    }
+  }
+  /* The markers the observer watches: only there while the scene is scroll-led. */
+  .hl-look-step {
+    display: none;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    [data-lab-root][data-motion="on"]:not([data-level="restrained"]) .hl-looks {
+      padding-block: 0;
+    }
+    [data-lab-root][data-motion="on"]:not([data-level="restrained"]) .hl-looks-track {
+      --hl-step: 38dvh;
+      height: calc(100dvh + var(--hl-steps) * var(--hl-step));
+    }
+    [data-lab-root][data-motion="on"]:not([data-level="restrained"]) .hl-looks-stage {
+      position: sticky;
+      top: 0;
+      display: grid;
+      align-content: center;
+      min-height: 100dvh;
+      padding-block: 1.5rem;
+    }
+    [data-lab-root][data-motion="on"]:not([data-level="restrained"]) .hl-look-step {
+      display: block;
+      position: absolute;
+      left: 0;
+      width: 1px;
+      top: calc(50dvh + var(--i) * var(--hl-step));
+      height: var(--hl-step);
+      pointer-events: none;
+    }
+    [data-lab-root][data-motion="on"]:not([data-level="restrained"]) .hl-look-step:first-of-type {
+      top: 0;
+      height: calc(50dvh + var(--hl-step));
+    }
+    [data-lab-root][data-motion="on"]:not([data-level="restrained"]) .hl-look-step:last-of-type {
+      height: calc(50dvh + var(--hl-step));
+    }
+  }
+  /* The cross-fade: only the page in the frame takes part, so the rest of the page stays live while it scrolls. */
+  html:active-view-transition-type(hl-look) {
+    view-transition-name: none;
+  }
+  html:active-view-transition-type(hl-look) .hl-looks-page {
+    view-transition-name: hl-look-page;
+  }
+  ::view-transition-group(hl-look-page),
+  ::view-transition-old(hl-look-page),
+  ::view-transition-new(hl-look-page) {
+    animation-duration: var(--hl-look-fade, 320ms);
+  }
+
+  /* ── 4. A CV says it. An exhbt shows it. ───────────────────────────────── */
+  .hl-employer-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "cv" "work" "sees";
+    gap: 2.5rem;
+  }
+  .hl-cv {
+    grid-area: cv;
+    margin: 0;
+  }
+  .hl-employer-work {
+    grid-area: work;
+  }
+  .hl-sees {
+    grid-area: sees;
+    display: grid;
+    gap: 1rem;
+    align-content: start;
+  }
+  .hl-cv-label {
+    margin-bottom: 0.75rem;
+  }
+  /* A CV is a document, not the work: flat, a hairline, its own small type. */
+  .hl-cv-sheet {
+    display: grid;
+    gap: 0.25rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-inner);
+    background: var(--color-surface);
+    padding: 1.5rem 1.5rem 1.75rem;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    color: var(--color-graphite);
+  }
+  .hl-cv-name {
+    margin-bottom: 0.5rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+  .hl-cv-head {
+    margin-top: 0.75rem;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+  .hl-cv-line {
+    color: var(--color-ink);
+  }
+  .hl-employer-page {
+    zoom: 0.4;
+  }
+  @media (width >= 640px) {
+    .hl-employer-page {
+      zoom: 0.58;
+    }
+  }
+  @media (width >= 1024px) {
+    .hl-employer-grid {
+      grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+      grid-template-rows: auto 1fr;
+      grid-template-areas: "cv work" "sees work";
+      gap: 2.5rem 4rem;
+      align-items: start;
+    }
+    .hl-employer-page {
+      zoom: 0.6;
+    }
+  }
+  .hl-sees-list {
+    display: grid;
+    gap: 0.75rem;
+  }
+  .hl-sees-list > li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .hl-sees-list > li > [data-tick] {
+    margin-top: 0.125rem;
+  }
+
+  /* ── 5. How it works ──────────────────────────────────────────────────── */
+  .hl-how {
+    background: var(--color-mist);
+  }
+  .hl-steps {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+  .hl-step {
+    display: grid;
+    gap: 1.25rem;
+    align-content: end;
+    min-width: 0;
+  }
+  .hl-step-words {
+    display: grid;
+    gap: 0.5rem;
+    max-width: 28rem;
+  }
+  .hl-step-picture {
+    position: relative;
+    display: grid;
+    gap: 0.75rem;
+  }
+  .hl-step-arrow {
+    display: flex;
+    justify-content: center;
+    padding-block: 0.25rem;
+    color: var(--color-slate);
+  }
+  .hl-arrow-across {
+    display: none;
+  }
+  .hl-step-page {
+    zoom: 0.4;
+  }
+  .hl-step[data-step="draft"] [data-lab-frame] .overflow-hidden,
+  .hl-step[data-step="live"] [data-lab-frame] .overflow-hidden {
+    max-height: 17rem;
+  }
+  @media (width >= 1024px) {
+    .hl-steps {
+      grid-template-columns: minmax(0, 3fr) auto minmax(0, 4fr) auto minmax(0, 5fr);
+      align-items: end;
+      gap: 1.25rem;
+    }
+    .hl-step-arrow {
+      align-self: center;
+      padding-block: 0;
+    }
+    .hl-arrow-across {
+      display: block;
+    }
+    .hl-arrow-down {
+      display: none;
+    }
+    .hl-step[data-step="draft"] [data-lab-frame] .overflow-hidden {
+      max-height: 15rem;
+    }
+    .hl-step[data-step="live"] [data-lab-frame] .overflow-hidden {
+      max-height: 20rem;
+    }
+    .hl-step[data-step="draft"] .hl-step-page {
+      zoom: 0.34;
+    }
+    .hl-step[data-step="live"] .hl-step-page {
+      zoom: 0.42;
+    }
+  }
+  .hl-draft > .astryx-banner {
+    margin: 1rem 1.5rem 0;
+  }
+  .hl-file {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    justify-self: start;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-element);
+    background: var(--color-surface);
+    padding: 0.75rem 1.25rem 0.75rem 0.75rem;
+  }
+  .hl-file-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--radius-inner);
+    background: var(--color-wash);
+    color: var(--color-jade);
+  }
+  .hl-file-words {
+    display: grid;
+  }
+  .hl-live-line,
+  .hl-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .hl-step-address {
+    overflow-wrap: anywhere;
+  }
+
+  /* The film: maximal only, with motion allowed and scroll timelines supported. */
+  .hl-film {
+    display: none;
+  }
+
+  /* ── 6. The roadmap ───────────────────────────────────────────────────── */
+  .hl-roadmap-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3rem;
+  }
+  .hl-roadmap-words {
+    display: grid;
+    gap: 1.5rem;
+    align-content: center;
+  }
+  .hl-roadmap-form {
+    display: grid;
+    gap: 0.75rem;
+    max-width: 30rem;
+  }
+  .hl-roadmap-form > :last-child {
+    justify-self: start;
+  }
+  .hl-roadmap-radar {
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-container);
+    padding: clamp(1.25rem, 3vw, 2rem);
+  }
+  @media (width >= 1024px) {
+    .hl-roadmap-grid {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+      gap: 4.5rem;
+      align-items: center;
+    }
+  }
+
+  /* ── 7. Prices, in a line ─────────────────────────────────────────────── */
+  .hl-prices {
+    border-top: 1px solid var(--color-line);
+  }
+  .hl-prices-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.75rem;
+  }
+  .hl-prices-words {
+    display: grid;
+    gap: 1.75rem;
+    align-content: start;
+    max-width: 40rem;
+  }
+  .hl-states {
+    display: grid;
+    gap: 0.875rem;
+  }
+  .hl-states > li {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    align-items: baseline;
+    gap: 1rem;
+  }
+  .hl-states > li > :first-child {
+    justify-self: start;
+  }
+  @media (width >= 1024px) {
+    .hl-prices-grid {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+      gap: 4.5rem;
+    }
+  }
+
+  /* ── The close: the one ink band ─────────────────────────────────────── */
+  .hl-close {
+    background: var(--color-ink);
+    color: #fff;
+  }
+  .hl-close-inner {
+    display: grid;
+    gap: 1.75rem;
+    padding-block: clamp(5rem, 11vw, 9.5rem);
+  }
+  .hl-close-inner h2 {
+    overflow-wrap: anywhere;
+  }
+  .hl-close-words {
+    max-width: 38rem;
+  }
+  .hl-close-act {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
+    padding-top: 0.5rem;
+  }
+}
