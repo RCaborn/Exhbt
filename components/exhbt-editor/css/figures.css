@@ -98,6 +98,22 @@
     right: 0;
     bottom: -1.875rem;
   }
+  /* Where the buttons wrap (a phone), under a line is over the button on the next: Toolbar.tsx (placeLinkChips) moves the chip
+     onto the button's own line, vertically in its middle, beside the link past its grip ("beside") or at its right end, left of
+     the grip ("end"). */
+  .xe-frame[data-as="button"] .xe-fig-link > .xe-fig-corner:is([data-place="beside"], [data-place="end"]) {
+    top: calc((2.75rem - 1.625rem) / 2);
+    bottom: auto;
+    transform: none;
+  }
+  .xe-frame[data-as="button"] .xe-fig-link > .xe-fig-corner[data-place="beside"] {
+    right: auto;
+    left: calc(100% + 0.5rem);
+  }
+  .xe-frame[data-as="button"] .xe-fig-link > .xe-fig-corner[data-place="end"] {
+    right: 3.25rem;
+    left: auto;
+  }
 
   /* ---------- A picture's description: "Needs a description" just after the placeholder's last word ---------- */
   .xe-fig-needs-line {
@@ -377,6 +393,16 @@
     /* Stacked, the rows are 44px apart (a row is 1.35 x 12px of type), so the presses never overlap. */
     .xe-fig-picked[data-stacked] {
       row-gap: calc(2.75rem - 1.35 * 0.75rem);
+    }
+  }
+  /* On a tablet a reference line's chip sits just right of the middle of the rule under the line. The line about the link
+     above it and the next line's words below are fields as wide as the line, and centred, the chip's 44px press reached the
+     middle of the one above. The next line's toolbar sits at the rule's right end, clear of it. (On a phone that end is
+     nearer the middle: there the chip stays in it.) */
+  @media (pointer: coarse) and (min-width: 48rem) {
+    .xe-frame[data-as="listed"] .xe-fig-link > .xe-fig-corner {
+      left: calc(50% + 0.5rem);
+      transform: none;
     }
   }
 }

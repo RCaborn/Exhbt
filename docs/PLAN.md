@@ -1,6 +1,8 @@
 # Exhbt — site plan (architecture for R1–R4, build R1)
 
 > **Status:** Historical. Phase 1 is described in [HANDOFF.md](../HANDOFF.md). The current shape is [MAP.md](MAP.md). Plan figures are `lib/entitlements.ts`. Hosts are `lib/hosts.ts`. Decisions that replaced the tier and URL notes below are [0001](decisions/0001-portfolio-subdomains.md) and [0002](decisions/0002-plan-tiers.md). Do not copy counts or portfolio paths out of this file.
+>
+> **Added 26 Nov 2026:** the `impeccable` and `ui-ux-pro-max` plugins named below are switched off. The `impeccable init`, hook, detector and `/impeccable` command steps no longer apply; use the vetted text playbooks in [`.claude/skills/impeccable/`](../.claude/skills/impeccable/SKILL.md) instead.
 
 ## Decisions log: team meeting, 6 Nov 2026 (Rory, Alex)
 
