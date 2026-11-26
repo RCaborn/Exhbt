@@ -36,11 +36,11 @@ import { LinksPanel } from "../tools/PartTools";
  * to join one of the person's exhbts.
  */
 
-/** The chip's words, and what each one means. */
-export const CHIP: Record<Standing, { label: string; variant: "success" | "neutral"; means: string }> = {
-  live: { label: "Live", variant: "success", means: "Visitors can see your portfolio at your address." },
-  offline: { label: "Not online yet", variant: "neutral", means: "Visitors get “not found” until you have an address and a published exhbt." },
-  preview: { label: "Preview only", variant: "neutral", means: "Only you can see your portfolio on your plan." },
+/** The chip's words, and what each one means. `short` is its word on a phone (under 30rem). */
+export const CHIP: Record<Standing, { label: string; short: string; variant: "success" | "neutral"; means: string }> = {
+  live: { label: "Live", short: "Live", variant: "success", means: "Visitors can see your portfolio at your address." },
+  offline: { label: "Not online yet", short: "Not live", variant: "neutral", means: "Visitors get “not found” until you have an address and a published exhbt." },
+  preview: { label: "Preview only", short: "Preview", variant: "neutral", means: "Only you can see your portfolio on your plan." },
 };
 
 /** The bar's own words, in one place. */
@@ -65,19 +65,19 @@ export function EditorBar({ team, jobLinks }: { team: ReactNode; jobLinks: React
   return (
     <>
       <div className="pe-bar" data-bar data-narrow={narrow ? "" : undefined}>
+        {/* Before the Toolbar, not in it: the toolbar's one Tab stop and its arrow keys are for its controls
+            only. An h2: the page's own h1 is the person's name, in visitors' markup. Undo moves the focus
+            here when nothing else is left to take it (tabIndex -1: focusable from code, not by Tab). */}
+        <span className="pe-bar-start">
+          <h2 id={HEADING_ID} tabIndex={-1} className="pe-bar-heading">
+            {BAR.heading}
+          </h2>
+          <Chip />
+        </span>
         <Toolbar
           label={BAR.heading}
           size={size}
           gap={2}
-          startContent={
-            <span className="pe-bar-start">
-              {/* An h2: the page's own h1 is the person's name, in visitors' markup. */}
-              <h2 id={HEADING_ID} tabIndex={-1} className="pe-bar-heading">
-                {BAR.heading}
-              </h2>
-              <Chip />
-            </span>
-          }
           endContent={
             <span className="pe-bar-end">
               {!narrow && <LookButton />}
@@ -129,8 +129,12 @@ function Chip(): ReactNode {
   return (
     <span className="pe-chip" data-chip={standing} title={c.means}>
       <StatusDot variant={c.variant} label={c.label} />
-      <Text type="supporting" weight="semibold" color={standing === "live" ? "primary" : "secondary"} className="pe-chip-word">
-        {c.label}
+      <Text type="supporting" weight="semibold" color={standing === "live" ? "primary" : "secondary"}>
+        <span className="pe-chip-word">{c.label}</span>
+        {/* Hidden from assistive technology: the long word, and what it means, are read already. */}
+        <span className="pe-chip-short" aria-hidden>
+          {c.short}
+        </span>
       </Text>
       <span className="sr-only">{c.means}</span>
     </span>

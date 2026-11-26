@@ -68,11 +68,33 @@ test.describe("The bar", () => {
     await expect(bar(page).locator("[data-chip]")).toContainText("Live");
     const t = toolbar(page);
     for (const name of ["Look", "Undo", "See as a visitor", "Job links", "More", "Share"]) await expect(t.getByRole("button", { name, exact: true })).toBeVisible();
+    // The toolbar holds controls only: the heading sits before it, and is not a Tab stop.
+    await expect(t.getByRole("heading")).toHaveCount(0);
+    await expect(bar(page).getByRole("heading", { level: 2, name: "Your portfolio", exact: true })).toHaveAttribute("tabindex", "-1");
     // The bar is exactly as tall as the exhbt editor's, and stays at the top while the page scrolls.
     const h = await bar(page).evaluate((el) => el.getBoundingClientRect().height);
     expect(h).toBe(56);
     await page.mouse.wheel(0, 1500);
     await expect.poll(() => bar(page).evaluate((el) => el.getBoundingClientRect().top)).toBe(0);
+  });
+
+  test("on a phone the chip keeps a word, never the dot alone, and the row fits", async ({ page }) => {
+    await newPerson(page, "chip-phone", "premium");
+    for (const width of [390, 360]) {
+      await page.setViewportSize({ width, height: 800 });
+      const chip = bar(page).locator("[data-chip]");
+      await expect(chip).toHaveAttribute("data-chip", "offline");
+      await expect(chip.locator(".pe-chip-short")).toBeVisible();
+      await expect(chip.locator(".pe-chip-short")).toHaveText("Not live");
+      await expect(bar(page).getByRole("heading", { level: 2, name: "Your portfolio", exact: true })).toBeAttached();
+      const primary = toolbar(page).getByRole("button", { name: "Claim your address" });
+      await expect(primary).toBeInViewport({ ratio: 1 });
+      // Nothing in the row is cut off or pushed past the window's edge.
+      expect(await bar(page).evaluate((el) => [...el.querySelectorAll("button, [data-chip], [data-save]")].every((n) => { const r = n.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; })), `at ${width}`).toBe(true);
+      const chipBox = (await chip.boundingBox())!;
+      const primaryBox = (await primary.boundingBox())!;
+      expect(chipBox.x + chipBox.width).toBeLessThanOrEqual(primaryBox.x);
+    }
   });
 
   test("at 700 Look, Undo, See as a visitor and Job links fold into the menu", async ({ page }) => {

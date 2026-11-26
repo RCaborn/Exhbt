@@ -5,6 +5,15 @@
    own type): they are the look's data, drawn as the look draws them. */
 @layer components {
   /* ---------- The bar's row ---------- */
+  /* The heading and the chip, before the Toolbar in the bar's frame: as wide as they are, never grown. */
+  .pe-bar > .pe-bar-start {
+    flex: 0 1 auto;
+  }
+  /* The toolbar holds one group, its controls, at the end of the row (with no start group, its own
+     space-between would put them at the start). */
+  .pe-bar [role="toolbar"] > :has(> .pe-bar-end) {
+    margin-inline-start: auto;
+  }
   .pe-bar-start {
     display: inline-flex;
     align-items: center;
@@ -40,17 +49,25 @@
     font-weight: var(--font-weight-medium);
   }
   /* On a phone the row keeps the status and the main button: the screen's name is in the site's
-     header already, so the bar's heading is kept for screen readers only, and the chip keeps its dot
-     (named) without the word. */
+     header already, so the bar's heading is kept for screen readers only. The chip keeps a word at every
+     width, never the dot alone (WCAG 1.4.1): under 30rem its short form ("Live", "Not live", "Preview"). */
+  .pe-chip-short {
+    display: none;
+  }
   @media (width < 30rem) {
-    .pe-bar-heading,
-    .pe-chip-word {
+    .pe-bar-heading {
       position: absolute;
       width: 1px;
       height: 1px;
       overflow: hidden;
       clip-path: inset(50%);
       white-space: nowrap;
+    }
+    .pe-chip-word {
+      display: none;
+    }
+    .pe-chip-short {
+      display: inline;
     }
   }
   /* A thin rule between the groups of the row: what you see, what you have done, where it goes. */
