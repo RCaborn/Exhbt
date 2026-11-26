@@ -43,6 +43,7 @@ export function FirstRun({
   words,
   art,
   progress,
+  onFill,
   onAdd,
   failed,
   loading,
@@ -50,6 +51,8 @@ export function FirstRun({
   words: AppWords;
   art: FirstRunArt;
   progress: Progress;
+  /** She finishes her page: a line about her, a photo, a look (in the lab, at once). */
+  onFill: () => void;
   /** Her first exhbt arrives (in the lab, at once). */
   onAdd: () => void;
   failed: boolean;
@@ -130,7 +133,8 @@ export function FirstRun({
                 url={words.ownerUrl}
                 label={`${words.person.name}'s page as she has it so far${progress.page ? ", with a line about her" : ": her name and nothing else"}${progress.exhbt ? ", and her first exhbt" : ""}`}
                 page="[zoom:0.56] sm:[zoom:0.62] lg:[zoom:0.6]"
-                crop="max-h-[24rem] sm:max-h-[28rem] lg:max-h-[30rem]"
+                // With her first exhbt on it the page is shown whole, so the exhbt can be seen where it landed.
+                crop={progress.exhbt ? "" : "max-h-[24rem] sm:max-h-[28rem] lg:max-h-[30rem]"}
               >
                 {page}
               </Frame>
@@ -147,17 +151,27 @@ export function FirstRun({
                 <Skeleton width={210} height={48} radius="rounded" index={8} />
               </div>
             ) : progress.exhbt ? (
-              <div className="app-first-done">
+              // The next step, whichever it is: her page if it isn't finished; then, on Free, putting it online.
+              <div className="app-first-done" key={progress.page ? "all" : "exhbt"}>
                 <span className="app-first-done-tick">
                   <Tick size="lg" />
                 </span>
-                <Heading level={2}>Your first exhbt is on your page.</Heading>
+                <Heading level={2}>{progress.page ? "All three done." : "Your first exhbt is on your page."}</Heading>
                 <Text as="p" display="block" color="secondary">
-                  {words.firstRun.draftNote}
+                  {progress.page ? words.firstRun.onlineNote : "Next, a line about you, a photo and a look, typed on the page itself."}
                 </Text>
                 <div className="app-row">
-                  <Button label="See plans" variant="primary" href="/pricing" target="_blank" />
+                  {progress.page ? (
+                    <Button label="See plans" variant="primary" href="/pricing" target="_blank" />
+                  ) : (
+                    <Button label="Finish your page" variant="primary" onClick={onFill} />
+                  )}
                 </div>
+                {!progress.page && (
+                  <Text as="p" display="block" type="supporting">
+                    {words.firstRun.draftNote}
+                  </Text>
+                )}
               </div>
             ) : (
               <>

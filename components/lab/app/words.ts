@@ -1,7 +1,7 @@
 import { BILLING_PERIOD, ENTITLEMENTS, PLAN_NAMES, PRICES, type Plan } from "@/lib/entitlements";
 import { demoExhbts, demoOwner, demoPortfolio } from "@/lib/exhbt";
 import { APP_HOST, portfolioHost, portfolioUrl } from "@/lib/hosts";
-import { canCreateExhbt, canPublish } from "@/lib/plan-rules";
+import { canClaimUsername, canCreateExhbt, canPublish } from "@/lib/plan-rules";
 import type { ExhbtRecord } from "@/lib/store";
 
 /**
@@ -67,6 +67,8 @@ export type AppWords = {
     plan: string;
     /** "On Free, your exhbt is a draft only you can see. Publishing to your own link comes with Premium." */
     draftNote: string;
+    /** With all three steps done on Free: what putting the page online takes. */
+    onlineNote: string;
     /** The one example exhbt the empty state pictures, and the first one she adds. */
     exampleSlug: string;
     exampleTitle: string;
@@ -147,6 +149,7 @@ export function appWords(): AppWords {
   const limit = ENTITLEMENTS[WORK_PLAN].exhbts;
   const room = canCreateExhbt(WORK_PLAN, records(used));
   const publish = canPublish(FIRST_RUN_PLAN, [], "first");
+  const address = canClaimUsername(FIRST_RUN_PLAN);
   const example = demoExhbts[0]!;
   return {
     person: {
@@ -167,6 +170,7 @@ export function appWords(): AppWords {
     firstRun: {
       plan: PLAN_NAMES[FIRST_RUN_PLAN],
       draftNote: `On ${PLAN_NAMES[FIRST_RUN_PLAN]}, your exhbt is a draft only you can see.${publish.ok ? "" : ` ${publish.reason}`}`,
+      onlineNote: `Your page and your first exhbt are saved. Only you can see them on ${PLAN_NAMES[FIRST_RUN_PLAN]}.${address.ok ? "" : ` ${address.reason}`}`,
       exampleSlug: example.slug,
       exampleTitle: example.doc.title,
     },

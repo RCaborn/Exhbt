@@ -170,9 +170,18 @@ export function WithWork({
             data-first={i === 0 || undefined}
             style={{ "--app-vt-name": `app-tile-${t.slug}` } as React.CSSProperties}
           >
+            <h2 className="sr-only">{t.title}</h2>
             {loading ? (
-              <div className="app-tile-art" data-loading>
-                <Skeleton height="100%" radius={0} index={i} />
+              // Laid out as the card that is coming: its figure, then its title and a line.
+              <div className="app-tile-art app-tile-skel" data-loading role="img" aria-label="Loading">
+                <div className="app-tile-skel-figure">
+                  <Skeleton height="100%" radius={2} index={i} />
+                </div>
+                <div className="app-tile-skel-words">
+                  <Skeleton width="85%" height={20} index={i + 1} />
+                  <Skeleton width="60%" height={20} index={i + 2} />
+                  <Skeleton width="92%" height={12} index={i + 3} />
+                </div>
               </div>
             ) : (
               <div

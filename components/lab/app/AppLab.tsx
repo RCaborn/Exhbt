@@ -10,7 +10,6 @@ import { useLab } from "../LabFrame";
 import { AppNav } from "./AppNav";
 import { FirstRun, type FirstRunArt, type Progress } from "./FirstRun";
 import { AppLabStrip } from "./LabStrip";
-import { useMorph } from "./motion";
 import { Roadmaps } from "./Roadmaps";
 import type { AppScreen, AppShow } from "./screens";
 import { Settings } from "./Settings";
@@ -48,10 +47,9 @@ export function AppLab({
 }) {
   const lab = useLab();
   const showToast = useToast();
-  const morph = useMorph();
   const [progress, setProgress] = useState<Progress>(START);
-  // At maximal her page fills in as a step is done (motion.ts); at the other levels it changes at once.
-  const step = useCallback((next: (p: Progress) => Progress) => morph(() => setProgress(next)), [morph]);
+  // At maximal her page fills in as a step is done: what the step adds arrives part by part (app.css).
+  const step = useCallback((next: (p: Progress) => Progress) => setProgress(next), []);
 
   const toast = useCallback(
     (body: string, id = "app-toast") => {
@@ -102,7 +100,15 @@ export function AppLab({
         {/* The site's own skip link (app/layout.tsx) points at #main; AppShell's points at its main region. Both land here. */}
         <div className="app-page" id="main" tabIndex={-1}>
           {screen === "first-run" && firstRun && (
-            <FirstRun words={words} art={firstRun} progress={progress} onAdd={() => step((p) => ({ ...p, exhbt: true }))} failed={failed} loading={loading} />
+            <FirstRun
+              words={words}
+              art={firstRun}
+              progress={progress}
+              onFill={() => step((p) => ({ ...p, page: true }))}
+              onAdd={() => step((p) => ({ ...p, exhbt: true }))}
+              failed={failed}
+              loading={loading}
+            />
           )}
           {screen === "work" && work && <WithWork words={words} art={work} address={address} failed={failed} loading={loading} onCopied={copied} toast={toast} />}
           {screen === "account" && <Settings words={words} address={address} failed={failed} loading={loading} onCopied={copied} onSaved={saved} toast={toast} />}

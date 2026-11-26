@@ -132,6 +132,11 @@
   [data-app-lab] .app-account[data-here] {
     background: var(--color-overlay-hover);
   }
+  /* Her initials in ink: chrome is ink and white, and mint is kept for go, live and checked. */
+  [data-app-lab] .app-account :is(.astryx-avatar, .astryx-avatar-fallback) {
+    background: var(--color-ink);
+    color: var(--color-surface);
+  }
   .app-account-name {
     display: none;
   }
@@ -355,7 +360,14 @@
   }
   .app-tile-art[data-loading] {
     box-shadow: none;
+    border: 1px solid var(--color-line);
     cursor: default;
+  }
+  /* At maximal the work's frame has a drawn ink edge as well as the shadow, as the kit's frame does there. */
+  [data-lab-root][data-level="maximal"] .app-tile-art:not([data-loading]) {
+    box-shadow:
+      0 0 0 1px var(--color-ink),
+      var(--shadow-high);
   }
   /* Every wrapper between the tile and her card stretches, so a card fills its tile to the row's height. */
   .app-tile-art,
@@ -520,6 +532,32 @@
   }
 
   /* ── Loading ───────────────────────────────────────────────────────────────────────────── */
+  .app-tile-skel {
+    grid-template-rows: 11rem auto;
+    gap: 1.5rem;
+    padding: 1.25rem;
+  }
+  .app-tile-skel-figure {
+    min-height: 0;
+  }
+  .app-tile-skel-words {
+    display: grid;
+    gap: 0.625rem;
+    align-content: start;
+  }
+  @media (width >= 1024px) {
+    /* The first tile is her band: its words beside its figure. */
+    .app-tile[data-first] .app-tile-skel {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-rows: 14rem;
+      gap: 3rem;
+      padding: 3rem;
+    }
+    .app-tile[data-first] .app-tile-skel-words {
+      order: -1;
+      align-content: center;
+    }
+  }
   .app-skel-frame {
     display: grid;
     gap: 2rem;
@@ -570,9 +608,10 @@
 }
 
 /*
- * Maximal: a change carried from where it was to where it lands (motion.ts). Only while a view
- * transition runs ([data-app-vt] on <html>) are the travelling parts named; its timing is the
- * level's slow duration and move curve, copied onto <html> for the length of it.
+ * Maximal, the tiles: a tile opens into its exhbt, and closes back into its place, as one picture
+ * carried across (motion.ts). Only while a view transition runs ([data-app-vt] on <html>) are the
+ * travelling parts named; its timing is the level's slow duration and move curve, copied onto
+ * <html> for the length of it. Moving and deleting a tile use the same, so the others close up.
  */
 @layer components {
   @media (prefers-reduced-motion: no-preference) {
@@ -582,12 +621,6 @@
     :root[data-app-vt] [data-app-lab] [data-morph] {
       view-transition-name: app-tile;
     }
-    :root[data-app-vt] [data-app-lab] .app-first-page {
-      view-transition-name: app-first-page;
-    }
-    :root[data-app-vt] [data-app-lab] .app-first-next {
-      view-transition-name: app-first-next;
-    }
     :root[data-app-vt]::view-transition-group(*) {
       animation-duration: var(--app-vt-duration);
       animation-timing-function: var(--app-vt-ease);
@@ -595,6 +628,38 @@
     :root[data-app-vt]::view-transition-old(*),
     :root[data-app-vt]::view-transition-new(*) {
       animation-duration: calc(var(--app-vt-duration) * 0.6);
+    }
+  }
+}
+
+/*
+ * Maximal, the first run: her page fills in as the strip's steps are done. What a step adds to her
+ * page arrives part by part (the line about her, her intro, where she is; then her first exhbt),
+ * on the entrance curve, rising a little into place. It is attached from this screen to hooks her
+ * page already has ([data-intro], [data-looking-for], [data-section]), the way decision 0033 has
+ * Home's exhbt assemble: the page itself is not touched, and its resting style is the finished page.
+ * The panel beside it, which names the next step, arrives the same way.
+ */
+@layer components {
+  @media (prefers-reduced-motion: no-preference) {
+    [data-lab-root][data-level="maximal"][data-motion="on"] .app-first-page :is(h1 + p, [data-intro], p:has([data-looking-for]), [data-section="work"]) {
+      animation: app-fill var(--duration-slow) var(--ease-entrance) both;
+    }
+    [data-lab-root][data-level="maximal"][data-motion="on"] .app-first-page [data-intro] {
+      animation-delay: calc(var(--duration-fast) * 1);
+    }
+    [data-lab-root][data-level="maximal"][data-motion="on"] .app-first-page p:has([data-looking-for]) {
+      animation-delay: calc(var(--duration-fast) * 2);
+    }
+    [data-lab-root][data-level="maximal"][data-motion="on"] .app-first-done {
+      animation: app-fill var(--duration-medium) var(--ease-entrance) both;
+      animation-delay: calc(var(--duration-fast) * 2);
+    }
+  }
+  @keyframes app-fill {
+    from {
+      opacity: 0;
+      translate: 0 1.5rem;
     }
   }
 }
