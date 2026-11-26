@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import { unverifiedOf } from "@/components/editor/model";
 import { canView } from "@/lib/access";
-import { LAYOUT_REFUSED } from "@/lib/add-exhbt";
+import { BUILD_IT_YOURSELF, LAYOUT_REFUSED } from "@/lib/add-exhbt";
 import { isAdmin } from "@/lib/admin";
 import { getCurrentUser, type SessionUser } from "@/lib/auth";
 import { editorKind } from "@/lib/editor-kind-server";
@@ -65,12 +65,15 @@ async function layoutAllowed(id: string, user: SessionUser, raw: unknown, doc: E
 /**
  * "Write it myself" on Add an exhbt (/exhbts/new): an empty exhbt in the layout chosen, if the plan has room.
  * The page lists the layouts the person's editor offers (offeredIn, decided as the edit page decides it), and
- * a form can be built by hand, so any other layout, or none, is refused here and sent back to choose again.
+ * a form can be built by hand, so any other layout is refused here and sent back to choose again.
+ * A form that names no layout at all (any "start from a blank page" button that isn't the layouts' own)
+ * is sent to choose one, with nothing to apologise for: no exhbt is made without a layout the person picked.
  * A case study is stored exactly as an empty doc always was: withFormat leaves the default layout's key out.
  */
 export async function createFromScratch(form: FormData) {
   const user = await signedIn();
   const layout = form.get("layout");
+  if (layout === null || layout === "") redirect(BUILD_IT_YOURSELF);
   if (!isFormat(layout) || !offeredIn(await editorKind(await isAdmin(user))).includes(layout)) redirect(LAYOUT_REFUSED);
   const store = getStore();
   const verdict = canCreateExhbt(await getPlan(user.id), await store.listExhbts(user.id));

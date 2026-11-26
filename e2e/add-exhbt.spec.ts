@@ -244,6 +244,15 @@ test.describe("Write it myself", () => {
     await axe(page);
     expect(await stored(page)).toHaveLength(0);
 
+    // A form that names no layout at all (a "start from a blank page" button elsewhere): the layouts to choose
+    // from, without the refusal, and still nothing made.
+    await page.getByRole("button", { name: ADD.layoutButton("gallery") }).evaluate((b) => b.removeAttribute("name"));
+    await page.getByRole("button", { name: ADD.layoutButton("gallery") }).click();
+    await page.waitForURL(exactly(BUILD_IT_YOURSELF));
+    await expect(page.getByRole("heading", ADD.layoutsHeading)).toBeVisible();
+    await expect(page.getByText(LAYOUT_NOT_OFFERED)).toHaveCount(0);
+    expect(await stored(page)).toHaveLength(0);
+
     // One of the three is made as asked, and opens in the classic editor.
     await page.getByRole("button", { name: ADD.layoutButton("research") }).click();
     await page.waitForURL(ADD.editUrl);
