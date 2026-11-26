@@ -300,7 +300,8 @@ export const HOME_BOXES: Record<string, string> = {
   "a section's heading": "[data-section] h2",
   card: "[data-card]",
   "a key figure": "[data-key-figure]",
-  "a row": "[data-section] dl > div",
+  // F's lines toolbar is an absolute, zero-size <div data-pe-lines> inside the <dl>: not a row.
+  "a row": "[data-section] dl > div:not([data-pe-lines])",
   "the footer": `${HOME} > footer`,
 };
 
@@ -366,7 +367,7 @@ export const HOME_EDIT_ONLY_IN_FLOW: { name: string; selector: string; allow: "r
   { name: "the tools line, empty", selector: 'dl > div:has([data-path="arrangement.tiles.education.tools"][data-empty])', allow: "remove" },
   { name: "who said the quote and their role, empty", selector: 'figcaption:has([data-path="arrangement.tiles.quote.name"][data-empty]):has([data-path="arrangement.tiles.quote.role"][data-empty])', allow: "remove" },
   // 2. Empty sections drawn whole: an empty About, Experience, Quote or Get in touch draws its heading and its empty fields.
-  { name: "an empty About me", selector: '[data-section="about"]:has([data-path="arrangement.tiles.about.text"][data-empty]):not(:has(dl [data-path]:not([data-empty])))', allow: "remove" },
+  { name: "an empty About me", selector: '[data-section="about"]:has([data-path="arrangement.tiles.about.text"][data-empty]):not(:has(dl [data-path]:not([data-pe-lines]):not([data-empty])))', allow: "remove" },
   { name: "an empty Experience", selector: '[data-section="experience"]:not(:has([data-path]:not([data-empty])))', allow: "remove" },
   { name: "an empty Quote", selector: '[data-section="quote"]:has([data-path="arrangement.tiles.quote.text"][data-empty])', allow: "remove" },
   { name: "an empty Get in touch", selector: '[data-section="contact"]:not(:has(dl > div))', allow: "remove" },
