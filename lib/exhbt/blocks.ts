@@ -427,6 +427,51 @@ export const richOf = (plainWords: string, runs: RichText | undefined): RichText
 /** What to store for such a field from the runs an editor holds: the plain words, and the runs only when some of them are formatted. */
 export const besideOf = (runs: RichText): { words: string; runs: RichText | undefined } => ({ words: plain(runs), runs: isFormatted(runs) ? runs : undefined });
 
+/** Runs with no link: bold and italic kept, any address dropped, and runs that are then alike joined. */
+const unlinked = (runs: RichText): RichText =>
+  runs.reduce<RichText>((out, run) => {
+    const r: Run = { ...run };
+    delete r.href;
+    const last = out[out.length - 1];
+    if (last && last.b === r.b && last.i === r.i) out[out.length - 1] = { ...last, t: last.t + r.t };
+    else out.push(r);
+    return out;
+  }, []);
+
+/**
+ * The three fields that take bold and italic but no links (decision 0032: a quote's words, a pull quote, a link's
+ * line) with any link taken out of their runs. The editor offers no Link there; a request built by hand could still
+ * send one, so the server reads every save and publish through this (app/(app)/exhbts/[id]/actions.ts, readDoc).
+ * The same doc when there is nothing to take out.
+ */
+export function withoutStrayLinks(doc: ExhbtDoc): ExhbtDoc {
+  let changed = false;
+  const fix = (runs: RichText | undefined): RichText | undefined => {
+    if (!runs?.some((r) => r.href !== undefined)) return runs;
+    changed = true;
+    const next = unlinked(runs);
+    return isFormatted(next) ? next : undefined;
+  };
+  const sections = doc.sections.map((s): Section => {
+    if (s.kind === "quote" || s.kind === "pullquote") {
+      const runs = fix(s.textRuns);
+      if (runs === s.textRuns) return s;
+      const next = { ...s, textRuns: runs };
+      if (!runs) delete next.textRuns;
+      return next;
+    }
+    if (s.kind === "link") {
+      const runs = fix(s.descriptionRuns);
+      if (runs === s.descriptionRuns) return s;
+      const next = { ...s, descriptionRuns: runs };
+      if (!runs) delete next.descriptionRuns;
+      return next;
+    }
+    return s;
+  });
+  return changed ? { ...doc, sections } : doc;
+}
+
 /** Runs without the spaces at their two ends, as a plain string is trimmed before it is drawn. */
 export function trimRuns(rt: RichText): RichText {
   const out = rt.map((r) => ({ ...r }));

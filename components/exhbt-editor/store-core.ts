@@ -97,9 +97,11 @@ const SHELL_KEYS = ["title", "gap", "context", "whereWhen", "myRole", "skills", 
 /**
  * Changes whenever structureKey(doc) could (the layout, flowOff, each section's id and kind, an
  * image's stage), and when a picture's size changes, since a grid tile's shape is drawn by the row.
+ * And when the flowchart goes from no boxes to some, or back: with none it has a row of its own and
+ * the rows round it are a visitor's (LayoutMain.tsx). Typing in a box, or a second box, changes nothing here.
  */
 function layoutSig(d: ExhbtDoc): string {
-  return JSON.stringify([d.format ?? "", d.flowOff === true, d.sections.map((s) => (s.kind === "image" ? [s.id, s.kind, s.stage ?? "", s.w ?? 0, s.h ?? 0] : [s.id, s.kind]))]);
+  return JSON.stringify([d.format ?? "", d.flowOff === true, d.flow.length === 0, d.sections.map((s) => (s.kind === "image" ? [s.id, s.kind, s.stage ?? "", s.w ?? 0, s.h ?? 0] : [s.id, s.kind]))]);
 }
 
 /** `obj` with `value` at `keys`, every object on the way copied and nothing else. The same object when the value is already there. */
@@ -157,7 +159,7 @@ export function createStore(initial: ExhbtDoc, opts: { onChange?: (doc: ExhbtDoc
     ver++;
     syncKeys();
     // The shell changes only when one of its fields or the page's structure does.
-    const nextSig = prev.sections === next.sections && prev.format === next.format && prev.flowOff === next.flowOff ? sig : layoutSig(next);
+    const nextSig = prev.sections === next.sections && prev.format === next.format && prev.flowOff === next.flowOff && (prev.flow.length === 0) === (next.flow.length === 0) ? sig : layoutSig(next);
     if (redrawShell || nextSig !== sig || SHELL_KEYS.some((k) => prev[k] !== next[k])) shellDoc = next;
     sig = nextSig;
     if (entry) push(entry);

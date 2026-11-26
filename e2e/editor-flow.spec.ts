@@ -794,8 +794,8 @@ test.describe("an empty flowchart", () => {
     await page.keyboard.type("The only step");
     expect(await stepsNow(page)).toEqual(["The only step"]);
     await expect(page.getByRole("button", { name: "Add a box", exact: true })).toHaveCount(0);
-    // The count issue is on the list until there are three.
-    await expect(list(page)).toHaveAttribute("data-invalid", "");
+    // One box is nothing to fix: since decision 0032 the fewest boxes is a suggestion, and the list carries no issue for it.
+    await expect(list(page)).not.toHaveAttribute("data-invalid", "");
   });
 
   for (const f of offered()) {
@@ -803,7 +803,7 @@ test.describe("an empty flowchart", () => {
       await openDoc(page, freshName("flowemptyparity"), { ...sampleDoc(f), flow: [] });
       await waitLive(page);
       const taken = await allowEditOnly(page, "all");
-      expect(taken.some((t) => t.startsWith("the empty flowchart's")), taken.join("; ")).toBe(true);
+      expect(taken.some((t) => t.startsWith("the empty flowchart's row (")), taken.join("; ")).toBe(true);
       await settle(page);
       const editing = await boxes(page);
       await seeAsVisitor(page, true);
@@ -811,6 +811,31 @@ test.describe("an empty flowchart", () => {
       expect(differences(await boxes(page), editing), `with these taken out: ${taken.join("; ")}`).toEqual([]);
     });
   }
+
+  test("only the first Add a box moves the rows: typing in a blank box moves nothing round the flowchart", async ({ page }) => {
+    // A gallery pairs "What I did" with "What happened". With no boxes the flowchart has a row of its own and the findings
+    // are the visitor's, the width of the page; the first box puts the flowchart back in its pair (a press, as adding a section is).
+    await page.setViewportSize(TALL);
+    await openDoc(page, freshName("flowemptyrows"), { ...sampleDoc("gallery"), flow: [] });
+    await settle(page);
+    const findings = page.locator(`${READY} article [data-section-id="findings"]`);
+    const alone = (await findings.boundingBox())!;
+    await page.locator(`${LIST} [data-flow-add]`).click();
+    await expect.poll(() => focusedPath(page)).toBe("flow.0.step");
+    await settle(page);
+    const paired = (await findings.boundingBox())!;
+    expect(paired.width).toBeLessThan(alone.width - 100);
+    // From here the flowchart has a box, blank: it keeps its place in the rows whatever is typed in it.
+    const round = async () => (await boxes(page)).filter((b) => !b.key.startsWith("flowchart box"));
+    const before = await round();
+    await page.keyboard.type("T");
+    await settle(page);
+    expect(differences(before, await round())).toEqual([]);
+    await page.keyboard.press("Backspace");
+    await settle(page);
+    expect(differences(before, await round())).toEqual([]);
+    expect(await stepsNow(page)).toEqual([""]);
+  });
 });
 
 /* ------------------------------------------------------------------------------------------------
@@ -968,7 +993,7 @@ test.describe("by touch", () => {
 test.describe("blank boxes as a visitor sees them", () => {
   const visitorList = (page: Page) => page.locator(`${READY} section[aria-label="Preview"]`).getByRole("list", { name: "Methodology" });
 
-  test("a blank last box is left out of 'See as a visitor', so the last filled step keeps the result box; the editing page still shows it; typing brings it in; all blank shows them all", async ({ page }) => {
+  test("a blank last box is left out of 'See as a visitor', so the last filled step keeps the result box; the editing page still shows it; typing brings it in; all blank shows no flowchart", async ({ page }) => {
     const base = sampleDoc("case-study");
     const filled = base.flow.slice(0, 3);
     await openDoc(page, freshName("blankflow"), { ...base, flow: [...filled, { step: "" }] });
@@ -988,7 +1013,8 @@ test.describe("blank boxes as a visitor sees them", () => {
     await seeAsVisitor(page, true);
     await expect(items).toHaveCount(4);
     await expect(items.last()).toContainText("Wrote it up");
-    // Every box blank (a new exhbt): they all show.
+    // Every box blank (a new exhbt): a visitor is shown no flowchart at all (decision 0032: a flowchart with no box
+    // filled in is not drawn), and the editing page still has every box to type in.
     await seeAsVisitor(page, false);
     await page.evaluate(() =>
       [0, 1, 2, 3].forEach((n) => {
@@ -997,6 +1023,8 @@ test.describe("blank boxes as a visitor sees them", () => {
       }),
     );
     await seeAsVisitor(page, true);
-    await expect(items).toHaveCount(4);
+    await expect(visitorList(page)).toHaveCount(0);
+    await seeAsVisitor(page, false);
+    expect(await keysNow(page)).toHaveLength(4);
   });
 });

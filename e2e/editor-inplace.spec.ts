@@ -985,18 +985,23 @@ test.describe("a formatted field's buttons, and an issue on the page", () => {
 
   test("Bold is stored; Link asks for an https address, says when it is not one, and stores it", async ({ page }) => {
     const { id } = await openDoc(page, freshName("buttons"), doc());
+    // The formatted fields' editors have started, so the keys below select in the editor itself.
+    await waitLive(page);
     const f = field(page, "sections.0.items.0");
+    // With a mouse, the buttons for words selected are the ones on the bar that comes to them (decision 0032,
+    // fields/SelectionBar.tsx); the field's own, at the end of its line, are hidden while it is up.
+    const bar = f.locator(".xe-selbar");
     await f.click();
     await expect(f.locator(".ProseMirror")).toBeFocused();
     await page.keyboard.press("End");
     await page.keyboard.press("Shift+Home");
-    await f.getByRole("button", { name: "Bold" }).click();
+    await bar.getByRole("button", { name: "Bold", exact: true }).click();
     await waitSaved(page, id);
     expect(((await readStored(page, id)).working.sections[0] as { items: RichText[] }).items[0]).toEqual([{ t: "Waits fell a lot.", b: true }]);
 
     await page.keyboard.press("End");
     await page.keyboard.press("Shift+Home");
-    await f.getByRole("button", { name: "Link" }).click();
+    await bar.getByRole("button", { name: "Link", exact: true }).click();
     const address = f.getByLabel("Link address (starting https://)");
     await expect(address).toBeFocused();
     await address.fill("http://example.com/log");

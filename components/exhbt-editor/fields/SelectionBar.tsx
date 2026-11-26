@@ -11,6 +11,7 @@ import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { Bold, Check, Highlighter, Italic, Link2, Unlink, X } from "lucide-react";
 import { safeHref } from "@/lib/exhbt/blocks";
+import { settlePlace } from "./bar-place";
 
 /*
  * The formatting controls that come to the words a person has selected (decision 0032; Rory, 26 Nov 2026:
@@ -116,7 +117,7 @@ export function SelectionBar({ editor, highlight, links, flags, barRef, linking,
     const below = box.bottom + GAP;
     const fitsBelow = below + height + EDGE <= window.innerHeight;
     const y = above < ceiling ? below : overControl(x, above, width, height) && fitsBelow && !overControl(x, below, width, height) ? below : above;
-    setAt((cur) => (cur && Math.abs(cur.x - x) < 0.5 && Math.abs(cur.y - y) < 0.5 ? cur : { x: Math.round(x), y: Math.round(y) }));
+    setAt((cur) => settlePlace(cur, x, y));
   }, [barRef, editor, linking]);
 
   // Shown for as long as it is mounted: the field mounts it only while words are selected.

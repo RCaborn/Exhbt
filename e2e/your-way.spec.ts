@@ -146,6 +146,9 @@ test.describe("Bold and italic at the words selected", () => {
 
   test("the bar comes for words chosen with the mouse too, and nothing on the page moves when it comes or goes", async ({ page }) => {
     await openDoc(page, freshName("ywm"), caseStudy());
+    // The formatted fields' editors have started, as select() waits for them: a double press on a field whose editor
+    // has not, hands the field over on the first press, and the second lands on the editor as a press of its own.
+    await waitLive(page);
     await settle(page);
     const path = `sections.${await at(page, "quote")}.text`;
     const rest = await boxes(page, { frames: true });
@@ -300,6 +303,38 @@ test.describe("Bold and italic at the words selected", () => {
   });
 });
 
+test.describe("The fields that take no links", () => {
+  test("a link sent in a quote, a pull quote or a link's line is not stored: the server keeps the words and their bold", async ({ page }) => {
+    // The editor offers no Link in these three (decision 0032); a request built by hand could still send one, so the
+    // store is handed one directly here, as such a request would carry it, and what the server saved is read back.
+    const { id } = await openDoc(page, freshName("ywnolink"), essay());
+    await page.evaluate(() =>
+      window.__exhbtEditor!.patchDoc((d) => ({
+        ...d,
+        sections: d.sections.map((s) =>
+          s.kind === "quote" || s.kind === "pullquote"
+            ? { ...s, textRuns: [{ t: s.text.slice(0, 5), b: true, href: "https://example.com/a" }, { t: s.text.slice(5), href: "https://example.com/b" }] }
+            : s.kind === "link"
+              ? { ...s, descriptionRuns: [{ t: s.description, href: "https://example.com/c" }] }
+              : s,
+        ),
+      })),
+    );
+    // Saved once the quote's bold is stored; the editor's own copy still holds the links, so it never matches what was stored.
+    await expect.poll(async () => ((await readStored(page, id)).working.sections.find((s) => s.kind === "quote") as Extract<ContentSection, { kind: "quote" }>).textRuns?.length ?? 0).toBeGreaterThan(0);
+    const stored = (await readStored(page, id)).working;
+    const quote = stored.sections.find((s) => s.kind === "quote") as Extract<ContentSection, { kind: "quote" }>;
+    const pullquote = stored.sections.find((s) => s.kind === "pullquote") as Extract<ContentSection, { kind: "pullquote" }>;
+    const links = stored.sections.filter((s) => s.kind === "link") as Extract<ContentSection, { kind: "link" }>[];
+    // The bold is kept where it was, the link is not; runs left with no formatting at all are not stored.
+    expect(quote.textRuns).toEqual([{ t: quote.text.slice(0, 5), b: true }, { t: quote.text.slice(5) }]);
+    expect(pullquote.textRuns).toEqual([{ t: pullquote.text.slice(0, 5), b: true }, { t: pullquote.text.slice(5) }]);
+    for (const l of links) expect(l).not.toHaveProperty("descriptionRuns");
+    // None of the three addresses is stored anywhere.
+    for (const a of ["example.com/a", "example.com/b", "example.com/c"]) expect(JSON.stringify(stored)).not.toContain(a);
+  });
+});
+
 test.describe("What a visitor sees of the formatting, on the page and in print", () => {
   const BOLD: RichText = [{ t: "Lunch is " }, { t: "calmer now", b: true }, { t: ", and the queue is out of the doorway." }];
   const SLANTED: RichText = [{ t: "A queue is a price " }, { t: "nobody set", i: true, b: true }, { t: "." }];
@@ -392,6 +427,30 @@ test.describe("A part's title, typed in place", () => {
     expect(await section(page, "quote")).not.toHaveProperty("title");
   });
 
+  test("the aim's switch puts the layout's heading back over a typed title, as one step Undo takes back; the one already on changes nothing", async ({ page }) => {
+    await openDoc(page, freshName("ywaim"), sampleDoc("research"));
+    const i = await at(page, "aim");
+    const id = (await docNow(page)).sections[i]!.id;
+    await typeIn(page, `sections.${i}.title`, "What I set out to test");
+    expect((await section(page, "aim")).title).toBe("What I set out to test");
+    const chip = (name: string) => frame(page, id).getByRole("group", { name: "Aim or hypothesis" }).getByRole("button", { name, exact: true });
+    await frame(page, id).hover();
+    // The sample's is a hypothesis. The one already on: nothing changes, and there is nothing new to undo.
+    expect(await section(page, "aim")).toMatchObject({ heading: "hypothesis" });
+    const label = await page.evaluate(() => window.__exhbtEditor!.undoLabel());
+    await chip("Hypothesis").click();
+    expect((await section(page, "aim")).title).toBe("What I set out to test");
+    expect(await page.evaluate(() => window.__exhbtEditor!.undoLabel())).toBe(label);
+    // The other: the layout's heading again, the typed title gone, and Undo brings it back.
+    await chip("Aim").click();
+    expect(await section(page, "aim")).toMatchObject({ heading: "aim" });
+    expect((await section(page, "aim")).title).toBeUndefined();
+    expect(await page.evaluate(() => window.__exhbtEditor!.undoLabel())).toBe("switch to Aim");
+    await page.evaluate(() => window.__exhbtEditor!.undo());
+    expect((await section(page, "aim")).title).toBe("What I set out to test");
+    expect(await section(page, "aim")).toMatchObject({ heading: "hypothesis" });
+  });
+
   test("a case study's flowchart has no heading until one is added: a chip adds it, and an empty one goes again", async ({ page }) => {
     await openDoc(page, freshName("ywf"), caseStudy());
     await settle(page);
@@ -462,6 +521,40 @@ test.describe("A part's title, typed in place", () => {
       }
     });
   }
+
+  test("a title that is one long word breaks inside the page at 390px, on the editing page and the visitor's", async ({ page }) => {
+    // From the review of 26 Nov: a hashtag or a name in capitals has no space to break at, and ran off a phone's screen.
+    const WORD = "MENTALHEALTHAWARENESSWEEK".slice(0, LIMITS.sectionTitleChars);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openTiming(page, "gallery", { full: true });
+    await page.evaluate((title) => {
+      window.__exhbtEditor!.patchDoc((d) => ({ ...d, flowTitle: title, refsTitle: title, sections: d.sections.map((s) => (s.kind === "findings" || s.kind === "quote" || s.kind === "reflection" ? { ...s, title } : s)) }));
+    }, WORD);
+    await settle(page);
+    const outside = (where: string) =>
+      page.evaluate(
+        ({ where, word }) => {
+          const width = document.documentElement.clientWidth;
+          const out: string[] = [];
+          const root = document.querySelector(where)!;
+          for (const el of root.querySelectorAll<HTMLElement>("[data-title], h1, h2, h3, h4, h5")) {
+            const words = el.querySelector<HTMLTextAreaElement>("textarea")?.value ?? el.textContent ?? "";
+            if (words !== word) continue;
+            const range = document.createRange();
+            range.selectNodeContents(el.querySelector("textarea") ?? el);
+            const right = Math.max(el.getBoundingClientRect().right, ...[...range.getClientRects()].map((r) => r.right));
+            if (right > width + 0.5) out.push(`${el.id || el.tagName} reaches ${Math.round(right)}px of ${width}`);
+          }
+          if (document.documentElement.scrollWidth > width) out.push(`the page is ${document.documentElement.scrollWidth}px wide`);
+          return out;
+        },
+        { where, word: WORD },
+      );
+    expect(await outside(`${READY} article`)).toEqual([]);
+    await seeAsVisitor(page, true);
+    await settle(page);
+    expect(await outside(`${READY} section[aria-label="Preview"] article`)).toEqual([]);
+  });
 
   test("a full page with a long title over every part still prints on one A4 page", async ({ page }) => {
     const title = "Summary of what we measured most months".slice(0, LIMITS.sectionTitleChars).trimEnd();

@@ -757,9 +757,13 @@ test.describe("Each new layout in the editor", () => {
     expect(await suggested(page)).not.toContain(NEED);
     await page.evaluate(() => ["image-1", "image-2", "link-1", "link-2"].forEach((id) => window.__exhbtEditor!.remove(id)));
     expect(await suggested(page)).toContain(NEED);
-    // A link clears it (the link has its own things to fill in).
+    // A link added with nothing in it does not clear it: a visitor is not shown an empty part, so it answers nothing (decision 0032).
     await addSection(page, "Add a link");
     await expect(framesOf(page, "link")).toHaveCount(1);
+    expect(await suggested(page)).toContain(NEED);
+    // Its words typed in, it does.
+    const at = (await docNow(page)).sections.findIndex((s) => s.kind === "link");
+    await page.evaluate((path) => window.__exhbtEditor!.setAt(path, "The model code"), `sections.${at}.label`);
     expect(await suggested(page)).not.toContain(NEED);
   });
 
@@ -790,6 +794,10 @@ test.describe("Each new layout in the editor", () => {
     await openAddSectionMenu(page);
     await page.locator(`${READY} [data-xe-menu] [data-block="findings"]`).click();
     await expect(framesOf(page, "findings")).toHaveCount(1);
+    // Added with no point written, it is not shown to a visitor, so it does not answer the suggestion (decision 0032); a point written does.
+    expect(await suggested(page)).toContain(NEED);
+    const at = (await docNow(page)).sections.findIndex((s) => s.kind === "findings");
+    await page.evaluate((path) => window.__exhbtEditor!.setAt(path, [{ t: "Letters show the reform was planned for years." }]), `sections.${at}.items.0`);
     expect(await suggested(page)).not.toContain(NEED);
   });
 

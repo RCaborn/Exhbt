@@ -642,7 +642,10 @@ function createEngine(store: Store, ui: UiApi, files: FilesController) {
         return;
       }
       const frame = mainColumn() && frameIn(mainColumn()!, id);
-      const field = frame?.querySelector<HTMLElement>(FIELD) ?? frame?.querySelector<HTMLElement>("[data-grip]");
+      // Its words, not its title: since decision 0032 a section's own title is a field over them (TitleField.tsx, data-title),
+      // and the cursor in the title sent what the person typed next into the heading.
+      const words = frame ? [...frame.querySelectorAll<HTMLElement>(FIELD)].find((el) => !el.closest("[data-title]")) : undefined;
+      const field = words ?? frame?.querySelector<HTMLElement>("[data-grip]");
       field?.focus({ preventScroll: true });
       frame?.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
     });

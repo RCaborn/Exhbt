@@ -16,12 +16,14 @@ import {
   text,
   trimRuns,
   validateForPublish,
+  withoutStrayLinks,
   wordCount,
   type Chart,
   type ContentSection,
   type ExhbtDoc,
   type Section,
 } from "../lib/exhbt/blocks";
+import { settlePlace } from "../components/exhbt-editor/fields/bar-place";
 import { flowHeading, FORMAT_RULES, FORMATS, refsHeading, sectionHeading, titleShown, type Format } from "../lib/exhbt/formats";
 import { applyTemplate, blockOptions, flowShown, insertBlock, pageItems, removeItem, restoreFlow } from "../lib/exhbt/layouts";
 import { sectionWords } from "../lib/exhbt/sections";
@@ -384,5 +386,31 @@ test.describe("The published copy holds only what a visitor is shown", () => {
     const none = publicDoc(core([findings(), FLOW, quote()], undefined, { flow: [{ step: "" }, { step: " " }] }));
     expect(none.sections.map((s) => s.id)).toEqual(["findings", "flow", "quote-1"]);
     expect(none.flow).toEqual([]);
+  });
+});
+
+test.describe("The selection bar's place settles", () => {
+  test("a place on a half pixel is stored once and then kept, so placing it after every render stops", () => {
+    // The words' centre on a half pixel: before 26 Nov the stored place (rounded) was compared with the unrounded one,
+    // never matched, and the editor stopped with "Maximum update depth exceeded" (pull request 52).
+    const first = settlePlace(null, 410.5, 200.5);
+    expect(first).toEqual({ x: 411, y: 201 });
+    expect(settlePlace(first, 410.5, 200.5)).toBe(first);
+    expect(settlePlace(first, 410.7, 200.6)).toBe(first);
+    // A move to another whole pixel is a new place.
+    expect(settlePlace(first, 412, 201)).toEqual({ x: 412, y: 201 });
+  });
+});
+
+test.describe("A quote, a pull quote and a link's line take no links", () => {
+  test("withoutStrayLinks keeps their words and bold, drops any address, and leaves a finding's link and a clean doc alone", () => {
+    const d = core([findings([[{ t: "Waits fell", href: "https://example.com/f" }]]), quote({ textRuns: [{ t: "Lunch ", i: true, href: "https://example.com/q" }, { t: "is calmer now, and the queue is out of the doorway." }] }), link({ descriptionRuns: [{ t: "Two weeks of lunchtimes, a row a minute", href: "https://example.com/l" }] })]);
+    const out = withoutStrayLinks(d);
+    const q = out.sections.find((s) => s.kind === "quote") as Of<"quote">;
+    expect(q.textRuns).toEqual([{ t: "Lunch ", i: true }, { t: "is calmer now, and the queue is out of the doorway." }]);
+    expect(out.sections.find((s) => s.kind === "link")).not.toHaveProperty("descriptionRuns");
+    expect((out.sections.find((s) => s.kind === "findings") as Of<"findings">).items[0]).toEqual([{ t: "Waits fell", href: "https://example.com/f" }]);
+    const clean = core([findings(), quote(), link()]);
+    expect(withoutStrayLinks(clean)).toBe(clean);
   });
 });

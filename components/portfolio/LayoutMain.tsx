@@ -51,15 +51,22 @@ const firstItem = (row: Row): PageItem => {
 export function LayoutMain({ doc, ctx }: { doc: ExhbtDoc; ctx: PageCtx }) {
   const f = ctx.format;
   const edit = ctx.edit;
-  const items = edit ? pageItems(doc) : readOnlyItems(doc, ctx.imageUrls);
+  const all = edit ? pageItems(doc) : readOnlyItems(doc, ctx.imageUrls);
+  // A flowchart with no boxes is not drawn for a visitor (decision 0032), so the rows round it are laid out without it,
+  // as a visitor's are; the editor draws it as a row of its own in its place, the "Add a box" placeholder, which nothing
+  // pairs with. Taken out, the editing page is the visitor's. A flowchart with boxes, blank ones too, keeps its place in
+  // the rows, so typing in a box never moves the page; only the first "Add a box" does, as adding a section does.
+  const emptyFlow = edit ? all.find((it): it is Extract<PageItem, { kind: "flow" }> => it.kind === "flow" && it.steps.length === 0) : undefined;
+  const items = emptyFlow ? all.filter((it) => it !== emptyFlow) : all;
   const rows = rowsFor(items, f);
-  const placeOf = new Map(items.map((it, i) => [it.id, i]));
+  // Places are the page's, with the empty flowchart counted: what "+" adds at and what a frame says of its place.
+  const placeOf = new Map(all.map((it, i) => [it.id, i]));
   let refsDrawn = 0;
 
   /** One item. Read-only: drawn here with `rc` for its place. Editing: the editor's frame, given `slotClass` (the row's classes for a lone item, else ""). */
   const item = (c: ItemCell, rc: string, slotClass = "") =>
     edit ? (
-      <Fragment key={c.item.id}>{edit.item({ id: c.item.id, kind: c.item.kind, as: c.as, rowClass: slotClass, index: placeOf.get(c.item.id) ?? -1, count: items.length })}</Fragment>
+      <Fragment key={c.item.id}>{edit.item({ id: c.item.id, kind: c.item.kind, as: c.as, rowClass: slotClass, index: placeOf.get(c.item.id) ?? -1, count: all.length })}</Fragment>
     ) : (
       <ItemView key={c.item.id} item={c.item} as={c.as} ctx={ctx} rowClass={rc} />
     );
@@ -181,18 +188,33 @@ export function LayoutMain({ doc, ctx }: { doc: ExhbtDoc; ctx: PageCtx }) {
     return `${shape}#${n}`;
   };
 
+  const flowAt = emptyFlow ? (placeOf.get(emptyFlow.id) ?? 0) : -1;
+  /** The empty flowchart's own row, edit-only (e2e/page-editor.ts EDIT_ONLY_IN_FLOW): the lone flowchart's classes, with the "+" before it. */
+  const emptyFlowRow = (beforeAll: boolean) =>
+    emptyFlow && (
+      <Fragment key="empty-flow">
+        {edit?.insert({ at: flowAt })}
+        <div data-empty-flow="">{item({ cell: "item", item: emptyFlow, as: "plain" }, "", rowClass({ row: "one", cell: { cell: "item", item: emptyFlow, as: "plain" } }, f, beforeAll))}</div>
+      </Fragment>
+    );
+  let flowDrawn = !emptyFlow;
+
   return (
     <>
       {rows.map((row, r) => {
         const at = placeOf.get(firstItem(row).id) ?? 0;
+        const flowHere = !flowDrawn && flowAt < at;
+        if (flowHere) flowDrawn = true;
         return (
           <Fragment key={keyOf(row)}>
+            {flowHere && emptyFlowRow(r === 0)}
             {edit?.insert({ at })}
             {drawRow(row, r === 0)}
           </Fragment>
         );
       })}
-      {edit?.insert({ at: items.length, end: true })}
+      {!flowDrawn && emptyFlowRow(rows.length === 0)}
+      {edit?.insert({ at: all.length, end: true })}
     </>
   );
 }
