@@ -78,6 +78,11 @@ function NotOnline({ data, home }: { data: PortfolioData; home: Home }): ReactNo
         data-not-online="nothing-live"
         title="Not online yet: publish an exhbt"
         description="Visitors get “not found” until one of your exhbts is live and shown here. This is how your page will look."
+        endContent={
+          <Button href="/exhbts/new" size="sm">
+            Add an exhbt
+          </Button>
+        }
       />
     );
   }

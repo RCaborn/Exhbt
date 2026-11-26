@@ -55,6 +55,17 @@ export async function waitReady(page: Page) {
 }
 
 /**
+ * E2E_GROW=mirror opens the editor with `?grow=mirror` (development only): its fields grow by their hidden
+ * mirror, as in a browser with no `field-sizing`. A reload keeps it; a test that goes to /portfolio again
+ * by its own address does not.
+ */
+function withGrow(query: string): string {
+  if (process.env.E2E_GROW !== "mirror") return query;
+  const [search, hash = ""] = query.split("#");
+  return `${search ? `${search}&` : "?"}grow=mirror${hash ? `#${hash}` : ""}`;
+}
+
+/**
  * Seeds `fixture`, switches this browser to the editor, signs in as its person and opens `/portfolio`
  * (with `query`, e.g. "?open=look" or "#job-links"). Waits for the editor unless `wait` is false (a
  * test of what comes before it, or of a crash).
@@ -62,7 +73,7 @@ export async function waitReady(page: Page) {
 export async function openEditor(page: Page, fixture: PortfolioFixture, opts: { query?: string; wait?: boolean } = {}): Promise<Seeded> {
   const seeded = await seed(page, fixture);
   await setKind(page, "page");
-  await signIn(page, fixture.username, `/portfolio${opts.query ?? ""}`);
+  await signIn(page, fixture.username, `/portfolio${withGrow(opts.query ?? "")}`);
   if (opts.wait !== false) await waitReady(page);
   return seeded;
 }
@@ -180,6 +191,29 @@ export function call(page: Page, name: "open" | "close" | "say" | "jumpTo" | "pr
       api[n as string]!(...(a as unknown[]));
     },
     [name, args] as const,
+  );
+}
+
+/** A change the bar or a section's tools would make, named for Undo (development only). */
+export type LabelledChange = { removeSection: string } | { moveSection: { from: number; to: number } } | { hide: string[] };
+
+/**
+ * Makes a labelled change through the editor's own `change` (an Undo step), as F's and G's parts do: the
+ * update is written inside the page, since a function cannot be handed over from the test.
+ */
+export function changeWith(page: Page, what: LabelledChange, label: string): Promise<void> {
+  return page.evaluate(
+    ([w, l]) => {
+      const api = window.__portfolioEditor!.api;
+      api.change((s) => {
+        if ("hide" in w) return { ...s, arrangement: { ...s.arrangement, hidden: w.hide } };
+        const sections = [...s.arrangement.sections];
+        if ("removeSection" in w) sections.splice(sections.indexOf(w.removeSection as never), 1);
+        else sections.splice(w.moveSection.to, 0, ...sections.splice(w.moveSection.from, 1));
+        return { ...s, arrangement: { ...s.arrangement, sections } };
+      }, l);
+    },
+    [what, label] as const,
   );
 }
 
