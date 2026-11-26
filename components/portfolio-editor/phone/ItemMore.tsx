@@ -91,6 +91,15 @@ export function ItemMore({ name, actions }: { name: string; actions: ItemAction[
   useEffect(() => {
     if (!open) setMine(false);
   }, [open]);
+  // The sheet is drawn only while this More is in use, and a moment after, while it slides away: a page
+  // has one More per section and tile, and a closed Drawer each drawn again on every key cost a phone
+  // about half of a keystroke's time (brief I's typing profile).
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    if (mine) return setHeld(true);
+    const t = setTimeout(() => setHeld(false), 450);
+    return () => clearTimeout(t);
+  }, [mine]);
   // The sheet is drawn at the editor's root, not in the frame: a move puts the frame's node back in the
   // page, and a dialog moved while it closes stays on the screen, empty.
   const [host, setHost] = useState<HTMLElement | null>(null);
@@ -134,6 +143,7 @@ export function ItemMore({ name, actions }: { name: string; actions: ItemAction[
         icon={<MoreHorizontal aria-hidden size={18} strokeWidth={2} />}
       />
       {host &&
+        (mine || held) &&
         createPortal(
           <Sheet name="item" when={mine} title={MORE.title(name)} subtitle={MORE.subtitle}>
             <ul className="pe-item-actions" aria-label={MORE.button(name)} data-item-actions>
