@@ -248,6 +248,32 @@ test.describe("On the page", () => {
     await expect(page.locator(`${READY} [data-portfolio-home] [data-avatar="initials"]`).first()).toBeVisible();
   });
 
+  test("Suggest an intro covers no word of the headline: on an empty intro, and once it has words", async ({ page }) => {
+    await newPerson(page, "intro-place", "premium");
+    await call(page, "setAt", "profile.headline", "Final-year Economics student at Leeds, into data analysis and public policy");
+    const tool = page.locator(`${READY} [data-tools="intro"]`);
+    /** Whether the button's box meets the headline's field (its words fill it: the headline is long enough to). */
+    const onHeadline = () =>
+      tool.evaluate((t) => {
+        const b = t.querySelector("button")!.getBoundingClientRect();
+        const r = document.querySelector('[data-editor="portfolio"][data-ready] [data-path="profile.headline"]')!.getBoundingClientRect();
+        return r.left < b.right && r.right > b.left && r.top < b.bottom && r.bottom > b.top;
+      });
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.mouse.move(0, 0);
+      await expect(tool.getByRole("button", { name: "Suggest an intro" })).toBeVisible();
+      expect(await onHeadline(), `empty intro at ${width}`).toBe(false);
+    }
+    // With words, it is above the intro, on the headline's line, so it is seen only while the intro is pointed at or edited.
+    await call(page, "setAt", "profile.bio", "I study economics at Leeds and turn public data into charts people read.");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.mouse.move(0, 0);
+    await expect(tool).toHaveCSS("opacity", "0");
+    await page.locator(`${READY} [data-intro]`).first().hover();
+    await expect(tool).toHaveCSS("opacity", "1");
+  });
+
   test("Suggest an intro fills the intro from the stand-in, and Undo takes it back", async ({ page }) => {
     await openEditor(page, fresh(FULL, "intro"));
     const before = await valueAt(page, "profile.bio");
