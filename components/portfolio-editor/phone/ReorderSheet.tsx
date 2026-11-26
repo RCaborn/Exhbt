@@ -1,39 +1,18 @@
 "use client";
 
 import "../css/phone.css";
-import {
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { closestCenter, DndContext, type DragEndEvent } from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS as Dnd } from "@dnd-kit/utilities";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { ArrowDown, ArrowUp, GripVertical, Undo2 } from "lucide-react";
 import { Said } from "@/components/exhbt-editor/ui/Said";
 import { Button } from "@/components/ui/Button";
 import type { SectionKey } from "@/lib/portfolio-layout";
-import {
-  usePortfolioApi,
-  usePortfolioState,
-  usePortfolioUndo,
-  useRuntime,
-} from "../runtime";
+import { usePortfolioApi, usePortfolioState, usePortfolioUndo, useRuntime } from "../runtime";
 import { moveSection } from "../sections/arrange";
-import {
-  announcementsFor,
-  EASE,
-  MOVE_MS,
-  useDragSensors,
-  useReducedMotion,
-} from "../sections/drag";
+import { announcementsFor, EASE, MOVE_MS, useDragSensors, useReducedMotion } from "../sections/drag";
 import { sectionName, W } from "../sections/words";
 import { Sheet } from "../ui/Sheet";
 
@@ -62,12 +41,7 @@ export const REORDER = {
 
 export function ReorderSheet(): ReactNode {
   return (
-    <Sheet
-      name="reorder"
-      title={REORDER.title}
-      subtitle={REORDER.how}
-      footer={<DoneButton />}
-    >
+    <Sheet name="reorder" title={REORDER.title} subtitle={REORDER.how} footer={<DoneButton />}>
       <ReorderList />
     </Sheet>
   );
@@ -90,24 +64,15 @@ function DoneButton(): ReactNode {
     if (!key) return;
     // After the dialog has given the focus back (to the bar's menu): the page at the section moved.
     setTimeout(() => {
-      const frame = document.querySelector<HTMLElement>(
-        `[data-section-frame="${key}"]`,
-      );
+      const frame = document.querySelector<HTMLElement>(`[data-section-frame="${key}"]`);
       if (!frame) return;
       frame.scrollIntoView({ block: "center" });
-      frame
-        .querySelector<HTMLElement>('[data-act="more"]')
-        ?.focus({ preventScroll: true });
+      frame.querySelector<HTMLElement>('[data-act="more"]')?.focus({ preventScroll: true });
     }, 450);
   };
   return (
     <span className="pe-reorder-foot">
-      <Button
-        size="md"
-        label={undo.label ? `Undo: ${undo.label}` : "Undo"}
-        {...(undo.label ? {} : ({ "aria-disabled": true } as object))}
-        onClick={() => undo.label && undo.undo()}
-      >
+      <Button size="md" label={undo.label ? `Undo: ${undo.label}` : "Undo"} {...(undo.label ? {} : ({ "aria-disabled": true } as object))} onClick={() => undo.label && undo.undo()}>
         <Undo2 aria-hidden size={16} strokeWidth={2.25} className="shrink-0" />
         Undo
       </Button>
@@ -157,9 +122,7 @@ function ReorderList(): ReactNode {
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) return;
-    const to = rt.state
-      .get()
-      .arrangement.sections.indexOf(over.id as SectionKey);
+    const to = rt.state.get().arrangement.sections.indexOf(over.id as SectionKey);
     if (to >= 0) moveTo(active.id as SectionKey, to);
   };
 
@@ -169,18 +132,9 @@ function ReorderList(): ReactNode {
     if (!r) return;
     refocus.current = null;
     const row = list.current?.querySelector(`[data-row="${r.key}"]`);
-    const pressed = row?.querySelector<HTMLButtonElement>(
-      `[data-move="${r.by < 0 ? "up" : "down"}"]`,
-    );
-    const other = row?.querySelector<HTMLButtonElement>(
-      `[data-move="${r.by < 0 ? "down" : "up"}"]`,
-    );
-    (pressed &&
-    !pressed.disabled &&
-    pressed.getAttribute("aria-disabled") !== "true"
-      ? pressed
-      : other
-    )?.focus();
+    const pressed = row?.querySelector<HTMLButtonElement>(`[data-move="${r.by < 0 ? "up" : "down"}"]`);
+    const other = row?.querySelector<HTMLButtonElement>(`[data-move="${r.by < 0 ? "down" : "up"}"]`);
+    (pressed && !pressed.disabled && pressed.getAttribute("aria-disabled") !== "true" ? pressed : other)?.focus();
   });
 
   return (
@@ -199,20 +153,10 @@ function ReorderList(): ReactNode {
           screenReaderInstructions: { draggable: W.sectionsHelp },
         }}
       >
-        <SortableContext
-          items={sections}
-          strategy={verticalListSortingStrategy}
-        >
+        <SortableContext items={sections} strategy={verticalListSortingStrategy}>
           <ul ref={list} className="pe-reorder-list" aria-label={REORDER.list}>
             {sections.map((key, i) => (
-              <Row
-                key={key}
-                sectionKey={key}
-                first={i === 0}
-                last={i === n - 1}
-                reduced={reduced}
-                onStep={step}
-              />
+              <Row key={key} sectionKey={key} first={i === 0} last={i === n - 1} reduced={reduced} onStep={step} />
             ))}
           </ul>
         </SortableContext>
@@ -221,29 +165,9 @@ function ReorderList(): ReactNode {
   );
 }
 
-function Row({
-  sectionKey,
-  first,
-  last: end,
-  reduced,
-  onStep,
-}: {
-  sectionKey: SectionKey;
-  first: boolean;
-  last: boolean;
-  reduced: boolean;
-  onStep(key: SectionKey, by: -1 | 1): void;
-}): ReactNode {
+function Row({ sectionKey, first, last: end, reduced, onStep }: { sectionKey: SectionKey; first: boolean; last: boolean; reduced: boolean; onStep(key: SectionKey, by: -1 | 1): void }): ReactNode {
   const name = sectionName(sectionKey);
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    setActivatorNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: sectionKey,
     transition: reduced ? null : { duration: MOVE_MS, easing: EASE },
     attributes: { roleDescription: "sortable section" },
