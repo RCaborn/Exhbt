@@ -320,8 +320,10 @@
       transition: none;
     }
   }
+  /* Your links, until PartTools places it (tools/place.ts, placeLinks): just under the top right corner
+     Get in touch's own toolbar takes (a 36px row and a margin), never in it. */
   .pe-part-tools[data-where="contact"] {
-    inset-block-start: var(--spacing-2);
+    inset-block-start: calc(2.25rem + var(--spacing-4));
     translate: none;
   }
   .pe-part-tools-note {

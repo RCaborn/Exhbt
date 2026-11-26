@@ -12,7 +12,7 @@ import type { HomePath } from "@/components/portfolio/home-ctx";
 import { Button } from "@/components/ui/Button";
 import { useBarSize, useNarrow } from "../bar/hooks";
 import { usePortfolioApi, usePortfolioState, usePortfolioUi } from "../runtime";
-import { placeTool, type Spot } from "./place";
+import { placeLinks, placeTool, type Spot } from "./place";
 
 /*
  * The corner tools of the two parts with no frame of their own (decision 0031, "What is edited where"),
@@ -68,6 +68,12 @@ function useIntroPlace(span: React.RefObject<HTMLSpanElement | null>, size: "sm"
   const placedRef = useRef(placed);
   placedRef.current = placed;
 
+  useReplace(span, place, deps);
+  return placed;
+}
+
+/** Runs `place` before the first paint and whenever `deps` change, and again when the page changes size, a key is typed on it, or its fonts arrive. */
+function useReplace(span: React.RefObject<HTMLSpanElement | null>, place: () => void, deps: unknown[]): void {
   useLayoutEffect(() => {
     place();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -91,7 +97,6 @@ function useIntroPlace(span: React.RefObject<HTMLSpanElement | null>, size: "sm"
       page.removeEventListener("input", soon, true);
     };
   }, [span, place]);
-  return placed;
 }
 
 function SuggestIntro(): ReactNode {
@@ -159,8 +164,31 @@ function YourLinks(): ReactNode {
   const open = usePortfolioUi((u) => u.sheet === "links");
   const size = useBarSize();
   const narrow = useNarrow();
+  const themeId = usePortfolioState((s) => s.arrangement.themeId);
+  const profile = usePortfolioState((s) => s.profile);
+  const span = useRef<HTMLSpanElement>(null);
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null);
+  // Clear of Get in touch's words and of the corner its own toolbar takes (tools/place.ts, placeLinks).
+  const place = useCallback(() => {
+    const tool = span.current;
+    const section = tool?.parentElement;
+    const button = tool?.querySelector("button");
+    if (!tool || !section || !button) return;
+    const b = button.getBoundingClientRect();
+    if (b.width === 0) return;
+    const bar = size === "md" ? 44 : 36;
+    const next = placeLinks(section, tool, { w: b.width, h: b.height }, bar) ?? { x: section.getBoundingClientRect().width - b.width, y: bar + 16 };
+    setAt((now) => (now && Math.abs(now.x - next.x) < 0.5 && Math.abs(now.y - next.y) < 0.5 ? now : next));
+  }, [size]);
+  useReplace(span, place, [themeId, profile]);
   return (
-    <span className="pe-part-tools" data-where="contact" data-tools="contact">
+    <span
+      ref={span}
+      className="pe-part-tools"
+      data-where="contact"
+      data-tools="contact"
+      style={at ? { insetInlineStart: at.x, insetBlockStart: at.y, insetInlineEnd: "auto", translate: "none" } : undefined}
+    >
       <Popover
         isOpen={open}
         onOpenChange={(next) => (next ? api.open("links") : open && api.close())}

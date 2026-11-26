@@ -93,3 +93,33 @@ export function placeTool(intro: HTMLElement, tool: HTMLElement, size: { w: numb
   }
   return null;
 }
+
+/**
+ * Your links, over Get in touch (`section`, relative while editing): clear of the section's words and of
+ * the corner where the section's own toolbar goes (F's sections/place.ts tries the gap above the top
+ * right corner, half over the top edge, then the corner itself: `bar` is that toolbar's height). Tried
+ * just under that corner, at the end; then at the section's foot, at the end; then at its foot, at the
+ * start. Null when none is clear.
+ */
+export function placeLinks(section: HTMLElement, tool: HTMLElement, size: { w: number; h: number }, bar: number): { x: number; y: number } | null {
+  const page = section.closest("[data-portfolio-home]") ?? document.body;
+  const s = section.getBoundingClientRect();
+  const p = page.getBoundingClientRect();
+  const words = wordBoxes(section, tool, { top: s.top - size.h, bottom: s.bottom + size.h });
+  // The toolbar's corner, generously: its rows above, on and under the top edge, up to four buttons wide.
+  const corner = { left: s.right - 4 * bar - 48, top: s.top - bar - 16, right: s.right + 8, bottom: s.top + bar + 8 };
+  const foot = s.height - size.h - 8;
+  const spots = [
+    { x: s.width - size.w, y: bar + 16 },
+    { x: s.width - size.w, y: foot },
+    { x: 0, y: foot },
+  ];
+  const edge = Math.min(p.right, document.documentElement.clientWidth) - 8;
+  for (const { x, y } of spots) {
+    const box = { left: s.left + x, top: s.top + y, right: s.left + x + size.w, bottom: s.top + y + size.h };
+    if (box.left < Math.max(p.left, 0) + 8 || box.right > edge || meets(box, corner)) continue;
+    if (words.some((w) => meets(w, box))) continue;
+    return { x, y };
+  }
+  return null;
+}
