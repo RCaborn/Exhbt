@@ -60,10 +60,10 @@ export type HomeProps = {
   edit?: HomeEdit;
 };
 
-const WRAP = "mx-auto w-full max-w-[68rem] px-5 @3xl:px-10";
+export const WRAP = "mx-auto w-full max-w-[68rem] px-5 @3xl:px-10";
 const H2 = "pf-display text-[1.75rem] leading-tight [letter-spacing:calc(var(--pf-tracking)*0.6)] @3xl:text-[2rem]";
-const ROWS = "pf-rows border-y border-[color:var(--pf-line)] [border-style:var(--pf-rule-style)]";
-const CARD = "border-[length:var(--pf-edge-width)] border-[color:var(--pf-edge)] bg-[var(--pf-card)]";
+export const ROWS = "pf-rows border-y border-[color:var(--pf-line)] [border-style:var(--pf-rule-style)]";
+export const CARD = "border-[length:var(--pf-edge-width)] border-[color:var(--pf-edge)] bg-[var(--pf-card)]";
 
 /** What each section needs before visitors see it. */
 export function sectionHasContent(key: SectionKey, p: Pick<HomeProps, "projects" | "featuredId" | "sections" | "tiles" | "person">): boolean {

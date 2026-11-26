@@ -1,4 +1,5 @@
 import type { PortfolioData } from "@/app/(app)/portfolio/load";
+import type { BuilderState } from "@/app/(app)/portfolio/steps";
 import type { HomeEdit } from "@/components/portfolio/home-ctx";
 import { PortfolioHome } from "@/components/portfolio/PortfolioHome";
 import { lookAttrs, themeStyle } from "@/components/portfolio/themeFonts";
@@ -58,10 +59,11 @@ export function standInAdapter(): HomeEdit {
 
 /**
  * The editing page as the stand-in draws it: an empty bar where the editor's bar will be, exactly as
- * tall, then the page in the person's look. The page is inert: nothing in it is a control yet.
+ * tall, then the page in the person's look. The page is inert: nothing in it is a control yet. `state`
+ * is the words to draw when they are newer than the data's own (the gate waiting for newer data).
  */
-export function StandInPage({ data }: { data: PortfolioData }) {
-  const home = editingHome(data.builder.initial, data);
+export function StandInPage({ data, state }: { data: PortfolioData; state?: BuilderState }) {
+  const home = editingHome(state ?? data.builder.initial, data);
   return (
     <>
       <div aria-hidden className="border-b border-line bg-surface" style={{ height: BAR_H }} />

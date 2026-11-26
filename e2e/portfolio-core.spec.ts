@@ -1,4 +1,5 @@
 import { FULL, SPARSE, fullFixture, sparseFixture } from "./fixtures/portfolio-pages";
+import type { Page } from "@playwright/test";
 import { HOME, READY, expect, field, focusedPath, fresh, openEditor, saveState, seed, settle, signIn, stateNow, test, textbox, typeIn, valueAt, waitReady, waitSaved } from "./portfolio-editor";
 
 // The one-page portfolio editor's core (decision 0031; brief E of docs/briefs/portfolio-first): which
@@ -348,5 +349,77 @@ test.describe("The crash fallback", () => {
     await settle(page);
     expect(await measure()).toEqual(before);
     expect(await page.locator(HOME).evaluate((el) => el.getBoundingClientRect().y + window.scrollY)).toBe(top);
+  });
+});
+
+test.describe("Coming back to the page", () => {
+  // The editor's save does not revalidate the page, so the browser's Back can hand /portfolio the data it
+  // was first loaded with. An editor mounted on it would show the old words and save them over the new.
+  // (With the gate's check taken out, both tests fail with the old words back in the state.)
+
+  /**
+   * Leaves the editor by a link inside the app, as a tile opens its exhbt. The page it goes to is asked
+   * for once beforehand, so the development server has built it and the journey itself is not left
+   * waiting on a build.
+   */
+  async function leaveByLink(page: Page) {
+    await page.getByRole("link", { name: "Account", exact: true }).first().click();
+    await page.waitForURL(/\/account$/);
+    await expect(page.locator("[data-editor]")).toHaveCount(0);
+  }
+  test("after Back, and after the header's link, the editor holds the newest saved words, and a key never saves older words over newer ones", async ({ page }) => {
+    const f = fresh(FULL, "back");
+    await openEditor(page, f);
+    expect((await page.request.get("/account")).status()).toBe(200);
+    await typeIn(page, "profile.name", "Robin Okafor");
+    await typeIn(page, "arrangement.tiles.about.text", "I count things, then I change one of them.");
+    await waitSaved(page);
+
+    // Away by a link inside the app, then the browser's Back.
+    await leaveByLink(page);
+    await page.goBack();
+    await waitReady(page);
+    expect(await valueAt(page, "profile.name")).toBe("Robin Okafor");
+    await expect(textbox(page, "profile.name")).toHaveValue("Robin Okafor");
+    await expect(textbox(page, "arrangement.tiles.about.text")).toHaveValue("I count things, then I change one of them.");
+
+    // A key in another field saves the whole page: the name and About me must still be the new ones after it.
+    await typeIn(page, "profile.headline", "Analyst, queues and rotas");
+    await waitSaved(page);
+
+    // Away again, and back by the header's own link this time: the newest words, the headline among them.
+    await leaveByLink(page);
+    await page.getByRole("link", { name: "Your portfolio", exact: true }).first().click();
+    await waitReady(page);
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, queues and rotas");
+    expect(await valueAt(page, "profile.name")).toBe("Robin Okafor");
+    await typeIn(page, "profile.location", "Leeds");
+    await waitSaved(page);
+
+    // What the server holds, read afresh: nothing older came back at any step.
+    await page.reload();
+    await waitReady(page);
+    expect(await valueAt(page, "profile.name")).toBe("Robin Okafor");
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, queues and rotas");
+    expect(await valueAt(page, "profile.location")).toBe("Leeds");
+    expect(await valueAt(page, "arrangement.tiles.about.text")).toBe("I count things, then I change one of them.");
+  });
+
+  test("Back while the last change is still on its way waits for it: the words typed before leaving are there, and no key saves over them", async ({ page }) => {
+    const f = fresh(FULL, "backfast");
+    await openEditor(page, f);
+    expect((await page.request.get("/account")).status()).toBe(200);
+    await typeIn(page, "profile.location", "Bradford");
+    // Not waited for: the editor sends what is waiting as it leaves the page.
+    await leaveByLink(page);
+    await page.goBack();
+    await waitReady(page);
+    expect(await valueAt(page, "profile.location")).toBe("Bradford");
+    await typeIn(page, "profile.headline", "Operations analyst");
+    await waitSaved(page);
+    await page.reload();
+    await waitReady(page);
+    expect(await valueAt(page, "profile.location")).toBe("Bradford");
+    expect(await valueAt(page, "profile.headline")).toBe("Operations analyst");
   });
 });
