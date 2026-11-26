@@ -36,14 +36,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: safari, projects: "--project=safari", shard: 1, of: 3 }
-          - { name: safari, projects: "--project=safari", shard: 2, of: 3 }
-          - { name: safari, projects: "--project=safari", shard: 3, of: 3 }
+          - { name: safari, projects: "--project=safari", shard: 1, of: 4 }
+          - { name: safari, projects: "--project=safari", shard: 2, of: 4 }
+          - { name: safari, projects: "--project=safari", shard: 3, of: 4 }
+          - { name: safari, projects: "--project=safari", shard: 4, of: 4 }
           - { name: iphone-ipad, projects: "--project=iphone --project=ipad", shard: 1, of: 1 }
           # The same again under Safari's rule about the focus, which WebKit on Linux does not have (e2e/editor-test.ts, safariFocus).
-          - { name: safari, projects: "--project=safari", shard: 1, of: 3, focus: safari }
-          - { name: safari, projects: "--project=safari", shard: 2, of: 3, focus: safari }
-          - { name: safari, projects: "--project=safari", shard: 3, of: 3, focus: safari }
+          - { name: safari, projects: "--project=safari", shard: 1, of: 4, focus: safari }
+          - { name: safari, projects: "--project=safari", shard: 2, of: 4, focus: safari }
+          - { name: safari, projects: "--project=safari", shard: 3, of: 4, focus: safari }
+          - { name: safari, projects: "--project=safari", shard: 4, of: 4, focus: safari }
           - { name: iphone-ipad, projects: "--project=iphone --project=ipad", shard: 1, of: 1, focus: safari }
     env:
       E2E_WEBKIT: "1"
