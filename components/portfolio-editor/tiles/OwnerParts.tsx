@@ -6,14 +6,13 @@ import { Eye, Plus } from "lucide-react";
 import { createFromScratch } from "@/app/(app)/exhbts/[id]/actions";
 import type { OwnerOnlyExhbt } from "@/app/(app)/portfolio/load";
 import type { HomeOwnerPlace } from "@/components/portfolio/home-ctx";
-import { bandButtonClass } from "@/components/portfolio/PortfolioHome";
+import { bandButtonClass, ROWS, WRAP } from "@/components/portfolio/PortfolioHome";
 import { usePortfolioApi, usePortfolioData, usePortfolioState, usePortfolioUi } from "../runtime";
 import { showTile } from "../sections/arrange";
 import { AddSection } from "../sections/AddSection";
 import { W } from "../sections/words";
 import { lookOf } from "../home-props";
 import { useArranged, useWorkTreatment } from "./arranged";
-import { ROWS, WRAP } from "./page-classes";
 import { WorkRowLike } from "./WorkRowLike";
 
 /*
