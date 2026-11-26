@@ -1,5 +1,6 @@
 Status: accepted
 Date: 13 Nov 2026
+Amended by: 0031 (exhbts are arranged on the portfolio page itself, and the separate exhbts list goes when the switch is on)
 
 # The portfolio customiser
 

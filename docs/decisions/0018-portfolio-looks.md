@@ -2,6 +2,7 @@ Status: accepted
 Date: 17 Nov 2026
 Supersedes: 0012 (the list of looks, their faces, the kit-only colours, the band-only contrast test)
 Amends: 0016 (the look's variables, graphs on a dark look), 0022 (where the look's variables sit, the --xp-* names)
+Amended by: 0031 (a look is picked from a menu in the editor's bar, and the page itself is the preview)
 
 # Portfolio looks: eight looks, one token set, both pages
 
