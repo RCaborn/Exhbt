@@ -169,6 +169,7 @@ test.describe("what follows a publish", () => {
 test.describe("redirects and back links", () => {
   for (const k of KINDS) {
     test(`${k}: the old addresses, the team page, the account and billing pages`, async ({ page }) => {
+      test.slow(); // eight pages, each compiled on its first visit in the dev server
       await kind(page, k);
       const user = unique(`rd${k[0]}`);
       await signInAs(page, user, "premium", "/account");
