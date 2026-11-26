@@ -17,6 +17,8 @@ import { Address } from "./Address";
 import { EditorBar } from "./bar/EditorBar";
 import { FirstRun } from "./bar/FirstRun";
 import { Canvas } from "./Canvas";
+import { keepUnsaved } from "./keep";
+import { Notices } from "./Notices";
 import { hasPending, noteSaved, noteSending, registerSender } from "./pending";
 import { DataContext, RuntimeContext, usePortfolioState, usePortfolioUi, useRuntime, type PortfolioEditorApi, type PortfolioUi, type Runtime, type SaveView } from "./runtime";
 import { createRuntime, type Host } from "./runtime-core";
@@ -86,6 +88,12 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
   const rt = createRuntime(loaded, host);
 
   async function send(state: BuilderState): Promise<SaveResult> {
+    // Once the site has been updated under this tab nothing more can be saved from it: every later state
+    // follows the first into the browser, to be offered back after the reload (keep.ts, Notices.tsx).
+    if (rt.save.get().stale) {
+      keepUnsaved(owner, state);
+      return { ok: false, error: STALE_EDITOR };
+    }
     try {
       if (devParam("save") === "stale") throw Object.assign(new Error('Server Action "dev" was not found on the server. (?save=stale, development only)'), { name: "UnrecognizedActionError" });
       if (devParam("save") === "fail") return { ok: false, error: "The save was told to fail (?save=fail, development only)." };
@@ -99,6 +107,7 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
       if (!isStale(e)) throw e;
       console.error("The server has no such action: this page is older than the site.", e);
       rt.save.set((v) => ({ ...v, stale: true }));
+      keepUnsaved(owner, state);
       return { ok: false, error: STALE_EDITOR };
     }
   }
@@ -171,6 +180,7 @@ const Shell = memo(function Shell({ ready, team, jobLinks }: { ready: boolean; t
     <ToastViewport position="bottomEnd">
       <div data-editor="portfolio" data-ready={ready ? "true" : undefined}>
         <EditorBar team={team} jobLinks={jobLinks} />
+        <Notices />
         <FirstRun />
         <Body />
         <UndoKeys />

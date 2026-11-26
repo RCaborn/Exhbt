@@ -698,3 +698,70 @@ test.describe("Undo", () => {
     expect(entryFor("nothing", start, start)).toBeNull();
   });
 });
+
+test.describe("Saving, after a deploy and in two tabs", () => {
+  test("the status says Saved · live when visitors can see the page, Saved on Free, and hiding every exhbt drops live", async ({ page }) => {
+    const f = fresh(FULL, "live");
+    const seeded = await openEditor(page, f);
+    const status = saveState(page);
+    await expect(status).toHaveText("Saved · live");
+    await expect(status).toHaveAttribute("data-live", "");
+    await changeWith(page, { hide: Object.values(seeded.ids) }, "hid every exhbt");
+    await waitSaved(page);
+    await expect(status).toHaveText("Saved");
+    await expect(status).not.toHaveAttribute("data-live", "");
+
+    const free = fresh(fullFixture("x", null, "free"), "livefree");
+    await openEditor(page, free);
+    await expect(saveState(page)).toHaveText("Saved");
+  });
+
+  test("after a deploy the words that could not be saved are kept in the browser and offered back once after the reload", async ({ page }) => {
+    const f = fresh(FULL, "stale");
+    await openEditor(page, f, { query: "?save=stale" });
+    await typeIn(page, "profile.headline", "Analyst, kept through a deploy");
+    const status = saveState(page);
+    await expect(status).toHaveAttribute("data-save", "stale");
+    await expect(status).toContainText("The site was updated. Reload to carry on.");
+    await expect(status.getByRole("button", { name: "Reload" })).toBeVisible();
+
+    // The reload, without ?save=stale (it would stay in the address).
+    await page.goto("/portfolio");
+    await waitReady(page);
+    expect(await valueAt(page, "profile.headline")).toBe("Operations analyst, food service and retail");
+    const offer = page.locator("[data-kept-offer]");
+    await expect(offer).toContainText("Your last changes were not saved before the reload");
+    await offer.getByRole("button", { name: "Put back the changes from before the reload" }).click();
+    await expect(offer).toHaveCount(0);
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, kept through a deploy");
+    await expect(textbox(page, "profile.headline")).toHaveValue("Analyst, kept through a deploy");
+    expect(await undoLabel(page)).toBe("put back the changes from before the reload");
+    await waitSaved(page);
+
+    // Offered once: the next visit has it saved, and no offer.
+    await page.goto("/portfolio");
+    await waitReady(page);
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, kept through a deploy");
+    await settle(page);
+    await expect(page.locator("[data-kept-offer]")).toHaveCount(0);
+  });
+
+  test("open in two tabs, each says so; the note goes when one closes; the last save wins", async ({ page, context }) => {
+    const f = fresh(FULL, "tabs");
+    await openEditor(page, f);
+    const other = await context.newPage();
+    await other.goto("/portfolio");
+    await waitReady(other);
+    for (const p of [page, other]) await expect(p.locator("[data-other-tab]")).toContainText("This page is open in another tab");
+
+    await typeIn(page, "profile.location", "Leeds");
+    await waitSaved(page);
+    await typeIn(other, "profile.location", "York");
+    await waitSaved(other);
+    await other.close();
+    await expect(page.locator("[data-other-tab]")).toHaveCount(0);
+    await page.reload();
+    await waitReady(page);
+    expect(await valueAt(page, "profile.location")).toBe("York");
+  });
+});

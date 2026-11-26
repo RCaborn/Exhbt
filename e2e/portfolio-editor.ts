@@ -184,7 +184,7 @@ export function call(page: Page, name: "open" | "close" | "say" | "jumpTo" | "pr
 }
 
 /** A change the bar or a section's tools would make, named for Undo (development only). */
-export type LabelledChange = { removeSection: string } | { moveSection: { from: number; to: number } };
+export type LabelledChange = { removeSection: string } | { moveSection: { from: number; to: number } } | { hide: string[] };
 
 /**
  * Makes a labelled change through the editor's own `change` (an Undo step), as F's and G's parts do: the
@@ -195,6 +195,7 @@ export function changeWith(page: Page, what: LabelledChange, label: string): Pro
     ([w, l]) => {
       const api = window.__portfolioEditor!.api;
       api.change((s) => {
+        if ("hide" in w) return { ...s, arrangement: { ...s.arrangement, hidden: w.hide } };
         const sections = [...s.arrangement.sections];
         if ("removeSection" in w) sections.splice(sections.indexOf(w.removeSection as never), 1);
         else sections.splice(w.moveSection.to, 0, ...sections.splice(w.moveSection.from, 1));
