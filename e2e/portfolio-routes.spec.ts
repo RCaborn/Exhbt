@@ -57,7 +57,9 @@ test.describe("the exhbts list", () => {
     await kind(page, "page");
     expect(await lands(page, "/exhbts")).toEqual({ status: 307, to: "/portfolio" });
     for (const q of ["full=1", "joined=1", "left=1"]) expect(await lands(page, `/exhbts?${q}`)).toEqual({ status: 307, to: `/portfolio?${q}` });
-    // The hash of a sent email's link stays with the browser across the redirect.
+    // The hash of a sent email's link stays with the browser across the redirect. (From another page: a
+    // change of hash alone on the list's own address would not load it again.)
+    await page.goto("/account");
     await page.goto("/exhbts#team-projects");
     await expect(page).toHaveURL(/\/portfolio#team-projects$/);
   });
@@ -76,10 +78,17 @@ test.describe("the exhbt editor's way back", () => {
     const back = bar(page).getByRole("link", { name: "Your portfolio" });
     await expect(back).toHaveAttribute("href", `/portfolio?at=${id}`);
     await expect(bar(page).getByRole("link", { name: "Your exhbts" })).toHaveCount(0);
-    // A title typed, then back at once: the portfolio is opened only once the title has been saved.
+    // A title typed, then back at once: the portfolio is opened only once the title has been saved. Each save
+    // is held for a second and a half here, so leaving before it lands would show.
     const title = `Open banking, rewritten ${Date.now().toString(36)}`;
+    await page.route(`**/exhbts/${id}/edit`, async (route) => {
+      if (route.request().method() === "POST") await new Promise((done) => setTimeout(done, 1500));
+      await route.continue();
+    });
     await fillTitle(page, title);
     await back.click();
+    await page.waitForTimeout(500);
+    await expect(page).toHaveURL(new RegExp(`/exhbts/${id}/edit$`));
     await page.waitForURL(new RegExp(`/portfolio\\?at=${id}$`));
     expect((await readStored(page, id)).working.title).toBe(title);
   });
@@ -196,7 +205,10 @@ test.describe("redirects and back links", () => {
     await page
       .getByLabel("Job description", { exact: true })
       .fill(
-        "We are hiring a graduate data analyst for our customer insight team. You will write SQL against our sales data, build time series forecasts of weekly demand, and keep the reporting in Excel up to date.",
+        "We are hiring a graduate data analyst for our customer insight team. You will write SQL against our sales data, " +
+          "build time series forecasts of weekly demand, and keep the reporting in Excel up to date. Some Python is useful but " +
+          "not essential. You will explain what you find to managers who are not analysts, so clear writing matters. The role " +
+          "suits someone who checks their numbers and likes turning messy data into a plain answer. Training is provided.",
       );
     await page.getByRole("button", { name: "Pick my exhbts" }).click();
     await page.waitForURL(/\/job-links\/[0-9a-f-]{36}$/);

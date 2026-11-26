@@ -63,6 +63,8 @@ function PublishBody() {
   async function publish() {
     issues.setTried(true);
     setBusy(true);
+    // Set when a first publish leaves for the portfolio: Publish stays busy until the page goes.
+    let leaving = false;
     setResult(null);
     try {
       await save.settled();
@@ -76,6 +78,7 @@ function PublishBody() {
         // Portfolio first: a first publish returns to the portfolio, where the tile has turned Live and the
         // note gives its link. Publishing changes to a live exhbt stays here, with the live panel.
         if (env.portfolioFirst && !published) {
+          leaving = true;
           router.push(portfolioAt);
           return;
         }
@@ -84,7 +87,7 @@ function PublishBody() {
     } catch {
       setResult({ ok: false, lines: ["Couldn't reach the server. Try again in a moment."] });
     } finally {
-      setBusy(false);
+      if (!leaving) setBusy(false);
     }
   }
 
