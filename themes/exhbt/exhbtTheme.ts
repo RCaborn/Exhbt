@@ -9,7 +9,8 @@ import { neutralTheme } from "@astryxdesign/theme-neutral";
  * Most of what is below came across from the design lab's proposed theme
  * (themes/exhbt-next/exhbtNextTheme.ts, decision 0033). It is the part only Astryx's own
  * components read: the rings, the status colours, the shadows, the radius tokens, motion,
- * the display steps and a style for each component. What a visitor's page can feel (the
+ * the display steps and a style for each component. The focus ring is jade everywhere but a
+ * person's own page, where app/globals.css gives it the look's ink (the rule under .xp). What a visitor's page can feel (the
  * type scale, the headings' weight, the button's additions, the header's new look) waits
  * for Rory's choice in the lab; until then the type scale, the heading sizes, the button
  * and the header read as they do today.
