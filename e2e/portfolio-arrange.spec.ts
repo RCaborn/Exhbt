@@ -114,11 +114,14 @@ test.describe("Sections", () => {
     await frame(page, "quote").hover({ position: { x: 40, y: 60 } });
     const grip = (await tools(page, "quote").getByRole("button", { name: "Drag A quote" }).boundingBox())!;
     const target = (await frame(page, "experience").boundingBox())!;
+    const quote = (await frame(page, "quote").boundingBox())!;
+    // The lifted copy's middle onto Experience's middle: the place a drop is judged by (closest centre).
+    const by = target.y + target.height / 2 - (quote.y + quote.height / 2);
     await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
     await page.mouse.down();
     await page.mouse.move(grip.x + grip.width / 2, grip.y - 20, { steps: 4 });
     await expect(page.getByTestId("lifted-section")).toBeVisible();
-    await page.mouse.move(grip.x + grip.width / 2, target.y + 20, { steps: 16 });
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2 + by, { steps: 16 });
     await page.mouse.up();
     await expect.poll(async () => (await sections(page)).indexOf("quote")).toBe(before.indexOf("experience"));
     expect(await undoLabel(page)).toBe("moved A quote");
