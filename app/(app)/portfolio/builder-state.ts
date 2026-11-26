@@ -1,7 +1,7 @@
 import type { PortfolioPerson } from "@/components/portfolio/PortfolioPage";
 import { normaliseLinkedin } from "@/lib/cv-contact";
 import { checkTiles } from "@/lib/portfolio-customise";
-import { normaliseGithub, normaliseWebsite, tileKindsShownBy } from "@/lib/portfolio-layout";
+import { normaliseGithub, normaliseWebsite, TILE_KINDS, TilesSchema, tileKindsShownBy } from "@/lib/portfolio-layout";
 import { profileProblems, type ProfileDraft } from "@/lib/portfolio-profile";
 import type { BuilderState } from "./steps";
 
@@ -50,13 +50,21 @@ export function editingPerson(p: ProfileDraft, username: string | null, photoUrl
 
 /**
  * Every problem stopping a save, each at the path of the field it is about (decision 0031, "Fields, and
- * the path each one has"): `profileProblems` key `k` at `profile.k`; `checkTiles` key `kind.field` at
- * `arrangement.tiles.kind.field` (a list's problem, `education.lines`, at the list's own path). In the
- * order `problemOf` reads them, so the first entry is the one the status line names.
+ * the path each one has"): `profileProblems` key `k` at `profile.k`; a tile's at the whole of its path in
+ * the tiles, so a line that is too long is at its own line (`arrangement.tiles.education.lines.1`) and
+ * only a list's own problem (too many lines) at the list's path. The same schema and the same order as
+ * `problemOf` (the profile, then the tiles in `TILE_KINDS` order), so the first entry is the problem the
+ * status line names.
  */
 export function issuesOf(s: BuilderState): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [k, message] of Object.entries(profileProblems(s.profile))) if (message) out[`profile.${k}`] = message;
-  for (const [k, message] of Object.entries(checkTiles(s.arrangement.tiles, tileKindsShownBy(s.arrangement.sections)).problems)) out[`arrangement.tiles.${k}`] = message;
+  const shown = tileKindsShownBy(s.arrangement.sections);
+  for (const kind of TILE_KINDS) {
+    if (!shown.includes(kind)) continue;
+    const one = TilesSchema.safeParse({ [kind]: s.arrangement.tiles[kind] });
+    if (one.success) continue;
+    for (const issue of one.error.issues) out[`arrangement.tiles.${issue.path.map(String).join(".")}`] ??= issue.message;
+  }
   return out;
 }

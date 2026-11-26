@@ -578,3 +578,57 @@ test.describe("See as a visitor", () => {
     await waitSaved(page);
   });
 });
+
+test.describe("Problems at the field", () => {
+  test("a headline over its limit is not sent, shows at the field, and Show me goes back to it; a line too long shows at the line", async ({ page }) => {
+    const f = fresh(FULL, "issues");
+    await openEditor(page, f);
+    const thirteen = "One two three four five six seven eight nine ten eleven twelve thirteen";
+    await typeIn(page, "profile.headline", thirteen);
+    const status = saveState(page);
+    await expect(status).toHaveAttribute("data-save", "invalid");
+    await expect(status).toContainText("Not saved: Keep the headline to 12 words or fewer.");
+    const headline = textbox(page, "profile.headline");
+    await expect(headline).toHaveAttribute("aria-invalid", "true");
+    // The note shows under the field while it has the cursor.
+    const note = field(page, "profile.headline").locator("xpath=ancestor::*[contains(@class,'xe-field')][1]").locator(".xe-issue");
+    // (It is always there for a screen reader, and shown or not by its opacity.)
+    await expect(note).toHaveCSS("opacity", "1");
+    await expect(note).toHaveText("Keep the headline to 12 words or fewer.");
+    // Nothing was sent: the server still has the old headline.
+    await page.waitForTimeout(1500);
+    expect(await page.evaluate(() => window.__portfolioEditor!.waiting())).toBe(true);
+
+    // From another field, Show me puts the cursor back in the headline.
+    await textbox(page, "profile.location").click();
+    await expect(note).toHaveCSS("opacity", "0");
+    await status.getByRole("button", { name: "Show me" }).click();
+    await expect.poll(() => focusedPath(page)).toBe("profile.headline");
+
+    // One word fewer and it saves.
+    await page.keyboard.press("ControlOrMeta+End");
+    await page.keyboard.press("Backspace");
+    for (let i = 0; i < "thirteen".length; i++) await page.keyboard.press("Backspace");
+    await expect(headline).not.toHaveAttribute("aria-invalid", "true");
+    await waitSaved(page);
+    expect(await valueAt(page, "profile.headline")).toBe(thirteen.replace(/ thirteen$/, ""));
+
+    // A line of education with fifteen words, its year among them: the problem is at that line, on its words half.
+    const path = "arrangement.tiles.education.lines.1";
+    await typeIn(page, path, "One two three four five six seven eight nine ten eleven twelve thirteen fourteen", { part: "label" });
+    await expect(status).toHaveAttribute("data-save", "invalid");
+    await expect(status).toContainText("Not saved: Keep each line to 14 words or fewer.");
+    expect(Object.keys((await uiNow(page)).issues)).toEqual([path]);
+    await expect(textbox(page, path, { part: "label" })).toHaveAttribute("aria-invalid", "true");
+    await expect(textbox(page, path, { part: "year" })).not.toHaveAttribute("aria-invalid", "true");
+    await textbox(page, "profile.location").click();
+    await status.getByRole("button", { name: "Show me" }).click();
+    await expect.poll(() => focusedPath(page)).toBe(path);
+    await page.keyboard.press("ControlOrMeta+End");
+    for (let i = 0; i < " fourteen".length; i++) await page.keyboard.press("Backspace");
+    await waitSaved(page);
+    await page.reload();
+    await waitReady(page);
+    expect(await valueAt(page, path)).toBe("One two three four five six seven eight nine ten eleven twelve thirteen, 2022–2023");
+  });
+});
