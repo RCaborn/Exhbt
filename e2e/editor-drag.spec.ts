@@ -1059,18 +1059,25 @@ test.describe("release 4's new rows: no flicker on a boundary, and a drop lands 
 
   test("Before and after: beside an image marked Before, at the place where an image marked After would form the pair", async ({ page }) => {
     await page.setViewportSize(TALL);
-    // The sample with its first After marked Before too, so that the first two Befores are alone, each on a row of its own,
-    // and the last After is the one to carry (the layout puts the pairs in the usual order itself, so the doc is not reordered).
+    // The sample's four pictures are two pairs (Before, After, Before, After). Any run of pictures that does not open with a
+    // Before then an After is one plain grid (lib/exhbt/layouts.ts, rowsFor: "before-after", then "group" of "images"), so a Before
+    // is alone only with something that is not a picture after it. So the page is arranged (it has the flowchart's marker): the
+    // first Before, then the flowchart, then the second pair, the rest, and the first After last of all, alone too. Carrying that
+    // After to straight after the lone Before is the place where the two would form a pair.
     const base = sampleDoc("before-after");
-    const afters = pick(base, (s) => s.kind === "image" && s.stage === "after");
-    const doc: ExhbtDoc = { ...base, sections: base.sections.map((s) => (s.id === afters[0] && s.kind === "image" ? { ...s, stage: "before" as const } : s)) };
+    const byId = (id: string) => base.sections.find((s) => s.id === id)!;
+    const [lone, mover] = ["image-1", "image-2"];
+    expect([byId(lone), byId(mover)].map((s) => (s.kind === "image" ? s.stage : null)), "the sample's first two pictures are a Before and an After").toEqual(["before", "after"]);
+    expect(base.sections.some((s) => s.kind === "flow"), "the sample has no marker of its own").toBe(false);
+    const others = base.sections.filter((s) => s.kind !== "image");
+    const doc: ExhbtDoc = { ...base, sections: [byId(lone), { id: "flow", kind: "flow" }, byId("image-3"), byId("image-4"), ...others, byId(mover)] };
     await openDoc(page, freshName("flickba"), doc);
     await waitLive(page);
     await settle(page);
     const order = await pageOrder(page);
-    const mover = afters[afters.length - 1]!;
-    const lone = afters[0]!;
-    expect((await rowsNow(page)).some((r) => r.row === "group" && r.of === "before-after" && r.items.some((c) => c.item.id === lone)), "the marked image has no After straight after it").toBe(false);
+    expect([order[0], order[order.length - 1]], "the lone Before first, the lone After last").toEqual([lone, mover]);
+    const rowIds = (r: Row) => (r.row === "group" ? r.items.map((c) => c.item.id) : r.row === "one" ? ids(r.cell) : [...ids(r.left), ...ids(r.right)]);
+    expect((await rowsNow(page)).map(rowIds).find((r) => r.includes(lone)), "the Before is on a row of its own").toEqual([lone]);
     await pickUp(page, mover);
     await arm(page);
     // Measured after the pick-up: picking up scrolls to the carried section, and nothing slides until the place changes.
@@ -1104,11 +1111,11 @@ test.describe("release 4's new rows: no flicker on a boundary, and a drop lands 
     // The plan gives each tile's half nearer a gap to that gap (components/exhbt-editor/drag/plan.ts, anchorFor: "in a group"), so
     // from the Before's right half to the After's left half is one place, the gap between them. The boundaries are the tiles'
     // middles: the Before's, where "before the Before" gives way to "between", and the After's, where "between" gives way to "after the After".
-    await rest(page, { x: B.x + B.w * 0.2, y }, { x: B.x + B.w * 0.8, y }, "across the Before's middle, left to right");
-    await rest(page, { x: A.x + A.w * 0.8, y }, { x: A.x + A.w * 0.2, y }, "across the After's middle, right to left");
-    await page.keyboard.press("Escape");
-    await expect(lifting(page)).toHaveCount(0);
-    expect(await pageOrder(page)).toEqual(order);
+    const between = order.filter((id) => id !== mover).indexOf(a);
+    expect(await rest(page, { x: B.x + B.w * 0.2, y }, { x: B.x + B.w * 0.8, y }, "across the Before's middle, left to right"), "into the gap from the Before").toBe(between);
+    expect(await rest(page, { x: A.x + A.w * 0.8, y }, { x: A.x + A.w * 0.2, y }, "across the After's middle, right to left"), "into the gap from the After").toBe(between);
+    // Dropped in the gap: the stored order is the place shown, between the Before and its After.
+    await dropAt(page, order, mover, between, "dropped between the Before and its After");
   });
 
   /** Build's sample: its row of buttons, the section straight above it, and a picture to carry that is on neither. */
