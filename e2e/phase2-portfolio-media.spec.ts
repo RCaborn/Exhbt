@@ -110,6 +110,11 @@ test.describe("Profile photo", () => {
     await seedAndSignIn(page, unique("axephoto"));
     await uploadPhoto(page);
     await expect(page.getByRole("button", { name: "Remove photo" })).toBeVisible();
+    // The photo's save refreshes the page's data, and while Next draws the refreshed page its <title> is out of
+    // the document for a few milliseconds (measured: 1 run in 3, about 30ms). The page has its title at first
+    // paint; axe was sometimes run inside that gap. So wait for the refresh to finish and the title to be back.
+    await page.waitForLoadState("networkidle");
+    await expect(page).toHaveTitle(/Build your portfolio/);
     const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
     expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
   });
