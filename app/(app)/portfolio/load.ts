@@ -36,6 +36,8 @@ export type VisitorSource = { publicPlan: boolean; published: { id: string; home
 export type PortfolioData = {
   /** The person's own id: what the editor keeps in the browser for them is kept under it, so it is never offered to anyone else. */
   owner: string;
+  /** The server's time when this was read. The editor will not open on data read before its own newest save landed (components/portfolio-editor/pending.ts). */
+  loadedAt: string;
   /** Exactly what page.tsx gives Builder today, but `step`. */
   builder: Omit<BuilderProps, "step">;
   ownerOnly: OwnerOnlyExhbt[];
@@ -72,6 +74,8 @@ async function waitingToJoin(userId: string): Promise<number> {
 /** `admin` is isAdmin(user), checked on this request by the page, which decides the builder with it. */
 export async function loadPortfolioData(userId: string, host: string | null, admin = false): Promise<PortfolioData> {
   const store = getStore();
+  // Stamped before anything is read: a save that lands while this loads is then newer than it.
+  const loadedAt = new Date().toISOString();
   const [plan, exhbts, profile, teamRequests] = await Promise.all([getPlan(userId), store.listExhbts(userId), store.getPortfolioProfile(userId), waitingToJoin(userId)]);
   const photoUrl = await signedFileUrl(profile.photoFileId, userId);
   const isPublic = ENTITLEMENTS[plan].publicPortfolio;
@@ -143,6 +147,7 @@ export async function loadPortfolioData(userId: string, host: string | null, adm
 
   return {
     owner: userId,
+    loadedAt,
     builder: {
       initial: { profile: draftFromProfile(profile), arrangement },
       projects,
