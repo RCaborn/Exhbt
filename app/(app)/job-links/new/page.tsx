@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { isAdmin } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { pickableExhbts } from "@/lib/job-links";
 import { canMakeJobLinks, getPlan } from "@/lib/plan";
+import { portfolioKind } from "@/lib/portfolio-kind-server";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
 import { UpgradeNote } from "../UpgradeNote";
@@ -25,12 +27,14 @@ export default async function NewJobLinkPage() {
     pickableExhbts(user.id),
   ]);
   const room = canMakeJobLinks(plan, active);
+  // Portfolio first (decision 0031): job links are a menu in the portfolio's bar, and the exhbts list has gone.
+  const portfolioFirst = (await portfolioKind(await isAdmin(user))) === "page";
 
   return (
     <div className="min-h-[calc(100svh-4.75rem)] bg-mist px-4 pt-10 pb-16 sm:px-8 sm:pt-14">
       <div className="mx-auto max-w-[40rem]">
         <p className="text-sm font-semibold">
-          <Link href="/portfolio#job-links" className="link">
+          <Link href={portfolioFirst ? "/portfolio?open=job-links" : "/portfolio#job-links"} className="link">
             Job links
           </Link>
         </p>
@@ -45,8 +49,8 @@ export default async function NewJobLinkPage() {
             ) : live.length === 0 ? (
               <p role="alert" className="mt-6 rounded-[var(--radius)] border border-error/40 bg-surface px-4 py-3 text-error">
                 Publish an exhbt first: a job link shows your live exhbts.{" "}
-                <Link href="/exhbts" className="link font-semibold">
-                  Your exhbts
+                <Link href={portfolioFirst ? "/portfolio" : "/exhbts"} className="link font-semibold">
+                  {portfolioFirst ? "Your portfolio" : "Your exhbts"}
                 </Link>
               </p>
             ) : (
