@@ -3,11 +3,16 @@ import { Text } from "@astryxdesign/core/Text";
 import { Frame } from "@/components/lab/Frame";
 import { FinishStage } from "@/components/lab/finish/FinishStage";
 import { PersonExhbt } from "@/components/lab/finish/PersonExhbt";
+import { PortfolioLanding, type LandingTile } from "@/components/lab/finish/PortfolioLanding";
 import { StateTabs } from "@/components/lab/finish/StateTabs";
 import { isFinishState, stateOf } from "@/components/lab/finish/states";
+import type { FinishWords } from "@/components/lab/finish/words";
 import { LAB_PATH } from "@/components/lab/lab";
-import { exhbtOf, sample } from "@/components/lab/samples";
+import { exhbtOf, lookOf, sample } from "@/components/lab/samples";
 import { labGate, labMetadata } from "@/components/lab/server";
+import { ProjectCard } from "@/components/portfolio/PortfolioHome";
+import { lookAttrs, themeStyle } from "@/components/portfolio/themeFonts";
+import { demoHomeProjects } from "@/lib/exhbt";
 import { exhbtSummary } from "@/lib/exhbt/blocks";
 import { headlineFor } from "@/lib/exhbt/headline";
 import { liveLine } from "@/lib/exhbt/publish-words";
@@ -20,6 +25,54 @@ export const generateMetadata = labMetadata("Finish");
 
 /** The exhbt the finish publishes: the sample person's first, the one Home pictures. */
 const SLUG = "gp-reminders";
+
+/** Back on the portfolio: three of her tiles, the one just published first, as she ordered them. */
+const TILES: { slug: string; status: LandingTile["status"] }[] = [
+  { slug: SLUG, status: "published" },
+  { slug: "ae-forecast", status: "live" },
+  { slug: "bed-dashboard", status: "draft" },
+];
+
+/** Everything the states say and point at, from where the product keeps each fact. */
+function wordsFor(): FinishWords {
+  const e = exhbtOf(SLUG);
+  const host = portfolioHost(sample.owner.username);
+  const link = sample.exhbtAddress(e.slug);
+  const headline = headlineFor(e.doc);
+  const premium = PLAN_NAMES.premium;
+  const price = PRICES.premium;
+  const free = canPublish("free", [], "lab");
+  const address = canClaimUsername("free");
+  return {
+    title: e.doc.title,
+    first: sample.firstName,
+    name: sample.owner.username,
+    host,
+    link,
+    path: link.slice(host.length),
+    liveLine: liveLine(false, false),
+    changedLine: liveLine(true, false),
+    checkedOn: e.checkedOn,
+    evidence: e.doc.evidence?.label ?? null,
+    viewHref: `/demo/${e.slug}`,
+    portfolioHref: `${LAB_PATH}/finish?state=portfolio`,
+    nextHref: `${LAB_PATH}/finish?state=drafting`,
+    preview: {
+      src: `${LAB_PATH}/finish/preview.png?slug=${e.slug}`,
+      alt: `The link's preview picture, on ink: ${sample.owner.name}, "${e.doc.title}"${headline ? `, ${headline.value}` : ""}, three of its skills and the link.`,
+      // As the exhbt page's metadata gives them to LinkedIn and the rest.
+      title: `${e.doc.title} · ${sample.owner.name}`,
+      description: [exhbtSummary(e.doc), e.doc.context.trim()].filter(Boolean).join(" "),
+    },
+    free: {
+      reason: free.ok ? "" : free.reason,
+      address: address.ok ? "" : address.reason,
+      plan: premium,
+      upgrade: `Upgrade to ${premium}${price ? ` (${price} a ${BILLING_PERIOD})` : ""}`,
+      exampleHost: portfolioHost("yourname"),
+    },
+  };
+}
 
 /**
  * The finish (/lab/design/finish): the moment a person publishes an exhbt, and what they see next,
@@ -36,66 +89,30 @@ export default async function LabFinish({ searchParams }: { searchParams: Promis
   labGate();
   const asked = (await searchParams).state;
   const state = isFinishState(asked) ? asked : "first";
+  const words = wordsFor();
   const e = exhbtOf(SLUG);
-  const host = portfolioHost(sample.owner.username);
-  const link = sample.exhbtAddress(e.slug);
-  const headline = headlineFor(e.doc);
-  const premium = PLAN_NAMES.premium;
-  const price = PRICES.premium;
-  const free = canPublish("free", [], "lab");
-  const address = canClaimUsername("free");
 
-  return (
-    <main id="main" className="fin" data-fin-state={state}>
-      <header className="fin-head lab-content">
-        <div className="fin-head-words">
-          <Heading level={1} type="display-2">
-            The moment you publish.
-          </Heading>
-          <Text as="p" display="block" type="large" color="secondary">
-            {stateOf(state).note}
-          </Text>
-        </div>
-        <StateTabs current={state} />
-      </header>
-
+  let stage: React.ReactNode;
+  if (state === "portfolio") {
+    const theme = lookOf();
+    const projects = demoHomeProjects();
+    const tiles = TILES.map(({ slug, status }): LandingTile => {
+      const p = projects.find((x) => x.id === slug || x.href?.endsWith(`/${slug}`)) ?? projects[0]!;
+      // Not a link here: in the stand-in a tile opens nothing.
+      return { id: slug, title: p.title, status, node: <ProjectCard project={{ ...p, href: null }} /> };
+    });
+    stage = <PortfolioLanding key={state} words={words} tiles={tiles} look={{ attrs: lookAttrs(theme), style: themeStyle(theme) }} />;
+  } else {
+    stage = (
       <FinishStage
         key={state}
         state={state}
-        words={{
-          title: e.doc.title,
-          first: sample.firstName,
-          name: sample.owner.username,
-          host,
-          link,
-          path: link.slice(host.length),
-          liveLine: liveLine(false, false),
-          changedLine: liveLine(true, false),
-          checkedOn: e.checkedOn,
-          evidence: e.doc.evidence?.label ?? null,
-          viewHref: `/demo/${e.slug}`,
-          portfolioHref: `${LAB_PATH}/finish?state=portfolio`,
-          nextHref: `${LAB_PATH}/finish?state=drafting`,
-          preview: {
-            src: `${LAB_PATH}/finish/preview.png?slug=${e.slug}`,
-            alt: `The link's preview picture: "${e.doc.title}"${headline ? `, ${headline.value} ${headline.label.toLowerCase()}` : ""}, by ${sample.owner.name}, on ink.`,
-            // As the exhbt page's metadata gives them to LinkedIn and the rest.
-            title: `${e.doc.title} · ${sample.owner.name}`,
-            description: [exhbtSummary(e.doc), e.doc.context.trim()].filter(Boolean).join(" "),
-          },
-          free: {
-            reason: free.ok ? "" : free.reason,
-            address: address.ok ? "" : address.reason,
-            plan: premium,
-            upgrade: `Upgrade to ${premium}${price ? ` (${price} a ${BILLING_PERIOD})` : ""}`,
-            exampleHost: portfolioHost("yourname"),
-          },
-        }}
+        words={words}
         editorPage={<PersonExhbt slug={e.slug} stage={state === "changes" ? "live" : "draft"} className="p-4 sm:p-8 lg:p-12" />}
         livePage={
           <Frame
-            url={link}
-            label={`${sample.owner.name}'s exhbt, live at ${link}: the question, how she did it, what she found, and every check ticked`}
+            url={words.link}
+            label={`${sample.owner.name}'s exhbt, live at ${words.link}: the question, how she did it, what she found, and every check ticked`}
             crop="max-h-[14rem] sm:max-h-[18rem] lg:max-h-[19rem]"
             page="[zoom:0.42] sm:[zoom:0.5]"
           >
@@ -113,6 +130,23 @@ export default async function LabFinish({ searchParams }: { searchParams: Promis
           </Frame>
         }
       />
+    );
+  }
+
+  return (
+    <main id="main" className="fin" data-fin-state={state}>
+      <header className="fin-head lab-content">
+        <div className="fin-head-words">
+          <Heading level={1} type="display-2">
+            The moment you publish.
+          </Heading>
+          <Text as="p" display="block" type="large" color="secondary">
+            {stateOf(state).note}
+          </Text>
+        </div>
+        <StateTabs current={state} />
+      </header>
+      {stage}
     </main>
   );
 }

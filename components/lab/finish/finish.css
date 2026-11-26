@@ -427,6 +427,107 @@
     top: 1.75rem;
   }
 
+  /* ── Back on the portfolio: three tiles in her look, one turning Live ────────────── */
+  .fin-replay {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.75rem;
+  }
+  .fin-bar-title {
+    padding-inline: 0.5rem 0.125rem;
+  }
+  /* Her page's ground and words come from her look (--pf-*); only the chrome over it is the lab's. */
+  .fin-folio {
+    background: var(--pf-ground);
+    color: var(--pf-ink);
+    padding: 1.75rem 1.25rem 2.75rem;
+  }
+  @media (width >= 640px) {
+    .fin-folio {
+      padding: 2.5rem 2.5rem 3.5rem;
+    }
+  }
+  .fin-folio-title {
+    margin-bottom: 1.75rem;
+    font-size: 1.75rem;
+    line-height: 1.2;
+  }
+  .fin-tiles {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.25rem 2rem;
+  }
+  @media (width >= 768px) {
+    .fin-tiles {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .fin-tile {
+    position: relative;
+    display: grid;
+  }
+  /* Her tiles at about two thirds of their size, so all three and the brackets round one fit the first
+     screen. A zoom draws them smaller while they still lay out at their own width. */
+  .fin-tile-page {
+    zoom: 0.72;
+  }
+  @media (width >= 768px) {
+    .fin-tile-page {
+      zoom: 0.62;
+    }
+  }
+  .fin-tile-page,
+  .fin-tile-page > * {
+    height: 100%;
+  }
+  /* The tile's status, clipped to its top edge: chrome over her page, in the app's own style. */
+  .fin-tile-status {
+    position: absolute;
+    top: -0.875rem;
+    right: 1rem;
+    z-index: 2;
+    display: grid;
+  }
+  .fin-tile-status > * {
+    grid-area: 1 / 1;
+    justify-self: end;
+  }
+  .fin-tile-was {
+    opacity: 0;
+  }
+  /* The logo's brackets round the tile just published: the work in focus. */
+  .fin-brackets {
+    position: absolute;
+    inset: -0.875rem;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .fin-bracket {
+    position: absolute;
+    width: 2.75rem;
+    height: 2.75rem;
+    fill: none;
+    stroke: var(--color-ink);
+    stroke-width: 5;
+    stroke-linecap: round;
+  }
+  .fin-bracket[data-corner="start"] {
+    top: 0;
+    left: 0;
+  }
+  .fin-bracket[data-corner="end"] {
+    right: 0;
+    bottom: 0;
+    transform: rotate(180deg);
+  }
+  [data-level="restrained"] .fin-brackets {
+    display: none;
+  }
+  [data-level="maximal"] .fin-bracket {
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+
   /* ── Motion: about a second, once ───────────────────────────────────────────────── */
   @media (prefers-reduced-motion: no-preference) {
     /* The checks fill one after another. At every level: it is the confirmation itself. */
@@ -450,6 +551,65 @@
     [data-motion="on"]:not([data-level="restrained"]) .fin-live .fin-seal {
       animation: fin-stamp var(--duration-medium) var(--ease-entrance) both;
       animation-delay: 760ms;
+    }
+
+    /* Back on the portfolio: the brackets close on the tile, then its token turns from Draft to Live. */
+    [data-motion="on"]:not([data-level="restrained"]) .fin-bracket[data-corner="start"] {
+      animation: fin-close-start var(--duration-slow) var(--ease-entrance) both;
+      animation-delay: 300ms;
+    }
+    [data-motion="on"]:not([data-level="restrained"]) .fin-bracket[data-corner="end"] {
+      animation: fin-close-end var(--duration-slow) var(--ease-entrance) both;
+      animation-delay: 300ms;
+    }
+    [data-motion="on"] .fin-tile-was {
+      animation: fin-was var(--duration-fast) var(--ease-exit) both;
+      animation-delay: var(--fin-turn, 760ms);
+    }
+    [data-motion="on"] .fin-tile-now {
+      animation: fin-now var(--duration-medium) var(--ease-entrance) both;
+      animation-delay: var(--fin-turn, 760ms);
+    }
+    [data-level="restrained"] .fin-tile-status {
+      --fin-turn: 240ms;
+    }
+  }
+  @keyframes fin-close-start {
+    from {
+      opacity: 0;
+      transform: translate(-1.75rem, -1.75rem);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes fin-close-end {
+    from {
+      opacity: 0;
+      transform: translate(1.75rem, 1.75rem) rotate(180deg);
+    }
+    to {
+      opacity: 1;
+      transform: rotate(180deg);
+    }
+  }
+  @keyframes fin-was {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes fin-now {
+    from {
+      opacity: 0;
+      transform: scale(0.7);
+    }
+    to {
+      opacity: 1;
+      transform: none;
     }
   }
 
