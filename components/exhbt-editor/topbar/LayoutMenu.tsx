@@ -42,7 +42,7 @@ const LAID_OUT_AS: Record<Format, string> = {
 };
 
 /* The first three are copied from the classic editor's LayoutPicker (decision 0026: it is deleted in release 5). */
-const SKETCHES: Record<Format, ReactNode> = {
+export const SKETCHES: Record<Format, ReactNode> = {
   // A title bar, a row of three boxes, two columns.
   "case-study": (
     <>

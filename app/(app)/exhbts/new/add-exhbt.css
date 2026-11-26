@@ -1,0 +1,263 @@
+/* "Add an exhbt" (/exhbts/new): the chooser and the layouts. The screen is built from Astryx components;
+   this file adds only what they don't have, and every colour, space, corner and timing in it is one of
+   Astryx's tokens (the Exhbt theme gives them the brand's values). */
+@layer components {
+  .add-exhbt {
+    /* The ground the pictures sit on: the brand's soft mint fill. */
+    --add-stage: var(--color-accent-muted);
+    /* Keyboard focus on this screen is ringed in jade, which reads on white, mist and mint (DESIGN.md, "Focus");
+       Astryx's own ring is the accent, and mint on white is too faint to find. */
+    --focus-outline-color: var(--color-text-accent);
+  }
+  /* One control per card, pressed anywhere on it. The control is a real link or submit button (an Astryx
+     Button), so it works without the page's scripts; its ::after, which Astryx leaves to the caller, is
+     its press area, grown past the button and cut off at the card's own edge. */
+  .add-cell {
+    display: grid;
+  }
+  .add-way,
+  .add-layout {
+    overflow: clip;
+  }
+  /* A way's picture sizes itself to its card, not to the window: two cards side by side on a tablet are
+     each narrower than one card on a phone. */
+  .add-way {
+    container-type: inline-size;
+  }
+  .add-go::after {
+    content: "";
+    position: absolute;
+    inset: -100vmax;
+  }
+  .add-way-foot {
+    margin-block-start: auto;
+  }
+  /* The mark before "what happens next": it turns down from the button above and sits on the first line. */
+  .add-next-mark {
+    flex: none;
+    margin-block-start: var(--spacing-0-5);
+    color: var(--color-text-secondary);
+  }
+
+  /* A card that can be pressed says so: its edge darkens, its button turns mint (the one mint button on the
+     screen is the one under the pointer or the keyboard), and it lifts by a hair, as a linked card does
+     elsewhere on the site. The cell stays put while its card lifts, so the pointer never falls off the edge
+     it is resting on. The lift rests under reduced motion. */
+  .add-cell:focus-within .add-go:focus-visible {
+    background-color: var(--color-accent);
+  }
+  @media (hover: hover) {
+    .add-cell:hover > :has(.add-go) {
+      border-color: var(--color-border-emphasized);
+    }
+    .add-cell:hover .add-go {
+      background-color: var(--color-accent);
+    }
+  }
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .add-way,
+    .add-layout {
+      transition:
+        transform var(--duration-fast) var(--ease-standard),
+        border-color var(--duration-fast) var(--ease-standard);
+    }
+    .add-cell:hover > :has(.add-go) {
+      transform: translateY(calc(-1 * var(--spacing-0-5)));
+    }
+  }
+
+  /* The pictures. A soft mint stage, white sheets of paper on it, and the editor's layout sketches drawn
+     on the sheets in hairlines that keep their weight at any size. */
+  .add-art {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-3);
+    block-size: calc(var(--spacing-12) * 4);
+    padding: var(--spacing-3);
+    border-radius: var(--radius-element);
+    background: var(--add-stage);
+    color: var(--color-text-secondary);
+  }
+  @container (inline-size >= 28rem) {
+    .add-art {
+      gap: var(--spacing-5);
+      block-size: calc(var(--spacing-8) * 7);
+      padding: var(--spacing-5);
+    }
+  }
+  .add-art-sheet {
+    display: block;
+    padding: var(--spacing-3);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-inner);
+    background: var(--color-background-card);
+  }
+  .add-sketch {
+    display: block;
+    inline-size: 100%;
+    block-size: auto;
+    overflow: visible;
+  }
+  .add-sketch * {
+    vector-effect: non-scaling-stroke;
+    stroke-width: calc(var(--border-width) * 1.5);
+  }
+  .add-art-arrow {
+    flex: none;
+    color: var(--color-text-primary);
+  }
+
+  /* A way that can't be taken now (no AI drafts left): its picture goes quiet. */
+  .add-way[data-off] .add-art {
+    background: var(--color-background-muted);
+    color: var(--color-text-disabled);
+    filter: grayscale(1);
+  }
+
+  /* What you bring: the kinds of file, or the layouts on offer. */
+  .add-art-from {
+    flex: none;
+    display: grid;
+    grid-template-columns: repeat(2, var(--spacing-10));
+    gap: var(--spacing-2);
+  }
+  .add-art-from[data-few] {
+    grid-template-columns: var(--spacing-10);
+  }
+  .add-art-file {
+    display: grid;
+    place-items: center;
+    block-size: var(--spacing-10);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-inner);
+    background: var(--color-background-card);
+    color: var(--color-text-primary);
+  }
+  @container (inline-size >= 28rem) {
+    .add-art-files {
+      grid-template-columns: repeat(2, var(--spacing-12));
+    }
+    .add-art-file {
+      block-size: var(--spacing-12);
+    }
+  }
+  .add-art-layouts .add-art-sheet {
+    padding: var(--spacing-1-5);
+    border-radius: calc(var(--radius-inner) / 2);
+  }
+  /* An odd one out sits under the middle of the pairs above it. */
+  .add-art-layouts:not([data-few]) > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    justify-self: center;
+    inline-size: var(--spacing-10);
+  }
+  .add-art-layouts .add-sketch * {
+    stroke-width: var(--border-width);
+  }
+
+  /* The page you get: the same sheet both times, written in or empty. */
+  .add-art-page {
+    position: relative;
+    flex: 0 1 calc(var(--spacing-12) * 4.5);
+    min-inline-size: 0;
+  }
+  .add-art-over {
+    position: absolute;
+    inset-block-start: var(--spacing-3);
+    inset-inline-start: var(--spacing-3);
+    inline-size: calc(100% - 2 * var(--spacing-3));
+  }
+  /* Written: the title and the result's box in ink, as an exhbt's own flowchart ends on an ink box; the
+     key figure's bars in the chart's two shades. */
+  .add-art-written > .add-sketch:first-child rect:nth-of-type(1),
+  .add-art-written > .add-sketch:first-child rect:nth-of-type(4) {
+    fill: var(--color-text-primary);
+    stroke: var(--color-text-primary);
+  }
+  .add-art-written .add-art-over rect {
+    fill: var(--color-accent);
+    stroke: none;
+  }
+  .add-art-written .add-art-over rect[data-key] {
+    fill: var(--color-text-accent);
+  }
+  /* Empty: quieter lines, and the cursor waiting in the title's box. */
+  .add-art-empty > .add-sketch:first-child {
+    color: var(--color-text-disabled);
+  }
+  .add-art-empty > .add-sketch:first-child rect:nth-of-type(1) {
+    stroke: var(--color-text-accent);
+  }
+  .add-art-empty .add-art-over path {
+    stroke: var(--color-text-accent);
+    stroke-width: calc(var(--border-width) * 2);
+    stroke-linecap: round;
+  }
+
+  /* The example exhbt in its browser frame: the real page, drawn at half size. It is the box its own
+     hidden parts are placed in (a chart's table for screen readers), so the frame's crop cuts them off
+     with the rest and they add nothing to the length of this page. */
+  .add-example {
+    position: relative;
+    zoom: 0.5;
+    padding: var(--spacing-8);
+    background: var(--color-background-card);
+  }
+
+  /* A layout to choose: its sketch on the stage, its name under it, then its line with its button beside
+     it. On a phone it is a row, sketch first, so seven of them fit a screen or two. */
+  .add-layout-body {
+    display: grid;
+    grid-template:
+      "art art" auto
+      "name name" auto
+      "line go" 1fr
+      / minmax(0, 1fr) auto;
+    column-gap: var(--spacing-3);
+    block-size: 100%;
+  }
+  .add-layout-art {
+    grid-area: art;
+    display: grid;
+    place-items: center;
+    padding: var(--spacing-6);
+    border-radius: var(--radius-element);
+    background: var(--add-stage);
+    color: var(--color-text-secondary);
+  }
+  .add-layout-art .add-sketch rect {
+    fill: var(--color-background-card);
+  }
+  .add-layout-name {
+    grid-area: name;
+    margin-block-start: var(--spacing-4);
+  }
+  .add-layout-line {
+    grid-area: line;
+    margin-block-start: var(--spacing-1);
+  }
+  .add-layout .add-go {
+    grid-area: go;
+    align-self: end;
+  }
+  @media (width < 40rem) {
+    .add-layout-body {
+      grid-template:
+        "art name go" auto
+        "art line go" 1fr
+        / calc(var(--spacing-12) * 2) minmax(0, 1fr) auto;
+    }
+    .add-layout-art {
+      padding: var(--spacing-3);
+      border-radius: var(--radius-inner);
+    }
+    .add-layout-name {
+      margin-block-start: 0;
+      align-self: end;
+    }
+    .add-layout .add-go {
+      align-self: center;
+    }
+  }
+}
