@@ -28,7 +28,7 @@ No two agents edit the same file. Hand-overs are named in the briefs.
 | Agent | Owns |
 |---|---|
 | 1a | `themes/exhbt/exhbtTheme.ts` and the five files `npm run theme` writes beside it |
-| 1b | `app/dev/astryx/` (new); new files in `components/ui/` (`Field.tsx`, `Notice.tsx`, `toast.ts`, `Sheet.tsx`, `Confirm.tsx`, `Menu.tsx`, `Empty.tsx`, `Steps.tsx`); `components/brand/Address.tsx` (new); `scripts/check-tokens.mjs`, `scripts/check-raised.mjs`, `scripts/check-astryx-use.mjs` (new); `package.json` (four script lines); `.github/workflows/ci.yml` (one step); `e2e/astryx-kit.spec.ts` (new) |
+| 1b | `app/dev/astryx/` (new); new files in `components/ui/` (`Field.tsx`, `Notice.tsx`, `toast.ts`, `Sheet.tsx`, `Confirm.tsx`, `Menu.tsx`, `Empty.tsx`, `Steps.tsx`); `components/brand/AddressLine.tsx` (new); `scripts/check-tokens.mjs`, `scripts/check-raised.mjs`, `scripts/check-astryx-use.mjs` (new); `package.json` (four script lines); `.github/workflows/ci.yml` (one step); `e2e/astryx-kit.spec.ts` (new) |
 | 2a | `components/site/SiteHeader.tsx`, `HeaderLinks.tsx`, `MobileNav.tsx`, `SiteFooter.tsx`; `components/site/shell.css` and `components/site/AppFooter.tsx` (new); `app/(app)/layout.tsx`, `app/(marketing)/layout.tsx`; the header's cases in `e2e/landing.spec.ts`, `phase1.spec.ts`, `phase2-editor-media.spec.ts`, `phase2-polish-2.spec.ts`, `phase2-saved-ideas.spec.ts`, `portfolio-landing.spec.ts` and `portfolio-switch.spec.ts`; `e2e/shell.spec.ts` (new) |
 | 2b | `components/ui/Page.tsx` (new); `app/(app)/account/page.tsx`, `account/billing/page.tsx`, `roadmap/page.tsx`, `roadmap/saved/page.tsx`, `job-links/new/page.tsx`, `job-links/[id]/page.tsx`, `admin/page.tsx`, `admin/accounts/page.tsx` (their outer frame and section wrappers only); `e2e/page-frame.spec.ts` (new); once 1b is merged, the baseline list in `scripts/check-raised.mjs`, to take a flattened file off it |
 
@@ -59,7 +59,7 @@ The first ten are the rules of `docs/briefs/edit-on-page/README.md`, with this b
 
 ## How each job is verified
 
-**1a.** `npm run check:theme`. Both parity specs with `CI` unset, so boxes are compared, `e2e/exhbt-page.spec.ts` and `e2e/phase2-looks.spec.ts`: the same results before the first change and after the last. A search of the built `exhbt.css` for the motion values and for the neutral theme's blue. Photographs of a focused "See the work" button in all eight looks, before and after. `/dev/astryx` beside the lab's Kit page: they match.
+**1a.** `npm run check:theme`. Both parity specs with `CI` unset, so boxes are compared, `e2e/exhbt-page.spec.ts` and `e2e/phase2-looks.spec.ts`: the same results before the first change and after the last. A search of the built `exhbt.css` for the motion values and for the neutral theme's blue. Photographs of a focused "See the work" button in all eight looks, before and after. The display type measured in a touch context at 390 and 820 wide, because the theme has a rule for touch screens that parity never runs. `/dev/astryx` beside the lab's Kit page: they match.
 
 **1b.** `e2e/astryx-kit.spec.ts`: axe on `/dev/astryx`; the focus ring's colour; a notice that is still a live region; the sheet as a drawer on a wide window, and a list of actions as a bottom sheet on a phone; nothing animating under reduced motion; the address component. The three check scripts pass on the branch and fail on a planted fault each.
 

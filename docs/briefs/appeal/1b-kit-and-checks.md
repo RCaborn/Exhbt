@@ -27,7 +27,7 @@ Nothing here changes a screen a student can reach. You add files; you wire none 
 
 - `app/dev/astryx/` (new).
 - New files in `components/ui/`: `Field.tsx`, `Notice.tsx`, `toast.ts`, `Sheet.tsx`, `Confirm.tsx`, `Menu.tsx`, `Empty.tsx`, `Steps.tsx`.
-- `components/brand/Address.tsx` (new).
+- `components/brand/AddressLine.tsx` (new).
 - `scripts/check-tokens.mjs`, `scripts/check-raised.mjs`, `scripts/check-astryx-use.mjs` (new).
 - `package.json`: three script lines, and their names added to the `check` script. Nothing else in that file.
 - `.github/workflows/ci.yml`: one step, beside `check:theme`.
@@ -124,15 +124,15 @@ export function Empty(props: { title: string; body?: string; picture?: ReactNode
 /** Astryx Stepper. Throws in development if given fewer than three steps. */
 export function Steps(props: { label: string; steps: { label: string; note?: string }[]; active: number; compact?: boolean }): ReactNode;
 
-// components/brand/Address.tsx
+// components/brand/AddressLine.tsx
 /**
  * A person's address as display type (decision 0033, the first of the six): the name, then the host from lib/hosts.ts.
  * "on-ink": the name in mint, the rest white. "on-white": the name in jade, the rest ink.
  */
-export function Address(props: { username: string; tone?: "on-ink" | "on-white"; size?: 1 | 2 | 3; as?: "p" | "h2" | "h3" }): ReactNode;
+export function AddressLine(props: { username: string; tone?: "on-ink" | "on-white"; size?: 1 | 2 | 3; as?: "p" | "h2" | "h3" }): ReactNode;
 ```
 
-**The three checks.**
+**The three checks.** All three leave out the design lab (`app/lab/`, `components/lab/`) and `themes/`: the lab is frozen for you, it is not part of the product, and it already holds things the checks would refuse (a floating button with `elevation="med"`, its own `shadow-pack` variables).
 
 - `scripts/check-tokens.mjs`: the brand's values are declared twice, in `themes/exhbt/exhbtTheme.ts` and in the `@theme` block of `app/globals.css`, and nothing stops them drifting. Read both and fail if mint, the mint press colour, jade, ink, graphite, slate, line, mist, wash, the error red or white differ. Compare case-insensitively.
 - `scripts/check-raised.mjs`: 0033's second rule. Count the files under `app/` and `components/` that use `shadow-pack`, or pass `elevation="low"`, `"med"` or `"high"` to anything. Hold today's list in the script as a baseline (about 33 files use `shadow-pack`). Fail when a file not on the list appears. Print how many are left. Later jobs shorten the list as they flatten a screen.
@@ -155,7 +155,7 @@ Commit and push after each.
 6. `Field.tsx`: prove on the dev page that a `TextField` with a `name` inside a plain `<form>` posts its value, with and without a `defaultValue`, and that an `error` is read out with the field. Label text passes through unchanged: do not turn "(optional)" in a label into Astryx's Optional mark, because the tests find fields by their labels and the screens that own those labels will decide.
 7. `Notice.tsx`: the outer element is the live region; the `Banner` is inside it.
 8. `Sheet.tsx`: start from the portfolio editor's file, taking `open` and `onOpenChange` as props where it reads the portfolio's runtime. Add the one thing it lacks: on a touch phone, `kind="actions"` draws an Astryx `BottomSheet` with `height="hug"`. When both wrappers are on `main`, the portfolio editor's can become a two-line import of yours; say so in your report, and do not touch it.
-9. `Address.tsx`: the host comes from `portfolioHost`, never from a typed string. A name `USERNAME_RE` would refuse is drawn as given: checking is the caller's job.
+9. `AddressLine.tsx` (named so as not to be confused with the portfolio editor's own `Address.tsx`, which reads the browser's address): the host comes from `portfolioHost`, never from a typed string. A name `USERNAME_RE` would refuse is drawn as given: checking is the caller's job.
 
 **Milestone 3: the checks**
 
@@ -167,12 +167,12 @@ Commit and push after each.
     - a `Notice` with `status="info"` sits in an element with `role="status"`, and one with `status="error"` in `role="alert"`;
     - the `Sheet` is a drawer at the side at 1440 wide; in a block that sets a 390 by 844 touch viewport with `test.use`, a `kind="actions"` sheet is a bottom sheet and a `kind="form"` sheet fills the width; Escape closes each and focus goes back to the button that opened it;
     - with reduced motion emulated, opening the `Sheet` leaves `document.getAnimations()` empty;
-    - `Address` for "priya-shah" shows the name and the host `portfolioHost` gives;
+    - `AddressLine` for "priya-shah" shows the name and the host `portfolioHost` gives;
     - `Steps` with two steps throws in development.
 
 ## Done looks like
 
-`/dev/astryx` shows every part the plan uses, in Exhbt's theme, beside today's hand-built versions. Eight wrappers and the address component exist, are used nowhere yet, and each has a live example and a test. `npm run check` runs three new checks, each proven to fail on a planted fault. No screen a student can reach has changed.
+`/dev/astryx` shows every part the plan uses, in Exhbt's theme, beside today's hand-built versions. Eight wrappers and `AddressLine` exist, are used nowhere yet, and each has a live example and a test. `npm run check` runs three new checks, each proven to fail on a planted fault. No screen a student can reach has changed.
 
 ## Report back
 

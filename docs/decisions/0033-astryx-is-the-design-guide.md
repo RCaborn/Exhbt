@@ -222,6 +222,7 @@ Each has the default that applies if Rory says nothing. The first six are the qu
 ## Not sure, and risky
 
 - **Nothing has been seen on a real iPhone.** Every phone screenshot came from a desktop browser pretending. Astryx's sheets, drawers and the phone keyboard are the parts most likely to differ.
+- **The golden copies cannot see a phone.** The parity specs run with a mouse pointer even at phone width, and the theme has a rule that applies only to touch screens under 1024px. A theme change could move a visitor's page on a real phone with every test green. The plan has the theme job measure a phone by hand; a parity run in a touch context would close the gap properly, and belongs to whoever owns that spec.
 - **Astryx is in beta.** A component can behave in a way its page does not say. Each job reads the component with the CLI and looks at it in the browser before building on it.
 - **The shell changes the header on every page at once.** Seven spec files select the header, its Menu button or its `Main` navigation. If it is not green in time it is left out whole: a half-moved header is the "two systems" look this decision exists to avoid.
 - **Astryx's `Banner` is not a live region by default.** Twelve spec files and every screen reader rely on `role="status"` or `role="alert"`; a swap that loses one is a regression nobody would see.
