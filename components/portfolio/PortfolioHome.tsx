@@ -722,6 +722,41 @@ function Vision({ theme, edit }: { theme: PortfolioTheme; edit: HomeEdit }) {
   );
 }
 
+/**
+ * One row of the work in the list and index looks: what sits inside each `<li>` of the list. `n` is the
+ * row's place in the list from 0 (the index look prints it as [01]). `inert` while editing: a click
+ * reaches the editor's frame, not the link. Exported so the editor draws its owner-only rows (a draft,
+ * a hidden exhbt) in the look's own row; it must draw for visitors exactly as it did inside `Work`.
+ */
+export function WorkRow({ project: p, n, look, inert }: { project: Pick<HomeProject, "title" | "summary" | "href">; n: number; look: "list" | "index"; inert?: boolean }) {
+  const body = (
+    <>
+      {look === "index" ? (
+        <span aria-hidden className="shrink-0 font-semibold text-[color:var(--pf-faint)] tabular-nums">
+          [{String(n + 1).padStart(2, "0")}]
+        </span>
+      ) : (
+        <ChevronRight aria-hidden size={18} strokeWidth={2} className="mt-[0.2em] shrink-0 text-[color:var(--pf-faint)]" />
+      )}
+      <span className="min-w-0">
+        <span
+          className={`block text-[1.125rem] leading-snug font-semibold ${p.href ? "underline decoration-[color:var(--pf-line)] decoration-2 underline-offset-[5px] group-hover:decoration-[color:var(--pf-ink)]" : ""}`}
+        >
+          {p.title}
+        </span>
+        {p.summary && <span className="mt-1 block text-[0.95rem] leading-relaxed text-[color:var(--pf-soft)]">{p.summary}</span>}
+      </span>
+    </>
+  );
+  return p.href ? (
+    <Link href={p.href} inert={inert || undefined} className="group flex gap-3 py-4">
+      {body}
+    </Link>
+  ) : (
+    <div className="flex gap-3 py-4">{body}</div>
+  );
+}
+
 function Work({ projects, more, theme, edit }: { projects: HomeProject[]; more: boolean; theme: PortfolioTheme; edit?: HomeEdit }) {
   const heading = (
     <h2 id="work-h" className={H2}>
@@ -738,32 +773,7 @@ function Work({ projects, more, theme, edit }: { projects: HomeProject[]; more: 
         {heading}
         <List className={`mt-6 max-w-[48rem] ${ROWS}`}>
           {projects.map((p, i) => {
-            const body = (
-              <>
-                {index ? (
-                  <span aria-hidden className="shrink-0 font-semibold text-[color:var(--pf-faint)] tabular-nums">
-                    [{String(i + 1).padStart(2, "0")}]
-                  </span>
-                ) : (
-                  <ChevronRight aria-hidden size={18} strokeWidth={2} className="mt-[0.2em] shrink-0 text-[color:var(--pf-faint)]" />
-                )}
-                <span className="min-w-0">
-                  <span
-                    className={`block text-[1.125rem] leading-snug font-semibold ${p.href ? "underline decoration-[color:var(--pf-line)] decoration-2 underline-offset-[5px] group-hover:decoration-[color:var(--pf-ink)]" : ""}`}
-                  >
-                    {p.title}
-                  </span>
-                  {p.summary && <span className="mt-1 block text-[0.95rem] leading-relaxed text-[color:var(--pf-soft)]">{p.summary}</span>}
-                </span>
-              </>
-            );
-            const row = p.href ? (
-              <Link href={p.href} inert={edit ? true : undefined} className="group flex gap-3 py-4">
-                {body}
-              </Link>
-            ) : (
-              <div className="flex gap-3 py-4">{body}</div>
-            );
+            const row = <WorkRow project={p} n={i} look={index ? "index" : "list"} inert={Boolean(edit)} />;
             return (
               <li key={p.id} data-card={p.id}>
                 {edit ? edit.tile({ id: p.id, where: "row", index: i, count: projects.length }, row) : row}

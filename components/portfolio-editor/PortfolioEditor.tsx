@@ -10,8 +10,10 @@ import type { PortfolioData } from "@/app/(app)/portfolio/load";
 import type { BuilderState } from "@/app/(app)/portfolio/steps";
 import { useBuilder } from "@/app/(app)/portfolio/useBuilder";
 import { useAtom } from "@/components/exhbt-editor/atom";
+import { ToastViewport } from "@astryxdesign/core/Toast";
 import { useNoZoomOnFocus } from "@/components/exhbt-editor/phone/noZoom";
 import { Said } from "@/components/exhbt-editor/ui/Said";
+import { Address } from "./Address";
 import { EditorBar } from "./bar/EditorBar";
 import { FirstRun } from "./bar/FirstRun";
 import { Canvas } from "./Canvas";
@@ -164,13 +166,17 @@ export function PortfolioEditor({ data, team, jobLinks }: PortfolioEditorProps):
  */
 const Shell = memo(function Shell({ ready, team, jobLinks }: { ready: boolean; team: ReactNode; jobLinks: ReactNode }): ReactNode {
   return (
-    <div data-editor="portfolio" data-ready={ready ? "true" : undefined}>
-      <EditorBar team={team} jobLinks={jobLinks} />
-      <FirstRun />
-      <Canvas />
-      <LiveRegion />
-      {devParam("crash") === "change" && <CrashOnChange />}
-    </div>
+    // Astryx's toasts (the note after ?at=) are drawn in this viewport, inside the app's theme.
+    <ToastViewport position="bottomEnd">
+      <div data-editor="portfolio" data-ready={ready ? "true" : undefined}>
+        <EditorBar team={team} jobLinks={jobLinks} />
+        <FirstRun />
+        <Canvas />
+        <LiveRegion />
+        {ready && <Address />}
+        {devParam("crash") === "change" && <CrashOnChange />}
+      </div>
+    </ToastViewport>
   );
 });
 

@@ -17,7 +17,9 @@ import { usePortfolioData, useRuntime, type PortfolioSheet, type Runtime } from 
  *   ?at=<exhbt id>                            scrolls to that tile and marks it for two seconds; if the
  *                                             exhbt is live, a note at the foot of the window gives its link
  *   ?full=1                                   the Add tile gives the plan's reason in the alert tone
- *   ?joined=1, ?left=1                        opens Team, with the note about joining or leaving
+ *   ?joined=1, ?left=1                        opens Team, with the note about joining or leaving; these
+ *                                             and ?full=1 stay in the address until Team closes, since
+ *                                             the server draws the Team sheet from them
  *   ?step=you|look|projects|publish           the step builder's own addresses: the name's field, the Look
  *                                             menu, the work, the address sheet
  *   #team-projects, #job-links                as open=team and open=job-links (sent emails carry the first)
@@ -61,15 +63,12 @@ function act(rt: Runtime, data: PortfolioData, say: (id: string) => void): strin
     open = asked as PortfolioSheet;
     done("open");
   }
-  if (q.get("full") === "1") {
-    rt.ui.set((u) => ({ ...u, full: true }));
-    done("full");
-  }
+  const full = q.get("full") === "1";
+  if (full) rt.ui.set((u) => ({ ...u, full: true }));
   for (const note of ["joined", "left"] as const) {
     if (q.get(note) !== "1") continue;
     rt.ui.set((u) => ({ ...u, team: note }));
     open = "team";
-    done(note);
   }
   const step = q.get("step");
   if (step === "you") rt.api.jumpTo("profile.name");
@@ -102,8 +101,36 @@ function act(rt: Runtime, data: PortfolioData, say: (id: string) => void): strin
     url.hash = "";
     changed = true;
   }
+  // The Team sheet is drawn on the server from the same words (TeamPanel's said and full): while it is
+  // open they stay in the address, so a refresh meanwhile draws it with them still, and they go as it
+  // closes (forgetTeamNote, below). Without Team open, `full` is only the Add tile's and goes at once.
+  if (open !== "team" && full) done("full");
   if (open) rt.api.open(open);
   return changed ? `${url.pathname}${url.search}${url.hash}` : null;
+}
+
+/** The team's words in the address: kept while the Team sheet is open (act, above). */
+const TEAM_WORDS = ["joined", "left", "full"] as const;
+
+/**
+ * Once the Team sheet closes, its note has been read: the note goes from the view, and its words from the
+ * address, so neither a reload nor the next refresh says it again.
+ */
+function forgetTeamNote(rt: Runtime): () => void {
+  let was = rt.ui.get().sheet;
+  return rt.ui.subscribe(() => {
+    const now = rt.ui.get().sheet;
+    const closed = was === "team" && now !== "team";
+    was = now;
+    if (!closed) return;
+    const url = new URL(window.location.href);
+    const kept = TEAM_WORDS.filter((k) => url.searchParams.has(k));
+    if (kept.length > 0) {
+      for (const k of kept) url.searchParams.delete(k);
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    }
+    if (rt.ui.get().team) rt.ui.set((u) => ({ ...u, team: null }));
+  });
 }
 
 /** Draws nothing: acts on the address once the editor is up. */
@@ -129,11 +156,14 @@ export function Address(): ReactNode {
       });
     };
     const next = act(rt, latest.current, live);
-    // Next's router follows the address through the browser's own history calls.
-    if (next) window.history.replaceState(null, "", next);
+    // Next's router follows the address through the browser's own history calls; its own entry in the
+    // history's state is kept, so Back and Forward still work as Next expects.
+    if (next) window.history.replaceState(window.history.state, "", next);
     // Once, as the editor opens: the address is read then, and never again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Not once: a subscription, set up again whenever React runs the effects again.
+  useEffect(() => forgetTeamNote(rt), [rt]);
   return null;
 }
 
