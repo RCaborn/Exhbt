@@ -17,11 +17,31 @@ const KEEP_MS = 400;
  * (and for a moment after, while it slides away).
  *
  * `purpose="form"` for a sheet holding a form a stray press outside must not lose (the address);
- * `footer` for a sheet's own actions, pinned while its contents scroll. App chrome, in the app's own
- * style: nothing here is hand-built.
+ * `footer` for a sheet's own actions, pinned while its contents scroll. `when` for a name that several
+ * parts on the page share: every section and tile draws a sheet named "item", and only the one whose
+ * More was pressed is to open. App chrome, in the app's own style: nothing here is hand-built.
  */
-export function Sheet({ name, title, subtitle, purpose = "info", width, footer, children }: { name: PortfolioSheet; title: string; subtitle?: string; purpose?: "info" | "form"; width?: number | string; footer?: ReactNode; children: ReactNode }): ReactNode {
-  const open = usePortfolioUi((u) => u.sheet === name);
+export function Sheet({
+  name,
+  when = true,
+  title,
+  subtitle,
+  purpose = "info",
+  width,
+  footer,
+  children,
+}: {
+  name: PortfolioSheet;
+  /** For a name several parts share (each section's and each tile's "item"): whether this one is the one meant. */
+  when?: boolean;
+  title: string;
+  subtitle?: string;
+  purpose?: "info" | "form";
+  width?: number | string;
+  footer?: ReactNode;
+  children: ReactNode;
+}): ReactNode {
+  const open = usePortfolioUi((u) => u.sheet === name) && when;
   const api = usePortfolioApi();
   const [kept, setKept] = useState(open);
   useEffect(() => {
