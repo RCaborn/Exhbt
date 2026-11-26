@@ -300,6 +300,38 @@ test.describe("Bold and italic at the words selected", () => {
   });
 });
 
+test.describe("The fields that take no links", () => {
+  test("a link sent in a quote, a pull quote or a link's line is not stored: the server keeps the words and their bold", async ({ page }) => {
+    // The editor offers no Link in these three (decision 0032); a request built by hand could still send one, so the
+    // store is handed one directly here, as such a request would carry it, and what the server saved is read back.
+    const { id } = await openDoc(page, freshName("ywnolink"), essay());
+    await page.evaluate(() =>
+      window.__exhbtEditor!.patchDoc((d) => ({
+        ...d,
+        sections: d.sections.map((s) =>
+          s.kind === "quote" || s.kind === "pullquote"
+            ? { ...s, textRuns: [{ t: s.text.slice(0, 5), b: true, href: "https://example.com/a" }, { t: s.text.slice(5), href: "https://example.com/b" }] }
+            : s.kind === "link"
+              ? { ...s, descriptionRuns: [{ t: s.description, href: "https://example.com/c" }] }
+              : s,
+        ),
+      })),
+    );
+    // Saved once the quote's bold is stored; the editor's own copy still holds the links, so it never matches what was stored.
+    await expect.poll(async () => ((await readStored(page, id)).working.sections.find((s) => s.kind === "quote") as Extract<ContentSection, { kind: "quote" }>).textRuns?.length ?? 0).toBeGreaterThan(0);
+    const stored = (await readStored(page, id)).working;
+    const quote = stored.sections.find((s) => s.kind === "quote") as Extract<ContentSection, { kind: "quote" }>;
+    const pullquote = stored.sections.find((s) => s.kind === "pullquote") as Extract<ContentSection, { kind: "pullquote" }>;
+    const links = stored.sections.filter((s) => s.kind === "link") as Extract<ContentSection, { kind: "link" }>[];
+    // The bold is kept where it was, the link is not; runs left with no formatting at all are not stored.
+    expect(quote.textRuns).toEqual([{ t: quote.text.slice(0, 5), b: true }, { t: quote.text.slice(5) }]);
+    expect(pullquote.textRuns).toEqual([{ t: pullquote.text.slice(0, 5), b: true }, { t: pullquote.text.slice(5) }]);
+    for (const l of links) expect(l).not.toHaveProperty("descriptionRuns");
+    // None of the three addresses is stored anywhere.
+    for (const a of ["example.com/a", "example.com/b", "example.com/c"]) expect(JSON.stringify(stored)).not.toContain(a);
+  });
+});
+
 test.describe("What a visitor sees of the formatting, on the page and in print", () => {
   const BOLD: RichText = [{ t: "Lunch is " }, { t: "calmer now", b: true }, { t: ", and the queue is out of the doorway." }];
   const SLANTED: RichText = [{ t: "A queue is a price " }, { t: "nobody set", i: true, b: true }, { t: "." }];

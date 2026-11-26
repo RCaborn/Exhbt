@@ -8,7 +8,7 @@ import { BUILD_IT_YOURSELF, LAYOUT_REFUSED } from "@/lib/add-exhbt";
 import { isAdmin } from "@/lib/admin";
 import { getCurrentUser, type SessionUser } from "@/lib/auth";
 import { editorKind } from "@/lib/editor-kind-server";
-import { emptyDoc, ExhbtDocSchema, LIMITS, text, validateForPublish, type ExhbtDoc } from "@/lib/exhbt/blocks";
+import { emptyDoc, ExhbtDocSchema, LIMITS, text, validateForPublish, withoutStrayLinks, type ExhbtDoc } from "@/lib/exhbt/blocks";
 import { formatOf, isFormat, LAYOUT_NOT_OFFERED, mayCarryFormat, offeredIn, withFormat } from "@/lib/exhbt/formats";
 import { slugify, uniqueSlug } from "@/lib/exhbt/slug";
 import { canCreateExhbt, canPublish, getPlan } from "@/lib/plan";
@@ -34,10 +34,10 @@ function readDoc(raw: unknown): ExhbtDoc | null {
   if (JSON.stringify(raw ?? null).length > 60_000) return null;
   const parsed = ExhbtDocSchema.safeParse(raw);
   if (!parsed.success) return null;
+  // A quote, a pull quote and a link's line take no links (decision 0032), whatever the request holds.
+  const doc = withoutStrayLinks(parsed.data);
   const unverified = (raw as { unverified?: unknown }).unverified;
-  return Array.isArray(unverified) && unverified.every((u) => typeof u === "string")
-    ? ({ ...parsed.data, unverified: unverified.slice(0, 50) } as ExhbtDoc)
-    : parsed.data;
+  return Array.isArray(unverified) && unverified.every((u) => typeof u === "string") ? ({ ...doc, unverified: unverified.slice(0, 50) } as ExhbtDoc) : doc;
 }
 
 /**

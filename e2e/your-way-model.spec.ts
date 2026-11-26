@@ -16,6 +16,7 @@ import {
   text,
   trimRuns,
   validateForPublish,
+  withoutStrayLinks,
   wordCount,
   type Chart,
   type ContentSection,
@@ -398,5 +399,18 @@ test.describe("The selection bar's place settles", () => {
     expect(settlePlace(first, 410.7, 200.6)).toBe(first);
     // A move to another whole pixel is a new place.
     expect(settlePlace(first, 412, 201)).toEqual({ x: 412, y: 201 });
+  });
+});
+
+test.describe("A quote, a pull quote and a link's line take no links", () => {
+  test("withoutStrayLinks keeps their words and bold, drops any address, and leaves a finding's link and a clean doc alone", () => {
+    const d = core([findings([[{ t: "Waits fell", href: "https://example.com/f" }]]), quote({ textRuns: [{ t: "Lunch ", i: true, href: "https://example.com/q" }, { t: "is calmer now, and the queue is out of the doorway." }] }), link({ descriptionRuns: [{ t: "Two weeks of lunchtimes, a row a minute", href: "https://example.com/l" }] })]);
+    const out = withoutStrayLinks(d);
+    const q = out.sections.find((s) => s.kind === "quote") as Of<"quote">;
+    expect(q.textRuns).toEqual([{ t: "Lunch ", i: true }, { t: "is calmer now, and the queue is out of the doorway." }]);
+    expect(out.sections.find((s) => s.kind === "link")).not.toHaveProperty("descriptionRuns");
+    expect((out.sections.find((s) => s.kind === "findings") as Of<"findings">).items[0]).toEqual([{ t: "Waits fell", href: "https://example.com/f" }]);
+    const clean = core([findings(), quote(), link()]);
+    expect(withoutStrayLinks(clean)).toBe(clean);
   });
 });
