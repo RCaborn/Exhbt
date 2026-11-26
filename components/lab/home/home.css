@@ -61,11 +61,12 @@
   .hl-hero-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "title" "work" "name" "act" "hint" "lead";
+    /* On a phone the way in comes before the picture, so the button is in the first screen and the page starts under it. */
+    grid-template-areas: "title" "name" "act" "work" "lead";
     row-gap: 1.25rem;
   }
   .hl-hero:not([data-field]) .hl-hero-grid {
-    grid-template-areas: "title" "work" "act" "lead";
+    grid-template-areas: "title" "act" "work" "lead";
   }
   .hl-hero-title {
     grid-area: title;
@@ -80,10 +81,6 @@
     gap: 0.625rem;
     max-width: 30rem;
   }
-  .hl-hero-hint {
-    grid-area: hint;
-    max-width: 30rem;
-  }
   .hl-hero-act {
     grid-area: act;
     display: flex;
@@ -91,14 +88,22 @@
     align-items: center;
     gap: 0.75rem 1.25rem;
   }
+  .hl-hero-roadmap {
+    flex-basis: 100%;
+  }
+  /* An inline link given a finger-sized target (44px tall) without changing how its words sit. */
+  .hl-hit {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+  }
   .hl-hero-work {
     grid-area: work;
     position: relative;
   }
-  /* The address the name gives, in display type: it breaks after the name's dot, or at a hyphen in a long name. */
+  /* The address the name gives, in display type, straight under the field: it breaks after the name's dot, or at a hyphen in a long name. */
   .hl-hero-address {
     overflow-wrap: anywhere;
-    padding-top: 0.25rem;
   }
   /* The tag on the frame's bar: an example, or a preview with your name. */
   .hl-frame-tag {
@@ -108,9 +113,14 @@
     z-index: 1;
     pointer-events: none;
   }
-  /* The page in the frame: zoomed, so it lays out as a laptop shows it. The window is an Astryx AspectRatio. */
+  /*
+   * The page in the frame. On a phone it is drawn at phone width, full size, so its words can be
+   * read, and the window is cropped to it (HeroPage scrolls it to her best work, or to her name once
+   * one is typed). From a tablet up it is zoomed, so it lays out as a laptop shows it. The window
+   * is an Astryx AspectRatio.
+   */
   .hl-hero-page {
-    zoom: 0.44;
+    zoom: 1;
   }
   .hl-hero-work {
     display: grid;
@@ -119,15 +129,11 @@
   }
   .hl-hero-scroll {
     height: 100%;
+    overflow: hidden;
   }
-  /* On a phone at maximal the opening line is larger, so the window is shorter and its caption goes, keeping the button in the first screen. */
+  /* The caption under the working window (maximal) is for a wide screen; on a phone the window says it by itself. */
   .hl-hero-work > .astryx-text {
     display: none;
-  }
-  @media (width < 640px) {
-    [data-level="maximal"] .hl-hero-work .astryx-aspect-ratio {
-      aspect-ratio: 2 / 1;
-    }
   }
   @media (width >= 640px) {
     .hl-hero-work > .astryx-text {
@@ -161,7 +167,7 @@
     animation-duration: var(--hl-open-time, 720ms);
   }
   .hl-hero-work .astryx-aspect-ratio {
-    aspect-ratio: 16 / 10;
+    aspect-ratio: 4 / 5;
   }
   @media (width >= 640px) {
     .hl-hero-page {
@@ -174,8 +180,8 @@
   @media (width >= 1024px) {
     .hl-hero-grid {
       grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-      grid-template-rows: auto auto auto auto auto 1fr;
-      grid-template-areas: "title title" "lead work" "name work" "hint work" "act work" ". work";
+      grid-template-rows: auto auto auto auto 1fr;
+      grid-template-areas: "title title" "lead work" "name work" "act work" ". work";
       column-gap: clamp(2.5rem, 5vw, 4.5rem);
       row-gap: 1.75rem;
     }
@@ -192,6 +198,43 @@
     }
     .hl-hero-work .astryx-aspect-ratio {
       aspect-ratio: 4 / 3;
+    }
+  }
+
+  /*
+   * Maximal, at rest: the work is the biggest thing on the screen. The window leaves the content
+   * line and runs off the edge of the screen (both edges on a phone, the right one from a laptop
+   * up), larger, with square corners where it meets the edge. The section clips it, so nothing
+   * scrolls sideways.
+   */
+  [data-level="maximal"] .hl-hero {
+    overflow-x: clip;
+  }
+  @media (width < 640px) {
+    [data-level="maximal"] .hl-hero-work {
+      margin-inline: calc(-1 * var(--exhbt-gutter));
+    }
+    [data-level="maximal"] .hl-hero-work [data-lab-frame] {
+      --radius: 0;
+    }
+  }
+  @media (width >= 1024px) {
+    [data-level="maximal"] .hl-hero-work {
+      /* From the content line to the screen's edge, and on past it, so the frame's far corners are never seen. */
+      --hl-off: 4rem;
+      margin-right: calc(-1 * (max(var(--exhbt-gutter), (100vw - var(--exhbt-content-width)) / 2 + var(--exhbt-gutter)) + var(--hl-off)));
+    }
+    [data-level="maximal"] .hl-frame-tag {
+      right: calc(var(--hl-off) + 1.25rem);
+    }
+    [data-level="maximal"] .hl-hero-work > .astryx-text {
+      display: none;
+    }
+    [data-level="maximal"] .hl-hero-page {
+      zoom: 0.6;
+    }
+    [data-level="maximal"] .hl-hero-work .astryx-aspect-ratio {
+      aspect-ratio: 5 / 4;
     }
   }
 

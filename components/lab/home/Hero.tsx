@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import { Heading } from "@astryxdesign/core/Heading";
+import { Link } from "@astryxdesign/core/Link";
 import { useAnnounce } from "@astryxdesign/core/hooks";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -94,8 +95,11 @@ export function Hero() {
           <div className="hl-hero-name">
             <TextInput
               label="Your name"
+              description="Type it and the address and the page take it. Nothing you type here is saved or sent."
               value={me.typed}
               onChange={(v) => setTyped(v)}
+              status={me.why ? { type: "warning", message: me.why } : undefined}
+              statusVariant="detached"
               size="lg"
               autoComplete="name"
               autoCapitalize="words"
@@ -110,19 +114,18 @@ export function Hero() {
             </p>
           </div>
         )}
-        {field && (
-          <div className="hl-hero-hint">
-            <Text as="p" display="block" type="supporting">
-              {me.why ?? "Type your name and the address and the page take it. Nothing you type here is saved or sent."}
-            </Text>
-          </div>
-        )}
 
         <div className="hl-hero-act">
           <Button label="Start your portfolio" href={`${LAB_PATH}/app`} variant="primary" size="lg" />
           <Text as="p" display="block" type="supporting">
             Next: a free account, then your page. You pay only to put it online.
           </Text>
+          {/* The way in for someone with nothing to show yet: free, and no account (clarity review, finding 1). */}
+          <p className="hl-hero-roadmap">
+            <Link href="#roadmap" className="hl-hit">
+              Not sure what to show yet? Build your free roadmap first
+            </Link>
+          </p>
         </div>
 
         <div className="hl-hero-work">

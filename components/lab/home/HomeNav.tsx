@@ -4,7 +4,7 @@ import { Logo } from "@/components/brand/Logo";
 import { LAB_PATH } from "../lab";
 
 /**
- * Home's top bar, as a signed-out visitor has it: the brand, three links into the page's own story,
+ * Home's top bar, as a signed-out visitor has it: the brand, four links into the page's own story (the free roadmap among them, the way in that needs no account),
  * "Log in", and the hero's one action again, under the same label (the appeal plan's job 6a: the
  * header's button says what the hero's says, so there is one way in, not two). It is the quiet
  * button, not mint: the page's one mint button is the hero's. Astryx TopNav in the proposed theme,
@@ -20,6 +20,7 @@ export function HomeNav() {
         <span className="hl-nav-links">
           <TopNavItem label="What is an exhbt?" href="#one-page" />
           <TopNavItem label="How it works" href="#how" />
+          <TopNavItem label="Free roadmap" href="#roadmap" />
           <TopNavItem label="Pricing" href="#prices" />
         </span>
       }

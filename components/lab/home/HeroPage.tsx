@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { AspectRatio } from "@astryxdesign/core/AspectRatio";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { PortfolioHome } from "@/components/portfolio/PortfolioHome";
 import { ProjectView } from "@/components/portfolio/ProjectView";
 import { lookAttrs, themeStyle } from "@/components/portfolio/themeFonts";
@@ -35,6 +36,25 @@ export function HeroPage({ live, moves }: { live: boolean; moves: boolean }) {
   const root = useRef<HTMLDivElement>(null);
   const shown = live && open ? exhbtOf(open) : null;
   const host = portfolioHost(me.username);
+  const phone = useMediaQuery("(width < 640px)");
+  const scroller = useRef<HTMLDivElement>(null);
+
+  // On a phone the page is drawn full size, so the window is a crop of it: her best work (its title
+  // and its graph) until a name is typed, then the top of the page, where the typed name is. The
+  // window moves to it, smoothly when motion is allowed. From a tablet up the whole page fits zoomed.
+  useEffect(() => {
+    const box = scroller.current;
+    if (!box) return;
+    if (!phone || shown) {
+      box.scrollTo({ top: 0 });
+      return;
+    }
+    // Her name, or her best work's title, with the line above it (the greeting, or "My best piece of work").
+    const target = box.querySelector<HTMLElement>(me.yours ? "h1" : '[data-section="featured"] h2');
+    if (!target) return;
+    const top = target.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 56;
+    box.scrollTo({ top: Math.max(0, top), behavior: moves ? "smooth" : "auto" });
+  }, [phone, shown, me.yours, moves]);
 
   const go = (slug: string | null) => {
     const doc = document as WithTransitions;
@@ -74,7 +94,7 @@ export function HeroPage({ live, moves }: { live: boolean; moves: boolean }) {
         live={live}
       >
         <AspectRatio ratio={4 / 3}>
-          <div className="hl-hero-scroll" onClickCapture={live ? catchLinks : undefined}>
+          <div ref={scroller} className="hl-hero-scroll" onClickCapture={live ? catchLinks : undefined}>
             {shown ? (
               <div {...lookAttrs(DEFAULT_THEME)} style={themeStyle(DEFAULT_THEME)} className="bg-[var(--pf-ground)] p-8 text-[color:var(--pf-ink)]">
                 <ProjectView
