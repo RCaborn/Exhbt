@@ -1113,6 +1113,9 @@
     color: #3E4044;
     font-size: 0.95rem;
     font-weight: var(--font-weight-medium);
+    --color-neutral: transparent;
+    --color-overlay-hover: transparent;
+    --color-overlay-pressed: transparent;
   }
 
   .astryx-top-nav-item:hover:where(:not(:disabled,[aria-disabled="true"])) {
@@ -1120,6 +1123,7 @@
   }
 
   .astryx-top-nav-item[data-selected="selected"] {
+    background-color: transparent;
     color: #0E0F12;
     text-decoration-line: underline;
     text-decoration-color: #00755D;
