@@ -898,32 +898,35 @@ function Rows({ lines, extra, className = "" }: { lines: string[]; extra?: { lab
 /**
  * The rows while editing: every stored line, empty ones too, so a line's path is its place in the
  * stored list (`arrangement.tiles.education.lines.0` is the first), each as two fields at that path,
- * the words and the year; then the extra row; then the controls over the list (`lineTools`, last, so
- * the hairlines between the rows stay where they are).
+ * the words and the year; then the extra row. The controls over the list (`lineTools`) come right after
+ * the </dl>, in a wrapper that takes the list's place and margins, so the list holds only its lines (a
+ * <dl> may hold nothing else) and the Tab order reaches the controls right after the lines they act on.
  */
 function LinesEditing({ kind, lines, edit, extra, className = "" }: { kind: "education" | "experience"; lines: string[]; edit: HomeEdit; extra?: { label: string; value: React.ReactNode }; className?: string }) {
   const path = `arrangement.tiles.${kind}.lines`;
   const words = LINE[kind];
   return (
-    <dl className={`${ROWS} relative text-[0.95rem] ${className}`}>
-      {lines.map((l, i) => {
-        const { label, year } = splitYear(l);
-        const at = `${path}.${i}`;
-        return (
-          <div key={i} className="flex items-baseline justify-between gap-6 py-3">
-            <dt className="min-w-0 font-semibold">{edit.text({ path: at, value: label, label: words.label(i + 1), placeholder: words.placeholder, as: "block", part: "label" })}</dt>
-            <dd className="shrink-0 text-[color:var(--pf-faint)] tabular-nums">{edit.text({ path: at, value: year ?? "", label: words.year, placeholder: words.yearPlaceholder, as: "block", part: "year" })}</dd>
+    <div className={`relative ${className}`} data-lines-box={kind}>
+      <dl className={`${ROWS} relative text-[0.95rem]`}>
+        {lines.map((l, i) => {
+          const { label, year } = splitYear(l);
+          const at = `${path}.${i}`;
+          return (
+            <div key={i} className="flex items-baseline justify-between gap-6 py-3">
+              <dt className="min-w-0 font-semibold">{edit.text({ path: at, value: label, label: words.label(i + 1), placeholder: words.placeholder, as: "block", part: "label" })}</dt>
+              <dd className="shrink-0 text-[color:var(--pf-faint)] tabular-nums">{edit.text({ path: at, value: year ?? "", label: words.year, placeholder: words.yearPlaceholder, as: "block", part: "year" })}</dd>
+            </div>
+          );
+        })}
+        {extra && (
+          <div className="flex items-baseline justify-between gap-6 py-3">
+            <dt className="font-semibold">{extra.label}</dt>
+            <dd className="min-w-0 text-right text-[color:var(--pf-faint)]">{extra.value}</dd>
           </div>
-        );
-      })}
-      {extra && (
-        <div className="flex items-baseline justify-between gap-6 py-3">
-          <dt className="font-semibold">{extra.label}</dt>
-          <dd className="min-w-0 text-right text-[color:var(--pf-faint)]">{extra.value}</dd>
-        </div>
-      )}
+        )}
+      </dl>
       {edit.lineTools({ path, kind, count: lines.length, max: TILE_LIMITS.lines })}
-    </dl>
+    </div>
   );
 }
 

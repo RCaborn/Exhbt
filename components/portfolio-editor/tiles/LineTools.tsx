@@ -20,12 +20,12 @@ import { W } from "../sections/words";
  * line takes an outline in the look's link colour, so the controls say which line they move. One
  * toolbar: one Tab stop, the arrow keys along it.
  *
- * It is the last child of the lines' <dl> (d-findings.md), absolute, without the rows' hairline, and it
- * carries the list's own `data-path`, where the list's own problem shows and "Show me" lands. It is a
- * <div> (a <dd> after the lines' <div> groups breaks axe's definition-list rule), so a count of the
- * lines by `dl > div` must leave it out by `[data-pe-lines]`. That <div> is a 0 by 0 point at the list's
- * bottom right that is always laid out, so its box never changes; its body (the toolbar and the list's
- * problem) is what shows and hides.
+ * It comes right after the lines' </dl>, inside the wrapper the page draws round both (LinesEditing in
+ * PortfolioHome): a <dl> may hold only its lines, and the Tab order reaches these controls right after
+ * the lines they act on. It carries the list's own `data-path`, where the list's own problem shows and
+ * "Show me" lands, and `data-pe-lines`. It is a 0 by 0 point at the list's bottom right that is always
+ * laid out, so its box never changes; its body (the toolbar and the list's problem) is what shows and
+ * hides.
  *
  * When a line's year holds words that `splitYear` will not read as a year, a hint shows under that
  * field while it has the cursor.
@@ -52,16 +52,18 @@ export function LineTools({ path, kind, count, max }: HomeLinesSlot): ReactNode 
   const hintRef = useRef<HTMLElement | null>(null);
   hintRef.current = hint;
 
-  // Which line the controls are for: the one with the cursor, else the one under the pointer.
+  // Which line the controls are for: the one with the cursor, else the one under the pointer. Listened
+  // for on the wrapper the page draws round the list and these controls, so a press on the controls is
+  // still inside it.
   useEffect(() => {
-    const dl = own.current?.parentElement;
-    if (!dl) return;
-    const rowOf = (i: number | null) => (i == null ? null : (dl.querySelector(`[data-path="${CSS.escape(`${path}.${i}`)}"]`)?.closest("dl > div") ?? null));
+    const box = own.current?.parentElement;
+    if (!box) return;
+    const rowOf = (i: number | null) => (i == null ? null : (box.querySelector(`[data-path="${CSS.escape(`${path}.${i}`)}"]`)?.closest("dl > div") ?? null));
     let focused: number | null = null;
     let hovered: number | null = null;
     const mark = () => {
       const i = focused ?? hovered;
-      for (const r of dl.querySelectorAll(":scope > div[data-pe-line]")) r.removeAttribute("data-pe-line");
+      for (const r of box.querySelectorAll("dl > div[data-pe-line]")) r.removeAttribute("data-pe-line");
       rowOf(i)?.setAttribute("data-pe-line", "active");
       setActive(i);
     };
@@ -77,7 +79,7 @@ export function LineTools({ path, kind, count, max }: HomeLinesSlot): ReactNode 
       mark();
     };
     const onFocusOut = (e: FocusEvent) => {
-      if (!dl.contains(e.relatedTarget as Node)) {
+      if (!box.contains(e.relatedTarget as Node)) {
         focused = null;
         setHint(null);
         mark();
@@ -93,17 +95,17 @@ export function LineTools({ path, kind, count, max }: HomeLinesSlot): ReactNode 
       hovered = null;
       mark();
     };
-    dl.addEventListener("focusin", onFocusIn);
-    dl.addEventListener("focusout", onFocusOut);
-    dl.addEventListener("input", onInput);
-    dl.addEventListener("mouseover", onOver);
-    dl.addEventListener("mouseleave", onLeave);
+    box.addEventListener("focusin", onFocusIn);
+    box.addEventListener("focusout", onFocusOut);
+    box.addEventListener("input", onInput);
+    box.addEventListener("mouseover", onOver);
+    box.addEventListener("mouseleave", onLeave);
     return () => {
-      dl.removeEventListener("focusin", onFocusIn);
-      dl.removeEventListener("focusout", onFocusOut);
-      dl.removeEventListener("input", onInput);
-      dl.removeEventListener("mouseover", onOver);
-      dl.removeEventListener("mouseleave", onLeave);
+      box.removeEventListener("focusin", onFocusIn);
+      box.removeEventListener("focusout", onFocusOut);
+      box.removeEventListener("input", onInput);
+      box.removeEventListener("mouseover", onOver);
+      box.removeEventListener("mouseleave", onLeave);
     };
   }, [path, count]);
 
