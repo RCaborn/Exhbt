@@ -60,7 +60,8 @@ export function standInAdapter(): HomeEdit {
 
 /**
  * The editing page as the stand-in draws it: an empty bar where the editor's bar will be, exactly as
- * tall, then the page in the person's look. The page is inert: nothing in it is a control yet. `state`
+ * tall, then the first-run strip as the editor will first draw it (bar/strip.tsx; none once hidden), then
+ * the page in the person's look. The page is inert: nothing in it is a control yet. `state`
  * is the words to draw when they are newer than the data's own (the gate waiting for newer data).
  */
 export function StandInPage({ data, state }: { data: PortfolioData; state?: BuilderState }) {
