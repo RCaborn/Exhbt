@@ -60,11 +60,20 @@ Feedback only: buttons respond to hover and press (Astryx), link underlines dark
 3px jade outline with a white gap and ink halo: visible on white, mist, mint and ink.
 
 ## Design system (Astryx)
-`@astryxdesign/core` (Meta's open-source React design system, beta) is installed with an Exhbt theme.
-- **Buttons are Astryx Buttons**, through `components/ui/Button.tsx`: `primary` (mint), `secondary` (white, ink edge), `ink`, `danger`; sizes `sm`–`xl`. With `href` it's a link. Don't write button classes by hand.
+Astryx (`@astryxdesign/core`, Meta's open-source React design system, beta) is the design guide (Rory, 26 Nov 2026). Before building any UI, read `docs/design/astryx-agent-guide.md` and run `npm run astryx -- docs principles`.
+
+**Order of authority**, highest first:
+1. The brand's colours and fonts. They are fixed (`docs/brand.md`); the Exhbt theme carries them into Astryx.
+2. Astryx's components, foundations (tokens) and layout rules. Every new control is an Astryx component, read first with `npm run astryx -- component <Name>`; never hand-build one Astryx has. Colours, spacing, radii, shadows and motion come from its tokens through the Exhbt theme.
+3. This file's own rules and banned list.
+
+**Where it applies.** Astryx governs the app and the marketing pages. The public exhbt and portfolio pages are a person's own pages in their look (`--xp-*`, `--pf-*`, `lib/portfolio-themes.ts`), so Astryx does not govern them.
+
+**What is on Astryx today:** buttons and the theme. The rest of the site is still hand-built with Tailwind and the site's own classes, and it moves over surface by surface under a plan to come (`docs/design/appeal-plan.md`, not written yet), with the e2e tests run at each step.
+- **Buttons are Astryx Buttons**, through `components/ui/Button.tsx`: `primary` (mint), `secondary` (white, ink edge), `ink`, `danger`; sizes `sm`-`xl`. With `href` it's a link. Don't write button classes by hand.
 - The theme is `themes/exhbt/exhbtTheme.ts`. `npm run theme` builds `exhbt.css`/`exhbt.js` beside it (committed); `npm run check` fails if they're stale.
 - `app/providers.tsx` wraps the app in the theme (light only) and makes Astryx links Next.js links. `globals.css` declares the layer order: Astryx sits under the site's own classes and Tailwind utilities.
-- Other Astryx components (dialogs, menus, tabs, inputs) are there to use: `npm run astryx -- component --list`. Fields, tags and cards are still the site's own classes; move them over one at a time, with the e2e tests.
+- Browse the components with `npm run astryx -- component --list`.
 
 ## Identity
 Full rules, sizes and don'ts are in `docs/brand.md`. In short:

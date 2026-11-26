@@ -194,6 +194,14 @@
       pointer-events: none;
     }
   }
+  /* On a tablet, the "+" after the last box of a column sits just under its foot, not a little into it: there its 44px press
+     reached the middle of the box's last line (its detail, a field as wide as the box). The section "+" in the gap below is
+     at the gap's left under a finger, clear of it. */
+  @media (pointer: coarse) and (min-width: 48rem) {
+    .xe-flow[data-axis="column"] .xe-flow-add[data-end] {
+      top: calc(100% + 0.375rem);
+    }
+  }
 
   /* ---------- While a box is carried ---------- */
   /* Nothing else offers itself: no tools, no "+" (nor while the drag board carries a section). */

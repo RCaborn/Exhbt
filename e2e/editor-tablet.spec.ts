@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "./editor-test";
 import { FORMAT_RULES } from "../lib/exhbt/formats";
 import { labelOf } from "../components/exhbt-editor/labels";
-import { docNow, field, finger, flowChipsNearWords, frame, grip, offered, openTiming, pageOrder, plusClashes, READY, smallPresses, toolbarClashes, typeIn, undoLabel, waitLive } from "./page-editor";
+import { coveredControls, docNow, field, finger, flowChipsNearWords, frame, grip, offered, openTiming, pageOrder, plusClashes, READY, smallPresses, textbox, toolbarClashes, typeIn, undoLabel, waitLive } from "./page-editor";
 
 /*
  * The editor on a tablet (decision 0026, "The chrome"; docs/briefs/edit-on-page/r3-l-phone.md), on the
@@ -111,6 +111,51 @@ for (const f of offered()) {
     const focused = await toolbarsNow(page, "all");
     expect(focused.bad.filter((b) => b.startsWith(`${id}:`))).toEqual([]);
     expect(await toolbarClashes(page)).toEqual([]);
+  });
+}
+
+/**
+ * The controls decision 0026 draws over another on purpose, as [what is under, what lies over it], for coveredControls.
+ * None: on these pages every control that lay over another was a fault (an open menu, which 0026 does draw over the
+ * page, is never open here).
+ */
+const ON_PURPOSE: [string, string][] = [];
+
+/** The paths of the findings on the page, in order. */
+const findingPaths = (page: Page) => page.locator(`${READY} article [data-path*=".items."][data-field]`).evaluateAll((els) => els.map((e) => e.getAttribute("data-path")!));
+
+for (const f of offered()) {
+  test(`${FORMAT_RULES[f].name.toLowerCase()}: nothing covers a control: at the middle of every button and field shown, a finger lands on that control, at rest, with each section touched and with the cursor in each finding`, async ({ page }) => {
+    await openTiming(page, f, { full: true });
+    await waitLive(page);
+    // The main session saw a section's grip over "Remove finding 1" on a tablet; the review saw chips over fields.
+    expect(await coveredControls(page, { allow: ON_PURPOSE }), "at rest").toEqual([]);
+    // Touched, a section's toolbar shows all its buttons (on its top edge, in a gutter or on its right edge, only its grip at rest).
+    for (const id of await pageOrder(page)) {
+      await grip(page, id).focus();
+      expect(await coveredControls(page, { allow: ON_PURPOSE }), `${id} touched`).toEqual([]);
+    }
+    // With the cursor in a finding, its own Move up, Move down and Remove show, on the rule above it, and its section's toolbar shows whole.
+    const findings = await findingPaths(page);
+    expect(findings.length).toBeGreaterThan(0);
+    for (const path of findings) {
+      await textbox(page, path).focus();
+      expect(await coveredControls(page, { allow: ON_PURPOSE }), `in ${path}`).toEqual([]);
+    }
+  });
+
+  test(`${FORMAT_RULES[f].name.toLowerCase()}: the findings moved to the top of the page: their toolbar, now on their top edge, lies over none of a finding's controls`, async ({ page }) => {
+    await openTiming(page, f, { full: true });
+    await waitLive(page);
+    // First under the context line, the gap above is too short for a row of 44px buttons: the toolbar goes onto the
+    // findings' top edge, by the first finding's own controls (research's, with no heading over its findings, sat under it).
+    await page.evaluate(() => window.__exhbtEditor!.move("findings", 0));
+    await expect.poll(async () => (await pageOrder(page))[0]).toBe("findings");
+    for (const path of await findingPaths(page)) {
+      await textbox(page, path).focus();
+      expect(await toolbarClashes(page), `in ${path}`).toEqual([]);
+      expect(await coveredControls(page, { allow: ON_PURPOSE, by: ".xe-tools" }), `in ${path}`).toEqual([]);
+    }
   });
 }
 
