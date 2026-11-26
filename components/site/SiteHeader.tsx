@@ -70,7 +70,7 @@ export function SiteHeader({
                 Account
               </Button>
             ) : (
-              <Link href="/login" color="primary" weight="medium" hasUnderline>
+              <Link href="/login" type="inherit" color="primary" weight="medium" hasUnderline>
                 Log in
               </Link>
             )}
