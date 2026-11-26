@@ -101,22 +101,20 @@ async function pickUp(page: Page, i: number) {
   await page.mouse.move(at.x + 2, at.y + 2, { steps: 2 });
   expect(await list(page).getAttribute("data-flow-drag")).toBeNull();
   await page.mouse.move(at.x + 6, at.y + 6, { steps: 3 });
-  const heard = () => page.evaluate(() => (window as Window & { __press?: string[] }).__press ?? []).catch(() => ["(the page could not be read)"]);
   try {
     await expect(list(page)).toHaveAttribute("data-flow-drag", "pointer");
   } catch (e) {
-    throw new Error(`The box did not lift. What the press met, in order:\n${(await heard()).join("\n")}\n${(e as Error).message}`);
+    const heard = await page.evaluate(() => (window as Window & { __press?: string[] }).__press ?? []).catch(() => ["(the page could not be read)"]);
+    throw new Error(`The box did not lift. What the press met, in order:\n${heard.join("\n")}\n${(e as Error).message}`);
   }
-  // TEMPORARY, while WebKit's runs are read: every pick-up's account, lifted or not, so the two groups can be compared.
-  console.log(`[lift] ${test.info().titlePath.slice(-2).join(" › ").slice(0, 70)}, box ${i + 1}, ${process.env.E2E_FOCUS || "no rule"}\n${(await heard()).filter((l) => /at the start|at the press|mousedown done/.test(l)).join("\n")}`);
   return { x: at.x + 6, y: at.y + 6 };
 }
 
 /**
  * What a press on box `i`'s grip meets, kept in the page for a pick-up that does not lift: a WebKit run's log is all
- * that a machine without WebKit sees of it. Where the focus is and whether the box is under the pointer with its tools
- * shown, before the pointer moves to it and again from inside the press (so nothing runs between the move and the press);
- * then each thing the page hears from the press on.
+ * that a machine without WebKit sees of it. Where the focus is and whether the box is hovered with its tools shown,
+ * before the pointer moves to it and again from inside the press (so nothing runs between the move and the press), what
+ * the press landed on, and what the page did then. It listens to no event that comes often, such as a mousemove.
  */
 function listen(page: Page, i: number) {
   return page.evaluate(
@@ -124,63 +122,35 @@ function listen(page: Page, i: number) {
       type Heard = Window & { __press?: string[]; __pressFrom?: number; __pressBox?: number; __lastUp?: number; __pressListening?: boolean };
       const w = window as Heard;
       const name = (t: EventTarget | null): string => {
-        if (t === window) return "window";
-        if (t === document) return "document";
-        if (!(t instanceof Element)) return String(t);
-        const tag = t.tagName.toLowerCase();
-        const mark = ["data-flow-grip", "data-flow-remove", "data-flow-add", "data-flow-step", "data-path", "data-section-id", "data-tool"].find((a) => t.hasAttribute(a));
+        if (!(t instanceof Element)) return t === document ? "document" : String(t);
+        const mark = ["data-flow-grip", "data-flow-step", "data-path", "data-section-id"].find((a) => t.hasAttribute(a));
         const cls = [...t.classList].find((c) => c.startsWith("xe-") || c.startsWith("xp-"));
-        return `${tag}${cls ? `.${cls}` : ""}${mark ? `[${mark}=${t.getAttribute(mark)}]` : ""}`;
+        return `${t.tagName.toLowerCase()}${cls ? `.${cls}` : ""}${mark ? `[${mark}=${t.getAttribute(mark)}]` : ""}`;
       };
-      const ms = () => `${Math.round(performance.now() - (w.__pressFrom ?? 0))}ms`;
       /** The focus, and box `n`'s hover and tools, now. */
       const state = (n: number) => {
         const li = document.querySelectorAll(BOX)[n];
         const tools = li?.querySelector(".xe-flow-tools");
         const s = tools ? getComputedStyle(tools) : null;
-        return `the focus on ${name(document.activeElement)}; the box hovered ${li?.matches(":hover")}, its words ${li?.querySelector(".xp-flow-box")?.matches(":hover")}; its tools ${s?.opacity}/${s?.pointerEvents}`;
+        return `the focus on ${name(document.activeElement)}; the box hovered ${li?.matches(":hover")}; its tools ${s?.opacity}/${s?.pointerEvents}`;
       };
+      const say = (s: string) => w.__press?.push(`  ${Math.round(performance.now() - (w.__pressFrom ?? 0))}ms ${s}`);
       w.__press = [];
       w.__pressFrom = performance.now();
       w.__pressBox = i;
-      const since = w.__lastUp === undefined ? "no drop yet" : `${Math.round(performance.now() - w.__lastUp)}ms after the last mouseup`;
-      w.__press.push(`  0ms at the start (${since}): ${state(i)}`);
+      say(`at the start (${w.__lastUp === undefined ? "no drop yet" : `${Math.round(performance.now() - w.__lastUp)}ms after the last mouseup`}): ${state(i)}`);
       if (w.__pressListening) return;
       w.__pressListening = true;
-      let moves = { on: "", n: 0, at: "" };
-      const flush = () => {
-        if (moves.n) w.__press?.push(`  ${moves.n} mousemove on ${moves.on}, the last at ${moves.at}`);
-        moves = { on: "", n: 0, at: "" };
-      };
-      const say = (s: string) => {
-        flush();
-        w.__press?.push(`  ${ms()} ${s}`);
-      };
-      window.addEventListener(
-        "mousemove",
-        (e) => {
-          const on = `${name(e.target)} buttons ${e.buttons}`;
-          if (moves.on !== on) flush();
-          moves = { on, n: moves.n + 1, at: `${e.clientX},${e.clientY}` };
-        },
-        true,
-      );
-      // The press as the browser hit it, against the page as it is drawn now, from inside the press.
+      // The press as the browser hit it, and the page as it is drawn there now, from inside the press.
       window.addEventListener(
         "mousedown",
-        (e) => {
-          const fresh = document.elementsFromPoint(e.clientX, e.clientY).slice(0, 3).map(name).join(" over ");
-          const words = document.querySelector(".xe-save-words")?.textContent ?? "";
-          say(`at the press: on ${name(e.target)}; drawn there now ${fresh}; ${state(w.__pressBox ?? 0)}; saving "${words}"`);
-        },
+        (e) => say(`at the press: on ${name(e.target)}; drawn there now ${document.elementsFromPoint(e.clientX, e.clientY).slice(0, 3).map(name).join(" over ")}; ${state(w.__pressBox ?? 0)}`),
         true,
       );
-      window.addEventListener("mouseup", () => (w.__lastUp = performance.now()), true);
-      for (const type of ["pointerdown", "pointerup", "mouseup", "click", "pointercancel", "dragstart", "resize", "scroll", "visibilitychange", "keydown"])
-        window.addEventListener(type, (e) => say(`${type} on ${name(e.target)}`), true);
-      for (const type of ["focusin", "focusout"]) window.addEventListener(type, (e) => say(`${type} on ${name(e.target)}, from or to ${name((e as FocusEvent).relatedTarget)}`), true);
       // After the page's own handlers and Safari's focus rule (e2e/editor-test.ts), which listens on the window too.
-      window.addEventListener("mousedown", (e) => say(`  the mousedown done: prevented ${e.defaultPrevented}, taken by the drag ${"dndKit" in e}, the focus on ${name(document.activeElement)}`));
+      window.addEventListener("mousedown", (e) => say(`the press done: prevented ${e.defaultPrevented}, taken by the drag ${"dndKit" in e}, the focus on ${name(document.activeElement)}`));
+      window.addEventListener("mouseup", () => (w.__lastUp = performance.now()), true);
+      for (const type of ["pointercancel", "dragstart", "resize", "visibilitychange", "keydown", "focusin"]) window.addEventListener(type, (e) => say(`${type} on ${name(e.target)}`), true);
       const flow = document.querySelector(LIST);
       if (flow) new MutationObserver(() => say(`data-flow-drag is ${flow.getAttribute("data-flow-drag")}`)).observe(flow, { attributes: true, attributeFilter: ["data-flow-drag"] });
       const region = document.querySelector('[data-editor="page"] [data-said]');
@@ -465,6 +435,10 @@ for (const f of offered()) {
       await expect(list(page)).not.toHaveAttribute("data-flow-drag", /./);
       // Each box is in its place, with nothing left over from the motion.
       expect(await placed(page)).toBe(true);
+      // The dropped box's grip has the focus, as after a drag from the keyboard. Under Safari's rule a press gives the grip
+      // none, and WebKit can lose the hover of a box the drop has moved under the pointer: with neither, the box's tools
+      // hid under the pointer and the pick-up below went to the box (FlowList.tsx, keepGrip).
+      await expect(gripOf(page, 2)).toBeFocused();
 
       // Back again, towards the start: over the near part of box 1, place 1; in line style the line goes before it.
       await pickUp(page, 2);
@@ -480,6 +454,10 @@ for (const f of offered()) {
       await page.mouse.up();
       expect(await keysNow(page)).toEqual(keys);
       expect(await stepsNow(page)).toEqual(steps);
+      // It is the focus that keeps the dropped box's tools shown, not the hover: they stay with the pointer off the box.
+      await expect(gripOf(page, 0)).toBeFocused();
+      await page.mouse.move(5, 5);
+      expect(await box(page, 0).locator(".xe-flow-tools").evaluate((e) => `${getComputedStyle(e).opacity}/${getComputedStyle(e).pointerEvents}`)).toBe("1/auto");
 
       // Let go off to the side of the flowchart, it goes back where it was.
       await pickUp(page, 1);
@@ -491,33 +469,6 @@ for (const f of offered()) {
       await page.mouse.up();
       await expect(said(page)).toHaveText("Box dropped where it was.");
       expect(await keysNow(page)).toEqual(keys);
-    });
-
-    // TEMPORARY, while WebKit's runs are read (phase-2-flow-lift): the pick-up that fails under Safari's rule there, again and again.
-    test("TEMPORARY: the box just dropped is picked up again at once, ten times over", async ({ page }) => {
-      await page.setViewportSize(TALL);
-      await open(page, f, DRAG_BOXES[f]);
-      const axis = (await list(page).getAttribute("data-axis")) as "row" | "column";
-      const n = (await keysNow(page)).length;
-      await page.mouse.move(5, 5);
-      let at = 0;
-      for (let round = 0; round < 10; round++) {
-        const to = at === 0 ? 2 : 0;
-        const keys = await keysNow(page);
-        await pickUp(page, at);
-        const p = along((await client(page))[to]!, axis, to > at ? 0.7 : 0.3);
-        await page.mouse.move(p.x, p.y, { steps: 15 });
-        await expect(said(page)).toHaveText(`The box would go to place ${to + 1} of ${n}.`);
-        await page.mouse.up();
-        expect(await keysNow(page)).toEqual(moved(keys, at, to));
-        await expect(said(page)).toHaveText(`Box dropped in place ${to + 1} of ${n}.`);
-        await settled(page);
-        await expect(copy(page)).toHaveCount(0);
-        await expect(line(page)).toHaveCount(0);
-        await expect(list(page)).not.toHaveAttribute("data-flow-drag", /./);
-        expect(await placed(page)).toBe(true);
-        at = to;
-      }
     });
 
     test("the keyboard moves a box from its grip, each step read out; Escape puts it back; the grip keeps the focus", async ({ page }) => {
