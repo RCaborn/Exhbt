@@ -13,8 +13,8 @@ import { ToolRow } from "../sections/ToolRow";
 import { W } from "../sections/words";
 
 /*
- * The controls over a list of education or experience lines (brief F, step 10), drawn over the list's
- * bottom edge and taking no room: "Add a line" while the plan's limit leaves room (`max`, from
+ * The controls over a list of education or experience lines (brief F, step 10), drawn just under the
+ * list (in the section's padding, clear of its words) and taking no room: "Add a line" while the plan's limit leaves room (`max`, from
  * TILE_LIMITS), and, for the line the cursor or the pointer is in, Move up, Move down and Remove. That
  * line takes an outline in the look's link colour, so the controls say which line they move. One
  * toolbar: one Tab stop, the arrow keys along it.

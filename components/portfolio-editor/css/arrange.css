@@ -163,14 +163,15 @@
     border-top: 1px solid var(--color-border);
   }
 
-  /* The lines' controls: over the list's bottom edge, at its right, without the rows' hairline. */
+  /* The lines' controls: just under the list's bottom edge, at its right (in the section's own bottom
+     padding, clear of the last line's year), without the rows' hairline. */
   [data-editor="portfolio"] .pe-line-tools {
     position: absolute;
     right: 0;
     bottom: 0;
     z-index: 5;
     border: 0 !important;
-    transform: translateY(50%);
+    transform: translateY(calc(100% + var(--spacing-1)));
   }
   [data-editor="portfolio"] .pe-line-tools > .pe-tools {
     position: static;

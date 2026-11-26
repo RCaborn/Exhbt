@@ -331,6 +331,30 @@ test.describe("Exhbt tiles", () => {
     await expect(full.getByRole("link", { name: "Upload your project" })).toHaveCount(0);
   });
 
+  test("after ?full=1 the full plan's reason is in the alert tone", async ({ page }) => {
+    await openEditor(page, fresh(fullFixture("pp-full", null, "free"), "fullalert"), { query: "?full=1" });
+    const full = page.locator(`${READY} [data-owner="add"]`);
+    await expect(full.getByRole("alert")).toBeVisible();
+    await expect(full.locator("[data-tone=alert]")).toBeVisible();
+  });
+
+  test("a tile opens its exhbt, and Back brings the page back as it was arranged", async ({ page }) => {
+    await openEditor(page, fresh(FULL, "back"));
+    const before = await workIds(page);
+    await tile(page, before[0]!).hover();
+    await tileTools(page, before[0]!).getByRole("button", { name: /^More for / }).click();
+    await page.getByRole("menuitem", { name: "Move down" }).click();
+    const moved = [before[1], before[0], before[2], before[3]];
+    await expect.poll(() => workIds(page)).toEqual(moved);
+    const open = tile(page, before[2]!).locator("[data-pe-open]");
+    await open.click();
+    // The exhbt editor's first draw in development can be slow on a busy machine.
+    await expect(page).toHaveURL(new RegExp(`/exhbts/${before[2]}/edit`), { timeout: 60_000 });
+    await page.goBack();
+    await waitReady(page);
+    await expect.poll(() => workIds(page)).toEqual(moved);
+  });
+
   test("with no exhbt, the band is the vision with the look's own Add an exhbt, and the work holds the Add tile", async ({ page }) => {
     const none = { ...fresh(FULL, "vision"), exhbts: [], featured: null };
     await openEditor(page, none);
@@ -356,6 +380,8 @@ test.describe("Lines of education and experience", () => {
     await page.keyboard.type("Summer intern, City Council");
     await typeIn(page, "arrangement.tiles.experience.lines.1", "2025", { part: "year" });
     await expect.poll(() => valueAt(page, "arrangement.tiles.experience.lines.1")).toBe("Summer intern, City Council, 2025");
+    // The controls cover none of the lines' words.
+    expect(await toolbarClashes(page)).toEqual([]);
     // Move it up, from the line's own controls.
     await tools.getByRole("button", { name: "Move line 2 up" }).click();
     expect(await valueAt(page, "arrangement.tiles.experience.lines")).toEqual(["Summer intern, City Council, 2025", "Shift supervisor, campus cafe, 2024 to now"]);
@@ -393,7 +419,7 @@ function toolbarClashes(page: Page): Promise<string[]> {
     const drawnNow = (el: Element) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
     const over = (a: DOMRect, b: DOMRect) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;
     const r = (b: DOMRect) => [b.x, b.y, b.width, b.height].map(Math.round).join(",");
-    const frames = [...root.querySelectorAll<HTMLElement>("[data-section-frame], [data-tile-frame]")];
+    const frames = [...root.querySelectorAll<HTMLElement>("[data-section-frame], [data-tile-frame], [data-pe-lines]")];
     const toolButtons = (fr: Element) => [...fr.querySelectorAll(":scope > [data-pe-tools] button")].filter((b) => drawnNow(b) && shown(b.closest("[data-pe-tools]")));
     const nameOf = (el: Element) => el.closest("[data-tile-frame]")?.getAttribute("data-tile-frame") ?? el.closest("[data-section-frame]")?.getAttribute("data-section-frame") ?? "the page";
     const worded: { el: Element; boxes: DOMRect[]; glyphs: DOMRect[] }[] = [];
