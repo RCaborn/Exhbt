@@ -24,11 +24,21 @@ type FieldBase = {
   /** Controlled use. */
   value?: string;
   onChange?: (value: string) => void;
+  /** The browser's own check: an empty field will not post. It draws no "Required" mark; `requiredMark` asks for one. */
   required?: boolean;
+  /** Show Astryx's "Required" mark by the label. It becomes part of the field's accessible name, so a screen that owns its labels decides. */
+  requiredMark?: boolean;
   placeholder?: string;
   autoComplete?: string;
   disabled?: boolean;
 };
+
+/**
+ * The browser's own `required`. Astryx's inputs hand untyped props to the native control but do not list `required`
+ * among them (their `isRequired` is a mark and aria-required only, and the field would still post empty), so it goes through
+ * as a spread. The spec checks the native control is `required`.
+ */
+const nativeRequired = (required?: boolean) => (required ? ({ required: true } as Record<string, unknown>) : {});
 
 /** Holds the value for uncontrolled use; passes a controlled one straight through. */
 function useValue({ value, defaultValue, onChange }: Pick<FieldBase, "value" | "defaultValue" | "onChange">) {
@@ -56,7 +66,8 @@ export function TextField(
       statusVariant="detached"
       value={v.value}
       onChange={v.onChange}
-      isRequired={props.required}
+      {...nativeRequired(props.required)}
+      isRequired={props.requiredMark}
       placeholder={props.placeholder}
       autoComplete={props.autoComplete}
       isDisabled={props.disabled}
@@ -74,9 +85,11 @@ export function TextAreaField(props: FieldBase & { rows?: number }): ReactNode {
       htmlName={props.name}
       description={props.hint}
       status={props.error ? { type: "error", message: props.error } : undefined}
+      statusVariant="detached"
       value={v.value}
       onChange={v.onChange}
-      isRequired={props.required}
+      {...nativeRequired(props.required)}
+      isRequired={props.requiredMark}
       placeholder={props.placeholder}
       autoComplete={props.autoComplete}
       isDisabled={props.disabled}
@@ -88,6 +101,8 @@ export function TextAreaField(props: FieldBase & { rows?: number }): ReactNode {
 export function CheckboxField(props: {
   label: string;
   name?: string;
+  /** What a ticked box posts under `name`. Astryx's own checkbox posts "on"; the server actions here read "yes". */
+  value?: string;
   hint?: string;
   defaultChecked?: boolean;
   checked?: boolean;
@@ -96,17 +111,23 @@ export function CheckboxField(props: {
 }): ReactNode {
   const [own, setOwn] = useState(props.defaultChecked ?? false);
   const controlled = props.checked !== undefined;
+  const checked = controlled ? props.checked! : own;
+  // With a value of its own, the box posts through a hidden input (present only when ticked), and Astryx's own name is left off so "on" is not posted too.
+  const own_ = props.value !== undefined && props.name;
   return (
-    <CheckboxInput
-      label={props.label}
-      htmlName={props.name}
-      description={props.hint}
-      value={controlled ? props.checked! : own}
-      onChange={(next) => {
-        if (!controlled) setOwn(next);
-        props.onChange?.(next);
-      }}
-      isRequired={props.required}
-    />
+    <>
+      <CheckboxInput
+        label={props.label}
+        htmlName={own_ ? undefined : props.name}
+        description={props.hint}
+        value={checked}
+        onChange={(next) => {
+          if (!controlled) setOwn(next);
+          props.onChange?.(next);
+        }}
+        isRequired={props.required}
+      />
+      {own_ && checked && <input type="hidden" name={props.name} value={props.value} />}
+    </>
   );
 }

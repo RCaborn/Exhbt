@@ -15,4 +15,5 @@ export function* walk(dir, skip = () => false, ext = /\.(ts|tsx)$/) {
 export const read = (path) => readFileSync(path, "utf8");
 
 /** The design lab is not part of the product, and themes/ holds the theme's own source. */
-export const isLab = (path) => path.startsWith("app/lab") || path.startsWith("components/lab");
+const LAB = ["app/lab", "components/lab"];
+export const isLab = (path) => LAB.some((lab) => path === lab || path.startsWith(`${lab}/`));

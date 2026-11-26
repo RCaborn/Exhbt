@@ -2,7 +2,7 @@
 //
 // The values are declared twice: in themes/exhbt/exhbtTheme.ts (what Astryx components paint with) and in the
 // @theme block of app/globals.css (what Tailwind classes and the hand-built parts paint with). Nothing else keeps
-// them equal. This reads both and compares them, case-insensitively.
+// them equal. This reads both (the stylesheet's @theme block only) and compares them, case-insensitively.
 //
 // Run it with `npm run check:tokens`. To try a changed copy of either file: node scripts/check-tokens.mjs [theme.ts] [globals.css]
 import { readFileSync } from "node:fs";
@@ -26,7 +26,28 @@ const PAIRS = [
 ];
 
 const theme = readFileSync(themePath, "utf8");
-const css = readFileSync(cssPath, "utf8");
+const cssAll = readFileSync(cssPath, "utf8");
+
+/** The text inside each `@theme { ... }` block, braces matched, so a same-named variable elsewhere is not read. */
+function themeBlocks(src) {
+  const out = [];
+  for (const m of src.matchAll(/@theme\b[^{]*\{/g)) {
+    let depth = 1;
+    let i = m.index + m[0].length;
+    const start = i;
+    for (; i < src.length && depth > 0; i++) {
+      if (src[i] === "{") depth++;
+      else if (src[i] === "}") depth--;
+    }
+    out.push(src.slice(start, i - 1));
+  }
+  return out.join("\n");
+}
+const css = themeBlocks(cssAll);
+if (!css) {
+  console.error(`Token check failed: no @theme block in ${cssPath}.`);
+  process.exit(1);
+}
 const problems = [];
 for (const [constant, variable, name] of PAIRS) {
   const a = theme.match(new RegExp(`const ${constant}\\s*=\\s*"(#[0-9a-fA-F]{3,8})"`))?.[1];

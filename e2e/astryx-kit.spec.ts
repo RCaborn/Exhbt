@@ -56,6 +56,28 @@ test.describe("Field", () => {
     expect(JSON.parse((await page.getByTestId("posted").textContent()) ?? "{}").seeded).toBe("York");
   });
 
+  test("a CheckboxField with a value posts that value when ticked, and nothing when not", async ({ page }) => {
+    await open(page);
+    const form = page.getByTestId("field-form");
+    await form.getByRole("button", { name: "Post the form" }).click();
+    expect(JSON.parse((await page.getByTestId("posted").textContent()) ?? "{}")).not.toHaveProperty("own");
+    await form.getByRole("checkbox", { name: "This is my own work." }).check();
+    await form.getByRole("button", { name: "Post the form" }).click();
+    expect(JSON.parse((await page.getByTestId("posted").textContent()) ?? "{}").own).toBe("yes");
+  });
+
+  test("required is the browser's own check, and draws no Required mark", async ({ page }) => {
+    await open(page);
+    const form = page.getByTestId("required-form");
+    const field = form.getByRole("textbox", { name: "Pick a name", exact: true }); // the name is the label alone
+    await expect(field).toHaveJSProperty("required", true);
+    await form.getByRole("button", { name: "Send it" }).click();
+    await expect(page.getByTestId("sent")).toHaveText(""); // an empty required field does not post
+    await field.fill("Zed");
+    await form.getByRole("button", { name: "Send it" }).click();
+    await expect(page.getByTestId("sent")).toHaveText("sent");
+  });
+
   test("an error is tied to its field and read out with it", async ({ page }) => {
     await open(page);
     const email = page.getByTestId("field-form").getByRole("textbox", { name: "Email" });
@@ -98,6 +120,18 @@ test.describe("Field", () => {
       return { style: s.outlineStyle, colour: s.outlineColor, width: s.outlineWidth, offset: s.outlineOffset };
     });
     expect(ring).toEqual({ style: "solid", colour: "rgb(0, 117, 93)", width: "3px", offset: "2px" });
+  });
+});
+
+test.describe("Confirm", () => {
+  test("says what it is for, and when onConfirm throws it stays open and says so", async ({ page }) => {
+    await open(page);
+    await page.getByRole("button", { name: "Delete, and fail" }).click();
+    const dialog = page.getByRole("alertdialog");
+    await expect(dialog).toContainText("This cannot be undone."); // no body was given
+    await dialog.getByRole("button", { name: "Delete it" }).click();
+    await expect(dialog).toContainText("That did not work");
+    await expect(dialog).toBeVisible();
   });
 });
 
@@ -210,11 +244,39 @@ test.describe("AddressLine and Steps", () => {
     await expect(line.locator("span").first()).toHaveText("priya-shah");
   });
 
+  test("AddressLine is drawn in the brand face at 600, on the display step", async ({ page }) => {
+    await open(page);
+    const line = page.locator("p", { hasText: portfolioHost("priya-shah") }).first();
+    const style = await line.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { family: s.fontFamily, weight: s.fontWeight, size: parseFloat(s.fontSize) };
+    });
+    expect(style.family).toContain("Bricolage");
+    expect(style.weight).toBe("600");
+    expect(style.size).toBeGreaterThan(40); // display-1 on a wide window
+  });
+
   test("Steps with two steps throws in development", async ({ page }) => {
     await open(page);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.getByRole("button", { name: /Draw two steps/ }).click();
     await expect.poll(() => errors.join("\n")).toMatch(/at least three steps/);
+  });
+});
+
+test.describe("AddressLine on a touch phone", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("a name of 30 characters breaks and does not run off the screen", async ({ page }) => {
+    await open(page);
+    const name = "alexandra-whitfield-robertsons";
+    expect(name).toHaveLength(30);
+    const box = page.getByTestId("long-address");
+    await expect(box).toContainText(name);
+    await box.scrollIntoViewIfNeeded();
+    const m = await box.evaluate((el) => ({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth, right: el.getBoundingClientRect().right, textRight: Math.max(...[...el.querySelectorAll("span")].map((s) => Math.max(...[...s.getClientRects()].map((r) => r.right)))) }));
+    expect(m.scroll).toBeLessThanOrEqual(m.inner);
+    expect(m.textRight).toBeLessThanOrEqual(m.right);
   });
 });

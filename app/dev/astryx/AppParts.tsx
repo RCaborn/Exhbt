@@ -23,6 +23,8 @@ export function AppParts() {
   const [form, setForm] = useState(false);
   const [actions, setActions] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [failing, setFailing] = useState(false);
+  const [sent, setSent] = useState(false);
   const [two, setTwo] = useState(false);
   return (
     <Group id="app-parts" title="The app's own parts" purpose="The wrappers in components/ui. A screen imports these, never a raw Astryx input.">
@@ -40,7 +42,7 @@ export function AppParts() {
             <TextField label="Your city" name="seeded" defaultValue="Leeds" hint="Where you are based." />
             <TextField label="Email" name="email" type="email" error="Enter a full email address." />
             <TextAreaField label="Notes (optional)" name="notes" rows={3} />
-            <CheckboxField label="This is my own work." name="own" />
+            <CheckboxField label="This is my own work." name="own" value="yes" />
             <Row>
               <Button type="submit" variant="primary">
                 Post the form
@@ -48,6 +50,28 @@ export function AppParts() {
             </Row>
             <Text as="p" display="block" type="code" data-testid="posted">
               {posted}
+            </Text>
+          </Stack>
+        </form>
+      </Block>
+
+      <Block title="A required field (the browser's own check, and no Required mark)">
+        <form
+          data-testid="required-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setSent(true);
+          }}
+        >
+          <Stack>
+            <TextField label="Pick a name" name="req" required />
+            <Row>
+              <Button type="submit" variant="primary">
+                Send it
+              </Button>
+            </Row>
+            <Text as="p" display="block" type="code" data-testid="sent">
+              {sent ? "sent" : ""}
             </Text>
           </Stack>
         </form>
@@ -80,6 +104,7 @@ export function AppParts() {
           <Button variant="danger" onClick={() => setConfirm(true)}>
             Delete
           </Button>
+          <Button onClick={() => setFailing(true)}>Delete, and fail</Button>
         </Row>
         <Sheet name="info" title="About this exhbt" open={drawer} onOpenChange={setDrawer}>
           <Text as="p">An info sheet: Escape or a press outside closes it.</Text>
@@ -93,6 +118,15 @@ export function AppParts() {
             <Button onClick={() => setActions(false)}>Gallery</Button>
           </Stack>
         </Sheet>
+        <Confirm
+          open={failing}
+          onOpenChange={setFailing}
+          title="Delete this exhbt, and fail?"
+          confirmLabel="Delete it"
+          onConfirm={() => {
+            throw new Error("the server said no");
+          }}
+        />
         <Confirm open={confirm} onOpenChange={setConfirm} title="Delete this exhbt?" body="It comes off your portfolio and can't be brought back." confirmLabel="Delete it" onConfirm={() => {}} />
       </Block>
 
@@ -122,6 +156,9 @@ export function AppParts() {
           </div>
           <div className="rounded-[var(--radius)] border border-line p-6">
             <AddressLine username="priya-shah" tone="on-white" size={2} />
+          </div>
+          <div data-testid="long-address" className="rounded-[var(--radius)] border border-line p-6">
+            <AddressLine username="alexandra-whitfield-robertsons" tone="on-white" size={1} />
           </div>
         </div>
       </Block>
