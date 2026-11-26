@@ -10,6 +10,7 @@ import {
   differences,
   docNow,
   field,
+  focusedPath,
   finger,
   flowChipsNearWords,
   frame,
@@ -660,6 +661,45 @@ for (const f of offered()) {
     expect(await smallPresses(page, `${READY} .xe-insert .xe-plus`)).toEqual([]);
   });
 }
+
+test("a Build exhbt with three links: a tap on each button's words puts the cursor in that link, and each Web address opens its own link's address", async ({ page }) => {
+  // Its buttons wrap on a phone: one to a line on an iPhone, the first alone and two side by side on a Pixel 7. Under its line
+  // the first link's Web address lay over the top of the second button, and took a tap on the middle of its words.
+  const build = sampleDoc("build");
+  const third: Section = { id: "link-3", kind: "link", href: "https://example.com/shift-swap-docs", label: "Read the docs", description: "Setup and the API" };
+  const doc = full({ ...build, sections: [...build.sections, third] });
+  await openDoc(page, freshName("phonelinks"), doc);
+  await waitLive(page);
+  const links = (await docNow(page)).sections.flatMap((s, n) => (s.kind === "link" ? [{ id: s.id, n }] : []));
+  expect(links).toHaveLength(3);
+  // The buttons do wrap here (the test is about a row of more than one line).
+  const tops = await Promise.all(links.map(async ({ id }) => Math.round((await rect(frame(page, id))).top + (await scrollY(page)))));
+  expect(new Set(tops).size).toBeGreaterThan(1);
+  /** A finger's tap at the middle of `l`, where it is drawn now. */
+  const tapMiddle = async (l: Locator) => {
+    await l.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    const r = await rect(l);
+    await page.touchscreen.tap(r.left + r.width / 2, r.top + r.height / 2);
+  };
+  for (const { id, n } of links) {
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await tapMiddle(field(page, `sections.${n}.label`));
+    await expect.poll(() => focusedPath(page), `a tap on ${id}'s words`).toBe(`sections.${n}.label`);
+  }
+  for (const { id, n } of links) {
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await tapMiddle(frame(page, id).locator(".xe-fig-corner"));
+    const pop = frame(page, id).locator("[popover], dialog").first();
+    await expect(pop, `${id}'s Web address`).toBeVisible();
+    await expect(pop.locator("input")).toBeFocused();
+    await expect(pop.locator("input")).toHaveAttribute("data-path", `sections.${n}.href`);
+    // Only its own is open.
+    const open = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('[data-editor="page"] .xe-fig-pop-link')].filter((p) => (p instanceof HTMLDialogElement ? p.open : p.matches(":popover-open"))).length);
+    expect(open).toBe(1);
+    await page.keyboard.press("Escape");
+    await expect(pop).toBeHidden();
+  }
+});
 
 test("the bar is one Tab stop: the arrows, Home and End move along it, and the stop goes back to its first button when the focus leaves", async ({ page }) => {
   await openTiming(page, "case-study", { full: true });
