@@ -230,10 +230,11 @@ export function FlowList({ children }: { children: ReactNode }) {
   /**
    * After a drag by mouse, the grip of the box carried has the focus, as a drag from the keyboard leaves it and as a
    * browser that focuses a pressed button already leaves it (React gives it back after the drop moves the box). Safari
-   * never focuses a pressed button: the focus is on this list. And Safari's engine can lose the hover of a box that the
+   * never focuses a pressed button: the focus was on this list. And Safari's engine can lose the hover of a box that the
    * drop has moved in the page with the pointer on it, until the pointer leaves the box. With neither the hover nor the
    * focus, the box's grip and Remove stayed hidden under the pointer, and a press on the grip went to the box: it did
    * not lift (the WebKit runs under Safari's rule about the focus; docs/briefs/edit-on-page/r3-notes-from-earlier-agents.md).
+   * A mouse's press now gives the grip the focus in Safari too (drag/grip.ts); this makes sure of it after the drop.
    */
   function keepGrip(p: Plan) {
     if (p.mouse) boxesNow([p.key])[0]?.querySelector<HTMLElement>("[data-flow-grip]")?.focus({ preventScroll: true });
