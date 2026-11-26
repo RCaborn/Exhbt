@@ -1,0 +1,119 @@
+/* The portfolio editor on a phone (decision 0031, "On a phone"; brief I). A phone is a window under 48rem
+   with a coarse pointer, the one test the exhbt editor uses (components/exhbt-editor/phone/usePhone.ts).
+   The More sheets and the reorder sheet are app chrome, in Astryx's tokens through the Exhbt theme; the
+   page itself keeps the look's own variables, and nothing here takes room on it. */
+@layer components {
+  /* ---------- A section's or a tile's More sheet ---------- */
+  .pe-item-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  /* Each action a 44px row with its name, the width of the sheet. */
+  .pe-item-actions .pe-item-action {
+    width: 100%;
+    max-width: none;
+    min-height: var(--size-element-md, 2.75rem);
+    height: auto;
+    justify-content: flex-start;
+    padding-block: var(--spacing-2);
+    text-align: start;
+  }
+  .pe-item-actions .pe-item-action > span {
+    width: 100%;
+  }
+  .pe-item-action-words {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    white-space: normal;
+  }
+  .pe-item-action-why {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-normal);
+    color: var(--color-text-secondary);
+  }
+  /* An action that is off: dimmed, still in its place and still focusable, its reason under its name. */
+  .pe-item-actions [data-off] .pe-item-action {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* ---------- Reorder sections ---------- */
+  .pe-reorder-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .pe-reorder-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-1);
+    box-sizing: border-box;
+    min-height: 3.5rem;
+    padding: 0 var(--spacing-1-5);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-container);
+    background: var(--color-background-surface);
+  }
+  .pe-reorder-row[data-dragging] {
+    position: relative;
+    z-index: 1;
+    border-color: var(--color-border-emphasized);
+    box-shadow: var(--shadow-med);
+  }
+  .pe-reorder-name {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0 var(--spacing-1);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* The grip takes the press, not the page: a press-and-hold there lifts the row and does not scroll. */
+  .pe-reorder-grip {
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    cursor: grab;
+  }
+  .pe-reorder-row :is(button) {
+    flex: none;
+    min-width: var(--size-element-md, 2.75rem);
+    min-height: var(--size-element-md, 2.75rem);
+  }
+  .pe-reorder-foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--spacing-2);
+    width: 100%;
+  }
+
+  @media (pointer: coarse) {
+    /* The More button and every control a sheet holds take a thumb. */
+    .pe-more {
+      min-width: var(--size-element-md, 2.75rem);
+      min-height: var(--size-element-md, 2.75rem);
+    }
+  }
+
+  @media (max-width: 47.99rem) and (pointer: coarse) {
+    /* iOS zooms in on a field under 16px when it takes the focus: on a phone, every field the editor's
+       sheets hold is 16px or more (the page's own fields are left at the look's sizes; noZoom.ts keeps
+       Safari from zooming on those). */
+    [data-sheet] :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]), textarea, select) {
+      font-size: max(1rem, 16px);
+    }
+  }
+}
