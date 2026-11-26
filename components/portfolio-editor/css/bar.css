@@ -70,13 +70,6 @@
       display: inline;
     }
   }
-  /* A thin rule between the groups of the row: what you see, what you have done, where it goes. */
-  .pe-bar-rule {
-    align-self: stretch;
-    width: 1px;
-    margin-block: var(--spacing-3);
-    background: var(--color-border);
-  }
 
   /* ---------- Notices under the bar (a look being previewed, a request to join) ---------- */
   .pe-bar-notices {

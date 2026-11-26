@@ -83,7 +83,6 @@ export function EditorBar({ team, jobLinks }: { team: ReactNode; jobLinks: React
               {!narrow && <LookButton />}
               {!narrow && <UndoButton />}
               <SaveStatus />
-              {!narrow && <span aria-hidden className="pe-bar-rule" />}
               {!narrow && <VisitorToggle />}
               {!narrow && <JobLinksButton jobLinks={jobLinks} />}
               <MoreMenu />
