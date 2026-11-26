@@ -126,3 +126,14 @@ export function usePortfolioUi<T>(select?: (u: PortfolioUi) => T): T | Portfolio
 export function usePortfolioSave(): SaveView {
   return useAtom(useRuntime().save);
 }
+
+/**
+ * Undo, for a part of the bar that offers it somewhere of its own (the folded menu on a narrow window):
+ * the label of the step Undo would reverse ("removed Experience"), or null when there is none, and the
+ * action. `undo` is the same function for the editor's life.
+ */
+export function usePortfolioUndo(): { label: string | null; undo(): void } {
+  const rt = useRuntime();
+  const label = useAtom(rt.undo, (u) => u.label);
+  return { label, undo: rt.undoLast };
+}
