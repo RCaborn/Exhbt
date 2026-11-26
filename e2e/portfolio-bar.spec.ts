@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { FULL, fullFixture } from "./fixtures/portfolio-pages";
-import { READY, call, expect, field, focusedPath, fresh, openEditor, setKind, stateNow, test, valueAt, waitReady, waitSaved } from "./portfolio-editor";
+import { READY, call, expect, focusedPath, fresh, openEditor, setKind, stateNow, test, valueAt, waitReady, waitSaved } from "./portfolio-editor";
 
 // The portfolio editor's bar and everything it opens (brief G of docs/briefs/portfolio-first; decision
 // 0031, "The bar" and "What is edited where"): the chip, Look, See as a visitor, Job links, the menu and
@@ -37,16 +37,16 @@ test.describe("The bar", () => {
     await expect.poll(() => bar(page).evaluate((el) => el.getBoundingClientRect().top)).toBe(0);
   });
 
-  test("at 700 Look, See as a visitor and Job links fold into the menu", async ({ page }) => {
+  test("at 700 Look, Undo, See as a visitor and Job links fold into the menu", async ({ page }) => {
     await page.setViewportSize({ width: 700, height: 900 });
     await openEditor(page, fresh(FULL, "bar-narrow"));
     const t = toolbar(page);
     await expect(t.getByRole("button", { name: "Share", exact: true })).toBeVisible();
     await expect(bar(page).locator("[data-save]")).toBeVisible();
-    for (const name of ["Look", "See as a visitor", "Job links"]) await expect(t.getByRole("button", { name, exact: true })).toHaveCount(0);
+    for (const name of ["Look", "Undo", "See as a visitor", "Job links"]) await expect(t.getByRole("button", { name, exact: true })).toHaveCount(0);
     await t.getByRole("button", { name: "More" }).click();
     const menu = page.getByRole("menu");
-    for (const name of ["Look", "See as a visitor", "Job links", "Team projects", "Use the step builder"]) await expect(menu.getByRole("menuitem", { name })).toBeVisible();
+    for (const name of ["Undo", "Look", "See as a visitor", "Job links", "Team projects", "Use the step builder"]) await expect(menu.getByRole("menuitem", { name })).toBeVisible();
     // Look from the menu is a sheet, and choosing a look there applies it.
     await menu.getByRole("menuitem", { name: "Look" }).click();
     const sheet = page.locator('[data-sheet="look"]');
@@ -177,5 +177,147 @@ test.describe("The first minute", () => {
   });
 });
 
-void field;
-void call;
+/** A small PNG drawn in the page, for the photo. */
+async function png(page: Page): Promise<Buffer> {
+  const b64 = await page.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = 300;
+    c.height = 300;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "#4fe9b4";
+    ctx.fillRect(0, 0, 300, 300);
+    return c.toDataURL("image/png").split(",")[1]!;
+  });
+  return Buffer.from(b64, "base64");
+}
+
+test.describe("On the page", () => {
+  test("the photo button opens the photo sheet, which adds and removes the photo", async ({ page }) => {
+    await newPerson(page, "photo", "premium");
+    const button = page.locator(`${READY} [data-photo-button]`).getByRole("button", { name: "Add a photo" });
+    await expect(button).toBeVisible();
+    await button.click();
+    const sheet = page.locator('[data-sheet="photo"]');
+    await expect(sheet.getByRole("heading", { name: "Add a photo" })).toBeVisible();
+    await sheet.getByTestId("photo-input").setInputFiles({ name: "me.png", mimeType: "image/png", buffer: await png(page) });
+    await expect(sheet.getByRole("status").filter({ hasText: "Photo saved." })).toBeVisible();
+    await expect(page.locator(`${READY} [data-portfolio-home] [data-avatar="photo"]`).first()).toBeVisible();
+    await expect(page.locator(`${READY} [data-photo-button]`).getByRole("button", { name: "Change your photo" })).toBeAttached();
+    await sheet.getByRole("button", { name: "Remove photo" }).click();
+    await expect(sheet.getByRole("status").filter({ hasText: "Photo removed." })).toBeVisible();
+    await expect(page.locator(`${READY} [data-portfolio-home] [data-avatar="initials"]`).first()).toBeVisible();
+  });
+
+  test("Suggest an intro fills the intro from the stand-in, and Undo takes it back", async ({ page }) => {
+    await openEditor(page, fresh(FULL, "intro"));
+    const before = await valueAt(page, "profile.bio");
+    await page.locator(`${READY} [data-tools="intro"]`).getByRole("button", { name: "Suggest an intro" }).click();
+    await expect(page.locator("[data-intro-note]")).toContainText("written only from what you’ve told us");
+    await expect.poll(() => valueAt(page, "profile.bio")).not.toBe(before);
+    await expect(page.locator(`${READY} #pe-undo`)).toHaveAccessibleName("Undo: suggested an intro");
+    await waitSaved(page);
+    await page.locator(`${READY} #pe-undo`).click();
+    await expect.poll(() => valueAt(page, "profile.bio")).toBe(before);
+  });
+
+  test("Your links saves each link, shows its problem, and turns LinkedIn on and off", async ({ page }) => {
+    await openEditor(page, fresh(FULL, "links"));
+    await page.locator(`${READY} [data-tools="contact"]`).getByRole("button", { name: "Your links" }).click();
+    const panel = page.locator("[data-links-panel]");
+    await expect(panel).toBeVisible();
+    const github = panel.getByRole("textbox", { name: /GitHub/ });
+    await github.fill("github.com/maya-new");
+    await expect.poll(() => valueAt(page, "profile.github")).toBe("github.com/maya-new");
+    await waitSaved(page);
+    // A link the rules refuse shows its problem at the field, and is not saved.
+    await panel.getByRole("textbox", { name: /Email/ }).fill("not an email");
+    await expect(panel.locator('[data-path="profile.contactEmail"]')).toContainText(/email/i);
+    await expect(page.locator(`${READY} [data-save]`)).toHaveAttribute("data-save", "invalid");
+    await panel.getByRole("textbox", { name: /Email/ }).fill("maya@example.com");
+    await waitSaved(page);
+    const show = panel.getByRole("switch", { name: "Show LinkedIn on your page" });
+    const was = await show.isChecked();
+    await show.click();
+    await expect.poll(() => valueAt(page, "arrangement.header.linkedin")).toBe(!was);
+  });
+});
+
+test.describe("The address sheet", () => {
+  test("on Free it says what a paid plan gives, with the upgrade", async ({ page }) => {
+    await newPerson(page, "addr-free");
+    await toolbar(page).getByRole("button", { name: "Claim your address" }).click();
+    const sheet = page.locator('[data-sheet="address"]');
+    await expect(sheet.locator('[data-address="blocked"]')).toBeVisible();
+    await expect(sheet).toContainText("a preview only you can see");
+    await expect(sheet.getByTestId("upgrade-prompt")).toBeVisible();
+    await expect(sheet.getByRole("textbox", { name: "Username" })).toHaveCount(0);
+  });
+
+  test("on Premium with no address it claims one, and the sheet turns to Share", async ({ page }) => {
+    await newPerson(page, "addr-claim", "premium");
+    await toolbar(page).getByRole("button", { name: "Claim your address" }).click();
+    const sheet = page.locator('[data-sheet="address"]');
+    await expect(sheet.locator('[data-address="claim"]')).toBeVisible();
+    await expect(sheet.getByTestId("publish-checklist")).toContainText("Choose your address");
+    const name = `pe-claim-${Math.random().toString(36).slice(2, 8)}`;
+    await sheet.getByRole("textbox", { name: "Username" }).fill(name);
+    await expect(sheet.getByText("Available.")).toBeVisible();
+    await sheet.getByRole("button", { name: "Claim username" }).click();
+    await expect(sheet.locator('[data-address="share"]')).toBeVisible();
+    await expect(sheet.locator("[data-address-host]")).toContainText(name);
+    // Nothing is live yet, so the address says not found until there is.
+    await expect(sheet).toContainText("shows “not found” until you publish an exhbt");
+    await expect(toolbar(page).getByRole("button", { name: "Share" })).toBeVisible();
+  });
+
+  test("with an address: Copy link, Change and Hide from search", async ({ page }) => {
+    await openEditor(page, fresh(fullFixture("x", null, "premium"), "addr-share"));
+    await toolbar(page).getByRole("button", { name: "Share" }).click();
+    const sheet = page.locator('[data-sheet="address"]');
+    await expect(sheet.locator('[data-address="share"]')).toBeVisible();
+    await expect(sheet.getByRole("button", { name: "Copy link" })).toBeVisible();
+    await sheet.getByRole("button", { name: "Change" }).click();
+    await expect(sheet.getByRole("textbox", { name: "Username" })).toBeVisible();
+    await expect(sheet).toContainText("redirects to the new one for 30 days");
+    const hide = sheet.getByRole("switch", { name: "Hide from search" });
+    await hide.click();
+    await expect.poll(() => valueAt(page, "profile.hideFromSearch")).toBe(true);
+    await waitSaved(page);
+  });
+});
+
+test.describe("Job links and Team", () => {
+  test("Job links opens its menu from the bar", async ({ page }) => {
+    await openEditor(page, fresh(FULL, "joblinks"));
+    await toolbar(page).getByRole("button", { name: "Job links" }).click();
+    await expect(page.locator("[data-job-links-menu]")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-job-links-menu]")).toBeHidden();
+  });
+
+  test("Team projects from the menu opens the Team sheet, with what team projects are", async ({ page }) => {
+    await openEditor(page, fresh(FULL, "team"));
+    await toolbar(page).getByRole("button", { name: "More" }).click();
+    await page.getByRole("menuitem", { name: "Team projects" }).click();
+    const sheet = page.locator('[data-sheet="team"]');
+    await expect(sheet.getByRole("heading", { name: "Team projects" })).toBeVisible();
+    await expect(sheet).toContainText("each of you can have an exhbt of it");
+  });
+
+  test("each part opens by name, as the address's ?open= will open it", async ({ page }) => {
+    await openEditor(page, fresh(FULL, "open"));
+    for (const [name, sel] of [
+      ["look", "[data-look-menu]"],
+      ["address", '[data-sheet="address"] [data-address]'],
+      ["job-links", "[data-job-links-menu]"],
+      ["team", "[data-team-sheet]"],
+      ["links", "[data-links-panel]"],
+    ] as const) {
+      await call(page, "open", name);
+      await expect(page.locator(sel)).toBeVisible();
+      await call(page, "close");
+      await expect(page.locator(sel)).toBeHidden();
+    }
+  });
+});
+

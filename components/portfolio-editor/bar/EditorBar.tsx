@@ -2,7 +2,7 @@
 
 import "../css/bar.css";
 import { useRef, type ReactNode } from "react";
-import { BriefcaseBusiness, Eye, Link2, MoreHorizontal, Palette } from "lucide-react";
+import { BriefcaseBusiness, Eye, Link2, MoreHorizontal, Palette, Undo2 } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { DropdownMenu, type DropdownMenuOption } from "@astryxdesign/core/DropdownMenu";
 import { Popover } from "@astryxdesign/core/Popover";
@@ -10,7 +10,7 @@ import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { Button } from "@/components/ui/Button";
 import { flushPending } from "../pending";
-import { usePortfolioApi, usePortfolioData, usePortfolioState, usePortfolioUi, type PortfolioSheet } from "../runtime";
+import { usePortfolioApi, usePortfolioData, usePortfolioState, usePortfolioUi, usePortfolioUndo, type PortfolioSheet } from "../runtime";
 import { AddressSheet } from "../sheets/AddressSheet";
 import { PhotoSheet } from "../sheets/PhotoButton";
 import { TeamNotice, TeamSheet, TEAM_WORDS } from "../sheets/TeamSheet";
@@ -27,7 +27,7 @@ import { LinksPanel } from "../tools/PartTools";
  * (css/core.css). In order: "Your portfolio" and the chip saying where the page stands; Look; Undo and
  * the save status; See as a visitor; Job links; the menu; and the one primary button, "Claim your
  * address" until there is one, then "Share". Under 48rem, Look, See as a visitor, Job links and Team
- * fold into the menu, keeping the heading, the status and the primary button.
+ * and Undo fold into the menu, keeping the heading, the status and the primary button.
  *
  * Every menu, popover and sheet the bar opens is drawn here once and follows the runtime's `ui.sheet`,
  * so `open(name)` from anywhere (the first-run strip, a field's "Show me", the address's `?open=`) opens
@@ -79,7 +79,7 @@ export function EditorBar({ team, jobLinks }: { team: ReactNode; jobLinks: React
           endContent={
             <span className="pe-bar-end">
               {!narrow && <LookButton />}
-              <UndoButton />
+              {!narrow && <UndoButton />}
               <SaveStatus />
               {!narrow && <span aria-hidden className="pe-bar-rule" />}
               {!narrow && <VisitorToggle />}
@@ -201,6 +201,7 @@ function MoreMenu(): ReactNode {
   const size = useBarSize();
   const { admin } = usePortfolioData();
   const visitor = usePortfolioUi((u) => u.visitor);
+  const undo = usePortfolioUndo();
   const form = useRef<HTMLFormElement>(null);
 
   const leave = async (go: () => void) => {
@@ -212,6 +213,7 @@ function MoreMenu(): ReactNode {
   const items: DropdownMenuOption[] = [
     ...(narrow
       ? ([
+          { label: undo.label ? `Undo: ${undo.label}` : "Undo", icon: <Undo2 aria-hidden size={16} />, isDisabled: !undo.label, onClick: () => undo.undo() },
           { label: BAR.look, icon: <Palette aria-hidden size={16} />, onClick: () => api.open("look") },
           { label: visitor ? "Back to editing" : BAR.visitor, icon: <Eye aria-hidden size={16} />, onClick: () => api.seeAsVisitor(!visitor) },
           { label: BAR.jobLinks, icon: <BriefcaseBusiness aria-hidden size={16} />, onClick: () => api.open("job-links") },
