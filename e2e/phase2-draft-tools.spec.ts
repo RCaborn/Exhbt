@@ -4,6 +4,7 @@ import { ENTITLEMENTS } from "../lib/entitlements";
 import { emptyDoc, text, type ExhbtDoc, type RichText } from "../lib/exhbt/blocks";
 import { aiVersionOf, blockValue, replaceBlock, sameBlock } from "../lib/exhbt/draft-blocks";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
+import { DRAFT_WITH_AI, startBlank } from "./add-exhbt";
 import { backToAiVersion, cardMenuButton, chooseLayout, closeRewrite, DRAFT_PROJECT as PROJECT, draftAndOpen, findingsField, openCardMenu, previewArticle, revealCardMenu, rewritesLeft, signInToDraft, startRewrite, waitForSaved } from "./editor";
 import { freshName, READY } from "./page-editor";
 
@@ -62,7 +63,7 @@ test.describe("Draft from a file", () => {
   test("an exhbt started from scratch has no rewrite tools", async ({ page }) => {
     await signInToDraft(page, "scratch");
     await page.goto("/exhbts");
-    await page.getByRole("button", { name: /start from scratch/i }).click();
+    await startBlank(page);
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
     await expect(page.getByRole("heading", { level: 1, name: "Edit exhbt" })).toBeAttached();
     await expect(page.getByTestId("tools-findings")).toHaveCount(0);
@@ -324,7 +325,7 @@ test.describe("An open rewrite form stays up and takes the press", () => {
     async function draftInLook(page: Page, id: string) {
       const user = freshName(`ground${id}`);
       await page.goto(`/dev/portfolio?username=${user}&plan=max&count=0&look=${id}`);
-      await page.goto(`/auth/dev?email=${user}@example.com&next=${encodeURIComponent("/exhbts/new")}`);
+      await page.goto(`/auth/dev?email=${user}@example.com&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
       await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
       const res = await page.request.post("/api/exhbts/draft", { data: { text: PROJECT } });
       expect(res.status()).toBe(200);

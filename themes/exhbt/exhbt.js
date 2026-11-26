@@ -31,15 +31,15 @@ export const exhbtTheme = {
     "--font-size-3xl": "2.0625rem",
     "--font-size-4xl": "2.5rem",
     "--font-size-5xl": "3rem",
-    "--text-heading-1-size": "var(--font-size-2xl)",
+    "--text-heading-1-size": "3rem",
     "--text-heading-1-weight": "var(--font-weight-semibold)",
-    "--text-heading-1-leading": "1.4286",
-    "--text-heading-2-size": "var(--font-size-xl)",
+    "--text-heading-1-leading": "1.05",
+    "--text-heading-2-size": "2rem",
     "--text-heading-2-weight": "var(--font-weight-semibold)",
-    "--text-heading-2-leading": "1.3913",
-    "--text-heading-3-size": "var(--font-size-lg)",
+    "--text-heading-2-leading": "1.1",
+    "--text-heading-3-size": "1.375rem",
     "--text-heading-3-weight": "var(--font-weight-semibold)",
-    "--text-heading-3-leading": "1.4737",
+    "--text-heading-3-leading": "1.15",
     "--text-heading-4-size": "var(--font-size-base)",
     "--text-heading-4-weight": "var(--font-weight-semibold)",
     "--text-heading-4-leading": "1.5",
@@ -234,19 +234,22 @@ export const exhbtTheme = {
         "fontFamily": "var(--font-family-heading)",
         "fontSize": "var(--text-heading-1-size)",
         "fontWeight": "var(--text-heading-1-weight)",
-        "lineHeight": "var(--text-heading-1-leading)"
+        "lineHeight": "var(--text-heading-1-leading)",
+        "letterSpacing": "-0.03em"
       },
       "level:2": {
         "fontFamily": "var(--font-family-heading)",
         "fontSize": "var(--text-heading-2-size)",
         "fontWeight": "var(--text-heading-2-weight)",
-        "lineHeight": "var(--text-heading-2-leading)"
+        "lineHeight": "var(--text-heading-2-leading)",
+        "letterSpacing": "-0.03em"
       },
       "level:3": {
         "fontFamily": "var(--font-family-heading)",
         "fontSize": "var(--text-heading-3-size)",
         "fontWeight": "var(--text-heading-3-weight)",
-        "lineHeight": "var(--text-heading-3-leading)"
+        "lineHeight": "var(--text-heading-3-leading)",
+        "letterSpacing": "-0.02em"
       },
       "level:4": {
         "fontFamily": "var(--font-family-heading)",
@@ -493,6 +496,19 @@ export const exhbtTheme = {
               "base": 16,
               "ratio": 1.1736
             }
+          }
+        }
+      },
+      {
+        "when": {
+          "width": {
+            "below": "sm"
+          }
+        },
+        "value": {
+          "tokens": {
+            "--text-heading-1-size": "2.25rem",
+            "--text-heading-2-size": "1.75rem"
           }
         }
       }

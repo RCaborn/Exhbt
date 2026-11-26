@@ -88,22 +88,26 @@ export async function openEditor(page: Page, fixture: PortfolioFixture, opts: { 
  * server's own EXHBT_PORTFOLIO=page, which a production run must set. Opens /portfolio and waits for the
  * editor. It reads nothing of the editor's development handle.
  *
- * Not yet runnable on `next build` + `next start`: with no Supabase, sign-up there answers "try later"
- * (lib/password-auth.ts) and the only way to a session is /auth/dev, which is off in production. Run with
- * EXHBT_ALLOW_MEMORY_STORE=1 (the stand-in store's own switch, which only matters when no Supabase is
- * configured), the store works; a session still needs /auth/dev to honour the same switch.
+ * On a production build (playwright.prod.config.ts sets E2E_PROD) the session comes from /auth/dev, which
+ * EXHBT_ALLOW_MEMORY_STORE opens there with no database; in development, from the site's own sign-up.
  */
 export async function signUpToEditor(page: Page, tag: string): Promise<{ email: string }> {
   const email = `pe-${tag}-${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}@example.com`;
   const password = "correct-horse-battery";
-  const kind = await page.request.get("/dev/portfolio-kind?kind=page", { maxRedirects: 0 });
-  expect([307, 404], "the development cookie's route answers, or is off as in production").toContain(kind.status());
-  await page.goto("/login/new?next=%2Faccount");
-  await expect(page.locator("form[data-ready=true]")).toBeAttached();
-  await page.getByLabel("Email address").fill(email);
-  await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByLabel("Confirm password").fill(password);
-  await page.getByRole("button", { name: "Create account" }).click();
+  if (process.env.E2E_PROD) {
+    // A production build (playwright.prod.config.ts): EXHBT_PORTFOLIO=page is the server's, and a session
+    // comes from /auth/dev, which EXHBT_ALLOW_MEMORY_STORE opens there; sign-up with a password does not
+    // work without a database in production. No /dev route is asked for.
+    await page.goto(`/auth/dev?email=${encodeURIComponent(email)}&next=%2Faccount`);
+  } else {
+    await setKind(page, "page");
+    await page.goto("/login/new?next=%2Faccount");
+    await expect(page.locator("form[data-ready=true]")).toBeAttached();
+    await page.getByLabel("Email address").fill(email);
+    await page.getByLabel("Password", { exact: true }).fill(password);
+    await page.getByLabel("Confirm password").fill(password);
+    await page.getByRole("button", { name: "Create account" }).click();
+  }
   await expect(page).toHaveURL(/\/account$/);
   await page.goto("/portfolio");
   await waitReady(page);
@@ -205,6 +209,18 @@ export async function valueAt(page: Page, path: string): Promise<unknown> {
 /** The editor's view as it is now: the open sheet, "See as a visitor", the marked tile, the team's note (development only). */
 export const uiNow = (page: Page) => page.evaluate(() => window.__portfolioEditor!.ui());
 
+/**
+ * Counts the server actions this browser sends from now on (a save is one: a POST that carries Next's
+ * `next-action` header), in every page of its context, so a save sent as a page is left counts too.
+ */
+export function countActions(page: Page): () => number {
+  let n = 0;
+  page.context().on("request", (r) => {
+    if (r.method() === "POST" && r.headers()["next-action"]) n++;
+  });
+  return () => n;
+}
+
 /** What Undo would undo ("removed Experience"), or null. */
 export const undoLabel = (page: Page): Promise<string | null> => page.evaluate(() => window.__portfolioEditor!.undoLabel());
 
@@ -284,7 +300,8 @@ export const HOME_BOXES: Record<string, string> = {
   "a section's heading": "[data-section] h2",
   card: "[data-card]",
   "a key figure": "[data-key-figure]",
-  "a row": "[data-section] dl > div",
+  // F's lines toolbar is an absolute, zero-size <div data-pe-lines> inside the <dl>: not a row.
+  "a row": "[data-section] dl > div:not([data-pe-lines])",
   "the footer": `${HOME} > footer`,
 };
 
@@ -343,13 +360,14 @@ export const HOME_EDIT_ONLY_IN_FLOW: { name: string; selector: string; allow: "r
   { name: "an empty intro", selector: '[data-intro]:has([data-path="profile.bio"][data-empty])', allow: "remove" },
   { name: "where you're based, empty", selector: ':is(span, dl > div):has(> * [data-path="profile.location"][data-empty], > [data-path="profile.location"][data-empty])', allow: "remove" },
   { name: "what you're looking for, empty", selector: ':is([data-looking-for], dl > div):has([data-path="profile.lookingFor"][data-empty])', allow: "remove" },
+  { name: "the line of where you're based and what you're looking for, both empty", selector: 'p:has([data-path="profile.location"][data-empty]):has([data-path="profile.lookingFor"][data-empty])', allow: "remove" },
   { name: "About me's words, empty", selector: '[data-path="arrangement.tiles.about.text"][data-empty] [data-para-box]', allow: "remove" },
   { name: "a line of education or experience with no words", selector: "dl > div:has([data-part=label] [data-empty]):has([data-part=year] [data-empty])", allow: "remove" },
   { name: "a line's year, empty", selector: "[data-part=year]:has([data-empty])", allow: "remove" },
   { name: "the tools line, empty", selector: 'dl > div:has([data-path="arrangement.tiles.education.tools"][data-empty])', allow: "remove" },
   { name: "who said the quote and their role, empty", selector: 'figcaption:has([data-path="arrangement.tiles.quote.name"][data-empty]):has([data-path="arrangement.tiles.quote.role"][data-empty])', allow: "remove" },
   // 2. Empty sections drawn whole: an empty About, Experience, Quote or Get in touch draws its heading and its empty fields.
-  { name: "an empty About me", selector: '[data-section="about"]:has([data-path="arrangement.tiles.about.text"][data-empty]):not(:has(dl [data-path]:not([data-empty])))', allow: "remove" },
+  { name: "an empty About me", selector: '[data-section="about"]:has([data-path="arrangement.tiles.about.text"][data-empty]):not(:has(dl [data-path]:not([data-pe-lines]):not([data-empty])))', allow: "remove" },
   { name: "an empty Experience", selector: '[data-section="experience"]:not(:has([data-path]:not([data-empty])))', allow: "remove" },
   { name: "an empty Quote", selector: '[data-section="quote"]:has([data-path="arrangement.tiles.quote.text"][data-empty])', allow: "remove" },
   { name: "an empty Get in touch", selector: '[data-section="contact"]:not(:has(dl > div))', allow: "remove" },

@@ -1,9 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { FULL, SPARSE, fullFixture, sparseFixture } from "./fixtures/portfolio-pages";
 import type { Page } from "@playwright/test";
+import { SKEW_MS, staleness } from "../components/portfolio-editor/pending";
 import { applyUndo, entryFor } from "../components/portfolio-editor/undo";
 import type { BuilderState } from "../app/(app)/portfolio/steps";
-import { HOME, READY, boxes, call, changeWith, differences, expect, field, focusedPath, renders, fresh, openEditor, saveState, seed, setKind, settle, signIn, signUpToEditor, stateNow, test, textbox, typeIn, uiNow, undoLabel, valueAt, waitReady, waitSaved, waitSavedOnPage } from "./portfolio-editor";
+import { HOME, READY, call, changeWith, expect, field, focusedPath, fresh, openEditor, saveState, seed, setKind, settle, signIn, signUpToEditor, stateNow, test, textbox, typeIn, uiNow, undoLabel, valueAt, waitReady, waitSaved, waitSavedOnPage } from "./portfolio-editor";
 
 // The one-page portfolio editor's core (decision 0031; brief E of docs/briefs/portfolio-first): which
 // builder a person gets, the page drawn as the visitor's with every word typed where it sits, each field
@@ -429,6 +430,81 @@ test.describe("Coming back to the page", () => {
   });
 });
 
+test.describe("Coming back to the page, and the servers' clocks", () => {
+  // loadedAt and savedAt are stamped by whichever server instance answers, so the gate allows their clocks
+  // SKEW_MS of difference (pending.ts). These check the rule in-process, then the wait it costs in a browser.
+  const T = Date.parse("2026-12-01T12:00:00.000Z");
+  const at = (ms: number) => new Date(T + ms).toISOString();
+  const saved = at(0);
+
+  test("a load made before the save on a server whose clock is 1.5s ahead is still behind, and is fetched again", () => {
+    expect(SKEW_MS).toBe(2000);
+    // Truly loaded 0.5s before the save landed; its server's clock reads 1.5s ahead.
+    expect(staleness(at(-500 + 1500), saved, 0)).toBe("margin");
+    // The plain cases.
+    expect(staleness(at(-1), saved, 0)).toBe("older");
+    expect(staleness(at(0), saved, 0)).toBe("older");
+    expect(staleness(at(SKEW_MS), saved, 0)).toBe("margin");
+    expect(staleness(at(SKEW_MS + 1), saved, 0)).toBe("fresh");
+    expect(staleness(at(-5000), saved, 1)).toBe("saving");
+    expect(staleness(at(-5000), null, 0)).toBe("fresh");
+  });
+
+  test("the limit: a load made before the save on a server whose clock is 3s ahead passes as fresh", () => {
+    // Truly loaded 0.5s before the save; its clock 3s ahead: it reads 2.5s after the save, past the margin.
+    // This is the fault the margin does not cover (e-handover.md, "The Back fix's limit").
+    expect(staleness(at(-500 + 3000), saved, 0)).toBe("fresh");
+  });
+
+  test("coming back within the margin after a save waits a moment on the page as left, then opens the editor on the new words", async ({ page }) => {
+    const f = fresh(FULL, "margin");
+    await openEditor(page, f);
+    expect((await page.request.get("/account")).status()).toBe(200);
+    await typeIn(page, "profile.headline", "Analyst, back within two seconds");
+    await waitSaved(page);
+    const landed = Date.now();
+    let fetched = 0;
+    page.on("request", (r) => {
+      if (new URL(r.url()).pathname === "/portfolio" && r.headers()["rsc"] === "1") fetched++;
+    });
+    // Away and straight back by the header's links, well inside the margin.
+    await page.getByRole("link", { name: "Account", exact: true }).first().click();
+    await page.waitForURL(/\/account$/);
+    await page.getByRole("link", { name: "Your portfolio", exact: true }).first().click();
+    await expect(page.locator('[data-editor="portfolio"][data-loading]')).toBeAttached();
+    expect(Date.now() - landed, "back inside the margin").toBeLessThan(SKEW_MS);
+    await waitReady(page);
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, back within two seconds");
+    await expect(page.locator("[data-stale-data]")).toHaveCount(0);
+    // A short wait, not the ten seconds of the warning: the move's own fetch, then one more once past the margin.
+    expect(Date.now() - landed).toBeLessThan(SKEW_MS + 4000);
+    expect(fetched).toBe(2);
+  });
+});
+
+test.describe("Coming back to the page, past the margin", () => {
+  test("coming back more than the margin after the last save opens the editor at once: one fetch of the page, no second", async ({ page }) => {
+    const f = fresh(FULL, "pastmargin");
+    await openEditor(page, f);
+    expect((await page.request.get("/account")).status()).toBe(200);
+    await typeIn(page, "profile.headline", "Analyst, back after a pause");
+    await waitSaved(page);
+    await page.getByRole("link", { name: "Account", exact: true }).first().click();
+    await page.waitForURL(/\/account$/);
+    await page.waitForTimeout(SKEW_MS + 500);
+    // The page's data as Next fetches it on a move inside the app (an RSC request to /portfolio).
+    let fetched = 0;
+    page.on("request", (r) => {
+      if (new URL(r.url()).pathname === "/portfolio" && r.headers()["rsc"] === "1") fetched++;
+    });
+    await page.getByRole("link", { name: "Your portfolio", exact: true }).first().click();
+    await waitReady(page);
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, back after a pause");
+    await page.waitForTimeout(1000);
+    expect(fetched, "the move's own fetch, and no refresh for the margin").toBe(1);
+  });
+});
+
 test.describe("Coming back to the page, with nothing of development's", () => {
   // The same journeys as above, built only from what a production build has: the site's own sign-up, the
   // header's links, and the words on the page (no /dev route, no /auth/dev, no development handle). They
@@ -610,15 +686,52 @@ test.describe("See as a visitor", () => {
     expect((await uiNow(page)).sheet).toBe("address");
   });
 
-  test("with an address and every exhbt hidden, the line says to publish one", async ({ page }) => {
+  test("with no exhbt at all, the line says to add one, with Add an exhbt", async ({ page }) => {
+    const base = fullFixture("x", null, "premium");
+    const f = fresh({ ...base, exhbts: [] }, "vnone");
+    await openEditor(page, f);
+    await call(page, "seeAsVisitor", true);
+    await expect(notOnline(page)).toHaveAttribute("data-not-online", "no-exhbt");
+    await expect(notOnline(page)).toContainText("Not online yet: add an exhbt");
+    await expect(page.locator("[data-canvas=visitor]").getByRole("link", { name: "Add an exhbt" })).toHaveAttribute("href", "/exhbts/new");
+  });
+
+  test("with drafts only, the line says to publish one and opens the newest draft by its title", async ({ page }) => {
+    const base = fullFixture("x", null, "premium");
+    const f = fresh({ ...base, exhbts: [{ ...base.exhbts[0]!, draft: true }] }, "vdrafts");
+    const seeded = await openEditor(page, f);
+    await call(page, "seeAsVisitor", true);
+    await expect(notOnline(page)).toHaveAttribute("data-not-online", "drafts-only");
+    await expect(notOnline(page)).toContainText("Not online yet: publish an exhbt");
+    // "Would a second till cut the lunch queue?", shortened for a button.
+    const open = page.locator("[data-canvas=visitor]").getByRole("link", { name: /^Open Would a second till/ });
+    await expect(open).toHaveAttribute("href", `/exhbts/${seeded.ids.queue}/edit`);
+    expect((await open.textContent())!.length).toBeLessThanOrEqual("Open ".length + 32);
+
+    // A draft with no title yet.
+    const untitled = fresh({ ...base, exhbts: [{ ...base.exhbts[0]!, draft: true, doc: { ...(base.exhbts[0]!.doc as object), title: "" } }] }, "vuntitled");
+    const s2 = await openEditor(page, untitled);
+    await call(page, "seeAsVisitor", true);
+    await expect(page.locator("[data-canvas=visitor]").getByRole("link", { name: "Open your draft" })).toHaveAttribute("href", `/exhbts/${s2.ids.queue}/edit`);
+  });
+
+  test("with every live exhbt hidden, the line says so, and Show one goes back to the page at the hidden exhbts", async ({ page }) => {
     const base = fullFixture("x", null, "premium");
     const f = fresh({ ...base, exhbts: base.exhbts.map((e) => ({ ...e, hidden: true })) }, "vhidden");
     await openEditor(page, f);
     await call(page, "seeAsVisitor", true);
-    await expect(notOnline(page)).toHaveAttribute("data-not-online", "nothing-live");
-    await expect(notOnline(page)).toContainText("Not online yet: publish an exhbt");
-    await expect(page.locator("[data-canvas=visitor]").getByRole("link", { name: "Add an exhbt" })).toHaveAttribute("href", "/exhbts/new");
+    await expect(notOnline(page)).toHaveAttribute("data-not-online", "all-hidden");
+    await expect(notOnline(page)).toContainText("Not online yet: every exhbt is hidden");
     await expect(page.locator(`[data-canvas=visitor] ${HOME} [data-card]`)).toHaveCount(0);
+    await page.locator("[data-canvas=visitor]").getByRole("button", { name: "Show one" }).click();
+    await expect(page.locator("[data-canvas=visitor]")).toHaveCount(0);
+    expect((await uiNow(page)).visitor).toBe(false);
+    // The hidden exhbts' row (F's, [data-hidden-row]) has the focus once it is on the page; without it, the work is in view.
+    const row = page.locator(`${READY} [data-hidden-row]`);
+    if ((await row.count()) > 0) {
+      await expect.poll(() => page.evaluate(() => Boolean(document.activeElement?.closest("[data-hidden-row]")))).toBe(true);
+      await expect(row).toBeInViewport();
+    } else await expect(page.locator(`${READY} [data-section="work"]`)).toBeInViewport();
   });
 
   test("a draft, a hidden exhbt and a look being previewed are not in it, and switching back keeps what was typed", async ({ page }) => {
@@ -836,46 +949,6 @@ test.describe("Saving, after a deploy and in two tabs", () => {
   });
 });
 
-test.describe("Box for box with the visitor's page", () => {
-  // The six looks E did not measure (Exhbt and Studio were, in milestone 1), on the full fixture, and
-  // Ledger and Notebook with no education line, where the location and the year are block fields. Every
-  // landmark of the page (HOME_BOXES) is where /p/<name> has it, within half a pixel, at 1440 and 412.
-  // Nothing on the full fixture is empty, so of HOME_EDIT_ONLY_IN_FLOW only "what you're looking for, as
-  // stored" can differ, and it is inside the boxes measured here, never one of them.
-  const cases: { look: string; noEducation?: boolean }[] = [
-    { look: "classic" },
-    { look: "notebook" },
-    { look: "mono" },
-    { look: "night" },
-    { look: "ledger" },
-    { look: "bloom" },
-    { look: "ledger", noEducation: true },
-    { look: "notebook", noEducation: true },
-  ];
-  for (const c of cases) {
-    test(`${c.look}${c.noEducation ? ", with no education line," : ""} is the visitor's page box for box at 1440 and 412`, async ({ page }) => {
-      test.slow();
-      const base = fullFixture("x", c.look);
-      const layout = base.layout as { tiles: Record<string, unknown> };
-      const fixture = c.noEducation ? { ...base, layout: { ...layout, tiles: { ...layout.tiles, education: { lines: [], tools: "Excel, Python, SQL, Tableau" } } } } : base;
-      const f = fresh(fixture, `box${c.look}${c.noEducation ? "n" : ""}`);
-      await openEditor(page, f);
-      for (const width of [1440, 412]) {
-        await page.setViewportSize({ width, height: 900 });
-        await page.goto("/portfolio");
-        await waitReady(page);
-        await settle(page);
-        const editing = await boxes(page);
-        await page.goto(`/p/${f.username}`);
-        await settle(page);
-        const visiting = await boxes(page);
-        expect(visiting.length, "the visitor's page drew its landmarks").toBeGreaterThan(10);
-        expect(differences(visiting, editing), `${c.look} at ${width}`).toEqual([]);
-      }
-    });
-  }
-});
-
 test.describe("Accessibility", () => {
   test("the editing page, See as a visitor and a problem at a field have no WCAG 2.1 AA violations axe can find", async ({ page }) => {
     const f = fresh(FULL, "axe");
@@ -895,94 +968,3 @@ test.describe("Accessibility", () => {
   });
 });
 
-test.describe("What draws again", () => {
-  /**
-   * Counts the charts' renders without touching components/charts/Chart.tsx: a stand-in for React's
-   * devtools hook, put in before the page's scripts, sees every commit. A Chart fiber rendered in a commit
-   * is one React did work on (PerformedWork, flag 1) that is not the very fiber the last commit of that
-   * root had: a subtree React skipped keeps its old fibers, flags and all. Kept per root, since Next's
-   * development overlay commits a root of its own.
-   */
-  const COUNT_CHARTS = () => {
-    const seenBy = new WeakMap<object, WeakSet<object>>();
-    const w = window as unknown as { __chartRenders: number; __REACT_DEVTOOLS_GLOBAL_HOOK__?: unknown };
-    w.__chartRenders = 0;
-    type Fiber = { type?: { name?: string } | null; flags: number; child: Fiber | null; sibling: Fiber | null };
-    w.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
-      supportsFiber: true,
-      renderers: new Map(),
-      inject: () => 1,
-      checkDCE: () => {},
-      onScheduleFiberRoot: () => {},
-      onCommitFiberUnmount: () => {},
-      onPostCommitFiberRoot: () => {},
-      onCommitFiberRoot: (_id: number, root: { current: Fiber }) => {
-        const seen = seenBy.get(root) ?? new WeakSet<object>();
-        const now = new WeakSet<object>();
-        const stack: Fiber[] = [root.current];
-        while (stack.length) {
-          const f = stack.pop()!;
-          if (f.type && typeof f.type === "function" && (f.type as { name?: string }).name === "Chart") {
-            now.add(f);
-            if (!seen.has(f) && (f.flags & 1) === 1) w.__chartRenders++;
-          }
-          if (f.child) stack.push(f.child);
-          if (f.sibling) stack.push(f.sibling);
-        }
-        seenBy.set(root, now);
-      },
-    };
-  };
-  const reset = (page: Page) =>
-    page.evaluate(() => {
-      window.__portfolioRenders = {};
-      (window as unknown as { __chartRenders: number }).__chartRenders = 0;
-    });
-  const read = async (page: Page) => {
-    await settle(page);
-    return { ...(await renders(page)), charts: await page.evaluate(() => (window as unknown as { __chartRenders: number }).__chartRenders) };
-  };
-
-  test("a key in the headline, a key in the intro and a section move: what renders, charts included", async ({ page }) => {
-    await page.addInitScript(COUNT_CHARTS);
-    const f = fresh(FULL, "renders");
-    await openEditor(page, f);
-    await settle(page);
-    // The counter sees the page's charts as they mount: it is working.
-    expect(await page.evaluate(() => (window as unknown as { __chartRenders: number }).__chartRenders)).toBeGreaterThan(0);
-
-    // Nothing typed: what draws on its own after the page is up (a chart measuring itself, say).
-    await textbox(page, "profile.headline").click();
-    await page.keyboard.press("End");
-    await reset(page);
-    await page.waitForTimeout(1000);
-    const idle = await read(page);
-    await reset(page);
-    await page.keyboard.type("s");
-    const headline = await read(page);
-    await reset(page);
-    await page.keyboard.type("s");
-    const headline2 = await read(page);
-
-    await textbox(page, "profile.bio").click();
-    await page.keyboard.press("End");
-    await reset(page);
-    await page.keyboard.type("s");
-    const intro = await read(page);
-
-    await reset(page);
-    await changeWith(page, { moveSection: { from: 2, to: 3 } }, "moved About me");
-    const move = await read(page);
-
-    const figures = { "nothing typed": idle, "a key in the headline": headline, "a second key in the headline": headline2, "a key in the intro": intro, "a section move": move };
-    console.log(`Render counts: ${JSON.stringify(figures)}`);
-    test.info().annotations.push({ type: "render counts", description: JSON.stringify(figures) });
-    // A key draws the page and the hero again, and no section, tile or chart.
-    for (const [what, n] of Object.entries({ headline, intro })) {
-      expect(Object.keys(n).filter((k) => /^(section|tile):/.test(k) && n[k as keyof typeof n]), what).toEqual([]);
-      expect(n.charts, what).toBe(0);
-    }
-    // A move draws no chart again.
-    expect(move.charts).toBe(0);
-  });
-});

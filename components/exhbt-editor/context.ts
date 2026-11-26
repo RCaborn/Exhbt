@@ -28,6 +28,11 @@ export type PageEditorProps = EditorProps & {
   publishedAt?: string | null;
   /** True for an admin: "Use the classic editor" is stored as their own choice of editor (lib/editor-kind.ts), where everyone else's is for the visit. */
   adminSwitch?: boolean;
+  /**
+   * True when the portfolio switch is at "page" for this person (lib/portfolio-kind.ts, decision 0031): the way
+   * back says "Your portfolio" and waits for the last save, and a first publish returns to the portfolio.
+   */
+  portfolioFirst?: boolean;
 };
 
 export type SheetName = "publish" | "card" | "work" | "chart" | "figure" | "reorder";
