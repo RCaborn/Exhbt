@@ -95,12 +95,12 @@ export function Settings({
 
   return (
     <div className="lab-content app-settings">
-      <header className="app-settings-head">
+      <div className="app-settings-head">
         <Heading level={1}>Account and billing</Heading>
         <Text as="p" display="block" color="secondary">
           Signed in as {words.person.email}. You&rsquo;re on {words.account.planName}, {words.account.priceLine}.
         </Text>
-      </header>
+      </div>
 
       <Layout
         height="auto"

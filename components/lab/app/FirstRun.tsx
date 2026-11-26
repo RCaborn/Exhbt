@@ -95,7 +95,7 @@ export function FirstRun({
       <div className="lab-content app-first">
         <div className="app-first-grid">
           <div className="app-first-now">
-            <header className="app-head app-first-head">
+            <div className="app-head app-first-head">
               <Heading level={1} type="display-1">
                 This is your portfolio, {words.person.first}.
               </Heading>
@@ -104,7 +104,7 @@ export function FirstRun({
                   It&rsquo;s the website an employer opens. Only you can see it for now.
                 </Text>
               </div>
-            </header>
+            </div>
 
             {failed && (
               <FailedSave

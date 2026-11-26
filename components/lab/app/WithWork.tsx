@@ -140,7 +140,7 @@ export function WithWork({
 
   return (
     <div className="lab-content app-work">
-      <header className="app-head app-work-head">
+      <div className="app-head app-work-head">
         <div className="app-eyebrow">
           <Text type="label">Your portfolio</Text>
           <Live />
@@ -157,7 +157,7 @@ export function WithWork({
             <Button label="See as a visitor" variant="ghost" icon={<Icon icon="externalLink" />} href="/demo" target="_blank" />
           </div>
         </div>
-      </header>
+      </div>
 
       {failed && (
         <FailedSave
