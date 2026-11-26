@@ -16,7 +16,7 @@ export const FINISH_STATES = [
   {
     id: "free",
     tab: "On Free",
-    note: "On Free an exhbt is saved as a draft only its owner can see. The moment says so, and offers the upgrade once.",
+    note: "On Free an exhbt is saved as a draft only its owner can see. The moment says so, and offers the upgrade once. Close it to play it again.",
   },
   {
     id: "portfolio",

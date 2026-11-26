@@ -96,7 +96,12 @@ export function FinishStage({
   // (in the lab and in every capture of it); "Play it again" goes back to the draft and runs it from
   // "Review and publish". Opened after the page has loaded, never in the server's HTML, and without
   // maximal's flight: the ticks and the stroke play once, or with less motion are simply there.
+  // Free opens on its own finish the same way: saved, and only she can see it (never "live").
   useEffect(() => {
+    if (state === "free") {
+      setStep("finish");
+      return;
+    }
     if (state !== "first") return;
     setLive(true);
     setUnsent(false);
@@ -192,7 +197,7 @@ export function FinishStage({
       <h2 id="fin-stage-title" className="sr-only">
         The exhbt editor, a stand-in
       </h2>
-      {state === "first" && (
+      {(state === "first" || state === "free") && (
         <div className="fin-replay">
           <Button label="Play it again" variant="secondary" size="lg" onClick={replay} />
         </div>
