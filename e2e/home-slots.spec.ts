@@ -165,6 +165,9 @@ function readSlots(page: Page) {
       tools: of("tools").map((e) => ({ where: e.dataset.where!, place: e.parentElement?.hasAttribute("data-intro") ? "intro" : e.parentElement?.getAttribute("data-section") })),
       lineTools: of("line-tools").map((e) => ({ path: e.dataset.path!, kind: e.dataset.kind!, count: Number(e.dataset.count), max: Number(e.dataset.max), lastOfList: e.parentElement?.tagName === "DL" && e === e.parentElement.lastElementChild })),
       photos: of("photo").map((e) => e.querySelectorAll("[data-avatar]").length),
+      // Every link on the page (the top bar's, the cards' and rows', the band's button, Get in touch's, the footer's): none may be followed while editing.
+      liveLinks: [...root.querySelectorAll("a[href]")].filter((a) => !a.closest("[inert]")).map((a) => a.getAttribute("href")),
+      links: root.querySelectorAll("a[href]").length,
     };
   });
 }
@@ -343,6 +346,9 @@ for (const look of BASE_LOOKS) {
         for (const x of fields) expect.soft(got.fields.find((g) => fieldKey(g) === fieldKey(x))?.label, `${fieldKey(x)}: its name`).toBe(x.label);
         expect.soft(got.fields.filter((g) => g.inert).map(fieldKey), "fields inside something inert").toEqual([]);
         expect.soft(got.photos, "the photo, once, round the face").toEqual([1]);
+        // The top bar, the footer and every link inside the sections are inert, so a click reaches the editor.
+        expect.soft(got.links, "the page's links").toBeGreaterThan(0);
+        expect.soft(got.liveLinks, "links that are not inert while editing").toEqual([]);
 
         // A frame per section, in order, each holding its section: every one is drawn, empty or not.
         expect.soft(got.sections, "a frame per section").toEqual(w.sections.map((key, index) => ({ key, index, count: w.sections.length, drawn: true })));
