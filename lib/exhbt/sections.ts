@@ -1,4 +1,5 @@
 import {
+  emptyDoc,
   formatLimits,
   needMet,
   SECTION_KINDS,
@@ -15,7 +16,7 @@ import {
   type SectionOf,
 } from "./blocks";
 import { newChart } from "./charts";
-import { FORMAT_COPY, FORMAT_RULES, formatOf, hiddenSections, type Format, type FromWork, type Need } from "./formats";
+import { FORMAT_COPY, FORMAT_RULES, formatOf, hiddenSections, withFormat, type Format, type FromWork, type Need } from "./formats";
 import { normaliseNumber, numbersInDoc } from "./verify";
 
 /**
@@ -107,6 +108,24 @@ export function newSection(kind: Exclude<SectionKind, "image">, sections: Sectio
     case "pullquote":
       return { id, kind, text: "" };
   }
+}
+
+/**
+ * The parts a layout's empty page starts with, besides an empty doc's flowchart and findings: those that can be there
+ * empty, ready to type in. A picture, a graph and a link are added on the page with "+" (a picture needs its file).
+ */
+const STARTING_PARTS: Partial<Record<Format, Exclude<SectionKind, "image">[]>> = { research: ["aim", "conclusion"], essay: ["pullquote"] };
+
+/**
+ * "Write it myself" (/exhbts/new): an empty exhbt in the layout chosen, with that layout's own parts that can start
+ * empty (STARTING_PARTS). A case study is stored exactly as an empty doc always was. The layout puts them in its usual
+ * order (adopt), wherever they sit in the list.
+ */
+export function startingDoc(f: Format): ExhbtDoc {
+  const doc = withFormat(emptyDoc(), f);
+  const sections: Section[] = [...doc.sections];
+  for (const kind of STARTING_PARTS[f] ?? []) sections.push(newSection(kind, sections));
+  return { ...doc, sections };
 }
 
 export const newImageSection = (fileId: string, sections: Section[], size?: { w: number; h: number }): SectionOf<"image"> => ({

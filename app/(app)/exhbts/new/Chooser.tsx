@@ -119,10 +119,10 @@ export function Chooser({ draft, offered, where }: { draft: DraftVerdict; offere
               <VStack gap={2}>
                 <Heading level={2}>Write it myself</Heading>
                 <Text as="p" color="secondary">
-                  Start with the page laid out in the layout you choose, and type straight onto each part.
+                  Start on an empty page in the layout you choose, and type straight onto it.
                 </Text>
                 <Text as="p" type="supporting">
-                  Nothing to upload first. You add pictures and graphs on the page.
+                  Nothing to upload first. You add pictures, graphs and links on the page with the “+”.
                 </Text>
               </VStack>
               <VStack gap={3} className="mt-auto">

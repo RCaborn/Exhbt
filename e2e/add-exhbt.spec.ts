@@ -3,8 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { LAYOUT_REFUSED } from "../lib/add-exhbt";
 import { ENTITLEMENTS, PLAN_NAMES } from "../lib/entitlements";
 import { emptyDoc, LIMITS, type ExhbtDoc } from "../lib/exhbt/blocks";
-import { CLASSIC_FORMATS, FORMAT_RULES, LAYOUT_NOT_OFFERED, OFFERED_FORMATS, withFormat } from "../lib/exhbt/formats";
+import { CLASSIC_FORMATS, FORMAT_RULES, LAYOUT_NOT_OFFERED, OFFERED_FORMATS } from "../lib/exhbt/formats";
 import { whereAPublishedExhbtGoes } from "../lib/exhbt/publish-words";
+import { startingDoc } from "../lib/exhbt/sections";
 import { WHAT_AN_EXHBT_IS } from "../lib/exhbt/what-it-is";
 import { portfolioHost } from "../lib/hosts";
 import { ADD, ADD_EXHBT, BUILD_IT_YOURSELF, DRAFT_WITH_AI } from "./add-exhbt";
@@ -242,8 +243,9 @@ test.describe("Write it myself", () => {
       await page.getByRole("button", { name: ADD.layoutButton(f) }).click();
       await page.waitForURL(ADD.editUrl);
       const id = idIn(page.url());
-      // Stored as an empty doc in that layout and nothing else.
-      expect((await stored(page)).find((e) => e.id === id)!.doc, f).toEqual(withFormat(emptyDoc(), f));
+      // Stored as an empty doc in that layout, with the layout's own parts that can start empty (research's aim and
+      // conclusion, an essay's pull quote), and nothing else.
+      expect((await stored(page)).find((e) => e.id === id)!.doc, f).toEqual(startingDoc(f));
       // The new editor opens on it, in that layout, with nothing typed.
       await waitEditor(page);
       await expect(page.locator(`${READY} article[data-exhbt-page]`)).toHaveAttribute("data-format", f);
@@ -290,7 +292,8 @@ test.describe("Write it myself", () => {
     await page.getByRole("button", { name: ADD.layoutButton("research") }).click();
     await page.waitForURL(ADD.editUrl);
     const made = (await stored(page)).find((e) => e.id === idIn(page.url()))!;
-    expect(made.doc).toEqual(withFormat(emptyDoc(), "research"));
+    expect(made.doc).toEqual(startingDoc("research"));
+    expect(made.doc.sections.map((s) => s.kind)).toEqual(["findings", "aim", "conclusion"]);
     await expect(page.getByRole("radiogroup", { name: "Layout" }).getByRole("radio", { name: /^Research/ })).toBeChecked();
   });
 });
