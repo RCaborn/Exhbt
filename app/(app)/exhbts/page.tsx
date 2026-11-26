@@ -68,7 +68,7 @@ export default async function ExhbtsPage({ searchParams }: { searchParams: Promi
                 </>
               )}
             </p>
-            {/* The one way to start an exhbt: the chooser (draft it with AI, or build it yourself). With the plan full, the upgrade offer below stands in for it. */}
+            {/* The one way to start an exhbt: the chooser ("Draft it from my files" or "Write it myself"). With the plan full, the upgrade offer below stands in for it. */}
             {room.ok && (
               <Button href={ADD_EXHBT} variant="primary">
                 Add an exhbt

@@ -71,7 +71,7 @@
     background: var(--add-stage);
     color: var(--color-text-secondary);
   }
-  @container (inline-size >= 28rem) {
+  @container (min-width: 28rem) {
     .add-art {
       gap: var(--spacing-5);
       block-size: calc(var(--spacing-8) * 7);
@@ -117,7 +117,7 @@
     background: var(--color-background-card);
     color: var(--color-text-primary);
   }
-  @container (inline-size >= 28rem) {
+  @container (min-width: 28rem) {
     .add-art-files {
       grid-template-columns: repeat(2, var(--spacing-12));
     }

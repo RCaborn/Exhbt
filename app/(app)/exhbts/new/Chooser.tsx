@@ -87,7 +87,7 @@ export function Chooser({ draft, offered, where }: { draft: DraftVerdict; offere
                   Upload the report, slides, pictures or notes, or give a link. The AI writes a first version from them and nothing else; you check every word.
                 </Text>
                 <Text as="p" type="supporting">
-                  It also chooses a layout and takes the key figure from your work.
+                  It also chooses a layout and looks in your files for the key figure.
                 </Text>
               </VStack>
               {draft.ok ? (

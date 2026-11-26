@@ -8,7 +8,7 @@ import { LayoutSketch } from "./layout-parts";
 /*
  * The two pictures on "Add an exhbt": what you bring, an arrow, and the page you get. Both end on the same
  * sheet, the editor's own sketch of a case study: written in for the AI draft, empty with a cursor in its
- * title for building it yourself. They are pictures only (hidden from screen readers); the words beside
+ * title for writing it yourself. They are pictures only (hidden from screen readers); the words beside
  * them say the same. Astryx lays them out; add-exhbt.css paints them, from Astryx's tokens.
  */
 
