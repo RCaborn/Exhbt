@@ -26,7 +26,7 @@ test.describe("The bar", () => {
   test("at 1440 the row holds every part, and the chip says the page is live", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openEditor(page, fresh(FULL, "bar-wide"));
-    await expect(bar(page).getByRole("heading", { level: 1, name: "Your portfolio" })).toBeVisible();
+    await expect(bar(page).getByRole("heading", { level: 2, name: "Your portfolio" })).toBeVisible();
     await expect(bar(page).locator("[data-chip]")).toHaveAttribute("data-chip", "live");
     await expect(bar(page).locator("[data-chip]")).toContainText("Live");
     const t = toolbar(page);
