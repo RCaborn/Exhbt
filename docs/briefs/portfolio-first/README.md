@@ -6,7 +6,7 @@ This folder holds one brief per build agent, A to L. Each brief stands alone: an
 
 ## Before anything starts
 
-- **The new exhbt editor is on for everyone.** The change is ready on `switch-on-page-editor` (c526fcf, 26 Nov: `DEFAULT_EDITOR` and its pin in one commit). Rory's decision: the portfolio is built after that, and it goes live after that too, because the portfolio hands people to the new exhbt editor and back.
+- **The new exhbt editor is on for everyone.** The change is ready on `switch-on-page-editor` (c526fcf, 26 Nov: `DEFAULT_EDITOR` and its pin in one commit). Rory's decision: the portfolio is built after that, and it goes live after that too, because the portfolio hands people to the new exhbt editor and back. The main session cuts `phase-2-pf0` only then.
 - **The hotfix (C) can go at once.** It mends a link on the live site and has nothing to do with the switch.
 - **Release branches are cut from `main`.** `origin/phase-2` is 409 commits behind `main` and none ahead: Phase 2 is live (`EXHBT_PHASE2=1` in `wrangler.jsonc`), and the editor's releases have gone to `main` by pull request. The line in `CLAUDE.md` about the `phase-2` branch predates that; nothing here pushes straight to `main`.
 
@@ -37,11 +37,11 @@ At most two Opus agents run at once; Sonnet agents may run beside them. Haiku do
 | | Brief | Model | Branch | Port | Starts when | Hours |
 |---|---|---|---|---|---|---|
 | C | `c-live-link-hotfix.md` | Sonnet | `phase-2-pf-c-live-link` | 3323 | now, from `main` | 1 |
-| A | `a-portfolio-parity.md` | Opus | `phase-2-pf-a-parity` | 3321 | `phase-2-pf0` exists | 4 |
-| B | `b-switch-and-seams.md` | Sonnet | `phase-2-pf-b-switch` | 3322 | `phase-2-pf0` exists | 5 |
+| A | `a-portfolio-parity.md` | Opus | `phase-2-pf-a-parity` | 3321 | the new exhbt editor is on for everyone, and `phase-2-pf0` is cut | 4 |
+| B | `b-switch-and-seams.md` | Sonnet | `phase-2-pf-b-switch` | 3322 | the same | 5 |
 | D | `d-page-slots.md` | Opus | `phase-2-pf-d-slots` | 3324 | A is merged into `phase-2-pf0` and `phase-2-pf1` is cut | 6 |
-| E | `e-editor-core.md` | Opus | `phase-2-pf-e-core` | 3325 | D is merged and `phase-2-pf2` is cut; B is merged; the new exhbt editor is on for everyone | 12 |
-| H | `h-structure.md` | Sonnet | `phase-2-pf-h-structure` | 3328 | B is merged; the new exhbt editor is on for everyone; the classic editor's removal (`docs/briefs/edit-on-page/r5-p-remove-classic.md`) is merged or held until R2 is merged | 6 |
+| E | `e-editor-core.md` | Opus | `phase-2-pf-e-core` | 3325 | D is merged and `phase-2-pf2` is cut; B is in `phase-2-pf2` (if `phase-2-pf1` was cut before B landed, the main session merges `phase-2-pf0` into `phase-2-pf2` first) | 12 |
+| H | `h-structure.md` | Sonnet | `phase-2-pf-h-structure` | 3328 | `phase-2-pf2` is cut with B in it; the classic editor's removal (`docs/briefs/edit-on-page/r5-p-remove-classic.md`) is merged or held until R2 is merged | 6 |
 | F | `f-sections-and-tiles.md` | Opus | `phase-2-pf-f-arrange` | 3326 | E's milestone 1 is merged | 9 |
 | G | `g-bar-and-sheets.md` | Sonnet | `phase-2-pf-g-bar` | 3327 | E's milestone 1 is merged; its Team sheet waits for H's step 1 | 8 |
 | I | `i-phone.md` | Opus | `phase-2-pf-i-phone` | 3329 | F and G are merged, and an Opus slot is free | 5 |
@@ -80,11 +80,11 @@ No two agents edit the same file in the same release, with these hand-overs: E m
 
 | Agent | Owns |
 |---|---|
-| E | `app/(app)/portfolio/page.tsx`, `load.ts` (new), `actions.ts`, `builder-state.ts` (new), `TryNewPortfolio.tsx` (new), `error.tsx` (new), `Builder.tsx` (exporting `BuilderProps` and moving `personOf` and `problemOf` out, nothing else); everything in `components/portfolio-editor/` but the folders handed over below; `components/exhbt-editor/fields/InlineText.tsx` (the word `export` only); `components/portfolio/PortfolioHome.tsx` and `home-ctx.ts` (slot fixes only, held to parity); `e2e/portfolio-editor.ts` (new, until J takes it), `e2e/portfolio-core.spec.ts` (new) |
+| E | `app/(app)/portfolio/page.tsx`, `load.ts` (new), `actions.ts`, `builder-state.ts` (new), `TryNewPortfolio.tsx` (new), `error.tsx` (new), `Builder.tsx` (exporting `BuilderProps` and moving `personOf` and `problemOf` out, nothing else); everything in `components/portfolio-editor/` but the folders handed over below; `components/exhbt-editor/fields/InlineText.tsx` (the word `export` only); `components/portfolio/PortfolioHome.tsx` and `home-ctx.ts` (slot fixes only, held to parity); `playwright.config.ts` (the portfolio specs' lines in the projects' matches only); `e2e/portfolio-editor.ts` (new, until J takes it), `e2e/portfolio-core.spec.ts` (new) |
 | F | `components/portfolio-editor/sections/`, `components/portfolio-editor/tiles/`, `components/portfolio-editor/css/arrange.css`, `e2e/portfolio-arrange.spec.ts` (new) |
 | G | `components/portfolio-editor/bar/`, `sheets/`, `tools/`, `components/portfolio-editor/css/bar.css`, `app/(app)/portfolio/JobLinksSection.tsx` (a `compact` variant), `e2e/portfolio-bar.spec.ts` (new) |
 | H | `components/team/TeamPanel.tsx` (new); `app/(app)/exhbts/page.tsx`, `exhbts/new/page.tsx`, `exhbts/[id]/actions.ts` (the idea redirects and the revalidations), `exhbts/[id]/edit/page.tsx` (passing the switch), `exhbts/[id]/team/page.tsx` (its back link); `components/exhbt-editor/topbar/TopBar.tsx` (the back link), `components/exhbt-editor/sheets/PublishSheet.tsx` (what follows a publish, and Free's line), `components/exhbt-editor/context.ts` (one optional prop); `app/(app)/account/page.tsx`, `account/portfolio/page.tsx`, `account/billing/page.tsx` (one button); `app/(app)/portfolio/customise/page.tsx`; `app/(app)/job-links/page.tsx`, `job-links/new/page.tsx`, `job-links/[id]/page.tsx` (back links); `app/(app)/team/accept/page.tsx`; `components/roadmap/BuildThis.tsx`, `app/(app)/roadmap/[id]/page.tsx`, `app/(app)/roadmap/saved/page.tsx` (passing the switch); `e2e/portfolio-routes.spec.ts` (new) |
-| I | `components/portfolio-editor/phone/`, `components/portfolio-editor/css/phone.css`, `playwright.config.ts` (the touch project's match), `e2e/portfolio-phone.spec.ts` (new) |
+| I | `components/portfolio-editor/phone/`, `components/portfolio-editor/css/phone.css`, `e2e/portfolio-phone.spec.ts` (new) |
 | J | `e2e/portfolio-editor.ts` (from E's merge), `e2e/portfolio-editor.spec.ts`, `portfolio-structure.spec.ts`, `portfolio-safety.spec.ts`, `portfolio-visitor.spec.ts`, `portfolio-smooth.spec.ts` (all new) |
 | K | `docs/MAP.md`, `HANDOFF.md`, `DESIGN.md` (the portfolio and builder paragraphs, and the Dragging rule's builder sentence), `AGENTS.md` (one line), `docs/briefs/portfolio-first/trial-checklist.md` (new) |
 
@@ -115,7 +115,7 @@ No two agents edit the same file in the same release, with these hand-overs: E m
    `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
    `Claude-Session: https://claude.ai/code/session_01SXCVQu8yRBVXtcSEG6wWoZ`
 9. **House rules that bite here:** on the portfolio page, colours, faces and corners come only from the look's variables (`--pf-*`, and `--xp-*` for the editor's field styles); app chrome uses the existing tokens and Astryx Buttons through `components/ui/Button.tsx`; lower-case "exhbt" in running text; plain British English with no hype words; no plan figures in prose or UI strings (read them from `lib/entitlements.ts`); hosts only from `lib/hosts.ts` (links to a person's page through `portfolioHref`); Claude Haiku is the only model the app names (`lib/ai/model.ts`); data access goes through the `Store` interface, on both implementations; never edit an applied migration (this build needs no new one); never commit a secret.
-10. **Visitors' pages are protected.** Do not edit `app/(portfolio)/**`, `lib/portfolio.ts` or `lib/plan-rules.ts` (`npm run check:protected` fails if you do), and do not regenerate the portfolio golden copies (`e2e/golden/portfolio/`; brief A writes them once). Brief L's one named edit under `app/(portfolio)/` is the only exception.
+10. **Visitors' pages are protected.** Do not edit `app/(portfolio)/**`, `lib/portfolio.ts` or `lib/plan-rules.ts` (`npm run check:protected` fails if you do), and do not regenerate the portfolio golden copies (`e2e/golden/portfolio/`; brief A writes them once). Brief L's named edits (the owner preview's words, and the two parity targets they change) are the only exception.
 11. **If something you wait for lands after you started,** the main session will tell you. Then merge the release branch into yours (`git fetch origin && git merge origin/<release branch>`); never rebase a branch you have pushed.
 12. **If you are resumed after a stop:** run `git status` and `git log --oneline -5` first, commit and push anything on disk that works, then carry on from the step list.
 

@@ -415,7 +415,7 @@ Each release goes to `main` by a pull request the main session opens, safe with 
 | **R3, trial, then on** | Rory and Alex on a laptop and an iPhone; then `EXHBT_PORTFOLIO=page` | Everyone | `/api/health` says `"portfolio": "page"` |
 | **R4, clean-up, a week later** | The default becomes `page`; the step builder, `frame`, the list's body and the switch go; the old specs' useful checks move | Nothing changes | The suite green without the old builder |
 
-R2 starts only once the new exhbt editor is on for everyone (the change is ready on `switch-on-page-editor`). The removal of the classic exhbt editor (`docs/briefs/edit-on-page/r5-p-remove-classic.md`) and brief H edit the same files: they are never in flight together. `EXHBT_TOOL_HOST` (the move to `app.exhbt.co.uk`, which signs everyone out once) is never switched on in the same week as `EXHBT_PORTFOLIO`.
+The build starts once the new exhbt editor is on for everyone (Rory's decision; the change is ready on `switch-on-page-editor`); only the hotfix goes before. The removal of the classic exhbt editor (`docs/briefs/edit-on-page/r5-p-remove-classic.md`) and brief H edit the same files: they are never in flight together. `EXHBT_TOOL_HOST` (the move to `app.exhbt.co.uk`, which signs everyone out once) is never switched on in the same week as `EXHBT_PORTFOLIO`.
 
 ## Visitors' pages stay as they are
 
@@ -456,7 +456,7 @@ The default is what gets built if he says nothing.
 7. **Draft tiles.** *Default: after the live exhbts, just before "Add an exhbt"; on paid plans they are not dragged or starred. On Free everything is arranged, as now.*
 8. **The LinkedIn from the roadmap gate** is already copied into the profile and shown once the page is live. *Default: keep it; the editor shows it on the page before anything is public, with "Show LinkedIn" beside it.*
 9. **The home page's "Build your exhbt" button** (Alex's page). *Default: the label stays; signed out it leads to log in or create an account, then the portfolio. Alex's call.*
-10. **When does it go on for everyone?** *Default: the day of Rory's laptop and iPhone check, once the release checks pass, and not in the same week as the move to `app.exhbt.co.uk`.*
+10. **When does it go on for everyone?** *Default: the day after Rory's laptop and iPhone check, once what it finds is fixed and the release checks pass, and not in the same week as the move to `app.exhbt.co.uk`.*
 
 Smaller defaults, stated so they can be changed: "Roadmaps" stays in the nav, second; an exhbt is deleted only from its editor's menu, not its tile; the star is the only way to choose the band; the step builder stays a week after the switch-on at `?builder=steps`, then goes.
 

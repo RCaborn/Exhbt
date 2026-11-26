@@ -6,7 +6,7 @@
 | Model | Sonnet |
 | Branch | `phase-2-pf-h-structure`, made from `phase-2-pf2` |
 | Port | 3328 |
-| Starts when | B is merged; the new exhbt editor is on for everyone; the classic exhbt editor's removal (`docs/briefs/edit-on-page/r5-p-remove-classic.md`) is merged, or the main session has said it waits until R2 is merged. The two are never in flight together |
+| Starts when | `phase-2-pf2` is cut with B in it; the classic exhbt editor's removal (`docs/briefs/edit-on-page/r5-p-remove-classic.md`) is merged, or the main session has said it waits until R2 is merged. The two are never in flight together |
 | Hours | About 6 |
 
 ## Goal
@@ -147,7 +147,7 @@ Commit and push after each. Each changed page reads the switch with `portfolioKi
 
 1. **TeamPanel first** (it unblocks G): move the join requests and the team projects out of `app/(app)/exhbts/page.tsx` into `components/team/TeamPanel.tsx` as the block says, with no change to what the list draws (check with `phase2-teammates.spec.ts`). Push and tell the main session at once.
 2. **`/exhbts`** at `page`: a 307 to `/portfolio`, query kept (`?full=1`, `?joined=1`, `?left=1`). At `steps`, the list as it is. The address is never deleted.
-3. **The upload** at `page`: the heading "Add an exhbt to your portfolio"; the back link "Your portfolio" to `/portfolio`; under the upload, "Or start from a blank page" (a form posting `createFromScratch`). Signed out, it redirects to `/login?next=/portfolio`.
+3. **The upload** at `page`: the heading "Add an exhbt to your portfolio"; the back link "Your portfolio" to `/portfolio`; under the upload, "Or start from a blank page" (a form posting `createFromScratch`). Signed out with no `into`, it redirects to `/login?next=/portfolio`; with `?into=` (a teammate drafting from a team project) it redirects as it does today, `into` kept.
 4. **The exhbt editor's way back.** The edit page passes `portfolioFirst` (the switch is `page`); `TopBar`'s back link then says "Your portfolio" and goes to `/portfolio?at=<id>`, and on click awaits `flushPending()` before it navigates (prevent the default, then `router.push`), so the portfolio never shows an old title. Without the prop, it is exactly today's link.
 5. **What follows a publish.** With `portfolioFirst`: a first publish (the exhbt was not live before) goes to `/portfolio?at=<id>` once it has landed; publishing changes to a live exhbt stays in the editor with today's live panel, whose "Back to your exhbts" becomes "Back to your portfolio" (`/portfolio?at=<id>`). On Free the sheet says "This exhbt is on your portfolio as a draft only you can see", with "Back to your portfolio" beside the upgrade. "Choose one" (no username) is left: `/account/portfolio` now redirects to the address sheet.
 6. **The team page's back link:** at `page`, "Back to the exhbt" to `/exhbts/<id>/edit`.
@@ -179,6 +179,6 @@ Run: `e2e/portfolio-routes.spec.ts`, `e2e/phase2-teammates.spec.ts`, `e2e/editor
    `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
    `Claude-Session: https://claude.ai/code/session_01SXCVQu8yRBVXtcSEG6wWoZ`
 9. **House rules that bite here:** on the portfolio page, colours, faces and corners come only from the look's variables (`--pf-*`, and `--xp-*` for the editor's field styles); app chrome uses the existing tokens and Astryx Buttons through `components/ui/Button.tsx`; lower-case "exhbt" in running text; plain British English with no hype words; no plan figures in prose or UI strings (read them from `lib/entitlements.ts`); hosts only from `lib/hosts.ts` (links to a person's page through `portfolioHref`); Claude Haiku is the only model the app names (`lib/ai/model.ts`); data access goes through the `Store` interface, on both implementations; never edit an applied migration (this build needs no new one); never commit a secret.
-10. **Visitors' pages are protected.** Do not edit `app/(portfolio)/**`, `lib/portfolio.ts` or `lib/plan-rules.ts` (`npm run check:protected` fails if you do), and do not regenerate the portfolio golden copies (`e2e/golden/portfolio/`; brief A writes them once). Brief L's one named edit under `app/(portfolio)/` is the only exception.
+10. **Visitors' pages are protected.** Do not edit `app/(portfolio)/**`, `lib/portfolio.ts` or `lib/plan-rules.ts` (`npm run check:protected` fails if you do), and do not regenerate the portfolio golden copies (`e2e/golden/portfolio/`; brief A writes them once). Brief L's named edits (the owner preview's words, and the two parity targets they change) are the only exception.
 11. **If something you wait for lands after you started,** the main session will tell you. Then merge the release branch into yours (`git fetch origin && git merge origin/<release branch>`); never rebase a branch you have pushed.
 12. **If you are resumed after a stop:** run `git status` and `git log --oneline -5` first, commit and push anything on disk that works, then carry on from the step list.

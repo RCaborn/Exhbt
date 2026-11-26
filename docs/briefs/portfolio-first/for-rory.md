@@ -49,6 +49,6 @@ How sure: sure of the order, and fairly sure of the days. If anything slips it'l
 7. **Draft tiles** sit after the live exhbts, just before "Add an exhbt", and on paid plans they can't be dragged or starred. On Free everything can be arranged, as now.
 8. **The LinkedIn from the roadmap form** is already copied to the profile and shown once the page is live. We keep that, with the "Show LinkedIn" switch right next to it.
 9. **The home page's "Build your exhbt" button** keeps its words. Signed out, it leads to log in or create an account, then the portfolio. Alex's call.
-10. **It goes on for everyone** on the day of your laptop and iPhone check, once the checks pass, and never in the same week as the move to app.exhbt.co.uk.
+10. **It goes on for everyone** the day after your laptop and iPhone check, once what you find is fixed and the checks pass, and never in the same week as the move to app.exhbt.co.uk.
 
 The free trial that holds a username for a while isn't decided, so it isn't in this plan.
