@@ -9,6 +9,7 @@ import { topSkills, type HomeProject, type KeyFigure } from "@/lib/portfolio-hom
 import { SECTION_HINTS, SECTION_NAMES, splitYear, type SectionKey, type Tiles } from "@/lib/portfolio-layout";
 import { initialsOf } from "@/lib/portfolio-profile";
 import { DEFAULT_THEME, type FontKey, type PortfolioTheme } from "@/lib/portfolio-themes";
+import type { HomeEdit } from "./home-ctx";
 import { lookAttrs, printStyle, themeStyle } from "./themeFonts";
 
 /**
@@ -46,6 +47,12 @@ export type HomeProps = {
   sectionsOnly?: boolean;
   /** The top bar, the hero and the best-work band, with no anchors: a picture of the page (the builder's look previews). */
   thumbnail?: boolean;
+  /**
+   * The portfolio editor's slots (decision 0031, "The adapter"; types in ./home-ctx.ts). No public page
+   * passes it, so the server draws exactly what it drew before; with it, each part asks the adapter for
+   * its editing version.
+   */
+  edit?: HomeEdit;
 };
 
 const WRAP = "mx-auto w-full max-w-[68rem] px-5 @3xl:px-10";
