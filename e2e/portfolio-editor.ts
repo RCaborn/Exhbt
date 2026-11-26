@@ -85,8 +85,13 @@ export async function openEditor(page: Page, fixture: PortfolioFixture, opts: { 
 /**
  * A new person, by the site's own sign-up (an email and a password, which the stand-in store keeps), with
  * the editor turned on: through the development cookie where that route answers, and otherwise by the
- * server's own EXHBT_PORTFOLIO=page, which a production run must set. Uses no /dev route and no /auth/dev,
- * so it works on a production build with the stand-in store. Opens /portfolio and waits for the editor.
+ * server's own EXHBT_PORTFOLIO=page, which a production run must set. Opens /portfolio and waits for the
+ * editor. It reads nothing of the editor's development handle.
+ *
+ * Not yet runnable on `next build` + `next start`: with no Supabase, sign-up there answers "try later"
+ * (lib/password-auth.ts) and the only way to a session is /auth/dev, which is off in production. Run with
+ * EXHBT_ALLOW_MEMORY_STORE=1 (the stand-in store's own switch, which only matters when no Supabase is
+ * configured), the store works; a session still needs /auth/dev to honour the same switch.
  */
 export async function signUpToEditor(page: Page, tag: string): Promise<{ email: string }> {
   const email = `pe-${tag}-${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}@example.com`;
