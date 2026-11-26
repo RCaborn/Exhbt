@@ -140,15 +140,18 @@ test.describe("The first minute", () => {
     await newPerson(page, "first");
     const strip = page.locator('[data-first-run="wide"]');
     await expect(strip).toBeVisible();
-    await expect(strip).toContainText("Your page");
-    await expect(strip).toContainText("Your first exhbt");
+    await expect(strip.getByRole("heading", { name: "Your portfolio in three steps" })).toBeVisible();
+    // Three steps, the first already done: signing up was it.
+    for (const name of ["Account", "Your page", "Your first exhbt"]) await expect(strip).toContainText(name);
+    await expect(strip).toHaveAttribute("data-step", "page");
     await strip.getByRole("button", { name: /^One line about you/ }).click();
     await expect.poll(() => focusedPath(page)).toBe("profile.headline");
     await page.keyboard.type("Data analyst in training");
     await expect(strip.locator('[data-todo="headline"]')).toHaveAttribute("data-done", "true");
     await strip.getByRole("button", { name: /^Pick a look/ }).click();
     await expect(page.locator("[data-look-menu]")).toBeVisible();
-    await page.locator("[data-look-menu]").getByRole("radio", { name: /Night/ }).check();
+    // A look this plan has (Free has only some), other than the one on the page.
+    await page.locator('[data-look-menu] [data-look-option]:not([data-locked]):not(:has(:checked))').first().getByRole("radio").check();
     await page.keyboard.press("Escape");
     await expect(strip.locator('[data-todo="look"]')).toHaveAttribute("data-done", "true");
     // Skip goes straight to the second step.
@@ -162,8 +165,8 @@ test.describe("The first minute", () => {
     await expect(page.locator("[data-first-run]")).toHaveCount(0);
   });
 
-  test("someone with a name, a headline and exhbts sees no strip", async ({ page }) => {
-    await openEditor(page, fresh(FULL, "first-done"));
+  test("someone with a name, a headline, a look of their own and exhbts sees no strip", async ({ page }) => {
+    await openEditor(page, fresh(fullFixture("x", "classic"), "first-done"));
     await expect(page.locator("[data-first-run]")).toHaveCount(0);
   });
 
@@ -171,7 +174,7 @@ test.describe("The first minute", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await newPerson(page, "first-narrow");
     const strip = page.locator('[data-first-run="narrow"]');
-    await expect(strip).toContainText("Step 1 of 2");
+    await expect(strip).toContainText("Step 2 of 3");
     await strip.getByRole("button", { name: "Next" }).click();
     await expect.poll(() => focusedPath(page)).toBe("profile.name");
   });
@@ -275,7 +278,9 @@ test.describe("The address sheet", () => {
     await toolbar(page).getByRole("button", { name: "Share" }).click();
     const sheet = page.locator('[data-sheet="address"]');
     await expect(sheet.locator('[data-address="share"]')).toBeVisible();
-    await expect(sheet.getByRole("button", { name: "Copy link" })).toBeVisible();
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    await sheet.getByRole("button", { name: "Copy link" }).click();
+    await expect(page.getByText("Link copied", { exact: true })).toBeVisible();
     await sheet.getByRole("button", { name: "Change" }).click();
     await expect(sheet.getByRole("textbox", { name: "Username" })).toBeVisible();
     await expect(sheet).toContainText("redirects to the new one for 30 days");

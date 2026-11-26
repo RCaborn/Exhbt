@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Check, Circle } from "lucide-react";
+import { Check, Circle, Copy } from "lucide-react";
 import { Banner } from "@astryxdesign/core/Banner";
+import { Heading } from "@astryxdesign/core/Heading";
+import { useToast } from "@astryxdesign/core/Toast";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
 import { UsernameForm } from "@/app/(app)/portfolio/UsernameForm";
 import { Button } from "@/components/ui/Button";
-import { CopyLink } from "@/components/ui/CopyLink";
 import { portfolioHost } from "@/lib/hosts";
 import { useListedLive } from "../bar/hooks";
 import { usePortfolioApi, usePortfolioData, usePortfolioState } from "../runtime";
@@ -81,7 +82,8 @@ function AddressBody(): ReactNode {
       </Text>
       <section className="pe-sheet-part" aria-labelledby="pe-address-h">
         <h3 id="pe-address-h">Your address</h3>
-        <p className="pe-address" data-address-host>
+        {/* The address set as display type: it is the person's own name on the web. */}
+        <Heading level={4} type="display-3" className="pe-address" data-address-host>
           {viewHref ? (
             <a href={viewHref} className="link" target="_blank" rel="noreferrer">
               {portfolioHost(username)}
@@ -89,10 +91,10 @@ function AddressBody(): ReactNode {
           ) : (
             portfolioHost(username)
           )}
-        </p>
-        {live === 0 && <Banner status="warning" title={ADDRESS_WORDS.notFound} description="Add an exhbt and publish it, and your page is online." />}
+        </Heading>
+        {live === 0 && <Banner status="info" title={ADDRESS_WORDS.notFound} description="Add an exhbt and publish it, and your page is online." />}
         <span className="pe-bar-end">
-          {viewHref && <CopyLink href={viewHref} size="sm" />}
+          {viewHref && <CopyAddress href={viewHref} />}
           <Button size="sm" aria-expanded={changing} aria-controls="pe-address-change" onClick={() => setChanging((c) => !c)}>
             Change
           </Button>
@@ -111,6 +113,28 @@ function AddressBody(): ReactNode {
       />
       <Checklist />
     </div>
+  );
+}
+
+/** Copy link: copies the address and says so in a toast ("Link copied"), and to a screen reader. */
+function CopyAddress({ href }: { href: string }): ReactNode {
+  const toast = useToast();
+  const api = usePortfolioApi();
+  async function copy() {
+    const full = href.startsWith("/") ? `${window.location.origin}${href}` : href;
+    try {
+      await navigator.clipboard.writeText(full);
+      toast({ body: "Link copied", uniqueID: "pe-link-copied" });
+      api.say("Link copied.");
+    } catch {
+      window.prompt("Copy this link", full);
+    }
+  }
+  return (
+    <Button size="sm" onClick={copy} label="Copy link">
+      <Copy aria-hidden size={15} strokeWidth={2.25} />
+      Copy link
+    </Button>
   );
 }
 

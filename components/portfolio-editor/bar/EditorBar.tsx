@@ -3,7 +3,8 @@
 import "../css/bar.css";
 import { useRef, type ReactNode } from "react";
 import { BriefcaseBusiness, Eye, Link2, MoreHorizontal, Palette, Undo2 } from "lucide-react";
-import { Badge } from "@astryxdesign/core/Badge";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Text } from "@astryxdesign/core/Text";
 import { DropdownMenu, type DropdownMenuOption } from "@astryxdesign/core/DropdownMenu";
 import { Popover } from "@astryxdesign/core/Popover";
 import { ToggleButton } from "@astryxdesign/core/ToggleButton";
@@ -36,9 +37,9 @@ import { LinksPanel } from "../tools/PartTools";
  */
 
 /** The chip's words, and what each one means. */
-export const CHIP: Record<Standing, { label: string; variant: "success" | "warning" | "neutral"; means: string }> = {
+export const CHIP: Record<Standing, { label: string; variant: "success" | "neutral"; means: string }> = {
   live: { label: "Live", variant: "success", means: "Visitors can see your portfolio at your address." },
-  offline: { label: "Not online yet", variant: "warning", means: "Visitors get “not found” until you have an address and a published exhbt." },
+  offline: { label: "Not online yet", variant: "neutral", means: "Visitors get “not found” until you have an address and a published exhbt." },
   preview: { label: "Preview only", variant: "neutral", means: "Only you can see your portfolio on your plan." },
 };
 
@@ -126,7 +127,10 @@ function Chip(): ReactNode {
   const c = CHIP[standing];
   return (
     <span className="pe-chip" data-chip={standing} title={c.means}>
-      <Badge variant={c.variant} label={c.label} />
+      <StatusDot variant={c.variant} label={c.label} />
+      <Text type="supporting" weight="semibold" color={standing === "live" ? "primary" : "secondary"}>
+        {c.label}
+      </Text>
       <span className="sr-only">{c.means}</span>
     </span>
   );

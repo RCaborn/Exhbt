@@ -2,7 +2,6 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { Lock } from "lucide-react";
-import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { RadioList, RadioListItem } from "@astryxdesign/core/RadioList";
 import { Text } from "@astryxdesign/core/Text";
@@ -66,7 +65,7 @@ export function LookPanel(): ReactNode {
       </Text>
       {savedButLocked && (
         <Banner
-          status="warning"
+          status="info"
           title={`Your saved look, ${savedButLocked}, comes with a plan you are not on now`}
           description="Your portfolio shows the default until you are back on it, then it returns."
           data-testid="look-held"
@@ -96,7 +95,12 @@ export function LookPanel(): ReactNode {
               label={
                 <span className="pe-look-name">
                   {base.name}
-                  {lock && <Badge variant="neutral" icon={<Lock aria-hidden size={12} strokeWidth={2.5} />} label={lock.planName} />}
+                  {lock && (
+                    <span className="pe-look-lock" aria-hidden>
+                      <Lock size={12} strokeWidth={2.5} />
+                      {lock.planName}
+                    </span>
+                  )}
                   {lock && <span className="sr-only">(comes with {lock.planName})</span>}
                 </span>
               }
@@ -184,7 +188,7 @@ export function PreviewNotice(): ReactNode {
         description="Only you see this preview. It is not saved, and visitors see your own look."
         endContent={
           <span className="pe-bar-end">
-            <Button href="/account/billing" size="sm" variant="primary">
+            <Button href="/account/billing" size="sm">
               See plans
             </Button>
             <Button size="sm" onClick={() => api.previewLook(null)}>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Badge } from "@astryxdesign/core/Badge";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Text } from "@astryxdesign/core/Text";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
@@ -154,7 +154,14 @@ function CompactJobLinks({
                     <span>{l.viewCount === 1 ? "1 view" : `${l.viewCount.toLocaleString("en-GB")} views`}</span>
                   </span>
                 }
-                startContent={<Badge variant={l.status === "live" ? "success" : "neutral"} label={l.status === "live" ? "Live" : "Off"} />}
+                startContent={
+                  <span className="pe-joblink-state">
+                    <StatusDot variant={l.status === "live" ? "success" : "neutral"} label={l.status === "live" ? "Live" : "Off"} />
+                    <Text type="supporting" weight="semibold">
+                      {l.status === "live" ? "Live" : "Off"}
+                    </Text>
+                  </span>
+                }
                 endContent={
                   <Button href={`/job-links/${l.id}`} size="sm" label={`Edit ${name}`}>
                     Edit
@@ -171,7 +178,7 @@ function CompactJobLinks({
         </p>
       ) : room.ok ? (
         <div className="pe-joblinks-foot">
-          <Button href="/job-links/new" variant={links.length ? "secondary" : "primary"} size="sm">
+          <Button href="/job-links/new" size="sm">
             New job link
           </Button>
           <Text type="supporting" color="secondary">

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Users } from "lucide-react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
@@ -45,6 +45,10 @@ export function TeamNotice(): ReactNode {
   const waiting = usePortfolioData().teamRequests;
   const api = usePortfolioApi();
   const open = usePortfolioUi((u) => u.sheet === "team");
+  // Seen in the Banner, and heard once through the live region: a Banner is not live by itself.
+  useEffect(() => {
+    if (waiting > 0) api.say(TEAM_WORDS.notice + ".");
+  }, [waiting, api]);
   if (waiting <= 0) return null;
   return (
     <div data-team-notice>

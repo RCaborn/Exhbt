@@ -12,13 +12,14 @@ import { useBarSize, useNarrow } from "./hooks";
 
 /*
  * The first minute (decision 0031, "A new student" and "Data": first run). Under the bar, in app chrome,
- * a strip that tells a stranger what this page is, what to do now and what comes next, in two steps:
- *   1. Your page, about a minute: the name, a one-line headline, a photo (optional) and a look, each one
+ * a strip that tells a stranger what this page is, what to do now and what comes next, in three steps:
+ *   1. Account, done: signing up was the first step, so the strip starts one in (decision 0033, G5);
+ *   2. Your page, about a minute: the name, a one-line headline, a photo (optional) and a look, each one
  *      going to its field or opening its menu, and ticked when done;
- *   2. Your first exhbt: it goes to the band ("Your best project goes here") or the Add tile.
+ *   3. Your first exhbt: it goes to the band ("Your best project goes here") or the Add tile.
  * "Skip to your first exhbt" is there from the start; "Hide this" is kept in the browser for this person
  * (localStorage, in try and catch: losing it only brings the strip back). It shows until both are done,
- * worked out from the data. On a narrow window it is one line, "Step 1 of 2", with Next.
+ * worked out from the data. On a narrow window it is one line, "Step 2 of 3", with Next.
  *
  * The steps, their words and what ticks them are data (STRIP, below), so a change of plan (decision
  * 0033) is a change to that table, not to the component. Astryx's Stepper draws the steps.
@@ -43,12 +44,21 @@ function toFirstExhbt(): void {
 
 /** The strip's words and steps, in one place. */
 export const STRIP = {
-  title: "Your portfolio in two steps",
+  title: "Your portfolio in three steps",
   lead: "This is your own page, as employers will see it. Type straight onto it.",
   skip: "Skip to your first exhbt",
   hide: "Hide this",
   next: "Next",
   steps: [
+    {
+      // A true head start: signing up was the first step, so the strip starts one in (decision 0033, G5).
+      id: "account",
+      label: "Account",
+      description: "Done",
+      lead: "Your account is ready. Next, your page.",
+      items: [],
+      done: () => true,
+    },
     {
       id: "page",
       label: "Your page",
@@ -147,7 +157,7 @@ export function FirstRun(): ReactNode {
             {next && <span className="pe-first-next">{` · ${next.label}`}</span>}
           </Text>
           <span className="pe-first-actions">
-            <Button size={size} variant="primary" onClick={go}>
+            <Button size={size} onClick={go}>
               {STRIP.next}
             </Button>
             {hideButton}
@@ -207,7 +217,7 @@ export function FirstRun(): ReactNode {
           )}
           {step.action && (
             <span>
-              <Button size={size} variant="primary" onClick={() => step.action!.go(api)}>
+              <Button size={size} onClick={() => step.action!.go(api)}>
                 {step.action.label}
               </Button>
             </span>

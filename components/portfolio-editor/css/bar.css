@@ -17,6 +17,28 @@
     gap: var(--spacing-2);
     min-width: 0;
   }
+  /* Where the page stands: a dot in its colour and the word (no Badge for a status, decision 0033). */
+  .pe-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-1-5);
+    white-space: nowrap;
+  }
+  .pe-joblink-state {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-1-5);
+    min-width: 3.5rem;
+  }
+  /* The plan a locked look comes with: the word and a lock, in the quiet text colour. */
+  .pe-look-lock {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-1);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+  }
   /* A thin rule between the groups of the row: what you see, what you have done, where it goes. */
   .pe-bar-rule {
     align-self: stretch;
