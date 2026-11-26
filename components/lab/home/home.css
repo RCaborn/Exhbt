@@ -62,11 +62,11 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     /* On a phone the way in comes before the picture, so the button is in the first screen and the page starts under it. */
-    grid-template-areas: "title" "name" "act" "work" "lead";
+    grid-template-areas: "title" "name" "act" "work" "next" "lead";
     row-gap: 1.25rem;
   }
   .hl-hero:not([data-field]) .hl-hero-grid {
-    grid-template-areas: "title" "act" "work" "lead";
+    grid-template-areas: "title" "act" "work" "next" "lead";
   }
   .hl-hero-title {
     grid-area: title;
@@ -88,8 +88,10 @@
     align-items: center;
     gap: 0.75rem 1.25rem;
   }
+  /* The way in for someone with nothing to show yet. On a phone it follows the picture, so the picture starts higher. */
   .hl-hero-roadmap {
-    flex-basis: 100%;
+    grid-area: next;
+    text-wrap: balance;
   }
   /* A link given a finger-sized target (44px tall) without changing how its words sit: the padding
      makes the target, the matching negative margin keeps the line where it was. */
@@ -181,15 +183,15 @@
   @media (width >= 1024px) {
     .hl-hero-grid {
       grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-      grid-template-rows: auto auto auto auto 1fr;
-      grid-template-areas: "title title" "lead work" "name work" "act work" ". work";
+      grid-template-rows: auto auto auto auto auto 1fr;
+      grid-template-areas: "title title" "lead work" "name work" "act work" "next work" ". work";
       column-gap: clamp(2.5rem, 5vw, 4.5rem);
       row-gap: 1.75rem;
     }
     /* Restrained has no field: its two lines sit level with the middle of the picture, not stranded at its top. */
     .hl-hero:not([data-field]) .hl-hero-grid {
-      grid-template-rows: auto 1fr auto auto 1fr;
-      grid-template-areas: "title title" ". work" "lead work" "act work" ". work";
+      grid-template-rows: auto 1fr auto auto auto 1fr;
+      grid-template-areas: "title title" ". work" "lead work" "act work" "next work" ". work";
     }
     .hl-hero-title {
       margin-bottom: 0.75rem;

@@ -120,13 +120,14 @@ export function Hero() {
           <Text as="p" display="block" type="supporting">
             Next: a free account, then your page. You pay only to put it online.
           </Text>
-          {/* The way in for someone with nothing to show yet: free, and no account (clarity review, finding 1). */}
-          <p className="hl-hero-roadmap">
-            <Link href="#roadmap" className="hl-hit">
-              Not sure what to show yet? Build your free roadmap first
-            </Link>
-          </p>
         </div>
+
+        {/* The way in for someone with nothing to show yet: free, and no account (clarity review, finding 1). */}
+        <p className="hl-hero-roadmap">
+          <Link href="#roadmap" className="hl-hit">
+            Not sure what to show yet? Build your free roadmap first
+          </Link>
+        </p>
 
         <div className="hl-hero-work">
           <HeroPage live={level === "maximal"} moves={moves} />

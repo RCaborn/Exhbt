@@ -653,26 +653,12 @@
     padding-top: 4rem;
   }
 
-  /* ── Levels ────────────────────────────────────────────────────────────────────────────── */
+  /* ── Levels ──────────────────────────────────────────────────────────────────────────── */
   /*
-   * Restrained: the frame, the type and flat forms, and motion as feedback only. Menus, dialogs,
-   * sheets and toasts arrive without an entrance: the medium and slow durations, which their
-   * entrances read, are stilled on this screen; the fast one (a hover, a press) stays.
+   * Restrained: the frame, the type at today's sizes and flat forms. Menus, dialogs, sheets and
+   * toasts ease in, crisply (lab.css gives restrained short durations and no overshoot), as the
+   * page for Rory describes the level: "menus and panels ease in".
    */
-  [data-lab-shell]:has([data-app-lab][data-app-level="restrained"]) :is([data-astryx-theme], [data-lab-root]) {
-    /* A menu's entrance reads the longest of the fast tempos; a press and a hover read the shortest. */
-    --duration-fast-max: 1ms;
-    --duration-medium-min: 1ms;
-    --duration-medium: 1ms;
-    --duration-medium-max: 1ms;
-    --duration-slow-min: 1ms;
-    --duration-slow: 1ms;
-    --duration-slow-max: 1ms;
-  }
-  /* A toast's entrance reads the fast tempo itself, which a hover needs, so it is stilled on the toast alone. */
-  [data-lab-shell]:has([data-app-lab][data-app-level="restrained"]) .astryx-toast {
-    transition-duration: 1ms;
-  }
 }
 
 /*
