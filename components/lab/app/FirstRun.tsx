@@ -185,11 +185,11 @@ export function FirstRun({
                       <span className="app-example-tag">Made-up example</span>
                     </span>
                   }
-                  title="Your first exhbt goes here"
+                  title="Your best project goes here"
                   description="One project as a page an employer reads in a minute and can check. We draft it from a file you already have; you check every word."
                   actions={<Button label="Add your first exhbt" variant="primary" size="lg" icon={<Icon icon={Plus} />} onClick={onAdd} />}
                 />
-                <Text as="p" display="block" type="supporting" justify="center">
+                <Text as="p" display="block" type="supporting">
                   {words.firstRun.draftNote}
                 </Text>
               </>

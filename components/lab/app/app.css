@@ -12,9 +12,10 @@
 
 @layer components {
   /*
-   * The private-preview notice moves into the frame's banner slot (AppShell, `banner`), so the
-   * site's own strip above every page (app/layout.tsx) is hidden while this screen is open. It
-   * comes back on every other page: the rule holds only while [data-app-lab] is in the document.
+   * The site's own private-preview strip above every page (app/layout.tsx) is left out while this
+   * screen is open, so the first screen goes to her page; the lab bar says what this is. Once
+   * promoted, the notice sits in AppShell's banner slot until launch. It comes back on every other
+   * page: the rule holds only while [data-app-lab] is in the document.
    */
   body:has([data-app-lab]) p[role="note"].bg-ink {
     display: none;
@@ -76,7 +77,9 @@
   .app-lab-panel-group > :first-child {
     flex-basis: 100%;
   }
+  /* The screen's note: under the row on a wide window; in the Show panel below that (LabStrip). */
   .app-lab-note {
+    display: none;
     margin-inline: auto;
     max-width: 90rem;
     padding: 0.25rem 0.75rem 0.625rem;
@@ -95,6 +98,9 @@
       display: flex;
       flex: none;
       align-items: center;
+    }
+    .app-lab-note {
+      display: block;
     }
     .app-lab-narrow {
       display: none;
@@ -317,7 +323,7 @@
   .app-example {
     display: grid;
     gap: 0.5rem;
-    justify-items: center;
+    justify-items: start;
     width: min(26rem, calc(100vw - 4rem));
   }
   .app-example > [data-lab-frame] {
@@ -330,6 +336,23 @@
     font-size: 0.8125rem;
     font-weight: 600;
     color: var(--color-graphite);
+  }
+  /*
+   * The space for her best project reads from its left edge, on the same line as everything else
+   * on the screen, not as a centred card (Astryx's EmptyState centres by default).
+   */
+  .app-first-next .astryx-empty-state {
+    align-items: flex-start;
+    justify-items: start;
+    text-align: start;
+    padding-inline: 0;
+  }
+  .app-first-next .astryx-empty-state > *,
+  .app-first-next :is(.astryx-empty-state-title, .astryx-empty-state-description) {
+    align-self: flex-start;
+    justify-content: flex-start;
+    width: 100%;
+    text-align: start;
   }
   .app-first-done {
     display: grid;

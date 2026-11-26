@@ -61,7 +61,7 @@
   .kit-level-facts dt {
     font-size: 0.8125rem;
     line-height: 1.5;
-    color: var(--color-slate);
+    color: var(--color-graphite);
   }
   .kit-level-facts dd {
     font-weight: 600;

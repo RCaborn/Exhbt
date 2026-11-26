@@ -16,7 +16,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Button as TodayButton } from "@/components/ui/Button";
-import { Tick } from "@/components/ui/Tick";
+import { ChosenMark } from "../ChosenMark";
 import { APEX } from "@/lib/hosts";
 import { Compare, KitBlock, KitSection, Note } from "./parts";
 
@@ -236,12 +236,12 @@ export function ChoosingKit() {
                           {l.note}
                         </Text>
                       </div>
-                      {layout === l.id && <Tick size="lg" />}
+                      {layout === l.id && <ChosenMark />}
                     </div>
                   </SelectableCard>
                 ))}
               </div>
-              <Note>Astryx SelectableCard. The chosen one has an ink edge and the site&rsquo;s own tick.</Note>
+              <Note>Astryx SelectableCard. The chosen one has an ink edge and an ink mark; mint stays for done and checked.</Note>
             </div>
           }
         />
@@ -262,7 +262,7 @@ export function CardsKit() {
                 <p className="mt-2 text-graphite">Your portfolio at your own address.</p>
               </div>
               <div className="rounded-[16px] border border-line bg-surface p-4">
-                <p className="font-semibold">Refer a friend</p>
+                <p className="font-semibold">Your address</p>
                 <p className="mt-1 text-sm text-graphite">A 16px corner here, 20 above, 24 on a form.</p>
               </div>
               <div className="bg-mist p-4">
@@ -285,7 +285,7 @@ export function CardsKit() {
               </Card>
               <Card variant="muted">
                 <div className="kit-stack" data-gap="sm">
-                  <Heading level={3}>Refer a friend</Heading>
+                  <Heading level={3}>Your address</Heading>
                   <Text as="p" display="block" color="secondary">
                     The quiet card: mist, with no edge.
                   </Text>

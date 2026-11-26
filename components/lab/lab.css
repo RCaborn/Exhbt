@@ -136,10 +136,21 @@
   [data-lab-root][data-motion="off"] *::after {
     scroll-behavior: auto !important;
   }
+  /*
+   * A toast's own buttons (its close, and an action passed to it) are finger-sized in the lab: a
+   * toast is where a phone user's thumb goes straight after an action. A theme change to make on
+   * promotion; here, so the theme stays as the kit shows it. Toasts are drawn outside the lab's root.
+   */
+  body:has([data-lab-root]) .astryx-toast :is(button, a) {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+
   /* Astryx's two busy loops don't read the duration tokens, so they are stilled by name. */
   [data-lab-root][data-motion="off"] :is(.astryx-skeleton, .astryx-spinner),
   [data-lab-root][data-motion="off"] :is(.astryx-skeleton, .astryx-spinner)::before,
-  [data-lab-root][data-motion="off"] :is(.astryx-skeleton, .astryx-spinner)::after {
+  [data-lab-root][data-motion="off"] :is(.astryx-skeleton, .astryx-spinner)::after,
+  [data-lab-root][data-motion="off"] .astryx-spinner * {
     animation: none !important;
   }
 

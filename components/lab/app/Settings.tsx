@@ -15,7 +15,7 @@ import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
-import { Tick } from "@/components/ui/Tick";
+import { ChosenMark } from "../ChosenMark";
 import { FailedSave } from "./Feedback";
 import { appHref } from "./screens";
 import type { AppWords, PlanWords } from "./words";
@@ -187,14 +187,20 @@ export function Settings({
                         <div className="app-plan">
                           <div className="app-plan-top">
                             <Heading level={3}>{p.name}</Heading>
-                            {chosen === p.id ? <Tick size="lg" /> : null}
+                            {chosen === p.id ? <ChosenMark /> : null}
                           </div>
                           <Text as="p" display="block" color="secondary">
                             {p.price}
                           </Text>
+                          {/* One word for each: the plan she has, and (once she picks another) the one she is moving to. */}
                           {p.id === current && (
                             <span className="app-plan-yours">
-                              <Token label="Your plan" color="green" size="sm" />
+                              <Token label="Your plan" size="sm" />
+                            </span>
+                          )}
+                          {p.id === chosen && p.id !== current && (
+                            <span className="app-plan-yours">
+                              <Token label={`Moving to ${p.name}`} size="sm" />
                             </span>
                           )}
                           <ul className="app-plan-lines">

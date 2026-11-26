@@ -169,7 +169,7 @@ export function appWords(): AppWords {
       headline: demoPortfolio.person.headline,
     },
     ownerUrl: `${APP_HOST}/portfolio`,
-    exampleUrl: portfolioUrl("yourname", "your-project"),
+    exampleUrl: portfolioUrl(demoOwner.username, example.slug),
     firstRun: {
       plan: PLAN_NAMES[FIRST_RUN_PLAN],
       draftNote: `On ${PLAN_NAMES[FIRST_RUN_PLAN]}, your exhbt is a draft only you can see.${publish.ok ? "" : ` ${publish.reason}`}`,

@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@astryxdesign/core/AppShell";
-import { Banner } from "@astryxdesign/core/Banner";
 import { Link } from "@astryxdesign/core/Link";
 import { useToast } from "@astryxdesign/core/Toast";
 import { Logo } from "@/components/brand/Logo";
@@ -20,8 +19,10 @@ const START: Progress = { page: false, exhbt: false };
 
 /**
  * The App screen (/lab/design/app): the frame every signed-in page would share, and three ordinary
- * screens in it. The page is the real frame, not a picture of one: Astryx AppShell with TopNav, the
- * private-preview notice in its banner slot, one content line, and a quiet footer after it.
+ * screens in it. The page is the real frame, not a picture of one: Astryx AppShell with TopNav, one
+ * content line, and a quiet footer after it. The private-preview notice is left out here (the lab bar
+ * says what this is), so the first screen goes to her page; once promoted, the notice goes in
+ * AppShell's banner slot until launch.
  *
  * Above the frame, while the lab bar shows, a strip of lab controls (LabStrip.tsx) switches the
  * screen and shows the feedback states. Each has its own address (screens.ts), read on the server.
@@ -71,22 +72,8 @@ export function AppLab({
   // "Your portfolio" goes to the portfolio as this person has it: her first run, or her work.
   const portfolio: AppScreen = screen === "first-run" ? "first-run" : "work";
 
-  // The notice in the banner slot scrolls away and the bar under it stays (app.css): the frame's top
-  // sticks at minus the notice's height, which is measured, as it wraps differently at each width.
-  const root = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = root.current;
-    const notice = el?.querySelector<HTMLElement>(".astryx-app-shell-header .astryx-banner-frame");
-    if (!el || !notice) return;
-    const keep = () => el.style.setProperty("--app-notice-h", `${notice.getBoundingClientRect().height}px`);
-    keep();
-    const watch = new ResizeObserver(keep);
-    watch.observe(notice);
-    return () => watch.disconnect();
-  }, []);
-
   return (
-    <div ref={root} data-app-lab data-app-screen={screen} data-app-level={lab.level}>
+    <div data-app-lab data-app-screen={screen} data-app-level={lab.level}>
       {lab.bar === "shown" && (
         <AppLabStrip
           screen={screen}
@@ -108,7 +95,6 @@ export function AppLab({
       <AppShell
         height="auto"
         variant="surface"
-        banner={<Banner container="section" status="info" title="Private preview. Exhbt isn’t public yet, so please don’t share this link widely." />}
         topNav={<AppNav screen={screen} portfolio={portfolio} person={words.person} onLogOut={() => toast("Logging out isn’t part of the lab.", "app-logout")} />}
       >
         {/* The site's own skip link (app/layout.tsx) points at #main; AppShell's points at its main region. Both land here. */}

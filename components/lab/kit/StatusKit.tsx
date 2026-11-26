@@ -108,7 +108,7 @@ export function EmptyKit({ picture }: { picture: React.ReactNode }) {
                 <EmptyState
                   headingLevel={3}
                   icon={picture}
-                  title="Your first exhbt goes here"
+                  title="Your best project goes here"
                   description="One project, written up as a page an employer can read in a minute. Start with a file you already have."
                   actions={<Button label="Add an exhbt" variant="primary" />}
                 />

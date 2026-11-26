@@ -43,8 +43,9 @@ function FirstRunTools({ c }: { c: FirstRunControls }) {
  * so it can't be taken for the product. It goes when the lab bar is folded away or left out, and
  * every screen is then reached through the app's own nav.
  *
- * On a wide window it is one row. Below that the screens stay as tabs (Astryx TabList scrolls) and
- * the rest is one press away in a panel, as the lab bar does.
+ * On a wide window it is one row with the screen's note under it. Below that the screens stay as
+ * tabs (Astryx TabList scrolls) and the rest, the note included, is one press away in a panel, as the
+ * lab bar does.
  */
 export function AppLabStrip({
   screen,
@@ -88,6 +89,11 @@ export function AppLabStrip({
             padding={3}
             content={
               <div className="app-lab-panel">
+                {note && (
+                  <Text as="p" display="block" type="supporting">
+                    {note}
+                  </Text>
+                )}
                 {firstRun && (
                   <div className="app-lab-panel-group">
                     <Text type="label">Her first run</Text>
@@ -101,7 +107,7 @@ export function AppLabStrip({
               </div>
             }
           >
-            <Button label="Lab controls for this screen" variant="secondary" size="sm" endContent={<Icon icon="chevronDown" />}>
+            <Button label="Lab controls for this screen" variant="secondary" size="lg" endContent={<Icon icon="chevronDown" />}>
               Show
             </Button>
           </Popover>

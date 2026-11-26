@@ -16,16 +16,40 @@ const read = (el: HTMLElement, name: string, kind: Kind): string => {
 };
 
 /**
+ * A duration as this level sets it with motion on. The lab's Motion off switch drops every duration
+ * to 1ms on the lab's root, so the figure is read from a hidden twin of the root (same level, motion
+ * on) placed beside it for a moment: the kit shows the level's timing, not the switch's.
+ */
+function readTimeWithMotion(probe: HTMLElement, name: string): string {
+  const root = probe.closest<HTMLElement>("[data-lab-root]");
+  if (!root?.parentElement || root.dataset.motion !== "off") return read(probe, name, "time");
+  const twin = root.cloneNode(false) as HTMLElement;
+  twin.dataset.motion = "on";
+  twin.hidden = true;
+  const p = document.createElement("span");
+  p.style.transitionDuration = `var(${name})`;
+  twin.appendChild(p);
+  root.parentElement.appendChild(twin);
+  const v = read(p, name, "time");
+  twin.remove();
+  return v;
+}
+
+/**
  * What one of the theme's tokens is set to here, read from the page itself: at this level, at this
  * width. So the kit's figures can't drift from the stylesheets (one owner per fact). A size is shown
- * in px, a duration in ms, anything else as written. Blank until the page has loaded.
+ * in px, a duration in ms (as the level has it with motion on), anything else as written. Blank until
+ * the page has loaded.
  */
 export function TokenValue({ name, kind = "raw" }: { name: string; kind?: Kind }) {
   const probe = useRef<HTMLSpanElement>(null);
   const { level, motion } = useLab();
   const [value, setValue] = useState("");
   useEffect(() => {
-    const update = () => probe.current && setValue(read(probe.current, name, kind));
+    const update = () => {
+      const el = probe.current;
+      if (el) setValue(kind === "time" ? readTimeWithMotion(el, name) : read(el, name, kind));
+    };
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
