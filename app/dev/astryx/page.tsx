@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Text } from "@astryxdesign/core/Text";
 import { Block, Compare, Group, Row, Stack } from "./parts";
+import { AppParts } from "./AppParts";
 import { Controls, Feedback, Overlays, Structure } from "./Kit";
 import { Faq } from "@/components/home/Faq";
 
@@ -62,6 +63,8 @@ export default function DevAstryx() {
       <Feedback />
       <Overlays />
       <Structure />
+
+      <AppParts />
 
       <Group id="today-only" title="Hand-built today" purpose="The parts the site draws by hand that have no Astryx twin on this page yet.">
         <Block title="A question that opens (the home page's Faq)">
