@@ -439,6 +439,8 @@ test.describe("What the address asks for", () => {
     }
     // The two hashes sent emails and other pages carry.
     for (const [hash, sheet] of [["#team-projects", "team"], ["#job-links", "job-links"]] as const) {
+      // From another document: a hash alone on the same address would not load the page again.
+      await page.goto("about:blank");
       await page.goto(`/portfolio${hash}`);
       await waitReady(page);
       await expect.poll(async () => (await uiNow(page)).sheet, hash).toBe(sheet);
