@@ -5,6 +5,7 @@ import { FORMAT_RULES, fromWorkOf, OFFERED_FORMATS } from "../lib/exhbt/formats"
 import { roomFor, sectionLabel, withKeyFigure, withWorkVisual } from "../lib/exhbt/sections";
 import { imageSize } from "../lib/figures/image-size";
 import { FIGURE, boxFromPixels, clampBox, fitCaption, mayHoldFigure, pixelsFromBox, withMargin } from "../lib/figures/rules";
+import { DRAFT_WITH_AI } from "./add-exhbt";
 import { uniqueEmail } from "./helpers";
 import { card, closeOpenSheet, openLayoutMenu, openPublishSheet, openThingsToFix, publish, removeSection, waitEditor, waitForSaved } from "./editor";
 import { READY } from "./page-editor";
@@ -374,14 +375,14 @@ test.describe("What the editor says after a draft (decision 0025)", () => {
 /** A dev user with a username on Premium (so they can publish), signed in on the draft page. */
 async function signInPremium(page: Page, username: string) {
   await page.goto(`/dev/portfolio?username=${username}&plan=premium&count=0`);
-  await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts/new`);
+  await page.goto(`/auth/dev?email=${username}@example.com&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
   await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
   await expect(page.locator("form[data-ready=true]")).toBeAttached();
 }
 
 /** A new dev user on the Free plan, signed in on the draft page. */
 async function signInFree(page: Page, name: string) {
-  await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(name))}&next=/exhbts/new`);
+  await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(name))}&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
   await expect(page.locator("form[data-ready=true]")).toBeAttached();
 }
 

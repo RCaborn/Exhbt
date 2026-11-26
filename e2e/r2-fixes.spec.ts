@@ -5,6 +5,7 @@ import { CLASSIC_FORMATS, FORMATS, mayCarryFormat, OFFERED_FORMATS, offeredIn } 
 import { withWorkVisual } from "../lib/exhbt/sections";
 import { pathOfNumber, unverifiedNumbers } from "../lib/exhbt/verify";
 import { fitCaption } from "../lib/figures/rules";
+import { DRAFT_WITH_AI } from "./add-exhbt";
 import * as classicEditor from "./editor-classic-helpers";
 import { fillValid, openPublishSheet, publishSheet, signInAs, startFromScratch, waitForSaved } from "./editor";
 import { uniqueEmail } from "./helpers";
@@ -507,7 +508,7 @@ test.describe("A pick is counted before the AI call, and given back when the ser
       multipart: { label: name, image: { name: "image-1.png", mimeType: "image/png", buffer: PNG } },
     });
   /** A new person on the free plan, which has one draft and two spare picks: three picks. */
-  const signIn = (page: Page, tag: string) => page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(tag))}&next=/exhbts/new`);
+  const signIn = (page: Page, tag: string) => page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(tag))}&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
 
   test("a call that failed before the service answered is given back", async ({ page }) => {
     await signIn(page, "pickfail");

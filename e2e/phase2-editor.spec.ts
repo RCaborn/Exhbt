@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import { slugify, uniqueSlug, SLUG_MAX } from "../lib/exhbt/slug";
 import { docToRuns, runsToDoc } from "../lib/exhbt/richtext-tiptap";
 import { LIMITS } from "../lib/exhbt/blocks";
+import { ADD } from "./add-exhbt";
 import { addGraphSection, addSkill, box, closeSheet, fieldAt, fillBox, fillContext, fillFinding, fillPlain, fillTitle, fillValid, finding, openPublishSheet, publish, publishSheet, reviewButton, seeAsVisitor, signInAs, startFromScratch, visitorRegion, waitForSave, waitEditor } from "./editor";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -167,7 +168,7 @@ test.describe("the exhbt editor", () => {
     await expect(prompt.getByText(/Delete one, or move to Premium/)).toBeVisible();
     await expect(prompt.getByRole("link", { name: /^Upgrade to Premium/ })).toHaveAttribute("href", "/account/billing");
     await expect(prompt.getByRole("link", { name: "Compare plans" })).toHaveAttribute("href", "/pricing");
-    await expect(page.getByRole("button", { name: "Start from scratch" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: ADD.listLink })).toHaveCount(0);
   });
 
   test("See as a visitor draws the article the public page draws: Save as PDF, the checked-on date, the checks link", async ({ page }) => {
