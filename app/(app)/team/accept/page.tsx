@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { isAdmin } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth";
+import { portfolioKind } from "@/lib/portfolio-kind-server";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
 import { readInvite, titleOf } from "@/lib/team";
@@ -69,15 +71,23 @@ export default async function AcceptInvitePage({ searchParams }: { searchParams:
   }
   const member = user ? (await getStore().listMembers(view.exhbt.id)).some((m) => m.userId === user.id) : false;
   if (view.state === "used" || member) {
+    // Portfolio first (decision 0031): team projects are a sheet on the portfolio.
+    const portfolioFirst = member && user ? (await portfolioKind(await isAdmin(user))) === "page" : false;
     return card(
       <>
         <h1 className="text-[2rem]">{member ? "You're on this project" : "This invite has been used"}</h1>
         {summary}
         {member && (
           <div className="mt-6">
-            <Button href="/exhbts#team-projects" variant="primary">
-              Go to your exhbts
-            </Button>
+            {portfolioFirst ? (
+              <Button href="/portfolio?open=team" variant="primary">
+                See your team projects
+              </Button>
+            ) : (
+              <Button href="/exhbts#team-projects" variant="primary">
+                Go to your exhbts
+              </Button>
+            )}
           </div>
         )}
       </>,

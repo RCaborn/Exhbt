@@ -56,6 +56,18 @@ export const exhbtTheme = defineTheme({
     "--size-element-sm": "36px",
     "--size-element-md": "44px",
     "--size-element-lg": "48px",
+    // Astryx's Heading takes the site's one heading scale (h1 to h3 in app/globals.css: 48, 32 and 22px),
+    // so a page built from <Heading> reads the same as a page of plain headings. Phones step down below.
+    "--text-heading-1-size": "3rem",
+    "--text-heading-1-leading": "1.05",
+    "--text-heading-2-size": "2rem",
+    "--text-heading-2-leading": "1.1",
+    "--text-heading-3-size": "1.375rem",
+    "--text-heading-3-leading": "1.15",
+  },
+  // The same step the site's headings take below 640px: h1 to 36px and h2 to 28px.
+  adaptations: {
+    rules: [{ when: { width: { below: "sm" } }, value: { tokens: { "--text-heading-1-size": "2.25rem", "--text-heading-2-size": "1.75rem" } } }],
   },
   components: {
     button: {
@@ -65,6 +77,12 @@ export const exhbtTheme = defineTheme({
       "variant:secondary": { backgroundColor: WHITE, color: INK, borderColor: INK, borderWidth: "1.5px", borderStyle: "solid" },
       // For mint and wash bands, where a mint button would disappear.
       "variant:ink": { backgroundColor: INK, color: WHITE },
+    },
+    // The display face's tracking, as the site's h1 to h3 have it.
+    heading: {
+      "level:1": { letterSpacing: "-0.03em" },
+      "level:2": { letterSpacing: "-0.03em" },
+      "level:3": { letterSpacing: "-0.02em" },
     },
   },
 });

@@ -110,6 +110,13 @@ test.describe("Layout rules", () => {
     expect(bad({ quote: { text: words(TILE_LIMITS.quoteWords), name: "x".repeat(TILE_LIMITS.nameChars + 1), role: "" } })).toBe(true);
     expect(bad({ education: { lines: ["a", "b", "c", "d"] } })).toBe(true);
     expect(bad({ education: { lines: [words(TILE_LIMITS.lineWords + 1)] } })).toBe(true);
+    // The year at a line's end is not one of its words: the limit is the words a person sees, and the year besides.
+    expect(bad({ education: { lines: [`${words(TILE_LIMITS.lineWords)}, 2026`] } })).toBe(false);
+    expect(bad({ education: { lines: [`${words(TILE_LIMITS.lineWords + 1)}, 2026`] } })).toBe(true);
+    // Over the characters, not the words: it says so.
+    const long = `${"Characterful ".repeat(8).trim()}, 2026`;
+    expect(long.length).toBeGreaterThan(TILE_LIMITS.lineChars);
+    expect(checkTiles({ education: { lines: [long] } }, ["education"]).problems["education.lines"]).toBe(`Keep each line to ${TILE_LIMITS.lineChars} characters or fewer.`);
     expect(normaliseWebsite("https://amara.dev/work")).toBe("https://amara.dev/work");
     expect(normaliseWebsite("amara.dev")).toBe("https://amara.dev/");
     for (const no of ["http://amara.dev", "javascript:alert(1)", "data:text/html,x", "ftp://x.com", "amara", "https://", "a b.com"]) expect(normaliseWebsite(no), no).toBeNull();
@@ -327,6 +334,8 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     await page.getByRole("button", { name: "Edit About me" }).click();
     await page.locator("#about-text").fill("I like problems where a small change saves real time.");
     await page.locator("#education-line-0").fill("BSc Data Science, University of Example, 2026");
+    // The line's counter counts its words as the server does, without the year.
+    await expect(page.getByText(`6 of ${TILE_LIMITS.lineWords} words`)).toBeVisible();
     await page.locator("#education-tools").fill("Python, SQL");
 
     await addSection(page, "Experience");

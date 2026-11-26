@@ -7,7 +7,9 @@ import { cancelInviteAction, decideAction, removeTeammateAction, resendInviteAct
 import { ConfirmAction } from "@/components/editor/ConfirmAction";
 import { Avatar } from "@/components/portfolio/Avatar";
 import { Button } from "@/components/ui/Button";
+import { isAdmin } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth";
+import { portfolioKind } from "@/lib/portfolio-kind-server";
 import { joinRequestsFor } from "@/lib/duplicates";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
@@ -57,12 +59,14 @@ export default async function TeamPage({ params, searchParams }: Params) {
   const rootOwner = root ? await displayNameFor(root.userId, "someone") : null;
   const used = members.length + invites.length;
   const title = titleOf(exhbt);
+  const back = (await portfolioKind(await isAdmin(user))) === "page" ? { href: `/exhbts/${id}/edit`, text: "Back to the exhbt" } : { href: "/exhbts", text: "Your exhbts" };
 
   return (
     <div className="bg-mist">
       <div className="mx-auto max-w-3xl px-4 pt-10 pb-16 sm:px-8 lg:pt-14">
-        <Link href="/exhbts" className="inline-flex items-center gap-1.5 text-sm font-semibold hover:text-graphite">
-          <ArrowLeft aria-hidden size={15} strokeWidth={2.25} /> Your exhbts
+        {/* Portfolio first (decision 0031): the exhbts list has gone, so the way back is to this exhbt's editor. */}
+        <Link href={back.href} className="inline-flex items-center gap-1.5 text-sm font-semibold hover:text-graphite">
+          <ArrowLeft aria-hidden size={15} strokeWidth={2.25} /> {back.text}
         </Link>
         <h1 className="mt-3">Teammates</h1>
         <p className="mt-1 font-semibold break-words">{title}</p>

@@ -5,6 +5,7 @@ import { PortfolioHome } from "@/components/portfolio/PortfolioHome";
 import { ProjectView } from "@/components/portfolio/ProjectView";
 import { Button } from "@/components/ui/Button";
 import { demoExhbts, demoHomeProjects, demoOwner, demoPortfolio } from "@/lib/exhbt";
+import { WHAT_AN_EXHBT_IS } from "@/lib/exhbt/what-it-is";
 import { portfolioHost } from "@/lib/hosts";
 import { PLAN_NAMES } from "@/lib/entitlements";
 import { marketingMetadata } from "@/lib/seo";
@@ -69,8 +70,7 @@ export default function WhatIsAnExhbt() {
             What is an <span className="highlight">exhbt?</span>
           </h1>
           <p className="mt-6 max-w-[40rem] text-[1.15rem] text-graphite sm:text-[1.3rem]">
-            One project, written up on a single page so a hiring manager can read it quickly and check it
-            for themselves. You make a few of them, and together they&rsquo;re your portfolio.
+            {WHAT_AN_EXHBT_IS} You make a few of them, and together they&rsquo;re your portfolio.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button href="/exhbts/new" size="lg">Build your exhbt</Button>

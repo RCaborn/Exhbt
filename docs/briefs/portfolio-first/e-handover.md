@@ -4,6 +4,26 @@ Written by agent E on 26 Nov 2026 for whoever takes over E's files. Read `e-edit
 
 ## Where things stand
 
+**Update, 26 Nov 2026 (E's successor, branch `phase-2-pf-e2`): milestone 2 is built and merged into `phase-2-pf2` (7b0e4cf). Everything below this note is E's hand-over as written, kept for its traps.**
+- **Done, each with its tests in `e2e/portfolio-core.spec.ts`:**
+  - steps 12 to 18;
+  - step 19's render counts, charts counted from the spec;
+  - the box-for-box check of the six looks, by `HOME_BOXES` landmarks;
+  - the mirror path (`E2E_GROW=mirror`);
+  - axe;
+  - `WorkRow` for F.
+- **Since then:**
+  - a line's limit no longer counts its year (`lineWords`, `lib/portfolio-layout.ts`);
+  - See as a visitor says why nothing is live, by case;
+  - the Back check allows the servers' clocks two seconds (below, "The Back fix's limit").
+- **On a production build:** `npx playwright test -c playwright.prod.config.ts` builds the app and runs "Coming back to the page, with nothing of development's" against `next start`. It uses the stand-in store with `EXHBT_ALLOW_MEMORY_STORE`, and it signs in through `/auth/dev`.
+  - `/auth/dev` honours that switch only when Supabase is not configured.
+  - Checked by hand with `next start`: with Supabase settings present it answers 404 both with and without the switch, and it also answers 404 with neither.
+  - On 26 Nov both tests passed on the production build. Back behaved as on the development server: two fetches of the page, no wait on the stand-in.
+  - One difference: in production the header's link prefetches `/portfolio`.
+- **Not done:** nothing has run on WebKit itself.
+
+
 - **Milestone 1** is merged into `phase-2-pf2` (67e13c8).
 - **Milestone 2, step 17's safety half** is done and tested (a72bbd9): the browser's Back can no longer bring old words back (below, "The Back fix"). The same commit adds `usePortfolioUndo()` to `runtime.ts` for G and exports `WRAP`, `ROWS` and `CARD` from `PortfolioHome.tsx` for F.
 - **Everything else in milestone 2 is not built.** For four of the steps a draft is in this branch, **written and typechecked but never run**. None of them is imported by anything, so none changes what the editor does today. Wire them one at a time, each with its test.
@@ -57,6 +77,33 @@ Step 4 is why the atom is written through and not copied from `useBuilder`'s sta
 - The gate also refreshes in the background when it mounts just after a history move (`movedAt`), for what other pages changed (an exhbt's title). `PortfolioEditor` does the same on `pageshow` with `persisted`.
 
 **Not covered, and known:** other pages Next has kept (the exhbts list, the account page) can still show an older portfolio after Back, since nothing purges them. Before the fix the step builder's `revalidate()` did.
+
+### The Back fix's limit, and the proper fix for after launch
+
+Added 26 Nov 2026 by E's successor.
+
+- **The limit.** `loadedAt` and `savedAt` are each stamped with `new Date()` by whichever server instance answers. Two instances can disagree. So the gate trusts a load only when it is newer than the newest landed save by more than `SKEW_MS` (2000, `pending.ts`).
+  - If clocks differ by up to two seconds, old words cannot come back.
+  - If the instance that served a load made *before* a save has a clock more than two seconds ahead of the instance that took the save, that load passes as newer. The editor would then open on old words. `e2e/portfolio-core.spec.ts` pins both sides: 1.5s is caught, 3s is the limit.
+- **What the margin costs.** A load made within two seconds after a save counts as behind. The gate then waits on the stand-in until two seconds have passed since the save's answer, measured on the browser's own clock and used only as a delay. It then fetches once.
+  - It never asks again sooner than 250ms, so it does not spin.
+  - Coming back more than two seconds after the last save costs nothing.
+  - When the server that answers the load has a clock behind the one that took the save, each fetch can land inside the margin again until real time catches up. Such a person waits up to about two seconds plus the gap between the clocks. This is accepted (main session, 26 Nov).
+  - Both cases are tested.
+- **The proper fix (decided against before launch: it writes to the live database and puts a trigger on every profile update).** Use a counter from one source in place of the two times.
+  - A migration:
+    ```sql
+    alter table profiles add column portfolio_version bigint not null default 0;
+    create function public.bump_portfolio_version() returns trigger language plpgsql as $$
+    begin new.portfolio_version := old.portfolio_version + 1; return new; end $$;
+    create trigger profiles_portfolio_version before update on profiles
+      for each row execute function public.bump_portfolio_version();
+    ```
+  - `PortfolioProfile` gains `version`. The in-memory store keeps a counter and bumps it in `updatePortfolioProfile` and `savePortfolioLayout`.
+  - `savePortfolioLayout` writes the `profiles` row last, after the exhbts' hidden flags and positions (today it writes it first). It returns `{ version }` from `.select("portfolio_version").single()`.
+  - The action returns `savedVersion` and the loader gives `loadedVersion`, read with the profile.
+  - `staleness` becomes `loadedVersion < savedVersion`, with no margin and no wait.
+  - Any other profile update (a plan change) only raises the number. A load can then look newer, never older, which is the safe way to be wrong.
 
 **How the gate behaves when the server is slow:** it waits on the stand-in, and after ten seconds shows the warning. If newer data then arrives it mounts the editor by itself. If a save that was on its way never gets an answer, it stays on the stand-in until the browser gives that request up, since it cannot know what the server holds.
 

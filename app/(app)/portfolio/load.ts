@@ -31,7 +31,12 @@ export type AddRoom =
   | { ok: false; used: number; limit: number; planName: string; reason: string; upgradeTo?: Plan };
 
 /** What "See as a visitor" draws from: the published copies a visitor's page would list (visibleOnPortfolio), before the person's order and hiding are applied. */
-export type VisitorSource = { publicPlan: boolean; published: { id: string; home: HomeProject }[] };
+export type VisitorSource = {
+  publicPlan: boolean;
+  published: { id: string; home: HomeProject }[];
+  /** The draft changed most recently (any exhbt not published), for "Open <title>" when nothing is live yet; its title is null when it has none. */
+  newestDraft: { id: string; title: string | null } | null;
+};
 
 export type PortfolioData = {
   /** The person's own id: what the editor keeps in the browser for them is kept under it, so it is never offered to anyone else. */
@@ -144,6 +149,9 @@ export async function loadPortfolioData(userId: string, host: string | null, adm
   const count = { used: exhbts.length, limit, planName: PLAN_NAMES[plan] };
   const addRoom: AddRoom = room.ok ? { ok: true, ...count } : { ok: false, ...count, reason: room.reason, upgradeTo: room.upgradeTo };
 
+  const newest = exhbts.filter((e) => e.status !== "published").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  const newestDraft = newest ? { id: newest.id, title: newest.doc.title.trim() || null } : null;
+
   // What a visitor's page would list: the published copies, each linked to its own page as the public page links it.
   const published = await Promise.all(visibleOnPortfolio(plan, exhbts).map(async (e) => ({ id: e.id, home: await homeOf(e, e.published!, viewHref ? `${viewHref}/${e.slug}` : "#") })));
 
@@ -172,7 +180,7 @@ export async function loadPortfolioData(userId: string, host: string | null, adm
     },
     ownerOnly,
     addRoom,
-    visitor: { publicPlan: isPublic, published },
+    visitor: { publicPlan: isPublic, published, newestDraft },
     teamRequests,
     // Whether the plan has job links at all (the menu shows the links, or the upgrade line).
     jobLinks: canMakeJobLinks(plan, 0).ok,

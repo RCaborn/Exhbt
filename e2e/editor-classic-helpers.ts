@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { DRAFT_WITH_AI, startBlank } from "./add-exhbt";
 import { uniqueEmail } from "./helpers";
 
 /**
@@ -18,7 +19,6 @@ import { uniqueEmail } from "./helpers";
 export const SEL = {
   /** The page after /exhbts: the signed-in list with its heading and the button that makes a blank exhbt. */
   listHeading: { level: 1 as const, name: "Your exhbts" },
-  startFromScratchButton: "Start from scratch",
   /** The draft page (/exhbts/new) and the editor page's own heading. */
   draftHeading: { level: 1 as const, name: "Draft an exhbt" },
   draftForm: "form[data-ready=true]",
@@ -102,12 +102,12 @@ export async function signInAs(page: Page, username: string, plan: Plan = "premi
 }
 
 /**
- * Presses "Start from scratch" on the list and waits for the editor; returns the new exhbt's id.
+ * Starts an empty case study (the layouts of "Add an exhbt", e2e/add-exhbt.ts) and waits for the editor; returns the new exhbt's id.
  * `waitForContext` (default true) also waits for the Context field, which loads in its own chunk after the page;
  * pass false for the tests that never waited for it.
  */
 export async function startFromScratch(page: Page, opts: { waitForContext?: boolean } = {}): Promise<string> {
-  await page.getByRole("button", { name: SEL.startFromScratchButton }).click();
+  await startBlank(page);
   await page.waitForURL(SEL.editUrl);
   await expect(page.locator(SEL.ready)).toBeAttached();
   if (opts.waitForContext !== false) await expect(page.getByRole(SEL.contextField.role, { name: SEL.contextField.name, exact: true })).toBeVisible();
@@ -123,7 +123,7 @@ export async function startEditor(page: Page, username: string) {
 /** Signs in as a new address and waits for the "Draft an exhbt" page and its form. */
 export async function signInToDraft(page: Page, tag: string) {
   await keepClassic(page);
-  await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(tag))}&next=/exhbts/new`);
+  await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(tag))}&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
   await expect(page.getByRole("heading", SEL.draftHeading)).toBeVisible();
   await expect(page.locator(SEL.draftForm)).toBeAttached();
 }
@@ -137,7 +137,7 @@ export async function draftAndOpen(page: Page, tag: string, opts: { waitForForm?
   if (opts.waitForForm !== false) await signInToDraft(page, tag);
   else {
     await keepClassic(page);
-    await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(tag))}&next=${encodeURIComponent("/exhbts/new")}`);
+    await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(tag))}&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
     await expect(page.getByRole("heading", SEL.draftHeading)).toBeVisible();
   }
   const res = await page.request.post("/api/exhbts/draft", { data: { text: DRAFT_PROJECT } });
