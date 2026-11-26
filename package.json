@@ -13,6 +13,7 @@
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "test:e2e": "playwright test",
     "check:docs": "node scripts/check-docs.mjs",
+    "check:protected": "node scripts/check-protected.mjs",
     "check": "npm run check:docs && npm run check:theme && npm run typecheck && npm run lint && npm run build && npm run test:e2e",
     "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs",
     "theme": "npm run astryx -- theme build themes/exhbt/exhbtTheme.ts",
