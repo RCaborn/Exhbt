@@ -37,6 +37,9 @@
   .add-cell:focus-within .add-go:focus-visible {
     background-color: var(--color-accent);
   }
+  .add-cell:has(.add-go:focus-visible) > :has(.add-go) {
+    border-color: var(--color-border-emphasized);
+  }
   @media (hover: hover) {
     .add-cell:hover > :has(.add-go) {
       border-color: var(--color-border-emphasized);

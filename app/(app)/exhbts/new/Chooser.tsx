@@ -23,10 +23,14 @@ import { DraftedArt, LayoutsArt } from "./art";
 import { Glyph } from "./glyphs";
 import "./add-exhbt.css";
 
-/** The page's frame: the app's mist ground and one column, shared by the chooser, the layouts and the full-plan notice. */
+/**
+ * The page's frame: the app's mist ground and one column, shared by the chooser, the layouts and the full-plan
+ * notice. The classes are the frame the upload form and the app's other one-task pages have (page.tsx), so a
+ * short screen, the full-plan notice, still fills the window down to the footer.
+ */
 export function AddFrame({ children }: { children: React.ReactNode }) {
   return (
-    <VStack className="add-exhbt bg-mist px-4 pt-10 pb-16 sm:px-8 sm:pt-14">
+    <VStack className="add-exhbt min-h-[calc(100svh-4.75rem)] bg-mist px-4 pt-10 pb-16 sm:px-8 sm:pt-14">
       <VStack gap={8} className="mx-auto w-full max-w-6xl">
         {children}
       </VStack>
@@ -88,11 +92,12 @@ export function Chooser({ draft, offered, where }: { draft: DraftVerdict; offere
               </VStack>
               {draft.ok ? (
                 <VStack gap={3} className="mt-auto">
-                  <HStack gap={4} vAlign="center" wrap="wrap">
-                    <Button href={DRAFT_WITH_AI} label="Upload my files" className="add-go">
+                  {/* The count wraps inside its own space beside the button, never under it: the two cards' buttons stay level. */}
+                  <HStack gap={4} vAlign="center">
+                    <Button href={DRAFT_WITH_AI} label="Upload my files" className="add-go shrink-0">
                       Upload my files <Glyph name="go" />
                     </Button>
-                    <Text type="supporting" hasTabularNumbers>
+                    <Text type="supporting" hasTabularNumbers className="min-w-0 text-balance">
                       {draft.left} of {draft.perPeriod} AI {draft.perPeriod === 1 ? "draft" : "drafts"} left
                     </Text>
                   </HStack>
@@ -121,8 +126,8 @@ export function Chooser({ draft, offered, where }: { draft: DraftVerdict; offere
                 </Text>
               </VStack>
               <VStack gap={3} className="mt-auto">
-                <HStack gap={4} vAlign="center" wrap="wrap">
-                  <Button href={BUILD_IT_YOURSELF} label="Choose a layout" className="add-go">
+                <HStack gap={4} vAlign="center">
+                  <Button href={BUILD_IT_YOURSELF} label="Choose a layout" className="add-go shrink-0">
                     Choose a layout <Glyph name="go" />
                   </Button>
                 </HStack>
