@@ -18,9 +18,10 @@ import { EditorBar } from "./bar/EditorBar";
 import { FirstRun } from "./bar/FirstRun";
 import { Canvas } from "./Canvas";
 import { hasPending, noteSaved, noteSending, registerSender } from "./pending";
-import { DataContext, RuntimeContext, usePortfolioState, useRuntime, type PortfolioEditorApi, type PortfolioUi, type Runtime, type SaveView } from "./runtime";
+import { DataContext, RuntimeContext, usePortfolioState, usePortfolioUi, useRuntime, type PortfolioEditorApi, type PortfolioUi, type Runtime, type SaveView } from "./runtime";
 import { createRuntime, type Host } from "./runtime-core";
 import { STALE_EDITOR } from "./ui/SaveStatus";
+import { VisitorView } from "./VisitorView";
 
 /*
  * The one-page portfolio editor (decision 0031): the person's own page, in their look, with every word
@@ -171,7 +172,7 @@ const Shell = memo(function Shell({ ready, team, jobLinks }: { ready: boolean; t
       <div data-editor="portfolio" data-ready={ready ? "true" : undefined}>
         <EditorBar team={team} jobLinks={jobLinks} />
         <FirstRun />
-        <Canvas />
+        <Body />
         <LiveRegion />
         {ready && <Address />}
         {devParam("crash") === "change" && <CrashOnChange />}
@@ -179,6 +180,12 @@ const Shell = memo(function Shell({ ready, team, jobLinks }: { ready: boolean; t
     </ToastViewport>
   );
 });
+
+/** The editing page, or "See as a visitor" in its place (the bar's button, `seeAsVisitor`). */
+function Body(): ReactNode {
+  const visitor = usePortfolioUi((u) => u.visitor);
+  return visitor ? <VisitorView /> : <Canvas />;
+}
 
 /** The one polite live region: what `say` says. */
 function LiveRegion(): ReactNode {
