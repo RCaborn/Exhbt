@@ -32,7 +32,7 @@ test.describe("Phone header", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Your exhbts" })).toBeVisible();
     expect(await noSideScroll(page)).toBe(true);
 
-    const header = page.locator("header").first();
+    const header = page.getByRole("banner");
     const menu = header.getByRole("button", { name: "Menu" });
     await expect(menu).toBeVisible();
     await expect(menu).toHaveAttribute("aria-expanded", "false");
@@ -65,7 +65,7 @@ test.describe("Phone header", () => {
     await signInAs(page, `${name}@example.com`, "/exhbts");
     await expect(page.getByRole("heading", { level: 1, name: "Your exhbts" })).toBeVisible();
     expect(await noSideScroll(page)).toBe(true);
-    const header = page.locator("header").first();
+    const header = page.getByRole("banner");
     const menu = header.getByRole("button", { name: "Menu" });
     await menu.click();
     const nav = header.getByRole("navigation", { name: "Main menu" });
@@ -80,7 +80,7 @@ test.describe("Phone header", () => {
   test("signed out: the marketing links are in the menu too, with no sideways scroll", async ({ page }) => {
     await page.goto("/pricing");
     expect(await noSideScroll(page)).toBe(true);
-    const header = page.locator("header").first();
+    const header = page.getByRole("banner");
     await header.getByRole("button", { name: "Menu" }).click();
     await expect(header.getByRole("navigation", { name: "Main menu" }).getByRole("link", { name: "What is an exhbt?" })).toBeVisible();
     await expect(header.getByRole("link", { name: "Log in" })).toBeVisible();
