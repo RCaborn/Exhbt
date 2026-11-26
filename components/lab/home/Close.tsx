@@ -20,7 +20,7 @@ export function Close() {
     <section aria-labelledby="hl-close-title" className="hl-close">
       <MediaTheme mode="dark">
         <div className="lab-content hl-close-inner">
-          <Heading level={2} type="display-1" id="hl-close-title">
+          <Heading level={2} type="hero" id="hl-close-title">
             <span className="sr-only">A portfolio at </span>
             <Address name={me.username} nameClass="text-mint" />
           </Heading>

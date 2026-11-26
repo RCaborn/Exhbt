@@ -111,36 +111,38 @@ export function Looks() {
       <div ref={track} className="hl-looks-track" style={{ "--hl-steps": LOOKS.length } as React.CSSProperties}>
         <div className="hl-looks-stage">
           <div className="lab-content hl-looks-grid">
-            <div className="hl-looks-words">
+            <div className="hl-looks-head">
               <Heading level={2} type="display-2" id="hl-looks-title">
                 One page, {inWords(LOOKS.length)} looks.
               </Heading>
               <Text as="p" display="block" type="large" color="secondary">
                 Your words stay as they are. Only the look changes.
               </Text>
-              <div className="hl-looks-list">
-                <RadioList
-                  label="Try a look"
-                  value={id}
-                  htmlName="home-look"
-                  onChange={(v) => {
-                    held.current = true;
-                    show(v, moves);
-                  }}
-                >
-                  {LOOKS.map((t) => (
-                    <RadioListItem
-                      key={t.id}
-                      value={t.id}
-                      label={
-                        <span className="hl-look-name" style={{ fontFamily: headingFamily(t), fontWeight: t.type.displayWeight }}>
-                          {t.name}
-                        </span>
-                      }
-                    />
-                  ))}
-                </RadioList>
-              </div>
+            </div>
+            <div className="hl-looks-list">
+              <RadioList
+                label="Try a look"
+                value={id}
+                htmlName="home-look"
+                onChange={(v) => {
+                  held.current = true;
+                  show(v, moves);
+                }}
+              >
+                {LOOKS.map((t) => (
+                  <RadioListItem
+                    key={t.id}
+                    value={t.id}
+                    label={
+                      <span className="hl-look-name" style={{ fontFamily: headingFamily(t), fontWeight: t.type.displayWeight }}>
+                        {t.name}
+                      </span>
+                    }
+                  />
+                ))}
+              </RadioList>
+            </div>
+            <div className="hl-looks-plans">
               <Text as="p" display="block" type="supporting">
                 {plansLine()}
               </Text>

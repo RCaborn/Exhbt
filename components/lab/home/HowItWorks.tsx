@@ -12,8 +12,8 @@ import { DRAFT_NOTE, FileChip, STEPS } from "./steps";
 /**
  * "Start with the file you already have" (beat four): how an exhbt is made, from the file to a page
  * on the person's own address, shown as the real screens, not sketches: the file, the first draft
- * in the editor with its one line of what to check (an Astryx Banner over the real page, its ticks
- * still hollow), and the same page published at its address. Each step is larger than the one
+ * in the editor with its one line of what to check (an Astryx Banner above the real page, whose
+ * ticks are still hollow), and the same page published at its address. Each step is larger than the one
  * before: the work grows as it goes.
  *
  * At maximal the same three steps are a film the scroll plays (Film.tsx); the still steps are
@@ -48,11 +48,10 @@ export function HowItWorks() {
         </li>
         <li className="hl-step" data-step="draft">
           <div className="hl-step-picture">
-            <Frame url={`${APP_HOST}/exhbts`} label="The first draft in the editor: the page with a note on what to check, its ticks still empty" page="hl-step-page">
-              <div className="hl-draft">
-                <Banner status="info" title={DRAFT_NOTE.title} description={DRAFT_NOTE.description} />
-                <SampleExhbt slug={gp!.slug} checked={false} className="p-6" />
-              </div>
+            {/* The note is the editor's, so it is app chrome in the proposed theme, outside the person's page. */}
+            <Banner status="info" title={DRAFT_NOTE.title} description={DRAFT_NOTE.description} />
+            <Frame url={`${APP_HOST}/exhbts`} label="The first draft in the editor, its ticks still empty" page="hl-step-page">
+              <SampleExhbt slug={gp!.slug} checked={false} className="p-6" />
             </Frame>
           </div>
           <StepWords {...STEPS.draft} />

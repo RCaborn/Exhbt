@@ -182,7 +182,7 @@
   }
   /* The whole page in view: zoomed so it lays out as a laptop shows it, its sidebar beside it. */
   .hl-assemble-page {
-    zoom: 0.4;
+    zoom: 0.36;
   }
   @media (width >= 640px) {
     .hl-assemble-page {
@@ -380,12 +380,22 @@
   .hl-looks-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 1.5rem;
-  }
-  .hl-looks-words {
-    display: grid;
+    grid-template-areas: "head" "work" "list" "plans";
     gap: 1rem;
-    align-content: start;
+  }
+  .hl-looks-head {
+    grid-area: head;
+    display: grid;
+    gap: 0.5rem;
+  }
+  .hl-looks-list {
+    grid-area: list;
+  }
+  .hl-looks-plans {
+    grid-area: plans;
+  }
+  .hl-looks-work {
+    grid-area: work;
   }
   /* Each look's name, large, in its own face (set on the element). Not chosen: the quiet text colour. */
   .hl-look-name {
@@ -397,7 +407,7 @@
     transition: color var(--duration-fast) var(--ease-standard);
   }
   .hl-looks .astryx-radio-list-item:not([data-selected]) .hl-look-name {
-    color: var(--color-text-secondary);
+    color: var(--color-slate);
   }
   /* On a phone the eight names sit in two columns, so the stage fits one screen. */
   .hl-looks-list [role="radiogroup"] {
@@ -419,8 +429,16 @@
   @media (width >= 1024px) {
     .hl-looks-grid {
       grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-      gap: 4rem;
-      align-items: center;
+      grid-template-rows: auto auto auto;
+      grid-template-areas: "head work" "list work" "plans work";
+      gap: 1.5rem 4rem;
+      align-content: center;
+    }
+    .hl-looks-head {
+      gap: 1rem;
+    }
+    .hl-looks-work {
+      align-self: center;
     }
     .hl-looks-list [role="radiogroup"] {
       grid-template-columns: minmax(0, 1fr);
@@ -537,7 +555,7 @@
     color: var(--color-ink);
   }
   .hl-employer-page {
-    zoom: 0.4;
+    zoom: 0.36;
   }
   @media (width >= 640px) {
     .hl-employer-page {
@@ -639,9 +657,6 @@
       zoom: 0.42;
     }
   }
-  .hl-draft > .astryx-banner {
-    margin: 1rem 1.5rem 0;
-  }
   .hl-file {
     display: inline-flex;
     align-items: center;
@@ -675,9 +690,248 @@
     overflow-wrap: anywhere;
   }
 
-  /* The film: maximal only, with motion allowed and scroll timelines supported. */
+  /*
+   * The film: "How it works" at maximal, played by the scroll. Only at maximal, with motion allowed
+   * and scroll timelines supported; anywhere else the still steps show and the film doesn't exist.
+   * The section is several screens tall; its stage stays put while it passes (the `contain` range of
+   * its view timeline is exactly that stretch), and each scene takes a slice of it.
+   */
   .hl-film {
     display: none;
+  }
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      [data-lab-root][data-level="maximal"][data-motion="on"] .hl-steps {
+        display: none;
+      }
+      [data-lab-root][data-level="maximal"][data-motion="on"] .hl-film {
+        display: block;
+        height: 440dvh;
+        view-timeline: --hl-film block;
+      }
+      [data-lab-root][data-level="maximal"][data-motion="on"] .hl-film-stage {
+        position: sticky;
+        top: 0;
+        display: grid;
+        align-content: center;
+        height: 100dvh;
+        overflow: clip;
+      }
+      [data-lab-root][data-level="maximal"][data-motion="on"]
+        .hl-film
+        :is(
+          .hl-film-captions > li,
+          .hl-film-file,
+          .hl-film-banner,
+          .hl-film-address,
+          .xp-aside,
+          .xp-title,
+          .xp-mark,
+          .xp-flow > li,
+          .xp-flow > li:last-child > .xp-flow-box,
+          [data-part]:not([data-part="process"]),
+          .xp-tick
+        ) {
+        animation-timeline: --hl-film;
+        animation-fill-mode: both;
+        animation-duration: auto;
+        animation-timing-function: var(--ease-standard);
+      }
+      /* The words: one scene at a time. */
+      [data-level="maximal"][data-motion="on"] .hl-film-captions > li[data-scene="file"] {
+        animation-name: hl-film-out;
+        animation-range: contain 24% contain 30%;
+      }
+      [data-level="maximal"][data-motion="on"] .hl-film-captions > li[data-scene="draft"] {
+        animation-name: hl-film-through;
+        animation-range: contain 28% contain 64%;
+      }
+      [data-level="maximal"][data-motion="on"] .hl-film-captions > li[data-scene="live"] {
+        animation-name: hl-film-in;
+        animation-range: contain 62% contain 70%;
+      }
+      /* The file arrives from the side and drops into the frame. */
+      [data-level="maximal"][data-motion="on"] .hl-film-file {
+        animation-name: hl-film-file;
+        animation-timing-function: linear;
+        animation-range: contain 0% contain 28%;
+      }
+      /* The page writes itself, in reading order, under the editor's note. */
+      [data-level="maximal"][data-motion="on"] .hl-film .xp-aside {
+        animation-name: hl-film-in;
+        animation-range: contain 27% contain 33%;
+      }
+      [data-level="maximal"][data-motion="on"] .hl-film .xp-title {
+        animation-name: hl-film-in;
+        animation-range: contain 29% contain 35%;
+      }
+      [data-level="maximal"][data-motion="on"] .hl-film .xp-mark {
+        background-color: transparent;
+        background-image: linear-gradient(var(--xp-highlight), var(--xp-highlight));
+        background-repeat: no-repeat;
+        background-size: 100% 100%;
+        animation-name: hl-mark;
+        animation-timing-function: linear;
+        animation-range: contain 33% contain 39%;
+      }
+      [data-level="maximal"][data-motion="on"] .hl-film .xp-flow > li {
+        animation-name: hl-arrive;
+        animation-timing-function: var(--ease-entrance);
+        animation-range: contain calc(38% + var(--hl-n, 0) * 2.5%) contain calc(42% + var(--hl-n, 0) * 2.5%);
+      }
+      .hl-film .xp-flow > li:nth-child(2) {
+        --hl-n: 1;
+      }
+      .hl-film .xp-flow > li:nth-child(3) {
+        --hl-n: 2;
+      }
+      .hl-film .xp-flow > li:nth-child(4) {
+        --hl-n: 3;
+      }
+      .hl-film .xp-flow > li:nth-child(5) {
+        --hl-n: 4;
+      }
+      .hl-film .xp-flow > li:nth-child(6) {
+        --hl-n: 5;
+      }
+      [data-level="maximal"][data-motion="on"] .hl-film .xp-flow > li:last-child > .xp-flow-box {
+        animation-name: hl-ink;
+        animation-range: contain 52% contain 55%;
+      }
+      [data-level="maximal"][data-motion="on"] .hl-film [data-part]:not([data-part="process"]) {
+        animation-name: hl-film-in;
+        animation-range: contain 48% contain 56%;
+      }
+      [data-level="maximal"][data-motion="on"] .hl-film-banner {
+        animation-name: hl-film-through;
+        animation-range: contain 30% contain 64%;
+      }
+      /* Checked: the ticks fill, then the address arrives with its Live dot. */
+      [data-level="maximal"][data-motion="on"] .hl-film .xp-tick {
+        animation-name: hl-pop;
+        animation-timing-function: var(--ease-entrance);
+        animation-range: contain calc(64% + var(--hl-n, 0) * 2%) contain calc(67% + var(--hl-n, 0) * 2%);
+      }
+      .hl-film [data-checks] li:nth-child(2) .xp-tick {
+        --hl-n: 1;
+      }
+      .hl-film [data-checks] li:nth-child(3) .xp-tick {
+        --hl-n: 2;
+      }
+      [data-level="maximal"][data-motion="on"] .hl-film-address {
+        animation-name: hl-film-in;
+        animation-timing-function: var(--ease-entrance);
+        animation-range: contain 70% contain 78%;
+      }
+    }
+  }
+  @keyframes hl-film-in {
+    from {
+      opacity: 0;
+      translate: 0 0.75rem;
+    }
+  }
+  @keyframes hl-film-out {
+    to {
+      opacity: 0;
+      translate: 0 -0.75rem;
+    }
+  }
+  @keyframes hl-film-through {
+    0% {
+      opacity: 0;
+      translate: 0 0.75rem;
+    }
+    14%,
+    86% {
+      opacity: 1;
+      translate: 0 0;
+    }
+    100% {
+      opacity: 0;
+      translate: 0 -0.75rem;
+    }
+  }
+  @keyframes hl-film-file {
+    0% {
+      opacity: 0;
+      translate: -55vw 0;
+    }
+    20% {
+      opacity: 1;
+    }
+    62% {
+      opacity: 1;
+      translate: 0 0;
+      scale: 1;
+    }
+    100% {
+      opacity: 0;
+      translate: 0 6rem;
+      scale: 0.55;
+    }
+  }
+  .hl-film-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+  .hl-film-captions {
+    display: grid;
+  }
+  /* The three scenes' words share one place; the film shows one at a time. */
+  .hl-film-captions > li {
+    grid-area: 1 / 1;
+    display: grid;
+    gap: 0.75rem;
+    align-content: start;
+  }
+  .hl-film-screen {
+    position: relative;
+    display: grid;
+    gap: 1rem;
+  }
+  .hl-film-file {
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    z-index: 2;
+    margin-left: -8rem;
+  }
+  .hl-film-banner {
+    position: absolute;
+    top: 3.5rem;
+    left: 1rem;
+    right: 1rem;
+    z-index: 1;
+  }
+  .hl-film-address {
+    display: grid;
+    gap: 0.25rem;
+    overflow-wrap: anywhere;
+  }
+  .hl-film-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .hl-film-page {
+    zoom: 0.34;
+  }
+  @media (width >= 640px) {
+    .hl-film-page {
+      zoom: 0.55;
+    }
+  }
+  @media (width >= 1024px) {
+    .hl-film-grid {
+      grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+      gap: 4rem;
+      align-items: center;
+    }
+    .hl-film-page {
+      zoom: 0.56;
+    }
   }
 
   /* ── 6. The roadmap ───────────────────────────────────────────────────── */
