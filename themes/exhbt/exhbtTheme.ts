@@ -32,7 +32,7 @@ const WHITE = "#FFFFFF";
 const FIELD = "#85888E";
 /** Light grey for text on ink (--color-on-ink in app/globals.css). */
 const ON_INK = "#C9CBCF";
-/** Error's pale ground: the error red mixed into white (ink text on it is 15:1, the red 5.0:1). */
+/** Error's pale ground: the error red mixed into white (ink text on it is 16.6:1, the red 4.85:1). */
 const ERROR_WASH = "#FBEBEB";
 
 const both = (v: string): [string, string] => [v, v];
