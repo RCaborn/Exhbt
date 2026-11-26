@@ -3,9 +3,9 @@
  * page, the links into it, the server action and the tests agree.
  *
  * With nothing after it, the address opens the chooser. An address that already says what is being
- * drafted skips the chooser: `?start=draft` is the upload form the AI drafts from, and so is
+ * drafted skips the chooser: `?start=draft` is the upload form the AI drafts from ("Draft it from my files"), and so is
  * `?into=<id>` (a teammate drafting their own exhbt from a team project, decision 0013).
- * `?start=blank` is the layouts to start an empty exhbt in.
+ * `?start=blank` is the layouts to start an empty exhbt in ("Write it myself").
  */
 export const ADD_EXHBT = "/exhbts/new";
 export const DRAFT_WITH_AI = `${ADD_EXHBT}?start=draft`;

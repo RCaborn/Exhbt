@@ -13,7 +13,7 @@ import { buildRoadmap, uniqueEmail, unlockProjects, waitForResult } from "./help
 import { freshName, READY } from "./page-editor";
 
 /*
- * "Add an exhbt" (/exhbts/new): the chooser with its two ways to start, the layouts of "Build it yourself",
+ * "Add an exhbt" (/exhbts/new): the chooser with its two ways to start, the layouts of "Write it myself",
  * and the addresses that skip the chooser. Rory, 26 Nov 2026: "Maybe we need for the exhbts a build from
  * scratch and a build with AI option?" Both existed, but not as a choice anyone saw.
  */
@@ -63,8 +63,8 @@ test.describe("The chooser", () => {
     // Two ways, each one card with one control, a link, and neither is the page's primary button.
     const draft = page.locator(ADD.draftWay);
     const blank = page.locator(ADD.blankWay);
-    await expect(draft.getByRole("heading", { level: 2, name: "Draft it with AI" })).toBeVisible();
-    await expect(blank.getByRole("heading", { level: 2, name: "Build it yourself" })).toBeVisible();
+    await expect(draft.getByRole("heading", { level: 2, name: "Draft it from my files" })).toBeVisible();
+    await expect(blank.getByRole("heading", { level: 2, name: "Write it myself" })).toBeVisible();
     for (const way of [draft, blank]) await expect(way.locator("a, button, input, [tabindex]")).toHaveCount(1);
     await expect(draft.getByRole("link", { name: ADD.draftLink })).toHaveAttribute("href", DRAFT_WITH_AI);
     await expect(blank.getByRole("link", { name: ADD.layoutsLink })).toHaveAttribute("href", BUILD_IT_YOURSELF);
@@ -77,11 +77,12 @@ test.describe("The chooser", () => {
     expect(Math.abs(a!.height - b!.height)).toBeLessThan(1);
     expect(Math.abs(a!.y - b!.y)).toBeLessThan(1);
 
-    // Each says what the AI does and doesn't do, the allowance, and what happens straight after.
-    await expect(draft).toContainText("The AI only uses what is in your files.");
+    // Each says what it needs, who writes what, the allowance, and what happens straight after.
+    await expect(draft).toContainText("The AI writes a first version from them and nothing else; you check every word.");
     await expect(draft).toContainText(`${ENTITLEMENTS.premium.draftsPer30Days} of ${ENTITLEMENTS.premium.draftsPer30Days} AI drafts left`);
-    await expect(draft).toContainText("You'll add your files, then get a first draft to edit.");
-    await expect(blank).toContainText("You'll choose a layout, then land on an empty page.");
+    await expect(draft).toContainText("You'll add your files, then get the first version to edit.");
+    await expect(blank).toContainText("Nothing to upload first.");
+    await expect(blank).toContainText("You'll choose a layout, then land on the empty page.");
     // The second way shows the layouts on offer: one sketch for each, with shapes in it.
     await expect(blank.locator("[data-offered] svg")).toHaveCount(OFFERED_FORMATS.length);
 
@@ -93,14 +94,14 @@ test.describe("The chooser", () => {
 
     await axe(page);
 
-    // Draft it with AI: the upload form, as it always was.
+    // Draft it from my files: the upload form, as it always was.
     await draft.getByRole("link", { name: ADD.draftLink }).click();
     await page.waitForURL(exactly(DRAFT_WITH_AI));
     await expect(page.getByRole("heading", SEL.draftHeading)).toBeVisible();
     await expect(page.locator(SEL.draftForm)).toBeAttached();
     await expect(page.getByRole("button", { name: "Draft my exhbt" })).toBeVisible();
 
-    // Build it yourself: the layouts, and one of them makes an empty exhbt and opens the editor.
+    // Write it myself: the layouts, and one of them makes an empty exhbt and opens the editor.
     await page.goBack();
     await blank.getByRole("link", { name: ADD.layoutsLink }).click();
     await page.waitForURL(exactly(BUILD_IT_YOURSELF));
@@ -182,7 +183,7 @@ test.describe("The chooser", () => {
   });
 });
 
-test.describe("Build it yourself", () => {
+test.describe("Write it myself", () => {
   test("each layout on offer makes an empty exhbt in that layout and opens the new editor", async ({ page }) => {
     test.setTimeout(300_000); // seven exhbts, each opened in the editor
     await signInAs(page, freshName("addeach"), "max");
@@ -363,7 +364,7 @@ test.describe("The plan's rules", () => {
     await expect(page.getByRole("button", { name: "Draft my exhbt" })).toHaveCount(0);
   });
 
-  test("with no AI drafts left, the AI way says so with the form's reason, and Build it yourself still works", async ({ page }) => {
+  test("with no AI drafts left, the first way says so with the form's reason, and Write it myself still works", async ({ page }) => {
     await signInAs(page, freshName("addspent"), "free");
     // Free's AI drafts for the last 30 days, used up; then the drafted exhbts deleted, so the plan has room again.
     for (let i = 0; i < ENTITLEMENTS.free.draftsPer30Days; i++) {
@@ -378,7 +379,7 @@ test.describe("The plan's rules", () => {
 
     await page.goto(ADD_EXHBT);
     const draft = page.locator(ADD.draftWay);
-    await expect(draft.getByRole("heading", { level: 2, name: "Draft it with AI" })).toBeVisible();
+    await expect(draft.getByRole("heading", { level: 2, name: "Draft it from my files" })).toBeVisible();
     // No way into the upload form from here, and the reason the form itself gives.
     await expect(draft.getByRole("link", { name: ADD.draftLink })).toHaveCount(0);
     await expect(draft.locator(`a[href="${DRAFT_WITH_AI}"]`)).toHaveCount(0);
@@ -397,7 +398,7 @@ test.describe("The plan's rules", () => {
     await page.goto(DRAFT_WITH_AI);
     await expect(page.getByRole("alert").filter({ hasText: reason })).toBeVisible();
 
-    // Build it yourself is untouched: the layouts no longer offer the AI, and one of them makes the exhbt.
+    // Write it myself is untouched: the layouts no longer offer the AI, and one of them makes the exhbt.
     await page.goto(ADD_EXHBT);
     await page.locator(ADD.blankWay).getByRole("link", { name: ADD.layoutsLink }).click();
     await expect(page.getByRole("heading", ADD.layoutsHeading)).toBeVisible();

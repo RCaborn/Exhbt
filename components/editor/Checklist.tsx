@@ -7,7 +7,7 @@ import { hasData } from "@/lib/exhbt/charts";
 import { Button } from "@/components/ui/Button";
 import { Tick } from "@/components/ui/Tick";
 
-/** True for a doc with nothing typed in yet: what "Build it yourself" makes (Add an exhbt), in any layout. */
+/** True for a doc with nothing typed in yet: what "Write it myself" makes (Add an exhbt), in any layout. */
 export function isBlank(doc: ExhbtDoc): boolean {
   return (
     !doc.title.trim() &&

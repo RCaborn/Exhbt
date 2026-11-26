@@ -16,7 +16,7 @@ export const ADD = {
   chooserHeading: { level: 1 as const, name: "Add an exhbt" },
   /** The chooser's two ways, each a card (`data-way`) with one link. */
   draftWay: '[data-way="draft"]',
-  draftLink: "Upload your project",
+  draftLink: "Upload my files",
   blankWay: '[data-way="blank"]',
   layoutsLink: "Choose a layout",
   layoutsHeading: { level: 1 as const, name: "Choose a layout" },

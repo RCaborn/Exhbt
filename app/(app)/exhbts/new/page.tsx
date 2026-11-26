@@ -32,8 +32,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * "Add an exhbt": two ways to start, of equal weight (lib/add-exhbt.ts has the addresses).
- *  - Draft it with AI: the upload form (docs/phase-2.md section 6), as it always was.
- *  - Build it yourself: the layouts the person's editor offers; choosing one makes an empty exhbt in it.
+ *  - Draft it from my files: the upload form (docs/phase-2.md section 6), as it always was.
+ *  - Write it myself: the layouts the person's editor offers; choosing one makes an empty exhbt in it.
  * An address that already says what is being drafted skips the chooser and opens the upload form:
  * `?start=draft`, and `?into=<id>` (a teammate drafting their own exhbt from a team project).
  *

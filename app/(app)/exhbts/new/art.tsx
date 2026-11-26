@@ -14,7 +14,7 @@ import { LayoutSketch } from "./layout-parts";
 
 const FILES: GlyphName[] = ["report", "slides", "picture", "link"];
 
-/** Draft it with AI: a report, slides, pictures and a link go in, and a written page comes out. */
+/** Draft it from my files: a report, slides, pictures and a link go in, and a written page comes out. */
 export function DraftedArt() {
   return (
     <HStack hAlign="center" vAlign="center" className="add-art" aria-hidden>
@@ -41,7 +41,7 @@ export function DraftedArt() {
   );
 }
 
-/** Build it yourself: the layouts on offer go in, and an empty page comes out with the cursor in its title. */
+/** Write it myself: the layouts on offer go in, and an empty page comes out with the cursor in its title. */
 export function LayoutsArt({ offered }: { offered: readonly Format[] }) {
   return (
     <HStack hAlign="center" vAlign="center" className="add-art" aria-hidden>

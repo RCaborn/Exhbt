@@ -16,7 +16,7 @@ import { Glyph } from "./glyphs";
 import { LayoutLine, LayoutSketch } from "./layout-parts";
 
 /**
- * "Build it yourself": the layouts the person's editor offers, each with the sketch and the line the
+ * "Write it myself": the layouts the person's editor offers, each with the sketch and the line the
  * editor's layout menu draws. One form; each layout is an Astryx Card whose one control is a real submit
  * button carrying the layout, its press area stretched over the card by the stylesheet. Pressing one makes
  * an empty exhbt in that layout and opens the editor (createFromScratch, which checks the layout again).
@@ -75,9 +75,9 @@ export function LayoutGallery({ offered, refused, canDraft }: { offered: readonl
             </Text>
             {canDraft && (
               <Text as="p" color="secondary">
-                Or upload your project and the AI chooses one for you.{" "}
+                Or upload your files and the AI chooses one for you.{" "}
                 <Link href={DRAFT_WITH_AI} color="primary" hasUnderline>
-                  Draft it with AI
+                  Draft it from my files
                 </Link>
               </Text>
             )}

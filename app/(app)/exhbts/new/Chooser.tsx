@@ -26,11 +26,11 @@ import "./add-exhbt.css";
 /** The page's frame: the app's mist ground and one column, shared by the chooser, the layouts and the full-plan notice. */
 export function AddFrame({ children }: { children: React.ReactNode }) {
   return (
-    <Section variant="muted" padding={0} className="add-exhbt px-4 pt-10 pb-16 sm:px-8 sm:pt-14">
-      <VStack gap={8} className="mx-auto max-w-6xl">
+    <VStack className="add-exhbt bg-mist px-4 pt-10 pb-16 sm:px-8 sm:pt-14">
+      <VStack gap={8} className="mx-auto w-full max-w-6xl">
         {children}
       </VStack>
-    </Section>
+    </VStack>
   );
 }
 
@@ -54,7 +54,8 @@ export function Back({ href, children }: { href: string; children: React.ReactNo
 export type Where = { live: true; liveBase: string | null } | { live: false; reason: string };
 
 /**
- * The chooser: what an exhbt is, two ways to start of equal weight, and where it ends up.
+ * The chooser: what an exhbt is, two ways to start of equal weight ("Draft it from my files" and "Write it
+ * myself", each saying what it needs and what happens next), and where it ends up.
  *
  * Each way is one Astryx Card with one real control, a link (components/ui/Button.tsx with `href`), whose
  * press area the stylesheet stretches over the whole card. So a card is pressed anywhere, with or without
@@ -77,25 +78,25 @@ export function Chooser({ draft, offered, where }: { draft: DraftVerdict; offere
             <VStack gap={5} height="100%">
               <DraftedArt />
               <VStack gap={2}>
-                <Heading level={2}>Draft it with AI</Heading>
+                <Heading level={2}>Draft it from my files</Heading>
                 <Text as="p" color="secondary">
-                  Upload your report, slides, pictures or a link. We write a first draft from them, choose a layout and take the key figure from your work.
+                  Upload the report, slides, pictures or notes, or give a link. The AI writes a first version from them and nothing else; you check every word.
                 </Text>
                 <Text as="p" type="supporting">
-                  The AI only uses what is in your files.
+                  It also chooses a layout and takes the key figure from your work.
                 </Text>
               </VStack>
               {draft.ok ? (
                 <VStack gap={3} className="mt-auto">
                   <HStack gap={4} vAlign="center" wrap="wrap">
-                    <Button href={DRAFT_WITH_AI} label="Upload your project" className="add-go">
-                      Upload your project <Glyph name="go" />
+                    <Button href={DRAFT_WITH_AI} label="Upload my files" className="add-go">
+                      Upload my files <Glyph name="go" />
                     </Button>
                     <Text type="supporting" hasTabularNumbers>
                       {draft.left} of {draft.perPeriod} AI {draft.perPeriod === 1 ? "draft" : "drafts"} left
                     </Text>
                   </HStack>
-                  <Next>You&apos;ll add your files, then get a first draft to edit.</Next>
+                  <Next>You&apos;ll add your files, then get the first version to edit.</Next>
                 </VStack>
               ) : (
                 <VStack className="mt-auto">
@@ -111,9 +112,12 @@ export function Chooser({ draft, offered, where }: { draft: DraftVerdict; offere
             <VStack gap={5} height="100%">
               <LayoutsArt offered={offered} />
               <VStack gap={2}>
-                <Heading level={2}>Build it yourself</Heading>
+                <Heading level={2}>Write it myself</Heading>
                 <Text as="p" color="secondary">
-                  Start with an empty page in the layout you choose, and type straight onto it.
+                  Start with the page laid out in the layout you choose, and type straight onto each part.
+                </Text>
+                <Text as="p" type="supporting">
+                  Nothing to upload first. You add pictures and graphs on the page.
                 </Text>
               </VStack>
               <VStack gap={3} className="mt-auto">
@@ -122,7 +126,7 @@ export function Chooser({ draft, offered, where }: { draft: DraftVerdict; offere
                     Choose a layout <Glyph name="go" />
                   </Button>
                 </HStack>
-                <Next>You&apos;ll choose a layout, then land on an empty page.</Next>
+                <Next>You&apos;ll choose a layout, then land on the empty page.</Next>
               </VStack>
             </VStack>
           </Card>

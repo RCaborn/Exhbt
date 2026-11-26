@@ -63,7 +63,7 @@ async function layoutAllowed(id: string, user: SessionUser, raw: unknown, doc: E
 }
 
 /**
- * "Build it yourself" on Add an exhbt (/exhbts/new): an empty exhbt in the layout chosen, if the plan has room.
+ * "Write it myself" on Add an exhbt (/exhbts/new): an empty exhbt in the layout chosen, if the plan has room.
  * The page lists the layouts the person's editor offers (offeredIn, decided as the edit page decides it), and
  * a form can be built by hand, so any other layout, or none, is refused here and sent back to choose again.
  * A case study is stored exactly as an empty doc always was: withFormat leaves the default layout's key out.
