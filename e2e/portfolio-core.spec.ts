@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { FULL, SPARSE, fullFixture, sparseFixture } from "./fixtures/portfolio-pages";
 import type { Page } from "@playwright/test";
 import { applyUndo, entryFor } from "../components/portfolio-editor/undo";
@@ -806,4 +807,23 @@ test.describe("Box for box with the visitor's page", () => {
       }
     });
   }
+});
+
+test.describe("Accessibility", () => {
+  test("the editing page, See as a visitor and a problem at a field have no WCAG 2.1 AA violations axe can find", async ({ page }) => {
+    const f = fresh(FULL, "axe");
+    await openEditor(page, f);
+    await settle(page);
+    const check = async (where: string) => {
+      const { violations } = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+      expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`), where).toEqual([]);
+    };
+    await check("the editing page");
+    await typeIn(page, "profile.headline", "One two three four five six seven eight nine ten eleven twelve thirteen");
+    await expect(saveState(page)).toHaveAttribute("data-save", "invalid");
+    await check("a problem at the headline");
+    await call(page, "seeAsVisitor", true);
+    await settle(page);
+    await check("See as a visitor");
+  });
 });
