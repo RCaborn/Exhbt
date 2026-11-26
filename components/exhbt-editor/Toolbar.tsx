@@ -111,9 +111,21 @@ const OUT_OF_PAGE = ".xe-insert, .xe-measure, .xe-drag-overlay, [data-edit-only]
  * Edit-only chips and labels that may reach out of their section. A flowchart box's grip and Remove are among them: in a
  * row they hang half under its foot, into the gap where the next section's toolbar goes (Build, Essay and Before and after
  * each pair their findings under a three-box flowchart, so the middle box's chips sat under that toolbar). With a mouse
- * they show only on their box, but a toolbar over them would take the press meant for them.
+ * they show only on their box, but a toolbar over them would take the press meant for them. So are a finding's own Move up,
+ * Move down and Remove, on the rule above it at its right end, and "Add a finding": they show while the finding is touched
+ * or typed in, and the toolbar shows whole then too (on a tablet, a section's grip lay over "Remove finding 1").
  */
-const CHIPS = ".xe-fig-chip, .xe-fig-picked, .xe-chip, .xe-above, .xe-flow-chip";
+const CHIPS = ".xe-fig-chip, .xe-fig-picked, .xe-chip, .xe-above, .xe-flow-chip, .xe-list-tools > *, .xe-add-finding";
+/** A finding's formatting buttons (Bold, Italic, Link: fields/RichEditor.tsx), under its line at its right end: 28px each, 4px apart, 16px under a finger (css/core.css). */
+const FORMAT_W = (coarse: boolean) => 3 * 28 + 2 * (coarse ? 16 : 4);
+
+/** A figure's or a link's chip under a finger: 44px tall and 4px past each end, about its middle (figures.css). */
+function chipPress(b: Box): Box {
+  const w = Math.max(b.w + 8, 44);
+  return { x: b.x + b.w / 2 - w / 2, y: b.y + b.h / 2 - 22, w, h: 44 };
+}
+/** What a toolbar keeps clear of for a chip: its own box; under a finger a finding's small controls by their 44px press, 8px round each (css/core.css, .xe-tool-sm). */
+const toolsKeepOff = (el: HTMLElement, b: Box, coarse: boolean): Box => (coarse && el.matches(".xe-tool-sm") ? { x: b.x - 8, y: b.y - 8, w: b.w + 16, h: b.h + 16 } : b);
 /** Kinds whose toolbar is always inside the corner (css/core.css): a picture, which has no words there. */
 const INSIDE_KINDS = new Set(["image"]);
 /** The gap between a toolbar's buttons (css/core.css). */
@@ -192,16 +204,29 @@ function placeTools() {
     void Promise.allSettled(moving.map((a) => a.finished)).then(queuePlace);
     return;
   }
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  // A Build button's "Web address" first: where it goes, the toolbars keep clear of.
+  placeLinkChips(main, coarse);
   // What a toolbar above a section must not lie over: every other section; whatever the page draws
   // between them that is no section's (the skills, the title and the context line over the first row,
   // research's "References" over its lines); and the chips that reach out of a section ("Edit figures"
-  // on a graph's foot, "Web address" on the rule between reference lines, a picked figure's label).
+  // on a graph's foot, "Web address" on the rule between reference lines, a picked figure's label, a
+  // finding's own controls), with where a finding's formatting buttons go, under its line at its right end
+  // (the last finding's hang into the gap under the section, where the next section's toolbar goes).
   const boxes = new Map<HTMLElement, Box>();
   const collect = (el: Element) => {
     for (const c of el.children) {
       if (!(c instanceof HTMLElement) || c.matches(OUT_OF_PAGE)) continue;
-      if (c.matches("[data-section-id]")) for (const o of [c, ...c.querySelectorAll<HTMLElement>(CHIPS)]) boxes.set(o, pageBox(o));
-      else if (c.querySelector("[data-section-id]")) collect(c);
+      if (c.matches("[data-section-id]")) {
+        boxes.set(c, pageBox(c));
+        for (const o of c.querySelectorAll<HTMLElement>(CHIPS)) boxes.set(o, toolsKeepOff(o, pageBox(o), coarse));
+        for (const words of c.querySelectorAll<HTMLElement>("li.xp-finding .xe-rich")) {
+          const r = pageBox(words);
+          const w = FORMAT_W(coarse);
+          const reach = coarse ? 8 : 0;
+          boxes.set(words, { x: r.x + r.w - w - reach, y: r.y + r.h - reach, w: w + 2 * reach, h: 28 + 2 * reach });
+        }
+      } else if (c.querySelector("[data-section-id]")) collect(c);
       else {
         // The person's own words (a field) count by their whole box, however short the line; a label the layout draws ("References") by its words alone.
         const b = c.matches("[data-path]") || c.querySelector("[data-path]") ? pageBox(c) : wordsBox(c);
@@ -212,7 +237,7 @@ function placeTools() {
   collect(main);
   const page = pageBox(main);
   // The gap a toolbar above needs: its buttons, and on a mouse the strip under them that keeps the pointer on the section.
-  const bridge = window.matchMedia("(pointer: coarse)").matches ? 0 : 6;
+  const bridge = coarse ? 0 : 6;
   // First every read, then every write: a pass reads the page's layout once, and one that changes nothing invalidates nothing.
   type Plan = { tools: HTMLElement; frame: HTMLElement; f: Box; kids: HTMLElement[]; unit: number; width: number; place: Place; dx: number; dy: number };
   const plans: Plan[] = [];
@@ -280,7 +305,18 @@ function placeTools() {
     // 5. The compact pair, the grip and "More actions", half over the top edge; the rest are in that menu. Where another section's
     // chip sits on that edge at the corner (a reference line's "Web address", on the rule over the next line), just under it,
     // still over none of the section's words.
-    Object.assign(plan, { place: "compact", ...(onEdge(2 * unit + GAP, buttons + 16) ?? {}) });
+    const pair = 2 * unit + GAP;
+    const compact = onEdge(pair, buttons + 16);
+    if (compact) {
+      Object.assign(plan, { place: "compact", ...compact });
+      continue;
+    }
+    // 6. Where even that would lie over something at the corner (the first finding's own controls, on the rule just under the
+    // findings' top edge where no heading sits over them), the pair goes along that edge to the left until it is clear, over
+    // none of the words. Only where nothing along it is clear does it stay on the corner.
+    let along: number | null = null;
+    for (let dx = -8; f.w - right - pair + dx >= 0 && along === null; dx -= 8) if (clear({ x: f.x + f.w - right - pair + dx, y: f.y - buttons / 2, w: pair, h: buttons })) along = dx;
+    Object.assign(plan, { place: "compact", dx: along ?? 0 });
   }
   for (const p of plans) {
     attr(p.tools, "data-place", p.place);
@@ -396,6 +432,56 @@ function placePluses(main: HTMLElement, coarse: boolean) {
       attr(insert, "data-small", small ? "" : null);
       prop(insert, "--xe-plus-shift", shift ? `${shift}px` : null);
     };
+  });
+  for (const write of writes) write();
+}
+
+/**
+ * A link drawn as a button (Build's demo and code): its "Web address" chip sits just under its line (css/figures.css), where
+ * it covers neither the button's words nor the line's. A row of buttons wraps, though: on a phone one or two to a line, 12px
+ * apart, and there the chip under a line lay over the top of the button below and took the tap meant for its words. So the
+ * chip goes in the first of these places where it and its press (44px under a finger) meet no other section, no toolbar,
+ * no other chip and not its own button, inside the page's column: under its line (no attribute); beside it, on the button's
+ * line, just past the link's right edge and its grip ("beside"); on the button's line at the link's right end, left of a
+ * 44px grip ("end"). Where none is clear, under its line. The link's own box is watched, so typing that widens it places it again.
+ */
+function placeLinkChips(main: HTMLElement, coarse: boolean) {
+  const chips = [...main.querySelectorAll<HTMLElement>('.xe-frame[data-as="button"] .xe-fig-link > .xe-fig-corner')].filter((c) => !c.closest(".xe-measure, .xe-drag-overlay"));
+  if (!chips.length) return;
+  const page = pageBox(main);
+  const frames = [...main.querySelectorAll<HTMLElement>("[data-section-id]")].filter((f) => !f.closest(".xe-measure, .xe-drag-overlay")).map((el) => ({ el, b: pageBox(el) }));
+  const others = [...main.querySelectorAll<HTMLElement>(`.xe-tools > *, ${CHIPS}`)]
+    .filter((c) => !chips.includes(c) && !c.closest(".xe-measure, .xe-drag-overlay") && c.getClientRects().length > 0)
+    .map((c) => toolsKeepOff(c, pageBox(c), coarse));
+  const placed: Box[] = [];
+  const writes = chips.map((chip) => {
+    const frame = chip.closest<HTMLElement>("[data-section-id]");
+    if (!frame) return () => {};
+    if (!watched.has(frame)) {
+      watched.add(frame);
+      sizes?.observe(frame);
+    }
+    // The chip is placed in the link's own box (.xe-fig-link, inset 0): its 26px, on the 44px button's line or 30px under the link's foot.
+    const f = pageBox(chip.parentElement ?? frame);
+    const w = chip.offsetWidth;
+    const h = chip.offsetHeight;
+    const button = frame.querySelector(".xp-outline-button");
+    const own = button ? pageBox(button) : null;
+    const line = f.y + (44 - h) / 2;
+    const at: [place: string | null, b: Box][] = [
+      [null, { x: coarse ? f.x : f.x + f.w - w, y: f.y + f.h + 30 - h, w, h }],
+      ["beside", { x: f.x + f.w + 8, y: line, w, h }],
+      ["end", { x: f.x + f.w - 52 - w, y: line, w, h }],
+    ];
+    const clear = (b: Box) => {
+      const p = coarse ? chipPress(b) : b;
+      if (p.x < page.x - 0.5 || p.x + p.w > page.x + page.w + 0.5) return false;
+      if (own && overlap(p, own)) return false;
+      return !frames.some((o) => o.el !== frame && overlap(p, o.b)) && !others.some((o) => overlap(p, o)) && !placed.some((o) => overlap(p, o));
+    };
+    const [place, b] = at.find(([, b]) => clear(b)) ?? at[0]!;
+    placed.push(coarse ? chipPress(b) : b);
+    return () => attr(chip, "data-place", place);
   });
   for (const write of writes) write();
 }

@@ -691,6 +691,49 @@ export function flowChipsNearWords(page: Page, clear = 4): Promise<string[]> {
 }
 
 /**
+ * Every button and field shown on the editing page, hit-tested at its middle: what a finger lands on there must be the
+ * control itself or something inside it (a press on the label round a tick box is the tick box's). A control counts as
+ * shown when it has a box, is not hidden, faded out or closed away, and takes a press (`pointer-events`). Each one is
+ * scrolled to the middle of the screen first, clear of the top bar. `allow` names the controls that may lie under
+ * another on purpose: [what is under (a selector), what lies over it (a selector)]. `by`, a selector, counts only what
+ * lies under a match of it (".xe-tools": a section's grip or toolbar). Returns each covered control in words; [] when
+ * there are none.
+ */
+export function coveredControls(page: Page, opts: { allow?: [under: string, over: string][]; by?: string } = {}): Promise<string[]> {
+  return page.evaluate(({ allow = [], by }) => {
+    const root = document.querySelector('[data-editor="page"] article[data-exhbt-page]');
+    if (!root) return ["no editing page"];
+    const CONTROLS = 'button, [role="button"], input:not([type="hidden"]), textarea, select, [contenteditable="true"], [role="textbox"], [data-path][data-field]';
+    const shown = (el: Element) => {
+      if (!el.getClientRects().length || el.closest("[hidden], [inert], .sr-only, dialog:not([open]), [popover]:not(:popover-open)")) return false;
+      const s = getComputedStyle(el);
+      if (s.visibility === "hidden" || s.pointerEvents === "none") return false;
+      for (let a: Element | null = el; a && a !== document.body; a = a.parentElement) if (Number(getComputedStyle(a).opacity) === 0) return false;
+      return true;
+    };
+    const name = (el: Element | null) => (el ? el.getAttribute("aria-label") ?? el.getAttribute("data-path") ?? (el.textContent?.trim().slice(0, 30) || el.className.toString().slice(0, 40) || el.tagName.toLowerCase()) : "nothing");
+    const sectionOf = (el: Element) => el.closest("[data-section-id]")?.getAttribute("data-section-id") ?? "the page";
+    // A field holds its own controls (a rich field's editor): only the outermost of a field and what it holds is tried.
+    const controls = [...root.querySelectorAll(CONTROLS)].filter((el) => shown(el) && !el.parentElement?.closest('[data-path][data-field], [contenteditable="true"]'));
+    const out: string[] = [];
+    for (const el of controls) {
+      el.scrollIntoView({ block: "center", inline: "center" });
+      const r = el.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      const hit = document.elementFromPoint(x, y);
+      if (!hit || hit === el || el.contains(hit)) continue;
+      // A tick box's label takes its press.
+      if (el.matches("input") && hit.closest("label")?.contains(el)) continue;
+      if (allow.some(([under, over]) => el.matches(under) && hit.closest(over))) continue;
+      if (by && !hit.closest(by)) continue;
+      out.push(`${name(el)} in ${sectionOf(el)} (${Math.round(x)},${Math.round(y)}) is under ${name(hit.closest(CONTROLS) ?? hit)} in ${sectionOf(hit)}`);
+    }
+    return out;
+  }, opts);
+}
+
+/**
  * The controls matching `selector` whose press is under 44px either way: from each one's middle, how
  * far a finger still lands on it, with nothing over it (L's measure in editor-phone). Hit testing is in
  * whole pixels, so a 44px press measures 42 or 43.
