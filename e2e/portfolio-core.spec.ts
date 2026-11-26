@@ -510,6 +510,8 @@ test.describe("What the address asks for", () => {
     await waitReady(page);
     const card = page.locator(`${READY} [data-card="${id}"]`);
     await expect(card).toHaveAttribute("data-marked", "");
+    // It draws in on the theme's motion tokens.
+    await expect(card).toHaveCSS("animation-name", "pe-mark");
     expect((await uiNow(page)).marked).toBe(id);
     await expect.poll(() => address(page)).toBe("/portfolio");
     const note = page.locator(".astryx-toast", { hasText: "Where do students sit in the library? is live at" });
@@ -556,6 +558,7 @@ test.describe("See as a visitor", () => {
     await call(page, "seeAsVisitor", true);
     await expect(notOnline(page)).toHaveAttribute("data-not-online", "nothing-live");
     await expect(notOnline(page)).toContainText("Not online yet: publish an exhbt");
+    await expect(page.locator("[data-canvas=visitor]").getByRole("link", { name: "Add an exhbt" })).toHaveAttribute("href", "/exhbts/new");
     await expect(page.locator(`[data-canvas=visitor] ${HOME} [data-card]`)).toHaveCount(0);
   });
 
@@ -755,7 +758,11 @@ test.describe("Saving, after a deploy and in two tabs", () => {
     const other = await context.newPage();
     await other.goto("/portfolio");
     await waitReady(other);
-    for (const p of [page, other]) await expect(p.locator("[data-other-tab]")).toContainText("This page is open in another tab");
+    for (const p of [page, other]) {
+      await expect(p.locator("[data-other-tab]")).toContainText("This page is open in another tab");
+      // Heard as well as seen.
+      await expect(p.locator("[data-said]").last()).toContainText("This page is open in another tab.");
+    }
 
     await typeIn(page, "profile.location", "Leeds");
     await waitSaved(page);
