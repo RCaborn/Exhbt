@@ -701,6 +701,13 @@
     }
   }
 
+  /* A part's own title may be one long word (a hashtag, an event's name in capitals, decision 0032): it breaks where it
+     must rather than run off a phone's screen. Every part title is an h2 or h3 in the page (page-ctx.ts, Sub); the
+     editor's title field breaks the same way (css/your-way.css). Ordinary titles are unchanged (e2e/golden boxes). */
+  article[data-exhbt-page] :is(h2, h3) {
+    overflow-wrap: anywhere;
+  }
+
   .xp-label {
     font-family: inherit;
     font-size: 0.8125rem;

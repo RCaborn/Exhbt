@@ -72,7 +72,7 @@
     min-width: 4ch;
     max-width: 100%;
   }
-  /* One long word breaks where it must, as the heading round it does on the visitor's page (exhbt-parts.tsx, TITLE_WRAP),
+  /* One long word breaks where it must, as the heading round it does on the visitor's page (app/globals.css),
      rather than run off a phone's screen. */
   [data-title] .xe-text,
   [data-title] .xe-grow-mirror {
