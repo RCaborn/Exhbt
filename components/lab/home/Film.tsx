@@ -35,15 +35,17 @@ export function Film({ file }: { file: string }) {
             ))}
           </ol>
           <div className="hl-film-screen">
-            <span className="hl-film-file" aria-hidden>
-              <FileChip name={file} />
-            </span>
-            <Frame url={sample.exhbtAddress(gp!.slug)} label="An exhbt being made: drafted from the file, checked, then published" page="hl-film-page">
-              <SampleExhbt slug={gp!.slug} className="p-6 sm:p-8" />
-            </Frame>
-            {/* The editor's note floats over the page: app chrome, so outside the person's page and in the proposed theme. */}
-            <div className="hl-film-banner">
-              <Banner status="info" title={DRAFT_NOTE.title} description={DRAFT_NOTE.description} elevation="med" />
+            <div className="hl-film-window">
+              <span className="hl-film-file" aria-hidden>
+                <FileChip name={file} />
+              </span>
+              <Frame url={sample.exhbtAddress(gp!.slug)} label="An exhbt being made: drafted from the file, checked, then published" page="hl-film-page">
+                <SampleExhbt slug={gp!.slug} className="p-6 sm:p-8" />
+              </Frame>
+              {/* The editor's note floats over the page: app chrome, so outside the person's page and in the proposed theme. */}
+              <div className="hl-film-banner">
+                <Banner status="info" title={DRAFT_NOTE.title} description={DRAFT_NOTE.description} elevation="med" />
+              </div>
             </div>
             <p className="hl-film-address">
               <span className="hl-film-live">

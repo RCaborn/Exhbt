@@ -17,21 +17,28 @@ export function tidyName(typed: string): string {
   return typed.replace(/\s+/g, " ").trimStart().slice(0, NAME_MAX);
 }
 
+/** Latin letters that don't come apart into a letter and an accent, spelt as English usually writes them. */
+const SPELL: Record<string, string> = { "ł": "l", "ø": "o", "đ": "d", "ð": "d", "ß": "ss", "æ": "ae", "œ": "oe", "þ": "th", "ı": "i" };
+
 /**
- * The name part of the address a typed name would give: accents dropped, apostrophes dropped,
- * anything else between words one hyphen, lower case, at most 30 characters (cut at a hyphen where
- * it can). "Priya Shah" gives "priya-shah", "Siobhán O'Brien" gives "siobhan-obrien".
+ * The name part of the address a typed name would give: accents dropped (and ł, ø, ß and the like
+ * spelt out), apostrophes dropped, anything else between words one hyphen, lower case, at most 30
+ * characters (cut at a hyphen where it can). "Priya Shah" gives "priya-shah", "Siobhán O'Brien"
+ * gives "siobhan-obrien", "Zoë Ćwikła" gives "zoe-cwikla".
  */
 export function addressPart(name: string): string {
   const s = name
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/['’]/g, "")
     .toLowerCase()
+    .replace(/[łøđðßæœþı]/g, (c) => SPELL[c] ?? c)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/['\u2019]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   if (s.length <= ADDRESS_MAX) return s;
   const cut = s.slice(0, ADDRESS_MAX);
+  // A cut that falls between two words keeps every word it has room for.
+  if (s[ADDRESS_MAX] === "-") return cut;
   const at = cut.lastIndexOf("-");
   return (at >= ADDRESS_MAX / 2 ? cut.slice(0, at) : cut).replace(/-+$/, "");
 }

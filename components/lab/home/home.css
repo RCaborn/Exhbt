@@ -124,8 +124,10 @@
       column-gap: clamp(2.5rem, 5vw, 4.5rem);
       row-gap: 1.75rem;
     }
+    /* Restrained has no field: its two lines sit level with the middle of the picture, not stranded at its top. */
     .hl-hero:not([data-field]) .hl-hero-grid {
-      grid-template-areas: "title title" "lead work" "act work" ". work" ". work" ". work";
+      grid-template-rows: auto 1fr auto auto 1fr;
+      grid-template-areas: "title title" ". work" "lead work" "act work" ". work";
     }
     .hl-hero-title {
       margin-bottom: 0.75rem;
@@ -726,6 +728,8 @@
           .hl-film-address,
           .xp-aside,
           .xp-title,
+          .xp-title + p,
+          [data-exhbt-page] > div > div:nth-child(2) > ul:first-child,
           .xp-mark,
           .xp-flow > li,
           .xp-flow > li:last-child > .xp-flow-box,
@@ -761,9 +765,14 @@
         animation-name: hl-film-in;
         animation-range: contain 27% contain 33%;
       }
-      [data-level="maximal"][data-motion="on"] .hl-film .xp-title {
+      [data-level="maximal"][data-motion="on"] .hl-film .xp-title,
+      [data-level="maximal"][data-motion="on"] .hl-film [data-exhbt-page] > div > div:nth-child(2) > ul:first-child {
         animation-name: hl-film-in;
         animation-range: contain 29% contain 35%;
+      }
+      [data-level="maximal"][data-motion="on"] .hl-film .xp-title + p {
+        animation-name: hl-film-in;
+        animation-range: contain 31% contain 37%;
       }
       [data-level="maximal"][data-motion="on"] .hl-film .xp-mark {
         background-color: transparent;
@@ -898,12 +907,22 @@
     z-index: 2;
     margin-left: -8rem;
   }
+  .hl-film-window {
+    position: relative;
+  }
+  /* The editor's note floats at the foot of the frame, clear of the title that is being written. */
   .hl-film-banner {
     position: absolute;
-    top: 3.5rem;
-    left: 1rem;
     right: 1rem;
+    bottom: 1rem;
+    left: 1rem;
     z-index: 1;
+  }
+  @media (width >= 1024px) {
+    .hl-film-banner {
+      left: auto;
+      width: min(26rem, 70%);
+    }
   }
   .hl-film-address {
     display: grid;
