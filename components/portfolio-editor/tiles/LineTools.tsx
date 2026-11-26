@@ -21,7 +21,9 @@ import { W } from "../sections/words";
  * toolbar: one Tab stop, the arrow keys along it.
  *
  * It is the last child of the lines' <dl> (d-findings.md), absolute, without the rows' hairline, and it
- * carries the list's own `data-path`, where the list's own problem shows and "Show me" lands.
+ * carries the list's own `data-path`, where the list's own problem shows and "Show me" lands. It is a
+ * <dd>, not a <div>, so it is never taken for one of the list's lines (a line is `dl > div`, which the
+ * page, the box-for-box tests and this file all count by).
  *
  * When a line's year holds words that `splitYear` will not read as a year, a hint shows under that
  * field while it has the cursor.
@@ -40,7 +42,7 @@ const yearReads = (year: string) => !year.trim() || splitYear(joinYear("x", year
 export function LineTools({ path, kind, count, max }: HomeLinesSlot): ReactNode {
   const api = usePortfolioApi();
   const rt = useRuntime();
-  const own = useRef<HTMLDivElement | null>(null);
+  const own = useRef<HTMLElement | null>(null);
   const [active, setActive] = useState<number | null>(null);
   // The list's own problem ("too many lines"): a line's own is shown on its words.
   const issue = useIssue(path);
@@ -131,7 +133,7 @@ export function LineTools({ path, kind, count, max }: HomeLinesSlot): ReactNode 
   };
 
   return (
-    <div ref={own} className="pe-line-tools" data-path={path} data-issue={issue ? "true" : undefined} data-pe-lines={kind} data-active={n ?? undefined}>
+    <dd ref={own} className="pe-line-tools" data-path={path} data-issue={issue ? "true" : undefined} data-pe-lines={kind} data-active={n ?? undefined}>
       <ToolRow spot={{ x: 0, y: 0, where: "edge" }} kind="line" label={W.lineTools(kind, (n ?? 0) + 1)}>
         {count < max && (
           <Button size="sm" label={W.addLine(kind)} onClick={add} {...({ "data-act": "add-line" } as object)}>
@@ -152,6 +154,6 @@ export function LineTools({ path, kind, count, max }: HomeLinesSlot): ReactNode 
         </p>
       )}
       {hint && <Tooltip key={hint.id || "hint"} anchorRef={hintRef} content={W.yearHint} isOpen placement="below" alignment="end" />}
-    </div>
+    </dd>
   );
 }
