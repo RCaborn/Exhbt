@@ -493,12 +493,10 @@ export const EDIT_ONLY_IN_FLOW: { name: string; selector: string; always: boolea
   { name: "an aim or a conclusion with no words", selector: ':is([data-kind="aim"], [data-kind="conclusion"])[data-section-id]:has([data-path$=".text"][data-empty])', always: false },
   { name: "an empty title", selector: '[data-path="title"][data-empty]', always: false },
   { name: "an empty flowchart box", selector: '[data-path$=".step"][data-empty]', always: false },
-  // A flowchart with no boxes: its one button in the flow, the placeholder (K's FlowBox.tsx); the "+" over each arrow takes
-  // no room. Where the flowchart is a part of its own (a case study's, a research poster's), the empty list the button sits
-  // by goes too: as a flex box it keeps apart the margins that meet round the visitor's empty part. In "What I did" the
-  // visitor's part holds its margins itself, as the list does.
-  { name: "the empty flowchart's list and Add a box", selector: '[data-part="process"] .xe-flow:has(> .xe-flow-first[data-flow-add])', always: false },
-  { name: "the empty flowchart's Add a box", selector: ".xe-flow-first[data-flow-add]", always: false },
+  // A flowchart with no boxes: its one button, "Add a box", is its placeholder (FlowBox.tsx); the "+" over each arrow takes
+  // no room. Since decision 0032 a flowchart with no boxes is not drawn for a visitor at all ("a flowchart with no box left is not
+  // drawn at all"), in every layout: so its whole part goes, the editor's frame round it with its heading and margins.
+  { name: "the empty flowchart", selector: '[data-section-id="flow"]:has(.xe-flow-first[data-flow-add])', always: false },
   { name: "an empty finding", selector: '[data-path*=".items."][data-empty]', always: false },
 ];
 

@@ -803,7 +803,7 @@ test.describe("an empty flowchart", () => {
       await openDoc(page, freshName("flowemptyparity"), { ...sampleDoc(f), flow: [] });
       await waitLive(page);
       const taken = await allowEditOnly(page, "all");
-      expect(taken.some((t) => t.startsWith("the empty flowchart's")), taken.join("; ")).toBe(true);
+      expect(taken.some((t) => t.startsWith("the empty flowchart (")), taken.join("; ")).toBe(true);
       await settle(page);
       const editing = await boxes(page);
       await seeAsVisitor(page, true);
