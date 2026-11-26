@@ -4,6 +4,7 @@ import { exhbtSummary, findingsOf, plain, text, wordCount, words, LIMITS, valida
 import { fullDoc, openBankingDoc, sampleDocs } from "../lib/exhbt/sample";
 import { withKeyFigure } from "../lib/exhbt/sections";
 import { applyBlock, blockValue } from "../lib/exhbt/draft-blocks";
+import { DRAFT_WITH_AI } from "./add-exhbt";
 import { addSection, closeSheet, fillPlain, listOrder, menuItem, openAddSectionMenu, pageOrder, publish, seeAsVisitor, visitorRegion, waitEditor } from "./editor";
 import { READY } from "./page-editor";
 import { uniqueBytes } from "./unique-bytes";
@@ -409,7 +410,7 @@ test.describe("The page in the editor", () => {
 
   test("the AI draft (stand-in) writes the question, what it is, where and when, a summary and a highlighted gap", async ({ page }) => {
     const email = `${unique("draft")}@example.com`;
-    await page.goto(`/auth/dev?email=${encodeURIComponent(email)}&next=/exhbts/new`);
+    await page.goto(`/auth/dev?email=${encodeURIComponent(email)}&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
     const res = await page.request.post("/api/exhbts/draft", { data: { text: "We timed lunchtime queues at the union cafe for two weeks, then tried a second till at the busiest hour. The queue fell, and staff said the rush felt calmer." } });
     expect(res.status()).toBe(200);
     const { id } = (await res.json()) as { id: string };

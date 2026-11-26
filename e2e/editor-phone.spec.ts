@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+import { DRAFT_WITH_AI } from "./add-exhbt";
 import { expect, test, type Locator, type Page } from "./editor-test";
 import { plain, text, type ExhbtDoc, type RichText, type Section } from "../lib/exhbt/blocks";
 import { FORMAT_RULES } from "../lib/exhbt/formats";
@@ -853,7 +854,7 @@ test("axe: on the page with the bar on a section, with the bar formatting, and w
 });
 
 test("a drafted part: the bar offers its More actions, and the menu opens above the bar within the screen", async ({ page }) => {
-  await page.goto(`/auth/dev?email=${freshName("phonedraft")}@example.com&next=/exhbts/new`);
+  await page.goto(`/auth/dev?email=${freshName("phonedraft")}@example.com&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
   await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
   const res = await page.request.post("/api/exhbts/draft", {
     data: { text: "Final-year project on lunch queues. I timed the queue for two weeks, added a second till, and timed it again. Waits fell from 11 to 4 minutes." },
@@ -902,7 +903,7 @@ test("a drafted part: the bar offers its More actions, and the menu opens above 
 // Escape closes a rewrite form on the bar too, with the focus on nothing as with it in the form, and gives the focus back to More
 // actions. The bar lays out More actions' parts in its own row (display: contents), so their wrapper has no box of its own.
 test("a drafted part's rewrite form on the bar closes with Escape, and the focus goes back to More actions", async ({ page }) => {
-  await page.goto(`/auth/dev?email=${freshName("phoneescape")}@example.com&next=/exhbts/new`);
+  await page.goto(`/auth/dev?email=${freshName("phoneescape")}@example.com&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
   await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
   const res = await page.request.post("/api/exhbts/draft", { data: { text: "Final-year project on lunch queues. I timed the queue for two weeks, added a second till, and timed it again. Waits fell from 11 to 4 minutes." } });
   expect(res.status()).toBe(200);
@@ -1010,7 +1011,7 @@ test.describe("figures, pictures and links at 390px", () => {
     await page.route("**/api/exhbts/figure-pick", (r) => r.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "We couldn't pick a figure just now." }) }));
     const username = freshName("phonetake");
     await page.goto(`/dev/portfolio?username=${username}&plan=premium&count=0`);
-    await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts/new`);
+    await page.goto(`/auth/dev?email=${username}@example.com&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
     await expect(page.locator("form[data-ready=true]")).toBeAttached();
     await page.locator("#files").setInputFiles("e2e/fixtures/report-with-chart.pdf");
     await expect(page.getByTestId("file-status")).toContainText("uploaded");

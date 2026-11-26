@@ -2,6 +2,7 @@ import { deflateSync } from "node:zlib";
 import { expect, type ElementHandle, type Locator, type Page } from "@playwright/test";
 import { text, type ExhbtDoc, type Section } from "../lib/exhbt/blocks";
 import { OFFERED_FORMATS, type Format } from "../lib/exhbt/formats";
+import { startBlank } from "./add-exhbt";
 import { BEFORE_AFTER_IMAGES, beforeAfterDoc, BUILD_IMAGES, buildDoc, essayDoc, EVENT_IMAGES, eventDoc, fullDoc, GALLERY_IMAGES, galleryDoc, researchDoc } from "../lib/exhbt/sample";
 
 /*
@@ -28,11 +29,11 @@ export async function waitReady(page: Page) {
   await expect(page.locator(READY)).toBeAttached();
 }
 
-/** Signs in as a development user with no exhbts, presses "Start from scratch" and waits for the editor; returns the new exhbt's id. */
+/** Signs in as a development user with no exhbts, starts an empty case study (e2e/add-exhbt.ts) and waits for the editor; returns the new exhbt's id. */
 export async function openNew(page: Page, username: string, plan: Plan = "premium"): Promise<string> {
   await page.goto(`/dev/portfolio?username=${username}&plan=${plan}&count=0`);
   await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts`);
-  await page.getByRole("button", { name: "Start from scratch" }).click();
+  await startBlank(page);
   await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
   await waitReady(page);
   return page.url().match(/\/exhbts\/([0-9a-f-]{36})\/edit$/)![1]!;
