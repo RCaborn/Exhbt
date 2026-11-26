@@ -17,8 +17,9 @@ import { usePortfolioApi, usePortfolioData, usePortfolioState } from "./runtime"
  * online. It is what the editing page is tested against.
  *
  * When visitors get "not found" today, a line above the page says so and why, in this order: the plan
- * has no public page; there is no address; nothing is live. The line is app chrome (Astryx's Banner);
- * the page under it is the person's own.
+ * has no public page; there is no address; nothing is live (no exhbt yet, only drafts, or every live one
+ * hidden). Each line offers the one step that puts the page online. The line is app chrome (Astryx's
+ * Banner); the page under it is the person's own.
  */
 export function VisitorView(): ReactNode {
   const state = usePortfolioState((s) => s);
@@ -70,21 +71,85 @@ function NotOnline({ data, home }: { data: PortfolioData; home: Home }): ReactNo
       />
     );
   }
-  if (home.projects.length === 0) {
+  if (home.projects.length === 0) return <NothingLive data={data} />;
+  return null;
+}
+
+/** A draft's title, short enough for a button. */
+const short = (title: string) => (title.length > 32 ? `${title.slice(0, 31).trimEnd()}…` : title);
+
+/**
+ * Nothing on the page is live, by why: no exhbt at all, only drafts, or every live one hidden from the
+ * page. Each with the one step that changes it.
+ */
+function NothingLive({ data }: { data: PortfolioData }): ReactNode {
+  const api = usePortfolioApi();
+  const draft = data.visitor.newestDraft;
+  if (data.visitor.published.length > 0) {
     return (
       <Banner
         status="info"
         container="section"
-        data-not-online="nothing-live"
-        title="Not online yet: publish an exhbt"
-        description="Visitors get “not found” until one of your exhbts is live and shown here. This is how your page will look."
+        data-not-online="all-hidden"
+        title="Not online yet: every exhbt is hidden"
+        description="Visitors get “not found” while none of your live exhbts is shown on your portfolio. This is how your page will look."
         endContent={
-          <Button href="/exhbts/new" size="sm">
-            Add an exhbt
+          <Button size="sm" onClick={() => showHidden(api)}>
+            Show one
           </Button>
         }
       />
     );
   }
-  return null;
+  if (draft) {
+    return (
+      <Banner
+        status="info"
+        container="section"
+        data-not-online="drafts-only"
+        title="Not online yet: publish an exhbt"
+        description="Visitors get “not found” until one of your exhbts is live. Finish a draft and publish it. This is how your page will look."
+        endContent={
+          <Button href={`/exhbts/${draft.id}/edit`} size="sm">
+            {draft.title ? `Open ${short(draft.title)}` : "Open your draft"}
+          </Button>
+        }
+      />
+    );
+  }
+  return (
+    <Banner
+      status="info"
+      container="section"
+      data-not-online="no-exhbt"
+      title="Not online yet: add an exhbt"
+      description="Visitors get “not found” until one of your exhbts is live. This is how your page will look."
+      endContent={
+        <Button href="/exhbts/new" size="sm">
+          Add an exhbt
+        </Button>
+      }
+    />
+  );
+}
+
+/**
+ * "Show one": back to the editing page, at the hidden exhbts (the row F draws, `[data-hidden-row]`, each
+ * with its own Show button), with the focus on the first Show. Waits a frame at a time for the editing
+ * page to be drawn; with no hidden row on the page, the work is the place.
+ */
+function showHidden(api: ReturnType<typeof usePortfolioApi>): void {
+  api.seeAsVisitor(false);
+  let tries = 40;
+  const go = () => {
+    const page = document.querySelector<HTMLElement>('[data-editor="portfolio"] [data-canvas="edit"]');
+    const row = page?.querySelector<HTMLElement>("[data-hidden-row]");
+    if (!row && tries-- > 0) return void requestAnimationFrame(go);
+    const place = row ?? page?.querySelector<HTMLElement>('[data-section="work"]');
+    if (!place) return;
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    place.scrollIntoView({ block: "center", behavior: calm ? "auto" : "smooth" });
+    (row?.querySelector<HTMLElement>("[data-show], button") ?? place).focus({ preventScroll: true });
+  };
+  requestAnimationFrame(go);
 }

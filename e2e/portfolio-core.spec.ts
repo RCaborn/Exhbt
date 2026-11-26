@@ -686,15 +686,52 @@ test.describe("See as a visitor", () => {
     expect((await uiNow(page)).sheet).toBe("address");
   });
 
-  test("with an address and every exhbt hidden, the line says to publish one", async ({ page }) => {
+  test("with no exhbt at all, the line says to add one, with Add an exhbt", async ({ page }) => {
+    const base = fullFixture("x", null, "premium");
+    const f = fresh({ ...base, exhbts: [] }, "vnone");
+    await openEditor(page, f);
+    await call(page, "seeAsVisitor", true);
+    await expect(notOnline(page)).toHaveAttribute("data-not-online", "no-exhbt");
+    await expect(notOnline(page)).toContainText("Not online yet: add an exhbt");
+    await expect(page.locator("[data-canvas=visitor]").getByRole("link", { name: "Add an exhbt" })).toHaveAttribute("href", "/exhbts/new");
+  });
+
+  test("with drafts only, the line says to publish one and opens the newest draft by its title", async ({ page }) => {
+    const base = fullFixture("x", null, "premium");
+    const f = fresh({ ...base, exhbts: [{ ...base.exhbts[0]!, draft: true }] }, "vdrafts");
+    const seeded = await openEditor(page, f);
+    await call(page, "seeAsVisitor", true);
+    await expect(notOnline(page)).toHaveAttribute("data-not-online", "drafts-only");
+    await expect(notOnline(page)).toContainText("Not online yet: publish an exhbt");
+    // "Would a second till cut the lunch queue?", shortened for a button.
+    const open = page.locator("[data-canvas=visitor]").getByRole("link", { name: /^Open Would a second till/ });
+    await expect(open).toHaveAttribute("href", `/exhbts/${seeded.ids.queue}/edit`);
+    expect((await open.textContent())!.length).toBeLessThanOrEqual("Open ".length + 32);
+
+    // A draft with no title yet.
+    const untitled = fresh({ ...base, exhbts: [{ ...base.exhbts[0]!, draft: true, doc: { ...(base.exhbts[0]!.doc as object), title: "" } }] }, "vuntitled");
+    const s2 = await openEditor(page, untitled);
+    await call(page, "seeAsVisitor", true);
+    await expect(page.locator("[data-canvas=visitor]").getByRole("link", { name: "Open your draft" })).toHaveAttribute("href", `/exhbts/${s2.ids.queue}/edit`);
+  });
+
+  test("with every live exhbt hidden, the line says so, and Show one goes back to the page at the hidden exhbts", async ({ page }) => {
     const base = fullFixture("x", null, "premium");
     const f = fresh({ ...base, exhbts: base.exhbts.map((e) => ({ ...e, hidden: true })) }, "vhidden");
     await openEditor(page, f);
     await call(page, "seeAsVisitor", true);
-    await expect(notOnline(page)).toHaveAttribute("data-not-online", "nothing-live");
-    await expect(notOnline(page)).toContainText("Not online yet: publish an exhbt");
-    await expect(page.locator("[data-canvas=visitor]").getByRole("link", { name: "Add an exhbt" })).toHaveAttribute("href", "/exhbts/new");
+    await expect(notOnline(page)).toHaveAttribute("data-not-online", "all-hidden");
+    await expect(notOnline(page)).toContainText("Not online yet: every exhbt is hidden");
     await expect(page.locator(`[data-canvas=visitor] ${HOME} [data-card]`)).toHaveCount(0);
+    await page.locator("[data-canvas=visitor]").getByRole("button", { name: "Show one" }).click();
+    await expect(page.locator("[data-canvas=visitor]")).toHaveCount(0);
+    expect((await uiNow(page)).visitor).toBe(false);
+    // The hidden exhbts' row (F's, [data-hidden-row]) has the focus once it is on the page; without it, the work is in view.
+    const row = page.locator(`${READY} [data-hidden-row]`);
+    if ((await row.count()) > 0) {
+      await expect.poll(() => page.evaluate(() => Boolean(document.activeElement?.closest("[data-hidden-row]")))).toBe(true);
+      await expect(row).toBeInViewport();
+    } else await expect(page.locator(`${READY} [data-section="work"]`)).toBeInViewport();
   });
 
   test("a draft, a hidden exhbt and a look being previewed are not in it, and switching back keeps what was typed", async ({ page }) => {
