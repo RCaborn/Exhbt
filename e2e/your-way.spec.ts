@@ -303,6 +303,31 @@ test.describe("Bold and italic at the words selected", () => {
   });
 });
 
+test.describe("Link on the bar, with Safari's focus", () => {
+  // In Safari tiptap's focus() gives the words the focus at once, where other browsers wait a frame. The Enter that
+  // confirmed the address then went on to the words as a new paragraph over the words selected, and the finding was
+  // stored with none (WebKit, 26 Nov). A Safari user agent takes tiptap down that path in any browser.
+  test.use({ userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15" });
+
+  test("the Enter that adds the link keeps the finding's words, and the next finding is untouched", async ({ page }) => {
+    const { id } = await openDoc(page, freshName("ywsafari"), doc([findings()]));
+    await waitLive(page);
+    const f = field(page, "sections.0.items.0");
+    await f.click();
+    await page.keyboard.press("End");
+    await page.keyboard.press("Shift+Home");
+    await f.locator(".xe-selbar").getByRole("button", { name: "Link", exact: true }).click();
+    const address = f.getByLabel("Link address (starting https://)");
+    await expect(address).toBeFocused();
+    await address.fill("https://example.com/queues");
+    await address.press("Enter");
+    const stored = async () => ((await readStored(page, id)).working.sections[0] as Extract<ContentSection, { kind: "findings" }>).items;
+    await expect.poll(async () => (await stored())[0]?.some((r) => r.href) ?? false).toBe(true);
+    expect(await stored()).toEqual([[{ t: "Waits fell from 11 minutes to 4.", href: "https://example.com/queues" }], text("Sales at lunch rose by 9%.")]);
+    expect((await section(page, "findings")).items).toHaveLength(2);
+  });
+});
+
 test.describe("The fields that take no links", () => {
   test("a link sent in a quote, a pull quote or a link's line is not stored: the server keeps the words and their bold", async ({ page }) => {
     // The editor offers no Link in these three (decision 0032); a request built by hand could still send one, so the
