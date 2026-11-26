@@ -11,6 +11,7 @@ import type { BuilderState } from "@/app/(app)/portfolio/steps";
 import { useBuilder } from "@/app/(app)/portfolio/useBuilder";
 import { useAtom } from "@/components/exhbt-editor/atom";
 import { ToastViewport } from "@astryxdesign/core/Toast";
+import { GrowContext } from "@/components/exhbt-editor/fields/InlineText";
 import { useNoZoomOnFocus } from "@/components/exhbt-editor/phone/noZoom";
 import { Said } from "@/components/exhbt-editor/ui/Said";
 import { Address } from "./Address";
@@ -20,7 +21,17 @@ import { Canvas } from "./Canvas";
 import { keepUnsaved } from "./keep";
 import { Notices } from "./Notices";
 import { hasPending, noteSaved, noteSending, registerSender } from "./pending";
-import { DataContext, RuntimeContext, usePortfolioState, usePortfolioUi, useRuntime, type PortfolioEditorApi, type PortfolioUi, type Runtime, type SaveView } from "./runtime";
+import {
+  DataContext,
+  RuntimeContext,
+  usePortfolioState,
+  usePortfolioUi,
+  useRuntime,
+  type PortfolioEditorApi,
+  type PortfolioUi,
+  type Runtime,
+  type SaveView,
+} from "./runtime";
 import { createRuntime, type Host } from "./runtime-core";
 import { STALE_EDITOR } from "./ui/SaveStatus";
 import { VisitorView } from "./VisitorView";
@@ -37,7 +48,8 @@ import { VisitorView } from "./VisitorView";
  *
  * Development only: `?crash=render` throws whenever it draws, `?crash=change` on the render after the
  * first change (e2e/portfolio-core.spec.ts); `?save=stale` makes every save fail as a stale tab's does,
- * `?save=fail` as a refused one does.
+ * `?save=fail` as a refused one does; `?grow=mirror` makes the fields grow by their hidden mirror, as
+ * they do in a browser with no `field-sizing`.
  */
 
 declare global {
@@ -63,11 +75,18 @@ export type PortfolioEditorProps = {
   jobLinks: ReactNode;
 };
 
-const devParam = (key: string) => (process.env.NODE_ENV !== "production" && typeof window !== "undefined" ? new URLSearchParams(window.location.search).get(key) : null);
+const devParam = (key: string) =>
+  process.env.NODE_ENV !== "production" && typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get(key)
+    : null;
 
 /** Next's words for an action it does not have: its error's, and the body it sends when a proxy drops its header (as components/exhbt-editor/Autosave.tsx reads them). */
-const NO_SUCH_ACTION = /Server Action ".*" was not found on the server|Failed to find Server Action|^Server action not found/i;
-const isStale = (e: unknown) => unstable_isUnrecognizedActionError(e) || (e instanceof Error && (e.name === "UnrecognizedActionError" || NO_SUCH_ACTION.test(e.message)));
+const NO_SUCH_ACTION =
+  /Server Action ".*" was not found on the server|Failed to find Server Action|^Server action not found/i;
+const isStale = (e: unknown) =>
+  unstable_isUnrecognizedActionError(e) ||
+  (e instanceof Error &&
+    (e.name === "UnrecognizedActionError" || NO_SUCH_ACTION.test(e.message)));
 
 type SaveResult = { ok: true } | { ok: false; error: string };
 
@@ -95,8 +114,18 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
       return { ok: false, error: STALE_EDITOR };
     }
     try {
-      if (devParam("save") === "stale") throw Object.assign(new Error('Server Action "dev" was not found on the server. (?save=stale, development only)'), { name: "UnrecognizedActionError" });
-      if (devParam("save") === "fail") return { ok: false, error: "The save was told to fail (?save=fail, development only)." };
+      if (devParam("save") === "stale")
+        throw Object.assign(
+          new Error(
+            'Server Action "dev" was not found on the server. (?save=stale, development only)',
+          ),
+          { name: "UnrecognizedActionError" },
+        );
+      if (devParam("save") === "fail")
+        return {
+          ok: false,
+          error: "The save was told to fail (?save=fail, development only).",
+        };
       const r = await savePortfolioAction(state);
       if (!r.ok) return { ok: false, error: r.error };
       // The server has it, as of its own clock: noted for the crash fallback and for the gate (pending.ts).
@@ -105,7 +134,10 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
     } catch (e) {
       // Anything else is thrown on to useBuilder, which says the server could not be reached.
       if (!isStale(e)) throw e;
-      console.error("The server has no such action: this page is older than the site.", e);
+      console.error(
+        "The server has no such action: this page is older than the site.",
+        e,
+      );
       rt.save.set((v) => ({ ...v, stale: true }));
       keepUnsaved(owner, state);
       return { ok: false, error: STALE_EDITOR };
@@ -118,11 +150,26 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
     return run;
   };
 
-  return { rt, host, loaded, owner, save: tracked, send: async (state) => (await tracked(state).catch(() => ({ ok: false as const }))).ok };
+  return {
+    rt,
+    host,
+    loaded,
+    owner,
+    save: tracked,
+    send: async (state) =>
+      (await tracked(state).catch(() => ({ ok: false as const }))).ok,
+  };
 }
 
-export function PortfolioEditor({ data, team, jobLinks }: PortfolioEditorProps): ReactNode {
-  if (devParam("crash") === "render") throw new Error("The portfolio editor was told to fail (?crash=render, development only).");
+export function PortfolioEditor({
+  data,
+  team,
+  jobLinks,
+}: PortfolioEditorProps): ReactNode {
+  if (devParam("crash") === "render")
+    throw new Error(
+      "The portfolio editor was told to fail (?crash=render, development only).",
+    );
   // The visit starts from the page as it was loaded. A later refresh brings new data (a photo, an address,
   // a publish in another tab) and never resets what the person has typed.
   const [visit] = useState(() => startVisit(data.builder.initial, data.owner));
@@ -145,7 +192,15 @@ export function PortfolioEditor({ data, team, jobLinks }: PortfolioEditorProps):
   useEffect(() => {
     setReady(true);
     // Development only: the browser tests read the editor's state and call its actions (e2e/portfolio-editor.ts).
-    if (process.env.NODE_ENV !== "production") window.__portfolioEditor = { state: rt.state.get, ui: rt.ui.get, save: rt.save.get, undoLabel: () => rt.undo.get().label, waiting: hasPending, api: rt.api };
+    if (process.env.NODE_ENV !== "production")
+      window.__portfolioEditor = {
+        state: rt.state.get,
+        ui: rt.ui.get,
+        save: rt.save.get,
+        undoLabel: () => rt.undo.get().label,
+        waiting: hasPending,
+        api: rt.api,
+      };
     // The crash fallback sends the newest state through the same action. Registered once, with what the
     // server had when the editor opened: a refresh must not make it forget a change that is still waiting.
     return registerSender({ send: visit.send }, visit.owner, visit.loaded);
@@ -174,20 +229,31 @@ export function PortfolioEditor({ data, team, jobLinks }: PortfolioEditorProps):
  * Everything the editor draws. Memoised: its props are the same from one key to the next, so the root's
  * own render (useBuilder's) stops here.
  */
-const Shell = memo(function Shell({ ready, team, jobLinks }: { ready: boolean; team: ReactNode; jobLinks: ReactNode }): ReactNode {
+const Shell = memo(function Shell({
+  ready,
+  team,
+  jobLinks,
+}: {
+  ready: boolean;
+  team: ReactNode;
+  jobLinks: ReactNode;
+}): ReactNode {
+  const grow = devParam("grow") === "mirror" ? "mirror" : null;
   return (
     // Astryx's toasts (the note after ?at=) are drawn in this viewport, inside the app's theme.
     <ToastViewport position="bottomEnd">
-      <div data-editor="portfolio" data-ready={ready ? "true" : undefined}>
-        <EditorBar team={team} jobLinks={jobLinks} />
-        <Notices />
-        <FirstRun />
-        <Body />
-        <UndoKeys />
-        <LiveRegion />
-        {ready && <Address />}
-        {devParam("crash") === "change" && <CrashOnChange />}
-      </div>
+      <GrowContext value={grow}>
+        <div data-editor="portfolio" data-ready={ready ? "true" : undefined}>
+          <EditorBar team={team} jobLinks={jobLinks} />
+          <Notices />
+          <FirstRun />
+          <Body />
+          <UndoKeys />
+          <LiveRegion />
+          {ready && <Address />}
+          {devParam("crash") === "change" && <CrashOnChange />}
+        </div>
+      </GrowContext>
     </ToastViewport>
   );
 });
@@ -199,7 +265,12 @@ function Body(): ReactNode {
 }
 
 /** Inside a text field Ctrl or Cmd and Z is the field's own undo; nothing of the editor's takes it there. */
-const inField = (el: Element | null) => Boolean(el?.closest('textarea, input, select, [contenteditable]:not([contenteditable="false"])'));
+const inField = (el: Element | null) =>
+  Boolean(
+    el?.closest(
+      'textarea, input, select, [contenteditable]:not([contenteditable="false"])',
+    ),
+  );
 
 /**
  * Ctrl or Cmd and Z outside a text field: the editor's Undo, as the bar's button does it (decision 0031,
@@ -209,7 +280,13 @@ function UndoKeys(): ReactNode {
   const rt = useRuntime();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "z") return;
+      if (
+        !(e.ctrlKey || e.metaKey) ||
+        e.shiftKey ||
+        e.altKey ||
+        e.key.toLowerCase() !== "z"
+      )
+        return;
       if (inField(document.activeElement) || !rt.undo.get().label) return;
       e.preventDefault();
       rt.undoLast();
@@ -230,6 +307,9 @@ function LiveRegion(): ReactNode {
 function CrashOnChange(): ReactNode {
   const state = usePortfolioState((s) => s);
   const [first] = useState(state);
-  if (state !== first) throw new Error("The portfolio editor was told to fail after a change (?crash=change, development only).");
+  if (state !== first)
+    throw new Error(
+      "The portfolio editor was told to fail after a change (?crash=change, development only).",
+    );
   return null;
 }

@@ -55,6 +55,17 @@ export async function waitReady(page: Page) {
 }
 
 /**
+ * E2E_GROW=mirror opens the editor with `?grow=mirror` (development only): its fields grow by their hidden
+ * mirror, as in a browser with no `field-sizing`. A reload keeps it; a test that goes to /portfolio again
+ * by its own address does not.
+ */
+function withGrow(query: string): string {
+  if (process.env.E2E_GROW !== "mirror") return query;
+  const [search, hash = ""] = query.split("#");
+  return `${search ? `${search}&` : "?"}grow=mirror${hash ? `#${hash}` : ""}`;
+}
+
+/**
  * Seeds `fixture`, switches this browser to the editor, signs in as its person and opens `/portfolio`
  * (with `query`, e.g. "?open=look" or "#job-links"). Waits for the editor unless `wait` is false (a
  * test of what comes before it, or of a crash).
@@ -62,7 +73,7 @@ export async function waitReady(page: Page) {
 export async function openEditor(page: Page, fixture: PortfolioFixture, opts: { query?: string; wait?: boolean } = {}): Promise<Seeded> {
   const seeded = await seed(page, fixture);
   await setKind(page, "page");
-  await signIn(page, fixture.username, `/portfolio${opts.query ?? ""}`);
+  await signIn(page, fixture.username, `/portfolio${withGrow(opts.query ?? "")}`);
   if (opts.wait !== false) await waitReady(page);
   return seeded;
 }
