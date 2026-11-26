@@ -32,6 +32,10 @@ export function MobileNav({
   breakpoint?: "sm" | "lg";
 }) {
   const [open, setOpen] = useState(false);
+  // Set once the page has hydrated: until then the Menu button does nothing (it never opened without scripts),
+  // and tests wait for this before they press it, as they wait for a form's data-ready.
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   const id = useId();
   const drawer = useRef<HTMLDialogElement>(null);
   const pathname = usePathname();
@@ -48,7 +52,7 @@ export function MobileNav({
   }, [open]);
 
   return (
-    <div className={breakpoint === "lg" ? "lg:hidden" : "sm:hidden"}>
+    <div className={breakpoint === "lg" ? "lg:hidden" : "sm:hidden"} data-menu data-ready={ready || undefined}>
       <Button aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)} label="Menu">
         <Menu aria-hidden size={16} strokeWidth={2.25} />
         Menu

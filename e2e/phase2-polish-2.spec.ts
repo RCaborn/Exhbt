@@ -33,6 +33,8 @@ test.describe("Phone header", () => {
     expect(await noSideScroll(page)).toBe(true);
 
     const header = page.getByRole("banner");
+    // The Menu button works once the page has hydrated (it has never opened without scripts); wait for that.
+    await expect(header.locator("[data-menu][data-ready=true]")).toBeAttached();
     const menu = header.getByRole("button", { name: "Menu" });
     await expect(menu).toBeVisible();
     await expect(menu).toHaveAttribute("aria-expanded", "false");
@@ -66,6 +68,8 @@ test.describe("Phone header", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Your exhbts" })).toBeVisible();
     expect(await noSideScroll(page)).toBe(true);
     const header = page.getByRole("banner");
+    // The Menu button works once the page has hydrated (it has never opened without scripts); wait for that.
+    await expect(header.locator("[data-menu][data-ready=true]")).toBeAttached();
     const menu = header.getByRole("button", { name: "Menu" });
     await menu.click();
     const nav = header.getByRole("navigation", { name: "Main menu" });
@@ -81,6 +85,8 @@ test.describe("Phone header", () => {
     await page.goto("/pricing");
     expect(await noSideScroll(page)).toBe(true);
     const header = page.getByRole("banner");
+    // The Menu button works once the page has hydrated (it has never opened without scripts); wait for that.
+    await expect(header.locator("[data-menu][data-ready=true]")).toBeAttached();
     await header.getByRole("button", { name: "Menu" }).click();
     await expect(header.getByRole("navigation", { name: "Main menu" }).getByRole("link", { name: "What is an exhbt?" })).toBeVisible();
     await expect(header.getByRole("link", { name: "Log in" })).toBeVisible();
