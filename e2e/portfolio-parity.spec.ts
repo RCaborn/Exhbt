@@ -62,6 +62,17 @@ type Target = {
   open: (page: Page, baseURL: string) => Promise<void>;
 };
 
+/**
+ * Opens a page. The dev server now and then answers 500 while it compiles (Next reads a manifest it is
+ * half way through writing: "Unexpected end of JSON input"), so a 500 is tried again, twice at most.
+ */
+async function go(page: Page, url: string) {
+  for (let tries = 1; ; tries++) {
+    const res = await page.goto(url);
+    if ((res?.status() ?? 200) < 500 || tries === 3) return;
+  }
+}
+
 /** The test server's address on a name.localhost host (Chromium resolves *.localhost to loopback). */
 const on = (baseURL: string, name: string) => baseURL.replace("//localhost", `//${name}.localhost`);
 
@@ -70,19 +81,19 @@ const targets: Target[] = [
     const u = fixture.username;
     const open =
       view === "public" || view === "owner"
-        ? (page: Page) => page.goto(`/p/${u}`).then(() => undefined)
-        : (page: Page, baseURL: string) => page.goto(`${on(baseURL, u)}/${"job" in view ? view.job : view.exhbt}`).then(() => undefined);
+        ? (page: Page) => go(page, `/p/${u}`)
+        : (page: Page, baseURL: string) => go(page, `${on(baseURL, u)}/${"job" in view ? view.job : view.exhbt}`);
     return { name, root: root ?? HOME, seed: fixture, signIn: view === "owner" ? u : undefined, open };
   }),
-  { name: "demo", root: HOME, open: (page) => page.goto("/demo").then(() => undefined) },
-  { name: "what-is-an-exhbt", root: HOME, open: (page) => page.goto("/what-is-an-exhbt").then(() => undefined) },
+  { name: "demo", root: HOME, open: (page) => go(page, "/demo") },
+  { name: "what-is-an-exhbt", root: HOME, open: (page) => go(page, "/what-is-an-exhbt") },
   // The home page's look pictures: one page restyled by a radio group of looks above it.
   ...BASE_LOOKS.map(
     (look): Target => ({
       name: `home-look-${look}`,
       root: HOME,
       open: async (page) => {
-        await page.goto("/");
+        await go(page, "/");
         const radio = page.locator(`input[name=home-look][value="${look}"]`);
         // Pressed until the page takes it: a press before hydration does nothing.
         await expect(async () => {
@@ -101,7 +112,7 @@ const targets: Target[] = [
     seed: BUILDER_LOOK_CARDS,
     signIn: BUILDER_LOOK_CARDS.username,
     open: async (page) => {
-      await page.goto("/portfolio?step=look");
+      await go(page, "/portfolio?step=look");
       await expect(page.locator("[data-ready=true] [data-testid=preview]")).toBeAttached();
       // Each picture draws only once it has measured its card.
       await expect(page.locator(`[data-look-card] ${HOME}`)).toHaveCount(BASE_LOOKS.length);
@@ -210,14 +221,14 @@ test.describe("The portfolio parity gate", () => {
   for (const t of targets) {
     test(t.name, async ({ page, request, baseURL }) => {
       test.setTimeout(180_000);
-      // The dev server now and then answers 500 while it compiles (a manifest read half written): the seed is tried again.
+      // A 500 while the dev server compiles is tried again, as in go().
       for (let tries = 1; t.seed; tries++) {
         const res = await request.post("/dev/portfolio-parity", { data: t.seed });
         if (res.status() >= 500 && tries < 3) continue;
         expect(res.status(), await res.text()).toBe(200);
         break;
       }
-      if (t.signIn) await page.goto(`/auth/dev?email=${encodeURIComponent(`${t.signIn}@example.com`)}&next=${encodeURIComponent(`/p/${t.signIn}`)}`);
+      if (t.signIn) await go(page, `/auth/dev?email=${encodeURIComponent(`${t.signIn}@example.com`)}&next=${encodeURIComponent(`/p/${t.signIn}`)}`);
       const got = await capture(page, t, baseURL!);
       const htmlFile = path.join(GOLDEN, `${t.name}.html`);
       const boxesFile = path.join(GOLDEN, `${t.name}.boxes.json`);
