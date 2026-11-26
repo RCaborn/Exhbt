@@ -183,6 +183,39 @@ test.describe("The chooser", () => {
   });
 });
 
+test.describe("The chooser's headings on a touch screen", () => {
+  test("are the site's heading sizes and leadings, as with a mouse at the same width: an iPad in portrait and a phone", async ({ page, browser }) => {
+    // From the review of 26 Nov: the base theme's touch rule set Astryx's headings back to its own type scale under
+    // 1024px (on an iPad in portrait the h1 was 26px, not 48), and kept loose leadings on a phone.
+    await signInAs(page, freshName("addtouch"), "premium");
+    const storageState = await page.context().storageState();
+    const headings = async (touch: boolean, width: number, height: number) => {
+      const ctx = await browser.newContext({ storageState, viewport: { width, height }, hasTouch: touch, isMobile: touch, deviceScaleFactor: touch ? 2 : 1 });
+      const p = await ctx.newPage();
+      await p.goto(ADD_EXHBT);
+      await expect(p.getByRole("heading", ADD.chooserHeading)).toBeVisible();
+      const got = await p.evaluate(() => ({
+        coarse: matchMedia("(pointer: coarse)").matches,
+        sizes: ["h1", "h2"].map((t) => {
+          const s = getComputedStyle(document.querySelector(`main ${t}`)!);
+          return `${t} ${s.fontSize} / ${s.lineHeight}`;
+        }),
+      }));
+      await ctx.close();
+      return got;
+    };
+    for (const [width, height] of [[810, 1080], [390, 844]] as const) {
+      const mouse = await headings(false, width, height);
+      const finger = await headings(true, width, height);
+      expect(finger.coarse, `${width}px: the touch screen is one`).toBe(true);
+      expect(finger.sizes, `${width}px`).toEqual(mouse.sizes);
+    }
+    // And they are the site's: 48px for the h1 on an iPad, 36px on a phone.
+    expect((await headings(true, 810, 1080)).sizes[0]).toMatch(/^h1 48px/);
+    expect((await headings(true, 390, 844)).sizes[0]).toMatch(/^h1 36px/);
+  });
+});
+
 test.describe("Write it myself", () => {
   test("each layout on offer makes an empty exhbt in that layout and opens the new editor", async ({ page }) => {
     test.setTimeout(300_000); // seven exhbts, each opened in the editor

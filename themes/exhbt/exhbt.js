@@ -501,6 +501,24 @@ export const exhbtTheme = {
       },
       {
         "when": {
+          "pointer": "coarse",
+          "width": {
+            "below": "lg"
+          }
+        },
+        "value": {
+          "tokens": {
+            "--text-heading-1-size": "3rem",
+            "--text-heading-1-leading": "1.05",
+            "--text-heading-2-size": "2rem",
+            "--text-heading-2-leading": "1.1",
+            "--text-heading-3-size": "1.375rem",
+            "--text-heading-3-leading": "1.15"
+          }
+        }
+      },
+      {
+        "when": {
           "width": {
             "below": "sm"
           }
