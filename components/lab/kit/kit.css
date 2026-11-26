@@ -9,14 +9,79 @@
     max-width: 82rem;
     padding: 3rem 1rem 8rem;
   }
+  /*
+   * Every grid here is one column until a rule below says otherwise, and that column is the
+   * container's width, never its widest child's (a 400px toast, a row of tabs).
+   */
+  .kit-top,
+  .kit-top-words,
+  .kit-level,
+  .kit-section-head,
+  .kit-compare,
+  .kit-stack,
+  .kit-specimens,
+  .kit-specimen,
+  .kit-stage,
+  .kit-tempo,
+  .kit-moment,
+  .kit-skeleton {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* The top: the loud line beside the work in its frame, then what the level is changing. */
   .kit-top {
     display: grid;
-    gap: 2rem 4rem;
+    gap: 2.5rem 4rem;
     padding-bottom: 4rem;
+  }
+  .kit-top-words {
+    display: grid;
+    gap: 1.5rem;
+    align-content: center;
+    max-width: 40rem;
+  }
+  .kit-level {
+    display: grid;
+    gap: 1rem;
+    border-top: 2px solid var(--color-ink);
+    padding-top: 1rem;
+  }
+  .kit-level-now {
+    max-width: 46rem;
+    color: var(--color-graphite);
+  }
+  .kit-level-now > b {
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+  .kit-level-facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem 2rem;
+  }
+  .kit-level-facts dt {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--color-graphite);
+  }
+  .kit-level-facts dd {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
   .kit-body {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 3rem;
+  }
+  /* A grid item is as wide as its widest unbreakable child unless told otherwise; none of these should be. */
+  .kit-top > *,
+  .kit-body > *,
+  .kit-section-head > *,
+  .kit-compare > *,
+  .kit-stack > *,
+  .kit-specimens > *,
+  .kit-stage > *,
+  .kit-moment > * {
+    min-width: 0;
   }
   .kit-rail {
     display: none;
@@ -28,12 +93,19 @@
   }
   @media (width >= 1024px) {
     .kit-top {
-      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-      align-items: end;
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
       padding-bottom: 6rem;
     }
+    .kit-level {
+      grid-column: 1 / -1;
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      gap: 1rem 4rem;
+    }
+    .kit-level-facts {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
     .kit-body {
-      grid-template-columns: 10.5rem minmax(0, 1fr);
+      grid-template-columns: 12rem minmax(0, 1fr);
       gap: 3.5rem;
     }
     .kit-rail {
@@ -188,42 +260,6 @@
     color: var(--color-graphite);
   }
 
-  /* A facts table: what a token is and what it is set to. */
-  .kit-facts {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.9375rem;
-    font-variant-numeric: tabular-nums;
-  }
-  .kit-facts caption {
-    padding-bottom: 0.75rem;
-    text-align: left;
-    font-weight: 600;
-  }
-  .kit-facts th,
-  .kit-facts td {
-    border-top: 1px solid var(--color-line);
-    padding: 0.625rem 1rem 0.625rem 0;
-    text-align: left;
-    vertical-align: top;
-  }
-  .kit-facts th {
-    font-weight: 600;
-    white-space: nowrap;
-  }
-  .kit-facts td {
-    color: var(--color-graphite);
-  }
-  .kit-facts tr:last-child > * {
-    border-bottom: 1px solid var(--color-line);
-  }
-  .kit-facts code {
-    font: inherit;
-    font-size: 0.8125rem;
-    color: var(--color-slate);
-    overflow-wrap: anywhere;
-  }
-
   /* Colour: the four that are fixed, large, and the greys under them. */
   .kit-swatches {
     display: grid;
@@ -253,7 +289,8 @@
     line-height: 1.1;
   }
   .kit-swatch span {
-    opacity: 0.8;
+    /* Full strength: white at reduced opacity on jade falls under 4.5:1. */
+    opacity: 1;
     font-variant-numeric: tabular-nums;
   }
   .kit-greys {
@@ -302,6 +339,13 @@
   }
   .kit-ground[data-ground="line"] {
     border: 1px solid var(--color-line);
+  }
+  /* An ink band, drawn as a panel. The same box for today's and the proposed one. */
+  .kit-ink {
+    border-radius: 20px;
+    background: var(--color-ink);
+    color: #fff;
+    padding: clamp(1.5rem, 5vw, 3.5rem);
   }
   /* Behind the work: plain mist, with room for the frame's shadow. */
   .kit-ground[data-ground="work"] {
@@ -387,22 +431,25 @@
     display: inline-flex;
     align-items: center;
     min-height: 2.75rem;
-    border: 1.5px solid var(--color-ink);
     border-radius: 999px;
-    background: #fff;
     padding-inline: 1.25rem;
     font-size: 0.9375rem;
     font-weight: 600;
     color: var(--color-ink);
+  }
+  /* A plain link or field: jade, with the white and ink halo. */
+  .kit-ring-today[data-ring="site"] {
+    border: 1.5px solid var(--color-ink);
+    background: #fff;
+    outline: 3px solid var(--color-jade);
+    outline-offset: 2px;
     box-shadow:
       0 0 0 5px var(--color-surface),
       0 0 0 7px var(--color-ink);
   }
-  .kit-ring-today[data-ring="site"] {
-    outline: 3px solid var(--color-jade);
-    outline-offset: 2px;
-  }
+  /* An Astryx button: Astryx's own ring in the accent, which is mint, and no halo. */
   .kit-ring-today[data-ring="astryx"] {
+    background: var(--color-mint);
     outline: 2px solid var(--color-mint);
     outline-offset: 3px;
   }
@@ -464,7 +511,20 @@
   .kit-curves {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
     gap: 1.5rem;
+  }
+  /* Said only when nothing travels: the lab's Motion off switch, or a device that asks for less. */
+  .kit-still-note {
+    display: none;
+  }
+  [data-motion="off"] .kit-still-note {
+    display: inline;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .kit-still-note {
+      display: inline;
+    }
   }
   @media (width >= 768px) {
     .kit-curves {
@@ -584,8 +644,21 @@
     border-radius: var(--radius-container);
     background: #fff;
   }
+  /* The same gutter the themed top bar pads itself with, so the logo and the first line share an edge. */
   .kit-window-body {
-    padding: 2rem 1.5rem 2.5rem;
+    padding: 2rem var(--exhbt-gutter) 2.5rem;
+  }
+  /* A sample that only works with room, and the note that stands in for it on a phone. */
+  .kit-wide-only {
+    display: none;
+  }
+  @media (width >= 640px) {
+    .kit-wide-only {
+      display: block;
+    }
+    .kit-narrow-only {
+      display: none;
+    }
   }
 
   /* Skeleton laid out as an exhbt taking shape. */

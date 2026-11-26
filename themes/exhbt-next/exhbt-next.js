@@ -238,11 +238,15 @@ export const exhbtNextTheme = {
   },
   localTokens: {
     "--astryx-theme-neutral-color-status-fill-accent": "light-dark(#0074e2, #6d9cfe)",
-    "--exhbt-hero-size": "clamp(3rem, 8.4vw, 6rem)"
+    "--exhbt-hero-size": "clamp(3rem, 8.4vw, 6rem)",
+    "--exhbt-content-width": "72rem",
+    "--exhbt-gutter": "clamp(1rem, 4vw, 2rem)"
   },
   __localTokenOwners: {
     "--astryx-theme-neutral-color-status-fill-accent": "neutral",
-    "--exhbt-hero-size": "exhbt"
+    "--exhbt-hero-size": "exhbt",
+    "--exhbt-content-width": "exhbt-next",
+    "--exhbt-gutter": "exhbt-next"
   },
   __localTokenLineage: ["neutral","exhbt","exhbt-next"],
   components: {
@@ -777,7 +781,8 @@ export const exhbtNextTheme = {
     },
     "switch-label": {
       "base": {
-        "paddingBlock": "calc((var(--size-element-md) - 1lh) / 2)"
+        "paddingBlock": "calc((var(--size-element-md) - 1lh) / 2)",
+        "fontWeight": "var(--font-weight-medium)"
       }
     },
     "tab": {
@@ -914,6 +919,12 @@ export const exhbtNextTheme = {
       "status:error": {
         "backgroundColor": "#FBEBEB",
         "color": "#0E0F12"
+      },
+      "container:card": {
+        "borderRadius": "var(--radius-element)"
+      },
+      "container:section": {
+        "borderRadius": "0"
       }
     },
     "token": {
@@ -977,7 +988,8 @@ export const exhbtNextTheme = {
         "backgroundColor": "#FFFFFF",
         "borderBottomWidth": "1px",
         "borderBottomStyle": "solid",
-        "borderBottomColor": "#E5E6E8"
+        "borderBottomColor": "#E5E6E8",
+        "paddingInline": "max(var(--exhbt-gutter), calc((100% - var(--exhbt-content-width)) / 2 + var(--exhbt-gutter)))"
       }
     },
     "top-nav-item": {
@@ -1023,6 +1035,11 @@ export const exhbtNextTheme = {
       "base": {
         "borderColor": "#E5E6E8"
       }
+    },
+    "checkbox-label": {
+      "base": {
+        "fontWeight": "var(--font-weight-normal)"
+      }
     }
   },
   __onDark: {
@@ -1030,12 +1047,38 @@ export const exhbtNextTheme = {
       "color-scheme": "dark",
       "--color-text-primary": "var(--color-on-dark)",
       "--color-icon-primary": "var(--color-on-dark)",
-      "--color-accent": "var(--color-on-dark)",
+      "--color-accent": "#4FE9B4",
       "--focus-outline-color": "#4FE9B4",
       "--color-text-accent": "#4FE9B4",
       "--color-icon-accent": "#4FE9B4",
       "--color-text-secondary": "#C9CBCF",
-      "--color-border": "rgb(255 255 255 / 0.16)"
+      "--color-border": "rgb(255 255 255 / 0.16)",
+      "--color-on-accent": "#0E0F12",
+      "--color-icon-secondary": "#C9CBCF",
+      "--color-overlay-hover": "rgb(255 255 255 / 0.14)",
+      "--color-overlay-pressed": "rgb(255 255 255 / 0.22)"
+    },
+    "components": {
+      "button": {
+        "variant:secondary": {
+          "backgroundColor": "transparent",
+          "color": "#FFFFFF",
+          "borderColor": "#FFFFFF"
+        }
+      },
+      "link": {
+        "base": {
+          "textDecorationColor": "color-mix(in srgb, #4FE9B4 55%, transparent)",
+          ":hover": {
+            "textDecorationColor": "#4FE9B4"
+          }
+        }
+      },
+      "divider": {
+        "base": {
+          "borderColor": "rgb(255 255 255 / 0.16)"
+        }
+      }
     }
   },
   __onLight: {

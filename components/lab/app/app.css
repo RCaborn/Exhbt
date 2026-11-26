@@ -1,0 +1,736 @@
+/*
+ * The App screen (/lab/design/app). Layered, like everything in the lab (components/lab/lab.css):
+ * CSS outside a layer would beat every layer, Tailwind's utilities included.
+ *
+ * A route's stylesheet stays loaded after the browser moves to another page of the site, so every
+ * rule here is scoped: to the screen's own root ([data-app-lab]), to a class only this screen
+ * uses (app-…), or through :has([data-app-lab]) to the document while this screen is on it.
+ *
+ * Sizes, colours, radii, shadows and timings come from the proposed theme's tokens and the site's
+ * own colour tokens; the few lengths written here are this screen's own layout.
+ */
+
+@layer components {
+  /*
+   * The site's own private-preview strip above every page (app/layout.tsx) is left out while this
+   * screen is open, so the first screen goes to her page; the lab bar says what this is. Once
+   * promoted, the notice sits in AppShell's banner slot until launch. It comes back on every other
+   * page: the rule holds only while [data-app-lab] is in the document.
+   */
+  body:has([data-app-lab]) p[role="note"].bg-ink {
+    display: none;
+  }
+
+  /* ── The lab's own controls for this screen: lab chrome, drawn like the lab bar ─────────── */
+  .app-lab {
+    position: relative;
+    z-index: 20;
+    border-bottom: 2px dashed var(--color-ink);
+    background: var(--color-mist);
+    color: var(--color-ink);
+  }
+  .app-lab-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+    margin-inline: auto;
+    max-width: 90rem;
+    padding: 0.25rem 0.75rem 0;
+  }
+  .app-lab-tabs {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .app-lab-wide {
+    display: none;
+  }
+  .app-lab-narrow {
+    display: flex;
+    flex: none;
+  }
+  .app-lab-group {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  .app-lab-group + .app-lab-group {
+    margin-left: 0.5rem;
+    border-left: 1px solid var(--color-line);
+    padding-left: 0.75rem;
+  }
+  .app-lab-group > .astryx-text {
+    margin-right: 0.25rem;
+  }
+  .app-lab-panel {
+    display: grid;
+    gap: 1rem;
+    width: min(20rem, calc(100vw - 3.5rem));
+  }
+  .app-lab-panel-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  .app-lab-panel-group > :first-child {
+    flex-basis: 100%;
+  }
+  /* The screen's note: under the row on a wide window; in the Show panel below that (LabStrip). */
+  .app-lab-note {
+    display: none;
+    margin-inline: auto;
+    max-width: 90rem;
+    padding: 0.25rem 0.75rem 0.625rem;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: var(--color-graphite);
+  }
+  @media (width >= 640px) {
+    .app-lab-row,
+    .app-lab-note {
+      padding-inline: 2rem;
+    }
+  }
+  @media (width >= 80rem) {
+    .app-lab-wide {
+      display: flex;
+      flex: none;
+      align-items: center;
+    }
+    .app-lab-note {
+      display: block;
+    }
+    .app-lab-narrow {
+      display: none;
+    }
+  }
+
+  /* ── The frame ─────────────────────────────────────────────────────────────────────────── */
+  /*
+   * The notice in the banner slot sits on the content line too, as the themed top bar does (the
+   * same padding, from the theme's two tokens). A change the theme should make for every banner
+   * across the top of a page (container="section"); it is here so the lab's theme stays as it is.
+   */
+  [data-app-lab] .astryx-app-shell-header .astryx-banner[data-container="section"] {
+    padding-inline: max(var(--exhbt-gutter), calc((100% - var(--exhbt-content-width)) / 2 + var(--exhbt-gutter)));
+  }
+  /*
+   * What stays on screen as the page scrolls. On a wide window the bar stays and the notice above it
+   * scrolls away: the frame's top (sticky in AppShell) sticks at minus the notice's height, measured
+   * in AppLab.tsx. On a phone none of it stays (decision 0031: the site's header scrolls away there),
+   * so the page has the whole screen. AppShell's drawer is below 48rem, the same edge.
+   */
+  [data-app-lab] .astryx-app-shell-header {
+    top: calc(-1 * var(--app-notice-h, 0px));
+  }
+  @media (width < 48rem) {
+    [data-app-lab] .astryx-app-shell-header {
+      position: relative;
+      top: 0;
+    }
+  }
+  /* The logo is a link home: as tall as a press target. */
+  [data-app-lab] .app-logo {
+    min-height: 44px;
+  }
+  [data-app-lab] .app-page {
+    padding-bottom: 6rem;
+  }
+  @media (width >= 640px) {
+    [data-app-lab] .app-page {
+      padding-bottom: 8rem;
+    }
+  }
+
+  /* The account corner: the avatar, and the first name beside it from a small tablet up. 44px at every width. */
+  [data-app-lab] .app-account {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  [data-app-lab] .app-account[aria-expanded="true"],
+  [data-app-lab] .app-account[data-here] {
+    background: var(--color-overlay-hover);
+  }
+  /* Her initials in ink: chrome is ink and white, and mint is kept for go, live and checked. */
+  [data-app-lab] .app-account :is(.astryx-avatar, .astryx-avatar-fallback) {
+    background: var(--color-ink);
+    color: var(--color-surface);
+  }
+  .app-account-name {
+    display: none;
+  }
+  @media (width >= 640px) {
+    .app-account-name {
+      display: inline;
+    }
+  }
+  .app-menu-who {
+    display: grid;
+    gap: 0.125rem;
+    padding: 0.5rem 0.75rem 0.375rem;
+  }
+
+  /* The app's own footer: a hairline, the mark and four quiet links, on the content line. */
+  .app-foot {
+    border-top: 1px solid var(--color-line);
+    background: var(--color-background-body);
+  }
+  .app-foot-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem 2rem;
+    padding-block: 1.75rem 2.25rem;
+  }
+  .app-foot-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.5rem;
+    font-size: 0.875rem;
+  }
+  .app-foot-links > a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--color-graphite);
+  }
+
+  /*
+   * A line the lab says inside the frame (what a mock-up leaves out), drawn as lab chrome like the
+   * lab bar, so it can't be taken for the product's own words.
+   */
+  .app-lab-aside {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.625rem;
+    max-width: 44rem;
+    border: 1.5px dashed var(--color-ink);
+    border-radius: var(--radius-element);
+    background: var(--color-mist);
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: var(--color-ink);
+  }
+  .app-lab-aside > b {
+    flex: none;
+    border-radius: 999px;
+    background: var(--color-ink);
+    padding: 0.05rem 0.55rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-surface);
+  }
+
+  /* ── A page's top: one loud line, and at most one line under it ─────────────────────────── */
+  .app-head {
+    display: grid;
+    gap: 1rem;
+    padding-top: 2.5rem;
+  }
+  @media (width >= 640px) {
+    .app-head {
+      padding-top: 4rem;
+    }
+  }
+  .app-lead {
+    max-width: 40rem;
+  }
+  .app-eyebrow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+  }
+  .app-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+  }
+  .app-failed {
+    margin-top: 2rem;
+  }
+
+  /* ── First run ─────────────────────────────────────────────────────────────────────────── */
+  /* The strip: app chrome straight under the bar, on the content line. */
+  .app-strip {
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-background-body);
+  }
+  .app-strip-row {
+    display: grid;
+    gap: 0.75rem 3rem;
+    padding-block: 1rem;
+  }
+  .app-strip-title {
+    display: grid;
+    gap: 0.125rem;
+    align-content: center;
+  }
+  .app-strip-steps {
+    min-width: 0;
+  }
+  @media (width >= 768px) {
+    .app-strip-row {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 38rem);
+      align-items: center;
+      padding-block: 1.25rem;
+    }
+  }
+
+  /* Now (her page, with the loud line over it) beside next (the empty state, with the screen's one mint button). */
+  .app-first-grid {
+    display: grid;
+    gap: 3rem;
+  }
+  .app-first-grid > * {
+    min-width: 0;
+  }
+  .app-first-now {
+    display: grid;
+    gap: 2rem;
+    align-content: start;
+  }
+  .app-first-page {
+    display: grid;
+    gap: 0.75rem;
+    align-content: start;
+  }
+  .app-first-next {
+    display: grid;
+    gap: 1rem;
+    align-content: start;
+  }
+  /*
+   * The space for her best project, drawn as a space: a flat mist panel as tall as the column, so
+   * the screen shows a place that asks to be filled, not a line of advice (the page for Rory, "a big
+   * 'Your best project goes here' panel and one button"). Flat: only the work is raised.
+   */
+  .app-first-next:has(.astryx-empty-state) {
+    border-radius: var(--radius-container);
+    background: var(--color-mist);
+    padding: clamp(1.25rem, 3vw, 2rem);
+  }
+  @media (width >= 1024px) {
+    .app-first-grid {
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      gap: 4.5rem;
+    }
+    .app-first-now {
+      gap: 2.5rem;
+    }
+    /* The answer to the step (done, or loading) starts level with the loud line. */
+    .app-first-next {
+      padding-top: 4rem;
+    }
+    /* The empty space runs the height of the column, beside her page. */
+    .app-first-next:has(.astryx-empty-state) {
+      align-self: stretch;
+      align-content: center;
+      margin-top: 2.5rem;
+      padding: 2.5rem;
+    }
+  }
+  /* The empty state's picture: an example exhbt, smaller and less raised than her page beside it. */
+  .app-example {
+    display: grid;
+    gap: 0.5rem;
+    justify-items: start;
+    width: min(26rem, 100%);
+  }
+  .app-example > [data-lab-frame] {
+    width: 100%;
+  }
+  .app-example > [data-lab-frame] > figure > .shadow-pack {
+    box-shadow: var(--shadow-low) !important;
+  }
+  .app-example-tag {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-graphite);
+  }
+  /*
+   * The space for her best project reads from its left edge, on the same line as everything else
+   * on the screen, not as a centred card (Astryx's EmptyState centres by default).
+   */
+  .app-first-next .astryx-empty-state {
+    align-items: flex-start;
+    justify-items: start;
+    text-align: start;
+    padding-inline: 0;
+  }
+  .app-first-next .astryx-empty-state > *,
+  .app-first-next :is(.astryx-empty-state-title, .astryx-empty-state-description) {
+    align-self: flex-start;
+    justify-content: flex-start;
+    width: 100%;
+    text-align: start;
+  }
+  .app-first-done {
+    display: grid;
+    gap: 0.75rem;
+    justify-items: start;
+    border-top: 2px solid var(--color-ink);
+    padding-top: 1.5rem;
+  }
+
+  /* ── With work ─────────────────────────────────────────────────────────────────────────── */
+  .app-work-head {
+    gap: 0.75rem;
+  }
+  .app-work-sub {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem 2rem;
+    margin-top: 0.5rem;
+  }
+  .app-tiles {
+    display: grid;
+    gap: 2.5rem 2rem;
+    margin-top: 2.5rem;
+  }
+  @media (width >= 640px) {
+    .app-tiles {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-top: 3.5rem;
+    }
+  }
+  /* Her best work leads across the whole line, drawn as her page's band; the rest are her cards, two by two. */
+  .app-tile-band {
+    display: none;
+    zoom: 0.84;
+  }
+  @media (width >= 1024px) {
+    .app-tiles {
+      gap: 3rem 2.5rem;
+    }
+    .app-tile[data-band] {
+      grid-column: 1 / -1;
+    }
+    .app-tile[data-band] .app-tile-band {
+      display: block;
+    }
+    .app-tile[data-band] .app-tile-band + .app-tile-card {
+      display: none;
+    }
+  }
+  .app-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+  }
+  /* The work, raised: her card in its own corners, with the theme's high shadow. The one shadow in the page's flow. */
+  .app-tile-art {
+    flex: 1 1 auto;
+    min-height: 16rem;
+    overflow: hidden;
+    border-radius: var(--app-tile-radius, var(--radius-container));
+    box-shadow: var(--shadow-high);
+    background: var(--color-background-body);
+    cursor: pointer;
+  }
+  .app-tile-art[data-loading] {
+    box-shadow: none;
+    border: 1px solid var(--color-line);
+    cursor: default;
+  }
+  /* At maximal the work's frame has a drawn ink edge as well as the shadow, as the kit's frame does there. */
+  [data-lab-root][data-level="maximal"] .app-tile-art:not([data-loading]) {
+    box-shadow:
+      0 0 0 1px var(--color-ink),
+      var(--shadow-high);
+  }
+  /* Every wrapper between the tile and her card stretches, so a card fills its tile to the row's height. */
+  .app-tile-art,
+  .app-tile-card,
+  .app-tile-card > *,
+  .app-tile-page {
+    display: grid;
+  }
+  .app-tile-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .app-tile-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  /* The Add tile: an empty slot in the same place a card would be, flat, with the screen's one mint button. */
+  .app-add-slot {
+    display: grid;
+    flex: 1 1 auto;
+    gap: 0.75rem;
+    align-content: center;
+    justify-items: start;
+    min-height: 16rem;
+    border: 1.5px dashed var(--color-field);
+    border-radius: var(--radius-container);
+    padding: 2rem;
+  }
+  .app-add-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border: 1.5px solid var(--color-ink);
+    border-radius: 999px;
+    color: var(--color-ink);
+  }
+  @media (hover: hover) {
+    .app-tile-art:not([data-loading]) {
+      transition:
+        translate var(--duration-fast) var(--ease-standard),
+        box-shadow var(--duration-fast) var(--ease-standard);
+    }
+    .app-tile:has(.app-tile-actions:hover, .app-tile-art:hover) .app-tile-art:not([data-loading]) {
+      translate: 0 -3px;
+    }
+  }
+
+  /* A tile opened: the exhbt itself, under a bar that goes back. */
+  .app-open {
+    display: grid;
+    gap: 1.5rem;
+    padding-top: 1.5rem;
+  }
+  .app-open-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+  }
+  .app-open-gap {
+    flex: 1 1 auto;
+  }
+
+  /* ── Account and billing ───────────────────────────────────────────────────────────────── */
+  .app-settings-head {
+    display: grid;
+    gap: 0.5rem;
+    padding-block: 2.5rem 2rem;
+  }
+  @media (width >= 640px) {
+    .app-settings-head {
+      padding-block: 4rem 3rem;
+    }
+  }
+  /* The template's start panel, down the side of a wide window; on a phone the sections simply follow one another. */
+  [data-app-lab] .app-settings .astryx-layout-panel {
+    display: none;
+  }
+  @media (width >= 1024px) {
+    [data-app-lab] .app-settings .astryx-layout-panel {
+      display: block;
+      width: 14rem;
+      margin-right: 4rem;
+    }
+  }
+  .app-settings-rail {
+    position: sticky;
+    top: 6rem;
+  }
+  .app-settings-body {
+    display: grid;
+    gap: 3.5rem;
+    max-width: 46rem;
+  }
+  .app-part {
+    display: grid;
+    gap: 1.25rem;
+    scroll-margin-top: 6rem;
+    border-top: 1px solid var(--color-line);
+    padding-top: 1.5rem;
+  }
+  .app-part-head {
+    display: grid;
+    gap: 0.375rem;
+  }
+  .app-part[data-part="address"] {
+    border-top-width: 2px;
+    border-top-color: var(--color-ink);
+  }
+  .app-form {
+    display: grid;
+    gap: 1.25rem;
+    max-width: 32rem;
+  }
+  .app-form .app-failed {
+    margin-top: 0;
+  }
+  .app-skel-fields {
+    display: grid;
+    gap: 0.5rem;
+  }
+  .app-plans {
+    display: grid;
+    gap: 0.75rem;
+  }
+  @media (width >= 768px) {
+    .app-plans {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .app-plan {
+    display: grid;
+    gap: 0.25rem;
+    align-content: start;
+  }
+  .app-plan-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .app-plan-yours {
+    margin-top: 0.25rem;
+  }
+  .app-plan-lines {
+    display: grid;
+    gap: 0.375rem;
+    margin-top: 0.75rem;
+    border-top: 1px solid var(--color-line);
+    padding-top: 0.75rem;
+  }
+  .app-plan-move {
+    display: grid;
+    gap: 0.75rem;
+    justify-items: start;
+  }
+
+  /* ── Loading ───────────────────────────────────────────────────────────────────────────── */
+  .app-tile-skel {
+    grid-template-rows: 11rem auto;
+    gap: 1.5rem;
+    padding: 1.25rem;
+  }
+  .app-tile-skel-figure {
+    min-height: 0;
+  }
+  .app-tile-skel-words {
+    display: grid;
+    gap: 0.625rem;
+    align-content: start;
+  }
+  @media (width >= 1024px) {
+    /* The first tile is her band: its words beside its figure. */
+    .app-tile[data-band] .app-tile-skel {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-rows: 14rem;
+      gap: 3rem;
+      padding: 3rem;
+    }
+    .app-tile[data-band] .app-tile-skel-words {
+      order: -1;
+      align-content: center;
+    }
+  }
+  .app-skel-frame {
+    display: grid;
+    gap: 2rem;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-container);
+    padding-bottom: 3rem;
+  }
+  .app-skel-hero {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    padding-inline: 2rem;
+  }
+  .app-skel-lines {
+    display: grid;
+    flex: 1 1 auto;
+    gap: 0.75rem;
+  }
+  .app-skel-empty {
+    display: grid;
+    gap: 1rem;
+    justify-items: center;
+  }
+
+  /* ── Roadmaps (not mocked up) ──────────────────────────────────────────────────────────── */
+  .app-roadmaps {
+    display: grid;
+    gap: 1rem;
+    justify-items: start;
+    padding-top: 4rem;
+  }
+
+  /* ── Levels ──────────────────────────────────────────────────────────────────────────── */
+  /*
+   * Restrained: the frame, the type at today's sizes and flat forms. Menus, dialogs, sheets and
+   * toasts ease in, crisply (lab.css gives restrained short durations and no overshoot), as the
+   * page for Rory describes the level: "menus and panels ease in".
+   */
+}
+
+/*
+ * Maximal, the tiles: a tile opens into its exhbt, and closes back into its place, as one picture
+ * carried across (motion.ts). Only while a view transition runs ([data-app-vt] on <html>) are the
+ * travelling parts named; its timing is the level's slow duration and move curve, copied onto
+ * <html> for the length of it. Moving and deleting a tile use the same, so the others close up.
+ */
+@layer components {
+  @media (prefers-reduced-motion: no-preference) {
+    :root[data-app-vt] [data-app-lab] .app-tile {
+      view-transition-name: var(--app-vt-name);
+    }
+    :root[data-app-vt] [data-app-lab] [data-morph] {
+      view-transition-name: app-tile;
+    }
+    :root[data-app-vt]::view-transition-group(*) {
+      animation-duration: var(--app-vt-duration);
+      animation-timing-function: var(--app-vt-ease);
+    }
+    :root[data-app-vt]::view-transition-old(*),
+    :root[data-app-vt]::view-transition-new(*) {
+      animation-duration: calc(var(--app-vt-duration) * 0.6);
+    }
+  }
+}
+
+/*
+ * Maximal, the first run: her page fills in as the strip's steps are done. What a step adds to her
+ * page arrives part by part (the line about her, her intro, where she is; then her first exhbt),
+ * on the entrance curve, rising a little into place. It is attached from this screen to hooks her
+ * page already has ([data-intro], [data-looking-for], [data-section]), the way decision 0033 has
+ * Home's exhbt assemble: the page itself is not touched, and its resting style is the finished page.
+ * The panel beside it, which names the next step, arrives the same way.
+ */
+@layer components {
+  @media (prefers-reduced-motion: no-preference) {
+    [data-lab-root][data-level="maximal"][data-motion="on"] .app-first-page :is(h1 + p, [data-intro], p:has([data-looking-for]), [data-section="work"]) {
+      animation: app-fill var(--duration-slow) var(--ease-entrance) both;
+    }
+    [data-lab-root][data-level="maximal"][data-motion="on"] .app-first-page [data-intro] {
+      animation-delay: calc(var(--duration-fast) * 1);
+    }
+    [data-lab-root][data-level="maximal"][data-motion="on"] .app-first-page p:has([data-looking-for]) {
+      animation-delay: calc(var(--duration-fast) * 2);
+    }
+    [data-lab-root][data-level="maximal"][data-motion="on"] .app-first-done {
+      animation: app-fill var(--duration-medium) var(--ease-entrance) both;
+      animation-delay: calc(var(--duration-fast) * 2);
+    }
+  }
+  @keyframes app-fill {
+    from {
+      opacity: 0;
+      translate: 0 1.5rem;
+    }
+  }
+}

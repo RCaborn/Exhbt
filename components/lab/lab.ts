@@ -14,9 +14,9 @@ export const isLevel = (v: unknown): v is Level => LEVELS.includes(v as Level);
 
 /** What each level means, in one line (the lab bar's tooltip and the index page). */
 export const LEVEL_NOTE: Record<Level, string> = {
-  restrained: "Today's sizes on the new system. Motion is feedback only.",
-  confident: "The proposed voice: one loud line a screen, the work raised, motion that confirms.",
-  maximal: "The same, turned up: the largest type, scroll-led pages and a finish in ink.",
+  restrained: "Today's sizes on the new system. The example exhbt builds itself, and publishing has a proper finish.",
+  confident: "One loud line a screen, the work raised, your name in the address, eight looks, the finish on ink.",
+  maximal: "The same, turned up: the largest type, the work to the screen's edge, a tile that opens, a film you scroll.",
 };
 
 /** "on" unless the lab's Motion off switch is set. A person's own reduced-motion setting still applies on top. */

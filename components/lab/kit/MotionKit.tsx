@@ -80,12 +80,12 @@ function Moment({ name, use, children }: { name: string; use: string; children: 
 /**
  * Motion shown by small demonstrations. Nothing here moves until a button is pressed, nothing
  * loops, and the resting state of each is its finished state, so with Motion off (or the device's
- * reduced-motion setting) the page is the same page with nothing travelling.
+ * reduced-motion setting) the page is the same page with nothing travelling. The two notes that
+ * say so are shown by the stylesheet (kit.css, .kit-still-note), so the server never guesses.
  */
 export function MotionKit() {
   const [at, setAt] = useState<"start" | "end">("start");
   const [run, setRun] = useState(0);
-  const { moves } = useLab();
   return (
     <KitSection id="motion" rule="Motion confirms what just happened and shows where things came from. Three tempos, one character, and nothing loops.">
       <KitBlock title="Tempo">
@@ -123,7 +123,9 @@ export function MotionKit() {
               </div>
               <div className="kit-row">
                 <Button label={at === "start" ? "Send them across" : "Send them back"} onClick={() => setAt(at === "start" ? "end" : "start")} />
-                {!moves && <Text type="supporting">Motion is off, so they jump.</Text>}
+                <span className="kit-still-note">
+                  <Text type="supporting">Motion is off, so they jump.</Text>
+                </span>
               </div>
             </div>
           }
@@ -187,7 +189,9 @@ export function MotionKit() {
             </div>
             <div className="kit-row">
               <Button label={run ? "Play them again" : "Play the three moments"} onClick={() => setRun((n) => n + 1)} />
-              {!moves && <Text type="supporting">Motion is off: each is already at rest, finished.</Text>}
+              <span className="kit-still-note">
+                <Text type="supporting">Motion is off: each is already at rest, finished.</Text>
+              </span>
             </div>
             <Note>Each plays once when asked and rests in its finished state. With Motion off, or a device set to reduce motion, nothing travels.</Note>
           </div>

@@ -1,0 +1,952 @@
+/*
+ * The finish screen (/lab/design/finish). Layered, like everything in the lab (components/lab/lab.css):
+ * app/globals.css declares the layer order, and CSS outside a layer would beat all of it.
+ *
+ * Sizes, colours, corners, shadows and timings are the proposed theme's tokens (themes/exhbt-next)
+ * and the site's colour tokens; the lengths written here are this screen's own layout. Every
+ * movement sits inside both motion guards and rests on the finished picture:
+ *   @media (prefers-reduced-motion: no-preference) { [data-motion="on"] … }
+ */
+@layer components {
+  /* ── The page: its line, the states, and the setting ─────────────────────────────── */
+  .fin {
+    padding-bottom: 5rem;
+  }
+  .fin-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+    padding-top: 2.5rem;
+    padding-bottom: 1.75rem;
+  }
+  .fin-head-words {
+    display: grid;
+    gap: 0.875rem;
+    max-width: 44rem;
+  }
+  /* A link given a finger-sized target (44px) without moving its line: padding makes the target, the negative margin keeps the line. */
+  .fin-hit {
+    display: inline-block;
+    padding-block: 0.75rem;
+    margin-block: -0.75rem;
+  }
+  /* The states: one Selector on a phone, tabs from a tablet up (StateTabs). */
+  .fin-tabs-wide {
+    display: none;
+  }
+  .fin-tabs-narrow {
+    max-width: 22rem;
+  }
+  @media (width >= 640px) {
+    .fin-tabs-wide {
+      display: block;
+    }
+    .fin-tabs-narrow {
+      display: none;
+    }
+  }
+  @media (width >= 640px) {
+    .fin-head {
+      gap: 2rem;
+      padding-top: 3.5rem;
+      padding-bottom: 2.25rem;
+    }
+  }
+
+  /* The setting: a stand-in for the exhbt editor. Chrome and the page lie flat; only the work raised at the finish casts a shadow. */
+  .fin-window {
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-container);
+    background: #fff;
+  }
+  .fin-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 3.75rem;
+    border-bottom: 1px solid var(--color-line);
+    padding: 0.5rem 0.75rem;
+  }
+  .fin-bar-gap {
+    flex: 1 1 auto;
+  }
+  .fin-bar-wide {
+    display: none;
+  }
+  @media (width >= 640px) {
+    .fin-bar {
+      gap: 0.75rem;
+      padding-inline: 1rem;
+    }
+    .fin-bar-wide {
+      display: inline-flex;
+      align-items: center;
+    }
+    .fin-bar-narrow {
+      display: none;
+    }
+  }
+  .fin-window-page {
+    margin: 0;
+  }
+  .fin-window-crop {
+    max-height: 30rem;
+    overflow: hidden;
+  }
+  @media (width >= 640px) {
+    .fin-window-crop {
+      max-height: 36rem;
+    }
+  }
+
+  /* ── Inside the dialog ───────────────────────────────────────────────────────────── */
+  .fin-overlay {
+    position: relative;
+  }
+  /* In a bottom sheet the grab handle sits over the top 24px of the content: start below it. */
+  .fin-overlay[data-form="sheet"] {
+    padding-top: 1.25rem;
+  }
+  .fin-overlay[data-form="sheet"] .fin-review > .astryx-layout-header {
+    padding-top: 0.5rem;
+  }
+  /* A check that hasn't happened: a hollow ring the size of the site's large tick. */
+  .fin-hollow {
+    display: inline-block;
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border: 1.5px dashed var(--color-field);
+    border-radius: 999px;
+  }
+
+  /* The review step: what publishing does, the checks as they stand, the person's tick, Publish.
+     The dialog has no padding of its own (the finish's label is inset), so each part pads itself. */
+  .fin-review > .astryx-layout-header {
+    padding: 1.25rem 1rem 0.5rem 1.5rem;
+  }
+  .fin-review-body {
+    display: grid;
+    gap: 1.25rem;
+    padding: 0 var(--spacing-6, 1.5rem) 1.5rem;
+  }
+  .fin-review-host {
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+  .fin-review-checks {
+    display: grid;
+    gap: 0.625rem;
+    border-block: 1px solid var(--color-line);
+    padding-block: 1rem;
+  }
+  .fin-review-checks > li {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-weight: 500;
+  }
+  .fin-review-foot {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 var(--spacing-6, 1.5rem) 1.5rem;
+  }
+  .fin-publish {
+    display: inline-flex;
+    border-radius: 999px;
+  }
+
+  /* ── The finish: the label (on ink) and the work (on white) ──────────────────────── */
+  .fin-live {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0.5rem;
+  }
+  @media (width >= 640px) {
+    .fin-live {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    }
+  }
+  /* The label: the inset panel, its corners concentric with the dialog's (28px less the 8px inset). */
+  .fin-label {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+    border-radius: var(--radius-container);
+    background: var(--color-mist);
+    padding: 1.25rem 1.25rem 1.5rem;
+    color: var(--color-ink);
+  }
+  .fin-label[data-ink] {
+    background: var(--color-ink);
+    color: #fff;
+  }
+  @media (width >= 640px) {
+    .fin-label {
+      padding: 1.5rem 2.25rem 2.5rem;
+      min-height: 100%;
+    }
+  }
+  /* The header's own padding is the dialog's; inside the label the label's padding is enough. */
+  .fin-label .astryx-layout-header,
+  .fin-free-words .astryx-layout-header {
+    padding: 0;
+  }
+  .fin-checks {
+    display: grid;
+    gap: 0.625rem;
+    font-weight: 500;
+  }
+  .fin-checks > li {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+  .fin-label[data-ink] .fin-checks {
+    color: var(--color-on-ink);
+  }
+  /* The tick sits on a hollow ring, so a tick that fills fills a place that was waiting for it. */
+  .fin-check {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+  }
+  .fin-check::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 1.5px dashed currentColor;
+    border-radius: 999px;
+    opacity: 0.5;
+  }
+
+  /* The address: the one loud line. Display type; the name in mint on ink (jade on mist); the rest of
+     the link below it, smaller. It breaks after the name's dot, and anywhere at all before it overflows. */
+  .fin-address {
+    margin-top: auto;
+    font-family: var(--font-family-heading);
+    font-size: var(--text-display-1-size);
+    font-weight: 600;
+    line-height: 1.02;
+    letter-spacing: -0.04em;
+    overflow-wrap: anywhere;
+  }
+  /* The highlighter, drawn as a stroke under the name (not behind it: white on mint can't be read).
+     One stroke, under the part of the address that is hers, wherever the line breaks. */
+  .fin-name {
+    background-image: linear-gradient(var(--color-mint), var(--color-mint));
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 100% 0.11em;
+    padding-bottom: 0.08em;
+  }
+  [data-level="restrained"] .fin-name {
+    background-image: none;
+  }
+  .fin-path {
+    display: block;
+    margin-top: 0.35em;
+    font-size: 0.5em;
+    letter-spacing: -0.03em;
+    color: var(--color-graphite);
+  }
+  .fin-label[data-ink] .fin-path {
+    color: var(--color-on-ink);
+  }
+  .fin-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+  }
+  .fin-send {
+    display: flex;
+    gap: 0.75rem;
+  }
+  @media (width < 640px) {
+    .fin-send:has(> :nth-child(2)) {
+      flex: 1 1 100%;
+    }
+    .fin-send:has(> :nth-child(2)) > .astryx-button {
+      flex: 1 1 0;
+      justify-content: center;
+    }
+    /* View it on its own line under them: its words line up with the label's edge. */
+    .fin-send:has(> :nth-child(2)) + .astryx-button {
+      margin-left: -0.75rem;
+    }
+  }
+
+  /* The work: the live page raised, the seal on its corner, the link as it pastes, the next step. */
+  .fin-work {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 1.75rem;
+    padding: 1.75rem 0.75rem 1rem;
+  }
+  @media (width >= 640px) {
+    .fin-work {
+      gap: 1.5rem;
+      padding: 2.5rem 2.25rem 1.5rem 2.5rem;
+    }
+  }
+  .fin-frame {
+    position: relative;
+  }
+  /* The seal, pressed on the frame's lower corner like a gallery's stamp. */
+  .fin-seal {
+    position: absolute;
+    right: 1.25rem;
+    bottom: -0.85rem;
+    z-index: 1;
+    transform: rotate(-3deg) scale(1.2);
+    transform-origin: 100% 50%;
+  }
+  [data-level="restrained"] .fin-seal {
+    transform: none;
+  }
+  .fin-share {
+    display: grid;
+    gap: 0.75rem;
+  }
+  .fin-next {
+    display: flex;
+    border-top: 1px solid var(--color-line);
+    padding-top: 1.25rem;
+  }
+
+  /* The close button: in the label on a phone (on ink), in the corner of the white side on a wide window. */
+  .fin-close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 2;
+  }
+  .fin-close-wide {
+    display: none;
+  }
+  @media (width >= 640px) {
+    .fin-close-narrow {
+      display: none;
+    }
+    .fin-close-wide {
+      display: block;
+      top: 1rem;
+      right: 1rem;
+    }
+  }
+
+  /* A link as it shows once pasted: the picture beside the words an app prints under it. */
+  .fin-unfurl {
+    display: grid;
+    grid-template-columns: minmax(0, 13rem) minmax(0, 1fr);
+    align-items: center;
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-element);
+    background: #fff;
+  }
+  .fin-unfurl-picture {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1200 / 630;
+    background: var(--color-ink);
+  }
+  .fin-unfurl-words {
+    display: grid;
+    align-content: center;
+    gap: 0.2rem;
+    min-width: 0;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+  }
+  .fin-unfurl-title,
+  .fin-unfurl-description {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .fin-unfurl-description {
+    -webkit-line-clamp: 1;
+  }
+  .fin-unfurl-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+  .fin-unfurl-description {
+    color: var(--color-graphite);
+  }
+  .fin-unfurl-host {
+    color: var(--color-slate);
+  }
+
+  /* ── Free: a draft only its owner can see ───────────────────────────────────────── */
+  /* A phone reads it in order (the line, the page, the offer, the way back); a wide window puts the page beside the words. */
+  .fin-free {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+    padding: 0.5rem 1rem 1.25rem;
+  }
+  @media (width >= 640px) {
+    .fin-free {
+      grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+      grid-template-areas:
+        "top work"
+        "offer work"
+        "back work";
+      align-content: start;
+      gap: 1.5rem 2.75rem;
+      padding: 2.5rem 2.5rem 2.25rem;
+    }
+    .fin-free-top {
+      grid-area: top;
+    }
+    .fin-free-work {
+      grid-area: work;
+      align-self: center;
+    }
+    .fin-free-offer {
+      grid-area: offer;
+    }
+    .fin-free-back {
+      grid-area: back;
+    }
+  }
+  .fin-free-top {
+    display: grid;
+    gap: 0.875rem;
+    padding-right: 2.5rem;
+  }
+  .fin-free-line {
+    font-family: var(--font-family-heading);
+    font-size: var(--text-display-2-size);
+    font-weight: 600;
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+  }
+  .fin-free-offer {
+    display: grid;
+    gap: 0.75rem;
+    border-top: 1px solid var(--color-line);
+    padding-top: 1.25rem;
+  }
+  .fin-free-gives {
+    display: grid;
+    gap: 0.375rem;
+    padding-left: 1.1rem;
+    list-style: disc;
+  }
+  .fin-free-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
+    margin-top: 0.5rem;
+  }
+  .fin-free-back {
+    margin-left: -0.75rem;
+  }
+  .fin-close-any {
+    top: 0.75rem;
+    right: 0.75rem;
+  }
+  .fin-overlay[data-form="sheet"] .fin-close-any {
+    top: 1.75rem;
+  }
+
+  /* ── Back on the portfolio: three tiles in her look, one turning Live ────────────── */
+  .fin-replay {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.75rem;
+  }
+  .fin-bar-title {
+    padding-inline: 0.5rem 0.125rem;
+  }
+  /* Her page's ground and words come from her look (--pf-*); only the chrome over it is the lab's. */
+  .fin-folio {
+    background: var(--pf-ground);
+    color: var(--pf-ink);
+    padding: 1.75rem 1.25rem 2.75rem;
+  }
+  @media (width >= 640px) {
+    .fin-folio {
+      padding: 2.5rem 2.5rem 3.5rem;
+    }
+  }
+  .fin-folio-title {
+    margin-bottom: 1.75rem;
+    font-size: 1.75rem;
+    line-height: 1.2;
+  }
+  .fin-tiles {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.25rem 2rem;
+  }
+  @media (width >= 768px) {
+    .fin-tiles {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .fin-tile {
+    position: relative;
+    display: grid;
+  }
+  /* Her tiles at about two thirds of their size, so all three and the brackets round one fit the first
+     screen. A zoom draws them smaller while they still lay out at their own width. */
+  .fin-tile-page {
+    zoom: 0.72;
+  }
+  @media (width >= 768px) {
+    .fin-tile-page {
+      zoom: 0.62;
+    }
+  }
+  .fin-tile-page,
+  .fin-tile-page > * {
+    height: 100%;
+  }
+  /* The tile's status, clipped to its top edge: chrome over her page, in the app's own style. */
+  .fin-tile-status {
+    position: absolute;
+    top: -0.875rem;
+    right: 1rem;
+    z-index: 2;
+    display: grid;
+  }
+  .fin-tile-status > * {
+    grid-area: 1 / 1;
+    justify-self: end;
+  }
+  .fin-tile-was {
+    opacity: 0;
+  }
+  /* The logo's brackets round the tile just published: the work in focus. */
+  .fin-brackets {
+    position: absolute;
+    inset: -0.875rem;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .fin-bracket {
+    position: absolute;
+    width: 2.75rem;
+    height: 2.75rem;
+    fill: none;
+    stroke: var(--color-ink);
+    stroke-width: 5;
+    stroke-linecap: round;
+  }
+  .fin-bracket[data-corner="start"] {
+    top: 0;
+    left: 0;
+  }
+  .fin-bracket[data-corner="end"] {
+    right: 0;
+    bottom: 0;
+    transform: rotate(180deg);
+  }
+  [data-level="restrained"] .fin-brackets {
+    display: none;
+  }
+  [data-level="maximal"] .fin-bracket {
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+
+  /* ── Writing the draft: the steps in words, the page taking shape beside them ─────── */
+  .fin-replay {
+    gap: 0.5rem;
+  }
+  .fin-wait {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.75rem;
+    padding: 1.5rem 1.25rem 1.75rem;
+  }
+  @media (width >= 768px) {
+    .fin-wait {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      grid-template-areas:
+        "top work"
+        "rest work";
+      grid-template-rows: auto 1fr;
+      align-items: start;
+      gap: 1.5rem 3rem;
+      padding: 2.5rem;
+    }
+    .fin-wait-top {
+      grid-area: top;
+    }
+    .fin-wait-rest {
+      grid-area: rest;
+    }
+    .fin-wait-work {
+      grid-area: work;
+    }
+  }
+  .fin-wait-top,
+  .fin-wait-rest {
+    display: grid;
+    gap: 1.25rem;
+    align-content: start;
+  }
+  .fin-wait-crop {
+    height: 15rem;
+    overflow: hidden;
+  }
+  @media (width >= 640px) {
+    .fin-wait-crop {
+      height: 22rem;
+    }
+  }
+  .fin-wait-page {
+    zoom: 0.42;
+  }
+  @media (width >= 640px) {
+    .fin-wait-page {
+      zoom: 0.5;
+    }
+  }
+  /* The shape of the page: a sidebar and a main column, as the exhbt page lays itself out. */
+  .fin-shape {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    padding: 1rem;
+  }
+  @media (width >= 640px) {
+    .fin-shape {
+      grid-template-columns: 9rem minmax(0, 1fr);
+      gap: 1.5rem;
+      padding: 1.5rem;
+    }
+  }
+  .fin-shape-aside,
+  .fin-shape-words,
+  .fin-shape-main {
+    display: grid;
+    gap: 0.625rem;
+    align-content: start;
+  }
+  .fin-shape-aside {
+    justify-items: start;
+    border-radius: var(--radius-element);
+    background: var(--color-mist);
+    padding: 1rem;
+  }
+  .fin-shape-main {
+    gap: 1.25rem;
+  }
+  .fin-shape-flow {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  .fin-shape-found {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1rem;
+  }
+  /* The file being read is real: its name, where the page will put it. Plain, not mint: it isn't a
+     button and nothing about it is live or checked yet. */
+  .fin-shape-file {
+    margin-top: 0.25rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-inner);
+    background: #fff;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-graphite);
+  }
+  /* A part waits, faint, until the step that makes it begins. The shimmer is stilled: nothing loops. */
+  .fin-shape [data-part-step] {
+    opacity: 0.4;
+  }
+  .fin-shape [data-part-step][data-on] {
+    opacity: 1;
+  }
+  .fin-shape .astryx-skeleton,
+  .fin-shape .astryx-skeleton::before,
+  .fin-shape .astryx-skeleton::after {
+    animation: none;
+  }
+
+  /* ── Motion: about a second, once ───────────────────────────────────────────────── */
+  @media (prefers-reduced-motion: no-preference) {
+    /* The checks fill one after another. At every level: it is the confirmation itself. */
+    [data-motion="on"] .fin-live .fin-check [data-tick] {
+      animation: fin-tick var(--duration-medium) var(--ease-entrance) both;
+      animation-delay: calc(120ms + var(--i) * var(--duration-fast-max));
+    }
+    [data-motion="on"] .fin-live .fin-check::before {
+      animation: fin-ring var(--duration-medium) var(--ease-standard) both;
+      animation-delay: calc(120ms + var(--i) * var(--duration-fast-max));
+    }
+    /* The live page rises into its frame; the highlighter is drawn under the address; the seal is pressed on. */
+    [data-motion="on"]:not([data-level="restrained"]) .fin-live .fin-frame {
+      animation: fin-rise var(--duration-slow) var(--ease-entrance) both;
+      animation-delay: 60ms;
+    }
+    [data-motion="on"]:not([data-level="restrained"]) .fin-live .fin-name {
+      animation: fin-stroke var(--duration-slow) var(--ease-standard) both;
+      animation-delay: 420ms;
+    }
+    [data-motion="on"]:not([data-level="restrained"]) .fin-live .fin-seal {
+      animation: fin-stamp var(--duration-medium) var(--ease-entrance) both;
+      animation-delay: 760ms;
+    }
+
+    /* Back on the portfolio: the brackets close on the tile, then its token turns from Draft to Live. */
+    [data-motion="on"]:not([data-level="restrained"]) .fin-bracket[data-corner="start"] {
+      animation: fin-close-start var(--duration-slow) var(--ease-entrance) both;
+      animation-delay: 300ms;
+    }
+    [data-motion="on"]:not([data-level="restrained"]) .fin-bracket[data-corner="end"] {
+      animation: fin-close-end var(--duration-slow) var(--ease-entrance) both;
+      animation-delay: 300ms;
+    }
+    [data-motion="on"] .fin-tile-was {
+      animation: fin-was var(--duration-fast) var(--ease-exit) both;
+      animation-delay: var(--fin-turn, 760ms);
+    }
+    [data-motion="on"] .fin-tile-now {
+      animation: fin-now var(--duration-medium) var(--ease-entrance) both;
+      animation-delay: var(--fin-turn, 760ms);
+    }
+    [data-level="restrained"] .fin-tile-status {
+      --fin-turn: 240ms;
+    }
+
+    /* Writing the draft: a part comes up when its step begins; the draft, when it arrives, assembles
+       in reading order (the sidebar, the title, the flowchart box by box, then the rest). */
+    [data-motion="on"] .fin-shape [data-part-step] {
+      transition: opacity var(--duration-slow) var(--ease-standard);
+    }
+    [data-motion="on"]:not([data-level="restrained"]) .fin-wait[data-arrived] :is(.xp-aside, .xp-title, .xp-flow-box, [data-part]) {
+      animation: fin-part var(--duration-medium) var(--ease-entrance) both;
+    }
+    [data-motion="on"] .fin-wait[data-arrived] .xp-title {
+      animation-delay: 90ms;
+    }
+    [data-motion="on"] .fin-wait[data-arrived] li:nth-child(1) > .xp-flow-box {
+      animation-delay: 220ms;
+    }
+    [data-motion="on"] .fin-wait[data-arrived] li:nth-child(2) > .xp-flow-box {
+      animation-delay: 290ms;
+    }
+    [data-motion="on"] .fin-wait[data-arrived] li:nth-child(3) > .xp-flow-box {
+      animation-delay: 360ms;
+    }
+    [data-motion="on"] .fin-wait[data-arrived] li:nth-child(4) > .xp-flow-box {
+      animation-delay: 430ms;
+    }
+    [data-motion="on"] .fin-wait[data-arrived] li:nth-child(n + 5) > .xp-flow-box {
+      animation-delay: 500ms;
+    }
+    [data-motion="on"] .fin-wait[data-arrived] [data-part] {
+      animation-delay: 600ms;
+    }
+  }
+  @keyframes fin-part {
+    from {
+      opacity: 0;
+      transform: translateY(0.75rem);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes fin-close-start {
+    from {
+      opacity: 0;
+      transform: translate(-1.75rem, -1.75rem);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes fin-close-end {
+    from {
+      opacity: 0;
+      transform: translate(1.75rem, 1.75rem) rotate(180deg);
+    }
+    to {
+      opacity: 1;
+      transform: rotate(180deg);
+    }
+  }
+  @keyframes fin-was {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes fin-now {
+    from {
+      opacity: 0;
+      transform: scale(0.7);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* ── Maximal: the ink holds the whole screen for a beat ─────────────────────────────
+     While .fin-live has [data-beat], the dialog's own backdrop is ink (a modal is in the top layer, so
+     nothing in the page could cover it) and an ink layer covers the dialog, so ink fills the screen with
+     the label's words on it and the live page's frame floating on it. When the beat ends, that layer
+     contracts into the label's box (LiveMoment measures it: --fin-ink-*), uncovering the white side,
+     and the backdrop eases back to the scrim. Everything stays opaque throughout, so the page behind
+     never shows through. Only maximal sets [data-beat], and only when motion is on (FinishStage). */
+  .fin-live {
+    isolation: isolate;
+  }
+  .fin-label,
+  .fin-work {
+    z-index: 1;
+  }
+  .fin-work {
+    position: relative;
+  }
+  .fin-live::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: var(--radius-page);
+    background: var(--color-ink);
+    pointer-events: none;
+    /* At rest it is exactly the label's box, and the label is ink, so it can't be seen. */
+    clip-path: inset(
+      var(--fin-ink-top, 50%) var(--fin-ink-right, 50%) var(--fin-ink-bottom, 50%) var(--fin-ink-left, 50%) round var(--radius-container)
+    );
+  }
+  [data-level="restrained"] .fin-live::before {
+    display: none;
+  }
+  .fin-live[data-beat]::before {
+    clip-path: inset(0 0 0 0 round var(--radius-page));
+  }
+  dialog:has(.fin-live[data-beat])::backdrop {
+    background-color: var(--color-ink);
+  }
+  dialog:has(.fin-live[data-beat]),
+  .astryx-bottom-sheet:has(.fin-live[data-beat]) {
+    background-color: var(--color-ink);
+    box-shadow: none;
+  }
+  /* A sheet's surface is painted by a panel inside it, so its top edge (where the handle is) is inked
+     from here: the overlay starts at the very top of the sheet. It lets go at once when the beat ends,
+     while the ink over the rest is still there to contract. */
+  .fin-overlay[data-form="sheet"]:has(.fin-live[data-beat]) {
+    border-radius: var(--radius-page) var(--radius-page) 0 0;
+    background-color: var(--color-ink);
+    /* The panel's own edge shows a pixel above the content: cover it too. */
+    box-shadow: 0 -2px 0 var(--color-ink);
+  }
+  .fin-live[data-beat] :is(.fin-share, .fin-next, .fin-close) {
+    opacity: 0;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    [data-level="maximal"][data-motion="on"] .fin-live[data-arrival="vt"]::before {
+      transition: clip-path var(--duration-slow) var(--ease-move);
+    }
+    [data-level="maximal"][data-motion="on"] dialog:has(.fin-live[data-arrival="vt"])::backdrop {
+      transition: background-color var(--duration-slow) var(--ease-standard);
+    }
+    [data-level="maximal"][data-motion="on"] .fin-live[data-arrival="vt"] :is(.fin-share, .fin-next, .fin-close) {
+      transition: opacity var(--duration-medium) var(--ease-standard) calc(var(--duration-slow) * 0.35);
+    }
+    /* The frame arrives by the view transition (out of the Publish button), so it doesn't also rise. */
+    [data-motion="on"]:not([data-level="restrained"]) .fin-live[data-arrival="vt"] .fin-frame {
+      animation: none;
+    }
+  }
+
+  /* The view transition itself (maximal). Its pseudo-elements hang off the document's root, which the
+     lab's level doesn't reach, so FinishStage reads the level's tokens and sets these two on <html>. */
+  html[data-fin-vt] .fin-live .fin-frame {
+    view-transition-name: fin-frame;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    ::view-transition-group(fin-frame) {
+      animation-duration: var(--fin-vt-duration, 960ms);
+      animation-timing-function: var(--fin-vt-ease, cubic-bezier(0.3, 1.36, 0.5, 1));
+    }
+    ::view-transition-old(fin-frame),
+    ::view-transition-new(fin-frame) {
+      height: 100%;
+      animation-duration: calc(var(--fin-vt-duration, 960ms) * 0.5);
+    }
+    html[data-fin-vt]::view-transition-old(root),
+    html[data-fin-vt]::view-transition-new(root) {
+      animation-duration: calc(var(--fin-vt-duration, 960ms) * 0.4);
+    }
+  }
+
+  @keyframes fin-tick {
+    from {
+      opacity: 0;
+      transform: scale(0.3);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes fin-ring {
+    from {
+      opacity: 0.5;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes fin-rise {
+    from {
+      opacity: 0;
+      transform: translateY(1.75rem) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes fin-stroke {
+    from {
+      background-size: 0% 0.11em;
+    }
+    to {
+      background-size: 100% 0.11em;
+    }
+  }
+  @keyframes fin-stamp {
+    from {
+      opacity: 0;
+      transform: rotate(-14deg) scale(2);
+    }
+    to {
+      opacity: 1;
+      transform: rotate(-3deg) scale(1.2);
+    }
+  }
+}

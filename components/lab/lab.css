@@ -15,13 +15,26 @@
  */
 
 @layer base {
-  /* The site's own tokens (app/globals.css, @theme), kept under other names before the lab re-points them. */
+  /*
+   * The site's own values, kept under other names before the lab changes them: its Tailwind
+   * tokens (app/globals.css, @theme) and the handful of Astryx tokens that the proposed theme sets
+   * and today's theme leaves to Astryx. This element is outside the proposed theme, so each var()
+   * here resolves to today's value, and "today" can be drawn inside the lab from one owner.
+   */
   [data-lab-shell] {
     display: contents;
     --lab-site-radius: var(--radius);
     --lab-site-radius-sm: var(--radius-sm);
     --lab-site-shadow-pack: var(--shadow-pack);
     --lab-site-line: var(--color-line);
+    --lab-site-focus-width: var(--focus-outline-width);
+    --lab-site-focus-color: var(--focus-outline-color);
+    --lab-site-focus-offset: var(--focus-outline-offset);
+    --lab-site-ease-entrance: var(--ease-entrance);
+    --lab-site-ease-move: var(--ease-move);
+    --lab-site-inverted: var(--color-background-inverted);
+    --lab-site-error-inverted: var(--color-background-error-inverted);
+    --lab-site-track: var(--color-track);
   }
 
   /*
@@ -39,15 +52,15 @@
 
 @layer components {
   /*
-   * The lab's root. The proposed theme is the one owner of radius and shadow, so the site's
-   * Tailwind tokens are re-pointed at it here (this is what generating globals.css's @theme from
-   * the theme would do), and every `shadow-pack` or `rounded-[var(--radius)]` in a real component
-   * follows the theme without the component changing.
+   * The lab's root. The proposed theme is the one owner of radius, so the site's two radius tokens
+   * are re-pointed at it here (this is what generating globals.css's @theme from the theme would
+   * do), and every `rounded-[var(--radius)]` in a real component follows the theme without the
+   * component changing. (The same can't be done for `shadow-pack`: Tailwind writes that utility's
+   * value out in full, so it doesn't read the variable. See the work's frame, below.)
    */
   [data-lab-root] {
     --radius-sm: var(--radius-inner);
     --radius: var(--radius-element);
-    --shadow-pack: var(--shadow-high);
     background: var(--color-background-body);
     color: var(--color-text-primary);
     min-height: 100dvh;
@@ -59,7 +72,7 @@
    * how lively motion is. It never changes a colour.
    */
   [data-lab-root][data-level="restrained"] {
-    /* Today's sizes: a 48px opening line, as the site's h1 is now. */
+    /* Today's sizes: a 48px opening line, as the site's h1 is now, and Home's line as it is. */
     --text-display-1-size: 3rem;
     --text-display-2-size: 2.5rem;
     --text-display-3-size: 2rem;
@@ -101,9 +114,11 @@
    * authored animation in the lab is written inside
    *   @media (prefers-reduced-motion: no-preference) { [data-motion="on"] … { } }
    * so it does not run here, and the theme's duration tokens drop to nothing, which stills every
-   * transition that reads them (Astryx's own included).
+   * transition that reads them (Astryx's own included). A themed element inside the lab sets the
+   * durations again for itself, so it is named too.
    */
-  [data-lab-root][data-motion="off"] {
+  [data-lab-root][data-motion="off"],
+  [data-lab-root][data-motion="off"] [data-astryx-theme] {
     --duration-fast-min: 1ms;
     --duration-fast: 1ms;
     --duration-fast-max: 1ms;
@@ -121,20 +136,42 @@
   [data-lab-root][data-motion="off"] *::after {
     scroll-behavior: auto !important;
   }
+  /*
+   * A toast's own buttons (its close, and an action passed to it) are finger-sized in the lab: a
+   * toast is where a phone user's thumb goes straight after an action. A theme change to make on
+   * promotion; here, so the theme stays as the kit shows it. Toasts are drawn outside the lab's root.
+   */
+  body:has([data-lab-root]) .astryx-toast :is(button, a) {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+
   /* Astryx's two busy loops don't read the duration tokens, so they are stilled by name. */
   [data-lab-root][data-motion="off"] :is(.astryx-skeleton, .astryx-spinner),
   [data-lab-root][data-motion="off"] :is(.astryx-skeleton, .astryx-spinner)::before,
-  [data-lab-root][data-motion="off"] :is(.astryx-skeleton, .astryx-spinner)::after {
+  [data-lab-root][data-motion="off"] :is(.astryx-skeleton, .astryx-spinner)::after,
+  [data-lab-root][data-motion="off"] .astryx-spinner * {
     animation: none !important;
   }
 
-  /* The site as it is today, drawn inside the lab: its own tokens back, under the production theme. */
+  /*
+   * The site as it is today, drawn inside the lab ([data-lab-today]), and a person's own page
+   * ([data-lab-page]): under the production theme (a nested Theme), with the site's tokens and the
+   * Astryx tokens only the proposed theme sets put back to what they are today.
+   */
   [data-lab-today],
   [data-lab-page] {
     --radius: var(--lab-site-radius);
     --radius-sm: var(--lab-site-radius-sm);
-    --shadow-pack: var(--lab-site-shadow-pack);
     --color-line: var(--lab-site-line);
+    --focus-outline-width: var(--lab-site-focus-width);
+    --focus-outline-color: var(--lab-site-focus-color);
+    --focus-outline-offset: var(--lab-site-focus-offset);
+    --ease-entrance: var(--lab-site-ease-entrance);
+    --ease-move: var(--lab-site-ease-move);
+    --color-background-inverted: var(--lab-site-inverted);
+    --color-background-error-inverted: var(--lab-site-error-inverted);
+    --color-track: var(--lab-site-track);
   }
   [data-lab-today] {
     display: contents;
@@ -142,13 +179,20 @@
 
   /*
    * The work, raised: the site's real BrowserFrame round a person's page. The frame is the site's
-   * chrome, so it takes the theme's container radius and the high shadow; the page inside is the
+   * chrome, so it takes the theme's container radius and its high shadow; the page inside is the
    * person's own and keeps its look's values ([data-lab-page], above).
+   *
+   * BrowserFrame's shadow is Tailwind's `shadow-pack` utility, which sits in the utilities layer,
+   * above this one, and writes its value out in full. So this is the lab's one `!important`: an
+   * important declaration in a layer beats an ordinary one in any layer.
    */
   [data-lab-frame] {
     --radius: var(--radius-container);
-    --shadow-pack: var(--shadow-high);
     min-width: 0;
+  }
+  [data-lab-frame] > .shadow-pack,
+  [data-lab-frame] > figure > .shadow-pack {
+    box-shadow: var(--shadow-high) !important;
   }
   [data-lab-root][data-level="restrained"] [data-lab-frame] {
     --radius: var(--radius-element);
@@ -156,6 +200,19 @@
   [data-lab-root][data-level="maximal"] [data-lab-frame] {
     /* A drawn edge as well as the shadow: the frame reads as an object. */
     --color-line: var(--color-ink);
+  }
+
+  /*
+   * The one content line: the theme's content width (72rem, gutters included, as the site's
+   * `max-w-[72rem] px-4 sm:px-8` is today) and gutter. The themed top bar pads itself to the same
+   * edge, so a page whose content sits in `.lab-content` lines up with the bar above it at every width.
+   */
+  .lab-content {
+    box-sizing: border-box;
+    margin-inline: auto;
+    width: 100%;
+    max-width: var(--exhbt-content-width);
+    padding-inline: var(--exhbt-gutter);
   }
 
   /* ── The lab bar: lab chrome, drawn so it can't be taken for the product ─────────────────── */
@@ -194,6 +251,7 @@
   }
   .lab-bar-title > span:last-child {
     padding-bottom: 0.125rem;
+    font-size: 0.8125rem;
     white-space: nowrap;
   }
   .lab-tag {

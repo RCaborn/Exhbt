@@ -38,7 +38,10 @@ The kit page (`/lab/design/kit`) shows all of it beside today's. In short:
 
 - **Type**: ratio 1.25 from 16px. `Heading type="display-1|display-2|display-3"` are semibold and set tight (61, 49 and 39px; 48, 40 and 33px below 640px). `Heading type="hero"` is Home's own step, `--exhbt-hero-size`.
 - **Motion**: `--duration-fast` 140ms (feedback), `--duration-medium` 320ms (something arriving), `--duration-slow` 720ms (a moment that is watched); `--ease-entrance` and `--ease-move` overshoot a little, `--ease-exit` never does.
-- **Shadow**: `--shadow-high` is the work's (the site's `shadow-pack`) and a dialog's; `--shadow-med` a toast's; `--shadow-low` a menu's or popover's. Nothing else in the flow of a page is raised.
-- **Rings**: focus is `--focus-outline-*`, 3px jade, 2px clear; a chosen thing takes an ink edge (`--shadow-inset-selected`). Neither is ever blue.
+- **Shadow**: `--shadow-high` is the work's and a dialog's; `--shadow-med` a toast's; `--shadow-low` a menu's or popover's. Nothing else in the flow of a page is raised. High is deeper and tighter than the site's `shadow-pack`, which is under form cards too today. The site's `BrowserFrame` carries Tailwind's `shadow-pack` class, which writes its value out and reads no variable, so the lab gives the frame the theme's shadow in `components/lab/lab.css`; promoting the theme means changing that class.
+- **Rings**: focus is `--focus-outline-*`, 3px jade, 2px clear (mint on ink). A chosen thing takes an ink edge, set on each component (the tab, the segment, the selectable card): Astryx's `--shadow-inset-selected` is ink here too, but no Astryx component reads it. Neither ring is ever blue.
 - **Radius**: `--radius-inner` 8, `--radius-element` 14, `--radius-container` 20, `--radius-page` 28; buttons, tokens and the segmented control are pills.
+- **The content line**: `--exhbt-content-width` (72rem) and `--exhbt-gutter`. The themed `TopNav` pads itself to them, and the lab's `.lab-content` class uses the same two, so a bar and the page under it share one left edge.
 - **Status**: go, live and checked are mint and jade; information is ink on mist; a warning is ink with an edge; an error is the one red. The categorical colours Astryx offers (blue, purple, orange and the rest) all come out grey.
+
+The lab's three levels (restrained, confident, maximal) are not three themes. This theme is confident; `components/lab/lab.css` re-points the display sizes, the hero step, the two overshooting curves, the medium and slow durations and the high shadow for the other two.

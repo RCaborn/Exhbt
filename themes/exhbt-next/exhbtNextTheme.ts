@@ -114,9 +114,14 @@ export const exhbtNextTheme = defineTheme({
   // stroke being drawn). Expressive: entrances and moves overshoot a little; exits and fades never do.
   motion: { fast: 140, medium: 320, slow: 720, ratio: 0.75, character: "expressive" },
 
-  // The theme's own tokens, beside Astryx's. Home's opening line is fluid: 48px on a phone, 96px on a wide screen.
+  // The theme's own tokens, beside Astryx's.
   localTokens: {
+    // Home's opening line is fluid: 48px on a phone, 96px on a wide screen.
     "--exhbt-hero-size": "clamp(3rem, 8.4vw, 6rem)",
+    // The one content line: every page's content is this wide at most, with this gutter, and the
+    // top bar pads itself to the same edge (top-nav, below). 72rem is the site's width today.
+    "--exhbt-content-width": "72rem",
+    "--exhbt-gutter": "clamp(1rem, 4vw, 2rem)",
   },
 
   tokens: {
@@ -132,8 +137,9 @@ export const exhbtNextTheme = defineTheme({
     ...VOICE,
 
     // Shadows. Nothing in the flow of a page is raised except the work (a person's page in its
-    // frame), which takes --shadow-high, the site's shadow-pack. Low and medium are for what floats
-    // over the page for a moment: menus and popovers (low), toasts (medium). Dialogs and sheets take high.
+    // frame), which takes --shadow-high: deeper and tighter than the site's shadow-pack, which sits
+    // under form cards too today. Low and medium are for what floats over the page for a moment:
+    // menus and popovers (low), toasts (medium). Dialogs and sheets take high.
     "--shadow-low": "0 1px 2px rgb(14 15 18 / 0.06), 0 6px 16px rgb(14 15 18 / 0.08)",
     "--shadow-med": "0 1px 2px rgb(14 15 18 / 0.06), 0 10px 28px rgb(14 15 18 / 0.12)",
     "--shadow-high": "0 1px 2px rgb(14 15 18 / 0.06), 0 20px 48px -12px rgb(14 15 18 / 0.2)",
@@ -274,8 +280,10 @@ export const exhbtNextTheme = defineTheme({
       checked: { backgroundColor: MINT, boxShadow: `inset 0 0 0 ${EDGE} ${INK}` },
     },
     "switch-thumb": { checked: { backgroundColor: INK } },
-    // The label is part of the press target, so it is as tall as a control (44px).
-    "switch-label": { base: { paddingBlock: "calc((var(--size-element-md) - 1lh) / 2)" } },
+    // A box's or a switch's label is a sentence, not a field's name, so it isn't semibold. The
+    // switch's is part of the press target, so it is as tall as a control (44px).
+    "checkbox-label": { base: { fontWeight: "var(--font-weight-normal)" } },
+    "switch-label": { base: { fontWeight: "var(--font-weight-medium)", paddingBlock: "calc((var(--size-element-md) - 1lh) / 2)" } },
 
     // ── Choosing a view: tabs underline in ink; the segmented control is a pill with an ink choice ──
     tab: {
@@ -333,7 +341,9 @@ export const exhbtNextTheme = defineTheme({
       "status:error": { color: ERROR },
     },
     banner: {
-      base: { borderRadius: "var(--radius-element)" },
+      // A banner in the flow of a page is a rounded box; one across the top of a page is square.
+      "container:card": { borderRadius: "var(--radius-element)" },
+      "container:section": { borderRadius: "0" },
       "status:info": { backgroundColor: MIST, color: INK },
       "status:success": { backgroundColor: WASH, color: INK },
       "status:warning": { backgroundColor: WHITE, color: INK, boxShadow: `inset 0 0 0 ${EDGE} ${INK}` },
@@ -367,7 +377,16 @@ export const exhbtNextTheme = defineTheme({
     "empty-state-description": { base: { color: TEXT_2 } },
 
     // ── The frame of the app ─────────────────────────────────────────────────
-    "top-nav": { base: { backgroundColor: WHITE, borderBottomWidth: "1px", borderBottomStyle: "solid", borderBottomColor: LINE } },
+    // The top bar: white, a hairline, and padded so its first and last things sit on the content line.
+    "top-nav": {
+      base: {
+        backgroundColor: WHITE,
+        borderBottomWidth: "1px",
+        borderBottomStyle: "solid",
+        borderBottomColor: LINE,
+        paddingInline: "max(var(--exhbt-gutter), calc((100% - var(--exhbt-content-width)) / 2 + var(--exhbt-gutter)))",
+      },
+    },
     "top-nav-item": {
       base: { color: TEXT_2, fontWeight: "var(--font-weight-medium)", borderRadius: "var(--radius-full)", ":hover": { color: TEXT } },
       selected: { color: TEXT, fontWeight: "var(--font-weight-semibold)" },
@@ -386,14 +405,31 @@ export const exhbtNextTheme = defineTheme({
     divider: { base: { borderColor: LINE } },
   },
 
-  // On ink (a toast, a tooltip, an ink band): the ring and the accent are mint, which reads there.
+  // On ink (a toast, a tooltip, an ink band under Astryx's MediaTheme). Astryx flips the colour
+  // scheme there and turns the accent white. This theme has one scheme, so what changes on ink is
+  // said here: the accent stays mint, the ring, links and accents are mint, quiet text is the
+  // site's on-ink grey, and a hover is a white tint. Type, links, buttons and dividers are what
+  // goes on ink; a card, a token, a banner or a field keeps its light ground.
   onDark: {
     tokens: {
+      "--color-accent": MINT,
+      "--color-on-accent": INK,
       "--focus-outline-color": MINT,
       "--color-text-accent": MINT,
       "--color-icon-accent": MINT,
       "--color-text-secondary": ON_INK,
+      "--color-icon-secondary": ON_INK,
       "--color-border": "rgb(255 255 255 / 0.16)",
+      "--color-overlay-hover": "rgb(255 255 255 / 0.14)",
+      "--color-overlay-pressed": "rgb(255 255 255 / 0.22)",
+    },
+    components: {
+      // The second button on ink is an outline: a white pill would outshine the mint one.
+      button: { "variant:secondary": { backgroundColor: "transparent", color: WHITE, borderColor: WHITE } },
+      link: {
+        base: { textDecorationColor: `color-mix(in srgb, ${MINT} 55%, transparent)`, ":hover": { textDecorationColor: MINT } },
+      },
+      divider: { base: { borderColor: "rgb(255 255 255 / 0.16)" } },
     },
   },
 

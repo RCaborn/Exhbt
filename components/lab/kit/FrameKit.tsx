@@ -4,6 +4,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { TopNav, TopNavItem } from "@astryxdesign/core/TopNav";
 import { Logo } from "@/components/brand/Logo";
 import { SiteHeader } from "@/components/site/SiteHeader";
+import { LAB_PATH } from "../lab";
 import { Compare, KitBlock, KitSection, Note } from "./parts";
 
 /**
@@ -31,7 +32,11 @@ export function FrameKit() {
           }
           proposed={
             <div className="kit-stack">
-              <div className="kit-window">
+              <p className="kit-note kit-narrow-only">
+                On a screen this narrow the bar&rsquo;s links fold into a drawer, which only the whole frame can show. Open it on a page of its own,
+                below.
+              </p>
+              <div className="kit-window kit-wide-only">
                 <TopNav
                   label="Exhbt, as a signed-in person has it"
                   heading={<Logo href="#frame" />}
@@ -49,12 +54,18 @@ export function FrameKit() {
                   </Heading>
                   <div className="mt-2">
                     <Text as="p" display="block" color="secondary">
-                      The bar and this line share one left edge, on every page.
+                      The logo and this line share one left edge, on every page.
                     </Text>
                   </div>
                 </div>
               </div>
-              <Note>Astryx TopNav, themed: white, a hairline, the page you are on in ink. The App screen shows the whole frame.</Note>
+              <div className="kit-row">
+                <Button label="Open the frame on a page of its own" href={`${LAB_PATH}/kit/shell`} variant="secondary" />
+              </div>
+              <Note>
+                Astryx TopNav, themed: white, a hairline, the page you are on in ink. On its own page it sits in Astryx&rsquo;s AppShell, where
+                the links fold into a drawer on a phone. The App screen builds the whole frame.
+              </Note>
             </div>
           }
         />

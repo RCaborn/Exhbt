@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Text } from "@astryxdesign/core/Text";
 import { Preview } from "@/components/home/Preview";
@@ -6,6 +5,7 @@ import { ProjectView } from "@/components/portfolio/ProjectView";
 import { Frame } from "@/components/lab/Frame";
 import { ButtonsKit, CardsKit, ChoosingKit, FieldsKit } from "@/components/lab/kit/ControlsKit";
 import { FrameKit } from "@/components/lab/kit/FrameKit";
+import { InkKit } from "@/components/lab/kit/InkKit";
 import { KitRail } from "@/components/lab/kit/KitRail";
 import { LevelFacts } from "@/components/lab/kit/LevelFacts";
 import { MotionKit } from "@/components/lab/kit/MotionKit";
@@ -15,9 +15,10 @@ import { EmptyKit, ProgressKit, RingsKit, StatusKit } from "@/components/lab/kit
 import { TokenValue } from "@/components/lab/kit/TokenValue";
 import { TypeKit } from "@/components/lab/kit/TypeKit";
 import { sample, SampleExhbt, SamplePortfolio } from "@/components/lab/samples";
+import { labGate, labMetadata } from "@/components/lab/server";
 import "@/components/lab/kit/kit.css";
 
-export const metadata: Metadata = { title: "Kit" };
+export const generateMetadata = labMetadata("Kit");
 
 const FIXED = [
   { name: "Mint", token: "--color-mint", role: "Go, live and checked. One mint button a screen, the tick, the dot on Live.", className: "bg-mint text-ink" },
@@ -41,21 +42,30 @@ const GREYS = [
  * real theme: every figure on it is read from the stylesheets, not typed.
  */
 export default function LabKit() {
+  labGate();
   const [featured] = sample.exhbts;
   return (
     <main id="main" className="kit">
       <header className="kit-top">
-        <div>
+        <div className="kit-top-words">
           <Heading level={1} type="display-1">
             The voice, on one page.
           </Heading>
-          <div className="mt-6 max-w-[38rem]">
-            <Text as="p" display="block" type="large" color="secondary">
-              Exhbt&rsquo;s colours and typefaces don&rsquo;t change. What changes is how loudly they speak. In each section the site as it is today
-              is on the left and the proposal is on the right, drawn by the same components the product uses.
-            </Text>
-          </div>
+          <Text as="p" display="block" type="large" color="secondary">
+            Exhbt&rsquo;s colours and typefaces don&rsquo;t change. What changes is how loudly they speak, and what they speak for: a person&rsquo;s own
+            work, shown large. In each section below, the site as it is today is on the left and the proposal is on the right.
+          </Text>
         </div>
+        {/* The product in the first screen: her portfolio, drawn by the real page, in the proposed frame. */}
+        <Frame
+          className="kit-top-work"
+          url={sample.address}
+          label={`${sample.owner.name}'s portfolio home page, an example: her name, her photo's place, her intro and her best piece of work`}
+          crop="max-h-[22rem] sm:max-h-[26rem] lg:max-h-[30rem]"
+          page="[zoom:0.5] sm:[zoom:0.6] lg:[zoom:0.56]"
+        >
+          <SamplePortfolio />
+        </Frame>
         <LevelFacts />
       </header>
 
@@ -91,6 +101,7 @@ export default function LabKit() {
                 ))}
               </div>
             </KitBlock>
+            <InkKit />
           </KitSection>
 
           <ButtonsKit />
