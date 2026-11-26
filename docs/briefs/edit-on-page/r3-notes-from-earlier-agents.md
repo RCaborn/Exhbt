@@ -506,3 +506,34 @@ Still open:
 - The real model has not seen a Word, PowerPoint or uploaded picture (eval cases 15 to 18), or a long draft: four characters a token is an estimate until a long draft's input tokens are in `ai_call_logs`.
 - Nothing here ran on WebKit or a phone.
 - The new editor's "Take a figure from my report" for Word and PowerPoint files (0025 says what it needs).
+
+## From the flow-lift agent, 26 Nov 2026 (branch `phase-2-flow-lift`)
+
+The flowchart drag test failed now and then in "safari 2/3, the focus rule": `e2e/editor-flow.spec.ts`, "a box dragged along the flowchart lands where shown…", the box never lifting (`data-flow-drag` never "pointer"). It was at line 314 then, its failing check in `pickUp` at 103; both have moved.
+
+What it was:
+- Always the second pick-up: the box just dropped, picked up again with the pointer still on it. Never the first pick-up or the third.
+- WebKit can lose the hover of a box that a drop moves in the page while the pointer is on it. The box then counts as not hovered while the pointer moves about on it, its own words included, until the pointer leaves the box. Chromium never does this.
+- A box's grip and Remove show on hover or while the box has the focus (`flow.css`). Where a press focuses the button (Chromium, WebKit on Linux), the grip keeps the focus through the drop, as React gives it back after moving the box, so they stayed up. Under Safari's rule a press gives the grip no focus: it goes to the flowchart's list. With neither, the tools were hidden under the pointer and the press went to the box.
+- Seen in WebKit's own logs. The test said what each press met, and a temporary test picked up the box just dropped ten times on each layout (both gone now). Before the fix (run 45726261188), under the rule, 5 of 67 such pick-ups failed, each with "the box hovered false; its tools 0/none" and the press on `div.xp-flow-box`, not taken by the drag. Without the rule 16 of 70 had the box not hovered at the press too, but the grip had the focus, its tools were up, and all 70 lifted.
+- A real Safari user meets it: Safari on a Mac never focuses a pressed button, and the lost hover is WebKit's own, not the emulation's (the group without the rule shows it). After a box is dropped with a mouse, its grip and Remove stay hidden until the pointer leaves the box, and a press where the grip should be does nothing.
+
+The fix (`components/exhbt-editor/flow/FlowList.tsx`, `keepGrip`): after a drag by mouse (a drop, a drop where it was, a cancel) the carried box's grip gets the focus, without a scroll. That is where other browsers leave it already, and where a drag from the keyboard leaves it. Touch and the keyboard are unchanged. After the fix (run 45727442555, with the same temporary test), under the rule, 0 of 70 failed; every one began with the focus on the grip, and 10 of them had the box not hovered at the press and lifted all the same. Without the rule, 0 of 70.
+
+Runs of the final code:
+- WebKit (run 45799050984, ae06cd5): "safari 2/3" 172 passed, none on a retry. "safari 2/3, the focus rule": all 103 flowchart tests that ran passed at the first try, the drag test on all seven layouts among them; the job then hit its 45-minute limit in `editor-inplace`, as installing WebKit had taken 30 minutes. The other six groups passed.
+- Chromium, one worker, on 840062d (the fix, the test and #45; #46 since then only switches the default editor, which the test server sets already): `editor-flow` and `editor-drag` together, `desktop` 231 passed without the rule and 230 with it (the other one's page crashed while loading, in a test of Move up and Move down; it passed 3 of 3 again), `touch` 11 passed both ways (the rest are mouse tests); the drag test 56 of 56 under `E2E_WEBKIT=chromium E2E_FOCUS=safari`.
+
+Tests:
+- The drag test checks that the dropped box's grip has the focus, and that its tools stay shown with the pointer off the box. Under `E2E_FOCUS=safari` that fails without the fix every time (checked with the old `FlowList.tsx` put back); the old failure needed WebKit.
+- A pick-up that doesn't lift fails with what the press met (`listen` in the spec): the box's hover, its tools and the focus before the pointer moves and from inside the press, what the press landed on, whether the drag took it, and what followed. It listens to no frequent event.
+- Chromium never showed the failure, with or without load: 0 in 140 runs of the test under `E2E_WEBKIT=chromium E2E_FOCUS=safari` before the fix (one run did not open the editor under load), 0 in 35 with no `requestIdleCallback` (as WebKit) and the processor 4 times slower, 0 in 21 at 6 times. So that emulation can't show this kind of fault; read WebKit's runs.
+- A way to read a WebKit run when its artifacts can't be downloaded: `gh api repos/RCaborn/Exhbt/actions/jobs/<job id>/logs` works without a token while the repository is public, once the job has finished.
+
+Not the same cause: `editor-drag.spec.ts`, "a click on a grip, or a nudge under 6px…" (then at 583), failed in "safari 1/3", without the rule, at its last step (dragging across a box's words selected nothing); "a new graph opens its figures sheet…" (then at 1222) passed on a retry in the same group, its "full" note missing after a second `openDoc`, with a WebKit "access control checks" page error. Neither touches the flowchart's drag or the focus rule. Not looked into further.
+
+Still open:
+- A click on the grip with no drag (under 6px) puts the focus back on the list in Safari; after a lost hover the tools then hide again until the pointer leaves the box. Not seen in a test.
+- The same hover dependence elsewhere, not tested: a section's toolbar (`.xe-frame:hover`) after a section is dropped with the mouse (the drag board moves sections in the page too), and a tablet's row chips after a box is dropped by touch.
+- Not checked on a real Mac: whether a real mouse meets the lost hover, and whether the grip, focused by script after a drop, draws a focus ring or its tooltip in Safari. Under the emulation on Chromium the list showed a focus ring after a press, so the grip may show one there.
+- In both runs with the temporary test, "the others slide aside" (Case study, the same test) failed on the first try in both groups and passed on the retry: the slide had not begun when the boxes were measured. With the temporary test and its log of every mousemove gone, the next run had no failed try in either group's flowchart tests. Watch for it.

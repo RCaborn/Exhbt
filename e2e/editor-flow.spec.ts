@@ -91,6 +91,7 @@ const AXIS: Partial<Record<Format, "row" | "column">> = { "case-study": "row", g
 
 /** Presses the mouse on a box's grip and moves past the 6px threshold. Returns where the pointer is. */
 async function pickUp(page: Page, i: number) {
+  await listen(page, i);
   await box(page, i).hover();
   const g = (await gripOf(page, i).boundingBox())!;
   const at = { x: g.x + g.width / 2, y: g.y + g.height / 2 };
@@ -100,8 +101,63 @@ async function pickUp(page: Page, i: number) {
   await page.mouse.move(at.x + 2, at.y + 2, { steps: 2 });
   expect(await list(page).getAttribute("data-flow-drag")).toBeNull();
   await page.mouse.move(at.x + 6, at.y + 6, { steps: 3 });
-  await expect(list(page)).toHaveAttribute("data-flow-drag", "pointer");
+  try {
+    await expect(list(page)).toHaveAttribute("data-flow-drag", "pointer");
+  } catch (e) {
+    const heard = await page.evaluate(() => (window as Window & { __press?: string[] }).__press ?? []).catch(() => ["(the page could not be read)"]);
+    throw new Error(`The box did not lift. What the press met, in order:\n${heard.join("\n")}\n${(e as Error).message}`);
+  }
   return { x: at.x + 6, y: at.y + 6 };
+}
+
+/**
+ * What a press on box `i`'s grip meets, kept in the page for a pick-up that does not lift: a WebKit run's log is all
+ * that a machine without WebKit sees of it. Where the focus is and whether the box is hovered with its tools shown,
+ * before the pointer moves to it and again from inside the press (so nothing runs between the move and the press), what
+ * the press landed on, and what the page did then. It listens to no event that comes often, such as a mousemove.
+ */
+function listen(page: Page, i: number) {
+  return page.evaluate(
+    ({ i, BOX, LIST }) => {
+      type Heard = Window & { __press?: string[]; __pressFrom?: number; __pressBox?: number; __lastUp?: number; __pressListening?: boolean };
+      const w = window as Heard;
+      const name = (t: EventTarget | null): string => {
+        if (!(t instanceof Element)) return t === document ? "document" : String(t);
+        const mark = ["data-flow-grip", "data-flow-step", "data-path", "data-section-id"].find((a) => t.hasAttribute(a));
+        const cls = [...t.classList].find((c) => c.startsWith("xe-") || c.startsWith("xp-"));
+        return `${t.tagName.toLowerCase()}${cls ? `.${cls}` : ""}${mark ? `[${mark}=${t.getAttribute(mark)}]` : ""}`;
+      };
+      /** The focus, and box `n`'s hover and tools, now. */
+      const state = (n: number) => {
+        const li = document.querySelectorAll(BOX)[n];
+        const tools = li?.querySelector(".xe-flow-tools");
+        const s = tools ? getComputedStyle(tools) : null;
+        return `the focus on ${name(document.activeElement)}; the box hovered ${li?.matches(":hover")}; its tools ${s?.opacity}/${s?.pointerEvents}`;
+      };
+      const say = (s: string) => w.__press?.push(`  ${Math.round(performance.now() - (w.__pressFrom ?? 0))}ms ${s}`);
+      w.__press = [];
+      w.__pressFrom = performance.now();
+      w.__pressBox = i;
+      say(`at the start (${w.__lastUp === undefined ? "no drop yet" : `${Math.round(performance.now() - w.__lastUp)}ms after the last mouseup`}): ${state(i)}`);
+      if (w.__pressListening) return;
+      w.__pressListening = true;
+      // The press as the browser hit it, and the page as it is drawn there now, from inside the press.
+      window.addEventListener(
+        "mousedown",
+        (e) => say(`at the press: on ${name(e.target)}; drawn there now ${document.elementsFromPoint(e.clientX, e.clientY).slice(0, 3).map(name).join(" over ")}; ${state(w.__pressBox ?? 0)}`),
+        true,
+      );
+      // After the page's own handlers and Safari's focus rule (e2e/editor-test.ts), which listens on the window too.
+      window.addEventListener("mousedown", (e) => say(`the press done: prevented ${e.defaultPrevented}, taken by the drag ${"dndKit" in e}, the focus on ${name(document.activeElement)}`));
+      window.addEventListener("mouseup", () => (w.__lastUp = performance.now()), true);
+      for (const type of ["pointercancel", "dragstart", "resize", "visibilitychange", "keydown", "focusin"]) window.addEventListener(type, (e) => say(`${type} on ${name(e.target)}`), true);
+      const flow = document.querySelector(LIST);
+      if (flow) new MutationObserver(() => say(`data-flow-drag is ${flow.getAttribute("data-flow-drag")}`)).observe(flow, { attributes: true, attributeFilter: ["data-flow-drag"] });
+      const region = document.querySelector('[data-editor="page"] [data-said]');
+      if (region) new MutationObserver(() => say(`said: ${region.textContent}`)).observe(region, { childList: true, characterData: true, subtree: true });
+    },
+    { i, BOX, LIST },
+  );
 }
 
 /** The point `share` of the way along box `i` (along the flowchart's axis), across its middle. */
@@ -379,6 +435,10 @@ for (const f of offered()) {
       await expect(list(page)).not.toHaveAttribute("data-flow-drag", /./);
       // Each box is in its place, with nothing left over from the motion.
       expect(await placed(page)).toBe(true);
+      // The dropped box's grip has the focus, as after a drag from the keyboard. Under Safari's rule a press gives the grip
+      // none, and WebKit can lose the hover of a box the drop has moved under the pointer: with neither, the box's tools
+      // hid under the pointer and the pick-up below went to the box (FlowList.tsx, keepGrip).
+      await expect(gripOf(page, 2)).toBeFocused();
 
       // Back again, towards the start: over the near part of box 1, place 1; in line style the line goes before it.
       await pickUp(page, 2);
@@ -394,6 +454,10 @@ for (const f of offered()) {
       await page.mouse.up();
       expect(await keysNow(page)).toEqual(keys);
       expect(await stepsNow(page)).toEqual(steps);
+      // It is the focus that keeps the dropped box's tools shown, not the hover: they stay with the pointer off the box.
+      await expect(gripOf(page, 0)).toBeFocused();
+      await page.mouse.move(5, 5);
+      expect(await box(page, 0).locator(".xe-flow-tools").evaluate((e) => `${getComputedStyle(e).opacity}/${getComputedStyle(e).pointerEvents}`)).toBe("1/auto");
 
       // Let go off to the side of the flowchart, it goes back where it was.
       await pickUp(page, 1);
