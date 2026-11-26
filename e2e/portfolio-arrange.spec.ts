@@ -262,7 +262,7 @@ test.describe("Exhbt tiles", () => {
     await tile(page, id).hover();
     await tileTools(page, id).getByRole("button", { name: /^Put .* in the band$/ }).click();
     expect((await arrangement(page)).featured).toBe(id);
-    await expect(page.locator(`${READY} [data-section="featured"] [data-tile-frame="${id}"]`)).toHaveCount(1);
+    await expect(page.locator(`${READY} [data-section-frame="featured"] [data-tile-frame="${id}"]`)).toHaveCount(1);
     expect(await workIds(page)).not.toContain(id);
     await pointAt(page, "featured");
     await tools(page, "featured").getByRole("button", { name: /^Take .* out of the band$/ }).click();
@@ -284,7 +284,7 @@ test.describe("Exhbt tiles", () => {
     expect(await workIds(page)).toContain(id);
     await expect(row).toHaveCount(0);
     // Hiding the band's exhbt takes its star off.
-    const band = await page.locator(`${READY} [data-section="featured"] [data-tile-frame]`).getAttribute("data-tile-frame");
+    const band = await page.locator(`${READY} [data-section-frame="featured"] [data-tile-frame]`).getAttribute("data-tile-frame");
     await tile(page, (await workIds(page))[0]!).hover();
     await tileTools(page, (await workIds(page))[0]!).getByRole("button", { name: /^Put .* in the band$/ }).click();
     const starred = (await arrangement(page)).featured!;
