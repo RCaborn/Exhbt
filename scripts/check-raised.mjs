@@ -43,7 +43,6 @@ const BASELINE = new Set([
   "components/portfolio/PortfolioHome.tsx",
   "components/roadmap/Generating.tsx",
   "components/roadmap/RoadmapViews.tsx",
-  "components/site/MobileNav.tsx",
   "components/team/MatchPrompt.tsx",
 ]);
 
