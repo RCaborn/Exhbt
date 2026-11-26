@@ -117,6 +117,8 @@ test.describe("Sections", () => {
     await page.mouse.move(grip.x + grip.width / 2, grip.y - 20, { steps: 4 });
     await expect(page.getByTestId("lifted-section")).toBeVisible();
     await page.mouse.move(grip.x + grip.width / 2, target.y + 20, { steps: 16 });
+    console.log("DEBUG grip", JSON.stringify(grip), "target", JSON.stringify(target), "lifted", JSON.stringify(await page.getByTestId("lifted-section").boundingBox()), "scroll", await page.evaluate(() => scrollY));
+    await page.screenshot({ path: "/tmp/claude-0/-home-user-Exhbt/8f68944d-9b6a-5167-8a40-0d82c10fe3df/scratchpad/dbg-drag.png" });
     await page.mouse.up();
     await expect.poll(async () => (await sections(page)).indexOf("quote")).toBe(before.indexOf("about"));
     expect(await undoLabel(page)).toBe("moved A quote");
