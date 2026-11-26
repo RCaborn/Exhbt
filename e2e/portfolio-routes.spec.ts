@@ -4,6 +4,7 @@ import { openBankingDoc } from "../lib/exhbt/sample";
 import { fillTitle } from "./editor";
 import { buildRoadmap, unlockProjects, waitForResult } from "./helpers";
 import { freshName, openDoc, openNew, READY, readStored, waitReady, waitSaved } from "./page-editor";
+import { READY as PORTFOLIO_READY, uiNow } from "./portfolio-editor";
 
 /*
  * Portfolio first's structure (decision 0031, "The structure"; brief H): with the switch at "page" the app
@@ -64,6 +65,16 @@ test.describe("the exhbts list", () => {
     const landed = page.waitForURL(/\/portfolio#team-projects$/, { waitUntil: "commit" });
     await page.goto("/exhbts#team-projects", { waitUntil: "commit" });
     await landed;
+
+    // Where the team actions send a person after joining (app/(app)/team/actions.ts): query and hash both come
+    // through, and the portfolio editor opens Team with the note about joining.
+    await page.goto("/account");
+    const joined = page.waitForURL(/\/portfolio\?joined=1#team-projects$/, { waitUntil: "commit" });
+    await page.goto("/exhbts?joined=1#team-projects", { waitUntil: "commit" });
+    await joined;
+    await expect(page.locator(PORTFOLIO_READY)).toBeAttached();
+    await expect.poll(async () => (await uiNow(page)).sheet).toBe("team");
+    expect((await uiNow(page)).team).toBe("joined");
   });
 });
 
