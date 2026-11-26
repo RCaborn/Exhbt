@@ -177,6 +177,34 @@
     color: var(--color-graphite);
   }
 
+  /*
+   * A line the lab says inside the frame (what a mock-up leaves out), drawn as lab chrome like the
+   * lab bar, so it can't be taken for the product's own words.
+   */
+  .app-lab-aside {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.625rem;
+    max-width: 44rem;
+    border: 1.5px dashed var(--color-ink);
+    border-radius: var(--radius-element);
+    background: var(--color-mist);
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: var(--color-ink);
+  }
+  .app-lab-aside > b {
+    flex: none;
+    border-radius: 999px;
+    background: var(--color-ink);
+    padding: 0.05rem 0.55rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-surface);
+  }
+
   /* ── A page's top: one loud line, and at most one line under it ─────────────────────────── */
   .app-head {
     display: grid;
@@ -224,7 +252,6 @@
     align-content: center;
   }
   .app-strip-steps {
-    display: none;
     min-width: 0;
   }
   @media (width >= 768px) {
@@ -232,9 +259,6 @@
       grid-template-columns: minmax(0, 1fr) minmax(0, 38rem);
       align-items: center;
       padding-block: 1.25rem;
-    }
-    .app-strip-steps {
-      display: block;
     }
   }
 
@@ -332,13 +356,13 @@
     .app-tiles {
       gap: 3rem 2.5rem;
     }
-    .app-tile[data-first] {
+    .app-tile[data-band] {
       grid-column: 1 / -1;
     }
-    .app-tile[data-first] .app-tile-band {
+    .app-tile[data-band] .app-tile-band {
       display: block;
     }
-    .app-tile[data-first] .app-tile-band + .app-tile-card {
+    .app-tile[data-band] .app-tile-band + .app-tile-card {
       display: none;
     }
   }
@@ -547,13 +571,13 @@
   }
   @media (width >= 1024px) {
     /* The first tile is her band: its words beside its figure. */
-    .app-tile[data-first] .app-tile-skel {
+    .app-tile[data-band] .app-tile-skel {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       grid-template-rows: 14rem;
       gap: 3rem;
       padding: 3rem;
     }
-    .app-tile[data-first] .app-tile-skel-words {
+    .app-tile[data-band] .app-tile-skel-words {
       order: -1;
       align-content: center;
     }
@@ -598,12 +622,18 @@
    * entrances read, are stilled on this screen; the fast one (a hover, a press) stays.
    */
   [data-lab-shell]:has([data-app-lab][data-app-level="restrained"]) :is([data-astryx-theme], [data-lab-root]) {
+    /* A menu's entrance reads the longest of the fast tempos; a press and a hover read the shortest. */
+    --duration-fast-max: 1ms;
     --duration-medium-min: 1ms;
     --duration-medium: 1ms;
     --duration-medium-max: 1ms;
     --duration-slow-min: 1ms;
     --duration-slow: 1ms;
     --duration-slow-max: 1ms;
+  }
+  /* A toast's entrance reads the fast tempo itself, which a hover needs, so it is stilled on the toast alone. */
+  [data-lab-shell]:has([data-app-lab][data-app-level="restrained"]) .astryx-toast {
+    transition-duration: 1ms;
   }
 }
 

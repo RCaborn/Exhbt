@@ -96,7 +96,7 @@ export function Settings({
   return (
     <div className="lab-content app-settings">
       <header className="app-settings-head">
-        <Heading level={1}>Account</Heading>
+        <Heading level={1}>Account and billing</Heading>
         <Text as="p" display="block" color="secondary">
           Signed in as {words.person.email}. You&rsquo;re on {words.account.planName}, {words.account.priceLine}.
         </Text>
@@ -173,7 +173,7 @@ export function Settings({
                 </form>
               </Part>
 
-              <Part id="plan" line={`Paid plans are billed once a year. You can move at any time.`}>
+              <Part id="plan" line={words.account.billingLine}>
                 {loading ? (
                   <div className="app-plans">
                     {[0, 1, 2].map((i) => (

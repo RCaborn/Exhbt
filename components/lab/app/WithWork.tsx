@@ -84,13 +84,19 @@ export function WithWork({
     if (!navigator.clipboard) toast(`The link is ${link}`, "app-copied");
   };
 
+  // The page's scroll belongs to the state it moves to, so it is set before the browser's picture of that state.
   const openTile = (slug: string) => {
     flushSync(() => setTraveller(slug));
-    morph(() => setOpen(slug));
-    window.scrollTo({ top: 0, behavior: "instant" });
+    morph(
+      () => setOpen(slug),
+      () => window.scrollTo({ top: 0, behavior: "instant" }),
+    );
   };
   const close = () => {
-    morph(() => setOpen(null));
+    morph(
+      () => setOpen(null),
+      () => document.querySelector("[data-app-lab] .app-tile-art[data-morph]")?.scrollIntoView({ block: "center", behavior: "instant" }),
+    );
   };
 
   // Moves stay inside a group: live exhbts first, in her order, then drafts (decision 0031).
@@ -124,9 +130,10 @@ export function WithWork({
             {art.pages[t.slug]}
           </Frame>
         </div>
-        <Text as="p" display="block" type="supporting">
-          The exhbt&rsquo;s editor opens here. Other agents are building it, so the lab shows the page itself.
-        </Text>
+        <p className="app-lab-aside">
+          <b>Lab</b>
+          <span>In the product the exhbt&rsquo;s editor opens here. It isn&rsquo;t part of this mock-up, so the page itself is shown.</span>
+        </p>
       </div>
     );
   }
@@ -162,12 +169,15 @@ export function WithWork({
       )}
 
       <ul className="app-tiles" aria-label="Your exhbts">
-        {tiles.map((t, i) => (
+        {tiles.map((t, i) => {
+          // Her best work leads as her page's band while it is first in her order.
+          const band = i === 0 && art.band.slug === t.slug;
+          return (
           <li
             key={t.slug}
             className="app-tile"
             data-status={t.status}
-            data-first={i === 0 || undefined}
+            data-band={band || undefined}
             style={{ "--app-vt-name": `app-tile-${t.slug}` } as React.CSSProperties}
           >
             <h2 className="sr-only">{t.title}</h2>
@@ -191,8 +201,8 @@ export function WithWork({
                 onClick={() => openTile(t.slug)}
                 aria-hidden
               >
-                {/* Her best work leads, as her page's band, where the tile is wide enough to hold it. */}
-                {i === 0 && art.band.slug === t.slug && <div className="app-tile-band">{art.band.node}</div>}
+                {/* As her page's band where the tile is wide enough to hold it, as her card where it isn't. */}
+                {band && <div className="app-tile-band">{art.band.node}</div>}
                 <div className="app-tile-card">{art.cards[t.slug]}</div>
               </div>
             )}
@@ -226,7 +236,8 @@ export function WithWork({
               )}
             </div>
           </li>
-        ))}
+          );
+        })}
         <li className="app-tile app-add">
           <div className="app-add-slot">
             <span className="app-add-mark" aria-hidden>

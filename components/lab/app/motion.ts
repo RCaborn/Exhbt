@@ -23,10 +23,19 @@ type StartViewTransition = (update: () => void) => { finished: Promise<void> };
 export function useMorph() {
   const { level, moves } = useLab();
   return useCallback(
-    (update: () => void) => {
+    /**
+     * `update` is the state change. `after` runs once the page has been drawn in its new state and
+     * before the browser takes its picture of it, for a scroll that belongs to the new state (the top
+     * of an opened exhbt, the tile it closes back into), so the picture carried across lands there.
+     */
+    (update: () => void, after?: () => void) => {
       const start = (document as Document & { startViewTransition?: StartViewTransition }).startViewTransition?.bind(document);
+      const run = () => {
+        flushSync(update);
+        after?.();
+      };
       if (level !== "maximal" || !moves || !start) {
-        update();
+        run();
         return;
       }
       const html = document.documentElement;
@@ -41,10 +50,10 @@ export function useMorph() {
         html.style.removeProperty("--app-vt-ease");
       };
       try {
-        start(() => flushSync(update)).finished.then(done, done);
+        start(run).finished.then(done, done);
       } catch {
         done();
-        update();
+        run();
       }
     },
     [level, moves],

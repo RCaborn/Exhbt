@@ -89,6 +89,8 @@ export type AppWords = {
     planName: string;
     priceLine: string;
     plans: PlanWords[];
+    /** How the paid plans are billed (BILLING_PERIOD). */
+    billingLine: string;
   };
 };
 
@@ -124,13 +126,14 @@ function planLines(plan: "free" | "premium" | "max"): string[] {
   return lines;
 }
 
-function changeTo(plan: "free" | "premium" | "max", have: number): string {
+/** What moving to `plan` changes for someone with `total` exhbts, `live` of them published. */
+function changeTo(plan: "free" | "premium" | "max", total: number, live: number): string {
   const e = ENTITLEMENTS[plan];
-  if (!e.publicPortfolio) return `On ${PLAN_NAMES[plan]} your portfolio goes offline and only you can see it. Nothing is deleted.`;
-  if (have > e.exhbts) {
-    return `On ${PLAN_NAMES[plan]} your portfolio shows your first ${count(e.exhbts, "exhbt")}, in the order you set. Nothing is deleted.`;
-  }
-  return `${PLAN_NAMES[plan]} holds ${count(e.exhbts, "exhbt")}, so all ${have} of yours stay online.`;
+  const name = PLAN_NAMES[plan];
+  if (!e.publicPortfolio) return `On ${name} your portfolio goes offline and only you can see it. Nothing is deleted.`;
+  if (live > e.exhbts) return `On ${name} your portfolio shows your first ${count(e.exhbts, "exhbt")}, in the order you set. Nothing is deleted.`;
+  if (total > e.exhbts) return `${name} holds ${count(e.exhbts, "exhbt")}. Your ${live} live ones stay online, and nothing is deleted.`;
+  return `${name} holds ${count(e.exhbts, "exhbt")}: all ${total} of yours fit, and your ${live} live ones stay online.`;
 }
 
 export function appWords(): AppWords {
@@ -192,8 +195,9 @@ export function appWords(): AppWords {
         name: PLAN_NAMES[id],
         price: priceOf(id),
         lines: planLines(id),
-        change: changeTo(id, used),
+        change: changeTo(id, used, tiles.filter((t) => t.status === "live").length),
       })),
+      billingLine: `Paid plans are billed once a ${BILLING_PERIOD}. You can move to another at any time.`,
     },
   };
 }
