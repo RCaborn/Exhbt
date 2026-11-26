@@ -21,6 +21,7 @@ import { HEADING_ID, UndoButton } from "../ui/UndoButton";
 import { useBarSize, useCoarse, useNarrow, useStanding, type Standing } from "./hooks";
 import { LookPanel, PreviewNotice } from "./LookMenu";
 import { LinksPanel } from "../tools/PartTools";
+import { ReorderSheet } from "../phone/ReorderSheet";
 
 /*
  * The editor's bar (decision 0031, "The bar"): one row of app chrome, Astryx's Toolbar (one Tab stop,
@@ -99,6 +100,8 @@ export function EditorBar({ team, jobLinks }: { team: ReactNode; jobLinks: React
       <PhotoSheet />
       <AddressSheet />
       <TeamSheet team={team} />
+      {/* "Reorder sections", the menu's item under a finger (brief I). */}
+      <ReorderSheet />
       {/* Folded into the menu on a narrow window, where the bar's buttons they hang off are gone. */}
       {narrow && (
         <>
