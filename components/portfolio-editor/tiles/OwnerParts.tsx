@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Eye, Plus } from "lucide-react";
-import { createFromScratch } from "@/app/(app)/exhbts/[id]/actions";
 import type { OwnerOnlyExhbt } from "@/app/(app)/portfolio/load";
 import type { HomeOwnerPlace } from "@/components/portfolio/home-ctx";
 import { bandButtonClass, ROWS, WorkRow, WRAP } from "@/components/portfolio/PortfolioHome";
@@ -30,7 +29,7 @@ export function OwnerParts({ where }: { where: HomeOwnerPlace }): ReactNode {
   return where === "work-end" ? <WorkEnd /> : <PageEnd />;
 }
 
-/** The look's own button in the vision: does what the Add tile does (its first way, uploading). */
+/** The look's own button in the vision: does what the Add tile does (to /exhbts/new, the chooser). */
 function VisionButton(): ReactNode {
   const themeId = usePortfolioState((s) => s.arrangement.themeId);
   const previewing = usePortfolioUi((u) => u.previewing);
@@ -135,7 +134,12 @@ function OwnerTile({ exhbt: e, shape, n }: { exhbt: OwnerOnlyExhbt; shape: "card
 
 const PAGE_BUTTON = "inline-flex items-center gap-2 rounded-[var(--pf-radius-button)] bg-[var(--pf-button-bg)] px-5 py-2.5 text-[0.95rem] font-semibold text-[color:var(--pf-button-text)] hover:opacity-90";
 
-/** "Add an exhbt": the two ways to make one, and how many the plan holds. When it is full: the reason and the upgrade, in the alert tone after `?full=1`. */
+/**
+ * The Add tile (decision 0033, F2): what the space is for, "Your next project goes here", answering the
+ * band's "Your best project goes here", and one link, "Add an exhbt", to /exhbts/new, the chooser that
+ * explains both ways to start. Then how many the plan holds. When it is full: the reason and the
+ * upgrade, in the alert tone after `?full=1`.
+ */
 function AddTile({ shape }: { shape: "card" | "row" }): ReactNode {
   const { addRoom: room, builder } = usePortfolioData();
   const full = usePortfolioUi((u) => u.full);
@@ -145,13 +149,8 @@ function AddTile({ shape }: { shape: "card" | "row" }): ReactNode {
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
         <Link href="/exhbts/new" className={PAGE_BUTTON}>
           <Plus aria-hidden size={16} strokeWidth={2.5} />
-          {W.upload}
+          {W.addExhbt}
         </Link>
-        <form action={createFromScratch}>
-          <button type="submit" className={ACCENT_LINK}>
-            {W.blank}
-          </button>
-        </form>
       </div>
       {!builder.plan.isPublic && <p className="text-[0.875rem] text-[color:var(--pf-soft)]">{W.freeNote}</p>}
       {count}
@@ -169,7 +168,7 @@ function AddTile({ shape }: { shape: "card" | "row" }): ReactNode {
       )}
     </div>
   );
-  const heading = <h3 className="pf-display text-[1.25rem] leading-snug [letter-spacing:calc(var(--pf-tracking)*0.3)]">{W.addExhbt}</h3>;
+  const heading = <h3 className="pf-display text-[1.25rem] leading-snug [letter-spacing:calc(var(--pf-tracking)*0.3)]">{W.addHeading}</h3>;
   const what = <p className="max-w-[34rem] text-[0.9375rem] leading-relaxed text-[color:var(--pf-soft)]">{W.addWhat}</p>;
   if (shape === "row") {
     return (

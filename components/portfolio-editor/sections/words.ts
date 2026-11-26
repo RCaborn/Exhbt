@@ -83,10 +83,9 @@ export const W = {
   hiddenWhy: "Visitors don't see these here. Each one still works at its link.",
 
   /* ---------- Add an exhbt ---------- */
+  addHeading: "Your next project goes here",
   addExhbt: "Add an exhbt",
   addWhat: "An exhbt is a short, checked write-up of one project, with its key result. Each one you add shows here.",
-  upload: "Upload your project",
-  blank: "Or start from a blank page",
   room: (used: number, limit: number, plan: string) => `${used} of ${limit} on ${plan}`,
   seePlansUpgrade: "See plans",
   freeNote: "On your plan an exhbt stays a draft that only you can see.",

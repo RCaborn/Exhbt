@@ -193,7 +193,12 @@ test.describe("Sections by touch", () => {
     const before = await sections(page);
     const grip = tools(page, "contact").getByRole("button", { name: "Drag Get in touch" });
     await grip.scrollIntoViewIfNeeded();
+    // On a touch screen the toolbar always shows, nothing pointed at, and its buttons are 44px.
     await expect(grip).toBeVisible();
+    for (const b of await tools(page, "contact").getByRole("button").all()) {
+      const box = (await b.boundingBox())!;
+      expect(Math.min(box.width, box.height), (await b.getAttribute("aria-label")) ?? "a tool").toBeGreaterThanOrEqual(44);
+    }
     const a = (await grip.boundingBox())!;
     const target = (await frame(page, "quote").boundingBox())!;
     const f = await finger(page);
@@ -319,20 +324,104 @@ test.describe("Exhbt tiles", () => {
     await expect(page.locator(`${READY} [data-owner="owner-only"]`)).toHaveCount(0);
   });
 
-  test("the Add tile gives the two ways to start and the plan's count; when the plan is full, its reason", async ({ page }) => {
+  test("the Add tile says what the space is for, has one link to add an exhbt and the plan's count; when the plan is full, its reason", async ({ page }) => {
     await openEditor(page, fresh(FULL, "addtile"));
     const add = page.locator(`${READY} [data-owner="add"]`);
-    await expect(add.getByRole("heading", { name: "Add an exhbt" })).toBeVisible();
-    await expect(add.getByRole("link", { name: "Upload your project" })).toHaveAttribute("href", "/exhbts/new");
-    await expect(add.getByRole("button", { name: "Or start from a blank page" })).toBeVisible();
+    await expect(add.getByRole("heading", { name: "Your next project goes here" })).toBeVisible();
+    await expect(add.getByRole("link")).toHaveCount(1);
+    await expect(add.getByRole("link", { name: "Add an exhbt" })).toHaveAttribute("href", "/exhbts/new");
+    // No blank-page form: /exhbts/new is the chooser that explains both ways.
+    await expect(add.getByRole("button")).toHaveCount(0);
+    await expect(add.locator("form")).toHaveCount(0);
     await expect(add.locator("[data-pe-room]")).toHaveText(/^5 of \d+ on \w+/);
 
     await openEditor(page, fresh(fullFixture("pp-full", null, "free"), "addfull"));
     const full = page.locator(`${READY} [data-owner="add"]`);
     await expect(full).toHaveAttribute("data-full", "true");
     await expect(full.getByRole("status")).toBeVisible();
-    await expect(full.getByRole("link", { name: "Upload your project" })).toHaveCount(0);
+    await expect(full.getByRole("link", { name: "Add an exhbt" })).toHaveCount(0);
   });
+
+  test("over a paid plan's limit, the extra exhbt is an owner-only tile with its chip, after the work and before the Add tile", async ({ page }) => {
+    const seeded = await openEditor(page, fresh(fullFixture("pp-full", null, "premium"), "overlimit"));
+    const over = page.locator(`${READY} [data-section="work"] [data-owner="owner-only"][data-why="over-limit"]`);
+    await expect(over).toHaveCount(1);
+    await expect(over).toContainText("Over your plan's limit");
+    const id = await over.getAttribute("data-tile");
+    expect(Object.values(seeded.ids)).toContain(id);
+    expect(await workIds(page)).not.toContain(id);
+    await expect(over.getByRole("link", { name: "Open" })).toHaveAttribute("href", `/exhbts/${id}/edit`);
+    await expect(over.getByRole("button")).toHaveCount(0);
+    // In the work's list: the owner-only tile, then the Add tile.
+    const order = await page.locator(`${READY} [data-section="work"] li[data-owner]`).evaluateAll((els) => els.map((e) => e.getAttribute("data-owner")));
+    expect(order).toEqual(["owner-only", "add"]);
+  });
+
+  test("with More of my work off the page, the owner's parts come after the last section", async ({ page }) => {
+    const f = withLayout("pageend", ["featured", "about", "contact"]);
+    f.exhbts[4] = { ...f.exhbts[4]!, draft: true };
+    await openEditor(page, f);
+    await expect(page.locator(`${READY} [data-section="work"]`)).toHaveCount(0);
+    const end = page.locator(`${READY} [data-owner="page-end"]`);
+    await expect(end).toBeVisible();
+    await expect(end.locator('[data-owner="owner-only"][data-why="draft"]')).toHaveCount(1);
+    await expect(end.locator('[data-owner="add"]').getByRole("link", { name: "Add an exhbt" })).toBeVisible();
+    // After the last section on the page.
+    const below = await page.evaluate(() => {
+      const last = document.querySelector('[data-section-frame="contact"]')!.getBoundingClientRect();
+      return document.querySelector('[data-owner="page-end"]')!.getBoundingClientRect().top >= last.bottom - 1;
+    });
+    expect(below).toBe(true);
+  });
+
+  for (const look of ["notebook", "mono"]) {
+    test(`in ${look}'s rows, a draft is a row of the look's own and the Add tile and hidden row follow it`, async ({ page }) => {
+      const f = fresh(fullFixture("pp-full", look), `rows${look}`);
+      f.exhbts[4] = { ...f.exhbts[4]!, draft: true };
+      await openEditor(page, f);
+      const work = page.locator(`${READY} [data-section="work"]`);
+      const id = (await workIds(page))[0]!;
+      await tile(page, id).hover();
+      await tileTools(page, id).getByRole("button", { name: /^Hide / }).click();
+      const order = await work.locator("li[data-owner]").evaluateAll((els) => els.map((e) => e.getAttribute("data-owner")));
+      expect(order).toEqual(["owner-only", "add", "hidden"]);
+      // The draft's row is the page's own WorkRow (its title, no card), then its chip.
+      const draft = work.locator('[data-owner="owner-only"]');
+      await expect(draft).toContainText((f.exhbts[4]!.doc as { title: string }).title);
+      await expect(draft).toContainText("Draft");
+      // In the index look its number carries on after the work's.
+      if (look === "mono") await expect(draft).toContainText(`[${String((await workIds(page)).length + 1).padStart(2, "0")}]`);
+    });
+  }
+});
+
+test.describe("In every look", () => {
+  test.skip(({ isMobile }) => isMobile, "desktop");
+
+  for (const look of ["exhbt", "classic", "notebook", "mono", "night", "studio", "ledger", "bloom"]) {
+    test(`${look}: no section's or tile's toolbar covers words, a link or a button, and the owner's parts are drawn`, async ({ page }) => {
+      test.slow();
+      const f = fresh(fullFixture("pp-full", look), `look${look}`);
+      f.exhbts[4] = { ...f.exhbts[4]!, draft: true };
+      await openEditor(page, f);
+      for (const key of await sections(page)) {
+        await pointAt(page, key);
+        expect(await toolbarClashes(page), `${look}: ${key}`).toEqual([]);
+      }
+      for (const id of await workIds(page)) {
+        await tile(page, id).scrollIntoViewIfNeeded();
+        await tile(page, id).hover();
+        await expect(tileTools(page, id).getByRole("toolbar")).toBeVisible();
+        expect(await toolbarClashes(page), `${look}: tile ${id}`).toEqual([]);
+      }
+      await expect(page.locator(`${READY} [data-owner="owner-only"]`)).toHaveCount(1);
+      await expect(page.locator(`${READY} [data-owner="add"]`).getByRole("link", { name: "Add an exhbt" })).toBeVisible();
+    });
+  }
+});
+
+test.describe("Exhbt tiles, after the Add tile", () => {
+  test.skip(({ isMobile }) => isMobile, "desktop");
 
   test("after ?full=1 the full plan's reason is in the alert tone", async ({ page }) => {
     await openEditor(page, fresh(fullFixture("pp-full", null, "free"), "fullalert"), { query: "?full=1" });
