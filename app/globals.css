@@ -388,6 +388,13 @@
     color: var(--xp-ink);
     font-family: var(--xp-font, var(--font-sans));
   }
+  /* The focus ring of an Astryx control on a person's page ("See the work") takes the look's own
+     text colour, not the theme's jade: on a person's page every colour comes from the look, and
+     the page's ink reads on its own ground in every look, Night's ink ground included (brief 1a,
+     milestone 1.5). The ring's width and offset stay the theme's. */
+  .xp {
+    --focus-outline-color: var(--xp-ink);
+  }
   /* Headings and paragraphs take the page's ink, not the site's (the base layer sets ink on every
      heading, and Astryx's reset on every paragraph). Low specificity, so .xp-muted still wins. */
   :where(.xp) :is(h1, h2, h3, p) {

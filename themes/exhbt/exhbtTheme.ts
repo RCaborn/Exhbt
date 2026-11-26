@@ -198,12 +198,13 @@ export const exhbtTheme = defineTheme({
     "--shadow-inset-warning": `inset 0 0 0 2px color-mix(in srgb, ${INK} 35%, transparent)`,
     "--shadow-inset-error": `inset 0 0 0 2px color-mix(in srgb, ${ERROR} 35%, transparent)`,
 
-    // Focus: NOT set here yet. The lab's ring (3px jade, 2px clear; 5.6:1 on white) beats Astryx's own
-    // (2px of the accent, mint, 3px clear; 1.5:1 on white) on every look but Night, where "See the
-    // work" sits on ink and the ring would drop from 12.5:1 to 3.4:1. A visitor's ring may not get
-    // worse (brief 1a, step 5), and the cure is in the looks' own variables (a mint ring under Night),
-    // which this file does not own. Once that is in, the three tokens are:
-    //   "--focus-outline-width": "3px", "--focus-outline-color": JADE, "--focus-outline-offset": "2px".
+    // Focus: one jade ring on every control, 3px wide and 2px clear (5.67:1 on white, 5.25:1 on the
+    // wash, 5.29:1 on mist, 3.38:1 on ink, 3.69:1 on mint). Astryx's own is 2px of the accent: mint,
+    // 1.5:1 on white. Under Astryx's own dark surfaces (a toast, a tooltip) onDark, below, makes it
+    // mint. On a person's page the ring takes the look's ink instead (.xp in app/globals.css).
+    "--focus-outline-width": "3px",
+    "--focus-outline-color": JADE,
+    "--focus-outline-offset": "2px",
 
     // Status, in the brand. Go, live and checked are mint and jade; information is ink on mist;
     // a warning is ink too, told apart by its icon and its edge (the brand has no amber); an error
