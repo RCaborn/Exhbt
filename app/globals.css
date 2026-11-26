@@ -6,6 +6,7 @@
 @import "@astryxdesign/core/reset.css";
 @import "@astryxdesign/core/astryx.css";
 @import "../themes/exhbt/exhbt.css";
+@source not "../.claude";
 
 @theme {
   /* Brand kit v1 (docs/brand.md). Mint leads, jade is mint's text-safe partner, ink is the
