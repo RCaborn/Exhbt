@@ -23,7 +23,9 @@ import { W } from "../sections/words";
  * It is the last child of the lines' <dl> (d-findings.md), absolute, without the rows' hairline, and it
  * carries the list's own `data-path`, where the list's own problem shows and "Show me" lands. It is a
  * <div> (a <dd> after the lines' <div> groups breaks axe's definition-list rule), so a count of the
- * lines by `dl > div` must leave it out by `[data-pe-lines]`.
+ * lines by `dl > div` must leave it out by `[data-pe-lines]`. That <div> is a 0 by 0 point at the list's
+ * bottom right that is always laid out, so its box never changes; its body (the toolbar and the list's
+ * problem) is what shows and hides.
  *
  * When a line's year holds words that `splitYear` will not read as a year, a hint shows under that
  * field while it has the cursor.
@@ -134,25 +136,28 @@ export function LineTools({ path, kind, count, max }: HomeLinesSlot): ReactNode 
 
   return (
     <div ref={own} className="pe-line-tools" data-path={path} data-issue={issue ? "true" : undefined} data-pe-lines={kind} data-active={n ?? undefined}>
-      <ToolRow spot={{ x: 0, y: 0, where: "edge" }} kind="line" label={W.lineTools(kind, (n ?? 0) + 1)}>
-        {count < max && (
-          <Button size="sm" label={W.addLine(kind)} onClick={add} {...({ "data-act": "add-line" } as object)}>
-            <Plus aria-hidden size={15} strokeWidth={2.5} /> {W.addLine(kind)}
-          </Button>
+      {/* The anchor above is a fixed, empty point at the list's bottom right; this is what shows and hides. */}
+      <div className="pe-line-tools-body">
+        <ToolRow spot={{ x: 0, y: 0, where: "edge" }} kind="line" label={W.lineTools(kind, (n ?? 0) + 1)}>
+          {count < max && (
+            <Button size="sm" label={W.addLine(kind)} onClick={add} {...({ "data-act": "add-line" } as object)}>
+              <Plus aria-hidden size={15} strokeWidth={2.5} /> {W.addLine(kind)}
+            </Button>
+          )}
+          {n != null && (
+            <>
+              <IconButton data-act="line-up" variant="ghost" label={W.lineUp(n + 1)} tooltip={W.lineUp(n + 1)} isDisabled={n === 0} onClick={() => move(-1)} icon={<ArrowUp aria-hidden size={16} strokeWidth={2} />} />
+              <IconButton data-act="line-down" variant="ghost" label={W.lineDown(n + 1)} tooltip={W.lineDown(n + 1)} isDisabled={n >= count - 1} onClick={() => move(1)} icon={<ArrowDown aria-hidden size={16} strokeWidth={2} />} />
+              <IconButton data-act="line-remove" variant="ghost" label={W.lineRemove(n + 1)} tooltip={W.lineRemove(n + 1)} onClick={remove} icon={<X aria-hidden size={16} strokeWidth={2.25} />} />
+            </>
+          )}
+        </ToolRow>
+        {issue && (
+          <p className="pe-lines-issue" role="status" data-pe-issue>
+            {issue}
+          </p>
         )}
-        {n != null && (
-          <>
-            <IconButton data-act="line-up" variant="ghost" label={W.lineUp(n + 1)} tooltip={W.lineUp(n + 1)} isDisabled={n === 0} onClick={() => move(-1)} icon={<ArrowUp aria-hidden size={16} strokeWidth={2} />} />
-            <IconButton data-act="line-down" variant="ghost" label={W.lineDown(n + 1)} tooltip={W.lineDown(n + 1)} isDisabled={n >= count - 1} onClick={() => move(1)} icon={<ArrowDown aria-hidden size={16} strokeWidth={2} />} />
-            <IconButton data-act="line-remove" variant="ghost" label={W.lineRemove(n + 1)} tooltip={W.lineRemove(n + 1)} onClick={remove} icon={<X aria-hidden size={16} strokeWidth={2.25} />} />
-          </>
-        )}
-      </ToolRow>
-      {issue && (
-        <p className="pe-lines-issue" role="status" data-pe-issue>
-          {issue}
-        </p>
-      )}
+      </div>
       {hint && <Tooltip key={hint.id || "hint"} anchorRef={hintRef} content={W.yearHint} isOpen placement="below" alignment="end" />}
     </div>
   );

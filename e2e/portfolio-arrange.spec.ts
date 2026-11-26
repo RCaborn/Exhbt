@@ -512,7 +512,7 @@ function toolbarClashes(page: Page): Promise<string[]> {
     const over = (a: DOMRect, b: DOMRect) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;
     const r = (b: DOMRect) => [b.x, b.y, b.width, b.height].map(Math.round).join(",");
     const frames = [...root.querySelectorAll<HTMLElement>("[data-section-frame], [data-tile-frame], [data-pe-lines]")];
-    const toolButtons = (fr: Element) => [...fr.querySelectorAll(":scope > [data-pe-tools] button")].filter((b) => drawnNow(b) && shown(b.closest("[data-pe-tools]")));
+    const toolButtons = (fr: Element) => [...fr.querySelectorAll(":scope > [data-pe-tools] button, :scope > .pe-line-tools-body > [data-pe-tools] button")].filter((b) => drawnNow(b) && shown(b.closest("[data-pe-tools]")));
     const nameOf = (el: Element) => el.closest("[data-tile-frame]")?.getAttribute("data-tile-frame") ?? el.closest("[data-section-frame]")?.getAttribute("data-section-frame") ?? "the page";
     const worded: { el: Element; boxes: DOMRect[]; glyphs: DOMRect[] }[] = [];
     const range = document.createRange();
