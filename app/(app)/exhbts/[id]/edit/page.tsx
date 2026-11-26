@@ -18,6 +18,7 @@ import { isFormat } from "@/lib/exhbt/formats";
 import { isDraftHelperFile, loadAiVersion, loadDraftSource } from "@/lib/draft-tools";
 import { signedFileUrl } from "@/lib/files";
 import { parseHost, portfolioHost } from "@/lib/hosts";
+import { portfolioKind } from "@/lib/portfolio-kind-server";
 import { portfolioHref } from "@/lib/portfolio-links";
 import { canPublish, getPlan } from "@/lib/plan";
 import { mediaFor, portfolioLook } from "@/lib/portfolio";
@@ -143,6 +144,8 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
         // What "See as a visitor" draws as the public page does: the team byline and the date beside the checks.
         team={await teamFor(record, onAppHost && profile.username ? portfolioHost(profile.username) : (await headers()).get("host"))}
         publishedAt={record.publishedAt}
+        // Portfolio first (decision 0031): the way back and a first publish go to the portfolio.
+        portfolioFirst={(await portfolioKind(admin)) === "page"}
       />
     )}
     </>
