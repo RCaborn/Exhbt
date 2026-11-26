@@ -134,6 +134,14 @@
   .link:hover {
     text-decoration-color: var(--color-jade);
   }
+  /* One focus ring in the header. Astryx draws the jade outline on its nav items, its heading link and its
+     links; the base layer's :focus-visible halo (white and ink box-shadow) then drew a second ring round
+     them. Only these Astryx parts of the site header lose the halo; everything else keeps it. */
+  .astryx-top-nav-item:focus-visible,
+  .astryx-top-nav-heading:focus-visible,
+  .site-nav .astryx-link:focus-visible {
+    box-shadow: none;
+  }
   /* Buttons are Astryx Buttons (components/ui/Button.tsx); the theme makes them pills.
      These size steps sit on top of Astryx's own sizes. */
   .btn-lg {
