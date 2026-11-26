@@ -5,7 +5,7 @@ import { FORMAT_COPY, type Format } from "../lib/exhbt/formats";
 import { fullDoc } from "../lib/exhbt/sample";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import { chooseLayout, openAddSectionMenu, publish, publishSheet, removeSection, reviewButton, thingsButton } from "./editor";
-import { READY, boxes, chooseAll, differences, docNow, field, frame, freshName, offered, openDoc, openTiming, readStored, sampleDoc, seeAsVisitor, settle, typeIn, waitLive, waitReady, waitSaved } from "./page-editor";
+import { READY, boxes, chooseAll, differences, docNow, field, frame, freshName, holdRichEditor, offered, openDoc, openTiming, readStored, sampleDoc, seeAsVisitor, settle, typeIn, waitLive, waitReady, waitSaved } from "./page-editor";
 
 /*
  * "Write it your way" (decision 0032; Rory, 26 Nov 2026): bold and italic in a quote, a pull quote and a link's
@@ -236,6 +236,45 @@ test.describe("Bold and italic at the words selected", () => {
       }).length;
     });
     expect(clash).toBe(0);
+  });
+
+  test("a pull quote's and a quote's lines break where a visitor's do, before and after their editors take over", async ({ page }) => {
+    // A pull quote's lines are balanced. A paragraph anywhere else on the site wraps another way, and the editor's own
+    // paragraph took that: the lines broke again when the editor took over from the resting words, and ran under the
+    // section's toolbar, which had been placed clear of them (seen on a tablet, where the toolbar is always shown).
+    const long = doc([FLOW, findings(), pull({ text: "A reform meant to close a door became the first step through it, and nobody who wrote it saw that coming." }), quote({ text: `${QUOTE} Nobody stands in the corridor any more, and the staff take their breaks when they are due.` }), next()], "essay");
+    const release = await holdRichEditor(page);
+    await openDoc(page, freshName("yww"), long);
+    await settle(page);
+    /** The words of each line of the part's quote, as drawn now (the marks round a quote left out). */
+    const lines = (part: string) =>
+      page.evaluate((name) => {
+        const article = [...document.querySelectorAll("article[data-exhbt-page]")].find((a) => a.getClientRects().length > 0)!;
+        const quote = article.querySelector(`[data-part="${name}"] blockquote`)!;
+        const walker = document.createTreeWalker(quote, NodeFilter.SHOW_TEXT);
+        const range = document.createRange();
+        const byTop = new Map<number, string[]>();
+        for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+          const el = t.parentElement!;
+          if (el.closest("[data-edit-only], .xe-rich-pending") || getComputedStyle(el).visibility === "hidden") continue;
+          for (const word of (t.textContent ?? "").matchAll(/[^\s“”]+/g)) {
+            range.setStart(t, word.index);
+            range.setEnd(t, word.index + word[0].length);
+            const top = Math.round(range.getClientRects()[0]?.top ?? -1);
+            byTop.set(top, [...(byTop.get(top) ?? []), word[0]]);
+          }
+        }
+        return [...byTop.entries()].sort((a, b) => a[0] - b[0]).map(([, words]) => words.join(" "));
+      }, part);
+    const rest = { pullquote: await lines("pullquote"), quote: await lines("quote") };
+    expect(rest.pullquote.length, "the pull quote runs to more than one line").toBeGreaterThan(1);
+    expect(rest.quote.length, "the quote runs to more than one line").toBeGreaterThan(1);
+    release();
+    await waitLive(page);
+    expect({ pullquote: await lines("pullquote"), quote: await lines("quote") }, "once the editors are live").toEqual(rest);
+    await seeAsVisitor(page, true);
+    await settle(page);
+    expect({ pullquote: await lines("pullquote"), quote: await lines("quote") }, "for a visitor").toEqual(rest);
   });
 
   test("with the new controls up, the editing page passes axe", async ({ page }) => {

@@ -39,6 +39,13 @@
   .xe-rich[data-quoted] .xe-rich-cell:not([data-empty]) .xe-pm p::after {
     content: "\201D";
   }
+  /* The words wrap as the page's do. A paragraph anywhere on the site wraps "pretty" (app/globals.css), and the
+     editor's own paragraph would take that over the quote's own way of wrapping (a pull quote's lines are balanced),
+     so the lines broke again the moment the editor took over from the resting words, and ran under the section's
+     toolbar, which had been placed clear of them. */
+  .xe-rich[data-quoted] .xe-pm p {
+    text-wrap: inherit;
+  }
   /* Empty, the placeholder carries the marks, in its own colour (RichEditor.tsx writes them into its own). */
   .xe-rich[data-quoted] > .xe-rest:empty::before {
     content: "\201C" attr(data-placeholder) "\201D";
