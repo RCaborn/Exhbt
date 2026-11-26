@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Link2, Sparkles } from "lucide-react";
+import { IconButton } from "@astryxdesign/core/IconButton";
 import { Popover } from "@astryxdesign/core/Popover";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
@@ -15,7 +16,9 @@ import { usePortfolioApi, usePortfolioState, usePortfolioUi } from "../runtime";
 /*
  * The corner tools of the two parts with no frame of their own (decision 0031, "What is edited where"),
  * drawn over the page and taking no room:
- *  - "intro": Suggest an intro, the last child of `[data-intro]` (relative while editing). It drafts an
+ *  - "intro": Suggest an intro, the last child of `[data-intro]` (relative while editing): on an empty
+ *    intro's own line, at its end; once the intro has words, just above it while it is pointed at or
+ *    edited (css/bar.css), so it never sits on the headline otherwise. It drafts an
  *    intro only from what the person has given (suggestIntroAction) and fills the field, with an Undo
  *    step, since it replaces what was there. Its daily limit's words are the action's own.
  *  - "contact": Your links, a grid child of Get in touch (relative while editing), so absolute. A
@@ -33,6 +36,7 @@ function SuggestIntro(): ReactNode {
   const profile = usePortfolioState((s) => s.profile);
   const filled = profile.bio.trim().length > 0;
   const size = useBarSize();
+  const narrow = useNarrow();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ text: string; error: boolean } | null>(null);
 
@@ -48,10 +52,15 @@ function SuggestIntro(): ReactNode {
 
   return (
     <span className="pe-tools" data-where="intro" data-tools="intro" data-filled={filled ? "" : undefined}>
-      <Button size={size} onClick={suggest} loading={busy} disabled={busy} label="Suggest an intro">
-        <Sparkles aria-hidden size={15} strokeWidth={2} />
-        Suggest an intro
-      </Button>
+      {/* On a narrow window, beside an empty intro's placeholder, only the icon fits: its name stays its label. */}
+      {narrow && !filled ? (
+        <IconButton size={size} onClick={suggest} isLoading={busy} label="Suggest an intro" tooltip="Suggest an intro" icon={<Sparkles aria-hidden size={16} strokeWidth={2} />} />
+      ) : (
+        <Button size={size} onClick={suggest} loading={busy} disabled={busy} label="Suggest an intro">
+          <Sparkles aria-hidden size={15} strokeWidth={2} />
+          Suggest an intro
+        </Button>
+      )}
       <span role="status" className="sr-only">
         {note?.text}
       </span>
