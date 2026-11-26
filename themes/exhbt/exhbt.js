@@ -982,11 +982,15 @@ export const exhbtTheme = {
         "color": "#3E4044",
         "fontSize": "0.95rem",
         "fontWeight": "var(--font-weight-medium)",
+        "--color-neutral": "transparent",
+        "--color-overlay-hover": "transparent",
+        "--color-overlay-pressed": "transparent",
         ":hover": {
           "color": "#0E0F12"
         }
       },
       "selected": {
+        "backgroundColor": "transparent",
         "color": "#0E0F12",
         "textDecorationLine": "underline",
         "textDecorationColor": "#00755D",

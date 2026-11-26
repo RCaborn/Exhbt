@@ -450,9 +450,21 @@ export const exhbtTheme = defineTheme({
     // pointer; the current item ink with the 2px jade underline. The lab's proposed frame (pill
     // items, a heavier current item, no underline) waits for Rory's choice.
     "top-nav": { base: { backgroundColor: WHITE, borderBottomWidth: "1px", borderBottomStyle: "solid", borderBottomColor: LINE } },
+    // Astryx lays a grey fill under the current item (--color-neutral) and its interaction overlay
+    // tints every item on hover and on press (--color-overlay-hover and -pressed, as a colour and, for
+    // a touch press, as an image). Today's header has neither, so the three are cleared on the item.
     "top-nav-item": {
-      base: { color: GRAPHITE, fontSize: "0.95rem", fontWeight: "var(--font-weight-medium)", ":hover": { color: INK } },
+      base: {
+        color: GRAPHITE,
+        fontSize: "0.95rem",
+        fontWeight: "var(--font-weight-medium)",
+        "--color-neutral": "transparent",
+        "--color-overlay-hover": "transparent",
+        "--color-overlay-pressed": "transparent",
+        ":hover": { color: INK },
+      },
       selected: {
+        backgroundColor: "transparent",
         color: INK,
         textDecorationLine: "underline",
         textDecorationColor: JADE,
