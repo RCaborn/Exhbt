@@ -20,8 +20,18 @@ export const dynamic = "force-dynamic";
  */
 const enabled = () => process.env.NODE_ENV !== "production" || process.env.EXHBT_LAB === "1";
 
-export default function DevAstryx() {
+export default async function DevAstryx({ searchParams }: { searchParams: Promise<{ only?: string }> }) {
   if (!enabled()) notFound();
+  // ?only=app-parts draws just the app's own parts: the tests that look for animation need a page with no skeleton or spinner.
+  const { only } = await searchParams;
+  if (only === "app-parts") {
+    return (
+      <main id="main" className="mx-auto max-w-[76rem] px-4 py-10 sm:px-8">
+        <Heading level={1}>Astryx kit: the app&rsquo;s own parts</Heading>
+        <AppParts />
+      </main>
+    );
+  }
   return (
     <main id="main" className="mx-auto max-w-[76rem] px-4 py-10 sm:px-8">
       <Heading level={1} type="display-2">

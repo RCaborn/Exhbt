@@ -98,7 +98,7 @@ export function AppParts() {
 
       <Block title="Menu and More">
         <Row>
-          <Menu trigger="Layout" label="Choose a layout" items={[{ label: "Case study" }, { label: "Gallery" }, { label: "Research", off: "Needs a figure first" }]} />
+          <Menu trigger="Choose a layout" label="Layouts" items={[{ label: "Case study" }, { label: "Gallery" }, { label: "Research", off: "Needs a figure first" }]} />
           <More label="More for this exhbt" items={[{ label: "See as a visitor", href: "#app-parts" }, { label: "Delete", danger: true }]} />
         </Row>
       </Block>
