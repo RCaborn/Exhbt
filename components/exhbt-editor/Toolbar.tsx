@@ -31,13 +31,13 @@ import type { Store } from "./store-core";
  * a little to the right where the section's own chips reach the corner); a column in the gutter to its
  * right, from the corner down (between a pair's columns); that column half over its right edge; and the
  * compact pair, the grip and "More actions", half over its top edge, with Move up, Move down, the
- * layout's action and Remove in that menu; where even that pair at the corner would cover something (the
- * first finding's own controls), the pair along that edge to the left, where it is clear. Only a
- * picture's sits inside its own corner, over the picture, as in the prototype Rory tried; where a tile is
- * too narrow for the row, one column down its right edge, going on at the foot of a second where the
- * picture is too short. In a row it is drawn Remove first and the grip last, and a column runs down from
- * the grip, so the grip is at the section's corner wherever it sits but in that last resort (the markup
- * keeps the grip first: it is the first Tab stop).
+ * layout's action and Remove in that menu. Only a picture's sits inside its own corner, over the
+ * picture, as in the prototype Rory tried; where a tile is too narrow for the row, one column down its
+ * right edge, going on at the foot of a second where the picture is too short. In a row it is drawn
+ * Remove first and the grip last, and a column runs down from the grip, so the grip is at the
+ * section's corner wherever it sits (the markup keeps the grip first: it is the first Tab stop). A
+ * finding's own controls step aside for it (`listsClear`), as its formatting buttons do
+ * (fields/RichEditor.tsx).
  */
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -113,21 +113,16 @@ const OUT_OF_PAGE = ".xe-insert, .xe-measure, .xe-drag-overlay, [data-edit-only]
  * Edit-only chips and labels that may reach out of their section. A flowchart box's grip and Remove are among them: in a
  * row they hang half under its foot, into the gap where the next section's toolbar goes (Build, Essay and Before and after
  * each pair their findings under a three-box flowchart, so the middle box's chips sat under that toolbar). With a mouse
- * they show only on their box, but a toolbar over them would take the press meant for them. So are a finding's own Move up,
- * Move down and Remove, on the rule above it at its right end, and "Add a finding": they show while the finding is touched
- * or typed in, and the toolbar shows whole then too (on a tablet, a section's grip lay over "Remove finding 1").
+ * they show only on their box, but a toolbar over them would take the press meant for them. (A finding's own Move up, Move
+ * down and Remove are not among them: they step aside for their section's toolbar, `listsClear`.)
  */
-const CHIPS = ".xe-fig-chip, .xe-fig-picked, .xe-chip, .xe-above, .xe-flow-chip, .xe-list-tools > *, .xe-add-finding";
-/** A finding's formatting buttons (Bold, Italic, Link: fields/RichEditor.tsx), under its line at its right end: 28px each, 4px apart, 16px under a finger (css/core.css). */
-const FORMAT_W = (coarse: boolean) => 3 * 28 + 2 * (coarse ? 16 : 4);
+const CHIPS = ".xe-fig-chip, .xe-fig-picked, .xe-chip, .xe-above, .xe-flow-chip";
 
 /** A figure's or a link's chip under a finger: 44px tall and 4px past each end, about its middle (figures.css). */
 function chipPress(b: Box): Box {
   const w = Math.max(b.w + 8, 44);
   return { x: b.x + b.w / 2 - w / 2, y: b.y + b.h / 2 - 22, w, h: 44 };
 }
-/** What a toolbar keeps clear of for a chip: its own box; under a finger a finding's small controls by their 44px press, 8px round each (css/core.css, .xe-tool-sm). */
-const toolsKeepOff = (el: HTMLElement, b: Box, coarse: boolean): Box => (coarse && el.matches(".xe-tool-sm") ? { x: b.x - 8, y: b.y - 8, w: b.w + 16, h: b.h + 16 } : b);
 /** Kinds whose toolbar is always inside the corner (css/core.css): a picture, which has no words there. */
 const INSIDE_KINDS = new Set(["image"]);
 /** The gap between a toolbar's buttons (css/core.css). */
@@ -136,6 +131,58 @@ const GAP = 4;
 const SLIDE_X = [0, 4, 8];
 /** Where a toolbar sits, for css/core.css; above the corner is no attribute. */
 type Place = "edge" | "side" | "rcol" | "compact" | null;
+/**
+ * Where `placeTools` puts one toolbar: its section's box `f`, its buttons (each `unit` wide and `buttons` tall, `width` in a row,
+ * `wide` in a column), how far in from the corner it starts (`right`: a flowchart's, 2rem), its place and how far it moved along.
+ */
+type Plan = { tools: HTMLElement; frame: HTMLElement; f: Box; kids: HTMLElement[]; unit: number; buttons: number; width: number; wide: number; right: number; place: Place; dx: number; dy: number };
+
+/** Where a toolbar's buttons are drawn with its section touched or under the pointer (all of them; the compact form, its pair), from its plan and css/core.css. */
+function toolsBox(p: Plan, bridge: number): Box {
+  const { f, buttons, width, wide, right, dx, dy } = p;
+  const tall = p.kids.length * buttons + GAP * Math.max(0, p.kids.length - 1);
+  switch (p.place) {
+    case null:
+      return { x: f.x + f.w - width, y: f.y - buttons - bridge, w: width, h: buttons };
+    case "edge":
+      return { x: f.x + f.w - right - width + dx, y: f.y - buttons / 2 + dy, w: width, h: buttons };
+    case "side":
+      return { x: f.x + f.w, y: f.y, w: wide, h: tall };
+    case "rcol":
+      return { x: f.x + f.w - wide / 2, y: f.y, w: wide, h: tall };
+    case "compact": {
+      const pair = 2 * p.unit + GAP;
+      return { x: f.x + f.w - right - pair + dx, y: f.y - buttons / 2 + dy, w: pair, h: buttons };
+    }
+  }
+}
+
+/**
+ * A finding's own Move up, Move down and Remove sit on the rule above it, at its right end (css/core.css). Where its section's
+ * toolbar lies over that place they go along the rule to the left, clear of it, with their 44px presses under a finger: the
+ * first finding's, just under the section's top edge where no heading sits over the findings (research's, or any findings
+ * moved to the top of the page), were under the toolbar on that edge, and on a tablet the grip lay over "Remove finding 1".
+ * The toolbar keeps its place, the grip at the section's corner. They show only while their finding is touched or typed in,
+ * when the toolbar shows whole, so they keep clear of the whole of it. Returns each one's move to the left (0: none).
+ */
+function listsClear(plans: Plan[], bridge: number, coarse: boolean): [HTMLElement, number][] {
+  const out: [HTMLElement, number][] = [];
+  const reach = coarse ? 8 : 0;
+  for (const p of plans) {
+    if (INSIDE_KINDS.has(p.frame.dataset.kind ?? "")) continue;
+    const lists = [...p.frame.querySelectorAll<HTMLElement>("li > .xe-list-tools")].filter((l) => l.getClientRects().length > 0);
+    if (!lists.length) continue;
+    const t = toolsBox(p, bridge);
+    for (const list of lists) {
+      // Where it is drawn now, less the move it has, is its own place at the rule's right end.
+      const moved = parseFloat(list.style.getPropertyValue("--xe-list-dx")) || 0;
+      const b = pageBox(list);
+      const press = { x: b.x + moved - reach, y: b.y - reach, w: b.w + 2 * reach, h: b.h + 2 * reach };
+      out.push([list, overlap(press, t) ? Math.ceil(press.x + press.w - t.x + GAP) : 0]);
+    }
+  }
+  return out;
+}
 /** The width a button was last drawn at: a tablet hides some until the section is touched, and the compact form most. */
 const drawnWidth = new WeakMap<HTMLElement, number>();
 
@@ -212,23 +259,13 @@ function placeTools() {
   // What a toolbar above a section must not lie over: every other section; whatever the page draws
   // between them that is no section's (the skills, the title and the context line over the first row,
   // research's "References" over its lines); and the chips that reach out of a section ("Edit figures"
-  // on a graph's foot, "Web address" on the rule between reference lines, a picked figure's label, a
-  // finding's own controls), with where a finding's formatting buttons go, under its line at its right end
-  // (the last finding's hang into the gap under the section, where the next section's toolbar goes).
+  // on a graph's foot, "Web address" on the rule between reference lines, a picked figure's label).
   const boxes = new Map<HTMLElement, Box>();
   const collect = (el: Element) => {
     for (const c of el.children) {
       if (!(c instanceof HTMLElement) || c.matches(OUT_OF_PAGE)) continue;
-      if (c.matches("[data-section-id]")) {
-        boxes.set(c, pageBox(c));
-        for (const o of c.querySelectorAll<HTMLElement>(CHIPS)) boxes.set(o, toolsKeepOff(o, pageBox(o), coarse));
-        for (const words of c.querySelectorAll<HTMLElement>("li.xp-finding .xe-rich")) {
-          const r = pageBox(words);
-          const w = FORMAT_W(coarse);
-          const reach = coarse ? 8 : 0;
-          boxes.set(words, { x: r.x + r.w - w - reach, y: r.y + r.h - reach, w: w + 2 * reach, h: 28 + 2 * reach });
-        }
-      } else if (c.querySelector("[data-section-id]")) collect(c);
+      if (c.matches("[data-section-id]")) for (const o of [c, ...c.querySelectorAll<HTMLElement>(CHIPS)]) boxes.set(o, pageBox(o));
+      else if (c.querySelector("[data-section-id]")) collect(c);
       else {
         // The person's own words (a field) count by their whole box, however short the line; a label the layout draws ("References") by its words alone.
         const b = c.matches("[data-path]") || c.querySelector("[data-path]") ? pageBox(c) : wordsBox(c);
@@ -241,7 +278,6 @@ function placeTools() {
   // The gap a toolbar above needs: its buttons, and on a mouse the strip under them that keeps the pointer on the section.
   const bridge = coarse ? 0 : 6;
   // First every read, then every write: a pass reads the page's layout once, and one that changes nothing invalidates nothing.
-  type Plan = { tools: HTMLElement; frame: HTMLElement; f: Box; kids: HTMLElement[]; unit: number; width: number; place: Place; dx: number; dy: number };
   const plans: Plan[] = [];
   for (const tools of toolbars) {
     const frame = tools.parentElement;
@@ -260,8 +296,10 @@ function placeTools() {
       return drawnWidth.get(c) ?? unit;
     });
     const width = widths.reduce((w, x) => w + x, 0) + GAP * Math.max(0, kids.length - 1);
+    const wide = Math.max(unit, ...widths);
+    const right = frame.dataset.kind === "flow" ? 32 : 0;
     const f = boxes.get(frame) ?? pageBox(frame);
-    const plan: Plan = { tools, frame, f, kids, unit, width, place: null, dx: 0, dy: 0 };
+    const plan: Plan = { tools, frame, f, kids, unit, buttons, width, wide, right, place: null, dx: 0, dy: 0 };
     plans.push(plan);
     // A picture's is always inside its corner (css/core.css).
     if (INSIDE_KINDS.has(frame.dataset.kind ?? "")) continue;
@@ -277,7 +315,6 @@ function placeTools() {
     if (clear({ x: f.x + f.w - width, y: f.y - buttons - bridge, w: width, h: buttons + bridge }, { x: f.x + f.w - width, y: f.y - buttons - bridge, w: width, h: buttons })) continue;
     // 2. A row half over the top edge; a little lower where the gap above is short of half of it, a little to the right where its
     // own chips reach the corner (the aim's switch), never inside. A flowchart's keeps clear of its first box's grip, on that box's corner.
-    const right = frame.dataset.kind === "flow" ? 32 : 0;
     const onEdge = (w: number, lowest: number) => {
       for (let dy = 0; dy <= lowest; dy += 4) {
         for (const dx of SLIDE_X) if (clear({ x: f.x + f.w - right - w + dx, y: f.y - buttons / 2 + dy, w, h: buttons })) return { dx, dy };
@@ -292,7 +329,6 @@ function placeTools() {
     // 3. A column in the gutter to its right, from the corner down: grip, move up, move down, the action, more, remove. Only in a
     // gutter on the page (between a pair's columns), touching the section, so the pointer never leaves it on the way.
     const tall = kids.length * buttons + GAP * Math.max(0, kids.length - 1);
-    const wide = Math.max(unit, ...widths);
     const side = { x: f.x + f.w, y: f.y, w: wide, h: tall };
     if (side.x + side.w <= page.x + page.w + 0.5 && clear(side)) {
       plan.place = "side";
@@ -307,25 +343,17 @@ function placeTools() {
     // 5. The compact pair, the grip and "More actions", half over the top edge; the rest are in that menu. Where another section's
     // chip sits on that edge at the corner (a reference line's "Web address", on the rule over the next line), just under it,
     // still over none of the section's words.
-    const pair = 2 * unit + GAP;
-    const compact = onEdge(pair, buttons + 16);
-    if (compact) {
-      Object.assign(plan, { place: "compact", ...compact });
-      continue;
-    }
-    // 6. Where even that would lie over something at the corner (the first finding's own controls, on the rule just under the
-    // findings' top edge where no heading sits over them), the pair goes along that edge to the left until it is clear, over
-    // none of the words. Only where nothing along it is clear does it stay on the corner.
-    let along: number | null = null;
-    for (let dx = -8; f.w - right - pair + dx >= 0 && along === null; dx -= 8) if (clear({ x: f.x + f.w - right - pair + dx, y: f.y - buttons / 2, w: pair, h: buttons })) along = dx;
-    Object.assign(plan, { place: "compact", dx: along ?? 0 });
+    Object.assign(plan, { place: "compact", ...(onEdge(2 * unit + GAP, buttons + 16) ?? {}) });
   }
+  // Each finding's own controls, where its section's toolbar now lies over them (one more read of the page for them all).
+  const lists = listsClear(plans, bridge, coarse);
   for (const p of plans) {
     attr(p.tools, "data-place", p.place);
     attr(p.tools, "aria-orientation", p.place === "side" || p.place === "rcol" ? "vertical" : null);
     prop(p.tools, "--xe-tools-dx", p.dx ? `${p.dx}px` : null);
     prop(p.tools, "--xe-tools-dy", p.dy ? `${p.dy}px` : null);
   }
+  for (const [list, dx] of lists) prop(list, "--xe-list-dx", dx ? `${dx}px` : null);
   // A picture's toolbar takes its shape from where it is now drawn (one more read of the page for them all).
   const pictures = plans.filter((p) => INSIDE_KINDS.has(p.frame.dataset.kind ?? ""));
   const shapes = pictures.map((p) => shapeOf(p.tools, p.frame, p.f, p.kids, p.unit, p.width));
@@ -454,7 +482,7 @@ function placeLinkChips(main: HTMLElement, coarse: boolean) {
   const frames = [...main.querySelectorAll<HTMLElement>("[data-section-id]")].filter((f) => !f.closest(".xe-measure, .xe-drag-overlay")).map((el) => ({ el, b: pageBox(el) }));
   const others = [...main.querySelectorAll<HTMLElement>(`.xe-tools > *, ${CHIPS}`)]
     .filter((c) => !chips.includes(c) && !c.closest(".xe-measure, .xe-drag-overlay") && c.getClientRects().length > 0)
-    .map((c) => toolsKeepOff(c, pageBox(c), coarse));
+    .map((c) => pageBox(c));
   const placed: Box[] = [];
   const writes = chips.map((chip) => {
     const frame = chip.closest<HTMLElement>("[data-section-id]");
