@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { PortfolioGate } from "@/components/portfolio-editor/PortfolioGate";
+import { TeamPanel } from "@/components/team/TeamPanel";
 import { isAdmin } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { portfolioKind, portfolioServed } from "@/lib/portfolio-kind-server";
@@ -12,7 +13,7 @@ import { loadPortfolioData } from "./load";
 import { isStep, type Step } from "./steps";
 import { TryNewPortfolio } from "./TryNewPortfolio";
 
-type Search = { step?: string; builder?: string };
+type Search = { step?: string; builder?: string; joined?: string; left?: string; full?: string };
 
 /** The address's own word for the step builder: the escape, and where the editor's crash fallback reloads to. */
 const stepsAsked = (q: Search) => q.builder === "steps";
@@ -56,7 +57,16 @@ export default async function BuildPortfolioPage({ searchParams }: { searchParam
   }
 
   // The editor is drawn in the browser, inside the gate's boundary. The two panels it shows that keep
-  // their own server actions are drawn here and handed in: the team's (brief H's TeamPanel, once it is
-  // merged) and the job links (G's compact one, once it is built).
-  return <PortfolioGate data={data} team={null} jobLinks={<JobLinksSection userId={user.id} />} />;
+  // their own server actions are drawn here and handed in: the team's (TeamPanel) and the job links (the
+  // compact menu). `joined`, `left` and `full` are the team's notes after a join, a leave or a refused
+  // Make my own; the editor's Address keeps them in the address until the Team sheet closes, so a refresh
+  // meanwhile draws the panel with them still.
+  const said = asked.joined ? "joined" : asked.left ? "left" : null;
+  return (
+    <PortfolioGate
+      data={data}
+      team={<TeamPanel userId={user.id} host={host} said={said} full={asked.full === "1"} />}
+      jobLinks={<JobLinksSection compact userId={user.id} />}
+    />
+  );
 }
