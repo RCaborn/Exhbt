@@ -1,6 +1,7 @@
 import { deflateSync } from "node:zlib";
 import { expect, type ElementHandle, type Locator, type Page } from "@playwright/test";
-import { text, type ExhbtDoc, type Section } from "../lib/exhbt/blocks";
+import { filledFlow, isBlank, text, type ExhbtDoc, type Section } from "../lib/exhbt/blocks";
+import { pageItems } from "../lib/exhbt/layouts";
 import { OFFERED_FORMATS, type Format } from "../lib/exhbt/formats";
 import { startBlank } from "./add-exhbt";
 import { BEFORE_AFTER_IMAGES, beforeAfterDoc, BUILD_IMAGES, buildDoc, essayDoc, EVENT_IMAGES, eventDoc, fullDoc, GALLERY_IMAGES, galleryDoc, researchDoc } from "../lib/exhbt/sample";
@@ -493,20 +494,33 @@ export const EDIT_ONLY_IN_FLOW: { name: string; selector: string; always: boolea
   { name: "an aim or a conclusion with no words", selector: ':is([data-kind="aim"], [data-kind="conclusion"])[data-section-id]:has([data-path$=".text"][data-empty])', always: false },
   { name: "an empty title", selector: '[data-path="title"][data-empty]', always: false },
   { name: "an empty flowchart box", selector: '[data-path$=".step"][data-empty]', always: false },
-  // A flowchart with no boxes: its one button, "Add a box", is its placeholder (FlowBox.tsx); the "+" over each arrow takes
-  // no room. Since decision 0032 a flowchart with no boxes is not drawn for a visitor at all ("a flowchart with no box left is not
-  // drawn at all"), in every layout: so its whole part goes, the editor's frame round it with its heading and margins.
-  { name: "the empty flowchart", selector: '[data-section-id="flow"]:has(.xe-flow-first[data-flow-add])', always: false },
   { name: "an empty finding", selector: '[data-path*=".items."][data-empty]', always: false },
 ];
+
+/** The name of the allowance below: a part with nothing in it. */
+export const EMPTY_PART = "a part with nothing in it, which a visitor is not shown";
+
+/**
+ * Decision 0032: "A part left empty is not drawn for a visitor ... The editor keeps its placeholders." Its one
+ * definition of empty is the product's (`isBlank` and `filledFlow` in lib/exhbt/blocks.ts), so this reads the doc and
+ * names each such part's frame on the editing page, the flowchart with no box filled in among them, rather than
+ * copying that definition into selectors. Each goes whole, with its heading and margins: the visitor's page has none of it.
+ */
+async function emptyParts(page: Page): Promise<typeof EDIT_ONLY_IN_FLOW> {
+  const doc = await docNow(page);
+  return pageItems(doc)
+    .filter((it) => (it.kind === "flow" ? filledFlow(it.steps).length === 0 : isBlank(it.s)))
+    .map((it) => ({ name: EMPTY_PART, selector: `[data-section-id="${it.id}"]`, always: false }));
+}
 
 /**
  * Takes out of the editing page what EDIT_ONLY_IN_FLOW allows (`which`: the two fields that are
  * always there, or every entry), so that what is left must be the visitor's page box for box.
  * Returns the names of what it took out, with how many of each.
  */
-export function allowEditOnly(page: Page, which: "always" | "all"): Promise<string[]> {
+export async function allowEditOnly(page: Page, which: "always" | "all"): Promise<string[]> {
   const list = EDIT_ONLY_IN_FLOW.filter((e) => which === "all" || e.always);
+  if (which === "all") list.push(...(await emptyParts(page)));
   return page.evaluate((entries) => {
     const named: string[] = [];
     const root = document.querySelector('[data-editor="page"] article[data-exhbt-page]');

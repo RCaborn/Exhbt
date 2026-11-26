@@ -4,7 +4,7 @@ import { lineAt, moved, placeAt, within } from "../components/exhbt-editor/flow/
 import { formatLimits, validateForPublish, type ExhbtDoc, type FlowStep } from "../lib/exhbt/blocks";
 import { FORMAT_RULES, type Format } from "../lib/exhbt/formats";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
-import { allowEditOnly, boxes, differences, docNow, field, finger, focusedPath, freshName, full, offered, openDoc, openTiming, READY, renders, sampleDoc, SAMPLES, seeAsVisitor, settle, undoLabel, waitLive, waitReady } from "./page-editor";
+import { allowEditOnly, boxes, EMPTY_PART, differences, docNow, field, finger, focusedPath, freshName, full, offered, openDoc, openTiming, READY, renders, sampleDoc, SAMPLES, seeAsVisitor, settle, undoLabel, waitLive, waitReady } from "./page-editor";
 
 /*
  * The flowchart edited where it sits (decision 0026; docs/briefs/edit-on-page/r3-k-flowchart.md): type
@@ -803,7 +803,7 @@ test.describe("an empty flowchart", () => {
       await openDoc(page, freshName("flowemptyparity"), { ...sampleDoc(f), flow: [] });
       await waitLive(page);
       const taken = await allowEditOnly(page, "all");
-      expect(taken.some((t) => t.startsWith("the empty flowchart (")), taken.join("; ")).toBe(true);
+      expect(taken.some((t) => t.startsWith(EMPTY_PART)), taken.join("; ")).toBe(true);
       await settle(page);
       const editing = await boxes(page);
       await seeAsVisitor(page, true);
