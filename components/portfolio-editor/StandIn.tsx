@@ -5,6 +5,7 @@ import { PortfolioHome } from "@/components/portfolio/PortfolioHome";
 import { lookAttrs, themeStyle } from "@/components/portfolio/themeFonts";
 import { BAR_H, GROUND } from "./geometry";
 import { editingHome } from "./home-props";
+import { OwnerPartsStill } from "./tiles/OwnerView";
 
 /*
  * The loading stand-in (decision 0031, "The switch": "The editor is drawn only in the browser, inside
@@ -21,7 +22,7 @@ import { editingHome } from "./home-props";
 const muted = { color: "var(--xp-muted)" } as const;
 
 /** The adapter the loading view draws with: the words as the page has them, an empty field's placeholder, and no control. */
-export function standInAdapter(): HomeEdit {
+export function standInAdapter(owner: HomeEdit["owner"] = () => null): HomeEdit {
   return {
     // A block field is a block in the editor: its words here are one too, so an empty parent keeps the line.
     text: (s) =>
@@ -52,7 +53,7 @@ export function standInAdapter(): HomeEdit {
     section: (_s, node) => node,
     tile: (_s, node) => node,
     lineTools: () => null,
-    owner: () => null,
+    owner,
     tools: () => null,
   };
 }
@@ -68,7 +69,7 @@ export function StandInPage({ data, state }: { data: PortfolioData; state?: Buil
     <>
       <div aria-hidden className="border-b border-line bg-surface" style={{ height: BAR_H }} />
       <div {...lookAttrs(home.theme)} style={themeStyle(home.theme)} className={GROUND} data-canvas="stand-in" inert>
-        <PortfolioHome {...home} edit={standInAdapter()} />
+        <PortfolioHome {...home} edit={standInAdapter((where) => <OwnerPartsStill where={where} data={data} state={state} />)} />
       </div>
     </>
   );
