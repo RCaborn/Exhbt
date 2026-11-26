@@ -506,3 +506,24 @@ Still open:
 - The real model has not seen a Word, PowerPoint or uploaded picture (eval cases 15 to 18), or a long draft: four characters a token is an estimate until a long draft's input tokens are in `ai_call_logs`.
 - Nothing here ran on WebKit or a phone.
 - The new editor's "Take a figure from my report" for Word and PowerPoint files (0025 says what it needs).
+
+## From the switch-on fixes agent, 26 Nov 2026 (branch `phase-2-switch-on-fixes`)
+
+Two faults to fix before the editor is switched on for everyone. Each test below failed before its fix.
+
+- Build on a phone (agent M's open item above):
+  - The cause: Build's buttons wrap on a phone, 12px apart. A link's "Web address", just under its line, then lay over the top of the button on the next line, and its 44px press took a tap on the middle of that button's words.
+  - The fix: `placeLinkChips` in `Toolbar.tsx`, run at the start of each placing pass. A button link's chip goes in the first place where it and its press meet no other section, no toolbar, no other chip and not its own button, inside the column: under its line, as before; on the button's line just past the link and its grip (`data-place="beside"`); or on the button's line at the link's right end, left of the grip (`"end"`). Where none is clear, under its line. The rules are in `figures.css`. A link's box is watched, so typing that widens it places it again. Where the row doesn't wrap (a tablet, a desktop) nothing moves.
+  - The test: `editor-phone`, "a Build exhbt with three links". It taps the middle of each button's words and each "Web address" with the touchscreen, on the Pixel 7 and the iPhone emulation.
+- Tablet and iPad: a grip or a toolbar over a control.
+  - The cause of "Remove finding 1": a finding's own controls (`.xe-list-tools`) and "Add a finding" were not among the chips a toolbar keeps clear of. Where no heading sits over the findings (research), the first finding's controls sit just under the section's top edge, at its right end. A toolbar on that edge lay over them, and the grip on "Remove finding 1". In research's sample the row above the corner fits the 44px gap exactly, so that sample shows it only where the gap comes out a fraction short; moving the findings to the top of the page shows it anywhere.
+  - The fix: they are among `CHIPS` in `Toolbar.tsx` now, counted by their 44px press under a finger. So is where a finding's formatting buttons go, under its line at its right end: the last finding's hang into the gap under the section, where the next section's toolbar goes (an essay with its findings first). Where even the compact pair at the corner would cover something, it now goes along the top edge to the left until it is clear, over none of the words, rather than stay on the corner. Decision 0026 says so now.
+  - The same test found two more, neither a grip nor a toolbar. On a tablet a reference line's "Web address" sits just right of the middle of the rule, not on it (`figures.css`): the line about the link is a field as wide as the line, and the centred chip's press reached its middle. The flowchart's "+" after the last box of a column sits just under its foot, not a little into it (`flow.css`, tablet only): its press reached the middle of the last box's detail.
+  - The tests: `editor-tablet`, for each of the seven layouts: "nothing covers a control" and "the findings moved to the top of the page". The first hit-tests the middle of every button and field shown (`coveredControls` in `e2e/page-editor.ts`) at rest, with each section touched and with the cursor in each finding. It allows nothing: 0026 draws no control over another on purpose on these pages (an open menu is never open here). The list (`ON_PURPOSE`) is in the spec, empty.
+
+Still open:
+- On a phone a section's grip sits half over its top edge, so where Build's buttons wrap it lies over the end of the line about the link above (the words, not the field's middle). The phone tests read words from text nodes only, and the line about a link is a text box, so none of them sees it.
+- On a phone the flowchart's end "+" and a reference line's chip are where they were. Their presses may reach the middle of the field above them as they did on a tablet; the hit test runs only on the tablet and iPad projects.
+- With the findings moved straight above research's hypothesis, "Add a finding" and the aim's Aim and Hypothesis switch sit at the same place on a tablet (both 3.25rem in, either side of the gap). Not a grip or a toolbar; not fixed here.
+- Nothing here ran on real WebKit, a real iPhone or a real iPad: `E2E_WEBKIT=chromium` gave the iPhone and iPad sizes on Chromium.
+- `flow.css` and `figures.css` changed; the flowchart drag branch (`phase-2-flow-lift`) changed neither when this was written.

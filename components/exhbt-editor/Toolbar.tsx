@@ -474,8 +474,9 @@ function placeLinkChips(main: HTMLElement, coarse: boolean) {
       ["end", { x: f.x + f.w - 52 - w, y: line, w, h }],
     ];
     const clear = (b: Box) => {
+      // The chip inside the column (its press may reach a few pixels into the page's margin, where nothing is).
+      if (b.x < page.x - 0.5 || b.x + b.w > page.x + page.w + 0.5) return false;
       const p = coarse ? chipPress(b) : b;
-      if (p.x < page.x - 0.5 || p.x + p.w > page.x + page.w + 0.5) return false;
       if (own && overlap(p, own)) return false;
       return !frames.some((o) => o.el !== frame && overlap(p, o.b)) && !others.some((o) => overlap(p, o)) && !placed.some((o) => overlap(p, o));
     };
