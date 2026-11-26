@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { safeNext, supabaseServer } from "@/lib/auth";
+import { landingAfterSignIn } from "@/lib/landing";
+import { portfolioKindForEveryone } from "@/lib/portfolio-kind-server";
+import { isPhase2Enabled } from "@/lib/site";
 import { recordReferralFromCookie } from "@/lib/referrals";
 import { getStore } from "@/lib/store";
 
@@ -7,7 +10,7 @@ import { getStore } from "@/lib/store";
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
-  const next = safeNext(url.searchParams.get("next"));
+  const next = safeNext(url.searchParams.get("next"), landingAfterSignIn("log-in", await portfolioKindForEveryone(), isPhase2Enabled()));
   if (!code) return NextResponse.redirect(new URL("/login?error=link", url.origin));
 
   const sb = await supabaseServer();
