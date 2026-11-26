@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Link } from "@astryxdesign/core/Link";
@@ -71,8 +71,22 @@ export function AppLab({
   // "Your portfolio" goes to the portfolio as this person has it: her first run, or her work.
   const portfolio: AppScreen = screen === "first-run" ? "first-run" : "work";
 
+  // The notice in the banner slot scrolls away and the bar under it stays (app.css): the frame's top
+  // sticks at minus the notice's height, which is measured, as it wraps differently at each width.
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = root.current;
+    const notice = el?.querySelector<HTMLElement>(".astryx-app-shell-header .astryx-banner-frame");
+    if (!el || !notice) return;
+    const keep = () => el.style.setProperty("--app-notice-h", `${notice.getBoundingClientRect().height}px`);
+    keep();
+    const watch = new ResizeObserver(keep);
+    watch.observe(notice);
+    return () => watch.disconnect();
+  }, []);
+
   return (
-    <div data-app-lab data-app-screen={screen} data-app-level={lab.level}>
+    <div ref={root} data-app-lab data-app-screen={screen} data-app-level={lab.level}>
       {lab.bar === "shown" && (
         <AppLabStrip
           screen={screen}

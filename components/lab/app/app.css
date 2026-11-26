@@ -110,6 +110,21 @@
   [data-app-lab] .astryx-app-shell-header .astryx-banner[data-container="section"] {
     padding-inline: max(var(--exhbt-gutter), calc((100% - var(--exhbt-content-width)) / 2 + var(--exhbt-gutter)));
   }
+  /*
+   * What stays on screen as the page scrolls. On a wide window the bar stays and the notice above it
+   * scrolls away: the frame's top (sticky in AppShell) sticks at minus the notice's height, measured
+   * in AppLab.tsx. On a phone none of it stays (decision 0031: the site's header scrolls away there),
+   * so the page has the whole screen. AppShell's drawer is below 48rem, the same edge.
+   */
+  [data-app-lab] .astryx-app-shell-header {
+    top: calc(-1 * var(--app-notice-h, 0px));
+  }
+  @media (width < 48rem) {
+    [data-app-lab] .astryx-app-shell-header {
+      position: relative;
+      top: 0;
+    }
+  }
   /* The logo is a link home: as tall as a press target. */
   [data-app-lab] .app-logo {
     min-height: 44px;
