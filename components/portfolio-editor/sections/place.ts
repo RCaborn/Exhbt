@@ -11,9 +11,11 @@ import { useLayoutEffect, useState, type RefObject } from "react";
  *
  *  - A section: a row in the gap above its top right corner (inside the section's own top padding);
  *    else a row half over its top edge; else the corner itself.
- *  - A tile: inside its own top right corner (over a card's picture or key figure, or a row's empty end)
- *    when no words are under it; else in the gutter to its right, when the page has room there; else
- *    half over its top edge; else the corner.
+ *  - A card: inside its own top right corner (over its picture or key figure) when no words are under
+ *    it; else in the gutter to its right, when the page has room there; else half over its top edge;
+ *    else the corner.
+ *  - A row (the list and index looks): the same places, the gutter first, but chosen once for the whole
+ *    list, so every row's toolbar sits in the same place.
  *
  * Measured when it is drawn and whenever the part changes size (a key typed, a section moved).
  */
@@ -75,21 +77,46 @@ export function placeSection(frame: HTMLElement, body: Element, tools: HTMLEleme
   return { x, y: 0, where: "corner" };
 }
 
-/** A tile's toolbar: inside its corner, the gutter to its right, half over its top edge, or the corner. */
-export function placeTile(frame: HTMLElement, tools: HTMLElement, bounds: DOMRect, neighbours: Element[]): Spot {
+/** Where a tile's toolbar could go, each null when it is not clear there. "corner" is always possible. */
+type TileSpots = Record<"inside" | "gutter" | "edge" | "corner", Spot | null>;
+
+function tileSpots(frame: HTMLElement, w: number, h: number, bounds: DOMRect, neighbours: Element[]): TileSpots {
   const f = frame.getBoundingClientRect();
-  const w = tools.offsetWidth;
-  const h = tools.offsetHeight;
   const own = wordRects(frame);
-  const others = neighbours.flatMap((n) => [n.getBoundingClientRect()]);
+  const others = neighbours.map((n) => n.getBoundingClientRect());
   const clear = (r: DOMRect, rects: DOMRect[]) => !rects.some((q) => overlaps(q, r));
   const inside = new DOMRect(f.right - w - MARGIN, f.top + MARGIN, w, h);
-  if (clear(inside, own)) return { x: f.width - w - MARGIN, y: MARGIN, where: "inside" };
   const gutter = new DOMRect(f.right + MARGIN, f.top, w, h);
-  if (gutter.right <= bounds.right && clear(gutter, others)) return { x: f.width + MARGIN, y: 0, where: "gutter" };
   const edge = new DOMRect(f.right - w - MARGIN, f.top - h / 2, w, h);
-  if (clear(edge, [...own, ...others.filter((o) => o.bottom <= f.top + 1)])) return { x: f.width - w - MARGIN, y: -h / 2, where: "edge" };
-  return { x: f.width - w - MARGIN, y: MARGIN, where: "corner" };
+  return {
+    inside: clear(inside, own) ? { x: f.width - w - MARGIN, y: MARGIN, where: "inside" } : null,
+    gutter: gutter.right <= bounds.right && clear(gutter, others) ? { x: f.width + MARGIN, y: 0, where: "gutter" } : null,
+    edge: clear(edge, [...own, ...others.filter((o) => o.bottom <= f.top + 1)]) ? { x: f.width - w - MARGIN, y: -h / 2, where: "edge" } : null,
+    corner: { x: f.width - w - MARGIN, y: MARGIN, where: "corner" },
+  };
+}
+
+const CARD_ORDER = ["inside", "gutter", "edge", "corner"] as const;
+const ROW_ORDER = ["gutter", "inside", "edge", "corner"] as const;
+
+/** A card's toolbar: inside its corner, the gutter to its right, half over its top edge, or the corner. */
+export function placeTile(frame: HTMLElement, tools: HTMLElement, bounds: DOMRect, neighbours: Element[]): Spot {
+  const spots = tileSpots(frame, tools.offsetWidth, tools.offsetHeight, bounds, neighbours);
+  return CARD_ORDER.map((k) => spots[k]).find(Boolean)!;
+}
+
+/**
+ * A row's toolbar (the list and index looks), decided for the whole list so every row's sits in the same
+ * place: the first of the gutter, inside its end, half over its top edge, that is clear for every row
+ * in `rows`; else the corner.
+ */
+export function placeRow(frame: HTMLElement, tools: HTMLElement, bounds: DOMRect, rows: HTMLElement[], neighboursOf: (row: HTMLElement) => Element[]): Spot {
+  const w = tools.offsetWidth;
+  const h = tools.offsetHeight;
+  const all = (rows.includes(frame) ? rows : [...rows, frame]).map((r) => tileSpots(r, w, h, bounds, neighboursOf(r)));
+  const own = tileSpots(frame, w, h, bounds, neighboursOf(frame));
+  const where = ROW_ORDER.find((k) => all.every((sp) => sp[k] != null)) ?? "corner";
+  return own[where]!;
 }
 
 /**

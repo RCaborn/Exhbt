@@ -27,9 +27,13 @@ export function moveSection(s: BuilderState, key: SectionKey, to: number): Build
   return withA(s, { ...s.arrangement, sections: moved(list, from, to) });
 }
 
-/** Takes a section off the page. Its words stay in the state, so Undo (or adding it again) brings them back; a save drops them (layoutFromSections). */
+/**
+ * Takes a section off the page. Its words stay in the state, so Undo (or adding it again) brings them
+ * back; a save drops them (layoutFromSections). The last section is never taken off: a stored layout with
+ * no sections reads as the defaults (sectionsOf), so the page keeps at least one.
+ */
 export function removeSection(s: BuilderState, key: SectionKey): BuilderState {
-  if (!s.arrangement.sections.includes(key)) return s;
+  if (!s.arrangement.sections.includes(key) || s.arrangement.sections.length <= 1) return s;
   return withA(s, { ...s.arrangement, sections: s.arrangement.sections.filter((k) => k !== key) });
 }
 
