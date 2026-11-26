@@ -1,21 +1,17 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { AspectRatio } from "@astryxdesign/core/AspectRatio";
 import { Button } from "@astryxdesign/core/Button";
 import { Heading } from "@astryxdesign/core/Heading";
 import { useAnnounce } from "@astryxdesign/core/hooks";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
-import { PortfolioHome } from "@/components/portfolio/PortfolioHome";
-import { demoHomeProjects, demoPortfolio } from "@/lib/exhbt";
 import { portfolioHost } from "@/lib/hosts";
-import { DEFAULT_THEME } from "@/lib/portfolio-themes";
-import { Frame } from "../Frame";
 import { LAB_PATH } from "../lab";
 import { useLab } from "../LabFrame";
 import { Address } from "../samples";
+import { HeroPage } from "./HeroPage";
 import { useHomeName } from "./HomeName";
 
 /** The highlighted half of the opening line, a word at a time, so the stroke can be drawn across it in reading order. */
@@ -57,7 +53,7 @@ function Stroke() {
  * no field, and the page is the made-up person's.
  */
 export function Hero() {
-  const { level } = useLab();
+  const { level, moves } = useLab();
   const me = useHomeName();
   const field = level !== "restrained";
   const { setTyped } = me;
@@ -79,7 +75,6 @@ export function Hero() {
     return () => clearTimeout(t);
   }, [me.address, announce]);
 
-  const host = portfolioHost(me.username);
   return (
     <section aria-labelledby="hl-hero-title" className="hl-hero" data-field={field || undefined}>
       <div className="lab-content hl-hero-grid">
@@ -131,26 +126,12 @@ export function Hero() {
         </div>
 
         <div className="hl-hero-work">
-          <Frame
-            url={host}
-            label={
-              me.yours
-                ? `A preview of a portfolio home page with your name, ${me.name}, at ${host}, filled with made-up example projects`
-                : `${demoPortfolio.person.name}'s portfolio home page, a made-up example: her name, her intro and her best piece of work`
-            }
-            page="hl-hero-page"
-          >
-            <AspectRatio ratio={4 / 3}>
-              <PortfolioHome
-                person={me.person}
-                theme={DEFAULT_THEME}
-                projects={demoHomeProjects()}
-                featuredId={null}
-                sections={["featured"]}
-                tiles={demoPortfolio.tiles}
-              />
-            </AspectRatio>
-          </Frame>
+          <HeroPage live={level === "maximal"} moves={moves} />
+          {level === "maximal" && (
+            <Text as="p" display="block" type="supporting">
+              This page works: open the best project on it.
+            </Text>
+          )}
           <span className="hl-frame-tag">
             <Token label={me.yours ? "Preview" : "Made-up example"} size="sm" />
           </span>

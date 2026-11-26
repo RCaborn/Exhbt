@@ -105,6 +105,40 @@
   .hl-hero-page {
     zoom: 0.44;
   }
+  .hl-hero-work {
+    display: grid;
+    gap: 0.75rem;
+    align-content: start;
+  }
+  .hl-hero-scroll {
+    height: 100%;
+  }
+  /* At maximal the window works: its page scrolls inside it, and doesn't hand the scroll on to the page around it. */
+  .hl-hero-window[data-live] .hl-hero-scroll {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /*
+   * The tile opening into its exhbt (maximal): the band's title travels to become the exhbt's title,
+   * and the rest of the page in the frame cross-fades. Only the frame's page takes part, so the
+   * page around it stays live. The time is the theme's "a moment that is watched", set by HeroPage.
+   */
+  html:active-view-transition-type(hl-open) {
+    view-transition-name: none;
+  }
+  html:active-view-transition-type(hl-open) .hl-hero-page {
+    view-transition-name: hl-open-page;
+  }
+  html:active-view-transition-type(hl-open) .hl-hero-page [data-band] h2,
+  html:active-view-transition-type(hl-open) .hl-hero-page .xp-title {
+    view-transition-name: hl-open-title;
+  }
+  ::view-transition-group(hl-open-title),
+  ::view-transition-group(hl-open-page),
+  ::view-transition-old(hl-open-page),
+  ::view-transition-new(hl-open-page) {
+    animation-duration: var(--hl-open-time, 720ms);
+  }
   .hl-hero-work .astryx-aspect-ratio {
     aspect-ratio: 16 / 10;
   }
