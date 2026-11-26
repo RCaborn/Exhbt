@@ -38,7 +38,7 @@ The bar across the top marked "Design lab" is the lab's own. It has the four scr
 
 ### The finish (publishing)
 
-**What it shows.** The page opens on the moment itself, a first publish on a paid plan, already done. The ink label reads "It's live on your portfolio." Its three checks tick in turn, and the address is in big type with Copy link as the one green button. Beside it are the live page with the "checked by exhbt" seal, the link as it looks pasted into LinkedIn, and "Add your next exhbt". "Play it again" runs it from "Review and publish". Four more moments sit behind the tabs (on a phone, a drop-down): publishing changes, which is quiet; Free, which never says live; back on the portfolio, where the tile turns from Draft to Live; and the wait while a first draft is written.
+**What it shows.** The page opens on the moment itself, a first publish on a paid plan, already done. The ink label reads "It's live on your portfolio." Its three checks tick in turn, and the address is in big type with Copy link as the one green button. Beside it are the live page with the "checked by exhbt" seal, the link as it looks pasted into LinkedIn, and "Add your next exhbt". Close the panel (the cross, or Escape) to reach "Play it again", which runs it from "Review and publish", and the tabs. Four more moments sit behind the tabs (on a phone, a drop-down): publishing changes, which is quiet; Free, which never says live; back on the portfolio, where the tile turns from Draft to Live; and the wait while a first draft is written.
 
 **What is different from today.** Today a publish ends on three lines in a blank panel and four equal buttons. Here it ends on the work, the link and one next step. Free says plainly that only she can see it, and offers the upgrade once.
 
@@ -46,7 +46,7 @@ The bar across the top marked "Design lab" is the lab's own. It has the four scr
 
 - **Restrained:** the label is pale, with no stroke or seal.
 - **Confident:** the label is on ink.
-- **Maximal:** the page flies out of the Publish button, and ink fills the screen for a beat before it settles. You see this only with Motion on, after "Play it again".
+- **Maximal:** the page flies out of the Publish button, and ink fills the screen for a beat before it settles. You see this only with Motion on: close the panel, press "Play it again", tick the box and press Publish.
 
 ### The signed-in page (App)
 
@@ -163,5 +163,9 @@ So the page can be corrected before it is sent:
 4. **The finish on ink.** The page doesn't mention ink. In the lab the finish's label is on ink from confident (pale at restrained), and maximal adds a full-screen ink beat. This breaks DESIGN.md's "one ink section, on Home only", which the page doesn't raise.
 5. **Maximal does more than the page lists.** The page lists a tile and a film. The lab adds the largest type, Home's example page to the screen's edge, an ink edge on frames, the finish's flight and ink beat, and the first-run page filling in part by part.
 6. **"It's live" as one sequence.** The page describes publish, then the tile turning, then the link. The lab shows them as two separate moments (the panel, and back on the portfolio) and asks which comes first (choice 4 above).
-7. **Home's main button.** The lab says "Start your portfolio", which is question 5's answer for after the new portfolio is on for everyone. Until then the page's own default is "Build your exhbt".
-8. **A loading button's spinner turns until the work is done.** It appears in the kit, as Astryx draws it. The page says nothing loops; with Motion off it is still.
+7. **A second way in on Home.** The page counts three ways in on today's Home as a weakness. The lab has one button, "Start your portfolio", and adds the free roadmap as a line under it and an item in the top bar ("Free roadmap"). That is a second way in, which the design review asked for and the page's own roadmap step supports, but the page doesn't mention it.
+8. **Levels change size and shadow too.** The page describes each level by what moves. In the lab every level also sets the type size (today's sizes at restrained, larger at confident, largest at maximal) and how far the work is raised.
+9. **No private-preview notice on the signed-in page.** The lab leaves it out of the App frame, because the lab bar says what this is. Until launch the real frame carries it.
+10. **The level descriptions were reworded.** The lab's own one-line descriptions of the levels (on the lab's index page and the kit) now say what each level adds as built: the finish on ink from confident, the work to the screen's edge at maximal. They no longer match the page's wording word for word.
+11. **Home's main button.** The lab says "Start your portfolio", which is question 5's answer for after the new portfolio is on for everyone. Until then the page's own default is "Build your exhbt".
+12. **A loading button's spinner turns until the work is done.** It appears in the kit, as Astryx draws it. The page says nothing loops; with Motion off it is still.

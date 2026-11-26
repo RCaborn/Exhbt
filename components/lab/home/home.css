@@ -227,11 +227,8 @@
       --hl-off: 4rem;
       margin-right: calc(-1 * (max(var(--exhbt-gutter), (100vw - var(--exhbt-content-width)) / 2 + var(--exhbt-gutter)) + var(--hl-off)));
     }
-    [data-level="maximal"] .hl-frame-tag {
+    [data-level="maximal"] .hl-hero-work .hl-frame-tag {
       right: calc(var(--hl-off) + 1.25rem);
-    }
-    [data-level="maximal"] .hl-hero-work > .astryx-text {
-      display: none;
     }
     [data-level="maximal"] .hl-hero-page {
       zoom: 0.6;
