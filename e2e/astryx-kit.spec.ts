@@ -124,13 +124,13 @@ test.describe("Field", () => {
 });
 
 test.describe("Confirm", () => {
-  test("says what it is for, and when onConfirm throws it stays open and says so", async ({ page }) => {
+  test("shows what will happen, and when onConfirm throws it stays open and says so", async ({ page }) => {
     await open(page);
     await page.getByRole("button", { name: "Delete, and fail" }).click();
     const dialog = page.getByRole("alertdialog");
-    await expect(dialog).toContainText("This cannot be undone."); // no body was given
+    await expect(dialog).toContainText("It comes off your portfolio."); // the caller's own body
     await dialog.getByRole("button", { name: "Delete it" }).click();
-    await expect(dialog).toContainText("That did not work");
+    await expect(dialog).toContainText("That didn't work, and nothing has changed.");
     await expect(dialog).toBeVisible();
   });
 });

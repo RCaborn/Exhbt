@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 
-const DEFAULT_BODY = "This cannot be undone.";
-const FAILED = "That did not work, so nothing is confirmed. Try again, or close this.";
+const FAILED = "That didn't work, and nothing has changed. Try again, or close this.";
 
 /** Astryx AlertDialog for something that cannot be undone. The confirm button is the only destructive button on the screen. If `onConfirm` throws, the dialog stays open and says so. */
 export function Confirm({
@@ -18,7 +17,8 @@ export function Confirm({
   open: boolean;
   onOpenChange(open: boolean): void;
   title: string;
-  body?: string;
+  /** What will happen, in a sentence. Required: Astryx ties the dialog to it, and only the caller knows whether the action can be undone. */
+  body: string;
   confirmLabel: string;
   onConfirm(): void | Promise<void>;
 }) {
@@ -33,7 +33,7 @@ export function Confirm({
       }}
       title={title}
       // Astryx needs a description to tie to the dialog. A failure replaces it, so it is what is read out.
-      description={failed ? FAILED : (body ?? DEFAULT_BODY)}
+      description={failed ? FAILED : body}
       actionLabel={confirmLabel}
       isActionLoading={busy}
       onAction={async () => {

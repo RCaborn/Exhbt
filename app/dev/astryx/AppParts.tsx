@@ -122,6 +122,7 @@ export function AppParts() {
           open={failing}
           onOpenChange={setFailing}
           title="Delete this exhbt, and fail?"
+          body="It comes off your portfolio."
           confirmLabel="Delete it"
           onConfirm={() => {
             throw new Error("the server said no");
