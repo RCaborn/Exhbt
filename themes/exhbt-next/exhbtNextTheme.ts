@@ -114,9 +114,14 @@ export const exhbtNextTheme = defineTheme({
   // stroke being drawn). Expressive: entrances and moves overshoot a little; exits and fades never do.
   motion: { fast: 140, medium: 320, slow: 720, ratio: 0.75, character: "expressive" },
 
-  // The theme's own tokens, beside Astryx's. Home's opening line is fluid: 48px on a phone, 96px on a wide screen.
+  // The theme's own tokens, beside Astryx's.
   localTokens: {
+    // Home's opening line is fluid: 48px on a phone, 96px on a wide screen.
     "--exhbt-hero-size": "clamp(3rem, 8.4vw, 6rem)",
+    // The one content line: every page's content is this wide at most, with this gutter, and the
+    // top bar pads itself to the same edge (top-nav, below). 72rem is the site's width today.
+    "--exhbt-content-width": "72rem",
+    "--exhbt-gutter": "clamp(1rem, 4vw, 2rem)",
   },
 
   tokens: {
@@ -274,8 +279,10 @@ export const exhbtNextTheme = defineTheme({
       checked: { backgroundColor: MINT, boxShadow: `inset 0 0 0 ${EDGE} ${INK}` },
     },
     "switch-thumb": { checked: { backgroundColor: INK } },
-    // The label is part of the press target, so it is as tall as a control (44px).
-    "switch-label": { base: { paddingBlock: "calc((var(--size-element-md) - 1lh) / 2)" } },
+    // A box's or a switch's label is a sentence, not a field's name, so it isn't semibold. The
+    // switch's is part of the press target, so it is as tall as a control (44px).
+    "checkbox-label": { base: { fontWeight: "var(--font-weight-normal)" } },
+    "switch-label": { base: { fontWeight: "var(--font-weight-medium)", paddingBlock: "calc((var(--size-element-md) - 1lh) / 2)" } },
 
     // ── Choosing a view: tabs underline in ink; the segmented control is a pill with an ink choice ──
     tab: {
@@ -333,7 +340,9 @@ export const exhbtNextTheme = defineTheme({
       "status:error": { color: ERROR },
     },
     banner: {
-      base: { borderRadius: "var(--radius-element)" },
+      // A banner in the flow of a page is a rounded box; one across the top of a page is square.
+      "container:card": { borderRadius: "var(--radius-element)" },
+      "container:section": { borderRadius: "0" },
       "status:info": { backgroundColor: MIST, color: INK },
       "status:success": { backgroundColor: WASH, color: INK },
       "status:warning": { backgroundColor: WHITE, color: INK, boxShadow: `inset 0 0 0 ${EDGE} ${INK}` },
@@ -367,7 +376,16 @@ export const exhbtNextTheme = defineTheme({
     "empty-state-description": { base: { color: TEXT_2 } },
 
     // ── The frame of the app ─────────────────────────────────────────────────
-    "top-nav": { base: { backgroundColor: WHITE, borderBottomWidth: "1px", borderBottomStyle: "solid", borderBottomColor: LINE } },
+    // The top bar: white, a hairline, and padded so its first and last things sit on the content line.
+    "top-nav": {
+      base: {
+        backgroundColor: WHITE,
+        borderBottomWidth: "1px",
+        borderBottomStyle: "solid",
+        borderBottomColor: LINE,
+        paddingInline: "max(var(--exhbt-gutter), calc((100% - var(--exhbt-content-width)) / 2 + var(--exhbt-gutter)))",
+      },
+    },
     "top-nav-item": {
       base: { color: TEXT_2, fontWeight: "var(--font-weight-medium)", borderRadius: "var(--radius-full)", ":hover": { color: TEXT } },
       selected: { color: TEXT, fontWeight: "var(--font-weight-semibold)" },

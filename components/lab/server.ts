@@ -1,4 +1,5 @@
 import "server-only";
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { DEFAULT_LEVEL, isBar, isLevel, LAB_COOKIE, type LabState } from "./lab";
 
@@ -8,6 +9,16 @@ import { DEFAULT_LEVEL, isBar, isLevel, LAB_COOKIE, type LabState } from "./lab"
  * it is never set and every lab address is not found. The same rule as app/dev/editor-timing.
  */
 export const labEnabled = () => process.env.NODE_ENV !== "production" || process.env.EXHBT_LAB === "1";
+
+/**
+ * A lab page's title, for `export const generateMetadata = labMetadata("Home")`. Where the lab is
+ * switched off it gives nothing, so the not-found page a lab address answers with doesn't carry
+ * the lab's name. (A plain `export const metadata` would: Next reads it before the layout's gate.)
+ */
+export const labMetadata =
+  (title: string) =>
+  (): Metadata =>
+    labEnabled() ? { title } : {};
 
 /**
  * The lab's switches as this request has them (the cookies the lab bar writes): the level, whether

@@ -305,6 +305,8 @@
     --duration-exit: var(--duration-fast);
     --astryx-theme-neutral-color-status-fill-accent: light-dark(#0074e2, #6d9cfe);
     --exhbt-hero-size: clamp(3rem, 8.4vw, 6rem);
+    --exhbt-content-width: 72rem;
+    --exhbt-gutter: clamp(1rem, 4vw, 2rem);
   }
 
   :scope {
@@ -911,7 +913,12 @@
     background-color: #0E0F12;
   }
 
+  .astryx-checkbox-label {
+    font-weight: var(--font-weight-normal);
+  }
+
   .astryx-switch-label {
+    font-weight: var(--font-weight-medium);
     padding-block: calc((var(--size-element-md) - 1lh) / 2);
   }
 
@@ -1026,9 +1033,14 @@
     color: #C92324;
   }
 
-  .astryx-banner {
+  .astryx-banner[data-container="card"] {
     border-radius: var(--radius-element);
     --_banner-radius: var(--radius-element);
+  }
+
+  .astryx-banner[data-container="section"] {
+    border-radius: 0;
+    --_banner-radius: 0;
   }
 
   .astryx-banner[data-status="info"] {
@@ -1108,6 +1120,7 @@
     border-bottom-width: 1px;
     border-bottom-style: solid;
     border-bottom-color: #E5E6E8;
+    padding-inline: max(var(--exhbt-gutter), calc((100% - var(--exhbt-content-width)) / 2 + var(--exhbt-gutter)));
   }
 
   .astryx-top-nav-item {

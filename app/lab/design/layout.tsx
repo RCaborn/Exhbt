@@ -7,10 +7,11 @@ import "@/components/lab/lab.css";
 import { LabFrame } from "@/components/lab/LabFrame";
 import { labEnabled, readLab } from "@/components/lab/server";
 
-export const metadata: Metadata = {
-  title: { default: "Design lab", template: "%s · Design lab" },
-  robots: { index: false, follow: false },
-};
+// Never indexed. The lab's name is in the title only where the lab answers.
+export function generateMetadata(): Metadata {
+  const robots = { index: false, follow: false };
+  return labEnabled() ? { title: { default: "Design lab", template: "%s · Design lab" }, robots } : { robots };
+}
 // The gate is read on each request, so one build serves the preview Worker (EXHBT_LAB=1) and the live one (never set).
 export const dynamic = "force-dynamic";
 

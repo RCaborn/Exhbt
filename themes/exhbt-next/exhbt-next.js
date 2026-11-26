@@ -238,11 +238,15 @@ export const exhbtNextTheme = {
   },
   localTokens: {
     "--astryx-theme-neutral-color-status-fill-accent": "light-dark(#0074e2, #6d9cfe)",
-    "--exhbt-hero-size": "clamp(3rem, 8.4vw, 6rem)"
+    "--exhbt-hero-size": "clamp(3rem, 8.4vw, 6rem)",
+    "--exhbt-content-width": "72rem",
+    "--exhbt-gutter": "clamp(1rem, 4vw, 2rem)"
   },
   __localTokenOwners: {
     "--astryx-theme-neutral-color-status-fill-accent": "neutral",
-    "--exhbt-hero-size": "exhbt-next"
+    "--exhbt-hero-size": "exhbt-next",
+    "--exhbt-content-width": "exhbt-next",
+    "--exhbt-gutter": "exhbt-next"
   },
   __localTokenLineage: ["neutral","exhbt","exhbt-next"],
   components: {
@@ -772,8 +776,14 @@ export const exhbtNextTheme = {
         "backgroundColor": "#0E0F12"
       }
     },
+    "checkbox-label": {
+      "base": {
+        "fontWeight": "var(--font-weight-normal)"
+      }
+    },
     "switch-label": {
       "base": {
+        "fontWeight": "var(--font-weight-medium)",
         "paddingBlock": "calc((var(--size-element-md) - 1lh) / 2)"
       }
     },
@@ -892,8 +902,11 @@ export const exhbtNextTheme = {
       }
     },
     "banner": {
-      "base": {
+      "container:card": {
         "borderRadius": "var(--radius-element)"
+      },
+      "container:section": {
+        "borderRadius": "0"
       },
       "status:info": {
         "backgroundColor": "#F6F7F8",
@@ -974,7 +987,8 @@ export const exhbtNextTheme = {
         "backgroundColor": "#FFFFFF",
         "borderBottomWidth": "1px",
         "borderBottomStyle": "solid",
-        "borderBottomColor": "#E5E6E8"
+        "borderBottomColor": "#E5E6E8",
+        "paddingInline": "max(var(--exhbt-gutter), calc((100% - var(--exhbt-content-width)) / 2 + var(--exhbt-gutter)))"
       }
     },
     "top-nav-item": {

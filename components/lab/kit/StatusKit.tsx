@@ -65,11 +65,15 @@ export function StatusKit() {
         <Compare
           today={
             <div className="kit-stack" data-gap="sm">
-              <p role="note" className="rounded-[var(--radius)] border border-line bg-mist px-4 py-3">
-                Worked on this with other people? Add them as teammates.
-              </p>
+              {/* The editor's teammates strip and the gate's error, with the classes each has today. */}
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[16px] border border-line bg-surface px-4 py-3">
+                <p className="text-sm">Worked on this with other people? Add them as teammates.</p>
+                <a href="#status" className="link text-sm font-semibold text-ink">
+                  Add teammates
+                </a>
+              </div>
               <p className="rounded-[var(--radius)] border border-error/40 bg-surface px-4 py-3 text-error">We couldn&rsquo;t read Dissertation.pdf.</p>
-              <Note>A box drawn by hand on each page, with its own padding and edge.</Note>
+              <Note>Each is a box drawn by hand where it is used, with its own corners, padding and edge.</Note>
             </div>
           }
           proposed={
@@ -94,8 +98,8 @@ export function EmptyKit({ picture }: { picture: React.ReactNode }) {
         <Compare
           today={
             <div className="kit-stack">
-              <div className="rounded-[16px] border border-dashed border-line p-6 text-center text-graphite">Nothing here yet. Your first exhbt will show here.</div>
-              <Note>A dashed box and a sentence, with the way forward somewhere else on the page.</Note>
+              <p className="text-graphite">Nothing here yet. Your first exhbt will show here.</p>
+              <Note>The whole empty state of the exhbts page: one grey sentence. The way to add one is a card further up the page.</Note>
             </div>
           }
           proposed={
@@ -130,10 +134,10 @@ export function ProgressKit() {
             <div className="kit-stack">
               <div>
                 <p className="text-sm font-semibold text-graphite">Step 2 of 3</p>
-                <div className="mt-2 flex gap-1.5" aria-hidden>
-                  <span className="h-1.5 flex-1 rounded-full bg-jade" />
-                  <span className="h-1.5 flex-1 rounded-full bg-jade" />
-                  <span className="h-1.5 flex-1 rounded-full bg-line" />
+                <div className="mt-2 grid grid-cols-3 gap-1.5" aria-hidden>
+                  <span className="h-1.5 rounded-full bg-jade" />
+                  <span className="h-1.5 rounded-full bg-jade" />
+                  <span className="h-1.5 rounded-full bg-wash" />
                 </div>
               </div>
               <Note>A counter over three bars. The steps have no names.</Note>
@@ -202,12 +206,13 @@ export function RingsKit() {
                   A plain link or field
                 </span>
                 <span className="kit-ring-today" data-ring="astryx">
-                  An Astryx button
+                  The main button
                 </span>
               </div>
               <Note>
-                Two rings: the site&rsquo;s jade outline with a white and ink halo, and on Astryx buttons a mint outline (1.5:1 on white) with the
-                same halo stacked on it. Astryx&rsquo;s own selection ring, unthemed, is blue.
+                Two rings, measured on the home page. A plain link or field gets the site&rsquo;s own: jade, with a white and ink halo. An
+                Astryx button gets Astryx&rsquo;s, in the accent colour, which is mint: 1.5:1 on white, and next to nothing round a mint
+                button. Astryx&rsquo;s selection ring, unthemed, is blue.
               </Note>
             </div>
           }

@@ -69,13 +69,19 @@ export function ButtonsKit() {
               <div className="kit-row">
                 <Button label="Small" variant="primary" size="sm" />
                 <Button label="Large" variant="primary" size="lg" />
+                {/* The largest size is the site's own step on top of Astryx's (components/ui/Button.tsx), for a page's one opening button. */}
+                <TodayButton variant="primary" size="xl">
+                  Largest
+                </TodayButton>
+              </div>
+              <div className="kit-row">
                 <Button label="Copy link" variant="secondary" icon={<Icon icon="copy" />} />
                 <Button label="Publishing" variant="primary" isLoading />
                 <Button label="Not yet" variant="primary" isDisabled />
               </div>
               <Note>
-                The same Astryx button as today. New: a quiet one (ghost) for a third choice, and Delete moves into a menu and a
-                confirmation, so red is never a resting pill (see What floats).
+                The same Astryx button as today, through the site&rsquo;s own wrapper or directly. New: a quiet one (ghost) for a third choice,
+                and Delete moves into a menu and a confirmation, so red is never a resting pill (see What floats).
               </Note>
             </div>
           }

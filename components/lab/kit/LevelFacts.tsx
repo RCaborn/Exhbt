@@ -10,43 +10,46 @@ const CHARACTER: Record<Level, string> = {
   maximal: "more overshoot",
 };
 const WORK: Record<Level, string> = {
-  restrained: "today's corners and shadow",
-  confident: "20px corners, the high shadow",
-  maximal: "a drawn ink edge and a deep shadow",
+  restrained: "Today's corners and shadow",
+  confident: "20px corners, a deeper shadow",
+  maximal: "A drawn ink edge, the deepest shadow",
 };
 
 /** What the level in the lab bar is changing right now, with each figure read from the page. */
 export function LevelFacts() {
   const { level } = useLab();
   return (
-    <table className="kit-facts">
-      <caption>
-        Showing <span className="capitalize">{level}</span>. <span className="font-normal text-graphite">{LEVEL_NOTE[level]}</span>
-      </caption>
-      <tbody>
-        <tr>
-          <th scope="row">A page&rsquo;s opening line</th>
-          <td>
+    <div className="kit-level">
+      <p className="kit-level-now">
+        <b>
+          Showing <span className="capitalize">{level}</span>.
+        </b>{" "}
+        {LEVEL_NOTE[level]} The switch is in the lab bar.
+      </p>
+      <dl className="kit-level-facts">
+        <div>
+          <dt>A page&rsquo;s opening line</dt>
+          <dd>
             <TokenValue name="--text-display-1-size" kind="size" />
-          </td>
-        </tr>
-        <tr>
-          <th scope="row">Home&rsquo;s opening line</th>
-          <td>
+          </dd>
+        </div>
+        <div>
+          <dt>Home&rsquo;s opening line</dt>
+          <dd>
             <TokenValue name="--exhbt-hero-size" kind="size" />
-          </td>
-        </tr>
-        <tr>
-          <th scope="row">Something arriving</th>
-          <td>
+          </dd>
+        </div>
+        <div>
+          <dt>Something arriving</dt>
+          <dd>
             <TokenValue name="--duration-medium" kind="time" />, {CHARACTER[level]}
-          </td>
-        </tr>
-        <tr>
-          <th scope="row">The work&rsquo;s frame</th>
-          <td>{WORK[level]}</td>
-        </tr>
-      </tbody>
-    </table>
+          </dd>
+        </div>
+        <div>
+          <dt>The work&rsquo;s frame</dt>
+          <dd>{WORK[level]}</dd>
+        </div>
+      </dl>
+    </div>
   );
 }

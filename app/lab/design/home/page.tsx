@@ -1,7 +1,7 @@
-import type { Metadata } from "next";
 import { Coming } from "@/components/lab/Coming";
+import { labMetadata } from "@/components/lab/server";
 
-export const metadata: Metadata = { title: "Home" };
+export const generateMetadata = labMetadata("Home");
 
 /** A placeholder, so the lab bar's link works. The screen's own agent replaces this file. */
 export default function LabHome() {
