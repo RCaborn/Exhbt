@@ -26,8 +26,9 @@
     gap: var(--spacing-2);
     min-width: 0;
   }
-  /* Where the page stands: a dot in its colour and the word (no Badge for a status, decision 0033). */
-  .pe-chip {
+  /* Where the page stands: a dot in its colour and the word (no Badge for a status, decision 0033).
+     Named pe-status, not pe-chip: F's draft chip on a card is .pe-chip (css/arrange.css). */
+  .pe-status {
     display: inline-flex;
     align-items: center;
     gap: var(--spacing-1-5);
@@ -51,7 +52,7 @@
   /* On a phone the row keeps the status and the main button: the screen's name is in the site's
      header already, so the bar's heading is kept for screen readers only. The chip keeps a word at every
      width, never the dot alone (WCAG 1.4.1): under 30rem its short form ("Live", "Not live", "Preview"). */
-  .pe-chip-short {
+  .pe-status-short {
     display: none;
   }
   @media (width < 30rem) {
@@ -63,10 +64,10 @@
       clip-path: inset(50%);
       white-space: nowrap;
     }
-    .pe-chip-word {
+    .pe-status-word {
       display: none;
     }
-    .pe-chip-short {
+    .pe-status-short {
       display: inline;
     }
   }
@@ -282,7 +283,9 @@
     z-index: 5;
     translate: -50% -50%;
   }
-  .pe-tools {
+  /* The corner tools of the intro and Get in touch. Named pe-part-tools, not pe-tools: F's section and
+     tile toolbars are .pe-tools (css/arrange.css), and each set of rules must leave the other alone. */
+  .pe-part-tools {
     position: absolute;
     z-index: 5;
     inset-block-start: 0;
@@ -293,35 +296,35 @@
      these are where it sits until then. Once the intro has words it shows only while the intro is
      pointed at or edited, on every pointer, and stays reachable by Tab (it is only faded, and focusing
      it is focus within the intro). */
-  .pe-tools[data-where="intro"] {
+  .pe-part-tools[data-where="intro"] {
     inset-block-start: 0.5lh;
     translate: 0 -50%;
     transition: opacity var(--duration-fast) var(--ease-standard);
   }
-  .pe-tools[data-where="intro"][data-filled] {
+  .pe-part-tools[data-where="intro"][data-filled] {
     inset-block-start: 0;
     translate: 0 calc(-100% - var(--spacing-1));
   }
-  [data-intro]:not(:hover):not(:focus-within) > .pe-tools[data-filled] {
+  [data-intro]:not(:hover):not(:focus-within) > .pe-part-tools[data-filled] {
     opacity: 0;
   }
   /* Under a mouse, pointing at it is pointing at the intro, so it shows itself. Under a finger nothing
      shows it before the tap, so unseen it must not take a tap meant for the headline under it. */
   @media (hover: none) {
-    [data-intro]:not(:focus-within) > .pe-tools[data-filled] {
+    [data-intro]:not(:focus-within) > .pe-part-tools[data-filled] {
       pointer-events: none;
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .pe-tools[data-where="intro"] {
+    .pe-part-tools[data-where="intro"] {
       transition: none;
     }
   }
-  .pe-tools[data-where="contact"] {
+  .pe-part-tools[data-where="contact"] {
     inset-block-start: var(--spacing-2);
     translate: none;
   }
-  .pe-tools-note {
+  .pe-part-tools-note {
     position: absolute;
     inset-inline-end: 0;
     inset-block-start: calc(100% + var(--spacing-2));
@@ -335,7 +338,7 @@
     font: var(--font-size-sm) / 1.4 var(--font-family-body);
     box-shadow: var(--shadow-med);
   }
-  .pe-tools-note[data-error] {
+  .pe-part-tools-note[data-error] {
     color: var(--color-text-error);
   }
   .pe-links {

@@ -126,12 +126,12 @@ function Chip(): ReactNode {
   const standing = useStanding();
   const c = CHIP[standing];
   return (
-    <span className="pe-chip" data-chip={standing} title={c.means}>
+    <span className="pe-status" data-chip={standing} title={c.means}>
       <StatusDot variant={c.variant} label={c.label} />
       <Text type="supporting" weight="semibold" color={standing === "live" ? "primary" : "secondary"}>
-        <span className="pe-chip-word">{c.label}</span>
+        <span className="pe-status-word">{c.label}</span>
         {/* Hidden from assistive technology: the long word, and what it means, are read already. */}
-        <span className="pe-chip-short" aria-hidden>
+        <span className="pe-status-short" aria-hidden>
           {c.short}
         </span>
       </Text>

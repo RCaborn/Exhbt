@@ -130,8 +130,8 @@ test.describe("The bar", () => {
       await page.setViewportSize({ width, height: 800 });
       const chip = bar(page).locator("[data-chip]");
       await expect(chip).toHaveAttribute("data-chip", "offline");
-      await expect(chip.locator(".pe-chip-short")).toBeVisible();
-      await expect(chip.locator(".pe-chip-short")).toHaveText("Not live");
+      await expect(chip.locator(".pe-status-short")).toBeVisible();
+      await expect(chip.locator(".pe-status-short")).toHaveText("Not live");
       await expect(bar(page).getByRole("heading", { level: 2, name: "Your portfolio", exact: true })).toBeAttached();
       const primary = toolbar(page).getByRole("button", { name: "Claim your address" });
       await expect(primary).toBeInViewport({ ratio: 1 });

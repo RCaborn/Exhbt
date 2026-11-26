@@ -118,7 +118,7 @@ function SuggestIntro(): ReactNode {
   return (
     <span
       ref={span}
-      className="pe-tools"
+      className="pe-part-tools"
       data-where="intro"
       data-tools="intro"
       data-spot={placed.spot}
@@ -138,7 +138,7 @@ function SuggestIntro(): ReactNode {
         {note?.text}
       </span>
       {note && (
-        <p aria-hidden className="pe-tools-note" data-error={note.error ? "" : undefined} data-intro-note>
+        <p aria-hidden className="pe-part-tools-note" data-error={note.error ? "" : undefined} data-intro-note>
           {note.text}
         </p>
       )}
@@ -160,7 +160,7 @@ function YourLinks(): ReactNode {
   const size = useBarSize();
   const narrow = useNarrow();
   return (
-    <span className="pe-tools" data-where="contact" data-tools="contact">
+    <span className="pe-part-tools" data-where="contact" data-tools="contact">
       <Popover
         isOpen={open}
         onOpenChange={(next) => (next ? api.open("links") : open && api.close())}
