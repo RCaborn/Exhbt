@@ -1,0 +1,80 @@
+/* The site header's layout around Astryx's TopNav (components/site/SiteHeader.tsx). Layout only: the bar's
+   white, its hairline and the links' colours and type come from the theme (themes/exhbt/exhbtTheme.ts,
+   `top-nav` and `top-nav-item`). The measures keep today's header: the 78rem line with a 1rem gutter on a phone
+   and 2rem from `sm`, the logo on that gutter, the links centred between the logo and the end controls, 28px
+   between two links. */
+@layer components {
+  /* AppShell, round every app and marketing page (app/(app)/layout.tsx, app/(marketing)/layout.tsx), with
+     height="auto" so the document scrolls, as the editors' sticky bars and the drag's edge scrolling need, and
+     mobileNav={false}: AppShell picks phone or laptop in a script after the page loads, so its phone bar would
+     appear only after hydration; the header's own CSS switches instead, in the server's HTML.
+     Four things it does are undone here:
+     - with height="auto" it is at least a window tall, which pushed the footer below the fold on a short page
+       (the log-in page grew from 900px to 1120px at 1440 by 900). The footer follows the page, as it did;
+     - it and its content region clip what overflows them, which cut the underline of a page's last link where the page
+       meets the footer (the log-in page's "Forgot your password?"). The page is drawn as it was, unclipped;
+     - with height="auto" it pins the header to the top of the window. The site header scrolls away and only an
+       editor's bar sticks (decision 0031), so the header region goes back into the flow;
+     - it draws its own "Skip to content" link. The root layout (app/layout.tsx) already draws one to #main, on
+       visitors' pages too, and each layout puts #main first in the shell's main region, so a keyboard meets
+       one skip link, not two. */
+  .site-shell {
+    min-height: auto;
+    overflow: visible;
+  }
+  .site-shell .astryx-layout-content {
+    overflow: visible;
+  }
+  .site-shell .astryx-app-shell-header {
+    position: static;
+  }
+  .site-shell > [data-testid="skip-to-content"] {
+    display: none;
+  }
+
+  .site-nav {
+    /* The gutter, plus whatever the window has beyond the 78rem line. */
+    --site-gutter: max(var(--spacing-4), (100% - 78rem) / 2 + var(--spacing-4));
+    /* TopNavHeading pads its logo by --spacing-2; the start side gives that back so the logo sits on the gutter. */
+    padding-block: var(--spacing-4);
+    padding-inline: calc(var(--site-gutter) - var(--spacing-2)) var(--site-gutter);
+  }
+  @media (width >= 40rem) {
+    .site-nav {
+      --site-gutter: max(var(--spacing-8), (100% - 78rem) / 2 + var(--spacing-8));
+    }
+  }
+
+  /* The links fill the room between the logo and the end controls, and sit in its middle. The heading's
+     padding and the start slot's gap are given back on the far side, so the middle is the same as today's. */
+  .site-nav :has(> .site-links) {
+    flex: 1 1 auto;
+    justify-content: center;
+    margin-inline-end: calc(var(--spacing-4) + var(--spacing-2));
+  }
+  .site-links > ul {
+    display: flex;
+    align-items: center;
+    /* With TopNavItem's own inline padding (--spacing-3 a side) this is 28px between two links' words. */
+    gap: var(--spacing-1);
+  }
+  .site-links-middle {
+    /* The roadmap button keeps 28px from the words on either side of it. */
+    margin-inline: var(--spacing-3);
+  }
+
+  .site-nav-end {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-4);
+    white-space: nowrap;
+  }
+
+  /* The phone drawer's calls to action, under its links. */
+  .site-drawer-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+    margin-top: var(--spacing-3);
+  }
+}
