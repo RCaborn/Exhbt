@@ -79,6 +79,42 @@ export async function openEditor(page: Page, fixture: PortfolioFixture, opts: { 
 }
 
 /* ------------------------------------------------------------------------------------------------
+ * Getting to the editor with nothing of development's: for a run against `next build` and `next start`
+ * ---------------------------------------------------------------------------------------------- */
+
+/**
+ * A new person, by the site's own sign-up (an email and a password, which the stand-in store keeps), with
+ * the editor turned on: through the development cookie where that route answers, and otherwise by the
+ * server's own EXHBT_PORTFOLIO=page, which a production run must set. Uses no /dev route and no /auth/dev,
+ * so it works on a production build with the stand-in store. Opens /portfolio and waits for the editor.
+ */
+export async function signUpToEditor(page: Page, tag: string): Promise<{ email: string }> {
+  const email = `pe-${tag}-${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}@example.com`;
+  const password = "correct-horse-battery";
+  const kind = await page.request.get("/dev/portfolio-kind?kind=page", { maxRedirects: 0 });
+  expect([307, 404], "the development cookie's route answers, or is off as in production").toContain(kind.status());
+  await page.goto("/login/new?next=%2Faccount");
+  await expect(page.locator("form[data-ready=true]")).toBeAttached();
+  await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByLabel("Confirm password").fill(password);
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page).toHaveURL(/\/account$/);
+  await page.goto("/portfolio");
+  await waitReady(page);
+  return { email };
+}
+
+/**
+ * Waits for "Saved" after typing, from the page alone (a production build has no development handle).
+ * A key makes the status "pending" in its own event (useBuilder), so the "Saved" seen after typing has
+ * returned is the save of those keys.
+ */
+export async function waitSavedOnPage(page: Page) {
+  await expect(saveState(page)).toHaveAttribute("data-save", "saved");
+}
+
+/* ------------------------------------------------------------------------------------------------
  * Finding things on the editing page
  * ---------------------------------------------------------------------------------------------- */
 
