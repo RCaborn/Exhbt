@@ -27,7 +27,7 @@ import { decideEditor, decideForEveryone, DEFAULT_EDITOR, EDITOR_OWN_COOKIE, typ
  * "page"), change this to "page" as well. Nothing else in this file changes: every other expectation follows
  * DEFAULT_EDITOR. Switching it on with the variable (EXHBT_EDITOR=page) needs neither change.
  */
-const SHIPPED_DEFAULT: EditorKind = "classic";
+const SHIPPED_DEFAULT: EditorKind = "page";
 
 /** What the variable says, for one browser: "default" is a variable that is not set. */
 type Variable = "page" | "classic" | "default";

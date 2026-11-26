@@ -314,11 +314,11 @@ Two marks on the page need colours each look must pass: the placeholders, which 
 
 The old editor stays for one release as "classic". It is what everyone gets while the new editor is tried on the live site, and the safety net once the new one is on for everyone.
 
-- **The switch.** The new editor is switched off by default (below, "Going live: switched off, then on"). `lib/editor-kind.ts` holds the rule and the one constant, and reads no request, so the tests run it as it ships. Whichever of these comes first decides:
+- **The switch.** The new editor was launched switched off by default and is now on by default (below, "Going live: switched off, then on"). `lib/editor-kind.ts` holds the rule and the one constant, and reads no request, so the tests run it as it ships. Whichever of these comes first decides:
   1. **The address.** `?editor=classic` serves the classic editor for that visit, whoever asks. The escape and the crash fallback use it.
   2. **An admin's own choice.** A signed-in admin, recognised the way `/admin` recognises one (`isAdmin` in `lib/admin.ts`: `profiles.role` is `exhbt_admin`), can choose either editor for themselves. The choice is kept in that browser in a cookie (`exhbt-editor-own`, for a year) and counts only while the person signed in is an admin, which is checked on every request. The same cookie in anyone else's browser counts for nothing.
   3. **The runtime variable `EXHBT_EDITOR`,** for everyone, with no deploy: `page` switches the new editor on and `classic` forces the classic one. It is read on each request, so setting it on the Worker in the Cloudflare dashboard takes effect at once. Anything else, or nothing, leaves it to the default.
-  4. **The default,** `DEFAULT_EDITOR` in `lib/editor-kind.ts`: `classic`.
+  4. **The default,** `DEFAULT_EDITOR` in `lib/editor-kind.ts`: `classic` when this was decided, `page` from 26 Nov 2026.
 
   What a request says (its cookies, who is signed in) is read in `lib/editor-kind-server.ts`, which is marked server only because it imports `next/headers`. `/api/health` reports as `editor` what an ordinary person gets (3, then 4), never an admin's own choice. In development only, a cookie (`exhbt-editor-kind`, set by `/dev/editor?kind=`) stands in for the variable for one browser: `page`, `classic`, or `default` for a variable that is not set. So each browser test has its own setting and a failed test cannot leave one behind for the next. The end-to-end suite's server runs with `EXHBT_EDITOR=page` (`playwright.config.ts`), so every spec tests the new editor as it is once on for everyone; `e2e/editor-admin-switch.spec.ts` tests the switched-off state and the admin's own switch through that cookie, and runs the rule directly as the live site runs it.
 - **The admin's own switch.** In the classic editor an admin sees one line above the editor, under the site's header and the teammates line: "Admins only", with a button, "Try the new editor". Nobody else is sent it. (It is a line and not a menu item because the classic editor has no menu.) Pressing it stores the choice and opens the same exhbt in the new editor; every exhbt opened in that browser after it is in the new editor too. In the new editor, "Use the classic editor" in the menu takes an admin back, and that choice is stored as well. Both go through `POST /api/exhbts/editor`, which answers 404 to anyone who is not an admin.
@@ -349,6 +349,8 @@ The choice belongs to the browser it was made in, on the host it was made on: an
 - in the code, change `DEFAULT_EDITOR` in `lib/editor-kind.ts` from `"classic"` to `"page"` and deploy. One test pins the default so that a merge cannot change it unseen: change `SHIPPED_DEFAULT` at the top of `e2e/editor-admin-switch.spec.ts` to match.
 
 Then check `/api/health`: it says `"editor": "page"`.
+
+**26 Nov 2026 (added line):** the new editor was switched on for everyone in the code (`DEFAULT_EDITOR` is now `"page"`, and `SHIPPED_DEFAULT` in `e2e/editor-admin-switch.spec.ts` matches). It was switched on for everyone on 26 Nov 2026; setting `EXHBT_EDITOR=classic` on the Worker (named "terna" in Cloudflare) puts everyone back without a deploy.
 
 **To force everyone back** to the classic editor, at any time and with no deploy, set `EXHBT_EDITOR` to `classic`. The variable overrides the default, so this works after either way of switching on. An admin's own choice still comes first, so an admin can go on looking at the new editor while everyone else has the classic one.
 
