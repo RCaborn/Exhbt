@@ -1,0 +1,425 @@
+import { FULL, SPARSE, fullFixture, sparseFixture } from "./fixtures/portfolio-pages";
+import type { Page } from "@playwright/test";
+import { HOME, READY, expect, field, focusedPath, fresh, openEditor, saveState, seed, settle, signIn, stateNow, test, textbox, typeIn, valueAt, waitReady, waitSaved } from "./portfolio-editor";
+
+// The one-page portfolio editor's core (decision 0031; brief E of docs/briefs/portfolio-first): which
+// builder a person gets, the page drawn as the visitor's with every word typed where it sits, each field
+// stored at its path, a line's two halves saved as one line, and the crash fallback. Each test seeds a
+// portfolio of its own through /dev/portfolio-parity and opts its own browser in with the development
+// cookie (the switch is at "steps" for everyone).
+
+const STEP_BUILDER = { level: 1, name: "Build your portfolio" } as const;
+
+test.describe("Which builder a person gets", () => {
+  test("with the switch as it ships, /portfolio is the step builder, exactly as before", async ({ page }) => {
+    const f = fresh(FULL, "steps");
+    await seed(page, f);
+    await signIn(page, f.username);
+    await expect(page.getByRole("heading", STEP_BUILDER)).toBeVisible();
+    await expect(page.locator("nav[aria-label=Steps] a[aria-current=step]")).toHaveText(/You/);
+    await expect(page.getByTestId("preview").locator(HOME)).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Job links" })).toBeVisible();
+    await expect(page).toHaveTitle(/Build your portfolio/);
+    // Nothing of the editor is on the page, and nobody who is not an admin is offered it.
+    await expect(page.locator("[data-editor]")).toHaveCount(0);
+    await expect(page.locator("[data-admin-switch]")).toHaveCount(0);
+    // ?step= is read as it always was.
+    await page.goto("/portfolio?step=look");
+    await expect(page.locator("nav[aria-label=Steps] a[aria-current=step]")).toHaveText(/Your look/);
+  });
+
+  test("with the switch at page, /portfolio is the person's own page, edited where it sits", async ({ page }) => {
+    const f = fresh(FULL, "page");
+    await openEditor(page, f);
+    await expect(page).toHaveTitle(/Your portfolio/);
+    await expect(page.getByRole("heading", { level: 1, name: "Your portfolio" })).toBeVisible();
+    await expect(page.getByRole("heading", STEP_BUILDER)).toHaveCount(0);
+    // The page is the visitor's page, in the person's look, with the name a field in its own heading.
+    const home = page.locator(`${READY} ${HOME}`);
+    await expect(home).toHaveAttribute("data-look", "exhbt");
+    await expect(home.locator("h1").getByRole("textbox", { name: "Your name" })).toHaveValue("Maya Clarke");
+    await expect(home.locator("[data-section]")).toHaveCount(6);
+    await expect(home.locator("[data-card]")).toHaveCount(4);
+    // The page's own links cannot be followed while it is being edited.
+    await expect(home.locator("nav[aria-label=Portfolio]")).toHaveAttribute("inert", "");
+    await expect(saveState(page)).toHaveAttribute("data-save", "saved");
+  });
+
+  test("?builder=steps serves the step builder whatever the switch says", async ({ page }) => {
+    const f = fresh(FULL, "escape");
+    await openEditor(page, f);
+    await page.goto("/portfolio?builder=steps");
+    await expect(page.getByRole("heading", STEP_BUILDER)).toBeVisible();
+    await expect(page.locator("[data-editor]")).toHaveCount(0);
+    await expect(page).toHaveTitle(/Build your portfolio/);
+    // It wins over what only the editor reads, and the step builder still reads its own step.
+    await page.goto("/portfolio?builder=steps&open=look&step=projects");
+    await expect(page.locator("nav[aria-label=Steps] a[aria-current=step]")).toHaveText(/Your page/);
+    // Without it, the editor again.
+    await page.goto("/portfolio");
+    await waitReady(page);
+  });
+
+  test("an admin on the step builder is offered the new portfolio, and taking it serves the editor from then on", async ({ page }) => {
+    const f = fresh(FULL, "admin");
+    await seed(page, f);
+    await signIn(page, f.username);
+    await expect(page.getByRole("heading", STEP_BUILDER)).toBeVisible();
+    await expect(page.locator("[data-admin-switch]")).toHaveCount(0);
+    expect((await page.request.get("/dev/admin?role=admin")).status()).toBe(200);
+    await page.reload();
+    const offer = page.locator("[data-admin-switch]");
+    await expect(offer).toContainText("Admins only");
+    await offer.getByRole("button", { name: "Try the new portfolio" }).click();
+    await waitReady(page);
+    await expect(page).toHaveURL(/\/portfolio$/);
+    // Their own choice holds on the next visit, and the address still takes them back for one.
+    await page.goto("/portfolio");
+    await waitReady(page);
+    await page.goto("/portfolio?builder=steps");
+    await expect(page.getByRole("heading", STEP_BUILDER)).toBeVisible();
+    await expect(page.locator("[data-admin-switch]")).toBeVisible();
+  });
+});
+
+test.describe("Typing on the page", () => {
+  /** Every field of decision 0031's table that is typed on the page, with words the server keeps as they are. */
+  const WORDS: { path: string; part?: "label" | "year"; words: string }[] = [
+    { path: "profile.name", words: "Jordan Mensah" },
+    { path: "profile.headline", words: "Graduate data analyst, transport and cities" },
+    { path: "profile.bio", words: "I studied Geography at Leeds and taught myself Python.\n\nI like work where a map changes a decision." },
+    { path: "profile.location", words: "Leeds" },
+    { path: "profile.lookingFor", words: "Graduate data roles from September" },
+    { path: "arrangement.tiles.about.text", words: "I map bus delays for fun, and I like a chart that changes a decision." },
+    { path: "arrangement.tiles.education.lines.0", part: "label", words: "BSc Geography, University of Leeds" },
+    { path: "arrangement.tiles.education.lines.0", part: "year", words: "2023 to 2026" },
+    { path: "arrangement.tiles.education.tools", words: "Python, QGIS, SQL" },
+    { path: "arrangement.tiles.experience.lines.1", part: "label", words: "Data volunteer, Leeds Bus Users" },
+    { path: "arrangement.tiles.experience.lines.1", part: "year", words: "2025" },
+    { path: "arrangement.tiles.quote.text", words: "Jordan's maps changed where we put the new stops." },
+    { path: "arrangement.tiles.quote.name", words: "Priya Shah" },
+    { path: "arrangement.tiles.quote.role", words: "Network planner" },
+  ];
+  /** What the state holds at each path once those words are typed. */
+  const STORED: Record<string, string> = {
+    "profile.name": "Jordan Mensah",
+    "profile.headline": "Graduate data analyst, transport and cities",
+    "profile.bio": "I studied Geography at Leeds and taught myself Python.\n\nI like work where a map changes a decision.",
+    "profile.location": "Leeds",
+    "profile.lookingFor": "Graduate data roles from September",
+    "arrangement.tiles.about.text": "I map bus delays for fun, and I like a chart that changes a decision.",
+    "arrangement.tiles.education.lines.0": "BSc Geography, University of Leeds, 2023 to 2026",
+    "arrangement.tiles.education.tools": "Python, QGIS, SQL",
+    "arrangement.tiles.experience.lines.1": "Data volunteer, Leeds Bus Users, 2025",
+    "arrangement.tiles.quote.text": "Jordan's maps changed where we put the new stops.",
+    "arrangement.tiles.quote.name": "Priya Shah",
+    "arrangement.tiles.quote.role": "Network planner",
+  };
+
+  test("every field is typed where it sits and is stored at its path after a reload", async ({ page }) => {
+    test.slow();
+    const f = fresh(FULL, "fields");
+    await openEditor(page, f);
+    for (const w of WORDS) {
+      await typeIn(page, w.path, w.words, { part: w.part });
+      // The cursor is still in the field it was typing in: nothing took it away mid-word.
+      expect(await focusedPath(page), `after typing in ${w.path}`).toBe(w.path);
+    }
+    for (const [path, words] of Object.entries(STORED)) expect(await valueAt(page, path), path).toBe(words);
+    await waitSaved(page);
+
+    // A reload brings back what the server holds: every word, at its path.
+    await page.reload();
+    await waitReady(page);
+    for (const [path, words] of Object.entries(STORED)) expect(await valueAt(page, path), `${path} after a reload`).toBe(words);
+    // And on the page, in its place: the name in the heading, the intro as two paragraphs, a line as its two halves.
+    await expect(page.locator(`${READY} ${HOME} h1`).getByRole("textbox", { name: "Your name" })).toHaveValue("Jordan Mensah");
+    await expect(field(page, "profile.bio").locator("textarea")).toHaveCount(2);
+    await expect(textbox(page, "arrangement.tiles.education.lines.0", { part: "label" })).toHaveValue("BSc Geography, University of Leeds");
+    await expect(textbox(page, "arrangement.tiles.education.lines.0", { part: "year" })).toHaveValue("2023 to 2026");
+    await expect(textbox(page, "arrangement.tiles.quote.name")).toHaveText("Priya Shah");
+
+    // The step builder reads the same save.
+    await page.goto("/portfolio?builder=steps");
+    await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Jordan Mensah");
+    await expect(page.getByLabel(/Headline/)).toHaveValue("Graduate data analyst, transport and cities");
+    await expect(page.getByLabel(/Where you’re based/)).toHaveValue("Leeds");
+  });
+
+  test("a line's two halves are saved as one line, and each stays as it is typed", async ({ page }) => {
+    const f = fresh(FULL, "lines");
+    await openEditor(page, f);
+    const path = "arrangement.tiles.education.lines.1";
+    const label = textbox(page, path, { part: "label" });
+    const year = textbox(page, path, { part: "year" });
+    await expect(label).toHaveValue("Foundation year, Sheffield College");
+    await expect(year).toHaveValue("2022–2023");
+    // A line nobody has typed in keeps its own punctuation.
+    expect(await valueAt(page, path)).toBe("Foundation year, Sheffield College, 2022–2023");
+
+    // Words with spaces between them, key by key: a space at the end of the half is kept while it is typed.
+    await typeIn(page, path, "MSc Data Science, University of Leeds", { part: "label" });
+    await expect(label).toHaveValue("MSc Data Science, University of Leeds");
+    expect(await valueAt(page, path)).toBe("MSc Data Science, University of Leeds, 2022–2023");
+    await page.keyboard.type(" ");
+    await expect(label).toHaveValue("MSc Data Science, University of Leeds ");
+    await page.keyboard.press("Backspace");
+
+    // A year typed digit by digit never shows in the words beside it, though the line only reads as a year at the end.
+    await year.click();
+    await page.keyboard.press("ControlOrMeta+A");
+    await page.keyboard.press("Backspace");
+    for (const key of "2027") {
+      await page.keyboard.type(key);
+      await expect(label).toHaveValue("MSc Data Science, University of Leeds");
+    }
+    await expect(year).toHaveValue("2027");
+    expect(await valueAt(page, path)).toBe("MSc Data Science, University of Leeds, 2027");
+    // The other lines were not touched.
+    expect(await valueAt(page, "arrangement.tiles.education.lines.0")).toBe("BSc Business Analytics, University of Sheffield, 2023 to now");
+
+    await waitSaved(page);
+    await page.reload();
+    await waitReady(page);
+    expect(await valueAt(page, path)).toBe("MSc Data Science, University of Leeds, 2027");
+    await expect(textbox(page, path, { part: "label" })).toHaveValue("MSc Data Science, University of Leeds");
+    await expect(textbox(page, path, { part: "year" })).toHaveValue("2027");
+  });
+
+  test("the intro is paragraphs: Enter starts one, Backspace joins two, and About me stays one", async ({ page }) => {
+    const f = fresh(FULL, "paras");
+    await openEditor(page, f);
+    const bio = field(page, "profile.bio");
+    const paras = bio.locator("textarea[data-para]");
+    await expect(paras).toHaveCount(2);
+    await expect(paras.nth(0)).toHaveAccessibleName("Your intro, paragraph 1 of 2");
+
+    // Enter at the end of the last paragraph starts a third, with the cursor in it.
+    await paras.nth(1).click();
+    await page.keyboard.press("ControlOrMeta+End");
+    await page.keyboard.press("Enter");
+    await expect(paras).toHaveCount(3);
+    await expect(paras.nth(2)).toBeFocused();
+    await page.keyboard.type("A third thought.");
+    expect(String(await valueAt(page, "profile.bio")).split("\n\n")).toHaveLength(3);
+
+    // Enter in the middle of a paragraph splits it there.
+    await paras.nth(2).evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(7, 7));
+    await page.keyboard.press("Enter");
+    await expect(paras).toHaveCount(4);
+    await expect(paras.nth(2)).toHaveValue("A third");
+    await expect(paras.nth(3)).toHaveValue(" thought.");
+    // Backspace at the start of a paragraph joins it to the one before, the cursor where they met.
+    await page.keyboard.press("Backspace");
+    await expect(paras).toHaveCount(3);
+    await expect(paras.nth(2)).toHaveValue("A third thought.");
+    await expect(paras.nth(2)).toBeFocused();
+    expect(await paras.nth(2).evaluate((el: HTMLTextAreaElement) => el.selectionStart)).toBe(7);
+    // The arrow keys walk from one paragraph to the next.
+    await paras.nth(2).evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(0, 0));
+    await page.keyboard.press("ArrowLeft");
+    await expect(paras.nth(1)).toBeFocused();
+
+    // About me's words are one paragraph: Enter does nothing there.
+    const about = field(page, "arrangement.tiles.about.text");
+    await about.locator("textarea").click();
+    await page.keyboard.press("Enter");
+    await expect(about.locator("textarea")).toHaveCount(1);
+    await expect(about.getByRole("textbox", { name: "About you" })).toBeVisible();
+
+    await waitSaved(page);
+    await page.reload();
+    await waitReady(page);
+    await expect(field(page, "profile.bio").locator("textarea[data-para]")).toHaveCount(3);
+    await expect(field(page, "profile.bio").locator("textarea[data-para]").nth(2)).toHaveValue("A third thought.");
+  });
+
+  test("an empty page shows each field's placeholder where its words go, and the first key fills it", async ({ page }) => {
+    const f = fresh(SPARSE, "sparse");
+    await openEditor(page, f);
+    // Every field is there to type in, the empty ones too, each named.
+    await expect(textbox(page, "profile.headline")).toHaveAttribute("placeholder", "One line about you");
+    await expect(textbox(page, "profile.bio")).toHaveAttribute("placeholder", "A few lines about you, in your own words");
+    await expect(textbox(page, "profile.location")).toHaveAttribute("aria-placeholder", "e.g. Leeds");
+    await expect(textbox(page, "arrangement.tiles.about.text")).toHaveAttribute("placeholder", "A few sentences about you");
+    // Typing in a section with no words yet makes its tile whole: the server takes it.
+    await typeIn(page, "arrangement.tiles.about.text", "I time queues, then change one thing.");
+    await typeIn(page, "arrangement.tiles.education.tools", "Excel, Python");
+    await typeIn(page, "profile.headline", "Operations analyst");
+    await waitSaved(page);
+    const s = await stateNow(page);
+    expect(s.arrangement.tiles.about).toEqual({ text: "I time queues, then change one thing." });
+    expect(s.arrangement.tiles.education).toEqual({ lines: [], tools: "Excel, Python" });
+    await page.reload();
+    await waitReady(page);
+    expect(await valueAt(page, "arrangement.tiles.about.text")).toBe("I time queues, then change one thing.");
+    expect(await valueAt(page, "arrangement.tiles.education.tools")).toBe("Excel, Python");
+    expect(await valueAt(page, "profile.headline")).toBe("Operations analyst");
+  });
+
+  for (const width of [1440, 412]) {
+    test(`Studio's name keeps one word to a line while it is typed, at ${width} wide`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      const f = fresh(fullFixture("x", "studio"), `studio${width}`);
+      await openEditor(page, f);
+      await settle(page);
+      const heading = page.locator(`${READY} ${HOME} h1`);
+      const editing = await heading.boundingBox();
+      // Every other part of the hero is where the visitor's page has it: the name's box is the same height.
+      const hero = page.locator(`${READY} ${HOME} header`).first();
+      const heroEditing = await hero.boundingBox();
+      // One field, as wide as its heading, with a line to each word.
+      const name = textbox(page, "profile.name");
+      await expect(name).toHaveValue("Maya Clarke");
+      const lines = await name.evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
+      expect(lines).toBe(2);
+      // A third word takes a third line, as the visitor's page would set it.
+      await name.click();
+      await page.keyboard.press("ControlOrMeta+End");
+      await page.keyboard.type(" Jones");
+      expect(await name.evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)))).toBe(3);
+      await page.keyboard.press("ControlOrMeta+A");
+      await page.keyboard.type("Maya Clarke");
+      await waitSaved(page);
+
+      // The visitor's own page, as it is published.
+      await page.goto(`/p/${f.username}`);
+      await settle(page);
+      const visiting = await page.locator(`${HOME} h1`).boundingBox();
+      const heroVisiting = await page.locator(`${HOME} header`).first().boundingBox();
+      expect(Math.abs(editing!.height - visiting!.height), `the name is ${editing!.height} tall while editing and ${visiting!.height} for a visitor`).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(heroEditing!.height - heroVisiting!.height), `the hero is ${heroEditing!.height} tall while editing and ${heroVisiting!.height} for a visitor`).toBeLessThanOrEqual(0.5);
+    });
+  }
+});
+
+test.describe("The crash fallback", () => {
+  test("a throw after a change sends the words typed, then opens the step builder with them saved", async ({ page }) => {
+    const f = fresh(FULL, "crash");
+    await openEditor(page, f, { query: "?crash=change" });
+    await textbox(page, "profile.name").click();
+    await page.keyboard.press("ControlOrMeta+A");
+    // One change, whole: the render after it throws.
+    await page.keyboard.insertText("Zadie Example");
+    await expect(page.getByRole("heading", { level: 1, name: "Build your portfolio" })).toBeVisible();
+    await expect(page).toHaveURL(/[?&]builder=steps/);
+    expect(new URL(page.url()).searchParams.get("crash")).toBeNull();
+    await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Zadie Example");
+    // Saved on the server, not only shown: the editor has it on the next visit.
+    await page.goto("/portfolio");
+    await waitReady(page);
+    expect(await valueAt(page, "profile.name")).toBe("Zadie Example");
+  });
+
+  test("a throw while the editor draws opens the step builder", async ({ page }) => {
+    const f = fresh(SPARSE, "crashr");
+    await openEditor(page, f, { query: "?crash=render&step=look", wait: false });
+    await expect(page.getByRole("heading", { level: 1, name: "Build your portfolio" })).toBeVisible();
+    await expect(page).toHaveURL(/[?&]builder=steps/);
+    // The step builder keeps its own step from the address.
+    await expect(page.locator("nav[aria-label=Steps] a[aria-current=step]")).toHaveText(/Your look/);
+    await expect(page.locator("[data-editor]")).toHaveCount(0);
+  });
+
+  test("nothing moves when the editor arrives: the loading view is the page it draws", async ({ page }) => {
+    const f = fresh(sparseFixture("x", null), "standin");
+    // The editor's chunk is held back, as a slow connection holds it.
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    await page.route(/PortfolioEditor/, async (route) => {
+      await held;
+      await route.continue();
+    });
+    await openEditor(page, f, { wait: false });
+    const loading = page.locator('[data-editor="portfolio"][data-loading]');
+    await expect(loading.locator(HOME)).toBeVisible();
+    await settle(page);
+    const measure = () =>
+      page.evaluate((home) => {
+        const root = document.querySelector(home)!.getBoundingClientRect();
+        return [...document.querySelectorAll(`${home} :is(h1, h2, p, dl, [data-intro], [data-section], [data-avatar], footer)`)].map((el) => {
+          const r = el.getBoundingClientRect();
+          return [el.tagName, Math.round((r.x - root.x) * 2) / 2, Math.round((r.y - root.y) * 2) / 2, Math.round(r.width * 2) / 2, Math.round(r.height * 2) / 2].join(" ");
+        });
+      }, HOME);
+    const before = await measure();
+    const top = await page.locator(HOME).evaluate((el) => el.getBoundingClientRect().y + window.scrollY);
+    release();
+    await waitReady(page);
+    await settle(page);
+    expect(await measure()).toEqual(before);
+    expect(await page.locator(HOME).evaluate((el) => el.getBoundingClientRect().y + window.scrollY)).toBe(top);
+  });
+});
+
+test.describe("Coming back to the page", () => {
+  // The editor's save does not revalidate the page, so the browser's Back can hand /portfolio the data it
+  // was first loaded with. An editor mounted on it would show the old words and save them over the new.
+  // (With the gate's check taken out, both tests fail with the old words back in the state.)
+
+  /**
+   * Leaves the editor by a link inside the app, as a tile opens its exhbt. The page it goes to is asked
+   * for once beforehand, so the development server has built it and the journey itself is not left
+   * waiting on a build.
+   */
+  async function leaveByLink(page: Page) {
+    await page.getByRole("link", { name: "Account", exact: true }).first().click();
+    await page.waitForURL(/\/account$/);
+    await expect(page.locator("[data-editor]")).toHaveCount(0);
+  }
+  test("after Back, and after the header's link, the editor holds the newest saved words, and a key never saves older words over newer ones", async ({ page }) => {
+    const f = fresh(FULL, "back");
+    await openEditor(page, f);
+    expect((await page.request.get("/account")).status()).toBe(200);
+    await typeIn(page, "profile.name", "Robin Okafor");
+    await typeIn(page, "arrangement.tiles.about.text", "I count things, then I change one of them.");
+    await waitSaved(page);
+
+    // Away by a link inside the app, then the browser's Back.
+    await leaveByLink(page);
+    await page.goBack();
+    await waitReady(page);
+    expect(await valueAt(page, "profile.name")).toBe("Robin Okafor");
+    await expect(textbox(page, "profile.name")).toHaveValue("Robin Okafor");
+    await expect(textbox(page, "arrangement.tiles.about.text")).toHaveValue("I count things, then I change one of them.");
+
+    // A key in another field saves the whole page: the name and About me must still be the new ones after it.
+    await typeIn(page, "profile.headline", "Analyst, queues and rotas");
+    await waitSaved(page);
+
+    // Away again, and back by the header's own link this time: the newest words, the headline among them.
+    await leaveByLink(page);
+    await page.getByRole("link", { name: "Your portfolio", exact: true }).first().click();
+    await waitReady(page);
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, queues and rotas");
+    expect(await valueAt(page, "profile.name")).toBe("Robin Okafor");
+    await typeIn(page, "profile.location", "Leeds");
+    await waitSaved(page);
+
+    // What the server holds, read afresh: nothing older came back at any step.
+    await page.reload();
+    await waitReady(page);
+    expect(await valueAt(page, "profile.name")).toBe("Robin Okafor");
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, queues and rotas");
+    expect(await valueAt(page, "profile.location")).toBe("Leeds");
+    expect(await valueAt(page, "arrangement.tiles.about.text")).toBe("I count things, then I change one of them.");
+  });
+
+  test("Back while the last change is still on its way waits for it: the words typed before leaving are there, and no key saves over them", async ({ page }) => {
+    const f = fresh(FULL, "backfast");
+    await openEditor(page, f);
+    expect((await page.request.get("/account")).status()).toBe(200);
+    await typeIn(page, "profile.location", "Bradford");
+    // Not waited for: the editor sends what is waiting as it leaves the page.
+    await leaveByLink(page);
+    await page.goBack();
+    await waitReady(page);
+    expect(await valueAt(page, "profile.location")).toBe("Bradford");
+    await typeIn(page, "profile.headline", "Operations analyst");
+    await waitSaved(page);
+    await page.reload();
+    await waitReady(page);
+    expect(await valueAt(page, "profile.location")).toBe("Bradford");
+    expect(await valueAt(page, "profile.headline")).toBe("Operations analyst");
+  });
+});
