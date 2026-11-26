@@ -150,8 +150,7 @@ test.describe("The first minute", () => {
     await expect(strip.locator('[data-todo="headline"]')).toHaveAttribute("data-done", "true");
     await strip.getByRole("button", { name: /^Pick a look/ }).click();
     await expect(page.locator("[data-look-menu]")).toBeVisible();
-    // A look this plan has (Free has only some), other than the one on the page.
-    await page.locator('[data-look-menu] [data-look-option]:not([data-locked]):not(:has(:checked))').first().getByRole("radio").check();
+    // Free has one look: looking through them, and keeping it, is the choice.
     await page.keyboard.press("Escape");
     await expect(strip.locator('[data-todo="look"]')).toHaveAttribute("data-done", "true");
     // Skip goes straight to the second step.
@@ -280,7 +279,7 @@ test.describe("The address sheet", () => {
     await expect(sheet.locator('[data-address="share"]')).toBeVisible();
     await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
     await sheet.getByRole("button", { name: "Copy link" }).click();
-    await expect(page.getByText("Link copied", { exact: true })).toBeVisible();
+    await expect(page.getByText("Link copied", { exact: true }).first()).toBeVisible();
     await sheet.getByRole("button", { name: "Change" }).click();
     await expect(sheet.getByRole("textbox", { name: "Username" })).toBeVisible();
     await expect(sheet).toContainText("redirects to the new one for 30 days");
@@ -292,12 +291,53 @@ test.describe("The address sheet", () => {
 });
 
 test.describe("Job links and Team", () => {
-  test("Job links opens its menu from the bar", async ({ page }) => {
-    await openEditor(page, fresh(FULL, "joblinks"));
+  test("Job links on Max with links: each link with Live, its views and Edit, then New job link and the links left", async ({ page }) => {
+    const f = fresh({ ...FULL, jobLinks: [{ slug: "northfield-analyst", company: "Northfield Foods", roleTitle: "Graduate Operations Analyst", picks: [{ exhbt: "queue", reason: "A timed trial." }] }] }, "joblinks");
+    await openEditor(page, f);
     await toolbar(page).getByRole("button", { name: "Job links" }).click();
-    await expect(page.locator("[data-job-links-menu]")).toBeVisible();
+    const menu = page.locator("[data-job-links-menu]");
+    await expect(menu.locator('[data-job-links="list"]')).toBeVisible();
+    await expect(menu).toContainText("Northfield Foods · Graduate Operations Analyst");
+    await expect(menu).toContainText("Live");
+    await expect(menu).toContainText(/0 views/);
+    await expect(menu.getByRole("link", { name: "Edit Northfield Foods · Graduate Operations Analyst" })).toBeVisible();
+    await expect(menu.getByRole("link", { name: "New job link" })).toHaveAttribute("href", "/job-links/new");
+    await expect(menu).toContainText(/\d+ of \d+ live links left/);
     await page.keyboard.press("Escape");
-    await expect(page.locator("[data-job-links-menu]")).toBeHidden();
+    await expect(menu).toBeHidden();
+  });
+
+  test("Job links on Max with none published says to publish first; on Premium, the upgrade line only", async ({ page }) => {
+    await newPerson(page, "jl-none", "max");
+    await toolbar(page).getByRole("button", { name: "Job links" }).click();
+    await expect(page.locator("[data-job-links-menu]")).toContainText("Publish an exhbt first: a job link shows your live exhbts.");
+    await page.keyboard.press("Escape");
+    await openEditor(page, fresh(fullFixture("x", null, "premium"), "jl-prem"));
+    await toolbar(page).getByRole("button", { name: "Job links" }).click();
+    const menu = page.locator("[data-job-links-menu]");
+    await expect(menu.locator('[data-job-links="upgrade"]')).toBeVisible();
+    await expect(menu.getByTestId("upgrade-prompt")).toBeVisible();
+    await expect(menu.getByRole("link", { name: "New job link" })).toHaveCount(0);
+  });
+
+  test("?open= opens each part once the page is up, and leaves the address", async ({ page }) => {
+    const seeded = await openEditor(page, fresh(FULL, "openq"), { query: "?open=look" });
+    void seeded;
+    await expect(page.locator("[data-look-menu]")).toBeVisible();
+    await expect(page).toHaveURL(/\/portfolio$/);
+    for (const [q, sel] of [
+      ["?open=address", '[data-sheet="address"] [data-address]'],
+      ["?open=job-links", "[data-job-links-menu]"],
+      ["?open=team", "[data-team-sheet]"],
+      ["?open=links", "[data-links-panel]"],
+      ["#job-links", "[data-job-links-menu]"],
+    ] as const) {
+      // From another page, as a link in an email arrives: a hash alone on the same page would not load it again.
+      await page.goto("about:blank");
+      await page.goto(`/portfolio${q}`);
+      await waitReady(page);
+      await expect(page.locator(sel)).toBeVisible();
+    }
   });
 
   test("Team projects from the menu opens the Team sheet, with what team projects are", async ({ page }) => {
@@ -305,7 +345,7 @@ test.describe("Job links and Team", () => {
     await toolbar(page).getByRole("button", { name: "More" }).click();
     await page.getByRole("menuitem", { name: "Team projects" }).click();
     const sheet = page.locator('[data-sheet="team"]');
-    await expect(sheet.getByRole("heading", { name: "Team projects" })).toBeVisible();
+    await expect(sheet.getByRole("heading", { name: "Team projects" }).first()).toBeVisible();
     await expect(sheet).toContainText("each of you can have an exhbt of it");
   });
 

@@ -112,6 +112,12 @@ export function FirstRun(): ReactNode {
   const headline = usePortfolioState((s) => s.profile.headline.trim().length > 0);
   const themeId = usePortfolioState((s) => s.arrangement.themeId);
   const [firstLook] = useState(themeId);
+  // Opening the Look menu counts as choosing: on Free there is one look, and keeping it is a choice too.
+  const lookOpen = usePortfolioUi((u) => u.sheet === "look");
+  const [lookSeen, setLookSeen] = useState(false);
+  useEffect(() => {
+    if (lookOpen) setLookSeen(true);
+  }, [lookOpen]);
   const [hidden, setHidden] = useState(false);
   const [skipped, setSkipped] = useState(false);
   const [viewing, setViewing] = useState<number | null>(null);
@@ -123,7 +129,7 @@ export function FirstRun(): ReactNode {
     name,
     headline,
     photo: Boolean(data.builder.photoUrl),
-    look: themeId !== firstLook || themeId !== DEFAULT_THEME.id,
+    look: lookSeen || themeId !== firstLook || themeId !== DEFAULT_THEME.id,
     exhbt: data.builder.projects.length + data.builder.drafts.length + data.ownerOnly.length > 0,
   };
   const steps = STRIP.steps;
