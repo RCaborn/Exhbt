@@ -1,6 +1,6 @@
 import { Fragment } from "react";
-import type { ContentSection, ExhbtDoc, RichText } from "@/lib/exhbt/blocks";
-import { FORMAT_COPY } from "@/lib/exhbt/formats";
+import { filledFlow, isBlank, type ContentSection, type ExhbtDoc } from "@/lib/exhbt/blocks";
+import { FORMAT_COPY, refsHeading, titleShown } from "@/lib/exhbt/formats";
 import { pageItems, rowsFor, type Cell, type ItemAs, type ItemCell, type PageItem, type Row, type StackCell } from "@/lib/exhbt/layouts";
 import { imageRatio } from "@/lib/exhbt/sections";
 import { AimStacked, ButtonLink, ClosingBlock, Figure, Findings, FlowPart, KeyFigure, LeadImage, PlainSection, RefLine, StagedImage, TileImage } from "./exhbt-parts";
@@ -13,8 +13,10 @@ import type { ImageUrls, PageCtx } from "./page-ctx";
  * each row with the page's parts (exhbt-parts.tsx) and the row classes in layout-rows.ts. Nothing is
  * reordered to make a row. Server-safe: no hooks, no "use client".
  *
- * On a public page an image with no address and an aim or conclusion with no words are left out
- * before the order is worked out, as the pages before release 2 did. With `ctx.edit` (decision 0026)
+ * On a public page an image with no address and a section with nothing to show (isBlank: an aim with no
+ * words, a quote nobody has typed, a graph nobody has filled in) are left out before the order is worked
+ * out, and so is a flowchart with no box filled in; its empty boxes are never drawn (decision 0032; before
+ * it only an aim or a conclusion could be empty on a public page). With `ctx.edit` (decision 0026)
  * nothing is left out, a "+" goes before each row and after the last, and each item is the editor's
  * frame (`ctx.edit.item`), which draws the item with ItemView itself; the wrappers of pairs, stacks
  * and groups are drawn here on both pages. In edit mode the rows depend only on what structureKey
@@ -23,13 +25,21 @@ import type { ImageUrls, PageCtx } from "./page-ctx";
  */
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
-const hasWords = (rt: RichText) => rt.some((r) => r.t.trim());
 
-/** What the read-only page leaves out before it pairs anything (decision 0027, "Reading what is drawn"). */
+/** What the read-only page leaves out before it pairs anything (decision 0027, "Reading what is drawn"): a picture it has no address for, and a section with nothing to show (decision 0032). */
 export const readOnlySkip =
   (imageUrls: ImageUrls) =>
   (s: ContentSection): boolean =>
-    (s.kind === "image" && !imageUrls[s.fileId]) || ((s.kind === "aim" || s.kind === "conclusion") && !hasWords(s.text));
+    (s.kind === "image" && !imageUrls[s.fileId]) || isBlank(s);
+
+/** The page's items as a visitor sees them: the flowchart with only its filled boxes, and not at all when none is filled. */
+export function readOnlyItems(doc: ExhbtDoc, imageUrls: ImageUrls): PageItem[] {
+  return pageItems(doc, readOnlySkip(imageUrls)).flatMap((it): PageItem[] => {
+    if (it.kind !== "flow") return [it];
+    const steps = filledFlow(it.steps);
+    return steps.length === 0 ? [] : steps.length === it.steps.length ? [it] : [{ ...it, steps }];
+  });
+}
 
 /** The first item of a row, in page order. */
 const firstItem = (row: Row): PageItem => {
@@ -41,7 +51,7 @@ const firstItem = (row: Row): PageItem => {
 export function LayoutMain({ doc, ctx }: { doc: ExhbtDoc; ctx: PageCtx }) {
   const f = ctx.format;
   const edit = ctx.edit;
-  const items = edit ? pageItems(doc) : pageItems(doc, readOnlySkip(ctx.imageUrls));
+  const items = edit ? pageItems(doc) : readOnlyItems(doc, ctx.imageUrls);
   const rows = rowsFor(items, f);
   const placeOf = new Map(items.map((it, i) => [it.id, i]));
   let refsDrawn = 0;
@@ -122,14 +132,23 @@ export function LayoutMain({ doc, ctx }: { doc: ExhbtDoc; ctx: PageCtx }) {
               </div>
             );
           case "refs": {
-            // One list per page in practice; a second (an arranged page) gets its own heading id.
+            // One list per page in practice; a second (an arranged page) gets its own heading id. Its title is the doc's
+            // refsTitle (decision 0032): the layout's own heading until the person types one, none once they clear it.
+            // On the editing page the heading is the editor's field, which reads the title itself, so the shell need not
+            // draw again as it is typed; a second list on the page shows the same title, read-only.
             const id = refsDrawn++ === 0 ? "refs-h" : `${row.items[0]!.item.id}-refs-h`;
+            const layout = refsHeading(f);
+            const shown = edit ? layout : titleShown(doc.refsTitle, layout);
             return (
-              <section aria-labelledby={id} data-part="references" className={rc}>
-                <ctx.Sub id={id} className="xp-label">
-                  {FORMAT_COPY[f].refs ?? FORMAT_COPY[f].link}
-                </ctx.Sub>
-                <ul className="mt-1">
+              <section {...(shown ? { "aria-labelledby": id } : { "aria-label": layout })} data-part="references" className={rc}>
+                {edit ? (
+                  edit.title({ Sub: ctx.Sub, id, className: "xp-label", path: "refsTitle", fallback: layout, label: `${layout}: title` })
+                ) : shown ? (
+                  <ctx.Sub id={id} className="xp-label">
+                    {shown}
+                  </ctx.Sub>
+                ) : null}
+                <ul className={shown ? "mt-1" : undefined}>
                   {row.items.map((c) => (
                     <li key={c.item.id} className={cellClass("refs")}>
                       {item(c, "")}
@@ -180,7 +199,7 @@ export function LayoutMain({ doc, ctx }: { doc: ExhbtDoc; ctx: PageCtx }) {
 
 /** One page item, drawn the way `as` says. `rowClass` goes on its root (read-only page); the editor's frame leaves it out and carries those classes itself. */
 export function ItemView({ item, as, ctx, rowClass = "" }: { item: PageItem; as: ItemAs; ctx: PageCtx; rowClass?: string }): React.ReactNode {
-  if (item.kind === "flow") return <FlowPart steps={item.steps} as={as} rowClass={rowClass} ctx={ctx} />;
+  if (item.kind === "flow") return <FlowPart steps={item.steps} title={item.title} as={as} rowClass={rowClass} ctx={ctx} />;
   const { Sub, imageUrls, format: f, edit } = ctx;
   const copy = FORMAT_COPY[f];
   const s = item.s;

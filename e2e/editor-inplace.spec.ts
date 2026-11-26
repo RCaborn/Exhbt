@@ -1014,13 +1014,18 @@ test.describe("a formatted field's buttons, and an issue on the page", () => {
     const words = Array.from({ length: 24 }, (_, i) => `word${i + 1}`).join(" ");
     await typeIn(page, "sections.0.items.0", words);
     await expect(field(page, "sections.0.items.0").locator(".ProseMirror")).not.toHaveAttribute("aria-invalid");
-    // An emptied finding is an issue once publishing has been tried.
+    // An emptied finding is no issue, even once publishing has been tried (decision 0032): it is left off the visitor's
+    // page. Until then it was the issue this test marked.
     await typeIn(page, "sections.0.items.1", "");
     await page.evaluate(() => window.__exhbtUi!.setTried(true));
     const pm = field(page, "sections.0.items.1").locator(".ProseMirror");
+    await expect(pm).not.toHaveAttribute("aria-invalid");
+    // A finding with an issue of its own: a link that is not https. The editor's own address prompt refuses one, so it
+    // is put in through the store, as words pasted in or saved by an older build could hold one.
+    await page.evaluate(() => window.__exhbtEditor!.setAt("sections.0.items.1", [{ t: "Sales held.", href: "http://example.com/sales" }]));
     await expect(pm).toHaveAttribute("aria-invalid", "true");
     const note = page.locator(`${READY} #${await pm.getAttribute("aria-describedby")}`);
-    await expect(note).not.toHaveText("");
+    await expect(note).toHaveText("Links must start with https://.");
     const shown = () => note.evaluate((el) => getComputedStyle(el).opacity);
     expect(await shown()).toBe("1");
     const focusedBoxes = await boxes(page, { frames: true });

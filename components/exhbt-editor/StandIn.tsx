@@ -29,6 +29,11 @@ import { visitorParts } from "./visitor-parts";
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 const hasWords = (rt: RichTextValue) => rt.some((r) => r.t.trim());
 const muted = MUTED;
+/** The title stored at a path ("sections.3.title", "flowTitle", "refsTitle"), or undefined when there is none. */
+function valueAt(doc: ExhbtDoc, path: string): string | undefined {
+  const v = path.split(".").reduce<unknown>((at, k) => (at && typeof at === "object" ? (at as Record<string, unknown>)[k] : undefined), doc);
+  return typeof v === "string" ? v : undefined;
+}
 
 /** An empty field's placeholder, in the part's own element and type, its words in --xp-muted. */
 const placeholder = (words: string) => (
@@ -67,9 +72,24 @@ export function standInAdapter(doc: ExhbtDoc, base: Omit<PageCtx, "edit">): Edit
   const adapter: EditAdapter = {
     text: (o) => (o.value.trim() ? o.value : placeholder(o.placeholder)),
     rich: (o) => {
-      const inner = hasWords(o.value) ? <RichText value={o.value} highlight={o.highlight} /> : placeholder(o.placeholder);
+      // Between quotation marks (a quote, a pull quote) the field draws the marks round its words; an empty one's placeholder carries them.
+      const words = hasWords(o.value) ? <RichText value={o.value} highlight={o.highlight} /> : null;
+      const inner = o.quoted ? words ? <>“{words}”</> : placeholder(`“${o.placeholder}”`) : (words ?? placeholder(o.placeholder));
       // A <p> on the page is the field's <div> in the editor, with the paragraph's classes.
       return o.className ? <div className={o.className}>{inner}</div> : inner;
+    },
+    // A part's title (decision 0032): the heading as the editor will draw it. The layout's own until the person types one;
+    // cleared, its placeholder keeps its place; where the layout draws none (a case study's flowchart), nothing, as the editor's
+    // way in there takes no room.
+    title: (o) => {
+      const stored = valueAt(doc, o.path);
+      if (!o.fallback && stored === undefined) return null;
+      const value = (stored ?? o.fallback).trim();
+      return (
+        <o.Sub id={o.id} className={o.className}>
+          {value || placeholder("Add a title")}
+        </o.Sub>
+      );
     },
     // As G's frame will: a <div> with the row's classes round the part, which is drawn without them.
     item: (o) => {

@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Ellipsis, GripVertical, Star, Trash2 } from "lucide-react";
 import { FORMAT_RULES, formatOf, type Format } from "@/lib/exhbt/formats";
 import { pageItems } from "@/lib/exhbt/layouts";
 import type { ExhbtDoc } from "@/lib/exhbt/blocks";
 import type { ItemAs } from "@/lib/exhbt/layouts";
-import { useRuntime } from "./context";
 import { useBoard } from "./drag";
 import { mainColumn } from "./drag/engine";
 import { MoreActions } from "./draft-tools";
@@ -18,8 +17,8 @@ import type { Store } from "./store-core";
 /*
  * A section's toolbar (decision 0026, "The chrome"): at its top corner, out of the flow, so it takes no
  * room. The grip (the only thing that drags), move up, move down, the layout's own action where there
- * is one, "More actions" where the AI drafted the part, and Remove (on the flowchart where the layout
- * always has one, there but off, saying why). With a mouse it shows on hover and on focus within; on a
+ * is one, "More actions" where the AI drafted the part, and Remove (on every section in every layout,
+ * the flowchart too: decision 0032). With a mouse it shows on hover and on focus within; on a
  * touch screen wider than 48rem it is always shown, at 44px (one over its own section shows its grip
  * until the section is touched or has the focus); on a phone only the grip shows (css/phone.css). Each
  * button has a tooltip. The buttons carry data-grip or data-tool, so other parts' CSS and tests can
@@ -671,17 +670,10 @@ export function useRoving(ref: React.RefObject<HTMLElement | null>) {
 /** Whether an AI draft's rewrite form is open in toolbar `bar` (BlockTools, in its "More actions"). */
 const rewriteOpenIn = (bar: HTMLElement | null) => Boolean(bar?.querySelector('[data-tool="more"] form'));
 
-/** Why the flowchart can't be removed in layout `f` (decision 0026; the review's vision-3), or null where it can. */
-export function whyFlowStays(f: Format): string | null {
-  if (FORMAT_RULES[f].flowRemovable) return null;
-  return f === "case-study" ? "A case study always has a flowchart. Choose another layout to take it off." : `${FORMAT_RULES[f].name} always has a flowchart. Choose another layout to take it off.`;
-}
-
 export function Toolbar() {
   const frame = useFrame();
   const store = useStoreInternal();
   const board = useBoard();
-  const { uiApi } = useRuntime();
   const id = frame?.id ?? "";
   const label = useDoc((d) => labelOf(d, id));
   const f = useDoc((d) => formatOf(d));
@@ -689,7 +681,6 @@ export function Toolbar() {
   const actions = frame ? actionsFor(store.get(), id, frame.kind, f, store, frame.as) : [];
   const ref = useRef<HTMLDivElement>(null);
   const menu = useRef<HTMLButtonElement>(null);
-  const why = useId();
   // The compact form's "More actions" (css/core.css: data-place="compact"): open, it shows the toolbar's other buttons under the
   // pair, by name, and its first takes the focus; Escape, the focus going to something else, a press outside it, or one of them
   // pressed closes it. While an AI draft's rewrite form is open in it, neither the focus going elsewhere nor a press outside does.
@@ -738,7 +729,6 @@ export function Toolbar() {
   }, [store, id, kind]);
   if (!frame) return null;
   const { place, count } = frame;
-  const stays = kind === "flow" ? whyFlowStays(f) : null;
   const block = kind === "flow" ? "flow" : kind === "findings" ? "findings" : null;
   return (
     <div
@@ -761,7 +751,7 @@ export function Toolbar() {
       }}
       onClick={(e) => {
         const b = (e.target as HTMLElement).closest("button");
-        // A button in the menu, pressed, closes it; not one that is off (it says why) nor an AI draft's "More actions" (it opens its own).
+        // A button in the menu, pressed, closes it; not one that is off nor an AI draft's "More actions" (it opens its own).
         if (!open || !b || b === menu.current || b.hasAttribute("data-grip") || b.getAttribute("aria-disabled") === "true" || b.closest('[data-tool="more"]')) return;
         setOpen(false);
         if (b.dataset.tool !== "remove") requestAnimationFrame(() => menu.current?.focus());
@@ -789,38 +779,10 @@ export function Toolbar() {
           <MoreActions block={block} />
         </span>
       )}
-      {stays ? (
-        // Where the layout always has a flowchart, Remove is there but off, as a box's is at three boxes: focused, its reason is its
-        // description and its tooltip; pressed, the reason is said, and shown (a touch screen has no tooltips) until the focus moves on.
-        <>
-          <button
-            type="button"
-            className="xe-tool"
-            data-tool="remove"
-            aria-label={`Remove ${label}`}
-            aria-disabled="true"
-            aria-describedby={why}
-            data-tip={stays}
-            onClick={(e) => {
-              uiApi.say(stays);
-              e.currentTarget.setAttribute("data-explain", "");
-              // Safari gives a pressed button no focus: without it the reason would never be taken away again.
-              e.currentTarget.focus();
-            }}
-            onBlur={(e) => e.currentTarget.removeAttribute("data-explain")}
-          >
-            <Trash2 aria-hidden size={15} strokeWidth={2.25} />
-            <span className="xe-tool-name">{`Remove ${label}`}</span>
-          </button>
-          <span id={why} hidden>
-            {stays}
-          </span>
-        </>
-      ) : (
-        <Tool name={`Remove ${label}`} tool="remove" onClick={() => board.remove(id)}>
-          <Trash2 aria-hidden size={15} strokeWidth={2.25} />
-        </Tool>
-      )}
+      {/* Every section can be taken off in every layout, the flowchart too (decision 0032): the "+" and the tray offer it back. */}
+      <Tool name={`Remove ${label}`} tool="remove" onClick={() => board.remove(id)}>
+        <Trash2 aria-hidden size={15} strokeWidth={2.25} />
+      </Tool>
     </div>
   );
 }

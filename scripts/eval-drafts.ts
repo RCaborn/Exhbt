@@ -29,13 +29,13 @@ import { draftExhbt, materialText, type DraftInput, type DraftResult } from "@/l
 import { overTargets } from "@/lib/ai/draft-targets";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey, costUsd } from "@/lib/ai/model";
 import { extractTextInBrowser } from "@/lib/doc-readers";
-import { chartsOf, findingsOf, LIMITS, normaliseDoc, plain, sectionTexts, validateForPublish, wordCount, words, type ExhbtDoc, type Issue, type RichText } from "@/lib/exhbt/blocks";
+import { chartsOf, findingsOf, LIMITS, normaliseDoc, plain, sectionTexts, wordCount, words, type ExhbtDoc, type Issue, type RichText } from "@/lib/exhbt/blocks";
 import { chartTexts, chartValues, KIND_NAMES, type Chart } from "@/lib/exhbt/charts";
 import { AIFailure } from "@/lib/ai/failure";
 import { FORMAT_RULES, formatOf } from "@/lib/exhbt/formats";
 import { unsupportedParts } from "@/lib/exhbt/references";
 import { misquoted, normaliseNumber, numbersIn, unverifiedNumbers } from "@/lib/exhbt/verify";
-import { markLayout, needsThePerson, type LayoutExpect, type LayoutMark } from "../evals/exhbt-draft/marks";
+import { draftIssues, markLayout, needsThePerson, type LayoutExpect, type LayoutMark } from "../evals/exhbt-draft/marks";
 
 const ROOT = process.cwd();
 const EVAL_DIR = join(ROOT, "evals/exhbt-draft");
@@ -250,7 +250,11 @@ const US_SPELLINGS = /\b(analyz\w*|optimiz\w*|organiz\w*|color\w*|behavior\w*|fa
 
 type Checks = {
   wordCount: number;
-  /** Everything that would stop publishing. `needsPerson` is the part of it no draft can clear (pictures, Before and After marks): left out of C2. */
+  /**
+   * Everything that would stop publishing, and what the page's layout usually has (draftIssues in
+   * evals/exhbt-draft/marks.ts: a suggestion to a person since decision 0032, still a mark against a draft).
+   * `needsPerson` is the part of it no draft can clear (pictures, Before and After marks): left out of C2.
+   */
   publishIssues: Issue[];
   needsPerson: Issue[];
   /**
@@ -315,7 +319,7 @@ function runChecks(result: DraftResult, source: string, f: Facts, banned: Banned
   // What the answer key's facts are looked for in: every word a reader sees, and each link's address.
   const hrefs = d.sections.flatMap((s) => (s.kind === "link" && s.href ? [s.href] : []));
   const text = squash([...docStrings(d), ...hrefs].join("\n"));
-  const publishIssues = validateForPublish(d);
+  const publishIssues = draftIssues(d);
   const draftNumbers = docStrings(d).flatMap(numbersIn);
   const values = new Set(draftNumbers.map(normaliseNumber).filter((v): v is string => v !== null));
 

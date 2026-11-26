@@ -1,6 +1,7 @@
 "use client";
 
 import "./css/core.css";
+import "./css/your-way.css";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { MadeWith } from "@/components/brand/MadeWith";

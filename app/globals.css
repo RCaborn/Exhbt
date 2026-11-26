@@ -1017,3 +1017,13 @@
     break-inside: avoid;
   }
 }
+
+/* Bold in an essay's pull quote (decision 0032). The pull quote is set in the look's display face at its
+   heading weight, so the body's bold (600) would not show in it, or would be lighter than the words round
+   it: bold there is a step heavier than the quote. In the utilities layer because it corrects a utility
+   (font-semibold, on the strong that RichText and the editor both write). */
+@layer utilities {
+  [data-part="pullquote"] strong.font-semibold {
+    font-weight: bolder;
+  }
+}

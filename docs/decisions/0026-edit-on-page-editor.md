@@ -1,6 +1,7 @@
 Status: accepted
 Date: 19 Nov 2026
 Amends: 0007 (the editor is the page itself, not cards beside a preview), 0015 (sections are edited, added, removed and dragged on the page; a removed image can be put back), 0022 ("Arrange sections" goes; the editing page is the page), 0017 and 0025 (where a picked figure is managed; taking a figure by hand; the drafted chart can come back), and `DESIGN.md` (the Dragging rule, the exhbt page paragraph, the editor paragraph: the new wording is under "What DESIGN.md says from release 3")
+Amended by: 0032 (the formatting buttons come to the words selected; a quote, a pull quote and a link's line take bold and italic; titles are typed in place; "Suggestions" in the fix list; the flowchart's Remove is never off)
 
 # The exhbt editor is the page itself
 

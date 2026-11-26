@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useMemo, useSyncExternalStore } from "react";
-import { validateForPublish, type ExhbtDoc, type Issue } from "@/lib/exhbt/blocks";
+import { suggestionsFor, validateForPublish, type ExhbtDoc, type Issue } from "@/lib/exhbt/blocks";
 import type { FieldPath } from "@/components/portfolio/page-ctx";
 import type { PortfolioTheme } from "@/lib/portfolio-themes";
 import type { Teammate } from "@/lib/team-rules";
@@ -50,7 +50,8 @@ export type Ui = {
 
 /** The formatted field that has the cursor, if one does: what its buttons do and which are on. For the phone's bar. */
 /** `toggleLink()` with no link on opens the field's own address prompt (as the classic editor's formatted field does, with its error for an address that is not https); with one on, it removes it. */
-export type ActiveRich = { highlight: boolean; bold: boolean; italic: boolean; link: boolean; toggleBold(): void; toggleItalic(): void; toggleLink(): void };
+/** `links`: whether the field takes links at all (a quote, a pull quote and a link's description take bold and italic only, decision 0032). */
+export type ActiveRich = { highlight: boolean; links: boolean; bold: boolean; italic: boolean; link: boolean; toggleBold(): void; toggleItalic(): void; toggleLink(): void };
 
 export type SaveApi = { status: { state: "saved" | "waiting" | "saving" | "retrying" | "error"; error?: string }; flush(): Promise<void>; settled(): Promise<void>; markSaved(d: ExhbtDoc): void };
 
@@ -198,6 +199,21 @@ export function useIssues(): Issues {
     const { all, shown } = issuesOf(doc, tried);
     return { all, shown, at: (path: FieldPath) => shown.filter((i) => i.path === path), tried, setTried: uiApi.setTried };
   }, [doc, tried, uiApi]);
+}
+
+const suggestionsCache = new WeakMap<ExhbtDoc, Issue[]>();
+/**
+ * What the editor suggests for the doc as it is now, and nothing requires (suggestionsFor, decision 0032): never
+ * among the issues, so they stop no publish, count in no "things to fix" and mark no field. Worked out once per doc.
+ */
+export function useSuggestions(): Issue[] {
+  const store = useStoreInternal();
+  const doc = useSyncExternalStore(store.subscribe, store.get, store.get);
+  return useMemo(() => {
+    let list = suggestionsCache.get(doc);
+    if (!list) suggestionsCache.set(doc, (list = suggestionsFor(doc)));
+    return list;
+  }, [doc]);
 }
 
 /** Autosave, as components/editor/useAutosave.ts returns it. */

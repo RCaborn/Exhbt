@@ -1,0 +1,148 @@
+/* Decision 0032, "write it your way": the bar that comes to a selection, a quote's marks round a
+   formatted field, and the way in to a title where the layout draws none. On the page every colour is
+   one of the page's --xp-* variables; the selection bar is app chrome, drawn by Astryx components in
+   Astryx's own tokens. Nothing here takes room on the page. */
+@layer components {
+  /* ---------- The bar at the selection (fields/SelectionBar.tsx) ---------- */
+  /* Its layer is Astryx's (a fixed one, in the browser's top layer), and so are its surface, its buttons and
+     its field. This is only what Astryx has no prop for: the bar is as wide as what it holds, and nothing in
+     it can be picked up as words. */
+  .xe-selbar {
+    width: max-content;
+    max-width: calc(100vw - var(--spacing-4));
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  /* The reason an address was refused, under its field: Astryx's error colour and its supporting text size. */
+  .xe-selbar-error {
+    margin: var(--spacing-1) var(--spacing-1) 0;
+    color: var(--color-text-error);
+    font-family: var(--font-family-body);
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+  }
+  /* While the bar is up it is the one set of formatting buttons: the field's own, at the end of its line, go.
+     They are hidden, not taken out, so nothing is drawn again and the one that had the focus cannot keep it. */
+  .xe-rich[data-selecting] > .xe-format,
+  .xe-rich[data-selecting]:focus-within > .xe-format {
+    visibility: hidden;
+  }
+
+  /* ---------- A button link's grip on a phone ---------- */
+  /* A build's links are buttons, each with its line under it, and on a phone they stack. A grip sits half over its
+     section's top edge (css/phone.css), and for the second button that half lay over the end of the first button's
+     line, 14px above. The line is words on the page now (it takes bold and italic), where it was a text box that
+     kept its words to itself, so the phone spec sees it. The grip sits on its own button's corner instead. */
+  @media (max-width: 47.99rem) and (pointer: coarse) {
+    [data-editor="page"] .xe-frame[data-kind="link"][data-as="button"] > .xe-tools {
+      top: 0;
+    }
+  }
+
+  /* ---------- A quote's marks round a formatted field ---------- */
+  /* The page writes the marks as text round the words (“…”). A formatted field is a block, so it draws them
+     itself, at the start and end of its one paragraph: the words wrap exactly as the published ones do. */
+  .xe-rich[data-quoted] > .xe-rest:not(:empty)::before,
+  .xe-rich[data-quoted] .xe-rich-cell:not([data-empty]) .xe-pm p::before {
+    content: "\201C";
+  }
+  .xe-rich[data-quoted] > .xe-rest:not(:empty)::after,
+  .xe-rich[data-quoted] .xe-rich-cell:not([data-empty]) .xe-pm p::after {
+    content: "\201D";
+  }
+  /* The words wrap as the page's do. A paragraph anywhere on the site wraps "pretty" (app/globals.css), and the
+     editor's own paragraph would take that over the quote's own way of wrapping (a pull quote's lines are balanced),
+     so the lines broke again the moment the editor took over from the resting words, and ran under the section's
+     toolbar, which had been placed clear of them. */
+  .xe-rich[data-quoted] .xe-pm p {
+    text-wrap: inherit;
+  }
+  /* Empty, the placeholder carries the marks, in its own colour (RichEditor.tsx writes them into its own). */
+  .xe-rich[data-quoted] > .xe-rest:empty::before {
+    content: "\201C" attr(data-placeholder) "\201D";
+  }
+
+  /* ---------- A part's title, typed in place (fields/TitleField.tsx) ---------- */
+  /* The field is as wide as its words, not as wide as its heading. A section's toolbar sits over the blank end
+     of the section's first line (Toolbar.tsx keeps it off the words), which for most sections is now its title's
+     line. On a tablet, where the toolbar is always shown, a field as wide as the heading had its middle under
+     those buttons, and a tap meant for the title pressed one. Empty, it is as wide as "Add a title". */
+  [data-title] .xe-text {
+    width: auto;
+    min-width: 4ch;
+    max-width: 100%;
+  }
+  /* Under a title, a flowchart box's Remove and grip hang half over the box's top corners, and on a touch
+     screen each takes a 44px press that reaches up and along the box's top edge (css/flow.css). A title sits
+     just over that edge (research's "Method" is 8px above its first box), so the corner of each press that
+     lay over the title's line is cut off: a press on the title's words is the title's. Each chip still takes
+     44px up and down and 44px across, through its middle. */
+  @media (pointer: coarse) {
+    section:has(> [data-title]) .xe-flow-tools > [data-flow-remove]::before {
+      clip-path: polygon(0 0, calc(100% - 1rem) 0, calc(100% - 1rem) 1rem, 100% 1rem, 100% 100%, 0 100%);
+    }
+    section:has(> [data-title]) .xe-flow-tools > .xe-flow-grip::before {
+      clip-path: polygon(1rem 0, 100% 0, 100% 100%, 0 100%, 0 1rem, 1rem 1rem);
+    }
+  }
+  /* Where the browser has no field-sizing, the hidden copy of the words sets the width (css/core.css, .xe-grow). */
+  [data-title] .xe-grow {
+    display: inline-grid;
+    grid-template-columns: minmax(0, max-content);
+    max-width: 100%;
+    vertical-align: top;
+  }
+  [data-title] .xe-grow > .xe-text {
+    width: 100%;
+  }
+  /* Cleared, its "Add a title" is fainter than a field's placeholder elsewhere: most titles are set in the
+     page's muted colour themselves, and the placeholder must not pass for one. */
+  [data-title] .xe-text::placeholder {
+    color: color-mix(in srgb, var(--xp-muted) 60%, transparent);
+  }
+
+  /* ---------- "Add a title", where the layout draws no heading (fields/TitleField.tsx) ---------- */
+  /* Over the part's top left edge, as the aim's switch is (css/core.css, .xe-above): it shows while the
+     pointer or the focus is in the part, and always under a finger, where nothing hovers. */
+  .xe-title-add {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .xe-frame:hover .xe-title-add,
+  .xe-frame:focus-within .xe-title-add,
+  .xe-title-add:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  @media (pointer: coarse) {
+    .xe-title-add {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+  /* On a phone the flowchart's own grip sits to the left of its boxes' grips (css/phone.css), where a chip
+     over a part's top edge goes: this one moves along again, clear of it. */
+  @media (max-width: 47.99rem) and (pointer: coarse) {
+    [data-editor="page"] .xe-frame[data-kind="flow"] .xe-title-add {
+      right: 5.75rem;
+    }
+  }
+
+  /* ---------- Suggestions, in "Things to fix" and in "Review and publish" (topbar/Suggestions.tsx) ---------- */
+  /* The list and its rows are Astryx's. This is only where the group sits: a rule and some room between it
+     and what has to be fixed, when there is anything above it. Astryx's own tokens. */
+  .xe-suggest:not(:first-child) {
+    margin-top: var(--spacing-3);
+    padding-top: var(--spacing-3);
+    border-top: 1px solid var(--color-border);
+  }
+  /* In the sheet the parts are already spaced as a stack, so the rule alone marks the group off. */
+  .xe-sheet-stack > .xe-suggest:not(:first-child) {
+    margin-top: 0;
+  }
+  /* The top bar's button when suggestions are all there is: quiet, in the bar's secondary ink, where "things
+     to fix" is in the error colour. Its count and its words swap by width as that button's do (css/topbar.css). */
+  .xe-topbar .xe-suggest-button {
+    color: var(--color-text-secondary);
+  }
+}

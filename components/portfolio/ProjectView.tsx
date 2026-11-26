@@ -98,6 +98,8 @@ export function ProjectView({
   const kind = doc.context.trim();
   const whereWhen = doc.whereWhen?.trim() ?? "";
   const myRole = doc.myRole?.trim() ?? "";
+  // A skill left empty is not drawn (decision 0032).
+  const skills = doc.skills.filter((s) => s.trim());
   const checks: { label: React.ReactNode; key: string; done: boolean }[] = [
     { key: "confirmed", label: confirmed ? `Confirmed by ${first}` : "Not confirmed yet", done: confirmed },
     ...(doc.evidence ? [{ key: "source", label: "Source attached", done: true }] : []),
@@ -203,9 +205,9 @@ export function ProjectView({
               {edit.skills()}
               {edit.tools({ block: "skills" })}
             </div>
-          ) : doc.skills.length > 0 && (
+          ) : skills.length > 0 && (
             <ul aria-label={copy.skills} className="flex flex-wrap gap-1 @2xl/main:justify-end">
-              {doc.skills.map((s) => (
+              {skills.map((s) => (
                 <li key={s} className="xp-pill px-2 py-[0.2rem] text-[0.78rem] font-medium">
                   {s}
                 </li>
@@ -238,7 +240,7 @@ export function ProjectView({
           {format === "case-study" && sectionsSlot ? (
             // The classic editor's "Arrange sections": the flowchart, then its own list of the sections.
             <>
-              <FlowPart steps={doc.flow} as="plain" rowClass="mt-8 print:mt-3" ctx={ctx} />
+              <FlowPart steps={doc.flow} title={doc.flowTitle} as="plain" rowClass="mt-8 print:mt-3" ctx={ctx} />
               {sectionsSlot}
             </>
           ) : (

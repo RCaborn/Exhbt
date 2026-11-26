@@ -1,6 +1,7 @@
 Status: accepted
 Date: 19 Nov 2026
 Amends: 0015 (the flowchart is a section that can be moved, and removed in five layouts; the core is no longer fixed in place), 0022 (the page is drawn by one engine from per-layout rules; a pair is drawn in the doc's order), 0024 (every layout is drawn in the doc's order; a layout is a starting template; what a switch does)
+Amended by: 0032 (the flowchart can be removed in every layout, a case study and research too, and a layout switch no longer brings it back)
 
 # A layout engine: every layout is drawn in the doc's own order
 

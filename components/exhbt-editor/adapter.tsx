@@ -9,6 +9,7 @@ import { useRuntime } from "./context";
 import { DraftToolsContext, MoreActions } from "./draft-tools";
 import { InlineText } from "./fields/InlineText";
 import { RichField } from "./fields/RichField";
+import { TitleField } from "./fields/TitleField";
 import { GraphExtras } from "./figures/GraphExtras";
 import { ImageExtras } from "./figures/ImageExtras";
 import { LinkExtras } from "./figures/LinkExtras";
@@ -27,7 +28,8 @@ import { jumpTo } from "./jump";
  * else (they are called while a part draws, inside its lists), so the hooks are in the components.
  * Every element this adds that the visitor's page lacks carries data-edit-only, and none takes room
  * but what 0026 puts in the flow in the editor only: the placeholders, each image's description field
- * and the "Add a skill" box.
+ * and the "Add a skill" box. A part's title (decision 0032) is the heading itself with a field in it; a
+ * cleared one keeps its place as a placeholder, "Add a title".
  */
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
@@ -50,6 +52,7 @@ export function useAdapter(): EditAdapter {
     () => ({
       text: (o) => <InlineText {...o} />,
       rich: (o) => (CAPTION.test(o.path) ? <CaptionField {...o} /> : <RichField {...o} />),
+      title: (o) => <TitleField {...o} />,
       item: (o) => <Frame {...o} />,
       insert: (o) => <MemoInsert {...o} />,
       extra: (o) => <Extra {...o} />,
@@ -116,7 +119,21 @@ const AimSwitch = memo(function AimSwitch({ sectionId }: { sectionId: string }) 
   return (
     <span className="xe-above" data-edit-only role="group" aria-label="Aim or hypothesis">
       {(["aim", "hypothesis"] as const).map((h) => (
-        <button key={h} type="button" className="xe-chip" aria-pressed={heading === h} onClick={() => store.patch(sectionId, (x) => (x.kind === "aim" ? { ...x, heading: h } : x))}>
+        <button
+          key={h}
+          type="button"
+          className="xe-chip"
+          aria-pressed={heading === h}
+          // The switch names the heading. A title the person typed over it would hide what the switch does, so pressing it puts the layout's heading back.
+          onClick={() =>
+            store.patch(sectionId, (x) => {
+              if (x.kind !== "aim") return x;
+              const next = { ...x, heading: h };
+              delete next.title;
+              return next;
+            })
+          }
+        >
           {h === "aim" ? "Aim" : "Hypothesis"}
         </button>
       ))}
@@ -124,13 +141,12 @@ const AimSwitch = memo(function AimSwitch({ sectionId }: { sectionId: string }) 
   );
 });
 
-/** A finding's controls (move up, move down, remove), drawn over its line; at `index === n`, "Add a finding", in the gap below the last. */
+/** A finding's controls (move up, move down, remove), drawn over its line; at `index === n`, "Add a finding", in the gap below the last. Any finding can be removed: how many there are is a suggestion (decision 0032). */
 const ListControls = memo(function ListControls({ path: given, index, n }: ListSlot) {
   const frame = useFrame();
   const path = useFieldPath(given);
   const store = useStoreInternal();
   const max = useDoc((d) => formatLimits(formatOf(d)).findings.max);
-  const min = useDoc((d) => formatLimits(formatOf(d)).findings.min);
   const id = frame?.id ?? "";
   if (index === n) {
     return (
@@ -158,7 +174,7 @@ const ListControls = memo(function ListControls({ path: given, index, n }: ListS
       <button type="button" className="xe-tool xe-tool-sm" data-tip={`Move finding ${k} down`} aria-label={`Move finding ${k} down`} disabled={index === n - 1} onClick={() => store.listMove(id, index, index + 1)}>
         <ArrowDown aria-hidden size={14} strokeWidth={2.25} />
       </button>
-      <button type="button" className="xe-tool xe-tool-sm" data-tip={`Remove finding ${k}`} aria-label={`Remove finding ${k}`} disabled={n <= min} onClick={() => store.listRemove(id, index)}>
+      <button type="button" className="xe-tool xe-tool-sm" data-tip={`Remove finding ${k}`} aria-label={`Remove finding ${k}`} onClick={() => store.listRemove(id, index)}>
         <X aria-hidden size={14} strokeWidth={2.25} />
       </button>
     </span>

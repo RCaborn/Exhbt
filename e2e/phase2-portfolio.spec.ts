@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { ENTITLEMENTS } from "../lib/entitlements";
-import { chartsOf, findingsOf, LIMITS, safeHref, text, validateForPublish, wordCount, type ExhbtDoc, type RichText } from "../lib/exhbt/blocks";
+import { chartsOf, findingsOf, LIMITS, safeHref, suggestionsFor, text, validateForPublish, wordCount, type ExhbtDoc, type RichText } from "../lib/exhbt/blocks";
 import { sampleDocs } from "../lib/exhbt/sample";
 import { APP_HOST, MARKETING_HOST, canonicalRedirectUrl, parseHost, toolRedirectUrl, usernameProblem } from "../lib/hosts";
 import { canCreateExhbt, canMakeJobLinks, canPublish, visibleOnPortfolio } from "../lib/plan-rules";
@@ -34,7 +34,10 @@ test.describe("Exhbt blocks", () => {
   test("publishing points at the block that breaks a limit", () => {
     expect(paths(doc({ title: "" }))).toEqual(["title"]);
     expect(paths(doc({ title: "x".repeat(LIMITS.titleChars + 1) }))).toEqual(["title"]);
-    expect(paths(doc({ flow: GP.flow.slice(0, LIMITS.flow.min - 1) }))).toEqual(["flow"]);
+    // Fewer boxes than most flowcharts have is a suggestion since decision 0032; more than the most there may be still stops publishing.
+    expect(paths(doc({ flow: GP.flow.slice(0, LIMITS.flow.min - 1) }))).toEqual([]);
+    expect(suggestionsFor(doc({ flow: GP.flow.slice(0, LIMITS.flow.min - 1) })).map((i) => i.path)).toEqual(["flow"]);
+    expect(paths(doc({ flow: Array.from({ length: LIMITS.flow.max + 1 }, () => ({ step: "A box" })) }))).toEqual(["flow"]);
     expect(paths(withFindings(Array.from({ length: LIMITS.findings.max + 1 }, () => text("A short finding."))))).toEqual(["sections.0.items"]);
     expect(paths(withFindings([[{ t: "Report", href: "http://example.com/report" }], text("Another finding.")]))).toEqual(["sections.0.items.0"]);
     expect(paths(doc({ gap: [{ t: "A question", href: "javascript:alert(1)" }] }))).toEqual(["gap"]);
