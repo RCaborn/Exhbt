@@ -1,6 +1,9 @@
+import AxeBuilder from "@axe-core/playwright";
 import { FULL, SPARSE, fullFixture, sparseFixture } from "./fixtures/portfolio-pages";
 import type { Page } from "@playwright/test";
-import { HOME, READY, call, expect, field, focusedPath, fresh, openEditor, saveState, seed, setKind, settle, signIn, stateNow, test, textbox, typeIn, uiNow, valueAt, waitReady, waitSaved } from "./portfolio-editor";
+import { applyUndo, entryFor } from "../components/portfolio-editor/undo";
+import type { BuilderState } from "../app/(app)/portfolio/steps";
+import { HOME, READY, boxes, call, changeWith, differences, expect, field, focusedPath, renders, fresh, openEditor, saveState, seed, setKind, settle, signIn, signUpToEditor, stateNow, test, textbox, typeIn, uiNow, undoLabel, valueAt, waitReady, waitSaved, waitSavedOnPage } from "./portfolio-editor";
 
 // The one-page portfolio editor's core (decision 0031; brief E of docs/briefs/portfolio-first): which
 // builder a person gets, the page drawn as the visitor's with every word typed where it sits, each field
@@ -152,6 +155,8 @@ test.describe("Typing on the page", () => {
     const path = "arrangement.tiles.education.lines.1";
     const label = textbox(page, path, { part: "label" });
     const year = textbox(page, path, { part: "year" });
+    // Run with E2E_GROW=mirror, the fields grow by their hidden mirror (portfolio-editor.ts).
+    if (process.env.E2E_GROW === "mirror") await expect(page.locator(`${READY} [data-grow="mirror"]`).first()).toBeAttached();
     await expect(label).toHaveValue("Foundation year, Sheffield College");
     await expect(year).toHaveValue("2022–2023");
     // A line nobody has typed in keeps its own punctuation.
@@ -424,6 +429,65 @@ test.describe("Coming back to the page", () => {
   });
 });
 
+test.describe("Coming back to the page, with nothing of development's", () => {
+  // The same journeys as above, built only from what a production build has: the site's own sign-up, the
+  // header's links, and the words on the page (no /dev route, no /auth/dev, no development handle). They
+  // run on the development server like every other test, and against `next build` and `next start` with
+  // the stand-in store and EXHBT_PORTFOLIO=page, which is where the Back fix has to hold.
+  /** The words in a field as the page shows them: a textarea's value, or a span's text. */
+  const value = (page: Page, path: string) => textbox(page, path).evaluate((el) => (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement ? el.value : (el.textContent ?? "")));
+  async function leave(page: Page) {
+    await page.getByRole("link", { name: "Account", exact: true }).first().click();
+    await page.waitForURL(/\/account$/);
+    await expect(page.locator("[data-editor]")).toHaveCount(0);
+  }
+
+  test("after Back and after the header's link, the newest saved words are on the page, and a key never saves older ones over them", async ({ page }) => {
+    await signUpToEditor(page, "prodback");
+    expect((await page.request.get("/account")).status()).toBe(200);
+    await typeIn(page, "profile.name", "Robin Okafor");
+    await typeIn(page, "profile.headline", "Analyst, queues and rotas");
+    await waitSavedOnPage(page);
+
+    await leave(page);
+    await page.goBack();
+    await waitReady(page);
+    expect(await value(page, "profile.name")).toBe("Robin Okafor");
+    expect(await value(page, "profile.headline")).toBe("Analyst, queues and rotas");
+    await typeIn(page, "profile.location", "Leeds");
+    await waitSavedOnPage(page);
+
+    await leave(page);
+    await page.getByRole("link", { name: "Your portfolio", exact: true }).first().click();
+    await waitReady(page);
+    expect(await value(page, "profile.location")).toBe("Leeds");
+    expect(await value(page, "profile.name")).toBe("Robin Okafor");
+
+    await page.reload();
+    await waitReady(page);
+    expect(await value(page, "profile.name")).toBe("Robin Okafor");
+    expect(await value(page, "profile.headline")).toBe("Analyst, queues and rotas");
+    expect(await value(page, "profile.location")).toBe("Leeds");
+  });
+
+  test("Back while the last change is on its way waits for it, and no key saves over it", async ({ page }) => {
+    await signUpToEditor(page, "prodfast");
+    expect((await page.request.get("/account")).status()).toBe(200);
+    await typeIn(page, "profile.location", "Bradford");
+    // Not waited for: the editor sends what is waiting as it leaves.
+    await leave(page);
+    await page.goBack();
+    await waitReady(page);
+    expect(await value(page, "profile.location")).toBe("Bradford");
+    await typeIn(page, "profile.headline", "Operations analyst");
+    await waitSavedOnPage(page);
+    await page.reload();
+    await waitReady(page);
+    expect(await value(page, "profile.location")).toBe("Bradford");
+    expect(await value(page, "profile.headline")).toBe("Operations analyst");
+  });
+});
+
 test.describe("What the address asks for", () => {
   /** The address as the page has it now, without the origin. */
   const address = (page: Page) => page.evaluate(() => `${location.pathname}${location.search}${location.hash}`);
@@ -505,6 +569,8 @@ test.describe("What the address asks for", () => {
     await waitReady(page);
     const card = page.locator(`${READY} [data-card="${id}"]`);
     await expect(card).toHaveAttribute("data-marked", "");
+    // It draws in on the theme's motion tokens.
+    await expect(card).toHaveCSS("animation-name", "pe-mark");
     expect((await uiNow(page)).marked).toBe(id);
     await expect.poll(() => address(page)).toBe("/portfolio");
     const note = page.locator(".astryx-toast", { hasText: "Where do students sit in the library? is live at" });
@@ -551,6 +617,7 @@ test.describe("See as a visitor", () => {
     await call(page, "seeAsVisitor", true);
     await expect(notOnline(page)).toHaveAttribute("data-not-online", "nothing-live");
     await expect(notOnline(page)).toContainText("Not online yet: publish an exhbt");
+    await expect(page.locator("[data-canvas=visitor]").getByRole("link", { name: "Add an exhbt" })).toHaveAttribute("href", "/exhbts/new");
     await expect(page.locator(`[data-canvas=visitor] ${HOME} [data-card]`)).toHaveCount(0);
   });
 
@@ -576,5 +643,346 @@ test.describe("See as a visitor", () => {
     await expect(page.locator("[data-canvas=visitor]")).toHaveCount(0);
     await expect(textbox(page, "profile.name")).toHaveValue("Robin Okafor  ");
     await waitSaved(page);
+  });
+});
+
+test.describe("Problems at the field", () => {
+  test("a headline over its limit is not sent, shows at the field, and Show me goes back to it; a line too long shows at the line", async ({ page }) => {
+    const f = fresh(FULL, "issues");
+    await openEditor(page, f);
+    const thirteen = "One two three four five six seven eight nine ten eleven twelve thirteen";
+    await typeIn(page, "profile.headline", thirteen);
+    const status = saveState(page);
+    await expect(status).toHaveAttribute("data-save", "invalid");
+    await expect(status).toContainText("Not saved: Keep the headline to 12 words or fewer.");
+    const headline = textbox(page, "profile.headline");
+    await expect(headline).toHaveAttribute("aria-invalid", "true");
+    // The note shows under the field while it has the cursor.
+    const note = field(page, "profile.headline").locator("xpath=ancestor::*[contains(@class,'xe-field')][1]").locator(".xe-issue");
+    // (It is always there for a screen reader, and shown or not by its opacity.)
+    await expect(note).toHaveCSS("opacity", "1");
+    await expect(note).toHaveText("Keep the headline to 12 words or fewer.");
+    // Nothing was sent: the server still has the old headline.
+    await page.waitForTimeout(1500);
+    expect(await page.evaluate(() => window.__portfolioEditor!.waiting())).toBe(true);
+
+    // From another field, Show me puts the cursor back in the headline.
+    await textbox(page, "profile.location").click();
+    await expect(note).toHaveCSS("opacity", "0");
+    await status.getByRole("button", { name: "Show me" }).click();
+    await expect.poll(() => focusedPath(page)).toBe("profile.headline");
+
+    // One word fewer and it saves.
+    await page.keyboard.press("ControlOrMeta+End");
+    await page.keyboard.press("Backspace");
+    for (let i = 0; i < "thirteen".length; i++) await page.keyboard.press("Backspace");
+    await expect(headline).not.toHaveAttribute("aria-invalid", "true");
+    await waitSaved(page);
+    expect(await valueAt(page, "profile.headline")).toBe(thirteen.replace(/ thirteen$/, ""));
+
+    // A line of education with fifteen words beside its year: the problem is at that line, on its words half.
+    const path = "arrangement.tiles.education.lines.1";
+    await typeIn(page, path, "One two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen", { part: "label" });
+    await expect(status).toHaveAttribute("data-save", "invalid");
+    await expect(status).toContainText("Not saved: Keep each line to 14 words or fewer, not counting the year.");
+    expect(Object.keys((await uiNow(page)).issues)).toEqual([path]);
+    await expect(textbox(page, path, { part: "label" })).toHaveAttribute("aria-invalid", "true");
+    await expect(textbox(page, path, { part: "year" })).not.toHaveAttribute("aria-invalid", "true");
+    await textbox(page, "profile.location").click();
+    await status.getByRole("button", { name: "Show me" }).click();
+    await expect.poll(() => focusedPath(page)).toBe(path);
+    await page.keyboard.press("ControlOrMeta+End");
+    for (let i = 0; i < " fifteen".length; i++) await page.keyboard.press("Backspace");
+    // Fourteen words and the year: saved.
+    await waitSaved(page);
+    await page.reload();
+    await waitReady(page);
+    expect(await valueAt(page, path)).toBe("One two three four five six seven eight nine ten eleven twelve thirteen fourteen, 2022–2023");
+  });
+});
+
+test.describe("Undo", () => {
+  const SIX = ["featured", "work", "about", "experience", "quote", "contact"];
+
+  test("Undo takes back the newest step and names the next, keeps what was typed since, and Ctrl+Z does it outside a field", async ({ page }) => {
+    const f = fresh(FULL, "undo");
+    await openEditor(page, f);
+    const undo = page.locator("#pe-undo");
+    await expect(undo).toHaveAccessibleName("Undo");
+    await expect(undo).toHaveAttribute("aria-disabled", "true");
+
+    await changeWith(page, { removeSection: "experience" }, "removed Experience");
+    await expect(undo).toHaveAccessibleName("Undo: removed Experience");
+    await changeWith(page, { moveSection: { from: 2, to: 0 } }, "moved About me");
+    await expect(undo).toHaveAccessibleName("Undo: moved About me");
+    expect((await stateNow(page)).arrangement.sections).toEqual(["about", "featured", "work", "quote", "contact"]);
+    // Typing is never a step, and an Undo never takes it back.
+    await typeIn(page, "profile.headline", "Analyst, queues and rotas");
+    expect(await undoLabel(page)).toBe("moved About me");
+
+    await undo.click();
+    expect((await stateNow(page)).arrangement.sections).toEqual(["featured", "work", "about", "quote", "contact"]);
+    await expect(undo).toHaveAccessibleName("Undo: removed Experience");
+    await expect(page.locator("[data-said]").last()).toContainText("Undone: moved About me.");
+
+    // Ctrl or Cmd and Z, with the focus outside a text field (on Undo itself).
+    await undo.focus();
+    await page.keyboard.press("ControlOrMeta+z");
+    await expect.poll(async () => (await stateNow(page)).arrangement.sections).toEqual(SIX);
+    expect(await undoLabel(page)).toBeNull();
+    await expect(undo).toHaveAccessibleName("Undo");
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, queues and rotas");
+    await waitSaved(page);
+    await page.reload();
+    await waitReady(page);
+    expect((await stateNow(page)).arrangement.sections).toEqual(SIX);
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, queues and rotas");
+
+    // In a text field, Ctrl+Z is the field's own undo: the editor's steps are left alone.
+    await changeWith(page, { removeSection: "quote" }, "removed Quote");
+    await textbox(page, "profile.location").click();
+    await page.keyboard.press("End");
+    await page.keyboard.type("x");
+    await page.keyboard.press("ControlOrMeta+z");
+    expect(await undoLabel(page)).toBe("removed Quote");
+    expect((await stateNow(page)).arrangement.sections).not.toContain("quote");
+  });
+
+  test("undo's rules: a line removed, another typed in since, then Undo brings the line back and keeps the typing", () => {
+    const state = (lines: string[], headline = "") =>
+      ({ profile: { headline }, arrangement: { sections: SIX, tiles: { education: { lines, tools: "" } } } }) as unknown as BuilderState;
+    const start = state(["BSc Geography, 2026", "A levels, 2022", "GCSEs, 2020"]);
+    const removed = state(["A levels, 2022", "GCSEs, 2020"]);
+    const entry = entryFor("removed a line of education", start, removed)!;
+    expect(entry.steps).toHaveLength(1);
+    // Typed since: the second line now, and the headline.
+    const typed = state(["A levels, 2022", "GCSEs: nine, 2020"], "Analyst");
+    const back = applyUndo(typed, entry);
+    expect(back.arrangement.tiles.education!.lines).toEqual(["BSc Geography, 2026", "A levels, 2022", "GCSEs: nine, 2020"]);
+    expect(back.profile.headline).toBe("Analyst");
+    // A change that changes nothing is no step.
+    expect(entryFor("nothing", start, start)).toBeNull();
+  });
+});
+
+test.describe("Saving, after a deploy and in two tabs", () => {
+  test("the status says Saved · live when visitors can see the page, Saved on Free, and hiding every exhbt drops live", async ({ page }) => {
+    const f = fresh(FULL, "live");
+    const seeded = await openEditor(page, f);
+    const status = saveState(page);
+    await expect(status).toHaveText("Saved · live");
+    await expect(status).toHaveAttribute("data-live", "");
+    await changeWith(page, { hide: Object.values(seeded.ids) }, "hid every exhbt");
+    await waitSaved(page);
+    await expect(status).toHaveText("Saved");
+    await expect(status).not.toHaveAttribute("data-live", "");
+
+    const free = fresh(fullFixture("x", null, "free"), "livefree");
+    await openEditor(page, free);
+    await expect(saveState(page)).toHaveText("Saved");
+  });
+
+  test("after a deploy the words that could not be saved are kept in the browser and offered back once after the reload", async ({ page }) => {
+    const f = fresh(FULL, "stale");
+    await openEditor(page, f, { query: "?save=stale" });
+    await typeIn(page, "profile.headline", "Analyst, kept through a deploy");
+    const status = saveState(page);
+    await expect(status).toHaveAttribute("data-save", "stale");
+    await expect(status).toContainText("The site was updated. Reload to carry on.");
+    await expect(status.getByRole("button", { name: "Reload" })).toBeVisible();
+
+    // The reload, without ?save=stale (it would stay in the address).
+    await page.goto("/portfolio");
+    await waitReady(page);
+    expect(await valueAt(page, "profile.headline")).toBe("Operations analyst, food service and retail");
+    const offer = page.locator("[data-kept-offer]");
+    await expect(offer).toContainText("Your last changes were not saved before the reload");
+    await offer.getByRole("button", { name: "Put back the changes from before the reload" }).click();
+    await expect(offer).toHaveCount(0);
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, kept through a deploy");
+    await expect(textbox(page, "profile.headline")).toHaveValue("Analyst, kept through a deploy");
+    expect(await undoLabel(page)).toBe("put back the changes from before the reload");
+    await waitSaved(page);
+
+    // Offered once: the next visit has it saved, and no offer.
+    await page.goto("/portfolio");
+    await waitReady(page);
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, kept through a deploy");
+    await settle(page);
+    await expect(page.locator("[data-kept-offer]")).toHaveCount(0);
+  });
+
+  test("open in two tabs, each says so; the note goes when one closes; the last save wins", async ({ page, context }) => {
+    const f = fresh(FULL, "tabs");
+    await openEditor(page, f);
+    const other = await context.newPage();
+    await other.goto("/portfolio");
+    await waitReady(other);
+    for (const p of [page, other]) {
+      await expect(p.locator("[data-other-tab]")).toContainText("This page is open in another tab");
+      // Heard as well as seen.
+      await expect(p.locator("[data-said]").last()).toContainText("This page is open in another tab.");
+    }
+
+    await typeIn(page, "profile.location", "Leeds");
+    await waitSaved(page);
+    await typeIn(other, "profile.location", "York");
+    await waitSaved(other);
+    await other.close();
+    await expect(page.locator("[data-other-tab]")).toHaveCount(0);
+    await page.reload();
+    await waitReady(page);
+    expect(await valueAt(page, "profile.location")).toBe("York");
+  });
+});
+
+test.describe("Box for box with the visitor's page", () => {
+  // The six looks E did not measure (Exhbt and Studio were, in milestone 1), on the full fixture, and
+  // Ledger and Notebook with no education line, where the location and the year are block fields. Every
+  // landmark of the page (HOME_BOXES) is where /p/<name> has it, within half a pixel, at 1440 and 412.
+  // Nothing on the full fixture is empty, so of HOME_EDIT_ONLY_IN_FLOW only "what you're looking for, as
+  // stored" can differ, and it is inside the boxes measured here, never one of them.
+  const cases: { look: string; noEducation?: boolean }[] = [
+    { look: "classic" },
+    { look: "notebook" },
+    { look: "mono" },
+    { look: "night" },
+    { look: "ledger" },
+    { look: "bloom" },
+    { look: "ledger", noEducation: true },
+    { look: "notebook", noEducation: true },
+  ];
+  for (const c of cases) {
+    test(`${c.look}${c.noEducation ? ", with no education line," : ""} is the visitor's page box for box at 1440 and 412`, async ({ page }) => {
+      test.slow();
+      const base = fullFixture("x", c.look);
+      const layout = base.layout as { tiles: Record<string, unknown> };
+      const fixture = c.noEducation ? { ...base, layout: { ...layout, tiles: { ...layout.tiles, education: { lines: [], tools: "Excel, Python, SQL, Tableau" } } } } : base;
+      const f = fresh(fixture, `box${c.look}${c.noEducation ? "n" : ""}`);
+      await openEditor(page, f);
+      for (const width of [1440, 412]) {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto("/portfolio");
+        await waitReady(page);
+        await settle(page);
+        const editing = await boxes(page);
+        await page.goto(`/p/${f.username}`);
+        await settle(page);
+        const visiting = await boxes(page);
+        expect(visiting.length, "the visitor's page drew its landmarks").toBeGreaterThan(10);
+        expect(differences(visiting, editing), `${c.look} at ${width}`).toEqual([]);
+      }
+    });
+  }
+});
+
+test.describe("Accessibility", () => {
+  test("the editing page, See as a visitor and a problem at a field have no WCAG 2.1 AA violations axe can find", async ({ page }) => {
+    const f = fresh(FULL, "axe");
+    await openEditor(page, f);
+    await settle(page);
+    const check = async (where: string) => {
+      const { violations } = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+      expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`), where).toEqual([]);
+    };
+    await check("the editing page");
+    await typeIn(page, "profile.headline", "One two three four five six seven eight nine ten eleven twelve thirteen");
+    await expect(saveState(page)).toHaveAttribute("data-save", "invalid");
+    await check("a problem at the headline");
+    await call(page, "seeAsVisitor", true);
+    await settle(page);
+    await check("See as a visitor");
+  });
+});
+
+test.describe("What draws again", () => {
+  /**
+   * Counts the charts' renders without touching components/charts/Chart.tsx: a stand-in for React's
+   * devtools hook, put in before the page's scripts, sees every commit. A Chart fiber rendered in a commit
+   * is one React did work on (PerformedWork, flag 1) that is not the very fiber the last commit of that
+   * root had: a subtree React skipped keeps its old fibers, flags and all. Kept per root, since Next's
+   * development overlay commits a root of its own.
+   */
+  const COUNT_CHARTS = () => {
+    const seenBy = new WeakMap<object, WeakSet<object>>();
+    const w = window as unknown as { __chartRenders: number; __REACT_DEVTOOLS_GLOBAL_HOOK__?: unknown };
+    w.__chartRenders = 0;
+    type Fiber = { type?: { name?: string } | null; flags: number; child: Fiber | null; sibling: Fiber | null };
+    w.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
+      supportsFiber: true,
+      renderers: new Map(),
+      inject: () => 1,
+      checkDCE: () => {},
+      onScheduleFiberRoot: () => {},
+      onCommitFiberUnmount: () => {},
+      onPostCommitFiberRoot: () => {},
+      onCommitFiberRoot: (_id: number, root: { current: Fiber }) => {
+        const seen = seenBy.get(root) ?? new WeakSet<object>();
+        const now = new WeakSet<object>();
+        const stack: Fiber[] = [root.current];
+        while (stack.length) {
+          const f = stack.pop()!;
+          if (f.type && typeof f.type === "function" && (f.type as { name?: string }).name === "Chart") {
+            now.add(f);
+            if (!seen.has(f) && (f.flags & 1) === 1) w.__chartRenders++;
+          }
+          if (f.child) stack.push(f.child);
+          if (f.sibling) stack.push(f.sibling);
+        }
+        seenBy.set(root, now);
+      },
+    };
+  };
+  const reset = (page: Page) =>
+    page.evaluate(() => {
+      window.__portfolioRenders = {};
+      (window as unknown as { __chartRenders: number }).__chartRenders = 0;
+    });
+  const read = async (page: Page) => {
+    await settle(page);
+    return { ...(await renders(page)), charts: await page.evaluate(() => (window as unknown as { __chartRenders: number }).__chartRenders) };
+  };
+
+  test("a key in the headline, a key in the intro and a section move: what renders, charts included", async ({ page }) => {
+    await page.addInitScript(COUNT_CHARTS);
+    const f = fresh(FULL, "renders");
+    await openEditor(page, f);
+    await settle(page);
+    // The counter sees the page's charts as they mount: it is working.
+    expect(await page.evaluate(() => (window as unknown as { __chartRenders: number }).__chartRenders)).toBeGreaterThan(0);
+
+    // Nothing typed: what draws on its own after the page is up (a chart measuring itself, say).
+    await textbox(page, "profile.headline").click();
+    await page.keyboard.press("End");
+    await reset(page);
+    await page.waitForTimeout(1000);
+    const idle = await read(page);
+    await reset(page);
+    await page.keyboard.type("s");
+    const headline = await read(page);
+    await reset(page);
+    await page.keyboard.type("s");
+    const headline2 = await read(page);
+
+    await textbox(page, "profile.bio").click();
+    await page.keyboard.press("End");
+    await reset(page);
+    await page.keyboard.type("s");
+    const intro = await read(page);
+
+    await reset(page);
+    await changeWith(page, { moveSection: { from: 2, to: 3 } }, "moved About me");
+    const move = await read(page);
+
+    const figures = { "nothing typed": idle, "a key in the headline": headline, "a second key in the headline": headline2, "a key in the intro": intro, "a section move": move };
+    console.log(`Render counts: ${JSON.stringify(figures)}`);
+    test.info().annotations.push({ type: "render counts", description: JSON.stringify(figures) });
+    // A key draws the page and the hero again, and no section, tile or chart.
+    for (const [what, n] of Object.entries({ headline, intro })) {
+      expect(Object.keys(n).filter((k) => /^(section|tile):/.test(k) && n[k as keyof typeof n]), what).toEqual([]);
+      expect(n.charts, what).toBe(0);
+    }
+    // A move draws no chart again.
+    expect(move.charts).toBe(0);
   });
 });

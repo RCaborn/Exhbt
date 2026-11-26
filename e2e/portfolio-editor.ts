@@ -55,6 +55,17 @@ export async function waitReady(page: Page) {
 }
 
 /**
+ * E2E_GROW=mirror opens the editor with `?grow=mirror` (development only): its fields grow by their hidden
+ * mirror, as in a browser with no `field-sizing`. A reload keeps it; a test that goes to /portfolio again
+ * by its own address does not.
+ */
+function withGrow(query: string): string {
+  if (process.env.E2E_GROW !== "mirror") return query;
+  const [search, hash = ""] = query.split("#");
+  return `${search ? `${search}&` : "?"}grow=mirror${hash ? `#${hash}` : ""}`;
+}
+
+/**
  * Seeds `fixture`, switches this browser to the editor, signs in as its person and opens `/portfolio`
  * (with `query`, e.g. "?open=look" or "#job-links"). Waits for the editor unless `wait` is false (a
  * test of what comes before it, or of a crash).
@@ -62,9 +73,50 @@ export async function waitReady(page: Page) {
 export async function openEditor(page: Page, fixture: PortfolioFixture, opts: { query?: string; wait?: boolean } = {}): Promise<Seeded> {
   const seeded = await seed(page, fixture);
   await setKind(page, "page");
-  await signIn(page, fixture.username, `/portfolio${opts.query ?? ""}`);
+  await signIn(page, fixture.username, `/portfolio${withGrow(opts.query ?? "")}`);
   if (opts.wait !== false) await waitReady(page);
   return seeded;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Getting to the editor with nothing of development's: for a run against `next build` and `next start`
+ * ---------------------------------------------------------------------------------------------- */
+
+/**
+ * A new person, by the site's own sign-up (an email and a password, which the stand-in store keeps), with
+ * the editor turned on: through the development cookie where that route answers, and otherwise by the
+ * server's own EXHBT_PORTFOLIO=page, which a production run must set. Opens /portfolio and waits for the
+ * editor. It reads nothing of the editor's development handle.
+ *
+ * Not yet runnable on `next build` + `next start`: with no Supabase, sign-up there answers "try later"
+ * (lib/password-auth.ts) and the only way to a session is /auth/dev, which is off in production. Run with
+ * EXHBT_ALLOW_MEMORY_STORE=1 (the stand-in store's own switch, which only matters when no Supabase is
+ * configured), the store works; a session still needs /auth/dev to honour the same switch.
+ */
+export async function signUpToEditor(page: Page, tag: string): Promise<{ email: string }> {
+  const email = `pe-${tag}-${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}@example.com`;
+  const password = "correct-horse-battery";
+  const kind = await page.request.get("/dev/portfolio-kind?kind=page", { maxRedirects: 0 });
+  expect([307, 404], "the development cookie's route answers, or is off as in production").toContain(kind.status());
+  await page.goto("/login/new?next=%2Faccount");
+  await expect(page.locator("form[data-ready=true]")).toBeAttached();
+  await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByLabel("Confirm password").fill(password);
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page).toHaveURL(/\/account$/);
+  await page.goto("/portfolio");
+  await waitReady(page);
+  return { email };
+}
+
+/**
+ * Waits for "Saved" after typing, from the page alone (a production build has no development handle).
+ * A key makes the status "pending" in its own event (useBuilder), so the "Saved" seen after typing has
+ * returned is the save of those keys.
+ */
+export async function waitSavedOnPage(page: Page) {
+  await expect(saveState(page)).toHaveAttribute("data-save", "saved");
 }
 
 /* ------------------------------------------------------------------------------------------------
@@ -180,6 +232,29 @@ export function call(page: Page, name: "open" | "close" | "say" | "jumpTo" | "pr
       api[n as string]!(...(a as unknown[]));
     },
     [name, args] as const,
+  );
+}
+
+/** A change the bar or a section's tools would make, named for Undo (development only). */
+export type LabelledChange = { removeSection: string } | { moveSection: { from: number; to: number } } | { hide: string[] };
+
+/**
+ * Makes a labelled change through the editor's own `change` (an Undo step), as F's and G's parts do: the
+ * update is written inside the page, since a function cannot be handed over from the test.
+ */
+export function changeWith(page: Page, what: LabelledChange, label: string): Promise<void> {
+  return page.evaluate(
+    ([w, l]) => {
+      const api = window.__portfolioEditor!.api;
+      api.change((s) => {
+        if ("hide" in w) return { ...s, arrangement: { ...s.arrangement, hidden: w.hide } };
+        const sections = [...s.arrangement.sections];
+        if ("removeSection" in w) sections.splice(sections.indexOf(w.removeSection as never), 1);
+        else sections.splice(w.moveSection.to, 0, ...sections.splice(w.moveSection.from, 1));
+        return { ...s, arrangement: { ...s.arrangement, sections } };
+      }, l);
+    },
+    [what, label] as const,
   );
 }
 

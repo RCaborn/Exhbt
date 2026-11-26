@@ -110,6 +110,9 @@ test.describe("Layout rules", () => {
     expect(bad({ quote: { text: words(TILE_LIMITS.quoteWords), name: "x".repeat(TILE_LIMITS.nameChars + 1), role: "" } })).toBe(true);
     expect(bad({ education: { lines: ["a", "b", "c", "d"] } })).toBe(true);
     expect(bad({ education: { lines: [words(TILE_LIMITS.lineWords + 1)] } })).toBe(true);
+    // The year at a line's end is not one of its words: the limit is the words a person sees, and the year besides.
+    expect(bad({ education: { lines: [`${words(TILE_LIMITS.lineWords)}, 2026`] } })).toBe(false);
+    expect(bad({ education: { lines: [`${words(TILE_LIMITS.lineWords + 1)}, 2026`] } })).toBe(true);
     expect(normaliseWebsite("https://amara.dev/work")).toBe("https://amara.dev/work");
     expect(normaliseWebsite("amara.dev")).toBe("https://amara.dev/");
     for (const no of ["http://amara.dev", "javascript:alert(1)", "data:text/html,x", "ftp://x.com", "amara", "https://", "a b.com"]) expect(normaliseWebsite(no), no).toBeNull();
