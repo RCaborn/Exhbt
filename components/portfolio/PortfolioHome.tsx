@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element -- signed Storage URLs change hourly; next/image would cache the wrong one. */
-import { Fragment } from "react";
+import { Fragment, memo } from "react";
 import Link from "next/link";
 import { ArrowUpRight, ChevronRight, CircleCheck, MapPin } from "lucide-react";
 import { Chart } from "@/components/charts/Chart";
@@ -792,9 +792,10 @@ function Work({ projects, more, theme, edit }: { projects: HomeProject[]; more: 
 
 /**
  * One of the cards under "More of my work": the key figure on top, then the title and one sentence. Also drawn on a per-job page.
+ * Memoised on the exhbt, which the loader gives and typing never changes, so a key typed in the editor draws no card again.
  * `inert` while editing: a click on the card reaches the editor's frame, not the link.
  */
-export function ProjectCard({ project: p, inert }: { project: HomeProject; inert?: boolean }) {
+export const ProjectCard = memo(function ProjectCard({ project: p, inert }: { project: HomeProject; inert?: boolean }) {
   const body = (
     <>
       {/* A graph sits on the look's figure ground (graphs never on a grey well, DESIGN.md); a picture or the steps on the well. */}
@@ -819,7 +820,7 @@ export function ProjectCard({ project: p, inert }: { project: HomeProject; inert
   ) : (
     <div className={card}>{body}</div>
   );
-}
+});
 
 function About({ tiles }: { tiles: Tiles }) {
   const text = (tiles.about?.text ?? "").trim();
@@ -1006,12 +1007,12 @@ function EmptySection({ sectionKey }: { sectionKey: SectionKey }) {
  */
 const hasFigure = (f: KeyFigure) => f.kind !== "flow" || f.steps.length > 0;
 
-/** The key figure: a graph as the exhbt page draws it, an image, or the steps of the process. */
-function Figure({ project: p, large = false }: { project: HomeProject; large?: boolean }) {
+/** The key figure: a graph as the exhbt page draws it, an image, or the steps of the process. Memoised on the exhbt, as the card is. */
+const Figure = memo(function Figure({ project: p, large = false }: { project: HomeProject; large?: boolean }) {
   return <KeyFigureView figure={p.figure} imageUrl={p.imageUrl} large={large} />;
-}
+});
 
-function KeyFigureView({ figure, imageUrl, large }: { figure: KeyFigure; imageUrl?: string | null; large: boolean }) {
+const KeyFigureView = memo(function KeyFigureView({ figure, imageUrl, large }: { figure: KeyFigure; imageUrl?: string | null; large: boolean }) {
   switch (figure.kind) {
     case "chart":
       return (
@@ -1048,7 +1049,7 @@ function KeyFigureView({ figure, imageUrl, large }: { figure: KeyFigure; imageUr
         </ol>
       );
   }
-}
+});
 
 /** "Graduate data roles" reads on after "Looking for"; a name or acronym ("NHS data roles") keeps its capital. */
 function lowerFirst(s: string): string {
