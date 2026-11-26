@@ -8,7 +8,7 @@ import { isAdmin } from "@/lib/admin";
 import { getCurrentUser, type SessionUser } from "@/lib/auth";
 import { draftVerdict } from "@/lib/drafting";
 import { editorKind } from "@/lib/editor-kind-server";
-import { ENTITLEMENTS, PLAN_NAMES } from "@/lib/entitlements";
+import { ENTITLEMENTS } from "@/lib/entitlements";
 import { offeredIn } from "@/lib/exhbt/formats";
 import { signedFileUrl } from "@/lib/files";
 import { canCreateExhbt, canPublish, getPlan } from "@/lib/plan";
@@ -65,7 +65,7 @@ export default async function NewExhbtPage({ searchParams }: { searchParams: Pro
   const publish = canPublish(plan, exhbts, "");
   const where: Where = ENTITLEMENTS[plan].publicPortfolio
     ? { live: true, liveBase: profile.username ? portfolioHref(profile.username, host) : null }
-    : { live: false, plan: PLAN_NAMES[plan], reason: publish.ok ? "" : publish.reason };
+    : { live: false, reason: publish.ok ? "" : publish.reason };
   return <Chooser draft={draft} offered={offered} where={where} />;
 }
 

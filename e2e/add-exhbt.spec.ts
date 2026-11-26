@@ -4,7 +4,9 @@ import { LAYOUT_REFUSED } from "../lib/add-exhbt";
 import { ENTITLEMENTS, PLAN_NAMES } from "../lib/entitlements";
 import { emptyDoc, LIMITS, type ExhbtDoc } from "../lib/exhbt/blocks";
 import { CLASSIC_FORMATS, FORMAT_RULES, LAYOUT_NOT_OFFERED, OFFERED_FORMATS, withFormat } from "../lib/exhbt/formats";
+import { whereAPublishedExhbtGoes } from "../lib/exhbt/publish-words";
 import { WHAT_AN_EXHBT_IS } from "../lib/exhbt/what-it-is";
+import { portfolioHost } from "../lib/hosts";
 import { ADD, ADD_EXHBT, BUILD_IT_YOURSELF, DRAFT_WITH_AI } from "./add-exhbt";
 import { DRAFT_PROJECT, keepClassic, layoutButton, layoutGroup, openLayoutMenu, SEL, signInAs, waitEditor } from "./editor";
 import { buildRoadmap, uniqueEmail, unlockProjects, waitForResult } from "./helpers";
@@ -81,7 +83,7 @@ test.describe("The chooser", () => {
     await expect(draft).toContainText("You'll add your files, then get a first draft to edit.");
     await expect(blank).toContainText("You'll choose a layout, then land on an empty page.");
     // The second way shows the layouts on offer: one sketch for each, with shapes in it.
-    await expect(blank.locator(".add-art-layouts svg")).toHaveCount(OFFERED_FORMATS.length);
+    await expect(blank.locator("[data-offered] svg")).toHaveCount(OFFERED_FORMATS.length);
 
     // Where it ends up: the publish step's own sentence, with this person's portfolio address.
     const where = page.getByTestId("where-it-goes");
@@ -197,7 +199,7 @@ test.describe("Build it yourself", () => {
       expect(await card.locator(".add-layout-art svg > *").count()).toBeGreaterThan(2);
       await expect(card.getByRole("button")).toHaveCount(1);
     }
-    const lines = await page.locator("[data-layout] .add-layout-line").allTextContents();
+    const lines = await page.locator("[data-layout] [data-suits]").allTextContents();
     expect(lines.every((l) => l.trim().length > 0)).toBe(true);
     await axe(page);
 
@@ -225,7 +227,7 @@ test.describe("Build it yourself", () => {
     await keepClassic(page);
     await signInAs(page, freshName("addclassic"), "max");
     await page.goto(ADD_EXHBT);
-    await expect(page.locator(`${ADD.blankWay} .add-art-layouts svg`)).toHaveCount(CLASSIC_FORMATS.length);
+    await expect(page.locator(`${ADD.blankWay} [data-offered] svg`)).toHaveCount(CLASSIC_FORMATS.length);
     await page.goto(BUILD_IT_YOURSELF);
     expect(await page.locator("[data-layout]").evaluateAll((els) => els.map((e) => e.getAttribute("data-layout")))).toEqual([...CLASSIC_FORMATS]);
 
@@ -386,9 +388,11 @@ test.describe("The plan's rules", () => {
     const box = (await draft.boundingBox())!;
     await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.25);
     await expect(page).toHaveURL(exactly(ADD_EXHBT));
-    // On Free an exhbt is built and previewed: the page says so, with the plan rule's own reason, and promises no portfolio.
+    // On Free nothing is promised now: the page says where an exhbt goes once published, then the plan rule's own reason.
     await expect(page.getByTestId("where-it-goes")).toHaveCount(0);
-    await expect(page.getByText(`Publishing to your own link comes with ${PLAN_NAMES.premium}.`)).toBeVisible();
+    await expect(page.locator('[data-where="later"]')).toHaveText(
+      `${whereAPublishedExhbtGoes(portfolioHost("yourname"))} Publishing to your own link comes with ${PLAN_NAMES.premium}.`,
+    );
     await axe(page);
     await page.goto(DRAFT_WITH_AI);
     await expect(page.getByRole("alert").filter({ hasText: reason })).toBeVisible();

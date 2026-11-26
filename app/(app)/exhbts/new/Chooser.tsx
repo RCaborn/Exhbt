@@ -1,4 +1,3 @@
-import { ArrowLeft, ArrowRight, CornerDownRight } from "lucide-react";
 import { Card } from "@astryxdesign/core/Card";
 import { Grid } from "@astryxdesign/core/Grid";
 import { Heading } from "@astryxdesign/core/Heading";
@@ -17,19 +16,21 @@ import type { DraftVerdict } from "@/lib/drafting";
 import type { Plan } from "@/lib/entitlements";
 import { demoExhbts, demoOwner } from "@/lib/exhbt";
 import type { Format } from "@/lib/exhbt/formats";
+import { whereAPublishedExhbtGoes } from "@/lib/exhbt/publish-words";
 import { WHAT_AN_EXHBT_IS } from "@/lib/exhbt/what-it-is";
-import { portfolioUrl } from "@/lib/hosts";
+import { portfolioHost, portfolioUrl } from "@/lib/hosts";
 import { DraftedArt, LayoutsArt } from "./art";
+import { Glyph } from "./glyphs";
 import "./add-exhbt.css";
 
 /** The page's frame: the app's mist ground and one column, shared by the chooser, the layouts and the full-plan notice. */
 export function AddFrame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="add-exhbt bg-mist px-4 pt-10 pb-16 sm:px-8 sm:pt-14">
+    <Section variant="muted" padding={0} className="add-exhbt px-4 pt-10 pb-16 sm:px-8 sm:pt-14">
       <VStack gap={8} className="mx-auto max-w-6xl">
         {children}
       </VStack>
-    </div>
+    </Section>
   );
 }
 
@@ -37,18 +38,20 @@ export function AddFrame({ children }: { children: React.ReactNode }) {
 export function Back({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <Link href={href} isStandalone color="secondary" weight="semibold">
-      <span className="inline-flex items-center gap-1">
-        <ArrowLeft aria-hidden size={16} strokeWidth={2.25} /> {children}
-      </span>
+      <HStack as="span" gap={1} vAlign="center">
+        <Glyph name="back" />
+        {children}
+      </HStack>
     </Link>
   );
 }
 
 /**
  * Where a finished exhbt goes. On a plan with a public portfolio it is the publish step's own sentence
- * (WhereItGoes); on Free, where publishing isn't included, it is the plan rule's reason (canPublish).
+ * (WhereItGoes); on Free, where publishing isn't included, the same promise for later and the plan rule's
+ * reason (canPublish).
  */
-export type Where = { live: true; liveBase: string | null } | { live: false; plan: string; reason: string };
+export type Where = { live: true; liveBase: string | null } | { live: false; reason: string };
 
 /**
  * The chooser: what an exhbt is, two ways to start of equal weight, and where it ends up.
@@ -69,8 +72,8 @@ export function Chooser({ draft, offered, where }: { draft: DraftVerdict; offere
       </VStack>
 
       <Grid columns={{ minWidth: 300, max: 2 }} gap={6}>
-        <div className="add-cell">
-          <Card className="add-way" padding={6} data-way="draft" data-off={draft.ok ? undefined : ""}>
+        <VStack className="add-cell">
+          <Card className="add-way grow" padding={6} data-way="draft" data-off={draft.ok ? undefined : ""}>
             <VStack gap={5} height="100%">
               <DraftedArt />
               <VStack gap={2}>
@@ -83,10 +86,10 @@ export function Chooser({ draft, offered, where }: { draft: DraftVerdict; offere
                 </Text>
               </VStack>
               {draft.ok ? (
-                <VStack gap={3} className="add-way-foot">
+                <VStack gap={3} className="mt-auto">
                   <HStack gap={4} vAlign="center" wrap="wrap">
                     <Button href={DRAFT_WITH_AI} label="Upload your project" className="add-go">
-                      Upload your project <ArrowRight aria-hidden size={16} strokeWidth={2.25} />
+                      Upload your project <Glyph name="go" />
                     </Button>
                     <Text type="supporting" hasTabularNumbers>
                       {draft.left} of {draft.perPeriod} AI {draft.perPeriod === 1 ? "draft" : "drafts"} left
@@ -95,16 +98,16 @@ export function Chooser({ draft, offered, where }: { draft: DraftVerdict; offere
                   <Next>You&apos;ll add your files, then get a first draft to edit.</Next>
                 </VStack>
               ) : (
-                <div className="add-way-foot">
+                <VStack className="mt-auto">
                   <UpgradePrompt reason={draft.reason} upgradeTo={draft.upgradeTo} primary={false} />
-                </div>
+                </VStack>
               )}
             </VStack>
           </Card>
-        </div>
+        </VStack>
 
-        <div className="add-cell">
-          <Card className="add-way" padding={6} data-way="blank">
+        <VStack className="add-cell">
+          <Card className="add-way grow" padding={6} data-way="blank">
             <VStack gap={5} height="100%">
               <LayoutsArt offered={offered} />
               <VStack gap={2}>
@@ -113,17 +116,17 @@ export function Chooser({ draft, offered, where }: { draft: DraftVerdict; offere
                   Start with an empty page in the layout you choose, and type straight onto it.
                 </Text>
               </VStack>
-              <VStack gap={3} className="add-way-foot">
+              <VStack gap={3} className="mt-auto">
                 <HStack gap={4} vAlign="center" wrap="wrap">
                   <Button href={BUILD_IT_YOURSELF} label="Choose a layout" className="add-go">
-                    Choose a layout <ArrowRight aria-hidden size={16} strokeWidth={2.25} />
+                    Choose a layout <Glyph name="go" />
                   </Button>
                 </HStack>
                 <Next>You&apos;ll choose a layout, then land on an empty page.</Next>
               </VStack>
             </VStack>
           </Card>
-        </div>
+        </VStack>
       </Grid>
 
       <WhereItEndsUp where={where} />
@@ -135,7 +138,7 @@ export function Chooser({ draft, offered, where }: { draft: DraftVerdict; offere
 function Next({ children }: { children: React.ReactNode }) {
   return (
     <HStack gap={1.5} vAlign="start">
-      <CornerDownRight aria-hidden size={16} strokeWidth={2} className="add-next-mark" />
+      <Glyph name="next" color="secondary" className="mt-0.5 shrink-0" />
       <Text as="p" type="supporting">
         {children}
       </Text>
@@ -157,8 +160,8 @@ function WhereItEndsUp({ where }: { where: Where }) {
           {where.live ? (
             <WhereItGoes liveBase={where.liveBase} hidden={false} className="text-graphite" />
           ) : (
-            <Text as="p" color="secondary">
-              On {where.plan} you build and preview your exhbts. {where.reason}
+            <Text as="p" color="secondary" data-where="later">
+              {whereAPublishedExhbtGoes(portfolioHost("yourname"))} {where.reason}
             </Text>
           )}
           <Text as="p" type="supporting">
@@ -189,9 +192,9 @@ export function NoRoom({ reason, upgradeTo }: { reason: string; upgradeTo?: Plan
         <Back href="/exhbts">Your exhbts</Back>
         <Heading level={1}>Add an exhbt</Heading>
       </VStack>
-      <div className="max-w-2xl">
+      <VStack className="max-w-2xl">
         <UpgradePrompt reason={reason} upgradeTo={upgradeTo} />
-      </div>
+      </VStack>
     </AddFrame>
   );
 }

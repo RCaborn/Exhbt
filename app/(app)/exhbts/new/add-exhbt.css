@@ -1,42 +1,33 @@
-/* "Add an exhbt" (/exhbts/new): the chooser and the layouts. The screen is built from Astryx components;
-   this file adds only what they don't have, and every colour, space, corner and timing in it is one of
-   Astryx's tokens (the Exhbt theme gives them the brand's values). */
+/* "Add an exhbt" (/exhbts/new): the chooser and the layouts. The screen is laid out with Astryx components
+   and their props; this file holds only what they have no prop for, and every colour, space, corner and
+   timing in it is one of Astryx's tokens (the Exhbt theme gives them the brand's values). Each rule says
+   why it is here. */
 @layer components {
   .add-exhbt {
-    /* The ground the pictures sit on: the brand's soft mint fill. */
+    /* The ground the pictures sit on: the brand's soft mint fill. Astryx's Card and Section have no variant for it. */
     --add-stage: var(--color-accent-muted);
     /* Keyboard focus on this screen is ringed in jade, which reads on white, mist and mint (DESIGN.md, "Focus");
        Astryx's own ring is the accent, and mint on white is too faint to find. */
     --focus-outline-color: var(--color-text-accent);
   }
-  /* One control per card, pressed anywhere on it. The control is a real link or submit button (an Astryx
-     Button), so it works without the page's scripts; its ::after, which Astryx leaves to the caller, is
-     its press area, grown past the button and cut off at the card's own edge. */
-  .add-cell {
-    display: grid;
-  }
+
+  /* One control per card, pressed anywhere on it. Astryx's ClickableCard follows its link in script, so it
+     can't be pressed with scripts off; here the control is a real link or submit button (an Astryx Button),
+     and its ::after, which Astryx leaves to the caller, is its press area, grown past the button and cut off
+     at the card's own edge. */
   .add-way,
   .add-layout {
     overflow: clip;
-  }
-  /* A way's picture sizes itself to its card, not to the window: two cards side by side on a tablet are
-     each narrower than one card on a phone. */
-  .add-way {
-    container-type: inline-size;
   }
   .add-go::after {
     content: "";
     position: absolute;
     inset: -100vmax;
   }
-  .add-way-foot {
-    margin-block-start: auto;
-  }
-  /* The mark before "what happens next": it turns down from the button above and sits on the first line. */
-  .add-next-mark {
-    flex: none;
-    margin-block-start: var(--spacing-0-5);
-    color: var(--color-text-secondary);
+  /* A way's picture sizes itself to its card, not to the window: two cards side by side on a tablet are
+     each narrower than one card on a phone. */
+  .add-way {
+    container-type: inline-size;
   }
 
   /* A card that can be pressed says so: its edge darkens, its button turns mint (the one mint button on the
@@ -66,12 +57,10 @@
     }
   }
 
-  /* The pictures. A soft mint stage, white sheets of paper on it, and the editor's layout sketches drawn
-     on the sheets in hairlines that keep their weight at any size. */
+  /* The pictures. Astryx has no illustration parts, so these are painted here: a soft mint stage, white
+     sheets of paper on it, and the editor's layout sketches drawn on the sheets in hairlines that keep their
+     weight at any size. */
   .add-art {
-    display: flex;
-    align-items: center;
-    justify-content: center;
     gap: var(--spacing-3);
     block-size: calc(var(--spacing-12) * 4);
     padding: var(--spacing-3);
@@ -87,7 +76,6 @@
     }
   }
   .add-art-sheet {
-    display: block;
     padding: var(--spacing-3);
     border: var(--border-width) solid var(--color-border);
     border-radius: var(--radius-inner);
@@ -103,10 +91,6 @@
     vector-effect: non-scaling-stroke;
     stroke-width: calc(var(--border-width) * 1.5);
   }
-  .add-art-arrow {
-    flex: none;
-    color: var(--color-text-primary);
-  }
 
   /* A way that can't be taken now (no AI drafts left): its picture goes quiet. */
   .add-way[data-off] .add-art {
@@ -115,19 +99,15 @@
     filter: grayscale(1);
   }
 
-  /* What you bring: the kinds of file, or the layouts on offer. */
+  /* What you bring: the kinds of file, or the layouts on offer, in two columns of fixed, token-sized tiles. */
   .add-art-from {
     flex: none;
-    display: grid;
     grid-template-columns: repeat(2, var(--spacing-10));
-    gap: var(--spacing-2);
   }
   .add-art-from[data-few] {
     grid-template-columns: var(--spacing-10);
   }
   .add-art-file {
-    display: grid;
-    place-items: center;
     block-size: var(--spacing-10);
     border: var(--border-width) solid var(--color-border);
     border-radius: var(--radius-inner);
@@ -205,22 +185,8 @@
     background: var(--color-background-card);
   }
 
-  /* A layout to choose: its sketch on the stage, its name under it, then its line with its button beside
-     it. On a phone it is a row, sketch first, so seven of them fit a screen or two. */
-  .add-layout-body {
-    display: grid;
-    grid-template:
-      "art art" auto
-      "name name" auto
-      "line go" 1fr
-      / minmax(0, 1fr) auto;
-    column-gap: var(--spacing-3);
-    block-size: 100%;
-  }
+  /* A layout's sketch on its stage. On a phone the stage is a small square beside the layout's words. */
   .add-layout-art {
-    grid-area: art;
-    display: grid;
-    place-items: center;
     padding: var(--spacing-6);
     border-radius: var(--radius-element);
     background: var(--add-stage);
@@ -229,35 +195,12 @@
   .add-layout-art .add-sketch rect {
     fill: var(--color-background-card);
   }
-  .add-layout-name {
-    grid-area: name;
-    margin-block-start: var(--spacing-4);
-  }
-  .add-layout-line {
-    grid-area: line;
-    margin-block-start: var(--spacing-1);
-  }
-  .add-layout .add-go {
-    grid-area: go;
-    align-self: end;
-  }
   @media (width < 40rem) {
-    .add-layout-body {
-      grid-template:
-        "art name go" auto
-        "art line go" 1fr
-        / calc(var(--spacing-12) * 2) minmax(0, 1fr) auto;
-    }
     .add-layout-art {
+      flex: none;
+      inline-size: calc(var(--spacing-12) * 2);
       padding: var(--spacing-3);
       border-radius: var(--radius-inner);
-    }
-    .add-layout-name {
-      margin-block-start: 0;
-      align-self: end;
-    }
-    .add-layout .add-go {
-      align-self: center;
     }
   }
 }
