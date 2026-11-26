@@ -234,8 +234,12 @@ test.describe("Sections by touch", () => {
     await f.up();
     await expect.poll(async () => (await sections(page)).indexOf("contact")).toBe(before.indexOf("quote"));
     expect(await undoLabel(page)).toBe("moved Get in touch");
-    await page.getByRole("button", { name: "Undo: moved Get in touch" }).click();
-    expect(await sections(page)).toEqual(before);
+    // Under 48rem the bar folds Undo into its menu (brief G, step 1): More, then the named Undo. Under a
+    // finger the menu opens as a sheet, where its items are buttons.
+    await page.locator('[data-editor="portfolio"][data-ready] [data-bar]').getByRole("button", { name: "More" }).click();
+    const undo = "Undo: moved Get in touch";
+    await page.getByRole("menuitem", { name: undo }).or(page.getByRole("dialog", { name: "More" }).getByRole("button", { name: undo })).click();
+    await expect.poll(() => sections(page)).toEqual(before);
   });
 });
 
