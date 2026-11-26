@@ -11,6 +11,13 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
  *   5. a phone gets the logo and the Menu button in the server's HTML, with no laptop row, and the header's box
  *      does not change as the page hydrates;
  *   6. marketing pages stay static: that one is the build's route table, not a browser test.
+ *
+ * What the trial of AppShell found (26 Nov 2026), and what components/site/shell.css does about it:
+ *   1 held with height="auto". 2 and 3 failed as it came: it pins its header, which then sat over the editor's
+ *   bar, so the header is unpinned. 4 failed: it draws a second skip link and its own main region, so its link is
+ *   hidden and #main is the first thing in its main. 5 failed with its own phone mode on: it decides phone or
+ *   laptop in a script, and a phone gained an "Open navigation" button on hydration, so mobileNav is off and the
+ *   header's CSS switches. 6 held: the marketing pages that were static are static.
  */
 
 const PHONE = { width: 390, height: 844 };
