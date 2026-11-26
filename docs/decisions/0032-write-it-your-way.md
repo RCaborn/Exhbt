@@ -20,6 +20,8 @@ Three things change. A person can format a sentence wherever they write one. A p
 
 Decision 0015 kept a quote plain because "formatting them changes what they said". Rory wants the choice, and it is the same choice a person has when they quote someone anywhere else.
 
+**Bold in a pull quote is a step heavier than the quote.** A pull quote is set in the look's display face at its heading weight, so the body's bold (600) would not show in it, or would be lighter than the words round it. The Studio look's display face is already at its heaviest, so bold there looks like the words round it; italic shows in every look.
+
 **How the formatting is stored.** The plain string stays exactly where it was, and the same words with their formatting are kept beside it as runs:
 
 | Section | The words (as before) | Their formatting (new, optional) |
@@ -43,7 +45,7 @@ Why beside, and not in the string's place:
 
 Now:
 
-- **Words selected, with a mouse or the keyboard:** a small bar sits just above the selection with Bold and Italic (Highlight on the context line), and Link where the field takes links. Link turns the bar into the address field, so the address is typed where the words are; Enter adds it, Escape gives the cursor back to the words. While the bar is up, the buttons at the end of the line go, so there is one set and it is where the eye is.
+- **Words selected, with a mouse or the keyboard:** a small bar sits just above the selection with Bold and Italic (Highlight on the context line), and Link where the field takes links. Link turns the bar into the address field, so the address is typed where the words are; Enter adds it, Escape gives the cursor back to the words. While the bar is up, the buttons at the end of the line go, so there is one set and it is where the eye is. The bar keeps off the editor's own controls (a section's buttons, a finding's, the "+" between sections): where it would lie over one above the words, it goes just under them.
 - **The cursor in a field with nothing selected:** the buttons at the end of the line, as before.
 - **Ctrl or Cmd with B or I** work in every formatted field. A key pressed in the moment before a field's editor has loaded is kept and done when it has.
 - **A field that takes no formatting shows nothing.**
@@ -51,7 +53,7 @@ Now:
 
 The bar is in the browser's top layer, so nothing on the page moves when it comes or goes (`e2e/your-way.spec.ts` measures every box before and after).
 
-**The bar is Astryx** (Rory, 26 Nov 2026: "you must use astryx as the design guide"): a fixed layer from `useLayer`, a `Card` for its surface, a `Toolbar` of `ToggleButton`s and an `IconButton`, each with Astryx's tooltip, and a `TextInput` for the address. Astryx's `Popover` was not used for the address: it hangs from a button and keeps the focus until it closes, and this has to hang from a selection and hand the cursor back to the words. The buttons at the end of a line, the phone's bar and the field's own address prompt are the editor's existing chrome and stay as they were built; moving them to Astryx is its own job.
+**The bar is Astryx** (Rory, 26 Nov 2026: "you must use astryx as the design guide"): a fixed layer from `useLayer`, a `Card` for its surface, a `Toolbar` of `ToggleButton`s and an `IconButton` in Astryx's small size (36px, the size of a section's own buttons beside it), each with Astryx's tooltip, and a `TextInput` for the address. Astryx's `Popover` was not used for the address: it hangs from a button and keeps the focus until it closes, and this has to hang from a selection and hand the cursor back to the words. "Suggestions" (below) is an Astryx `List`. The buttons at the end of a line, the phone's bar and the field's own address prompt are the editor's existing chrome and stay as they were built; moving them to Astryx is its own job.
 
 ## B. Section titles the person can change
 
@@ -77,7 +79,9 @@ The flowchart's is on the doc because its marker holds nothing and is taken out 
 
 **A case study draws no heading over its flowchart** ("Process" is only the section's name for a screen reader). A placeholder there would sit on every case study, so the way in is a small "Add a title" over the flowchart's top edge, out of the flow, as the aim's switch is. Pressed, it puts the field in the flow; a title left empty takes it out again. A title typed there is drawn as a small label over the boxes.
 
-**One line, at most 28 characters** (`LIMITS.sectionTitleChars`, checked on publish as every one-line field is). The longest heading a layout has of its own is 25 ("Limitations and next steps"). At 28, a title of ordinary words holds on one line in all eight looks at 390px, in the large heading the findings and the flowchart take; one made of the widest letters wraps to a second line, and nothing overflows. `e2e/your-way.spec.ts` measures both.
+**One line, at most 25 characters** (`LIMITS.sectionTitleChars`, checked on publish as every one-line field is). That is the most that stays on one line for a visitor on a phone (390px wide) in every layout and all eight looks, measured in the large heading the findings and the flowchart take. The Mono look sets it: its letters are all one width, and 25 of them fill the line. The other seven looks hold 27 to 30 letters of ordinary words, so the limit would be 27 if Mono were allowed to wrap. `e2e/your-way.spec.ts` checks each layout in each look, with words wider than usual. A title all in capitals, or made of a font's widest letters, can still wrap to a second line; nothing overflows.
+
+The layouts' own headings are not held to the limit, because they are not stored. One is longer than it: research's "Limitations and next steps" is 26 characters, drawn as a small label, where 39 fit. A person can shorten it or replace it, and cannot lengthen it.
 
 **A title is not counted in the 200 words**, the person's no more than the layout's own ever was. Counting it would have meant that changing "What I found" (never counted) to "Findings" made the page longer. It is one short line, held by its own limit. This amends 0009, which counts every word on the page; Rory may want it the other way, and it is one line in `sectionTexts` if he does.
 
@@ -102,6 +106,8 @@ The flowchart's is on the doc because its marker holds nothing and is taken out 
 Before this, most of these were things to fix ("Fill in this finding or remove it."). Three of the renderers would have drawn a bare heading for an empty part had it ever been published: the quote ("Feedback" over an empty pair of quotation marks), what I'd do next, and the flowchart outside a case study.
 
 **The published copy holds only what is shown** (`publicDoc`). Empty parts stay in the working copy. So a portfolio card, a link preview and the build before this one never meet one.
+
+**Nothing empty is counted in the 200 words**, since a visitor never reads it: a graph nobody has typed in used to count its two placeholder labels.
 
 **A quote needs no name.** With none there is no line under the words, and no stray comma. A role is drawn only with a name.
 
@@ -144,6 +150,8 @@ Each of these was a message in `validateForPublish`:
 
 The two that said "needs" now read "works best with", since they are suggestions.
 
+**A draft is still marked on them.** The draft eval (`evals/exhbt-draft/`) scored a draft on everything that stopped publishing. It now scores it on that and on the suggestions (`draftIssues` in `marks.ts`), so its marks mean what they meant: an AI draft is still expected to hold what its layout usually has.
+
 ## A step back
 
 If this build is rolled back to the one before it (origin/main at d277be7), with exhbts saved and published under 0032 in the database:
@@ -177,9 +185,9 @@ The publish check is shared, so the classic editor is relaxed with it, and its l
 
 ## Not sure, and risky
 
-- **Safari and Firefox** have not been tried. The bar is a native popover placed by hand; Astryx shows it as an ordinary fixed box where the browser has no popovers.
+- **Safari and Firefox** have not been tried. The bar is a native popover placed by hand; Astryx shows it as an ordinary fixed box where the browser has no popovers. `e2e/your-way.spec.ts` is not one of the specs the WebKit job runs, and the one test changed in `e2e/safari.webkit.ts` (the flowchart's Remove) was changed without a WebKit run.
 - **A real phone** has not tried the three new fields in the bar at the foot of the screen.
 - **A screen reader** has not been heard on the bar or on a cleared title.
 - **The words of the suggestions** are a first draft.
 
-Code: `lib/exhbt/blocks.ts` (`richOf`, `isBlank`, `filledFlow`, `hasBody`, `validateForPublish`, `suggestionsFor`, `publicDoc`), `lib/exhbt/formats.ts` (`flowHeading`, `sectionHeading`, `refsHeading`, `titleShown`, `flowShown`), `lib/exhbt/layouts.ts`, `components/portfolio/exhbt-parts.tsx`, `LayoutMain.tsx`, `page-ctx.ts` (`TitleSlot`, `beside`, `quoted`), `components/exhbt-editor/fields/SelectionBar.tsx`, `TitleField.tsx`, `RichEditor.tsx`, `RichField.tsx`, `topbar/Suggestions.tsx`, `css/your-way.css`. Tests: `e2e/your-way.spec.ts`, `e2e/your-way-model.spec.ts`, `e2e/step-back.spec.ts`, `e2e/editor-classic-keeps.spec.ts`.
+Code: `lib/exhbt/blocks.ts` (`richOf`, `isBlank`, `filledFlow`, `hasBody`, `validateForPublish`, `suggestionsFor`, `publicDoc`), `lib/exhbt/formats.ts` (`flowHeading`, `sectionHeading`, `refsHeading`, `titleShown`, `flowShown`), `lib/exhbt/layouts.ts`, `components/portfolio/exhbt-parts.tsx`, `LayoutMain.tsx`, `page-ctx.ts` (`TitleSlot`, `beside`, `quoted`), `components/exhbt-editor/fields/SelectionBar.tsx`, `TitleField.tsx`, `RichEditor.tsx`, `RichField.tsx`, `topbar/Suggestions.tsx`, `css/your-way.css`. Tests: `e2e/your-way.spec.ts` (the browser), `e2e/your-way-model.spec.ts` and `e2e/layout-model.spec.ts` (the rules), `e2e/step-back.spec.ts` (the build before this one), `e2e/editor-classic-keeps.spec.ts` (the classic editor), `e2e/editor-phone.spec.ts` (the three fields on a phone's bar).

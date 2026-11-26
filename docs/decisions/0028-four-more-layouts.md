@@ -1,7 +1,7 @@
 Status: accepted
 Date: 19 Nov 2026
 Amends: 0024 (seven layouts, not three; "My part" is built as "My role"; a "Build" layout, which 0024 left for later), 0015 (one new section kind, the pull quote; an image can be marked before or after; a link's address is optional in one layout), 0025 (what each new layout takes from the work)
-Amended by: 0030 (the word caps in the table below are now the AI's targets, not limits for people; the counts, a link's label and the characters stay)
+Amended by: 0030 (the word caps in the table below are now the AI's targets, not limits for people; the counts, a link's label and the characters stay), 0032 (each layout's needs are suggestions; a pull quote takes bold and italic; each layout's headings can be replaced or cleared by the person)
 
 # Four more layouts: Build, Essay, Before and after, Event or performance
 

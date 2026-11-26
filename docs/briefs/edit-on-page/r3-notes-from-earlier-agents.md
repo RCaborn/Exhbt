@@ -564,3 +564,30 @@ Still open:
 - The same hover dependence elsewhere, not tested: a section's toolbar (`.xe-frame:hover`) after a section is dropped with the mouse (the drag board moves sections in the page too), and a tablet's row chips after a box is dropped by touch.
 - Not checked on a real Mac: whether a real mouse meets the lost hover, and whether the grip, focused by script after a drop, draws a focus ring or its tooltip in Safari. Under the emulation on Chromium the list showed a focus ring after a press, so the grip may show one there.
 - In both runs with the temporary test, "the others slide aside" (Case study, the same test) failed on the first try in both groups and passed on the retry: the slide had not begun when the boxes were measured. With the temporary test and its log of every mousemove gone, the next run had no failed try in either group's flowchart tests. Watch for it.
+
+## From the editor-freedom agent, 26 Nov 2026 (branch `phase-2-editor-freedom`, decision 0032)
+
+What was built is in `docs/decisions/0032-write-it-your-way.md`. These are the things that would have saved time.
+
+How the doc is stored:
+- A quote's words, a pull quote's and a link's line are still plain strings (`text`, `description`). Their bold and italic are runs kept beside them (`textRuns`, `descriptionRuns`). Never put runs in the string's place: the build before 0032 reads the string, and so do the word count, the number check and the AI's source-quote check. Read them with `richOf(string, runs)`, write them with the store's `setBeside`. Runs that no longer spell their string are ignored, and `normaliseDoc` drops them.
+- A part's title is one optional string with three states: absent (the layout's own heading, which follows a layout switch), `""` (cleared, no heading for a visitor) and the person's words. `titleShown` in `lib/exhbt/formats.ts` is the one place that decides. The flowchart's and a list of links' are on the doc (`flowTitle`, `refsTitle`).
+- "Empty" has one definition: `isBlank`, `filledFlow` and `hasBody` in `lib/exhbt/blocks.ts`. The page, the published copy, the word count and the publish check all read it. Add a new kind there first.
+- What a layout usually has is `suggestionsFor`, not `validateForPublish`. The draft eval marks a draft on both (`draftIssues` in `evals/exhbt-draft/marks.ts`).
+
+The page must not change for a doc nobody has formatted or titled (`e2e/layout-parity.spec.ts` compares the markup byte for byte):
+- Unformatted words are written as the same expression as before (`wordsOf` in `exhbt-parts.tsx`), because `RichText` wraps each run in a span.
+- On this machine four of the parity gate's cases fail on `main` too: `demo-gp-reminders`, `demo-ae-forecast`, `demo-bed-dashboard`, `demo-study-habits`, each with "N boxes moved" at 1440. Their markup matches. Every box that "moved" has no size (it is not drawn), so its place is only the article's distance from the top of the page, which is 209px now and was 217px when the golden boxes were written on 19 Nov. Something above the article on the demo pages got 8px shorter since. CI compares only the markup, so it does not see it.
+
+Astryx, for the next control in the editor's chrome:
+- `useLayer({ mode: "fixed" })` puts a box in the browser's top layer at a place you give it, drawn where it is in the markup. That is how the bar sits at a selection and is still found as "this field's Bold".
+- A `ToggleButton` does not take a `Toolbar`'s size: give it `size` itself. A `Toolbar` in a `Card` pads itself 8px top and bottom and has no prop for it.
+- A `ListItem` cuts a string label off at one line. Pass a node (`<Text as="span">`) for words that should wrap.
+- Astryx's CSS is not in the editor's `@layer components`, so a rule there does not override it. Use the component's props.
+
+Tests:
+- A formatted field's editor starts in an idle moment, or on a click. Keys sent straight after the click can reach the editor before it has heard of the selection: `waitLive(page)` first, then wait two frames after selecting (`select` in `e2e/your-way.spec.ts`). On a loaded machine this failed about one run in three without the wait.
+- Tests that need no browser can be run with no dev server: a Playwright config with no `webServer`, and a `grep` made from the titles of tests whose callback takes no `page`, `browser` or `request`. Every such test in forty spec files ran in under two minutes.
+- With five or more agents each running a dev server (about 2.5GB each) the machine runs out of memory, and what goes is a browser tab or a dev server. "Page crashed" and `ECONNREFUSED` in a test's error mean that, not the code. `free -g` before a run, and run a spec again on its own before believing a failure.
+
+Not done, and not checked: see the end of decision 0032.

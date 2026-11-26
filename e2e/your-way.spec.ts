@@ -61,6 +61,8 @@ async function select(page: Page, path: string, from: number, count: number) {
   for (let i = 0; i < from; i++) await page.keyboard.press("ArrowRight");
   for (let i = 0; i < count; i++) await page.keyboard.press("Shift+ArrowRight");
   await expect.poll(() => page.evaluate(() => getSelection()?.toString().length ?? 0)).toBe(count);
+  // The editor hears of a selection a moment after the browser makes it: by two frames on, it has.
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 }
 
 /** The bar that comes to the words selected in a formatted field (fields/SelectionBar.tsx). */
