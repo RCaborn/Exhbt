@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { safeNext } from "@/lib/auth";
+import { landingAfterSignIn } from "@/lib/landing";
+import { portfolioKindForEveryone } from "@/lib/portfolio-kind-server";
+import { isPhase2Enabled } from "@/lib/site";
 import { isSupabaseConfigured } from "@/lib/store";
 import { Button } from "@/components/ui/Button";
 import { GoogleOrEmail } from "../GoogleOrEmail";
@@ -9,7 +12,7 @@ export const metadata: Metadata = { title: "Create an account", robots: { index:
 
 export default async function SignupPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next: rawNext } = await searchParams;
-  const next = safeNext(rawNext, "/account");
+  const next = safeNext(rawNext, landingAfterSignIn("sign-up", await portfolioKindForEveryone(), isPhase2Enabled()));
   const loginHref = `/login?next=${encodeURIComponent(next)}`;
   return (
     <div className="mx-auto max-w-md px-4 pt-16 sm:px-8 lg:pt-24">
