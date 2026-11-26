@@ -3,11 +3,12 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { createFromScratch, deleteExhbt, moveExhbt } from "./[id]/actions";
+import { deleteExhbt, moveExhbt } from "./[id]/actions";
 import { DeleteExhbt } from "@/components/editor/DeleteExhbt";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { JoinRequests, TeamProjects } from "@/components/team/TeamPanel";
 import { Button } from "@/components/ui/Button";
+import { ADD_EXHBT } from "@/lib/add-exhbt";
 import { isAdmin } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { ENTITLEMENTS, PLAN_NAMES } from "@/lib/entitlements";
@@ -54,17 +55,25 @@ export default async function ExhbtsPage({ searchParams }: { searchParams: Promi
       <div className="mx-auto max-w-3xl px-4 pt-10 pb-16 sm:px-8 lg:pt-14">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h1>Your exhbts</h1>
-          <p className="text-sm text-graphite">
-            {exhbts.length > max ? (
-              <>
-                <span className="font-mono text-ink">{exhbts.length}</span> exhbts · {PLAN_NAMES[plan]} holds <span className="font-mono text-ink">{max}</span>
-              </>
-            ) : (
-              <>
-                <span className="font-mono text-ink">{exhbts.length}</span> of <span className="font-mono text-ink">{max}</span> used on {PLAN_NAMES[plan]}
-              </>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <p className="text-sm text-graphite">
+              {exhbts.length > max ? (
+                <>
+                  <span className="font-mono text-ink">{exhbts.length}</span> exhbts · {PLAN_NAMES[plan]} holds <span className="font-mono text-ink">{max}</span>
+                </>
+              ) : (
+                <>
+                  <span className="font-mono text-ink">{exhbts.length}</span> of <span className="font-mono text-ink">{max}</span> used on {PLAN_NAMES[plan]}
+                </>
+              )}
+            </p>
+            {/* The one way to start an exhbt: the chooser ("Draft it from my files" or "Write it myself"). With the plan full, the upgrade offer below stands in for it. */}
+            {room.ok && (
+              <Button href={ADD_EXHBT} variant="primary">
+                Add an exhbt
+              </Button>
             )}
-          </p>
+          </div>
         </div>
 
         {profile.username && exhbts.length > 0 && (
@@ -82,29 +91,12 @@ export default async function ExhbtsPage({ searchParams }: { searchParams: Promi
           <section aria-labelledby="preview-only" className="mt-6 rounded-[20px] border border-line bg-surface p-5 sm:p-6">
             <h2 id="preview-only" className="text-[1.375rem]">Preview only on {PLAN_NAMES[plan]}</h2>
             <p className="mt-2 text-graphite">Build and preview your exhbts here. Publishing them to your own link comes with {PLAN_NAMES.premium}.</p>
-            {/* When the plan is full, the New exhbt card below carries the upgrade prompt. */}
+            {/* When the plan is full, the upgrade prompt below says so instead. */}
             {room.ok && <UpgradePrompt className="mt-3" reason={`Ready to share them? ${PLAN_NAMES.premium} publishes to your own link.`} upgradeTo="premium" />}
           </section>
         )}
 
-        <section aria-labelledby="new" className="mt-8 rounded-[20px] border border-line bg-surface p-5 sm:p-6">
-          <h2 id="new" className="text-[1.375rem]">New exhbt</h2>
-          {room.ok ? (
-            <>
-              <p className="mt-2 text-graphite">Upload your project and we&apos;ll draft it for you, or write it yourself.</p>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Button href="/exhbts/new" variant="primary">
-                  Upload your project
-                </Button>
-                <form action={createFromScratch}>
-                  <Button type="submit">Start from scratch</Button>
-                </form>
-              </div>
-            </>
-          ) : (
-            <UpgradePrompt reason={room.reason} upgradeTo={room.upgradeTo} className="mt-3" />
-          )}
-        </section>
+        {!room.ok && <UpgradePrompt reason={room.reason} upgradeTo={room.upgradeTo} className="mt-8" />}
 
         {exhbts.length === 0 ? (
           <p className="mt-8 text-graphite">Nothing here yet. Your first exhbt will show here.</p>
