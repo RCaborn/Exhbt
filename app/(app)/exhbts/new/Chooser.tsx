@@ -38,6 +38,24 @@ export function AddFrame({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * The chooser's way back and heading. Portfolio first (the switch at `page`, decision 0031), the exhbts live
+ * on the portfolio, so the way back goes there and the heading says where the new one goes.
+ */
+function Top({ portfolioFirst }: { portfolioFirst: boolean }) {
+  return portfolioFirst ? (
+    <>
+      <Back href="/portfolio">Your portfolio</Back>
+      <Heading level={1}>Add an exhbt to your portfolio</Heading>
+    </>
+  ) : (
+    <>
+      <Back href="/exhbts">Your exhbts</Back>
+      <Heading level={1}>Add an exhbt</Heading>
+    </>
+  );
+}
+
 /** The way back up: from the chooser to the list of exhbts, from the layouts to the chooser. */
 export function Back({ href, children }: { href: string; children: React.ReactNode }) {
   return (
@@ -65,12 +83,11 @@ export type Where = { live: true; liveBase: string | null } | { live: false; rea
  * press area the stylesheet stretches over the whole card. So a card is pressed anywhere, with or without
  * the page's scripts, and each is one stop for the keyboard.
  */
-export function Chooser({ draft, offered, where }: { draft: DraftVerdict; offered: readonly Format[]; where: Where }) {
+export function Chooser({ draft, offered, where, portfolioFirst = false }: { draft: DraftVerdict; offered: readonly Format[]; where: Where; portfolioFirst?: boolean }) {
   return (
     <AddFrame>
       <VStack gap={3} hAlign="start">
-        <Back href="/exhbts">Your exhbts</Back>
-        <Heading level={1}>Add an exhbt</Heading>
+        <Top portfolioFirst={portfolioFirst} />
         <Text as="p" type="large" weight="normal" color="secondary" className="max-w-2xl">
           {WHAT_AN_EXHBT_IS}
         </Text>
@@ -194,12 +211,11 @@ function WhereItEndsUp({ where }: { where: Where }) {
 }
 
 /** No room on the plan for another exhbt: the upgrade offer, as the list of exhbts shows it. */
-export function NoRoom({ reason, upgradeTo }: { reason: string; upgradeTo?: Plan }) {
+export function NoRoom({ reason, upgradeTo, portfolioFirst = false }: { reason: string; upgradeTo?: Plan; portfolioFirst?: boolean }) {
   return (
     <AddFrame>
       <VStack gap={3} hAlign="start">
-        <Back href="/exhbts">Your exhbts</Back>
-        <Heading level={1}>Add an exhbt</Heading>
+        <Top portfolioFirst={portfolioFirst} />
       </VStack>
       <VStack className="max-w-2xl">
         <UpgradePrompt reason={reason} upgradeTo={upgradeTo} />

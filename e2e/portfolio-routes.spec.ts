@@ -78,6 +78,26 @@ test.describe("the exhbts list", () => {
   });
 });
 
+test.describe("Add an exhbt", () => {
+  for (const k of KINDS) {
+    test(`${k}: the chooser's heading, its way back, and where signing in comes back to`, async ({ page }) => {
+      await kind(page, k);
+      const at = k === "page";
+      // Signed out: the plain chooser comes back to the portfolio at page; an address that says what is being
+      // drafted, or into which exhbt, comes back to itself at both settings.
+      expect(await lands(page, "/exhbts/new")).toEqual({ status: 307, to: at ? "/login?next=/portfolio" : `/login?next=${encodeURIComponent("/exhbts/new")}` });
+      expect(await lands(page, "/exhbts/new?start=draft")).toEqual({ status: 307, to: `/login?next=${encodeURIComponent("/exhbts/new?start=draft")}` });
+      const into = "00000000-0000-4000-8000-000000000000";
+      expect(await lands(page, `/exhbts/new?into=${into}`)).toEqual({ status: 307, to: `/login?next=${encodeURIComponent(`/exhbts/new?into=${into}`)}` });
+
+      await signInAs(page, unique(`ad${k[0]}`), "premium", "/exhbts/new");
+      await expect(page.getByRole("heading", { level: 1, name: at ? "Add an exhbt to your portfolio" : "Add an exhbt", exact: true })).toBeVisible();
+      const back = page.locator("#main").getByRole("link", { name: at ? "Your portfolio" : "Your exhbts", exact: true });
+      await expect(back).toHaveAttribute("href", at ? "/portfolio" : "/exhbts");
+    });
+  }
+});
+
 test.describe("the exhbt editor's way back", () => {
   test("steps: Your exhbts, to the list", async ({ page }) => {
     await kind(page, "steps");
