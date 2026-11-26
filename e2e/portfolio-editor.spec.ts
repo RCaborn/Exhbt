@@ -1,6 +1,9 @@
+import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { BASE_LOOKS, fullFixture, sparseFixture } from "./fixtures/portfolio-pages";
 import { HOME, HOME_BOXES, HOME_EDIT_ONLY_IN_FLOW, READY, boxes, differences, expect, fresh, openEditor, settle, test, waitReady } from "./portfolio-editor";
+
+const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
 // The editing page is the visitor's page (decision 0031; brief J of docs/briefs/portfolio-first): in all eight
 // looks, full and empty, at 1440 and 412, every landmark of the page is where /p/<name> has it, within half a
@@ -78,5 +81,51 @@ for (const { look, kind } of CASES) {
       expect(off, `${look} ${kind} at ${width}`).toEqual([]);
       expect(await page.locator(`${READY} ${HOME}`).count()).toBe(1);
     }
+  });
+}
+
+/** axe's WCAG 2.1 AA findings on the page as it is now, in words. */
+async function axe(page: Page): Promise<string[]> {
+  await settle(page);
+  const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  return violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`);
+}
+
+// F's parts in every look (brief F; decision 0031, "Sections and tiles"): a section's and a tile's toolbar
+// shown, the Add a section menu and a tile's More menu open, and the empty page with the vision and the Add
+// tile. G's bar, sheets and the Look menu are added when G's work lands.
+for (const look of BASE_LOOKS) {
+  test(`${look}: axe finds no WCAG 2.1 AA violation with the sections' and tiles' controls shown, their menus open, and on the empty page`, async ({ page }) => {
+    test.slow();
+    const stored = look === "exhbt" ? null : look;
+    // A draft and a hidden exhbt, so the owner-only tile and the hidden row are on the page too.
+    const base = fullFixture("x", stored, "premium");
+    const f = fresh({ ...base, exhbts: base.exhbts.map((e) => ({ ...e, draft: e.key === "poster", hidden: e.key === "rota" })) }, `axe${look}`);
+    await openEditor(page, f);
+
+    await page.locator(`${READY} [data-section-frame="about"]`).hover();
+    expect(await axe(page), `${look}: a section's toolbar`).toEqual([]);
+    const card = page.locator(`${READY} [data-section="work"] [data-tile-frame]`).first();
+    await card.hover();
+    expect(await axe(page), `${look}: a tile's toolbar`).toEqual([]);
+
+    await card.locator(":scope > [data-pe-tools]").getByRole("button", { name: /^More for / }).click();
+    await expect(page.getByRole("menu")).toBeVisible();
+    expect(await axe(page), `${look}: a tile's More menu`).toEqual([]);
+    await page.keyboard.press("Escape");
+
+  });
+
+  test(`${look}: axe finds no WCAG 2.1 AA violation on the empty page, with the vision, the Add tile and the Add a section menu`, async ({ page }) => {
+    test.slow();
+    const stored = look === "exhbt" ? null : look;
+    // The vision band with the look's own Add an exhbt, and the Add tile. Its sections are the default few,
+    // so Add a section has some to offer (on the full page it reads "Every section…").
+    await openEditor(page, fresh({ ...sparseFixture("x", stored), exhbts: [] }, `axe0${look}`));
+    await page.locator(`${READY} [data-path="arrangement.sections"]`).getByRole("button", { name: "Add a section" }).click({ timeout: 10_000 });
+    await expect(page.getByRole("menu")).toBeVisible();
+    expect(await axe(page), `${look}: Add a section`).toEqual([]);
+    await page.keyboard.press("Escape");
+    expect(await axe(page), `${look}: the empty page`).toEqual([]);
   });
 }
