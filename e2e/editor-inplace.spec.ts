@@ -8,6 +8,7 @@ import { createFiles } from "../components/exhbt-editor/files";
 import { createStore } from "../components/exhbt-editor/store-core";
 import { undoneWords } from "../components/exhbt-editor/undo";
 import { ORDER_FIXTURES } from "./fixtures/order-docs";
+import { EDIT_ONLY_IN_FLOW } from "./page-editor";
 import {
   allowEditOnly,
   boxes,
@@ -1260,4 +1261,57 @@ test("a picture removed and saved: its file goes when the visit ends, as no Undo
   await page.getByRole("link", { name: "Your exhbts" }).first().click();
   await page.waitForURL(/\/exhbts$/);
   await expect.poll(() => fileExists(page, files["image-1"]!)).toBe(false);
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * Release 4, brief Q: the four new samples (decision 0028), made full, in the Exhbt, Classic and Night looks,
+ * at 1440 and on a Pixel 7. The loop in "box for box" above already runs every offered layout in every look; this
+ * block adds what it does not say: that the only parts taken out of the editing page are the two
+ * of EDIT_ONLY_IN_FLOW that are always there, by name, and that a full page has none of the others.
+ * ---------------------------------------------------------------------------------------------- */
+
+const NEW_LAYOUTS = ["build", "essay", "before-after", "event"] as const;
+const THREE_LOOKS = ["exhbt", "classic", "night"];
+const ALWAYS_THERE = EDIT_ONLY_IN_FLOW.filter((e) => e.always).map((e) => e.name);
+
+async function boxForBoxByName(page: Page, f: (typeof NEW_LAYOUTS)[number], look: string) {
+  await openTiming(page, f, { full: true, look });
+  await waitLive(page);
+  await settle(page);
+  // A full page has no placeholder: every entry that is only there while its part is empty is absent.
+  const present = await page.evaluate((entries) => {
+    const root = document.querySelector('[data-editor="page"] article[data-exhbt-page]')!;
+    return entries.filter((e) => root.querySelector(e.selector)).map((e) => e.name);
+  }, EDIT_ONLY_IN_FLOW.filter((e) => !e.always));
+  expect(present, "a full page has none of the placeholders").toEqual([]);
+  const taken = await allowEditOnly(page, "always");
+  // What was taken out is the image descriptions and the Add a skill box, by name, and nothing else.
+  expect(taken.length, "the two always-there entries are on the page").toBeGreaterThan(0);
+  for (const t of taken) expect(ALWAYS_THERE.some((n) => t.startsWith(n)), `"${t}" is one of the entries that are always there`).toBe(true);
+  await settle(page);
+  const editing = await boxes(page);
+  await seeAsVisitor(page, true);
+  await settle(page);
+  expect(differences(await boxes(page), editing)).toEqual([]);
+}
+
+test.describe("release 4's new layouts, box for box, by name", () => {
+  for (const look of THREE_LOOKS) {
+    for (const f of NEW_LAYOUTS) {
+      test(`a full ${FORMAT_RULES[f].name.toLowerCase()} in ${look}, at 1440 wide: only the always-there entries differ`, async ({ page }) => {
+        await boxForBoxByName(page, f, look);
+      });
+    }
+  }
+
+  test.describe("on a Pixel 7", () => {
+    test.use(PIXEL_7);
+    for (const look of THREE_LOOKS) {
+      for (const f of NEW_LAYOUTS) {
+        test(`a full ${FORMAT_RULES[f].name.toLowerCase()} in ${look}: only the always-there entries differ`, async ({ page }) => {
+          await boxForBoxByName(page, f, look);
+        });
+      }
+    }
+  });
 });
