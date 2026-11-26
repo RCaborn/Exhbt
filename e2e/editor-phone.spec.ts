@@ -442,7 +442,9 @@ test.describe("formatting on the bar", () => {
       const i = (await docNow(page)).sections.findIndex((s) => s.kind === kind);
       const f = field(page, `sections.${i}.${key}`);
       await f.scrollIntoViewIfNeeded();
-      await f.tap();
+      // At the start of its words. (A source's one line is 20px tall, and the 44px press of the "Web address" chip on the
+      // rule under it reaches up over the middle of that line: as it did while the line was a plain field.)
+      await f.tap({ position: { x: 24, y: 8 } });
       await expect(f.locator(".ProseMirror")).toBeFocused();
       for (const name of ["Bold", "Italic", "Done"]) await expect(onBar(page, name), kind).toBeVisible();
       await expect(onBar(page, "Link"), kind).toHaveCount(0);

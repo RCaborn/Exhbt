@@ -28,6 +28,17 @@
     visibility: hidden;
   }
 
+  /* ---------- A button link's grip on a phone ---------- */
+  /* A build's links are buttons, each with its line under it, and on a phone they stack. A grip sits half over its
+     section's top edge (css/phone.css), and for the second button that half lay over the end of the first button's
+     line, 14px above. The line is words on the page now (it takes bold and italic), where it was a text box that
+     kept its words to itself, so the phone spec sees it. The grip sits on its own button's corner instead. */
+  @media (max-width: 47.99rem) and (pointer: coarse) {
+    [data-editor="page"] .xe-frame[data-kind="link"][data-as="button"] > .xe-tools {
+      top: 0;
+    }
+  }
+
   /* ---------- A quote's marks round a formatted field ---------- */
   /* The page writes the marks as text round the words (“…”). A formatted field is a block, so it draws them
      itself, at the start and end of its one paragraph: the words wrap exactly as the published ones do. */
