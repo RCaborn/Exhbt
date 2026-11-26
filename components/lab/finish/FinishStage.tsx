@@ -75,6 +75,7 @@ export function FinishStage({
   const [confirmed, setConfirmed] = useState(false);
   const [tried, setTried] = useState(false);
   const [beat, setBeat] = useState(false);
+  const [arrival, setArrival] = useState<"css" | "vt">("css");
   const [said, setSaid] = useState("");
   const publishRef = useRef<HTMLSpanElement>(null);
   const changes = state === "changes";
@@ -83,6 +84,7 @@ export function FinishStage({
     setSaid("");
     setTried(false);
     setConfirmed(false);
+    setArrival("css");
     setStep(state === "free" ? "finish" : "review");
   }
   const close = () => {
@@ -117,8 +119,8 @@ export function FinishStage({
       arrive();
       return;
     }
-    // Maximal: the frame opens out of the Publish button (one name on both), and the ink holds the
-    // screen for a beat before it settles (finish.css, [data-beat]).
+    // Maximal: the frame opens out of the Publish button (one name on both: the button's wrapper before,
+    // the frame after, finish.css), and the ink holds the screen for a beat before it settles ([data-beat]).
     const m = motionOf();
     const html = document.documentElement;
     html.style.setProperty("--fin-vt-duration", m.slow);
@@ -126,15 +128,16 @@ export function FinishStage({
     html.dataset.finVt = "";
     publishRef.current?.style.setProperty("view-transition-name", "fin-frame");
     const vt = document.startViewTransition(() => {
-      publishRef.current?.style.removeProperty("view-transition-name");
       flushSync(() => {
         arrive();
+        setArrival("vt");
         setBeat(true);
       });
     });
     vt.finished.finally(() => {
       delete html.dataset.finVt;
-      window.setTimeout(() => setBeat(false), 380);
+      // The beat: the ink holds a moment longer than the frame's flight, then lets go.
+      window.setTimeout(() => setBeat(false), 420);
     });
   }
 
@@ -160,7 +163,7 @@ export function FinishStage({
         />
       )}
       {step === "finish" && state === "free" && <FreeMoment words={words} freePage={freePage} onClose={close} />}
-      {step === "finish" && state !== "free" && <LiveMoment words={words} livePage={livePage} beat={beat} onClose={close} />}
+      {step === "finish" && state !== "free" && <LiveMoment words={words} livePage={livePage} beat={beat} arrival={arrival} onClose={close} />}
     </div>
   );
   const isOpen = step !== "closed";

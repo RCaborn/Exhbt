@@ -452,6 +452,91 @@
       animation-delay: 760ms;
     }
   }
+
+  /* ── Maximal: the ink holds the whole screen for a beat ─────────────────────────────
+     While .fin-live has [data-beat], the dialog's own backdrop is ink (a modal is in the top layer, so
+     nothing in the page could cover it) and an ink layer covers the dialog, so ink fills the screen with
+     the label's words on it and the live page's frame floating on it. When the beat ends, that layer
+     contracts into the label's box (LiveMoment measures it: --fin-ink-*), uncovering the white side,
+     and the backdrop eases back to the scrim. Everything stays opaque throughout, so the page behind
+     never shows through. Only maximal sets [data-beat], and only when motion is on (FinishStage). */
+  .fin-live {
+    isolation: isolate;
+  }
+  .fin-label,
+  .fin-work {
+    z-index: 1;
+  }
+  .fin-work {
+    position: relative;
+  }
+  .fin-live::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: var(--radius-page);
+    background: var(--color-ink);
+    pointer-events: none;
+    /* At rest it is exactly the label's box, and the label is ink, so it can't be seen. */
+    clip-path: inset(
+      var(--fin-ink-top, 50%) var(--fin-ink-right, 50%) var(--fin-ink-bottom, 50%) var(--fin-ink-left, 50%) round var(--radius-container)
+    );
+  }
+  [data-level="restrained"] .fin-live::before {
+    display: none;
+  }
+  .fin-live[data-beat]::before {
+    clip-path: inset(0 0 0 0 round var(--radius-page));
+  }
+  dialog:has(.fin-live[data-beat])::backdrop {
+    background-color: var(--color-ink);
+  }
+  dialog:has(.fin-live[data-beat]),
+  .astryx-bottom-sheet:has(.fin-live[data-beat]) {
+    background-color: var(--color-ink);
+    box-shadow: none;
+  }
+  .fin-live[data-beat] :is(.fin-share, .fin-next, .fin-close) {
+    opacity: 0;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    [data-level="maximal"][data-motion="on"] .fin-live[data-arrival="vt"]::before {
+      transition: clip-path var(--duration-slow) var(--ease-move);
+    }
+    [data-level="maximal"][data-motion="on"] dialog:has(.fin-live[data-arrival="vt"])::backdrop {
+      transition: background-color var(--duration-slow) var(--ease-standard);
+    }
+    [data-level="maximal"][data-motion="on"] .fin-live[data-arrival="vt"] :is(.fin-share, .fin-next, .fin-close) {
+      transition: opacity var(--duration-medium) var(--ease-standard) calc(var(--duration-slow) * 0.35);
+    }
+    /* The frame arrives by the view transition (out of the Publish button), so it doesn't also rise. */
+    [data-motion="on"]:not([data-level="restrained"]) .fin-live[data-arrival="vt"] .fin-frame {
+      animation: none;
+    }
+  }
+
+  /* The view transition itself (maximal). Its pseudo-elements hang off the document's root, which the
+     lab's level doesn't reach, so FinishStage reads the level's tokens and sets these two on <html>. */
+  html[data-fin-vt] .fin-live .fin-frame {
+    view-transition-name: fin-frame;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    ::view-transition-group(fin-frame) {
+      animation-duration: var(--fin-vt-duration, 960ms);
+      animation-timing-function: var(--fin-vt-ease, cubic-bezier(0.3, 1.36, 0.5, 1));
+    }
+    ::view-transition-old(fin-frame),
+    ::view-transition-new(fin-frame) {
+      height: 100%;
+      animation-duration: calc(var(--fin-vt-duration, 960ms) * 0.5);
+    }
+    html[data-fin-vt]::view-transition-old(root),
+    html[data-fin-vt]::view-transition-new(root) {
+      animation-duration: calc(var(--fin-vt-duration, 960ms) * 0.4);
+    }
+  }
+
   @keyframes fin-tick {
     from {
       opacity: 0;

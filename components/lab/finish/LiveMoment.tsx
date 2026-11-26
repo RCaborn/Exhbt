@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Plus, Share2 } from "lucide-react";
 import { Button } from "@astryxdesign/core/Button";
 import { DialogHeader } from "@astryxdesign/core/Dialog";
@@ -41,12 +41,15 @@ export function LiveMoment({
   words,
   livePage,
   beat = false,
+  arrival = "css",
   onClose,
 }: {
   words: FinishWords;
   livePage: React.ReactNode;
   /** Maximal only: the beat after Publish, when the ink holds the whole screen. */
   beat?: boolean;
+  /** "vt": the frame arrived by a view transition (maximal), so it doesn't rise as well. */
+  arrival?: "css" | "vt";
   onClose: () => void;
 }) {
   const { level } = useLab();
@@ -61,6 +64,26 @@ export function LiveMoment({
   // The step before was the review, whose Publish button has gone: focus moves to this moment's title.
   useEffect(() => {
     root.current?.querySelector<HTMLElement>("h2[tabindex]")?.focus({ preventScroll: true });
+  }, []);
+
+  // Maximal's ink layer rests on exactly the label's box (finish.css, .fin-live::before), so it is
+  // measured: offsets, which a dialog's entrance transform doesn't change, kept current as it resizes.
+  useLayoutEffect(() => {
+    const live = root.current;
+    const label = live?.querySelector<HTMLElement>(".fin-label");
+    if (!live || !label) return;
+    const measure = () => {
+      const px = (n: number) => `${Math.max(0, Math.round(n))}px`;
+      live.style.setProperty("--fin-ink-top", px(label.offsetTop));
+      live.style.setProperty("--fin-ink-left", px(label.offsetLeft));
+      live.style.setProperty("--fin-ink-right", px(live.clientWidth - label.offsetLeft - label.offsetWidth));
+      live.style.setProperty("--fin-ink-bottom", px(live.clientHeight - label.offsetTop - label.offsetHeight));
+    };
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(live);
+    watch.observe(label);
+    return () => watch.disconnect();
   }, []);
 
   async function copy() {
@@ -115,7 +138,7 @@ export function LiveMoment({
   );
 
   return (
-    <div ref={root} className="fin-live" data-beat={beat || undefined}>
+    <div ref={root} className="fin-live" data-beat={beat || undefined} data-arrival={arrival}>
       <div className="fin-label" data-ink={ink || undefined}>
         {ink ? <MediaTheme mode="dark">{label}</MediaTheme> : label}
       </div>
