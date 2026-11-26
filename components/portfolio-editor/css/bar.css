@@ -1,0 +1,460 @@
+/* The portfolio editor's bar and everything it opens (brief G; decision 0031, "The bar"): app chrome,
+   built from Astryx components and placed here with Astryx's own tokens only (--color-*, --spacing-*,
+   --radius-*, --duration-*, --ease-*, --font-*). No colour, space, corner or timing is written by hand.
+   The one exception is a look's own colours and faces in the Look menu (its swatches, its faces in their
+   own type): they are the look's data, drawn as the look draws them. */
+@layer components {
+  /* ---------- The bar's row ---------- */
+  /* The heading and the chip, before the Toolbar in the bar's frame: as wide as they are, never grown. */
+  .pe-bar > .pe-bar-start {
+    flex: 0 1 auto;
+  }
+  /* The toolbar holds one group, its controls, at the end of the row (with no start group, its own
+     space-between would put them at the start). */
+  .pe-bar [role="toolbar"] > :has(> .pe-bar-end) {
+    margin-inline-start: auto;
+  }
+  .pe-bar-start {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    min-width: 0;
+  }
+  .pe-bar-end {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    min-width: 0;
+  }
+  /* Where the page stands: a dot in its colour and the word (no Badge for a status, decision 0033).
+     Named pe-status, not pe-chip: F's draft chip on a card is .pe-chip (css/arrange.css). */
+  .pe-status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-1-5);
+    white-space: nowrap;
+  }
+  .pe-joblink-state {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-1-5);
+    min-width: 3.5rem;
+  }
+  /* The plan a locked look comes with: the word and a lock, in the quiet text colour. */
+  .pe-look-lock {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-1);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+  }
+  /* On a phone the row keeps the status and the main button: the screen's name is in the site's
+     header already, so the bar's heading is kept for screen readers only. The chip keeps a word at every
+     width, never the dot alone (WCAG 1.4.1): under 30rem its short form ("Live", "Not live", "Preview"). */
+  .pe-status-short {
+    display: none;
+  }
+  @media (width < 30rem) {
+    .pe-bar-heading {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .pe-status-word {
+      display: none;
+    }
+    .pe-status-short {
+      display: inline;
+    }
+  }
+
+  /* ---------- Notices under the bar (a look being previewed, a request to join) ---------- */
+  .pe-bar-notices {
+    display: grid;
+  }
+  .pe-bar-notices:empty {
+    display: none;
+  }
+
+  /* ---------- The Look menu ---------- */
+  .pe-look {
+    display: grid;
+    gap: var(--spacing-3);
+    width: min(26rem, 100%);
+  }
+  .pe-look-lead {
+    margin: 0;
+  }
+  .pe-look-name {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--spacing-2);
+    font-weight: var(--font-weight-semibold);
+  }
+  .pe-look-faces {
+    display: block;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.35;
+  }
+  .pe-look-face {
+    font-size: var(--font-size-base);
+    color: var(--color-text-primary);
+  }
+  .pe-look-blurb {
+    display: block;
+    margin-top: var(--spacing-0-5);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+  }
+  /* The look in brief: three overlapping dots of its own colours. Decorative. */
+  .pe-look-dots {
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+  .pe-look-dot {
+    width: var(--spacing-5);
+    height: var(--spacing-5);
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-border);
+    background: var(--pe-dot);
+  }
+  .pe-look-dot + .pe-look-dot {
+    margin-inline-start: calc(-1 * var(--spacing-2));
+  }
+
+  /* A look's colourways: small round radios, each its own colour (Astryx has no swatch picker). */
+  .pe-swatches {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-2);
+    margin: var(--spacing-2) 0 0;
+    padding: 0;
+    border: 0;
+  }
+  .pe-swatches-label {
+    margin-inline-end: var(--spacing-1);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+  }
+  .pe-swatch {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    /* A press target of 44px under a finger, the visible dot inside it smaller. */
+    width: var(--size-element-sm);
+    height: var(--size-element-sm);
+    cursor: pointer;
+  }
+  @media (pointer: coarse) {
+    .pe-swatch {
+      width: var(--size-element-md);
+      height: var(--size-element-md);
+    }
+  }
+  .pe-swatch input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .pe-swatch-dot {
+    width: var(--spacing-6);
+    height: var(--spacing-6);
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-border);
+    background: var(--pe-dot);
+    transition: box-shadow var(--duration-fast) var(--ease-standard);
+  }
+  .pe-swatch input:checked + .pe-swatch-dot {
+    box-shadow:
+      0 0 0 2px var(--color-background-surface),
+      0 0 0 4px var(--color-border-emphasized);
+  }
+  .pe-swatch input:focus-visible + .pe-swatch-dot {
+    outline: 2px solid var(--color-text-accent);
+    outline-offset: 4px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pe-swatch-dot {
+      transition: none;
+    }
+  }
+
+  /* ---------- Job links (the compact list is drawn on the server: app/(app)/portfolio/JobLinksSection.tsx) ---------- */
+  .pe-joblinks {
+    display: grid;
+    gap: var(--spacing-3);
+    width: min(26rem, 100%);
+  }
+  .pe-joblink-name {
+    font-weight: var(--font-weight-semibold);
+    overflow-wrap: anywhere;
+  }
+  .pe-joblink-meta {
+    display: grid;
+    gap: var(--spacing-0-5);
+  }
+  .pe-joblink-url {
+    font-family: var(--font-family-code);
+    overflow-wrap: anywhere;
+  }
+  .pe-joblinks-note {
+    margin: 0;
+  }
+  .pe-joblinks-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-3);
+  }
+
+  /* ---------- Sheets ---------- */
+  .pe-sheet-body {
+    display: grid;
+    gap: var(--spacing-6);
+  }
+  .pe-sheet-lead {
+    margin: 0;
+  }
+  .pe-sheet-part {
+    display: grid;
+    gap: var(--spacing-3);
+  }
+  .pe-sheet-part h3 {
+    margin: 0;
+    font: var(--font-weight-semibold) var(--font-size-base) / 1.3 var(--font-family-body);
+    letter-spacing: normal;
+  }
+  .pe-address {
+    font-weight: var(--font-weight-semibold);
+    overflow-wrap: anywhere;
+  }
+  .pe-checks {
+    display: grid;
+    gap: var(--spacing-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .pe-check {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-2);
+  }
+  .pe-check-mark {
+    flex-shrink: 0;
+    margin-top: var(--spacing-0-5);
+    color: var(--color-icon-secondary);
+  }
+  .pe-check[data-done] .pe-check-mark {
+    color: var(--color-icon-accent);
+  }
+
+  /* The Team sheet's empty state shows only when the server's panel drew nothing. */
+  .pe-team:empty {
+    display: none;
+  }
+  .pe-team-empty {
+    display: none;
+  }
+  .pe-team:empty + .pe-team-empty {
+    display: block;
+  }
+  .pe-links-switch {
+    margin-top: var(--spacing-2);
+  }
+
+  /* ---------- On the page: the photo button and the corner tools ---------- */
+  /* Drawn over the page and taking no room (decision 0031, "What the editing page adds"). They are
+     chrome over the page, so they are Astryx buttons, raised off it. */
+  .pe-photo {
+    display: contents;
+  }
+  .pe-photo-button {
+    position: absolute;
+    z-index: 5;
+    translate: -50% -50%;
+  }
+  /* The corner tools of the intro and Get in touch. Named pe-part-tools, not pe-tools: F's section and
+     tile toolbars are .pe-tools (css/arrange.css), and each set of rules must leave the other alone. */
+  .pe-part-tools {
+    position: absolute;
+    z-index: 5;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    translate: 0 -50%;
+  }
+  /* Suggest an intro: PartTools places it where it meets no word (tools/place.ts), as inline insets;
+     these are where it sits until then. Once the intro has words it shows only while the intro is
+     pointed at or edited, on every pointer, and stays reachable by Tab (it is only faded, and focusing
+     it is focus within the intro). */
+  .pe-part-tools[data-where="intro"] {
+    inset-block-start: 0.5lh;
+    translate: 0 -50%;
+    transition: opacity var(--duration-fast) var(--ease-standard);
+  }
+  .pe-part-tools[data-where="intro"][data-filled] {
+    inset-block-start: 0;
+    translate: 0 calc(-100% - var(--spacing-1));
+  }
+  [data-intro]:not(:hover):not(:focus-within) > .pe-part-tools[data-filled] {
+    opacity: 0;
+  }
+  /* Under a mouse, pointing at it is pointing at the intro, so it shows itself. Under a finger nothing
+     shows it before the tap, so unseen it must not take a tap meant for the headline under it. */
+  @media (hover: none) {
+    [data-intro]:not(:focus-within) > .pe-part-tools[data-filled] {
+      pointer-events: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pe-part-tools[data-where="intro"] {
+      transition: none;
+    }
+  }
+  /* Your links, until PartTools places it (tools/place.ts, placeLinks): just under the top right corner
+     Get in touch's own toolbar takes (a 36px row and a margin), never in it. */
+  .pe-part-tools[data-where="contact"] {
+    inset-block-start: calc(2.25rem + var(--spacing-4));
+    translate: none;
+  }
+  .pe-part-tools-note {
+    position: absolute;
+    inset-inline-end: 0;
+    inset-block-start: calc(100% + var(--spacing-2));
+    width: min(22rem, 80vw);
+    margin: 0;
+    padding: var(--spacing-2) var(--spacing-3);
+    border-radius: var(--radius-container);
+    border: 1px solid var(--color-border);
+    background: var(--color-background-surface);
+    color: var(--color-text-secondary);
+    font: var(--font-size-sm) / 1.4 var(--font-family-body);
+    box-shadow: var(--shadow-med);
+  }
+  .pe-part-tools-note[data-error] {
+    color: var(--color-text-error);
+  }
+  .pe-links {
+    display: grid;
+    gap: var(--spacing-4);
+    width: min(24rem, 100%);
+  }
+
+  /* ---------- The first minute ---------- */
+  .pe-first {
+    display: grid;
+    gap: var(--spacing-3);
+    padding: var(--spacing-3) var(--spacing-4);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-background-muted);
+    color: var(--color-text-primary);
+  }
+  .pe-first-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--spacing-2) var(--spacing-4);
+  }
+  .pe-first-title {
+    margin: 0;
+    font: var(--font-weight-semibold) var(--font-size-base) / 1.3 var(--font-family-body);
+    letter-spacing: normal;
+  }
+  .pe-first-lead {
+    margin: 0;
+  }
+  .pe-first-actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-2);
+  }
+  .pe-first-body {
+    display: grid;
+    gap: var(--spacing-3) var(--spacing-8);
+    align-items: start;
+  }
+  @media (width >= 64rem) {
+    .pe-first-body {
+      grid-template-columns: minmax(24rem, 30rem) minmax(0, 1fr);
+    }
+  }
+  .pe-first-now {
+    display: grid;
+    gap: var(--spacing-2);
+    justify-items: start;
+  }
+  .pe-first-tick {
+    color: var(--color-icon-accent);
+  }
+  .pe-first-open {
+    color: var(--color-icon-secondary);
+  }
+  .pe-first-optional {
+    color: var(--color-text-secondary);
+    font-weight: var(--font-weight-normal);
+  }
+  .pe-first-next {
+    color: var(--color-text-secondary);
+    font-weight: var(--font-weight-normal);
+  }
+  [data-first-run="narrow"] .pe-first-head {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  .pe-first-line {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pe-first-todo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  @media (width < 48rem) {
+    .pe-first {
+      padding-inline: var(--spacing-2);
+    }
+  }
+  /* The loading view's copy of the strip (bar/strip.tsx, StripStandIn): one copy for each width and
+     pointer the editor's strip can be drawn at, and only the one that applies is shown, so its room is
+     the room the editor's strip takes. The width is useNarrow's (under 48rem), the pointer useCoarse's. */
+  .pe-first-standin > [data-variant] {
+    display: none;
+  }
+  @media (width >= 48rem) and (not (pointer: coarse)) {
+    .pe-first-standin > [data-variant="wide-sm"] {
+      display: block;
+    }
+  }
+  @media (width >= 48rem) and (pointer: coarse) {
+    .pe-first-standin > [data-variant="wide-md"] {
+      display: block;
+    }
+  }
+  @media (width < 48rem) and (not (pointer: coarse)) {
+    .pe-first-standin > [data-variant="narrow-sm"] {
+      display: block;
+    }
+  }
+  @media (width < 48rem) and (pointer: coarse) {
+    .pe-first-standin > [data-variant="narrow-md"] {
+      display: block;
+    }
+  }
+}
