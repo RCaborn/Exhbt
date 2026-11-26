@@ -50,7 +50,7 @@ export function FlowBox({ boxKey, className, children }: { boxKey: string; class
     animateLayoutChanges: () => false,
     attributes: { roleDescription: "draggable box" },
   });
-  // dnd-kit's listeners first: then a mouse's press keeps the focus on the grip, in Safari too (drag/grip.ts).
+  // dnd-kit's own listeners, and a mouse's press leaves the focus on the grip, in Safari too (drag/grip.ts).
   const grip = useMemo(
     () => ({
       ...attributes,

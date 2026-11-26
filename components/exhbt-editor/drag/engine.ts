@@ -678,7 +678,7 @@ function createEngine(store: Store, ui: UiApi, files: FilesController) {
         props = {
           "aria-describedby": HOW_ID,
           onPointerDown: notePointer,
-          // The sensor first: then a mouse's press keeps the focus on the grip, in Safari too (grip.ts).
+          // A mouse's press leaves the focus on the grip, in Safari too (grip.ts).
           onMouseDown: (e: ReactMouseEvent<HTMLElement>) => {
             sense(e.nativeEvent, (at, token) => pickUp(id, "pointer", at, token));
             holdFocus(e);
