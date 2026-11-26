@@ -52,11 +52,13 @@ export const LIMITS = {
   /** The title is the question the work answers (decision 0022). */
   titleChars: 80,
   /**
-   * A section's own title (decision 0032): one line. At this length a title of ordinary words holds on one
-   * line in every look at 390px, in the large heading the findings and the flowchart take; one of the
-   * widest letters wraps to a second line and nothing overflows (e2e/write-your-way.spec.ts measures both).
+   * A section's own title (decision 0032): one line. This is the most that holds on one line for a visitor on
+   * a phone (390px wide), in every layout and every look, in the large heading the findings and the flowchart
+   * take (e2e/your-way.spec.ts measures it). The Mono look sets it: its letters are all one width, and 25 of
+   * them fill the line. The other looks hold 27 to 30 letters of ordinary words. A title all in capitals, or
+   * of a font's widest letters, can still wrap to a second line; nothing overflows.
    */
-  sectionTitleChars: 28,
+  sectionTitleChars: 25,
   /** "What it is", e.g. "MSc Finance dissertation" (stored as `context`). */
   contextChars: 90,
   /** "Where and when", e.g. "University of St Andrews, August 2026". */
