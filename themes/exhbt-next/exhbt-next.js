@@ -985,12 +985,16 @@ export const exhbtNextTheme = {
         "color": "var(--color-text-secondary)",
         "fontSize": "0.95rem",
         "fontWeight": "var(--font-weight-medium)",
+        "--color-neutral": "transparent",
+        "--color-overlay-hover": "transparent",
+        "--color-overlay-pressed": "transparent",
         ":hover": {
           "color": "var(--color-text-primary)"
         },
         "borderRadius": "var(--radius-full)"
       },
       "selected": {
+        "backgroundColor": "transparent",
         "color": "var(--color-text-primary)",
         "textDecorationLine": "underline",
         "textDecorationColor": "#00755D",

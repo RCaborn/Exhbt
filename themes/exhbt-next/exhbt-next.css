@@ -1117,6 +1117,9 @@
     color: var(--color-text-secondary);
     font-size: 0.95rem;
     font-weight: var(--font-weight-medium);
+    --color-neutral: transparent;
+    --color-overlay-hover: transparent;
+    --color-overlay-pressed: transparent;
     border-radius: var(--radius-full);
   }
 
@@ -1125,6 +1128,7 @@
   }
 
   .astryx-top-nav-item[data-selected="selected"] {
+    background-color: transparent;
     color: var(--color-text-primary);
     text-decoration-line: underline;
     text-decoration-color: #00755D;
