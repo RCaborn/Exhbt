@@ -33,9 +33,12 @@ import { safeHref } from "@/lib/exhbt/blocks";
  */
 
 const LINK_ERROR = "Links must start with https://.";
-/** The gap between the bar and the words, and the least it keeps from the window's edges. */
+/** The gap between the bar and the words, the least it keeps from the window's edges, and how near one of the editor's controls is too near. */
 const GAP = 8;
 const EDGE = 8;
+const NEAR = 6;
+/** The editor's own controls, which the bar keeps off: a section's buttons, a finding's, the chips over a part, the pluses. */
+const CONTROLS = ".xe-tools > *, .xe-list-tools > *, .xe-shell-tools > *, .xe-above > *, .xe-over > *, .xe-insert button, .xe-add-finding button";
 
 type Flags = { bold: boolean; italic: boolean; link: boolean };
 
@@ -74,6 +77,20 @@ function selectionBox(editor: Editor): { left: number; right: number; top: numbe
   return { left: a.left, right: oneLine ? b.right : editor.view.dom.getBoundingClientRect().right, top: a.top, bottom: b.bottom };
 }
 
+/** Whether a box of that size, placed there, would lie over one of the editor's controls that is showing. */
+function overControl(x: number, y: number, width: number, height: number): boolean {
+  const page = document.querySelector('[data-editor="page"]');
+  if (!page) return false;
+  for (const el of page.querySelectorAll<HTMLElement>(CONTROLS)) {
+    // One that is not drawn, or is drawn clear (a toolbar at rest), is not in the way.
+    if (typeof el.checkVisibility === "function" && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
+    const r = el.getBoundingClientRect();
+    // Within a few pixels counts: the bar's shadow would lie on the control.
+    if (r.width > 0 && r.height > 0 && r.left < x + width + NEAR && r.right > x - NEAR && r.top < y + height + NEAR && r.bottom > y - NEAR) return true;
+  }
+  return false;
+}
+
 export function SelectionBar({ editor, highlight, links, flags, barRef, linking, setLinking }: SelectionBarProps) {
   const layer = useLayer({ mode: "fixed" });
   const { show, hide } = layer;
@@ -90,11 +107,15 @@ export function SelectionBar({ editor, highlight, links, flags, barRef, linking,
     if (!box) return;
     held.current = box;
     const { width, height } = bar.getBoundingClientRect();
-    // Above the words; under them where the editor's top bar, or the top of the window, leaves no room above.
+    const x = Math.max(EDGE, Math.min((box.left + box.right) / 2 - width / 2, document.documentElement.clientWidth - width - EDGE));
+    // Above the words. Under them where the editor's top bar, or the top of the window, leaves no room above,
+    // and where it would lie over one of the editor's own controls (a section's buttons are at its top edge,
+    // just over its first line) and would not under the words.
     const ceiling = (document.querySelector('[data-editor="page"] [data-topbar]')?.getBoundingClientRect().bottom ?? 0) + EDGE;
     const above = box.top - height - GAP;
-    const y = above >= ceiling ? above : box.bottom + GAP;
-    const x = Math.max(EDGE, Math.min((box.left + box.right) / 2 - width / 2, document.documentElement.clientWidth - width - EDGE));
+    const below = box.bottom + GAP;
+    const fitsBelow = below + height + EDGE <= window.innerHeight;
+    const y = above < ceiling ? below : overControl(x, above, width, height) && fitsBelow && !overControl(x, below, width, height) ? below : above;
     setAt((cur) => (cur && Math.abs(cur.x - x) < 0.5 && Math.abs(cur.y - y) < 0.5 ? cur : { x: Math.round(x), y: Math.round(y) }));
   }, [barRef, editor, linking]);
 
@@ -208,20 +229,20 @@ export function SelectionBar({ editor, highlight, links, flags, barRef, linking,
             startContent={
               <>
                 {highlight ? (
-                  <ToggleButton label="Highlight" isPressed={flags.bold} icon={<Highlighter aria-hidden size={16} strokeWidth={2.25} />} onPressedChange={() => editor.chain().focus(null, { scrollIntoView: false }).toggleBold().run()}>
+                  <ToggleButton label="Highlight" size="sm" isPressed={flags.bold} icon={<Highlighter aria-hidden size={16} strokeWidth={2.25} />} onPressedChange={() => editor.chain().focus(null, { scrollIntoView: false }).toggleBold().run()}>
                     Highlight
                   </ToggleButton>
                 ) : (
                   <>
-                    <ToggleButton label="Bold" tooltip="Bold" isIconOnly isPressed={flags.bold} icon={<Bold aria-hidden size={16} strokeWidth={2.5} />} onPressedChange={() => editor.chain().focus(null, { scrollIntoView: false }).toggleBold().run()} />
-                    <ToggleButton label="Italic" tooltip="Italic" isIconOnly isPressed={flags.italic} icon={<Italic aria-hidden size={16} strokeWidth={2.5} />} onPressedChange={() => editor.chain().focus(null, { scrollIntoView: false }).toggleItalic().run()} />
+                    <ToggleButton label="Bold" tooltip="Bold" size="sm" isIconOnly isPressed={flags.bold} icon={<Bold aria-hidden size={16} strokeWidth={2.5} />} onPressedChange={() => editor.chain().focus(null, { scrollIntoView: false }).toggleBold().run()} />
+                    <ToggleButton label="Italic" tooltip="Italic" size="sm" isIconOnly isPressed={flags.italic} icon={<Italic aria-hidden size={16} strokeWidth={2.5} />} onPressedChange={() => editor.chain().focus(null, { scrollIntoView: false }).toggleItalic().run()} />
                   </>
                 )}
                 {links &&
                   (flags.link ? (
-                    <IconButton label="Remove link" tooltip="Remove link" variant="ghost" icon={<Unlink aria-hidden size={16} strokeWidth={2.25} />} onClick={() => editor.chain().focus(null, { scrollIntoView: false }).extendMarkRange("link").unsetLink().run()} />
+                    <IconButton label="Remove link" tooltip="Remove link" size="sm" variant="ghost" icon={<Unlink aria-hidden size={16} strokeWidth={2.25} />} onClick={() => editor.chain().focus(null, { scrollIntoView: false }).extendMarkRange("link").unsetLink().run()} />
                   ) : (
-                    <IconButton label="Link" tooltip="Link" variant="ghost" icon={<Link2 aria-hidden size={16} strokeWidth={2.25} />} onClick={() => setLinking(true)} />
+                    <IconButton label="Link" tooltip="Link" size="sm" variant="ghost" icon={<Link2 aria-hidden size={16} strokeWidth={2.25} />} onClick={() => setLinking(true)} />
                   ))}
               </>
             }

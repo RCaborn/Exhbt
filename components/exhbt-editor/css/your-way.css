@@ -44,6 +44,13 @@
     content: "\201C" attr(data-placeholder) "\201D";
   }
 
+  /* ---------- A part's title, typed in place (fields/TitleField.tsx) ---------- */
+  /* Cleared, its "Add a title" is fainter than a field's placeholder elsewhere: most titles are set in the
+     page's muted colour themselves, and the placeholder must not pass for one. */
+  [data-title] .xe-text::placeholder {
+    color: color-mix(in srgb, var(--xp-muted) 60%, transparent);
+  }
+
   /* ---------- "Add a title", where the layout draws no heading (fields/TitleField.tsx) ---------- */
   /* Over the part's top left edge, as the aim's switch is (css/core.css, .xe-above): it shows while the
      pointer or the focus is in the part, and always under a finger, where nothing hovers. */
@@ -61,6 +68,13 @@
     .xe-title-add {
       opacity: 1;
       pointer-events: auto;
+    }
+  }
+  /* On a phone the flowchart's own grip sits to the left of its boxes' grips (css/phone.css), where a chip
+     over a part's top edge goes: this one moves along again, clear of it. */
+  @media (max-width: 47.99rem) and (pointer: coarse) {
+    [data-editor="page"] .xe-frame[data-kind="flow"] .xe-title-add {
+      right: 5.75rem;
     }
   }
 

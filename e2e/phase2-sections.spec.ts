@@ -9,6 +9,7 @@ import {
   normaliseDoc,
   plain,
   publicDoc,
+  suggestionsFor,
   text,
   validateForPublish,
   wordCount,
@@ -125,13 +126,21 @@ test.describe("Sections: the model", () => {
     expect(odd.sections.map((s) => s.id)).toEqual(["quote-1", "link-1", "reflection-1"]);
   });
 
-  test("publishing needs the core and findings or a graph; each kind has its cap of how many; no part has a word cap of its own", () => {
+  test("publishing needs a title and something besides it; each kind has its cap of how many; no part has a word cap of its own or has to be filled in", () => {
+    const hints = (d: ExhbtDoc) => suggestionsFor(d).map((i) => `${i.path}: ${i.message}`);
     expect(paths(core([F]))).toEqual([]);
     expect(paths(core([graph()]))).toEqual([]);
     expect(paths(core([F, graph(), image(), quote(), next(), link()]))).toEqual([]);
-    // Neither findings nor a graph.
-    expect(paths(core([quote(), next(), link()]))).toEqual(["sections"]);
-    expect(paths(core([]))).toEqual(["sections"]);
+    expect(hints(core([F]))).toEqual([]);
+    // Neither findings nor a graph: a suggestion since decision 0032 (Rory, 26 Nov 2026: "optionality in filling in all
+    // sections or not"). Until then it stopped publishing, at "sections".
+    const RESULTS = "sections: Add findings or a graph, so the exhbt shows what came of the work.";
+    expect(paths(core([quote(), next(), link()]))).toEqual([]);
+    expect(hints(core([quote(), next(), link()]))).toEqual([RESULTS]);
+    expect(paths(core([]))).toEqual([]);
+    expect(hints(core([]))).toEqual([RESULTS]);
+    // A title alone is still not a page.
+    expect(validateForPublish({ ...core([]), gap: [], flow: [] })).toEqual([{ path: "gap", message: "Add something besides the title: a line of context here, or a section below." }]);
     // One of each, except graphs and images: two each.
     expect(paths(core([F, { ...F, id: "findings-2" }]))).toEqual(["sections"]);
     expect(paths(core([F, quote(), { ...quote(), id: "quote-2" }]))).toEqual(["sections"]);
@@ -143,19 +152,30 @@ test.describe("Sections: the model", () => {
     // Each field of each kind. No part has a word cap of its own, only the page (decision 0030): a 40-word quote, a 45-word
     // "what I'd do next" and a 25-word description pass, well past the 30, 35 and 15 words each was held to until 25 Nov 2026.
     expect(paths(core([F, quote(nWords(40))]))).toEqual([]);
-    expect(paths(core([F, quote("", "")]))).toEqual(["sections.1.text", "sections.1.name"]);
+    // A quote with no words is not drawn, so nothing about it is checked; one with words and nobody named passes (0032).
+    expect(paths(core([F, quote("", "")]))).toEqual([]);
+    expect(paths(core([F, quote(undefined, "", "")]))).toEqual([]);
     expect(paths(core([F, quote(undefined, "x".repeat(LIMITS.quote.nameChars + 1))]))).toEqual(["sections.1.name"]);
     expect(paths(core([F, next(nWords(45))]))).toEqual([]);
-    expect(paths(core([F, next("")]))).toEqual(["sections.1.text"]);
+    // "What I'd do next" left empty is not drawn, and is nothing to fix.
+    expect(paths(core([F, next("")]))).toEqual([]);
     expect(paths(core([F, { ...next(), text: [{ t: "notes", href: "http://example.com" }] } as Section]))).toEqual(["sections.1.text"]);
     for (const bad of ["http://example.com/code", "javascript:alert(1)", "not a link", ""]) expect(paths(core([F, link(bad)])), bad).toEqual(["sections.1.href"]);
     expect(paths(core([F, link(undefined, nWords(LIMITS.link.labelWords + 1))]))).toEqual(["sections.1.label"]);
-    expect(paths(core([F, link(undefined, " ")]))).toEqual(["sections.1.label"]);
+    // A link with an address and no label goes live under the layout's own word for a link; one with nothing in it at all is not drawn.
+    expect(paths(core([F, link(undefined, " ")]))).toEqual([]);
+    expect(paths(core([F, link("", "", "")]))).toEqual([]);
     expect(paths(core([F, link(undefined, "Code", nWords(25))]))).toEqual([]);
     expect(paths(core([F, { ...image(), alt: " " } as Section]))).toEqual(["sections.1.alt"]);
-    expect(paths(core([{ ...F, items: [text("Only one.")] } as Section]))).toEqual(["sections.0.items"]);
-    // The core is still checked: the flowchart needs its boxes.
-    expect(paths({ ...core([F]), flow: [{ step: "Only one box" }] })).toEqual(["flow"]);
+    // One finding where most pages have two, and one box where most flowcharts have three: suggestions, each at its part.
+    const one = core([{ ...F, items: [text("Only one.")] } as Section]);
+    expect(paths(one)).toEqual([]);
+    expect(hints(one)).toEqual(["sections.0.items: Most pages have at least 2 points here. Add another if you have one."]);
+    const oneBox = { ...core([F]), flow: [{ step: "Only one box" }] };
+    expect(paths(oneBox)).toEqual([]);
+    expect(hints(oneBox)).toEqual(["flow: Most flowcharts have at least 3 boxes. Add another if it helps."]);
+    // The most there may be still holds: a seventh box stops publishing.
+    expect(paths({ ...core([F]), flow: Array.from({ length: LIMITS.flow.max + 1 }, () => ({ step: "A box" })) })).toEqual(["flow"]);
   });
 
   test("every word in every section counts; alt text and link addresses don't", () => {

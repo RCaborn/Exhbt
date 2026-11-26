@@ -9,6 +9,7 @@ import {
   LIMITS,
   normaliseDoc,
   publicDoc,
+  suggestionsFor,
   text,
   validateForPublish,
   wordCount,
@@ -67,6 +68,8 @@ const gallery = () => galleryDoc(IDS);
 const research = () => researchDoc(ID(1));
 const messages = (d: ExhbtDoc) => validateForPublish(d).map((i) => `${i.path}: ${i.message}`);
 const pathsOf = (d: ExhbtDoc) => validateForPublish(d).map((i) => i.path);
+/** What the editor suggests and nothing requires (decision 0032): what the layout usually has. */
+const hints = (d: ExhbtDoc) => suggestionsFor(d).map((i) => `${i.path}: ${i.message}`);
 const image = (n: number, over: Partial<Extract<Section, { kind: "image" }>> = {}): Section => ({ id: `image-${n}`, kind: "image", fileId: ID(n), alt: `Picture ${n}`, caption: [], ...over });
 const nWords = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
 
@@ -241,9 +244,11 @@ test.describe("model: publishing", () => {
   test("gallery rules", () => {
     const g = gallery();
     const keep = (n: number) => ({ ...g, sections: [...g.sections.filter((s) => s.kind !== "image"), ...g.sections.filter((s) => s.kind === "image").slice(0, n)] });
-    expect(pathsOf(keep(1))).toContain("sections");
-    expect(messages(keep(1))).toContain("sections: A gallery needs at least 2 images.");
+    // One picture where a gallery usually has two: a suggestion since decision 0032, and nothing stops publishing.
+    expect(messages(keep(1))).toEqual([]);
+    expect(hints(keep(1))).toEqual(["sections: A gallery works best with at least 2 images."]);
     expect(messages(keep(2))).toEqual([]);
+    expect(hints(keep(2))).toEqual([]);
     // A missing alt fails at that image.
     const noAlt = { ...g, sections: g.sections.map((s) => (s.id === "image-3" && s.kind === "image" ? { ...s, alt: "" } : s)) };
     const at = noAlt.sections.findIndex((s) => s.id === "image-3");
@@ -265,11 +270,15 @@ test.describe("model: publishing", () => {
   test("research rules", () => {
     const r = research();
     const without = (kinds: string[]) => ({ ...r, sections: r.sections.filter((s) => !kinds.includes(s.kind)) });
-    expect(pathsOf(without(["aim"]))).toContain("sections");
-    expect(messages(without(["aim"]))).toContain("sections: Add your aim or hypothesis.");
-    expect(messages(without(["conclusion"]))).toContain("sections: Add your conclusion.");
-    expect(messages(without(["graph", "image"]))).toContain("sections: Add a graph or an image: the key figure.");
-    expect(messages(without(["findings"]))).toContain("sections: Add your results.");
+    // What research usually has is suggested, one by one, and none of it stops publishing (decision 0032).
+    expect(hints(r)).toEqual([]);
+    expect(hints(without(["aim"]))).toEqual(["sections: Add your aim or hypothesis."]);
+    expect(hints(without(["conclusion"]))).toEqual(["sections: Add your conclusion."]);
+    expect(hints(without(["graph", "image"]))).toEqual(["sections: Add a graph or an image: the key figure."]);
+    expect(hints(without(["findings"]))).toEqual(["sections: Add your results."]);
+    for (const kinds of [["aim"], ["conclusion"], ["graph", "image"], ["findings"], ["aim", "conclusion", "graph", "image", "findings"]]) expect(messages(without(kinds)), kinds.join()).toEqual([]);
+    // An aim that is there with no words answers nothing: only what a visitor would see counts.
+    expect(hints({ ...r, sections: r.sections.map((s) => (s.kind === "aim" ? { ...s, text: [] } : s)) })).toEqual(["sections: Add your aim or hypothesis."]);
     const four = { ...r, sections: [...r.sections, image(2), image(3)] };
     expect(messages(four)).toContain("sections: Up to 3 figures, graphs and images together.");
     // The aim has no word limit of its own (decision 0030): one of 30 words, past the 20 it was held to, adds no issue of its own.
@@ -292,9 +301,15 @@ test.describe("model: publishing", () => {
     expect(asCase.sections.filter((s) => s.kind === "image")).toHaveLength(8);
   });
 
-  test("gallery wording for the brief", () => {
-    const blank = withFormat(emptyDoc(), "gallery");
-    expect(messages(blank)).toContain("gap: Add the brief: what you were asked to do, and for whom.");
+  test("a blank page in any layout asks for a title and something besides it, and nothing else", () => {
+    // Until decision 0032 each layout asked for its own first paragraph by name ("Add the brief: what you were asked
+    // to do, and for whom."). Nothing has to be filled in now, except that a title alone is not a page.
+    for (const f of FORMATS) {
+      const blank = withFormat(emptyDoc(), f);
+      expect(messages(blank), f).toEqual(["title: Add a title.", "gap: Add something besides the title: a line of context here, or a section below."]);
+      expect(messages({ ...blank, title: "A title" }), f).toEqual(["gap: Add something besides the title: a line of context here, or a section below."]);
+      expect(messages({ ...blank, title: "A title", gap: text("One line.") }), f).toEqual([]);
+    }
   });
 });
 
@@ -416,7 +431,8 @@ test.describe("model: references, captions, notes", () => {
 
   test("layoutNotes for a blank doc switched to a gallery", () => {
     const n = layoutNotes(withFormat(emptyDoc(), "gallery"));
-    expect(n.missing.map((m) => m.text)).toEqual(["Add at least 2 images", "Fill in or remove the empty findings"]);
+    // The empty findings are not drawn for a visitor and stop nothing, so they are no longer listed (decision 0032).
+    expect(n.missing.map((m) => m.text)).toEqual(["Add at least 2 images"]);
     expect(n.missing[0]!.add).toBe("image");
     expect(n.hidden).toEqual([]);
   });

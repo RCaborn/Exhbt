@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emptyDoc, ExhbtDocSchema, formatLimits, publicDoc, text, validateForPublish, type ExhbtDoc, type Section } from "../lib/exhbt/blocks";
+import { emptyDoc, ExhbtDocSchema, formatLimits, publicDoc, suggestionsFor, text, validateForPublish, type ExhbtDoc, type Section } from "../lib/exhbt/blocks";
 import { checkedReason, figureSentence, layoutSentence } from "../lib/exhbt/drafted";
 import { FORMAT_RULES, fromWorkOf, OFFERED_FORMATS } from "../lib/exhbt/formats";
 import { roomFor, sectionLabel, withKeyFigure, withWorkVisual } from "../lib/exhbt/sections";
@@ -177,9 +177,13 @@ test.describe("The work's own graph wins (decision 0025)", () => {
     expect(r.doc.sections[1]).toMatchObject({ picked: { kind: "table" } });
   });
 
-  test("a case study drafted with a graph and no findings can still be published when the work's graph takes its place", () => {
+  test("a case study drafted with a graph and no findings: the work's graph shows what came of the work, as the drafted graph did", () => {
     const NEEDS = "Add findings or a graph, so the exhbt shows what came of the work.";
-    const messages = (d: ExhbtDoc) => validateForPublish(d).map((i) => i.message);
+    // What a case study usually has is a suggestion since decision 0032: it is asked of the suggestions, and it never stops publishing.
+    const messages = (d: ExhbtDoc) => {
+      expect(validateForPublish(d).map((i) => i.message)).not.toContain(NEEDS);
+      return suggestionsFor(d).map((i) => i.message);
+    };
     const draft: ExhbtDoc = { ...caseDraft(), sections: [bar("graph-1", [7.9, 6.5])], unverified: [] };
     expect(messages(draft)).not.toContain(NEEDS);
     for (const kind of ["graph", "table"] as const) {
@@ -211,8 +215,9 @@ test.describe("The work's own graph wins (decision 0025)", () => {
     expect(kindsOf(r.doc)).toEqual(["aim", "findings", "image", "conclusion", "link"]);
     expect(sectionLabel(r.doc.sections, 2, "research")).toBe("Key figure");
     expect(r.removed).toHaveLength(2);
-    // Research needs a figure to publish: the picked one is it.
-    expect(validateForPublish(r.doc).map((i) => i.message)).not.toContain("Add a graph or an image: the key figure.");
+    // Research usually has a figure (a suggestion since decision 0032): the picked one is it.
+    expect(suggestionsFor(r.doc).map((i) => i.message)).not.toContain("Add a graph or an image: the key figure.");
+    expect(suggestionsFor({ ...r.doc, sections: r.doc.sections.filter((s) => s.kind !== "image") }).map((i) => i.message)).toContain("Add a graph or an image: the key figure.");
   });
 
   test("research: the drafted graph stays the key figure and another visual follows it, up to the cap on figures", () => {

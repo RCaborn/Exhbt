@@ -33,7 +33,8 @@ export function Suggestions({ onPick }: { onPick(path: FieldPath): void }): Reac
             return (
               <ListItem
                 key={`${s.path}|${s.message}`}
-                label={s.message}
+                // As a node, not a string: a row cuts a string off at one line, and a suggestion is a sentence to be read whole.
+                label={<Text as="span">{s.message}</Text>}
                 description={about || undefined}
                 align="first-line"
                 startContent={<Lightbulb aria-hidden size={16} strokeWidth={2.25} />}

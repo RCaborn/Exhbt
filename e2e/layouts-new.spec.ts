@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { markLayout, needsThePerson } from "../evals/exhbt-draft/marks";
+import { draftIssues, markLayout, needsThePerson } from "../evals/exhbt-draft/marks";
 import { DraftSchema, DraftSchemaSeven, leftOff, repairDraft, toDoc, type Draft } from "../lib/ai/draft-answer";
 import { DRAFT_TARGETS } from "../lib/ai/draft-targets";
 import { formatLimits, LIMITS, validateForPublish, wordCount, words, type ExhbtDoc } from "../lib/exhbt/blocks";
@@ -510,26 +510,29 @@ test.describe("The draft eval's fixtures and marks for seven layouts", () => {
   test("what only the person can clear (pictures, Before and After marks) is told apart from what a draft got wrong", () => {
     // A drafted before and after: no pictures yet, so nothing is marked. Its three points on what changed are there.
     const drafted = toDoc(answer({ format: "before-after", findings: ["The total is on one screen.", "Buttons are bigger.", "Repeat orders take two taps."] }), MATERIAL);
-    const issues = validateForPublish(drafted);
+    // What a layout usually has is a suggestion to a person since decision 0032 and stops no one publishing. A draft
+    // is still marked on it (draftIssues: what stops publishing, then the suggestions), so the marks mean what they did.
+    expect(validateForPublish(drafted)).toEqual([]);
+    const issues = draftIssues(drafted);
     const person = issues.filter((i) => needsThePerson(i, drafted)).map((i) => i.message);
-    expect(person).toEqual(["A before and after needs at least 2 images.", "Mark one image Before and one After."]);
+    expect(person).toEqual(["A before and after works best with at least 2 images.", "Mark one image Before and one After."]);
     // Without its findings, the missing "what changed" is the draft's own failing.
     const thin = toDoc(answer({ format: "before-after", findings: [] }), MATERIAL);
-    const thinIssues = validateForPublish(thin).filter((i) => !needsThePerson(i, thin)).map((i) => i.message);
+    const thinIssues = draftIssues(thin).filter((i) => !needsThePerson(i, thin)).map((i) => i.message);
     expect(thinIssues).toContain("Add what changed and why.");
     // An event's poster is the person's to add; its role is the draft's to find in the material.
     const event = toDoc(answer({ format: "event", myRole: "" }), MATERIAL);
-    const eventIssues = validateForPublish(event);
+    const eventIssues = draftIssues(event);
     expect(eventIssues.filter((i) => needsThePerson(i, event)).map((i) => i.message)).toEqual(["Add at least one picture, such as the poster."]);
     expect(eventIssues.filter((i) => !needsThePerson(i, event)).map((i) => i.message)).toContain("Say what your role was.");
     // A gallery's two pictures, and a build's screenshot or link.
     const gallery = toDoc(answer({ format: "gallery" }), MATERIAL);
-    expect(validateForPublish(gallery).filter((i) => needsThePerson(i, gallery)).map((i) => i.message)).toEqual(["A gallery needs at least 2 images."]);
+    expect(draftIssues(gallery).filter((i) => needsThePerson(i, gallery)).map((i) => i.message)).toEqual(["A gallery works best with at least 2 images."]);
     const build = toDoc(answer({ format: "build" }), MATERIAL);
-    expect(validateForPublish(build).filter((i) => needsThePerson(i, build)).map((i) => i.message)).toEqual(["Add a screenshot or a link, so people can see it working."]);
+    expect(draftIssues(build).filter((i) => needsThePerson(i, build)).map((i) => i.message)).toEqual(["Add a screenshot or a link, so people can see it working."]);
     // Research's key figure can be drafted from the material's figures, so it stays the draft's.
     const research = toDoc(answer({ format: "research", aim: "To test it.", conclusion: "It held." }), MATERIAL);
-    expect(validateForPublish(research).filter((i) => needsThePerson(i, research))).toEqual([]);
+    expect(draftIssues(research).filter((i) => needsThePerson(i, research))).toEqual([]);
   });
 });
 
