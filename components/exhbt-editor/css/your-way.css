@@ -52,6 +52,38 @@
   }
 
   /* ---------- A part's title, typed in place (fields/TitleField.tsx) ---------- */
+  /* The field is as wide as its words, not as wide as its heading. A section's toolbar sits over the blank end
+     of the section's first line (Toolbar.tsx keeps it off the words), which for most sections is now its title's
+     line. On a tablet, where the toolbar is always shown, a field as wide as the heading had its middle under
+     those buttons, and a tap meant for the title pressed one. Empty, it is as wide as "Add a title". */
+  [data-title] .xe-text {
+    width: auto;
+    min-width: 4ch;
+    max-width: 100%;
+  }
+  /* Under a title, a flowchart box's Remove and grip hang half over the box's top corners, and on a touch
+     screen each takes a 44px press that reaches up and along the box's top edge (css/flow.css). A title sits
+     just over that edge (research's "Method" is 8px above its first box), so the corner of each press that
+     lay over the title's line is cut off: a press on the title's words is the title's. Each chip still takes
+     44px up and down and 44px across, through its middle. */
+  @media (pointer: coarse) {
+    section:has(> [data-title]) .xe-flow-tools > [data-flow-remove]::before {
+      clip-path: polygon(0 0, calc(100% - 1rem) 0, calc(100% - 1rem) 1rem, 100% 1rem, 100% 100%, 0 100%);
+    }
+    section:has(> [data-title]) .xe-flow-tools > .xe-flow-grip::before {
+      clip-path: polygon(1rem 0, 100% 0, 100% 100%, 0 100%, 0 1rem, 1rem 1rem);
+    }
+  }
+  /* Where the browser has no field-sizing, the hidden copy of the words sets the width (css/core.css, .xe-grow). */
+  [data-title] .xe-grow {
+    display: inline-grid;
+    grid-template-columns: minmax(0, max-content);
+    max-width: 100%;
+    vertical-align: top;
+  }
+  [data-title] .xe-grow > .xe-text {
+    width: 100%;
+  }
   /* Cleared, its "Add a title" is fainter than a field's placeholder elsewhere: most titles are set in the
      page's muted colour themselves, and the placeholder must not pass for one. */
   [data-title] .xe-text::placeholder {
