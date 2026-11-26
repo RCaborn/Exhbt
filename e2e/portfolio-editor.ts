@@ -221,6 +221,45 @@ export function countActions(page: Page): () => number {
   return () => n;
 }
 
+/**
+ * Each piece of text inside `sel` whose contrast with the nearest opaque background among its ancestors is
+ * under WCAG AA (4.5:1, or 3:1 from 24px, or 18.66px bold). Placeholders are left out, as axe leaves them out.
+ * For what is drawn in the top layer, which axe (4.14) measures against whatever is under it in the markup
+ * (G's e2e/portfolio-bar.spec.ts, where this was written).
+ */
+export async function lowContrast(page: Page, sel: string): Promise<string[]> {
+  return page.locator(sel).evaluate((root) => {
+    const rgba = (c: string) => (c.match(/[\d.]+/g) ?? []).map(Number) as number[];
+    const lum = ([r, g, b]: number[]) =>
+      [r!, g!, b!].map((v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)).reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i]!, 0);
+    const background = (el: Element): number[] => {
+      for (let at: Element | null = el; at; at = at.parentElement) {
+        const c = rgba(getComputedStyle(at).backgroundColor);
+        if (c.length >= 3 && (c[3] ?? 1) >= 1) return c;
+      }
+      return [255, 255, 255];
+    };
+    const out: string[] = [];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const el = n.parentElement;
+      if (!el || !n.textContent?.trim() || el.closest("[aria-hidden=true]")) continue;
+      const s = getComputedStyle(el);
+      if (s.visibility === "hidden" || s.display === "none" || el.getClientRects().length === 0) continue;
+      const fg = rgba(s.color);
+      const bg = background(el);
+      const a = fg[3] ?? 1;
+      const seen = [0, 1, 2].map((i) => fg[i]! * a + bg[i]! * (1 - a));
+      const [hi, lo] = [lum(seen), lum(bg)].sort((x, y) => y - x);
+      const ratio = (hi! + 0.05) / (lo! + 0.05);
+      const px = parseFloat(s.fontSize);
+      const large = px >= 24 || (px >= 18.66 && Number(s.fontWeight) >= 700);
+      if (ratio < (large ? 3 : 4.5)) out.push(`${n.textContent.trim()}: ${ratio.toFixed(2)}`);
+    }
+    return out;
+  });
+}
+
 /** What Undo would undo ("removed Experience"), or null. */
 export const undoLabel = (page: Page): Promise<string | null> => page.evaluate(() => window.__portfolioEditor!.undoLabel());
 

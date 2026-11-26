@@ -1,7 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { BASE_LOOKS, fullFixture, sparseFixture } from "./fixtures/portfolio-pages";
-import { HOME, HOME_BOXES, HOME_EDIT_ONLY_IN_FLOW, READY, boxes, differences, expect, fresh, openEditor, settle, test, waitReady } from "./portfolio-editor";
+import { canUseTheme } from "../lib/plan-rules";
+import { themeById } from "../lib/portfolio-themes";
+import { fillTitle } from "./editor";
+import { HOME, HOME_BOXES, HOME_EDIT_ONLY_IN_FLOW, READY, boxes, call, differences, expect, focusedPath, fresh, lowContrast, openEditor, setKind, settle, test, waitReady } from "./portfolio-editor";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -129,3 +132,82 @@ for (const look of BASE_LOOKS) {
     expect(await axe(page), `${look}: the empty page`).toEqual([]);
   });
 }
+
+// G's bar and sheets in every look (brief G; decision 0031, "The bar"). G's own spec runs axe with each part open
+// in the Exhbt look; here the same parts in all eight, since every sheet sits over the person's own page.
+const PARTS: [name: string, sel: string][] = [
+  ["look", "[data-look-menu]"],
+  ["address", '[data-sheet="address"] [data-address]'],
+  ["photo", "[data-photo-sheet]"],
+  ["job-links", "[data-job-links-menu]"],
+  ["team", "[data-team-sheet]"],
+  ["links", "[data-links-panel]"],
+];
+
+for (const look of BASE_LOOKS) {
+  test(`${look}: axe finds no WCAG 2.1 AA violation in the bar, nor with each of its menus and sheets open`, async ({ page }) => {
+    test.slow();
+    const stored = look === "exhbt" ? null : look;
+    const plan = canUseTheme("premium", themeById(look)!).ok ? "premium" : "max";
+    await openEditor(page, fresh(fullFixture("x", stored, plan), `axeg${look}`));
+    expect(await axe(page), `${look}: the bar`).toEqual([]);
+    for (const [name, sel] of PARTS) {
+      await call(page, "open", name);
+      await expect(page.locator(sel)).toBeVisible();
+      if (name === "links" || name === "look") {
+        // In the top layer: axe (4.14) measures its contrast against whatever is under it in the markup (the
+        // site's footer, or a dark look's page: Night and Studio for the Look menu), so contrast is measured on
+        // its own surface instead, to the same 4.5:1, as G's spec does for Your links.
+        const { violations } = await new AxeBuilder({ page }).withTags(WCAG).disableRules(["color-contrast"]).analyze();
+        expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`), `${look}: ${name}`).toEqual([]);
+        expect(await lowContrast(page, sel), `${look}: ${name}, contrast on its own surface`).toEqual([]);
+      } else expect(await axe(page), `${look}: ${name}`).toEqual([]);
+      await call(page, "close");
+      await expect(page.locator(sel)).toBeHidden();
+    }
+  });
+}
+
+test("a new person's first journey: the strip, then the vision's Add an exhbt, a blank exhbt with a title, and back by Your portfolio to its Draft tile", async ({ page }) => {
+  test.slow();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await setKind(page, "page");
+  const email = `pe-journey-${Math.random().toString(36).slice(2, 8)}@example.com`;
+  // Premium, where a draft is the owner's own tile, marked Draft; signed in with no next of their own.
+  await page.goto(`/auth/dev?email=${encodeURIComponent(email)}&next=${encodeURIComponent(`/dev/plan?plan=premium&next=${encodeURIComponent("/portfolio")}`)}`);
+  await waitReady(page);
+
+  // The strip, on its first step, with the cursor in the name.
+  const strip = page.locator('[data-first-run="wide"]');
+  await expect(strip).toHaveAttribute("data-step", "page");
+  await strip.getByRole("button", { name: /^Your name/ }).click();
+  await expect.poll(() => focusedPath(page)).toBe("profile.name");
+  await page.keyboard.type("Sam Taylor");
+  await strip.getByRole("button", { name: /^One line about you/ }).click();
+  await expect.poll(() => focusedPath(page)).toBe("profile.headline");
+  await page.keyboard.type("Data analyst in training");
+  await strip.getByRole("button", { name: /^Pick a look/ }).click();
+  // Looking through the looks and keeping the one shown is the choice (as G's spec has it).
+  await expect(page.locator("[data-look-menu]")).toBeVisible();
+  await page.keyboard.press("Escape");
+  // The photo is optional and skipped: with the name, the headline and the look done, the strip moves to its
+  // second step by itself.
+  await expect(strip).toHaveAttribute("data-step", "exhbt");
+
+  // The vision band's own button, the chooser, a blank page in the first layout.
+  await page.locator(`${READY} [data-owner="vision"]`).click();
+  await expect(page).toHaveURL(/\/exhbts\/new$/);
+  await page.getByRole("link", { name: "Choose a layout" }).click();
+  await page.getByRole("button", { name: /^Use the .* layout$/ }).first().click();
+  await expect(page).toHaveURL(/\/exhbts\/[^/]+\/edit/);
+  await fillTitle(page, "Timing the lunch queue");
+  // Back at once, by the editor's own link: the title is saved before the page leaves.
+  await page.locator("header[data-topbar]").getByRole("link", { name: "Your portfolio" }).click();
+  await waitReady(page);
+  const tile = page.locator(`${READY} [data-owner="owner-only"][data-why="draft"]`);
+  await expect(tile).toHaveCount(1);
+  await expect(tile).toContainText("Timing the lunch queue");
+  await expect(tile).toContainText("Draft");
+  // What was typed in the strip's first step is the page's.
+  await expect(page.locator(`${READY} ${HOME} h1`).getByRole("textbox", { name: "Your name" })).toHaveValue("Sam Taylor");
+});
