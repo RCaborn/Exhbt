@@ -58,6 +58,32 @@ Step 4 is why the atom is written through and not copied from `useBuilder`'s sta
 
 **Not covered, and known:** other pages Next has kept (the exhbts list, the account page) can still show an older portfolio after Back, since nothing purges them. Before the fix the step builder's `revalidate()` did.
 
+### The Back fix's limit, and the proper fix for after launch
+
+Added 26 Nov 2026 by E's successor.
+
+- **The limit.** `loadedAt` and `savedAt` are each stamped with `new Date()` by whichever server instance answers. Two instances can disagree. So the gate trusts a load only when it is newer than the newest landed save by more than `SKEW_MS` (2000, `pending.ts`).
+  - If clocks differ by up to two seconds, old words cannot come back.
+  - If the instance that served a load made *before* a save has a clock more than two seconds ahead of the instance that took the save, that load passes as newer. The editor would then open on old words. `e2e/portfolio-core.spec.ts` pins both sides: 1.5s is caught, 3s is the limit.
+- **What the margin costs.** A load made within two seconds after a save counts as behind. The gate then waits on the stand-in until two seconds have passed since the save's answer, measured on the browser's own clock and used only as a delay. It then fetches once.
+  - It never asks again sooner than 250ms, so it does not spin.
+  - Coming back more than two seconds after the last save costs nothing.
+  - Both cases are tested.
+- **The proper fix (decided against before launch: it writes to the live database and puts a trigger on every profile update).** Use a counter from one source in place of the two times.
+  - A migration:
+    ```sql
+    alter table profiles add column portfolio_version bigint not null default 0;
+    create function public.bump_portfolio_version() returns trigger language plpgsql as $$
+    begin new.portfolio_version := old.portfolio_version + 1; return new; end $$;
+    create trigger profiles_portfolio_version before update on profiles
+      for each row execute function public.bump_portfolio_version();
+    ```
+  - `PortfolioProfile` gains `version`. The in-memory store keeps a counter and bumps it in `updatePortfolioProfile` and `savePortfolioLayout`.
+  - `savePortfolioLayout` writes the `profiles` row last, after the exhbts' hidden flags and positions (today it writes it first). It returns `{ version }` from `.select("portfolio_version").single()`.
+  - The action returns `savedVersion` and the loader gives `loadedVersion`, read with the profile.
+  - `staleness` becomes `loadedVersion < savedVersion`, with no margin and no wait.
+  - Any other profile update (a plan change) only raises the number. A load can then look newer, never older, which is the safe way to be wrong.
+
 **How the gate behaves when the server is slow:** it waits on the stand-in, and after ten seconds shows the warning. If newer data then arrives it mounts the editor by itself. If a save that was on its way never gets an answer, it stays on the stand-in until the browser gives that request up, since it cannot know what the server holds.
 
 ## What is left, step by step

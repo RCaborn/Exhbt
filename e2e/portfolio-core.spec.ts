@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { FULL, SPARSE, fullFixture, sparseFixture } from "./fixtures/portfolio-pages";
 import type { Page } from "@playwright/test";
+import { SKEW_MS, staleness } from "../components/portfolio-editor/pending";
 import { applyUndo, entryFor } from "../components/portfolio-editor/undo";
 import type { BuilderState } from "../app/(app)/portfolio/steps";
 import { HOME, READY, boxes, call, changeWith, differences, expect, field, focusedPath, renders, fresh, openEditor, saveState, seed, setKind, settle, signIn, signUpToEditor, stateNow, test, textbox, typeIn, uiNow, undoLabel, valueAt, waitReady, waitSaved, waitSavedOnPage } from "./portfolio-editor";
@@ -426,6 +427,81 @@ test.describe("Coming back to the page", () => {
     await waitReady(page);
     expect(await valueAt(page, "profile.location")).toBe("Bradford");
     expect(await valueAt(page, "profile.headline")).toBe("Operations analyst");
+  });
+});
+
+test.describe("Coming back to the page, and the servers' clocks", () => {
+  // loadedAt and savedAt are stamped by whichever server instance answers, so the gate allows their clocks
+  // SKEW_MS of difference (pending.ts). These check the rule in-process, then the wait it costs in a browser.
+  const T = Date.parse("2026-12-01T12:00:00.000Z");
+  const at = (ms: number) => new Date(T + ms).toISOString();
+  const saved = at(0);
+
+  test("a load made before the save on a server whose clock is 1.5s ahead is still behind, and is fetched again", () => {
+    expect(SKEW_MS).toBe(2000);
+    // Truly loaded 0.5s before the save landed; its server's clock reads 1.5s ahead.
+    expect(staleness(at(-500 + 1500), saved, 0)).toBe("margin");
+    // The plain cases.
+    expect(staleness(at(-1), saved, 0)).toBe("older");
+    expect(staleness(at(0), saved, 0)).toBe("older");
+    expect(staleness(at(SKEW_MS), saved, 0)).toBe("margin");
+    expect(staleness(at(SKEW_MS + 1), saved, 0)).toBe("fresh");
+    expect(staleness(at(-5000), saved, 1)).toBe("saving");
+    expect(staleness(at(-5000), null, 0)).toBe("fresh");
+  });
+
+  test("the limit: a load made before the save on a server whose clock is 3s ahead passes as fresh", () => {
+    // Truly loaded 0.5s before the save; its clock 3s ahead: it reads 2.5s after the save, past the margin.
+    // This is the fault the margin does not cover (e-handover.md, "The Back fix's limit").
+    expect(staleness(at(-500 + 3000), saved, 0)).toBe("fresh");
+  });
+
+  test("coming back within the margin after a save waits a moment on the page as left, then opens the editor on the new words", async ({ page }) => {
+    const f = fresh(FULL, "margin");
+    await openEditor(page, f);
+    expect((await page.request.get("/account")).status()).toBe(200);
+    await typeIn(page, "profile.headline", "Analyst, back within two seconds");
+    await waitSaved(page);
+    const landed = Date.now();
+    let fetched = 0;
+    page.on("request", (r) => {
+      if (new URL(r.url()).pathname === "/portfolio" && r.headers()["rsc"] === "1") fetched++;
+    });
+    // Away and straight back by the header's links, well inside the margin.
+    await page.getByRole("link", { name: "Account", exact: true }).first().click();
+    await page.waitForURL(/\/account$/);
+    await page.getByRole("link", { name: "Your portfolio", exact: true }).first().click();
+    await expect(page.locator('[data-editor="portfolio"][data-loading]')).toBeAttached();
+    expect(Date.now() - landed, "back inside the margin").toBeLessThan(SKEW_MS);
+    await waitReady(page);
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, back within two seconds");
+    await expect(page.locator("[data-stale-data]")).toHaveCount(0);
+    // A short wait, not the ten seconds of the warning: the move's own fetch, then one more once past the margin.
+    expect(Date.now() - landed).toBeLessThan(SKEW_MS + 4000);
+    expect(fetched).toBe(2);
+  });
+});
+
+test.describe("Coming back to the page, past the margin", () => {
+  test("coming back more than the margin after the last save opens the editor at once: one fetch of the page, no second", async ({ page }) => {
+    const f = fresh(FULL, "pastmargin");
+    await openEditor(page, f);
+    expect((await page.request.get("/account")).status()).toBe(200);
+    await typeIn(page, "profile.headline", "Analyst, back after a pause");
+    await waitSaved(page);
+    await page.getByRole("link", { name: "Account", exact: true }).first().click();
+    await page.waitForURL(/\/account$/);
+    await page.waitForTimeout(SKEW_MS + 500);
+    // The page's data as Next fetches it on a move inside the app (an RSC request to /portfolio).
+    let fetched = 0;
+    page.on("request", (r) => {
+      if (new URL(r.url()).pathname === "/portfolio" && r.headers()["rsc"] === "1") fetched++;
+    });
+    await page.getByRole("link", { name: "Your portfolio", exact: true }).first().click();
+    await waitReady(page);
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, back after a pause");
+    await page.waitForTimeout(1000);
+    expect(fetched, "the move's own fetch, and no refresh for the margin").toBe(1);
   });
 });
 

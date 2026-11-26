@@ -32,6 +32,8 @@ let newest: BuilderState | null = null;
 let serverHas: BuilderState | null = null;
 /** The server's own time of the newest save that landed from this document. */
 let savedAt: string | null = null;
+/** This browser's own clock when that save's answer came: only for how long to wait, never compared with a server's time. */
+let savedHereAt = 0;
 let sender: Sender | null = null;
 /** Saves on their way: the gate and the crash fallback wait for them. */
 let sending = 0;
@@ -45,7 +47,10 @@ export function notePending(state: BuilderState): void {
 /** The server has this state: a save of it landed, at the server's time `at`. */
 export function noteSaved(state: BuilderState, at?: string): void {
   serverHas = state;
-  if (at && (!savedAt || at > savedAt)) savedAt = at;
+  if (at && (!savedAt || at > savedAt)) {
+    savedAt = at;
+    savedHereAt = Date.now();
+  }
 }
 
 /** A save is on its way: until it is answered, nobody is to think the server is up to date. */
@@ -71,12 +76,49 @@ export function hasPending(): boolean {
 }
 
 /**
+ * How far two server instances' clocks may differ before old words could come back. `loadedAt` and
+ * `savedAt` are each stamped by whichever instance answered, so a load is trusted only when it is newer
+ * than the newest landed save by more than this. Beyond it, a load made before the save on an instance
+ * whose clock is ahead by more than SKEW_MS would pass as newer: the known limit, until the store gives a
+ * counter from one source (docs/briefs/portfolio-first/e-handover.md, "The Back fix's limit").
+ */
+export const SKEW_MS = 2000;
+
+/**
+ * Why data loaded at `loadedAt` may not be the newest, from the server's two times alone (pure, for the
+ * in-process tests): "saving", a save is on its way; "older", it was loaded at or before the newest
+ * landed save; "margin", after it, but by no more than SKEW_MS, so a clock that is ahead could explain
+ * it; "fresh", newer by more than that.
+ */
+export function staleness(loadedAt: string, saved: string | null, onTheirWay: number): "fresh" | "saving" | "older" | "margin" {
+  if (onTheirWay > 0) return "saving";
+  if (saved === null) return "fresh";
+  const load = Date.parse(loadedAt);
+  const save = Date.parse(saved);
+  if (load <= save) return "older";
+  return load <= save + SKEW_MS ? "margin" : "fresh";
+}
+
+/** `staleness` for `who`, with what this document knows. Anyone else's data is never behind this document's saves. */
+export function behind(who: string, loadedAt: string): "fresh" | "saving" | "older" | "margin" {
+  if (owner !== who) return "fresh";
+  return staleness(loadedAt, savedAt, sending);
+}
+
+/**
  * Whether data loaded at the server's time `loadedAt` may be older than what this document has saved for
- * `who`: a save is on its way, or one landed after the load. The gate asks before it mounts an editor.
+ * `who` (`behind`, above, is not "fresh"). The gate asks before it mounts an editor.
  */
 export function isBehind(who: string, loadedAt: string): boolean {
-  if (owner !== who) return false;
-  return sending > 0 || (savedAt !== null && loadedAt <= savedAt);
+  return behind(who, loadedAt) !== "fresh";
+}
+
+/**
+ * How long until a load asked for now is sure to be past the margin: SKEW_MS after the newest save's
+ * answer came, on this browser's own clock. 0 when that has passed. Only ever a delay.
+ */
+export function marginLeft(): number {
+  return savedAt === null ? 0 : Math.max(0, savedHereAt + SKEW_MS - Date.now());
 }
 
 /** The newest state this document had for `who`, for the loading view to draw while newer data is fetched. Null for anyone else. */
