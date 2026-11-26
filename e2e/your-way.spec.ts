@@ -366,7 +366,7 @@ test.describe("What a visitor sees of the formatting, on the page and in print",
   const LINE: RichText = [{ t: "Two weeks", b: true }, { t: " of lunchtimes, a row a minute" }];
   const formatted = () => doc([FLOW, findings(), pull({ textRuns: SLANTED }), quote({ textRuns: BOLD }), next(), link({ descriptionRuns: LINE })], "essay");
 
-  test("bold and italic are drawn in the quote, the pull quote and the link's description, and print keeps them", async ({ page }) => {
+  test("bold and italic are drawn in the quote, the pull quote and the link's description, and print keeps them", async ({ page, browserName }) => {
     const out = await openDoc(page, freshName("ywv"), formatted());
     await page.goto(out.url);
     const art = page.locator("article[data-exhbt-page]");
@@ -385,7 +385,8 @@ test.describe("What a visitor sees of the formatting, on the page and in print",
       expect(await art.locator('[data-part="pullquote"] em').evaluate((el) => getComputedStyle(el).fontStyle), media).toBe("italic");
     }
     await page.emulateMedia({ media: "screen" });
-    expect(await pagesOf(page)).toBe(1);
+    // Counting the printed pages needs a PDF, which only Chromium can make (page.pdf); the print styles above are checked everywhere.
+    if (browserName === "chromium") expect(await pagesOf(page)).toBe(1);
   });
 });
 
@@ -581,7 +582,8 @@ test.describe("A part's title, typed in place", () => {
     expect(await outside(`${READY} section[aria-label="Preview"] article`)).toEqual([]);
   });
 
-  test("a full page with a long title over every part still prints on one A4 page", async ({ page }) => {
+  test("a full page with a long title over every part still prints on one A4 page", async ({ page, browserName }) => {
+    test.skip(browserName !== "chromium", "It counts the printed pages of a PDF, and only Chromium makes one (page.pdf).");
     const title = "Summary of what we measured most months".slice(0, LIMITS.sectionTitleChars).trimEnd();
     const long: ExhbtDoc = { ...fullDoc, flowTitle: title, sections: fullDoc.sections.map((s) => (s.kind === "findings" || s.kind === "quote" || s.kind === "reflection" ? { ...s, title } : s)) };
     expect(validateForPublish(long)).toEqual([]);

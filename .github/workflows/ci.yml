@@ -32,10 +32,10 @@ jobs:
       - run: npm run build
 
   # The end-to-end suite, split across ten runners (by spec file), each with its own dev server.
-  # Eight shards still left one at 27.7 minutes (release 3, shard 7), so ten shards and a 45-minute limit; the main session watches the shard times.
+  # Eight shards still left one at 27.7 minutes (release 3, shard 7), so ten shards and a 60-minute limit (45 until shard 2's tests took 34.9 minutes, 26 Nov 2026); the main session watches the shard times.
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
