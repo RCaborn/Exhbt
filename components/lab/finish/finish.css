@@ -831,6 +831,15 @@
     background-color: var(--color-ink);
     box-shadow: none;
   }
+  /* A sheet's surface is painted by a panel inside it, so its top edge (where the handle is) is inked
+     from here: the overlay starts at the very top of the sheet. It lets go at once when the beat ends,
+     while the ink over the rest is still there to contract. */
+  .fin-overlay[data-form="sheet"]:has(.fin-live[data-beat]) {
+    border-radius: var(--radius-page) var(--radius-page) 0 0;
+    background-color: var(--color-ink);
+    /* The panel's own edge shows a pixel above the content: cover it too. */
+    box-shadow: 0 -2px 0 var(--color-ink);
+  }
   .fin-live[data-beat] :is(.fin-share, .fin-next, .fin-close) {
     opacity: 0;
   }
