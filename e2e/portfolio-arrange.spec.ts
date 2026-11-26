@@ -389,6 +389,9 @@ test.describe("Exhbt tiles", () => {
       const draft = work.locator('[data-owner="owner-only"]');
       await expect(draft).toContainText((f.exhbts[4]!.doc as { title: string }).title);
       await expect(draft).toContainText("Draft");
+      // Every row's toolbar sits in the same place, decided for the whole list.
+      const wheres = await work.locator("[data-tile-frame] > [data-pe-tools]").evaluateAll((els) => [...new Set(els.map((e) => e.getAttribute("data-where")))]);
+      expect(wheres.length, `one place for every row: ${wheres.join(", ")}`).toBe(1);
       // In the index look its number carries on after the work's.
       if (look === "mono") await expect(draft).toContainText(`[${String((await workIds(page)).length + 1).padStart(2, "0")}]`);
     });
