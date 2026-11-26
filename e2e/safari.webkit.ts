@@ -99,17 +99,18 @@ test.describe("under Safari's rule about the focus (a press gives a button none)
     await expect.poll(async () => (await pageOrder(page)).length).toBe(order.length + 1);
   });
 
-  test("the reason a case study's flowchart can't be removed is shown when its Remove is pressed, and goes when the person presses elsewhere", async ({ page, isMobile }) => {
-    test.skip(isMobile, "a phone's bar says it instead");
+  // Until decision 0032 a case study's flowchart could not be removed: its Remove was off, and pressed, it showed why until
+  // the person pressed elsewhere (which a press that gives no focus made hard to end on Safari). It is taken off like any
+  // other part now, so a press on Remove, which gets no focus here, must still take it off.
+  test("a case study's flowchart is taken off by a press on its Remove", async ({ page, isMobile }) => {
+    test.skip(isMobile, "a phone's bar has Remove instead");
     await openTiming(page, "case-study", { full: true });
     const remove = frame(page, "flow").locator('[data-tool="remove"]');
-    await expect(remove).toHaveAttribute("aria-disabled", "true");
+    await expect(remove).not.toHaveAttribute("aria-disabled", "true");
     await frame(page, "flow").hover();
-    // aria-disabled, so Playwright won't press it unless told: a person can.
-    await remove.click({ force: true });
-    await expect(remove).toHaveAttribute("data-explain", "");
-    await page.locator(`${READY} article h1, ${READY} article .xp-title`).first().click({ position: { x: 2, y: 2 } });
-    await expect(remove).not.toHaveAttribute("data-explain", "");
+    await remove.click();
+    expect(await pageOrder(page)).not.toContain("flow");
+    expect((await docNow(page)).flowOff).toBe(true);
   });
 });
 

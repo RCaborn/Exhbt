@@ -5,7 +5,7 @@ import { FORMAT_COPY, type Format } from "../lib/exhbt/formats";
 import { fullDoc } from "../lib/exhbt/sample";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import { chooseLayout, openAddSectionMenu, publish, publishSheet, removeSection, reviewButton, thingsButton } from "./editor";
-import { READY, boxes, chooseAll, differences, docNow, field, frame, freshName, offered, openDoc, openTiming, readStored, sampleDoc, seeAsVisitor, settle, typeIn, waitReady, waitSaved } from "./page-editor";
+import { READY, boxes, chooseAll, differences, docNow, field, frame, freshName, offered, openDoc, openTiming, readStored, sampleDoc, seeAsVisitor, settle, typeIn, waitLive, waitReady, waitSaved } from "./page-editor";
 
 /*
  * "Write it your way" (decision 0032; Rory, 26 Nov 2026): bold and italic in a quote, a pull quote and a link's
@@ -51,6 +51,8 @@ const pagesOf = async (page: Page) => {
 
 /** Puts the cursor in a formatted field and selects `count` characters from the `from`th, with the keyboard. */
 async function select(page: Page, path: string, from: number, count: number) {
+  // Every formatted field's editor has started (they start one at a time in idle moments), so the keys below meet the editor itself.
+  await waitLive(page);
   const f = field(page, path);
   await f.scrollIntoViewIfNeeded();
   await f.click();
@@ -58,6 +60,7 @@ async function select(page: Page, path: string, from: number, count: number) {
   await page.keyboard.press("ControlOrMeta+Home");
   for (let i = 0; i < from; i++) await page.keyboard.press("ArrowRight");
   for (let i = 0; i < count; i++) await page.keyboard.press("Shift+ArrowRight");
+  await expect.poll(() => page.evaluate(() => getSelection()?.toString().length ?? 0)).toBe(count);
 }
 
 /** The bar that comes to the words selected in a formatted field (fields/SelectionBar.tsx). */

@@ -751,7 +751,7 @@ export function Toolbar() {
       }}
       onClick={(e) => {
         const b = (e.target as HTMLElement).closest("button");
-        // A button in the menu, pressed, closes it; not one that is off (it says why) nor an AI draft's "More actions" (it opens its own).
+        // A button in the menu, pressed, closes it; not one that is off nor an AI draft's "More actions" (it opens its own).
         if (!open || !b || b === menu.current || b.hasAttribute("data-grip") || b.getAttribute("aria-disabled") === "true" || b.closest('[data-tool="more"]')) return;
         setOpen(false);
         if (b.dataset.tool !== "remove") requestAnimationFrame(() => menu.current?.focus());

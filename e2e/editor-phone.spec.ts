@@ -167,17 +167,15 @@ test.describe("each section shows only its grip", () => {
     await expect(chart).toBeHidden();
     await expect(bar(page)).toHaveAttribute("aria-label", "Graph 2: tools");
 
-    // The flowchart in a case study can't be removed (the layout always has one): its Remove is there but off, and a tap says why.
+    // The flowchart in a case study is taken off like any other part (decision 0032: nothing has to be on the page).
+    // Until then its Remove was there but off, and a tap said why.
     await choose(page, "flow");
     await expect(bar(page)).toHaveAttribute("aria-label", "Flowchart: tools");
-    const why = "A case study always has a flowchart. Choose another layout to take it off.";
-    await expect(onBar(page, "Remove Flowchart")).toHaveAttribute("aria-disabled", "true");
-    await expect(onBar(page, "Remove Flowchart")).toHaveAccessibleDescription(why);
-    // aria-disabled, so Playwright won't tap it unless told: a person can.
-    await onBar(page, "Remove Flowchart").tap({ force: true });
-    await expect(bar(page).locator(".xe-bar-why")).toHaveText(why);
-    await expect(bar(page).locator(".xe-bar-why")).toBeVisible();
-    await expect(frame(page, "flow")).toBeVisible();
+    await expect(onBar(page, "Remove Flowchart")).not.toHaveAttribute("aria-disabled", "true");
+    await expect(onBar(page, "Remove Flowchart")).toHaveAccessibleDescription("");
+    await onBar(page, "Remove Flowchart").tap();
+    await expect(frame(page, "flow")).toHaveCount(0);
+    expect((await docNow(page)).flowOff).toBe(true);
 
     // A plain field in the title: the bar names the part (its More actions show only where the AI drafted it).
     await field(page, "title").tap();
@@ -413,6 +411,52 @@ test.describe("formatting on the bar", () => {
     await onBar(page, "Done").tap();
     await expect(bar(page)).toHaveAttribute("aria-label", "Findings: tools");
     await expect(grip(page, (await docNow(page)).sections[findings]!.id)).toBeFocused();
+  });
+
+  test("in a quote, a pull quote and a link's description: Bold and Italic are on the bar with no Link, and Bold marks the words chosen", async ({ page }) => {
+    // Decision 0032: these three take bold and italic. None takes a link: a quote's neighbours (who said it, their role) are
+    // plain, and a link's section is the link. The formatting is kept beside each one's plain words.
+    const doc: ExhbtDoc = {
+      schemaVersion: 2,
+      format: "essay",
+      title: "Did the law lead?",
+      context: "Year 2 essay",
+      skills: ["Argument"],
+      gap: text("Courts follow more often than they lead."),
+      flow: [{ step: "Read the cases" }, { step: "Set them in order" }, { step: "Weighed each one" }],
+      sections: [
+        { id: "flow", kind: "flow" },
+        { id: "findings", kind: "findings", items: [text("The statute came first."), text("Opinion moved later.")] },
+        { id: "pullquote-1", kind: "pullquote", text: "A court rarely leads." },
+        { id: "quote-1", kind: "quote", text: "It read as a careful argument.", name: "", role: "" },
+        { id: "link-1", kind: "link", href: "https://example.com/hansard", label: "Hansard, 3 March 1965", description: "The second reading" },
+      ],
+    };
+    await openDoc(page, freshName("phyw"), doc);
+    await waitLive(page);
+    for (const [kind, key, runs] of [
+      ["quote", "text", "textRuns"],
+      ["pullquote", "text", "textRuns"],
+      ["link", "description", "descriptionRuns"],
+    ] as const) {
+      const i = (await docNow(page)).sections.findIndex((s) => s.kind === kind);
+      const f = field(page, `sections.${i}.${key}`);
+      await f.scrollIntoViewIfNeeded();
+      await f.tap();
+      await expect(f.locator(".ProseMirror")).toBeFocused();
+      for (const name of ["Bold", "Italic", "Done"]) await expect(onBar(page, name), kind).toBeVisible();
+      await expect(onBar(page, "Link"), kind).toHaveCount(0);
+      await chooseAll(page);
+      // Under a finger no bar comes to the words: the system's own copy and paste bubble sits there, and the buttons are on this bar.
+      await expect(page.locator(`${READY} .xe-selbar`), kind).toHaveCount(0);
+      await onBar(page, "Bold").tap();
+      await expect.poll(async () => ((await docNow(page)).sections[i] as unknown as Record<string, RichText | undefined>)[runs], kind).toMatchObject([{ b: true }]);
+      await onBar(page, "Done").tap();
+    }
+    // The plain words are untouched: the formatting sits beside them.
+    const after = await docNow(page);
+    expect(after.sections.find((s) => s.kind === "quote")).toMatchObject({ text: "It read as a careful argument." });
+    expect(after.sections.find((s) => s.kind === "link")).toMatchObject({ description: "The second reading" });
   });
 
   test("Link with words chosen opens the address prompt; a link is made only with an https address", async ({ page }) => {

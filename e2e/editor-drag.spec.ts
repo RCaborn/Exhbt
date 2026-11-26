@@ -332,30 +332,25 @@ test.describe("each section's toolbar, at 1440 wide", () => {
     }
   });
 
-  test("a case study's and research's flowchart: Remove is there but off, and says why when focused or pressed; a gallery's takes it off", async ({ page }) => {
-    const WHY = { "case-study": "A case study always has a flowchart. Choose another layout to take it off.", research: "Research always has a flowchart. Choose another layout to take it off." } as const;
-    for (const f of ["case-study", "research"] as const) {
+  test("the flowchart's Remove takes it off in every layout: a case study's and research's too, whose Remove was off until decision 0032", async ({ page }) => {
+    // Until decision 0032 a case study and research always drew their flowchart: Remove was there but off, and said why.
+    for (const f of offered()) {
       await openTiming(page, f, { full: true });
-      const order = await pageOrder(page);
-      const remove = frame(page, "flow").locator('[data-tool="remove"]');
-      await expect(remove).toHaveAttribute("aria-disabled", "true");
-      await expect(remove).toHaveAccessibleName("Remove Flowchart");
-      await expect(remove).toHaveAccessibleDescription(WHY[f]);
-      await expect(remove).toHaveAttribute("data-tip", WHY[f]);
+      const tools = frame(page, "flow").locator("> .xe-tools");
+      const remove = tools.locator('[data-tool="remove"]');
+      await expect(remove, f).not.toHaveAttribute("aria-disabled", "true");
+      await expect(remove, f).toHaveAccessibleName("Remove Flowchart");
+      await expect(remove, f).toHaveAccessibleDescription("");
+      await expect(remove, f).toHaveAttribute("data-tip", "Remove Flowchart");
       await frame(page, "flow").hover();
-      // aria-disabled, so Playwright won't press it unless told: a person can.
-      await remove.click({ force: true });
-      await expect(said(page)).toHaveText(WHY[f]);
-      expect(await pageOrder(page)).toEqual(order);
-      // Shown as well as said: the reason in its tooltip, while the button keeps the focus.
-      expect(await remove.evaluate((el) => getComputedStyle(el, "::after").content)).toBe(`"${WHY[f]}"`);
+      // Where the toolbar is its compact pair, Remove is in its menu.
+      if ((await tools.getAttribute("data-place")) === "compact" && (await tools.getAttribute("data-open")) === null) await tools.locator('[data-tool="menu"]').click();
+      await remove.click();
+      expect(await pageOrder(page), f).not.toContain("flow");
+      expect((await docNow(page)).flowOff, f).toBe(true);
+      // Its boxes are kept, to come back with it.
+      expect((await docNow(page)).flow.length, f).toBeGreaterThan(0);
     }
-    await openTiming(page, "gallery", { full: true });
-    const remove = frame(page, "flow").locator('[data-tool="remove"]');
-    await expect(remove).not.toHaveAttribute("aria-disabled", "true");
-    await frame(page, "flow").hover();
-    await remove.click();
-    expect(await pageOrder(page)).not.toContain("flow");
   });
 
   test("each toolbar is one Tab stop: the arrows, Home and End move along it; the grip's arrows move a section only while it is carried", async ({ page }) => {

@@ -493,34 +493,39 @@ test.describe("Sections in the editor", () => {
     await expect(page.getByText(/^(It's live|Your changes are live)\b/)).toHaveCount(0);
   });
 
-  test("the flowchart stays on every exhbt, with 3 to 6 boxes", async ({ page }) => {
+  // Until decision 0032 the flowchart stayed on every case study with 3 to 6 boxes, and a page with no findings and no
+  // graph could not be published. Nothing has to be filled in now: the most there may be of each thing still holds.
+  test("the flowchart has up to 6 boxes, any of them removable; with every section taken away the page still publishes, and findings or a graph are suggested", async ({ page }) => {
     await signInAs(page, "flo");
     await startWithCore(page, "Sections: the flowchart stays");
-    // Not a section: nothing removes it, and the menu doesn't offer it while it is on the page.
-    await onSection(page, "flow");
-    await expect(page.locator(`${READY} [data-section-id="flow"]`).getByRole("button", { name: /^Remove process/i })).toHaveCount(0);
+    // The menu doesn't offer the flowchart while it is on the page.
     await openAddSectionMenu(page);
     expect(await page.locator(`${READY} [data-xe-menu] [data-block]`).evaluateAll((bs) => bs.map((b) => b.getAttribute("data-block")))).toEqual(["findings", "graph", "image", "quote", "reflection", "link"]);
     await page.keyboard.press("Escape");
 
-    // 3 to 6 boxes.
-    await expect(page.getByRole("button", { name: "Remove box 1" })).toBeDisabled();
+    // Up to 6 boxes, and a box can be removed at any count.
+    await onSection(page, "flow");
+    await expect(page.getByRole("button", { name: "Remove box 1" })).toBeEnabled();
     for (let n = 4; n <= LIMITS.flow.max; n++) await addBox(page);
     await expect(page.getByLabel(/^Box \d$/)).toHaveCount(LIMITS.flow.max);
     await expect(page.getByRole("button", { name: "Add a box at the end" })).toHaveCount(0);
 
-    // With every section taken away, the flowchart is still drawn, and publishing asks for findings or a graph.
+    // With every section taken away, the flowchart is still drawn. Findings or a graph are a suggestion, which goes to the "+".
     await onSection(page, "findings");
     await page.getByRole("button", { name: "Remove findings" }).click();
     expect(await listOrder(page)).toEqual([]);
     await expect(page.getByRole("list", { name: "Methodology" })).toBeVisible();
     for (let n = 4; n <= LIMITS.flow.max; n++) await fillBox(page, n, `Step ${n}`);
+    const NEED = "Add findings or a graph, so the exhbt shows what came of the work.";
+    await page.getByRole("button", { name: "1 suggestion", exact: true }).click();
+    await page.getByRole("region", { name: "Suggestions" }).getByText(NEED, { exact: true }).click();
+    await expect(page.getByRole("button", { name: "Add a section", exact: true })).toBeFocused();
+    // And it stops nothing: the sheet says it again, and the page goes live.
     await openPublishSheet(page);
+    await expect(publishSheet(page).getByText(NEED, { exact: true })).toBeVisible();
     await publishSheet(page).getByLabel(SEL.publishConfirm).check();
     await publishSheet(page).getByRole("button", { name: "Publish", exact: true }).click();
-    const problems = await openThingsToFix(page);
-    await problems.getByRole("button", { name: "Sections: Add findings or a graph, so the exhbt shows what came of the work." }).click();
-    await expect(page.getByRole("button", { name: "Add a section", exact: true })).toBeFocused();
+    await expect(publishSheet(page).getByText(SEL.liveText)).toBeVisible();
   });
 
   test("an exhbt saved before sections shows the same page as the same exhbt in sections", async ({ page }) => {
