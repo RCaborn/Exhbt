@@ -30,14 +30,14 @@ Do the first four in the Exhbt look, then again in Studio.
 
 | Done | Try this | What went wrong |
 |---|---|---|
-| ☐ | Open `/portfolio`. The bar shows Your portfolio, a status word and one button, and the rest is in the menu. | |
+| ☐ | Open `/portfolio`. The bar shows Your portfolio, a status word and one button, the rest is in the menu, and the bar stays at the top as you scroll. | |
 | ☐ | Tap a field and type. **Nothing zooms** when the keyboard opens, and the page stays where it was. | |
-| ☐ | Add a photo from the camera roll. It shows in the hero. (check when I lands) | |
-| ☐ | Open the Look sheet, change the look, close it. The sheet fills the screen and the page behind is the new look. (check when I lands) | |
-| ☐ | Press and hold a tile, then drag it to a new place. The page doesn't scroll under your finger. (check when I lands) | |
-| ☐ | Press and hold a section and drag it. (check when I lands) | |
-| ☐ | Tap **More** on a tile and on a section. A sheet lists what you can do, and each button is easy to hit. (check when I lands) | |
-| ☐ | Open **Reorder sections**, move one up and one down with the buttons, and close it. (check when I lands) | |
+| ☐ | Add a photo from the camera roll. It shows in the hero. | |
+| ☐ | Open the Look sheet, change the look, close it. The sheet fills the screen and the page behind is the new look. | |
+| ☐ | Press and hold a tile, then drag it to a new place. The page doesn't scroll under your finger. | |
+| ☐ | Press and hold a section and drag it. | |
+| ☐ | Tap **More** on a tile and on a section. A full-screen sheet lists what you can do; an action that is off is dimmed and says why. After one, a toast offers Undo. | |
+| ☐ | Open **Reorder sections**, move one with Move up and Move down, one by press and hold, try its Undo, then press Done. | |
 | ☐ | Add an exhbt from the Add tile, write a title, go back, and find it on the page. | |
 | ☐ | Turn the phone sideways and back. Nothing jumps or is cut off. | |
 
