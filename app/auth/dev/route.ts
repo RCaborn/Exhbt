@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { DEV_USER_COOKIE, safeNext } from "@/lib/auth";
+import { landingAfterSignIn } from "@/lib/landing";
+import { portfolioKindForEveryone } from "@/lib/portfolio-kind-server";
+import { isPhase2Enabled } from "@/lib/site";
 import { recordReferralFromCookie } from "@/lib/referrals";
 import { getStore, isSupabaseConfigured } from "@/lib/store";
 
@@ -14,7 +17,7 @@ export async function GET(req: NextRequest) {
 
   await getStore().claimPendingRoadmaps(email, `dev-${email}`);
   await recordReferralFromCookie(`dev-${email}`, null);
-  const res = NextResponse.redirect(new URL(safeNext(url.searchParams.get("next")), url.origin));
+  const res = NextResponse.redirect(new URL(safeNext(url.searchParams.get("next"), landingAfterSignIn("log-in", await portfolioKindForEveryone(), isPhase2Enabled())), url.origin));
   res.cookies.set(DEV_USER_COOKIE, email, { httpOnly: true, sameSite: "lax", path: "/" });
   return res;
 }
