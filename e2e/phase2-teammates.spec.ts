@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { ENTITLEMENTS } from "../lib/entitlements";
 import { TEAMMATES_PER_EXHBT } from "../lib/team-rules";
+import { ADD, DRAFT_WITH_AI, startBlank } from "./add-exhbt";
 import { closeSheet } from "./editor";
 
 // Teammates and private file matching (docs/decisions/0013): invites by email and accepting them,
@@ -232,7 +233,7 @@ test.describe("A teammate's own exhbt", () => {
 
     await page.goto("/exhbts");
     await expect(page.getByText(new RegExp(`1 of ${max} used on Free`))).toBeVisible();
-    if (max === 1) await expect(page.getByRole("button", { name: "Start from scratch" })).toHaveCount(0);
+    if (max === 1) await expect(page.getByRole("link", { name: ADD.listLink })).toHaveCount(0);
     await expect(page.getByRole("link", { name: `Open your own exhbt of ${TITLE}` })).toBeVisible();
 
     // Drafting from the team's files fills this exhbt; it doesn't start another.
@@ -284,7 +285,7 @@ test.describe("The same file on someone else's exhbt", () => {
     await uploadTo(page, id, "report.txt", "text/plain", NOTES, "evidence");
 
     await signInAs(page, stranger);
-    await page.getByRole("button", { name: "Start from scratch" }).click();
+    await startBlank(page);
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
     await expect(page.locator("[data-ready=true]")).toBeAttached();
     const completed = page.waitForResponse((r) => /\/api\/files\/[0-9a-f-]{36}\/complete$/.test(r.url()));
@@ -353,7 +354,7 @@ test.describe("The same file on someone else's exhbt", () => {
     await uploadTo(page, id, "data.txt", "text/plain", NOTES);
 
     // On the upload page this time.
-    await signInAs(page, stranger, "/exhbts/new");
+    await signInAs(page, stranger, DRAFT_WITH_AI);
     await expect(page.locator("form[data-ready=true]")).toBeAttached();
     await page.locator("#files").setInputFiles({ name: "data.txt", mimeType: "text/plain", buffer: NOTES });
     const prompt = page.getByTestId("match-prompt");

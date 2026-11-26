@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import Stripe from "stripe";
 import { BILLING_PERIOD, ENTITLEMENTS, PLAN_NAMES, PRICES } from "../lib/entitlements";
+import { ADD, DRAFT_WITH_AI } from "./add-exhbt";
 import { openPublishSheet, signInAs, startFromScratch } from "./editor";
 import { uniqueBytes } from "./unique-bytes";
 
@@ -83,14 +84,13 @@ test.describe("Upgrade at the point of need", () => {
       await startFromScratch(page, { waitForContext: false });
       await page.goto("/exhbts");
     }
-    await expect(page.getByRole("button", { name: "Start from scratch" })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Upload your project" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: ADD.listLink })).toHaveCount(0);
     const prompt = page.getByTestId("upgrade-prompt");
     await expect(prompt).toContainText(`Your plan holds ${ENTITLEMENTS.premium.exhbts} exhbts.`);
     await expect(prompt.getByRole("link", { name: new RegExp(`^Upgrade to ${PLAN_NAMES.max}`) })).toHaveAttribute("href", "/account/billing");
 
     // The upload page refuses too, with the same offer.
-    await page.goto("/exhbts/new");
+    await page.goto(DRAFT_WITH_AI);
     const alert = page.getByRole("alert").filter({ hasText: "Your plan holds" });
     await expect(alert.getByRole("link", { name: new RegExp(`^Upgrade to ${PLAN_NAMES.max}`) })).toHaveAttribute("href", "/account/billing");
     await expect(page.getByRole("button", { name: "Draft my exhbt" })).toHaveCount(0);

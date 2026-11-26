@@ -31,6 +31,8 @@ export const DEFAULT_FORMAT: Format = "case-study";
  * person's editor doesn't offer is not let through.
  */
 export const mayCarryFormat = (next: Format, stored: Format, offered: readonly Format[] = OFFERED_FORMATS): boolean => offered.includes(next) || next === stored;
+/** Said when a request names a layout the person's editor doesn't offer: by a save or a publish, and by "Add an exhbt". */
+export const LAYOUT_NOT_OFFERED = "That layout isn't available yet. Choose another layout and try again.";
 export const isFormat = (v: unknown): v is Format => typeof v === "string" && (FORMATS as readonly string[]).includes(v);
 export const formatOf = (d: { format?: unknown }): Format => (isFormat(d.format) ? d.format : DEFAULT_FORMAT);
 

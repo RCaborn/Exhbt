@@ -1,0 +1,209 @@
+/* "Add an exhbt" (/exhbts/new): the chooser and the layouts. The screen is laid out with Astryx components
+   and their props; this file holds only what they have no prop for, and every colour, space, corner and
+   timing in it is one of Astryx's tokens (the Exhbt theme gives them the brand's values). Each rule says
+   why it is here. */
+@layer components {
+  .add-exhbt {
+    /* The ground the pictures sit on: the brand's soft mint fill. Astryx's Card and Section have no variant for it. */
+    --add-stage: var(--color-accent-muted);
+    /* Keyboard focus on this screen is ringed in jade, which reads on white, mist and mint (DESIGN.md, "Focus");
+       Astryx's own ring is the accent, and mint on white is too faint to find. */
+    --focus-outline-color: var(--color-text-accent);
+  }
+
+  /* One control per card, pressed anywhere on it. Astryx's ClickableCard follows its link in script, so it
+     can't be pressed with scripts off; here the control is a real link or submit button (an Astryx Button),
+     and its ::after, which Astryx leaves to the caller, is its press area, grown past the button and cut off
+     at the card's own edge. */
+  .add-way,
+  .add-layout {
+    overflow: clip;
+  }
+  .add-go::after {
+    content: "";
+    position: absolute;
+    inset: -100vmax;
+  }
+  /* A way's picture sizes itself to its card, not to the window: two cards side by side on a tablet are
+     each narrower than one card on a phone. */
+  .add-way {
+    container-type: inline-size;
+  }
+
+  /* A card that can be pressed says so: its edge darkens, its button turns mint (the one mint button on the
+     screen is the one under the pointer or the keyboard), and it lifts by a hair, as a linked card does
+     elsewhere on the site. The cell stays put while its card lifts, so the pointer never falls off the edge
+     it is resting on. The lift rests under reduced motion. */
+  .add-cell:focus-within .add-go:focus-visible {
+    background-color: var(--color-accent);
+  }
+  .add-cell:has(.add-go:focus-visible) > :has(.add-go) {
+    border-color: var(--color-border-emphasized);
+  }
+  @media (hover: hover) {
+    .add-cell:hover > :has(.add-go) {
+      border-color: var(--color-border-emphasized);
+    }
+    .add-cell:hover .add-go {
+      background-color: var(--color-accent);
+    }
+  }
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .add-way,
+    .add-layout {
+      transition:
+        transform var(--duration-fast) var(--ease-standard),
+        border-color var(--duration-fast) var(--ease-standard);
+    }
+    .add-cell:hover > :has(.add-go) {
+      transform: translateY(calc(-1 * var(--spacing-0-5)));
+    }
+  }
+
+  /* The pictures. Astryx has no illustration parts, so these are painted here: a soft mint stage, white
+     sheets of paper on it, and the editor's layout sketches drawn on the sheets in hairlines that keep their
+     weight at any size. */
+  .add-art {
+    gap: var(--spacing-3);
+    block-size: calc(var(--spacing-12) * 4);
+    padding: var(--spacing-3);
+    border-radius: var(--radius-element);
+    background: var(--add-stage);
+    color: var(--color-text-secondary);
+  }
+  @container (min-width: 28rem) {
+    .add-art {
+      gap: var(--spacing-5);
+      block-size: calc(var(--spacing-8) * 7);
+      padding: var(--spacing-5);
+    }
+  }
+  .add-art-sheet {
+    padding: var(--spacing-3);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-inner);
+    background: var(--color-background-card);
+  }
+  .add-sketch {
+    display: block;
+    inline-size: 100%;
+    block-size: auto;
+    overflow: visible;
+  }
+  .add-sketch * {
+    vector-effect: non-scaling-stroke;
+    stroke-width: calc(var(--border-width) * 1.5);
+  }
+
+  /* A way that can't be taken now (no AI drafts left): its picture goes quiet. */
+  .add-way[data-off] .add-art {
+    background: var(--color-background-muted);
+    color: var(--color-text-disabled);
+    filter: grayscale(1);
+  }
+
+  /* What you bring: the kinds of file, or the layouts on offer, in two columns of fixed, token-sized tiles. */
+  .add-art-from {
+    flex: none;
+    grid-template-columns: repeat(2, var(--spacing-10));
+  }
+  .add-art-from[data-few] {
+    grid-template-columns: var(--spacing-10);
+  }
+  .add-art-file {
+    block-size: var(--spacing-10);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-inner);
+    background: var(--color-background-card);
+    color: var(--color-text-primary);
+  }
+  @container (min-width: 28rem) {
+    .add-art-files {
+      grid-template-columns: repeat(2, var(--spacing-12));
+    }
+    .add-art-file {
+      block-size: var(--spacing-12);
+    }
+  }
+  .add-art-layouts .add-art-sheet {
+    padding: var(--spacing-1-5);
+    border-radius: calc(var(--radius-inner) / 2);
+  }
+  /* An odd one out sits under the middle of the pairs above it. */
+  .add-art-layouts:not([data-few]) > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    justify-self: center;
+    inline-size: var(--spacing-10);
+  }
+  .add-art-layouts .add-sketch * {
+    stroke-width: var(--border-width);
+  }
+
+  /* The page you get: the same sheet both times, written in or empty. */
+  .add-art-page {
+    position: relative;
+    flex: 0 1 calc(var(--spacing-12) * 4.5);
+    min-inline-size: 0;
+  }
+  .add-art-over {
+    position: absolute;
+    inset-block-start: var(--spacing-3);
+    inset-inline-start: var(--spacing-3);
+    inline-size: calc(100% - 2 * var(--spacing-3));
+  }
+  /* Written: the title and the result's box in ink, as an exhbt's own flowchart ends on an ink box; the
+     key figure's bars in the chart's two shades. */
+  .add-art-written > .add-sketch:first-child rect:nth-of-type(1),
+  .add-art-written > .add-sketch:first-child rect:nth-of-type(4) {
+    fill: var(--color-text-primary);
+    stroke: var(--color-text-primary);
+  }
+  .add-art-written .add-art-over rect {
+    fill: var(--color-accent);
+    stroke: none;
+  }
+  .add-art-written .add-art-over rect[data-key] {
+    fill: var(--color-text-accent);
+  }
+  /* Empty: quieter lines, and the cursor waiting in the title's box. */
+  .add-art-empty > .add-sketch:first-child {
+    color: var(--color-text-disabled);
+  }
+  .add-art-empty > .add-sketch:first-child rect:nth-of-type(1) {
+    stroke: var(--color-text-accent);
+  }
+  .add-art-empty .add-art-over path {
+    stroke: var(--color-text-accent);
+    stroke-width: calc(var(--border-width) * 2);
+    stroke-linecap: round;
+  }
+
+  /* The example exhbt in its browser frame: the real page, drawn at half size. It is the box its own
+     hidden parts are placed in (a chart's table for screen readers), so the frame's crop cuts them off
+     with the rest and they add nothing to the length of this page. */
+  .add-example {
+    position: relative;
+    zoom: 0.5;
+    padding: var(--spacing-8);
+    background: var(--color-background-card);
+  }
+
+  /* A layout's sketch on its stage. On a phone the stage is a small square beside the layout's words. */
+  .add-layout-art {
+    padding: var(--spacing-6);
+    border-radius: var(--radius-element);
+    background: var(--add-stage);
+    color: var(--color-text-secondary);
+  }
+  .add-layout-art .add-sketch rect {
+    fill: var(--color-background-card);
+  }
+  @media (width < 40rem) {
+    .add-layout-art {
+      flex: none;
+      inline-size: calc(var(--spacing-12) * 2);
+      padding: var(--spacing-3);
+      border-radius: var(--radius-inner);
+    }
+  }
+}
