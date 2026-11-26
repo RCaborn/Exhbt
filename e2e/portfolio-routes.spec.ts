@@ -262,6 +262,7 @@ test.describe("roadmap ideas", () => {
     await waitForResult(page);
     const roadmap = new URL(page.url()).pathname;
     await unlockProjects(page, { email });
+    await expect(page.getByRole("heading", { level: 1, name: "Projects that would prove them" })).toBeVisible();
     await page.goto(`/auth/dev?email=${encodeURIComponent(email)}&next=${encodeURIComponent(`${roadmap}?view=projects`)}`);
     await expect(page.getByRole("button", { name: /^Build this as an exhbt/ }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /^Add to your portfolio as an exhbt/ })).toHaveCount(0);
