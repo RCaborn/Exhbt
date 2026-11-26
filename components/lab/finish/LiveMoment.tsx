@@ -119,16 +119,19 @@ export function LiveMoment({
         <span className="fin-path">{words.path}</span>
       </p>
       <div className="fin-actions">
-        <Button label={copied ? "Link copied" : "Copy link"} variant="primary" size="lg" icon={<Icon icon={copied ? "check" : "copy"} />} onClick={copy} />
-        {canShare && (
-          <Button
-            label="Share"
-            variant="secondary"
-            size="lg"
-            icon={<Icon icon={Share2} />}
-            onClick={() => navigator.share?.({ title: words.title, url }).catch(() => {})}
-          />
-        )}
+        {/* Sending it is the next step, so the two ways to send it stay together (a phone gives them half the row each). */}
+        <span className="fin-send">
+          <Button label={copied ? "Link copied" : "Copy link"} variant="primary" size="lg" icon={<Icon icon={copied ? "check" : "copy"} />} onClick={copy} />
+          {canShare && (
+            <Button
+              label="Share"
+              variant="secondary"
+              size="lg"
+              icon={<Icon icon={Share2} />}
+              onClick={() => navigator.share?.({ title: words.title, url }).catch(() => {})}
+            />
+          )}
+        </span>
         <Button label="View it" variant="ghost" size="lg" icon={<Icon icon="externalLink" />} href={words.viewHref} />
       </div>
       <span className="fin-close fin-close-narrow">

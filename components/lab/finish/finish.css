@@ -239,7 +239,24 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+    gap: 0.5rem 0.75rem;
+  }
+  .fin-send {
+    display: flex;
     gap: 0.75rem;
+  }
+  @media (width < 640px) {
+    .fin-send:has(> :nth-child(2)) {
+      flex: 1 1 100%;
+    }
+    .fin-send:has(> :nth-child(2)) > .astryx-button {
+      flex: 1 1 0;
+      justify-content: center;
+    }
+    /* View it on its own line under them: its words line up with the label's edge. */
+    .fin-send:has(> :nth-child(2)) + .astryx-button {
+      margin-left: -0.75rem;
+    }
   }
 
   /* The work: the live page raised, the seal on its corner, the link as it pastes, the next step. */

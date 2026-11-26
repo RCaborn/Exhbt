@@ -12,7 +12,7 @@ import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
 import { useToast } from "@astryxdesign/core/Toast";
 import { Token } from "@astryxdesign/core/Token";
-import { useLab } from "../LabFrame";
+import { PersonPage, useLab } from "../LabFrame";
 import { FreeMoment } from "./FreeMoment";
 import { LiveMoment } from "./LiveMoment";
 import { ReviewStep } from "./ReviewStep";
@@ -198,8 +198,9 @@ export function FinishStage({
           <figcaption className="sr-only">
             {`${words.title}, by ${words.first}, as it stands in the editor: ${live ? "live" : "a draft, not yet confirmed or checked"}.`}
           </figcaption>
+          {/* Her page, under today's theme and tokens: the proposed theme never restyles it. */}
           <div inert aria-hidden className="fin-window-crop">
-            {editorPage}
+            <PersonPage>{editorPage}</PersonPage>
           </div>
         </figure>
       </div>
@@ -212,6 +213,8 @@ export function FinishStage({
         <Dialog
           isOpen={isOpen}
           onOpenChange={(o) => !o && close()}
+          // Named outright: the title's own wiring (aria-labelledby) didn't follow the step's content swap.
+          aria-label={title}
           width={wide ? (state === "free" ? "min(60rem, calc(100vw - 2rem))" : "min(72rem, calc(100vw - 2rem))") : 520}
           maxHeight="calc(100dvh - 2rem)"
           padding={0}
