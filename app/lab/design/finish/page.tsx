@@ -1,6 +1,7 @@
 import { Heading } from "@astryxdesign/core/Heading";
 import { Text } from "@astryxdesign/core/Text";
 import { Frame } from "@/components/lab/Frame";
+import { DraftWait } from "@/components/lab/finish/DraftWait";
 import { FinishStage } from "@/components/lab/finish/FinishStage";
 import { PersonExhbt } from "@/components/lab/finish/PersonExhbt";
 import { PortfolioLanding, type LandingTile } from "@/components/lab/finish/PortfolioLanding";
@@ -57,6 +58,8 @@ function wordsFor(): FinishWords {
     viewHref: `/demo/${e.slug}`,
     portfolioHref: `${LAB_PATH}/finish?state=portfolio`,
     nextHref: `${LAB_PATH}/finish?state=drafting`,
+    editorHref: `${LAB_PATH}/finish?state=first`,
+    appHost: APP_HOST,
     preview: {
       src: `${LAB_PATH}/finish/preview.png?slug=${e.slug}`,
       alt: `The link's preview picture, on ink: ${sample.owner.name}, "${e.doc.title}"${headline ? `, ${headline.value}` : ""}, three of its skills and the link.`,
@@ -102,6 +105,8 @@ export default async function LabFinish({ searchParams }: { searchParams: Promis
       return { id: slug, title: p.title, status, node: <ProjectCard project={{ ...p, href: null }} /> };
     });
     stage = <PortfolioLanding key={state} words={words} tiles={tiles} look={{ attrs: lookAttrs(theme), style: themeStyle(theme) }} />;
+  } else if (state === "drafting") {
+    stage = <DraftWait key={state} words={words} draftPage={<PersonExhbt slug={e.slug} stage="draft" className="p-8" />} />;
   } else {
     stage = (
       <FinishStage

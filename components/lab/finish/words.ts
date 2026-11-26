@@ -24,9 +24,12 @@ export type FinishWords = {
   evidence: string | null;
   /** The live exhbt, for "View it" (the sample's own page, /demo/<slug>). */
   viewHref: string;
-  /** "Your portfolio" and "Add your next exhbt": the lab's own states. */
+  /** "Your portfolio", "Add your next exhbt" and "Open it in the editor": the lab's own states. */
   portfolioHref: string;
   nextHref: string;
+  editorHref: string;
+  /** The app's own host (lib/hosts.ts), for the address bar of a page only its owner sees. */
+  appHost: string;
   /** The link preview: the real picture (preview.png) and what the apps print under it. */
   preview: { src: string; alt: string; title: string; description: string };
   /** On Free: why it can't go out, what the upgrade gives, and its button. */

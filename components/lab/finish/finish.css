@@ -528,6 +528,123 @@
     height: 3.5rem;
   }
 
+  /* ── Writing the draft: the steps in words, the page taking shape beside them ─────── */
+  .fin-replay {
+    gap: 0.5rem;
+  }
+  .fin-wait {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.75rem;
+    padding: 1.5rem 1.25rem 1.75rem;
+  }
+  @media (width >= 768px) {
+    .fin-wait {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      grid-template-areas:
+        "top work"
+        "rest work";
+      grid-template-rows: auto 1fr;
+      align-items: start;
+      gap: 1.5rem 3rem;
+      padding: 2.5rem;
+    }
+    .fin-wait-top {
+      grid-area: top;
+    }
+    .fin-wait-rest {
+      grid-area: rest;
+    }
+    .fin-wait-work {
+      grid-area: work;
+    }
+  }
+  .fin-wait-top,
+  .fin-wait-rest {
+    display: grid;
+    gap: 1.25rem;
+    align-content: start;
+  }
+  .fin-wait-crop {
+    height: 15rem;
+    overflow: hidden;
+  }
+  @media (width >= 640px) {
+    .fin-wait-crop {
+      height: 22rem;
+    }
+  }
+  .fin-wait-page {
+    zoom: 0.42;
+  }
+  @media (width >= 640px) {
+    .fin-wait-page {
+      zoom: 0.5;
+    }
+  }
+  /* The shape of the page: a sidebar and a main column, as the exhbt page lays itself out. */
+  .fin-shape {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    padding: 1rem;
+  }
+  @media (width >= 640px) {
+    .fin-shape {
+      grid-template-columns: 9rem minmax(0, 1fr);
+      gap: 1.5rem;
+      padding: 1.5rem;
+    }
+  }
+  .fin-shape-aside,
+  .fin-shape-words,
+  .fin-shape-main {
+    display: grid;
+    gap: 0.625rem;
+    align-content: start;
+  }
+  .fin-shape-aside {
+    justify-items: start;
+    border-radius: var(--radius-element);
+    background: var(--color-mist);
+    padding: 1rem;
+  }
+  .fin-shape-main {
+    gap: 1.25rem;
+  }
+  .fin-shape-flow {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  .fin-shape-found {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1rem;
+  }
+  /* The file being read is real: its name, on the sidebar's button. */
+  .fin-shape-file {
+    margin-top: 0.25rem;
+    border-radius: 999px;
+    background: var(--color-mint);
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+  /* A part waits, faint, until the step that makes it begins. The shimmer is stilled: nothing loops. */
+  .fin-shape [data-part-step] {
+    opacity: 0.4;
+  }
+  .fin-shape [data-part-step][data-on] {
+    opacity: 1;
+  }
+  .fin-shape .astryx-skeleton,
+  .fin-shape .astryx-skeleton::before,
+  .fin-shape .astryx-skeleton::after {
+    animation: none;
+  }
+
   /* ── Motion: about a second, once ───────────────────────────────────────────────── */
   @media (prefers-reduced-motion: no-preference) {
     /* The checks fill one after another. At every level: it is the confirmation itself. */
@@ -572,6 +689,46 @@
     }
     [data-level="restrained"] .fin-tile-status {
       --fin-turn: 240ms;
+    }
+
+    /* Writing the draft: a part comes up when its step begins; the draft, when it arrives, assembles
+       in reading order (the sidebar, the title, the flowchart box by box, then the rest). */
+    [data-motion="on"] .fin-shape [data-part-step] {
+      transition: opacity var(--duration-slow) var(--ease-standard);
+    }
+    [data-motion="on"]:not([data-level="restrained"]) .fin-wait[data-arrived] :is(.xp-aside, .xp-title, .xp-flow-box, [data-part]) {
+      animation: fin-part var(--duration-medium) var(--ease-entrance) both;
+    }
+    [data-motion="on"] .fin-wait[data-arrived] .xp-title {
+      animation-delay: 90ms;
+    }
+    [data-motion="on"] .fin-wait[data-arrived] li:nth-child(1) > .xp-flow-box {
+      animation-delay: 220ms;
+    }
+    [data-motion="on"] .fin-wait[data-arrived] li:nth-child(2) > .xp-flow-box {
+      animation-delay: 290ms;
+    }
+    [data-motion="on"] .fin-wait[data-arrived] li:nth-child(3) > .xp-flow-box {
+      animation-delay: 360ms;
+    }
+    [data-motion="on"] .fin-wait[data-arrived] li:nth-child(4) > .xp-flow-box {
+      animation-delay: 430ms;
+    }
+    [data-motion="on"] .fin-wait[data-arrived] li:nth-child(n + 5) > .xp-flow-box {
+      animation-delay: 500ms;
+    }
+    [data-motion="on"] .fin-wait[data-arrived] [data-part] {
+      animation-delay: 600ms;
+    }
+  }
+  @keyframes fin-part {
+    from {
+      opacity: 0;
+      transform: translateY(0.75rem);
+    }
+    to {
+      opacity: 1;
+      transform: none;
     }
   }
   @keyframes fin-close-start {
