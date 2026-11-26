@@ -60,6 +60,8 @@ type Plan = {
   keys: string[];
   axis: Axis;
   mode: "pointer" | "keys";
+  /** Carried by a mouse (not a finger or the keyboard). */
+  mouse: boolean;
   /** Each box along the axis, and the flowchart across it. */
   spans: Span[];
   across: Span;
@@ -179,7 +181,8 @@ export function FlowList({ children }: { children: ReactNode }) {
     const spans = rects.map((r) => (ax === "row" ? { start: r.left + sx, end: r.right + sx } : { start: r.top + sy, end: r.bottom + sy }));
     const across = ax === "row" ? { start: olRect.top + sy, end: olRect.bottom + sy } : { start: olRect.left + sx, end: olRect.right + sx };
     const mode = typeof KeyboardEvent !== "undefined" && activatorEvent instanceof KeyboardEvent ? "keys" : "pointer";
-    plan.current = { key, from, target: from, keys: list, axis: ax, mode, spans, across, left: false };
+    const mouse = typeof MouseEvent !== "undefined" && activatorEvent instanceof MouseEvent;
+    plan.current = { key, from, target: from, keys: list, axis: ax, mode, mouse, spans, across, left: false };
     const l = layer.current?.getBoundingClientRect();
     origin.current = { x: (l?.left ?? 0) + sx, y: (l?.top ?? 0) + sy };
     const li = lis[from]!.getBoundingClientRect();
@@ -224,6 +227,18 @@ export function FlowList({ children }: { children: ReactNode }) {
     }
   }
 
+  /**
+   * After a drag by mouse, the grip of the box carried has the focus, as a drag from the keyboard leaves it and as a
+   * browser that focuses a pressed button already leaves it (React gives it back after the drop moves the box). Safari
+   * never focuses a pressed button: the focus is on this list. And Safari's engine can lose the hover of a box that the
+   * drop has moved in the page with the pointer on it, until the pointer leaves the box. With neither the hover nor the
+   * focus, the box's grip and Remove stayed hidden under the pointer, and a press on the grip went to the box: it did
+   * not lift (the WebKit runs under Safari's rule about the focus; docs/briefs/edit-on-page/r3-notes-from-earlier-agents.md).
+   */
+  function keepGrip(p: Plan) {
+    if (p.mouse) boxesNow([p.key])[0]?.querySelector<HTMLElement>("[data-flow-grip]")?.focus({ preventScroll: true });
+  }
+
   function onDragEnd({ over }: DragEndEvent) {
     const p = plan.current;
     plan.current = null;
@@ -233,12 +248,14 @@ export function FlowList({ children }: { children: ReactNode }) {
       // Slide style: the boxes moved aside go back, and the box from where it was let go. (Line style: the copy goes back.)
       if (style === "slide") settle(p, () => setView(null));
       else setView(null);
+      keepGrip(p);
       return uiApi.say("Box dropped where it was.");
     }
     settle(p, () => {
       setView(null);
       store.flowMove(p.key, to);
     });
+    keepGrip(p);
     uiApi.say(`Box dropped in place ${to + 1} of ${p.keys.length}.`);
   }
 
@@ -247,6 +264,7 @@ export function FlowList({ children }: { children: ReactNode }) {
     plan.current = null;
     if (p && style === "slide") settle(p, () => setView(null));
     else setView(null);
+    if (p) keepGrip(p);
     if (p) uiApi.say("Moving the box cancelled. It's back where it was.");
   }
 
