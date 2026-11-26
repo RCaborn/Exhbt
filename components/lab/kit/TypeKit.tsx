@@ -2,6 +2,7 @@ import { Heading } from "@astryxdesign/core/Heading";
 import { Link } from "@astryxdesign/core/Link";
 import { Text } from "@astryxdesign/core/Text";
 import { portfolioHost } from "@/lib/hosts";
+import { Address } from "../samples";
 import { Compare, KitBlock, KitSection, Note } from "./parts";
 import { TokenValue } from "./TokenValue";
 
@@ -32,15 +33,7 @@ function TodaySpec({ name, size }: { name: string; size: string }) {
 
 const PROPOSED: { type: "display-1" | "display-2" | "display-3"; line: React.ReactNode }[] = [
   // A person's address, set as display type wherever it is claimed, shared or published.
-  {
-    type: "display-1",
-    line: (
-      <>
-        <span className="text-jade">amara</span>
-        {portfolioHost("amara").slice("amara".length)}
-      </>
-    ),
-  },
+  { type: "display-1", line: <Address /> },
   { type: "display-2", line: "One project, one page" },
   { type: "display-3", line: "Start with the file you already have" },
 ];

@@ -25,6 +25,21 @@ export const sample = {
   looks: PORTFOLIO_THEMES,
 } as const;
 
+/**
+ * A person's address as a line of type, the way Home sets it today: the name in the brand's
+ * colour, the rest in the text's own. Put it inside a Heading or any text. There is one place to
+ * break, after the name's dot, so an address at display size wraps there and never inside a word.
+ * Hers by default. On ink pass `nameClass="text-mint"` (jade is too dark there).
+ */
+export function Address({ name = demoOwner.username, nameClass = "text-jade" }: { name?: string; nameClass?: string }) {
+  return (
+    <>
+      <span className={nameClass}>{name}</span>.<wbr />
+      {portfolioHost(name).slice(name.length + 1)}
+    </>
+  );
+}
+
 /** A look by its name ("night", "studio"...), in its first colourway. The Exhbt look when it isn't one. */
 export const lookOf = (look?: LookId | null): PortfolioTheme => PORTFOLIO_THEMES.find((t) => t.look === look) ?? DEFAULT_THEME;
 

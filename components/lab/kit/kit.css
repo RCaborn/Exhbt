@@ -503,7 +503,20 @@
   .kit-curves {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
     gap: 1.5rem;
+  }
+  /* Said only when nothing travels: the lab's Motion off switch, or a device that asks for less. */
+  .kit-still-note {
+    display: none;
+  }
+  [data-motion="off"] .kit-still-note {
+    display: inline;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .kit-still-note {
+      display: inline;
+    }
   }
   @media (width >= 768px) {
     .kit-curves {

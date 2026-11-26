@@ -16,7 +16,9 @@ A page under `app/lab/design/` is already inside:
 2. the lab's root element, `<div data-lab-root data-level="…" data-motion="on|off">`;
 3. the lab bar (`LabBar.tsx`).
 
-So a page starts at `<main id="main">` and uses Astryx components directly. It never renders `Theme` itself and never imports the theme.
+So a page starts at `<main id="main">` and uses Astryx components directly. It never renders `Theme` itself and never imports the theme. (A page built on Astryx's `AppShell` leaves out its own `<main>`: the shell draws one, and the skip link.)
+
+A page's title is `export const generateMetadata = labMetadata("Home")` (`server.ts`), not a plain `metadata` export, which would put the lab's name on the live site's not-found page.
 
 ## Level and motion
 
@@ -24,7 +26,7 @@ So a page starts at `<main id="main">` and uses Astryx components directly. It n
 |---|---|
 | CSS | `[data-level="restrained"] .thing`, `[data-level="maximal"] .thing`; confident is the default and needs no selector. |
 | A server component | `const { level, motion } = await readLab()` from `@/components/lab/server`. |
-| A client component | `const { level, motion, moves } = useLab()` from `@/components/lab/LabFrame`. `moves` is false when Motion off is set or the device asks for less motion; script-driven motion checks it. |
+| A client component | `const { level, motion, moves } = useLab()` from `@/components/lab/LabFrame`. `moves` is true only when Motion off isn't set and the device hasn't asked for less motion. It is false on the server and until the device has been asked, so start script-driven motion from an effect that depends on it, and don't draw different markup from it: showing and hiding is CSS's job (below). |
 | A test or a screenshot | Cookies on `/lab/design`: `lab-level=restrained|confident|maximal`, `lab-motion=off`, `lab-bar=hidden|none`. |
 
 Every authored animation is written so that the resting style is the finished state, and inside both guards:
@@ -58,14 +60,19 @@ Inside the lab the site's `--radius` and `--radius-sm` are re-pointed at the the
 - `Frame` (`Frame.tsx`): a person's page in the site's real browser frame. The one thing in the flow of a page that casts a shadow.
 - `PersonPage` (`LabFrame.tsx`): puts a person's own page back under today's theme and tokens. `Frame` uses it. A person's page is never restyled by the lab.
 - `SampleExhbt`, `SamplePortfolio`, `sample`, `lookOf`, `exhbtOf`, `sectionsAll` (`samples.tsx`): the made-up person from `/demo`, drawn by the real `ProjectView` and `PortfolioHome` in any of the eight looks.
+- `Address` (`samples.tsx`): a person's address as a line of type, the name in jade (`nameClass="text-mint"` on ink), with its one place to break after the name's dot. At display size an address without it breaks inside a word.
 - `Today` (`LabFrame.tsx`): wraps a sample of the site as it is now, for a comparison.
+
+## Who changes what
+
+The voice has one owner: `themes/exhbt-next/`, `lab.css`, `LabFrame.tsx`, `LabBar.tsx`, `lab.ts`, `server.ts`, `Frame.tsx`, `samples.tsx` and `kit/`. A screen is its own page (`app/lab/design/<screen>/`) and its own new files in `components/lab/<screen>/`, with its CSS in a stylesheet of its own that the page imports. A screen that needs the voice changed says so in its notes rather than rebuilding the theme: the built theme files are generated, and two rebuilds on one branch conflict.
 
 ## Files
 
 | File | What it is |
 |---|---|
 | `lab.ts` | Levels, cookie names, the list of screens. Plain data. |
-| `server.ts` | `labEnabled()`, `readLab()`. Server only. |
+| `server.ts` | `labEnabled()`, `readLab()`, `labMetadata()`. Server only. |
 | `LabFrame.tsx` | `LabFrame`, `useLab()`, `Today`, `PersonPage`. |
 | `LabBar.tsx` | The lab bar. |
 | `lab.css` | The lab's root, the three levels' tokens, Motion off, the bar. |

@@ -1,10 +1,9 @@
 "use client";
 
-import { createContext, use, useCallback, useMemo, useState, useTransition } from "react";
+import { createContext, use, useCallback, useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LayerProvider } from "@astryxdesign/core/Layer";
 import { Theme } from "@astryxdesign/core/theme";
-import { useReducedMotion } from "@/components/ui/useReducedMotion";
 import { exhbtTheme } from "@/themes/exhbt/exhbt";
 import { exhbtNextTheme } from "@/themes/exhbt-next";
 import { LAB_COOKIE, LAB_PATH, type Bar, type LabState, type Level, type Motion } from "./lab";
@@ -16,6 +15,9 @@ import { LabBar } from "./LabBar";
  * - `motion`: "on" unless the lab's Motion off switch is set.
  * - `moves`: true only when motion is on and the person hasn't asked their device for less of it.
  *   Motion run from script (a view transition, an observer that starts something) checks this one.
+ *   It is false on the server and until the device has been asked, so nothing starts for someone
+ *   who wanted stillness: start script motion from an effect that depends on it, and don't draw
+ *   different markup from it (the server's would flash). What shows or hides is CSS's job.
  */
 export type Lab = LabState & {
   moves: boolean;
@@ -32,6 +34,17 @@ export function useLab(): Lab {
   if (!lab) throw new Error("useLab() only works under the design lab's frame (app/lab/design/layout.tsx).");
   return lab;
 }
+
+// Whether the device asks for less motion. Until it has been asked (on the server, and while the
+// page is taking over the server's HTML) the answer is assumed to be yes.
+const LESS_MOTION = "(prefers-reduced-motion: reduce)";
+const watchDevice = (changed: () => void) => {
+  const query = window.matchMedia(LESS_MOTION);
+  query.addEventListener("change", changed);
+  return () => query.removeEventListener("change", changed);
+};
+const askDevice = () => window.matchMedia(LESS_MOTION).matches;
+const assumeLess = () => true;
 
 const YEAR = 60 * 60 * 24 * 365;
 const keep = (name: string, value: string) => {
@@ -53,7 +66,7 @@ export function LabFrame({ initial, children }: { initial: LabState; children: R
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [state, setState] = useState(initial);
-  const reduced = useReducedMotion();
+  const reduced = useSyncExternalStore(watchDevice, askDevice, assumeLess);
 
   // A switch changes at once (the attribute and the context), is kept in a cookie, and then the
   // server components are asked again, so anything drawn per level on the server follows.

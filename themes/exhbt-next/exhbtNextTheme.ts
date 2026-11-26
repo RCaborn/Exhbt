@@ -137,8 +137,9 @@ export const exhbtNextTheme = defineTheme({
     ...VOICE,
 
     // Shadows. Nothing in the flow of a page is raised except the work (a person's page in its
-    // frame), which takes --shadow-high, the site's shadow-pack. Low and medium are for what floats
-    // over the page for a moment: menus and popovers (low), toasts (medium). Dialogs and sheets take high.
+    // frame), which takes --shadow-high: deeper and tighter than the site's shadow-pack, which sits
+    // under form cards too today. Low and medium are for what floats over the page for a moment:
+    // menus and popovers (low), toasts (medium). Dialogs and sheets take high.
     "--shadow-low": "0 1px 2px rgb(14 15 18 / 0.06), 0 6px 16px rgb(14 15 18 / 0.08)",
     "--shadow-med": "0 1px 2px rgb(14 15 18 / 0.06), 0 10px 28px rgb(14 15 18 / 0.12)",
     "--shadow-high": "0 1px 2px rgb(14 15 18 / 0.06), 0 20px 48px -12px rgb(14 15 18 / 0.2)",
