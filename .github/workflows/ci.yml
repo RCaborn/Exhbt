@@ -23,6 +23,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check:docs
+      # Visitors' pages are not edited (portfolio first, rule 10); fetches origin/main itself.
+      - run: npm run check:protected
+        if: github.event_name == 'pull_request'
       - run: npm run check:theme
       - run: npm run typecheck
       - run: npm run lint

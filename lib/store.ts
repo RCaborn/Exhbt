@@ -2101,7 +2101,15 @@ function memoryStore(): Store {
       return [...m.roadmaps.values()].filter((r) => r.ipHash === ipHash && recent(hours, r)).length;
     },
     async claimPendingRoadmaps(email, userId) {
-      for (const r of m.roadmaps.values()) if (r.pendingEmail === email && !r.userId) r.userId = userId;
+      const claimed = [...m.roadmaps.values()].filter((r) => r.pendingEmail === email && !r.userId);
+      for (const r of claimed) r.userId = userId;
+      // As the Supabase store does: the newest name and LinkedIn from the gate fill the profile, without overwriting what's there.
+      const newestFirst = [...claimed].sort((x, y) => y.createdAt.localeCompare(x.createdAt));
+      const name = newestFirst.find((r) => r.pendingName)?.pendingName;
+      const linkedin = newestFirst.find((r) => r.pendingLinkedin)?.pendingLinkedin;
+      const mine = profile(userId);
+      const fill = { ...(name && mine.name === null ? { name } : {}), ...(linkedin && mine.linkedin === null ? { linkedin } : {}) };
+      if (Object.keys(fill).length) m.profiles.set(userId, { ...mine, ...fill });
     },
     async getRoadmap(id) {
       return m.roadmaps.get(id) ?? null;
