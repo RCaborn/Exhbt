@@ -362,3 +362,18 @@ export function splitYear(line: string): { label: string; year: string | null } 
   const m = line.trim().match(/^(.*?)[,–—-]?\s*((?:19|20)\d{2}(?:\s*(?:[–—-]|to)\s*(?:(?:19|20)\d{2}|now|present))?)$/i);
   return m && m[1]!.trim() ? { label: m[1]!.trim().replace(/[,–—-]$/, "").trim(), year: m[2]!.trim() } : { label: line.trim(), year: null };
 }
+
+/**
+ * The reverse of `splitYear`, for the portfolio editor's two fields per line (decision 0031): the words
+ * and the year written back as one line, "label, year". `splitYear` reads it back as the same two for
+ * any words that do not themselves end in a year and any year it reads ("2024", "2021–2024", "2023 to
+ * now"). With no year, the words alone. The editor rewrites a line only when one of its fields is typed
+ * in, so a stored line nobody touches keeps its own punctuation.
+ */
+export function joinYear(label: string, year: string | null): string {
+  const words = label.trim();
+  const when = (year ?? "").trim();
+  if (!when) return words;
+  // A year with no words is the year alone ("2024", which splitYear reads as words with no year).
+  return words ? `${words}, ${when}` : when;
+}
