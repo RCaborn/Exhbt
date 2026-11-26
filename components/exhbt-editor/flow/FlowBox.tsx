@@ -1,12 +1,13 @@
 "use client";
 
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS as DndCSS } from "@dnd-kit/utilities";
 import { GripVertical, Plus, X } from "lucide-react";
 import { useReducedMotion } from "@/components/ui/useReducedMotion";
 import { LIMITS } from "@/lib/exhbt/blocks";
 import { useRuntime } from "../context";
+import { holdFocus, notePointer } from "../drag/grip";
 import { FLOW_BOX_STYLE } from "../drag/options";
 import { useStoreInternal } from "../store";
 
@@ -49,7 +50,19 @@ export function FlowBox({ boxKey, className, children }: { boxKey: string; class
     animateLayoutChanges: () => false,
     attributes: { roleDescription: "draggable box" },
   });
-  const grip = useMemo(() => ({ ...attributes, ...listeners }), [attributes, listeners]);
+  // dnd-kit's own listeners, and a mouse's press leaves the focus on the grip, in Safari too (drag/grip.ts).
+  const grip = useMemo(
+    () => ({
+      ...attributes,
+      ...listeners,
+      onPointerDown: notePointer,
+      onMouseDown: (e: ReactMouseEvent<HTMLElement>) => {
+        listeners?.onMouseDown?.(e);
+        holdFocus(e);
+      },
+    }),
+    [attributes, listeners],
+  );
   const ctx = useMemo<BoxCtx>(() => ({ boxKey, setGrip: setActivatorNodeRef, grip }), [boxKey, setActivatorNodeRef, grip]);
   return (
     <BoxContext value={ctx}>
