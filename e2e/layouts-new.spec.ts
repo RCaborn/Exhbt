@@ -5,6 +5,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { markLayout, needsThePerson } from "../evals/exhbt-draft/marks";
 import { DraftSchema, DraftSchemaSeven, leftOff, repairDraft, toDoc, type Draft } from "../lib/ai/draft-answer";
+import { DRAFT_TARGETS } from "../lib/ai/draft-targets";
 import { formatLimits, LIMITS, validateForPublish, wordCount, words, type ExhbtDoc } from "../lib/exhbt/blocks";
 import { checkedReason, CLASSIC_REASONS, isLayoutReason, LAYOUT_REASONS, layoutSentence } from "../lib/exhbt/drafted";
 import { CLASSIC_FORMATS, FORMAT_RULES, FORMATS, formatOf, type Format } from "../lib/exhbt/formats";
@@ -254,10 +255,10 @@ test.describe("Only what the person supplied reaches a drafted doc", () => {
     // Reworded, or written by the AI: none.
     expect(pullquoteOf(toDoc(answer({ pullquote: "A reform meant to close a door opened it." }), MATERIAL))).toEqual([]);
     expect(pullquoteOf(toDoc(answer({ pullquote: "Reform is a door that never closes." }), MATERIAL))).toEqual([]);
-    // In the material, but over the cap: left off, never cut.
-    const long = Array.from({ length: LIMITS.pullquote.words + 1 }, (_, i) => `word${i}`).join(" ");
+    // In the material, but over the AI's target (decision 0030): left off, never cut. A person may type a longer one.
+    const long = Array.from({ length: DRAFT_TARGETS.pullquoteWords + 1 }, (_, i) => `word${i}`).join(" ");
     expect(pullquoteOf(toDoc(answer({ pullquote: long }), `${MATERIAL}\n${long}`))).toEqual([]);
-    expect(pullquoteFrom(long.split(" ").slice(1).join(" "), long, LIMITS.pullquote.words)).not.toBeNull();
+    expect(pullquoteFrom(long.split(" ").slice(1).join(" "), long, DRAFT_TARGETS.pullquoteWords)).not.toBeNull();
   });
 
   test("a source with no address is kept only when its citation is in the material word for word", () => {

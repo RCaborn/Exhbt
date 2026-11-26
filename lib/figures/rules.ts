@@ -1,4 +1,5 @@
-import { LIMITS, type FigureBox } from "@/lib/exhbt/blocks";
+import type { FigureBox } from "@/lib/exhbt/blocks";
+import { DRAFT_TARGETS } from "@/lib/ai/draft-targets";
 import { cutCaption } from "./caption";
 
 /**
@@ -106,8 +107,8 @@ export const pixelsFromBox = (b: FigureBox, size: PixelSize): PixelBox => ({
   bottom: Math.round((b.y + b.h) * size.height),
 });
 
-/** A caption cut to the word limit for image captions, so a picked figure never blocks publishing on length. */
-export function fitCaption(s: string, max: number = LIMITS.images.captionWords): string {
+/** A caption the AI wrote for a picked figure, cut to its target for an image's caption (draftTargets, decision 0030): a case study's unless a layout's is given. */
+export function fitCaption(s: string, max: number = DRAFT_TARGETS.captionWords): string {
   return cutCaption(s, max);
 }
 

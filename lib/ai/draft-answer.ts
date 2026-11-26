@@ -1,9 +1,11 @@
 import { z } from "zod/v4";
-import { formatLimits, LIMITS, SCHEMA_VERSION, text, withHighlight, words, type ExhbtDoc, type Section } from "@/lib/exhbt/blocks";
+import { formatLimits, LIMITS, SCHEMA_VERSION, withHighlight, words, type ExhbtDoc, type Section } from "@/lib/exhbt/blocks";
 import { CLASSIC_FORMATS, FORMATS, isFormat } from "@/lib/exhbt/formats";
 import { CLASSIC_REASONS, LAYOUT_REASONS } from "@/lib/exhbt/drafted";
 import { CHART_KINDS, hasData, type Chart } from "@/lib/exhbt/charts";
-import { pullquoteFrom, referencesFrom, roleFrom, sourcesFrom, squash } from "@/lib/exhbt/references";
+import { emphasisRuns, unmarked } from "@/lib/exhbt/emphasis";
+import { pullquoteFrom, referencesFrom, roleFrom, saidIn, sourcesFrom } from "@/lib/exhbt/references";
+import { DRAFT_TARGETS, draftTargets } from "./draft-targets";
 
 /**
  * The draft's answer shape and the code that reads it: the schemas, the repair, and the answer
@@ -235,21 +237,59 @@ const L = LIMITS;
 /**
  * The quote the model proposed, if it's really in the material: its words as written there, and
  * the name too. Anything else is dropped rather than flagged: a quote can't be checked like a
- * number, and an invented one would put words in someone's mouth.
+ * number, and an invented one would put words in someone's mouth. One longer than the AI's target
+ * (decision 0030) is dropped too, never cut: a cut quote is not what was said. A person may type a
+ * longer one; the page's 200 words are the only limit on theirs.
  */
 export function quoteFrom(q: Draft["quote"] | null, source: string): { text: string; name: string; role: string } | null {
   if (!q) return null;
   const said = q.text.trim().replace(/^["“‘']+|["”’']+$/g, "").trim();
   const name = q.name.trim();
-  const flat = squash(source);
-  if (!said || !name || words(said) > L.quote.words || !flat.includes(squash(said)) || !flat.includes(squash(name))) return null;
+  if (!said || !name || words(said) > DRAFT_TARGETS.quoteWords || !saidIn(source, said) || !saidIn(source, name)) return null;
   const role = q.role.trim();
-  return { text: said, name: name.slice(0, L.quote.nameChars), role: role && flat.includes(squash(role)) ? role.slice(0, L.quote.roleChars) : "" };
+  return { text: said, name: name.slice(0, L.quote.nameChars), role: role && saidIn(source, role) ? role.slice(0, L.quote.roleChars) : "" };
 }
 
 /**
- * The model's strings as an ExhbtDoc, trimmed to the block counts. Word limits are left to the
- * editor (drafts may run over; publishing may not), but counts are clamped so the layout holds.
+ * The answer with the marks taken out of every field that isn't formatted text (decision 0029, "Emphasis inside the
+ * answer"): the title, the summary, what it is, where and when, the skills, the context line and its highlight (whose
+ * bold is the gap it highlights), the flowchart, every graph's words, the quote, the references' labels, the pull quote
+ * and My role. Findings, what I'd do next, the aim and the conclusion keep theirs, for toDoc to turn into runs. A
+ * reference's address is never touched. So every check toDoc makes reads the plain words.
+ */
+export function plainAnswer(d: Draft, source: string): Draft {
+  const u = (s: string) => unmarked(s, source);
+  return {
+    ...d,
+    title: u(d.title),
+    summary: u(d.summary),
+    context: u(d.context),
+    whereWhen: u(d.whereWhen),
+    skills: d.skills.map(u),
+    gap: u(d.gap),
+    gapHighlight: u(d.gapHighlight),
+    flow: d.flow.map((s) => ({ step: u(s.step), detail: u(s.detail) })),
+    charts: d.charts.map((c) => ({
+      ...c,
+      title: u(c.title),
+      xTitle: u(c.xTitle),
+      yTitle: u(c.yTitle),
+      unit: u(c.unit),
+      series: c.series.map(u),
+      rows: c.rows.map((r) => ({ ...r, label: u(r.label) })),
+      cells: c.cells.map((row) => row.map(u)),
+    })),
+    quote: { text: u(d.quote.text), name: u(d.quote.name), role: u(d.quote.role) },
+    references: d.references.map((r) => ({ ...r, label: u(r.label) })),
+    ...(d.pullquote !== undefined ? { pullquote: u(d.pullquote) } : {}),
+    ...(d.myRole !== undefined ? { myRole: u(d.myRole) } : {}),
+  };
+}
+
+/**
+ * The model's strings as an ExhbtDoc, trimmed to the block counts. Nothing is cut to a number of
+ * words: the AI is asked to write each part to its target (draftTargets, decision 0030), and only the
+ * page's 200 words limit what can be published. Counts are clamped so the layout holds.
  * `source` is the material (materialText in ./exhbt-draft.ts): everything the person supplied.
  *
  * Only what the person supplied (AGENTS.md; decision 0028, "The AI chooses among seven"). The parts
@@ -262,13 +302,19 @@ export function quoteFrom(q: Draft["quote"] | null, source: string): { text: str
  *  - My role (an event): word for word, and within its cap.
  * Before and After marks are never set: the AI hasn't seen the pictures, and no picture is drafted.
  * A part that belongs to another layout is not kept hidden: it is left off.
+ *
+ * Emphasis (decision 0029, "Emphasis inside the answer"): the findings, what I'd do next, the aim and the conclusion
+ * keep the AI's bold and italic as runs, within the rules of lib/exhbt/emphasis.ts. Every other field is read with
+ * the marks taken out (plainAnswer), before any check.
  */
-export function toDoc(d: Draft, source: string): ExhbtDoc {
+export function toDoc(answer: Draft, source: string): ExhbtDoc {
+  const d = plainAnswer(answer, source);
   const nonEmpty = (s: string) => s.trim().length > 0;
+  const runs = (s: string) => emphasisRuns(s, source);
   // The layout the draft chose; the caps are that layout's (decisions 0024 and 0028).
   const f = isFormat(d.format) ? d.format : "case-study";
   const FL = formatLimits(f);
-  const findings = d.findings.map((x) => x.trim()).filter(nonEmpty).slice(0, FL.findings.max).map(text);
+  const findings = d.findings.map((x) => x.trim()).filter(nonEmpty).slice(0, FL.findings.max).map(runs);
   const charts = d.charts
     .map(toChart)
     .filter((c): c is Chart => c !== null && hasData(c))
@@ -278,7 +324,7 @@ export function toDoc(d: Draft, source: string): ExhbtDoc {
   const findingsSection: Section[] = findings.length ? [{ id: "findings", kind: "findings" as const, items: findings }] : [];
   const graphs: Section[] = charts.map((chart, i) => ({ id: `graph-${i + 1}`, kind: "graph" as const, chart }));
   const quoteSection: Section[] = quote ? [{ id: "quote-1", kind: "quote" as const, ...quote }] : [];
-  const nextSection: Section[] = next ? [{ id: "reflection-1", kind: "reflection" as const, text: text(next) }] : [];
+  const nextSection: Section[] = next ? [{ id: "reflection-1", kind: "reflection" as const, text: runs(next) }] : [];
   /** Link sections, each label cut to the layout's cap. Their descriptions are the person's to write. */
   const links = (kept: { href: string; label: string }[]): Section[] =>
     kept.map((r, i) => ({ id: `link-${i + 1}`, kind: "link" as const, href: r.href, label: r.label.split(/\s+/).slice(0, FL.link.labelWords).join(" "), description: "" }));
@@ -288,17 +334,17 @@ export function toDoc(d: Draft, source: string): ExhbtDoc {
     const aim = d.aim.trim();
     const conclusion = d.conclusion.trim();
     sections = [
-      ...(aim ? [{ id: "aim-1", kind: "aim" as const, text: text(aim), ...(d.aimIsHypothesis ? { heading: "hypothesis" as const } : {}) }] : []),
+      ...(aim ? [{ id: "aim-1", kind: "aim" as const, text: runs(aim), ...(d.aimIsHypothesis ? { heading: "hypothesis" as const } : {}) }] : []),
       ...findingsSection,
       ...graphs,
-      ...(conclusion ? [{ id: "conclusion-1", kind: "conclusion" as const, text: text(conclusion) }] : []),
+      ...(conclusion ? [{ id: "conclusion-1", kind: "conclusion" as const, text: runs(conclusion) }] : []),
       ...quoteSection,
       ...nextSection,
       ...links(referencesFrom(d.references, source, FL.sections.link)),
     ];
   } else if (f === "essay") {
     // An essay's usual order: the key points, the pull quote, the graph, feedback, what I'd look at next, then the sources.
-    const pullquote = pullquoteFrom(d.pullquote ?? "", source, FL.pullquote.words);
+    const pullquote = pullquoteFrom(d.pullquote ?? "", source, draftTargets(f).pullquoteWords);
     sections = [
       ...findingsSection,
       ...(pullquote ? [{ id: "pullquote-1", kind: "pullquote" as const, text: pullquote }] : []),

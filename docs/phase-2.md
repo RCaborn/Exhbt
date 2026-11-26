@@ -108,7 +108,7 @@ Phase 2 builds on all of this rather than starting again.
 - Prompt rule as everywhere: use only the user's material. Every number in the draft must carry a `sourceQuote` from the material.
 - On the server, `lib/exhbt/verify.ts` checks each number in the draft appears in the extracted source text. Any that don't are flagged in the editor: "We couldn't find 18% in your files — check it."
 - Uploaded images are offered as figure candidates. A chart is only proposed when the numbers came from the files.
-- Cost: around 10–30k input tokens per draft, under $0.01 at Haiku's price (estimate). Each draft is logged in `ai_call_logs` with step `exhbt_draft`, which is already allowed.
+- Cost: around 10–30k input tokens per draft, and up to about 65k for the longest material a draft reads (`lib/material.ts`), under $0.01 at Haiku's price (estimate). Each draft is logged in `ai_call_logs` with step `exhbt_draft`, which is already allowed.
 
 **Layout and blocks** (`lib/exhbt/blocks.ts`, zod). Rory, 12 Nov 2026: a recruiter skims, so every part is short and snappy, mostly bullets. **150–200 words in all**: 200 is the hard limit on publish and covers every word on the page (header, skills, headline, graph titles and labels included; only image alt text is left out), and the editor's guide aims at 150.
 
@@ -118,14 +118,16 @@ Header, fixed, from the profile and the exhbt:
 - **Title:** ≤ 80 characters.
 
 Body, in this order:
-1. **Context and the gap:** what the question was and why it mattered. ≤ 2 short sentences, or ≤ 3 bullets; ≤ 40 words.
+1. **Context and the gap:** what the question was and why it mattered. ≤ 2 short sentences, or ≤ 3 bullets.
 2. **Process flowchart:** straight after the context, drawn by `components/exhbt/MethodFlow.tsx`.
    - 3–6 boxes, each a short phrase (≤ 8 words), documenting the process. The AI drafts it from the material.
    - Edited on the diagram itself, wherever it appears in edit mode (the editor and the portfolio edit mode): type in a box; "+" between boxes to add one, × to remove one; drag or ←/→ to reorder. It redraws as you type.
    - Left to right on wide screens, top to bottom on phones. Every box's text is in the page for screen readers.
-3. **Findings:** 2–4 bullets, ≤ 20 words each. Every number must come from the uploaded material, or it's flagged.
+3. **Findings:** 2–4 bullets. Every number must come from the uploaded material, or it's flagged.
 4. **Graphs:** 1 or 2, each one of a fixed set of kinds (decision 0011, `lib/exhbt/charts.ts`, the chart rules in `DESIGN.md`), built only from numbers in the material. Can be removed if the project has no numbers.
-5. **Images:** up to 2 (a screenshot, a figure from the report), each with a caption ≤ 15 words.
+5. **Images:** up to 2 (a screenshot, a figure from the report), each with a caption.
+
+Only the page has a word limit. No part has one of its own (decision 0030, Rory, 25 Nov 2026), though the AI still writes each part short, to its targets in `lib/ai/draft-targets.ts`. The flowchart's boxes keep theirs, because long text breaks the diagram.
 
 Footer, small: "See the work" (the original file or link, one click away) and the trust badge (confirmed by the author, source attached).
 
@@ -140,7 +142,7 @@ Footer, small: "See the work" (the original file or link, one click away) and th
   - bullets only inside the bullet block
   - stored as small Tiptap JSON per field and rendered by our own renderer, never as raw HTML
   - the editor code loads only on the editor page
-- Live word count per card and overall. Saving is never blocked, so drafts can run over. Publishing is blocked until every limit passes. The same `validateForPublish()` runs on the server.
+- Live word count per card and overall. Saving is never blocked, so drafts can run over. Publishing is blocked until every limit passes: the page's 200 words, and the counts and lengths that keep its shape (decision 0030). The same `validateForPublish()` runs on the server.
 - Per block: "Rewrite this block" (counts towards `blockRegenerations`) and "Undo to AI version".
 - Live preview beside the cards, using the real `Exhbt` component.
 

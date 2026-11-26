@@ -210,7 +210,7 @@ test.describe("a picture's description", () => {
     expect(((await readStored(page, id)).working.sections[n] as SectionOf<"image">).alt).toBe("A bar chart of missed appointments by reminder time");
     await bar(page).getByRole("button", { name: "Review and publish" }).click();
     await publish.getByRole("button", { name: /^Publish( changes)?$/ }).click();
-    await expect(publish.getByText(/^(It's live\.|Your changes are live\.)$/)).toBeVisible();
+    await expect(publish.getByText(/^(It's live|Your changes are live) on your portfolio\.$/)).toBeVisible();
   });
 
   test("in a gallery's narrow tiles the empty description wraps in its caption's type, and its mark stays inside the tile, a dot where the words don't fit", async ({ page }) => {

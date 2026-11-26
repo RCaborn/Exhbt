@@ -125,7 +125,7 @@ test.describe("Sections: the model", () => {
     expect(odd.sections.map((s) => s.id)).toEqual(["quote-1", "link-1", "reflection-1"]);
   });
 
-  test("publishing needs the core and findings or a graph; each kind has its cap", () => {
+  test("publishing needs the core and findings or a graph; each kind has its cap of how many; no part has a word cap of its own", () => {
     expect(paths(core([F]))).toEqual([]);
     expect(paths(core([graph()]))).toEqual([]);
     expect(paths(core([F, graph(), image(), quote(), next(), link()]))).toEqual([]);
@@ -140,17 +140,18 @@ test.describe("Sections: the model", () => {
     expect(paths(core([F, graph(1), graph(2)]))).toEqual([]);
     expect(paths(core([F, graph(1), graph(2), graph(3)]))).toEqual(["sections"]);
     expect(paths(core([F, image(1), image(2), image(3)]))).toEqual(["sections"]);
-    // Each field of each kind.
-    expect(paths(core([F, quote(nWords(LIMITS.quote.words + 1))]))).toEqual(["sections.1.text"]);
+    // Each field of each kind. No part has a word cap of its own, only the page (decision 0030): a 40-word quote, a 45-word
+    // "what I'd do next" and a 25-word description pass, well past the 30, 35 and 15 words each was held to until 25 Nov 2026.
+    expect(paths(core([F, quote(nWords(40))]))).toEqual([]);
     expect(paths(core([F, quote("", "")]))).toEqual(["sections.1.text", "sections.1.name"]);
     expect(paths(core([F, quote(undefined, "x".repeat(LIMITS.quote.nameChars + 1))]))).toEqual(["sections.1.name"]);
-    expect(paths(core([F, next(nWords(LIMITS.reflection.words + 1))]))).toEqual(["sections.1.text"]);
+    expect(paths(core([F, next(nWords(45))]))).toEqual([]);
     expect(paths(core([F, next("")]))).toEqual(["sections.1.text"]);
     expect(paths(core([F, { ...next(), text: [{ t: "notes", href: "http://example.com" }] } as Section]))).toEqual(["sections.1.text"]);
     for (const bad of ["http://example.com/code", "javascript:alert(1)", "not a link", ""]) expect(paths(core([F, link(bad)])), bad).toEqual(["sections.1.href"]);
     expect(paths(core([F, link(undefined, nWords(LIMITS.link.labelWords + 1))]))).toEqual(["sections.1.label"]);
     expect(paths(core([F, link(undefined, " ")]))).toEqual(["sections.1.label"]);
-    expect(paths(core([F, link(undefined, "Code", nWords(LIMITS.link.descriptionWords + 1))]))).toEqual(["sections.1.description"]);
+    expect(paths(core([F, link(undefined, "Code", nWords(25))]))).toEqual([]);
     expect(paths(core([F, { ...image(), alt: " " } as Section]))).toEqual(["sections.1.alt"]);
     expect(paths(core([{ ...F, items: [text("Only one.")] } as Section]))).toEqual(["sections.0.items"]);
     // The core is still checked: the flowchart needs its boxes.
@@ -164,16 +165,16 @@ test.describe("Sections: the model", () => {
     expect(wordCount(core([F, link("https://example.com/a/long/address/with/parts", "Model code", "The notebook and data")])) - n).toBe(2 + 4);
     expect(wordCount(core([F, { ...image(), alt: "lots of words that are not counted", caption: text("two words") } as Section])) - n).toBe(2);
 
-    // At the cap a quote fits; one word more and it can't be published.
+    // Up to the page's 200 a section fits, however long; one word more and it can't be published. Four 20-word findings,
+    // a 40-word context line and a 30-word quote fill most of the page.
     const full = {
-      ...core([{ ...F, items: Array.from({ length: LIMITS.findings.max }, () => text(nWords(LIMITS.findings.wordsEach))) } as Section]),
-      gap: text(nWords(LIMITS.gapWords)),
+      ...core([{ ...F, items: Array.from({ length: LIMITS.findings.max }, () => text(nWords(20))) } as Section]),
+      gap: text(nWords(40)),
       flow: Array.from({ length: LIMITS.flow.min }, () => ({ step: nWords(LIMITS.flow.stepWords), detail: nWords(LIMITS.flow.detailWords) })),
     };
-    const withQuote = { ...full, sections: [...full.sections, quote(nWords(LIMITS.quote.words), "Priya Shah", "")] };
+    const withQuote = { ...full, sections: [...full.sections, quote(nWords(30), "Priya Shah", "")] };
     const room = LIMITS.totalWords - wordCount(withQuote);
     expect(room).toBeGreaterThan(0);
-    expect(room).toBeLessThanOrEqual(LIMITS.reflection.words);
     expect(paths({ ...withQuote, sections: [...withQuote.sections, next(nWords(room))] })).toEqual([]);
     expect(paths({ ...withQuote, sections: [...withQuote.sections, next(nWords(room + 1))] })).toEqual([""]);
   });
@@ -423,9 +424,12 @@ test.describe("Sections in the editor", () => {
   });
 
   test("a quote that takes the exhbt over 200 words blocks publishing, and the bar turns red", async ({ page }) => {
+    // Lengths that fill most of the page: a 40-word context line, four 20-word findings, then a 30-word quote. No part has
+    // a word cap of its own (decision 0030), so only the page's 200 words stop it.
+    const [GAP, FINDING, QUOTE] = [40, 20, 30];
     await signInAs(page, "wanda");
     await startWithCore(page, "Cutting lunch queues at the student union cafe");
-    await fillContext(page, nWords(LIMITS.gapWords));
+    await fillContext(page, nWords(GAP));
     for (let i = 1; i <= LIMITS.flow.min; i++) {
       await fillBox(page, i, nWords(LIMITS.flow.stepWords));
       await fillPlain(page, page.getByLabel(`Box ${i} detail`), nWords(LIMITS.flow.detailWords));
@@ -434,13 +438,13 @@ test.describe("Sections in the editor", () => {
       await onSection(page, "findings");
       await page.getByRole("button", { name: "Add a finding" }).click();
     }
-    for (let i = 1; i <= LIMITS.findings.max; i++) await fillFinding(page, i, nWords(LIMITS.findings.wordsEach));
+    for (let i = 1; i <= LIMITS.findings.max; i++) await fillFinding(page, i, nWords(FINDING));
 
     // Under the cap, with room left: the menu says how much.
     const total = await wordsOnBar(page);
     const room = LIMITS.totalWords - total;
     expect(room).toBeGreaterThan(0);
-    expect(room).toBeLessThan(LIMITS.quote.words + 2);
+    expect(room).toBeLessThan(QUOTE + 2);
     await openAddSectionMenu(page);
     await expect(page.getByTestId("words-left")).toHaveText(`${room} words left of ${LIMITS.totalWords}.`);
     await expect(page.locator("[data-word-bar]")).not.toHaveAttribute("data-over");
@@ -450,11 +454,11 @@ test.describe("Sections in the editor", () => {
     // The cursor reaches the new quote two frames after the add (drag/engine.ts afterAdd), with the "+" focused meanwhile:
     // typing before it lands sends the first word to the "+" (its space presses it), as on a slow runner. Wait, as a person does.
     await expect(page.getByLabel("The quote, word for word")).toBeFocused();
-    await page.keyboard.type(nWords(LIMITS.quote.words));
+    await page.keyboard.type(nWords(QUOTE));
     await fillPlain(page, page.getByLabel("Who said it"), "Priya Shah");
-    const over = total + LIMITS.quote.words + 2 - LIMITS.totalWords;
+    const over = total + QUOTE + 2 - LIMITS.totalWords;
     await expect(page.locator("[data-word-bar]")).toHaveAttribute("data-over", "true");
-    await expect(page.locator("[data-word-bar]").locator(".text-error")).toHaveText(String(total + LIMITS.quote.words + 2));
+    await expect(page.locator("[data-word-bar]").locator(".text-error")).toHaveText(String(total + QUOTE + 2));
     await openAddSectionMenu(page);
     await expect(page.getByTestId("words-left")).toHaveText(`${over} ${over === 1 ? "word" : "words"} over the ${LIMITS.totalWords}-word limit. Trim something before you publish.`);
     await page.keyboard.press("Escape");
@@ -462,8 +466,11 @@ test.describe("Sections in the editor", () => {
     await openPublishSheet(page);
     await publishSheet(page).getByLabel(SEL.publishConfirm).check();
     await publishSheet(page).getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(await openThingsToFix(page)).toContainText(`Keep the whole exhbt to ${LIMITS.totalWords} words (it's ${total + LIMITS.quote.words + 2}).`);
-    await expect(page.getByText("It's live.")).toHaveCount(0);
+    const fixes = await openThingsToFix(page);
+    await expect(fixes).toContainText(`Keep the whole exhbt to ${LIMITS.totalWords} words (it's ${total + QUOTE + 2}).`);
+    // The only word limit is the page's: nothing is listed against the long context line, the findings or the quote.
+    await expect(fixes).not.toContainText(/Keep (the context|each finding|the quote) to/);
+    await expect(page.getByText(/^(It's live|Your changes are live)\b/)).toHaveCount(0);
   });
 
   test("the flowchart stays on every exhbt, with 3 to 6 boxes", async ({ page }) => {

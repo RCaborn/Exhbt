@@ -1,0 +1,64 @@
+[
+  {
+    "id": "15-word-chart-picture",
+    "files": [
+      "15-word-chart-picture.docx"
+    ],
+    "what": "A Word report with the results chart pasted in as a picture (image2) and a university crest on its title page (image3). A smaller copy of the crest is only in the header, so it is not offered.",
+    "expect": {
+      "picture": "word/media/image2.png",
+      "kind": "graph",
+      "box": {
+        "x": 0.04,
+        "y": 0.0643,
+        "w": 0.92,
+        "h": 0.8714
+      }
+    }
+  },
+  {
+    "id": "16-pptx-chart-and-photo",
+    "files": [
+      "16-pptx-chart-and-photo.pptx"
+    ],
+    "what": "A PowerPoint with a chart picture on slide 2 and a photo of the stall on slide 3. The society's logo is on every slide and a crest is on the master, so neither is offered.",
+    "expect": {
+      "picture": "ppt/media/image7.png",
+      "kind": "graph",
+      "box": {
+        "x": 0.0308,
+        "y": 0.0511,
+        "w": 0.9385,
+        "h": 0.8979
+      }
+    }
+  },
+  {
+    "id": "17-uploaded-pictures",
+    "files": [
+      "17-uploaded-pictures-sketch.png",
+      "17-uploaded-pictures-desk.png",
+      "17-uploaded-pictures-poster.png"
+    ],
+    "what": "Three pictures uploaded with a design project: a rough wireframe sketch, a photo of the desk, and the finished poster. The finished poster should lead.",
+    "expect": {
+      "picture": "17-uploaded-pictures-poster.png",
+      "kind": "other",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      }
+    }
+  },
+  {
+    "id": "18-word-native-chart",
+    "files": [
+      "18-word-native-chart.docx"
+    ],
+    "what": "A Word report whose only chart is drawn in Word itself, so there is no picture to take. Nothing should be sent, and the file should be reported as holding a chart that can't be lifted.",
+    "expect": null,
+    "nativeChart": true
+  }
+]

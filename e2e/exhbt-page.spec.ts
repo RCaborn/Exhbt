@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { devices, expect, test, type Page } from "@playwright/test";
-import { exhbtSummary, plain, text, wordCount, LIMITS, validateForPublish, withHighlight, type ExhbtDoc } from "../lib/exhbt/blocks";
+import { exhbtSummary, findingsOf, plain, text, wordCount, words, LIMITS, validateForPublish, withHighlight, type ExhbtDoc } from "../lib/exhbt/blocks";
 import { fullDoc, openBankingDoc, sampleDocs } from "../lib/exhbt/sample";
 import { withKeyFigure } from "../lib/exhbt/sections";
 import { applyBlock, blockValue } from "../lib/exhbt/draft-blocks";
@@ -19,6 +19,58 @@ const PIXEL_7 = { viewport: devices["Pixel 7"].viewport, deviceScaleFactor: devi
 /** A 1x1 PNG, for an image section. */
 const PNG = uniqueBytes(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
 const unique = (tag: string) => `${tag}${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`;
+
+/** A case study whose words sit mostly in one finding, beside the graph: no part has a word cap of its own (decision 0030). Fictional. */
+const UNEVEN_CASE_STUDY: ExhbtDoc = {
+  schemaVersion: 2,
+  title: "Would a second till cut lunchtime queues at the union cafe?",
+  context: "Year 2 operations module",
+  whereWhen: "University of Leeds, March 2026",
+  skills: ["Excel", "Queue timing", "Data analysis"],
+  gap: withHighlight("Lunchtime queues ran past ten minutes. Nobody had timed what a second till would save.", "Nobody had timed what a second till would save."),
+  flow: [{ step: "Timed queues for two weeks" }, { step: "Opened a second till" }, { step: "Timed them again" }],
+  sections: [
+    {
+      id: "findings",
+      kind: "findings",
+      items: [
+        text(
+          "Over the two weeks before the change, the average lunchtime wait was 11 minutes, and on the busiest days the queue reached the door by ten past twelve. After the second till opened, the average wait fell to 4 minutes, and the longest wait I timed was 9 minutes, on the Friday of the second week, when it rained. Most of the gain came between twelve and one, when about two thirds of the day's customers arrive. Outside that hour the second till sat idle for long stretches, so the cafe now opens it from half past eleven to half past one only. Staff said the rush felt calmer, and fewer people gave up and left the queue before paying.",
+        ),
+        text("Sales held steady."),
+      ],
+    },
+    { id: "graph-1", kind: "graph", chart: { kind: "bar", title: "Average wait", unit: "min", rows: [{ label: "Before", value: 11 }, { label: "After", value: 4 }] } },
+  ],
+  evidence: { kind: "link", href: "https://example.com/queue-timings", label: "Timing sheet" },
+};
+
+/** The same in research: the aim, the method, the key figure, one long result, the conclusion. Fictional. */
+const UNEVEN_RESEARCH: ExhbtDoc = {
+  schemaVersion: 2,
+  format: "research",
+  title: "Does a 10-minute walk before a test improve recall?",
+  context: "Year 1 lab report",
+  skills: ["SPSS"],
+  gap: withHighlight("Exercise is known to lift mood. Whether a short walk helps recall straight after is less clear.", "Whether a short walk helps recall straight after is less clear."),
+  flow: [{ step: "Recruited 40 volunteers" }, { step: "Walked or sat for 10 minutes" }, { step: "Tested word recall" }],
+  sections: [
+    { id: "aim-1", kind: "aim", text: text("Test whether a short walk before a test improves word recall.") },
+    { id: "graph-1", kind: "graph", chart: { kind: "bar", title: "Words recalled out of 40", rows: [{ label: "Walked", value: 24 }, { label: "Sat", value: 21 }] } },
+    {
+      id: "findings",
+      kind: "findings",
+      items: [
+        text(
+          "Students who walked for 10 minutes before the test recalled 24 words out of 40 on average, against 21 for students who sat and read a magazine. The difference was small but held in both sessions, in the morning and in the afternoon. Recall was higher for the first ten words on the list in both groups, which matches what earlier studies report about the start of a word list. The walking group also made fewer false recalls, naming words that were not on the list 1.2 times on average against 2.1 times for the sitting group. Three volunteers who walked said they felt more alert, but this was not measured, so it is noted here only as their comment.",
+        ),
+        text("The gap was small but held."),
+      ],
+    },
+    { id: "conclusion-1", kind: "conclusion", text: text("A short walk gave a small rise in recall.") },
+  ],
+  evidence: { kind: "link", href: "https://example.com/recall-lab-report", label: "Lab report" },
+};
 
 async function seed(page: Page, username: string) {
   const res = await page.request.get(`/dev/portfolio?username=${username}&plan=premium&with=open-banking`, { maxRedirects: 0 });
@@ -42,11 +94,17 @@ test.describe("The exhbt's fields", () => {
     expect(exhbtSummary({ ...GP, summary: "   " })).toBe(exhbtSummary(GP));
     expect(exhbtSummary({ sections: [], summary: "" })).toBe("");
 
-    // Both count towards the 200 words, and both have limits on publish.
+    // Both count towards the 200 words. Where and when has a limit in characters on publish; the summary has no word
+    // limit of its own (decision 0030): a long one is only held by the page's 200 words.
     expect(wordCount({ ...GP, whereWhen: "Leeds, May 2026", summary: "One two three." })).toBe(wordCount(GP) + 3 + 3);
     expect(validateForPublish(openBankingDoc)).toEqual([]);
     expect(validateForPublish({ ...GP, whereWhen: "x".repeat(LIMITS.whereWhenChars + 1) }).map((i) => i.path)).toEqual(["whereWhen"]);
-    expect(validateForPublish({ ...GP, summary: Array.from({ length: LIMITS.summaryWords + 1 }, () => "w").join(" ") }).map((i) => i.path)).toEqual(["summary"]);
+    const longSummary = { ...GP, summary: Array.from({ length: 40 }, () => "w").join(" ") };
+    expect(wordCount(longSummary)).toBe(wordCount(GP) + 40);
+    expect(wordCount(longSummary)).toBeLessThanOrEqual(LIMITS.totalWords);
+    expect(validateForPublish(longSummary)).toEqual([]);
+    const overPage = { ...GP, summary: Array.from({ length: LIMITS.totalWords - wordCount(GP) + 1 }, () => "w").join(" ") };
+    expect(validateForPublish(overPage).map((i) => i.path)).toEqual([""]);
   });
 
   test("the highlight is the gap's words as written, or nothing", () => {
@@ -172,6 +230,28 @@ test.describe("The exhbt page", () => {
     const pdf = await page.pdf({ format: "A4", preferCSSPageSize: true, printBackground: true });
     expect(pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g)?.length).toBe(1);
   });
+
+  // An uneven page (decision 0030). Until 25 Nov 2026 each part had a word cap of its own, which also kept every page on
+  // one A4 sheet; now only the page's 200 words hold it, so one long finding is allowed. These print one: a finding of
+  // about 120 words beside the graph, under 200 words in all, in a case study and in research.
+  for (const [name, doc] of [
+    ["a case study", UNEVEN_CASE_STUDY],
+    ["research", UNEVEN_RESEARCH],
+  ] as const) {
+    test(`an uneven page prints on one A4 page: ${name} with one long finding beside the graph`, async ({ page }) => {
+      expect(validateForPublish(doc)).toEqual([]);
+      expect(words(plain(findingsOf(doc)[0]!))).toBeGreaterThanOrEqual(110);
+      expect(wordCount(doc)).toBeLessThanOrEqual(LIMITS.totalWords);
+      const res = await page.request.post("/dev/parity", { data: { username: unique("uneven"), slug: "uneven", doc } });
+      expect(res.status(), await res.text()).toBe(200);
+      const { url } = (await res.json()) as { url: string };
+      await page.goto(url);
+      await expect(page.getByRole("heading", { level: 1, name: doc.title })).toBeVisible();
+      await page.emulateMedia({ media: "print" });
+      const pdf = await page.pdf({ format: "A4", preferCSSPageSize: true, printBackground: true });
+      expect(pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g)?.length).toBe(1);
+    });
+  }
 
   test("a portfolio look restyles the page through the --xp-* variables", async ({ page }) => {
     const name = unique("look");

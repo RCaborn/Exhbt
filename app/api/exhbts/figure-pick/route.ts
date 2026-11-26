@@ -13,8 +13,10 @@ import { recordAIFailure } from "@/lib/ai-failures";
 
 /**
  * Picks the figure for an exhbt being drafted (decisions 0017 and 0025). The draft page sends it,
- * beside /api/exhbts/draft, small JPEGs of the pages of the person's PDF that draw something
- * besides text, as multipart form data: a `label` ("report.pdf, page 3") and an `image` for each.
+ * beside /api/exhbts/draft, small JPEGs of what a figure could be on: the pages of the person's PDF
+ * that draw something besides text, the pictures inside a Word or PowerPoint file, and the PNG or
+ * JPEG pictures they agreed to send. Multipart form data: a `label` ("report.pdf, page 3", or
+ * "File 2, slide 3" for a picture) and an `image` for each.
  * The images go to the model and are dropped here; only the pick comes back:
  * { pick: { image, kind, box, alt, caption } | null }, `image` counting from 1 in the order sent,
  * `kind` "graph", "table" or "other", `box` in fractions of the image.
@@ -119,6 +121,9 @@ export async function POST(req: Request) {
             costUsd: result.costUsd,
             raw: result.raw,
             sizes: images.map((im) => ({ width: im.width, height: im.height })),
+            // What the model was told each image was: a PDF page's label holds the file's name ("report.pdf, page 3"); a
+            // picture from a Word or PowerPoint file, or one the person uploaded, has a number instead ("File 2, slide 3").
+            labels: images.map((im) => im.label),
           },
         };
   return NextResponse.json({ pick: result.pick, ...debug });

@@ -42,12 +42,13 @@ test.describe("Exhbt blocks", () => {
     expect(paths(doc({ evidence: { kind: "link", href: "http://example.com/work", label: "The work" } }))).toEqual(["evidence"]);
   });
 
-  test("the whole exhbt has a word limit, even when every block is within its own", () => {
+  test("the whole exhbt has a word limit, however its words are spread", () => {
+    // Four 20-word findings and a 40-word context line (each part's cap until decision 0030), and six full boxes: over 200 in all.
     const long = withFindings(
-      Array.from({ length: LIMITS.findings.max }, () => text(nWords(LIMITS.findings.wordsEach))),
+      Array.from({ length: LIMITS.findings.max }, () => text(nWords(20))),
       {
         title: "Total words",
-        gap: text(nWords(LIMITS.gapWords)),
+        gap: text(nWords(40)),
         flow: Array.from({ length: LIMITS.flow.max }, () => ({ step: nWords(LIMITS.flow.stepWords), detail: nWords(LIMITS.flow.detailWords) })),
         evidence: undefined,
       },

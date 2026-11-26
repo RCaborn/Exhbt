@@ -1,4 +1,5 @@
 import { safeHref } from "./blocks";
+import { materialWords } from "./emphasis";
 
 /**
  * Pure helpers for what the AI draft may keep from the person's material (decision 0024). No
@@ -42,10 +43,14 @@ export function referencesFrom(refs: { label: string; url: string }[], source: s
 
 /* ---------------- The parts the four layouts of decision 0028 add ---------------- */
 
-/** True when `words` are in `source` word for word (typography, spacing and case aside). Nothing is never "in" it. */
+/**
+ * True when `words` are in `source` word for word (typography, spacing and case aside): as written there, or with the
+ * material's own emphasis marks taken out (a Markdown file's `**bold**`), since what the AI copies is read with its
+ * marks taken out (decision 0029, "Emphasis inside the answer"). Nothing is never "in" it.
+ */
 export function saidIn(source: string, words: string): boolean {
   const w = squash(words);
-  return w.length > 0 && squash(source).includes(w);
+  return w.length > 0 && (squash(source).includes(w) || squash(materialWords(source)).includes(w));
 }
 
 /** Text with the quote marks round it taken off: a sentence quoted from the material is compared without them. */

@@ -1,36 +1,63 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Circle, FileText, Loader2, Upload, X } from "lucide-react";
 import { DOC_ACCEPT, DocError, DocNeedsServer, countWords, extractTextInBrowser, readOnServerFull } from "@/lib/doc-readers";
+import { filesBudget, keepStartAndEnd, LEFT_OUT, sharesOf } from "@/lib/material";
 import { removeFile } from "@/components/editor/media";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { finishUpload } from "@/components/team/finish-upload";
 import { Button } from "@/components/ui/Button";
 import type { Plan } from "@/lib/entitlements";
+import { formatLimits } from "@/lib/exhbt/blocks";
 import { FORMAT_RULES, isFormat } from "@/lib/exhbt/formats";
 import { isLayoutReason, type FigureNews } from "@/lib/exhbt/drafted";
 import type { PdfPages } from "@/lib/figures/pdf";
 import { Tick } from "@/components/ui/Tick";
-import { drawPages, pdfCandidates, placeFigure, prepareFigure, withinCaps, type FigureOutcome, type FigureSource } from "./figure";
+import type { OfficeRead } from "@/lib/figures/office";
+import {
+  drawPages,
+  officeCandidates,
+  pdfCandidates,
+  pictureCandidates,
+  placeFigure,
+  prepareFigure,
+  readOffice,
+  readPicture,
+  withinCaps,
+  type Candidate,
+  type FigureOutcome,
+  type FigureSource,
+  type PictureSource,
+  type ReadyFigure,
+} from "./figure";
 
 /**
  * The upload step: files are read on the device as they're added (scans and photos ask before
  * being sent to the AI reader), uploaded straight to Storage with a signed URL, then "Draft my
- * exhbt" sends the text, notes and link to /api/exhbts/draft and opens the editor.
+ * exhbt" sends the text, notes and link to /api/exhbts/draft and opens the editor. Each file is
+ * read whole; the draft gets all of it while the files fit the material budget together, and
+ * otherwise each file's share, the start and the end of a long one (lib/material.ts). Each file's
+ * line says which.
  *
- * A PDF read on the device also has its first pages drawn small. While the draft is written, the
- * pages that draw a chart, diagram or table go to /api/exhbts/figure-pick; the figure picked is
- * cut out, uploaded and put on the exhbt before the editor opens, in place of the graph the draft
- * drew when it is a graph itself (decisions 0017 and 0025, ./figure.ts). A scan's pages are drawn
- * and sent only once the person has agreed to send the scan. The editor then says, once, which
- * layout was chosen and why, and what came of looking for a figure.
+ * A PDF read on the device also has its first pages drawn small, and a Word or PowerPoint file has
+ * its pictures read out of it. While the draft is written, the pages and pictures that may hold a
+ * chart, diagram or photo go to /api/exhbts/figure-pick, with the PNG or JPEG files the person
+ * uploaded and agreed to send; the figure picked is cut out, uploaded and put on the exhbt before
+ * the editor opens, in place of the graph the draft drew when it is a graph itself (decisions 0017
+ * and 0025, ./figure.ts). A scan's pages, and a picture file, are sent only once the person has
+ * agreed. A layout that takes pictures (a gallery, a before and after, an event) also gets the
+ * person's uploaded pictures, the lead first, up to its cap; an essay takes nothing. The editor then
+ * says, once, which layout was chosen and why, and what came of looking for a figure.
  */
 
 /** How long, after the draft is saved, the page waits for the figure before opening the editor without it. */
 const FIGURE_WAIT_MS = 20_000;
 const isPdfFile = (f: File) => f.type === "application/pdf" || /\.pdf$/i.test(f.name);
+const isOfficeFile = (f: File) => /\.(docx|pptx)$/i.test(f.name);
+/** A PNG or JPEG: the pictures a person's own upload can put on an exhbt. */
+const isPlainPicture = (f: File) => f.type === "image/png" || f.type === "image/jpeg" || /\.(png|jpe?g)$/i.test(f.name);
 
 type Item = {
   key: string;
@@ -104,6 +131,10 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
   const [figure, setFigure] = useState<"none" | "working" | "done">("none");
   // Each PDF's pages, drawn once it has been read on the device (decision 0017).
   const pages = useRef(new Map<string, Promise<PdfPages | null>>());
+  // Each Word or PowerPoint file's pictures, read once it has been read on the device (decision 0025).
+  const office = useRef(new Map<string, Promise<{ kind: "docx" | "pptx"; read: OfficeRead } | null>>());
+  // The picture files the person agreed to send to be read, and so to be looked at for the key figure.
+  const agreed = useRef(new Set<string>());
   useEffect(() => {
     const drawn = pages.current;
     return () => drawn.forEach((p) => void p.then((x) => x?.pages.forEach((t) => URL.revokeObjectURL(t.url))));
@@ -144,11 +175,14 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
   /** Reads a file on the device; then uploads it, unless it's already stored (a team file). */
   async function read(key: string, file: File, uploadAfter: boolean) {
     try {
-      const text = await extractTextInBrowser(file);
+      // The whole file, so its words can be counted and its end kept: what the draft reads of it is its share of the
+      // budget, worked out below with the other files (lib/material.ts).
+      const text = await extractTextInBrowser(file, { maxChars: Number.POSITIVE_INFINITY });
       patch(key, { status: "ready", text });
       if (uploadAfter) void upload(key, file);
       // Read on the device, so its pages can be drawn here for picking a figure. A scan's are drawn only once the person agrees to send it (readOnServerFor).
       if (isPdfFile(file)) pages.current.set(key, drawPages(file));
+      if (isOfficeFile(file)) office.current.set(key, readOffice(file));
     } catch (e) {
       if (e instanceof DocNeedsServer) {
         patch(key, { status: "consent", needs: e.kind });
@@ -202,6 +236,8 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
   function forgetPages(key: string) {
     const drawn = pages.current.get(key);
     pages.current.delete(key);
+    office.current.delete(key);
+    agreed.current.delete(key);
     void drawn?.then((x) => x?.pages.forEach((t) => URL.revokeObjectURL(t.url)));
   }
 
@@ -210,6 +246,8 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
     // They've agreed to send the scan, to be read and to be looked at for a figure (decision 0025).
     // Its pages are drawn here, on the device, and go with the draft like any other PDF's.
     if (it.needs === "scan" && !pages.current.has(it.key)) pages.current.set(it.key, drawPages(it.file));
+    // A picture they agree to send to be read is looked at for the key figure too, as the card says.
+    if (it.needs === "image" && isPlainPicture(it.file)) agreed.current.add(it.key);
     try {
       const { text, truncated } = await readOnServerFull(it.file, "/api/files/transcribe");
       patch(it.key, { status: "ready", text, truncated });
@@ -226,7 +264,17 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
 
   const working = items.some((it) => it.status === "reading" || it.status === "transcribing" || it.upload === "uploading");
   const material = items.filter((it) => it.status === "ready" && it.text);
-  const totalWords = material.reduce((n, it) => n + countWords(it.text), 0) + countWords(notes);
+  // What the draft reads of each file (lib/material.ts): all of it while the files fit the budget together; otherwise each
+  // file its share, the longest cut to their start and their end. Each file's line says which, and that is what is sent.
+  const reading = useMemo(() => {
+    const ready = items.filter((it) => it.status === "ready" && it.text);
+    const shares = sharesOf(
+      ready.map((it) => it.text.length),
+      filesBudget(ready.map((it) => it.file.name)),
+    );
+    return new Map(ready.map((it, i) => [it.key, readingOf(it.text, shares[i]!)]));
+  }, [items]);
+  const totalWords = material.reduce((n, it) => n + (reading.get(it.key)?.keptWords ?? 0), 0) + countWords(notes);
   const canDraft = ready && !working && !busy && totalWords >= MIN_WORDS;
 
   async function submit(e?: React.FormEvent) {
@@ -238,25 +286,58 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
     // (decision 0017): those read here, and scans the person agreed to send (decision 0025).
     const stop = new AbortController();
     const drawn = material.filter((it) => pages.current.has(it.key));
-    setFigure(drawn.length ? "working" : "none");
-    // Whether some pages went unlooked-at, so "no figure" is never said of pages nobody saw: a PDF
-    // longer than the pages drawn, pages past the caps on one pick, or a PDF that couldn't be drawn.
+    const officeFiles = material.filter((it) => office.current.has(it.key));
+    // The picture files they agreed to send, stored and read.
+    const toSend = items.filter((it) => agreed.current.has(it.key) && it.status === "ready" && it.upload === "done" && it.fileId);
+    const looking = drawn.length + officeFiles.length + toSend.length > 0;
+    setFigure(looking ? "working" : "none");
+    // Whether some pages or pictures went unlooked-at, so "no figure" is never said of what nobody saw: a PDF
+    // longer than the pages drawn, pages past the caps on one pick, a file that couldn't be read, or pictures past the caps.
     let leftOut = false;
-    const figureJob: Promise<FigureOutcome> | null = drawn.length
+    // A chart drawn in Word or PowerPoint is not a picture and can't be lifted: said when nothing was picked.
+    let chartFile = false;
+    const figureJob: Promise<FigureOutcome> | null = looking
       ? (async (): Promise<FigureOutcome> => {
           const sources: FigureSource[] = [];
           for (const it of drawn) {
             const p = await pages.current.get(it.key);
             if (p) sources.push({ name: it.file.name, file: it.file, fileId: it.upload === "done" ? it.fileId : undefined, pages: p });
           }
-          // A PDF whose pages couldn't be drawn wasn't looked at: that isn't "no figure".
-          if (!sources.length) return { status: "failed" };
-          const all = sources.flatMap(pdfCandidates);
+          // A PDF's pages are labelled with its name; a picture from a Word or PowerPoint file, or one uploaded, with a number: "File 2, slide 3".
+          let no = sources.length;
+          const all: Candidate[] = sources.flatMap(pdfCandidates);
+          let unread = drawn.length - sources.length;
+          let capped = false;
+          let readable = sources.length > 0;
+          for (const it of officeFiles) {
+            const o = await office.current.get(it.key);
+            no++;
+            if (!o) {
+              unread++;
+              continue;
+            }
+            readable = true;
+            if (o.read.nativeChart) chartFile = true;
+            if (o.read.skipped > 0) capped = true;
+            all.push(...(await officeCandidates({ name: it.file.name, file: it.file, fileId: it.upload === "done" ? it.fileId : undefined, read: o.read }, no)));
+          }
+          const pictures: PictureSource[] = [];
+          for (const it of toSend) {
+            const r = await readPicture(it.file);
+            if (r) pictures.push({ name: it.file.name, file: it.file, fileId: it.fileId!, ...r });
+            else unread++;
+          }
+          if (pictures.length) readable = true;
+          all.push(...(await pictureCandidates(pictures, no + 1)));
+          // Nothing that could be looked at could be read: that isn't "no figure".
+          if (!readable) return { status: "failed" };
           const candidates = withinCaps(all);
-          leftOut = sources.length < drawn.length || candidates.length < all.length || sources.some((s) => s.pages.pageCount > s.pages.pages.length);
+          leftOut = unread > 0 || capped || candidates.length < all.length || sources.some((s) => s.pages.pageCount > s.pages.pages.length);
           return prepareFigure(candidates, stop.signal);
         })().catch((): FigureOutcome => ({ status: "failed" }))
       : null;
+    // The person's own PNG and JPEG uploads, in the order uploaded, for a layout that takes pictures (decision 0025).
+    const ownPictures = items.filter((it) => it.status === "ready" || it.status === "consent").filter((it) => isPlainPicture(it.file) && it.upload === "done" && it.fileId).map((it) => it.fileId!);
     // Counts from the upload for the AI's choice of layout (decision 0024): picture files, PDF pages, and
     // pages with pictures on them. Never the pages. Waits at most two seconds and sends what is known.
     const signals = await uploadSignals(items.filter((it) => it.status === "ready"), pages.current);
@@ -265,7 +346,8 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
     const dropUnplaced = () => {
       stop.abort();
       void figureJob?.then((f) => {
-        if (f.status === "ready" && !placed) void removeFile(f.figure.fileId);
+        // A picture they uploaded themselves is never deleted: it is theirs (it has no `picked`).
+        if (f.status === "ready" && !placed && f.figure.picked) void removeFile(f.figure.fileId);
       });
     };
     try {
@@ -273,7 +355,7 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          text: material.map((it) => `File: ${it.file.name}\n${it.text}`).join("\n\n"),
+          text: material.map((it) => `File: ${it.file.name}\n${reading.get(it.key)?.kept ?? it.text}`).join("\n\n"),
           notes,
           link: link.trim() || undefined,
           fileIds: items.filter((it) => it.upload === "done" && it.fileId).map((it) => it.fileId),
@@ -295,20 +377,29 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
       // What the editor says about the figure when none goes on: none found, it couldn't look, or
       // there was no PDF to look in. A figure that does go on is read from the exhbt itself.
       let news: FigureNews | undefined;
-      if (FORMAT_RULES[format].fromWork === "none") {
+      const takes = FORMAT_RULES[format].fromWork;
+      if (takes === "none") {
         // The layout takes nothing from the work (decision 0025): the pick is dropped below, nothing is placed, nothing is said.
-      } else if (!figureJob) {
-        const files = items.filter((it) => it.status === "ready");
-        if (files.length && !files.some((it) => isPdfFile(it.file))) news = "unread";
       } else {
         // The figure goes on before the editor opens, so the editor's first save already has it.
         // A pick that takes longer than the wait is one that couldn't look, not one that found nothing.
         const late = new Promise<FigureOutcome>((r) => setTimeout(() => r({ status: "failed" }), FIGURE_WAIT_MS));
-        const fig = await Promise.race([figureJob, late]);
-        if (fig.status === "ready") {
-          placed = await placeFigure(data.id, fig.figure);
+        const fig: FigureOutcome | null = figureJob ? await Promise.race([figureJob, late]) : null;
+        let lead: ReadyFigure | null = fig?.status === "ready" ? fig.figure : null;
+        // A layout that takes pictures (a gallery, a before and after, an event) is made of the person's pictures: with none
+        // chosen, the first uploaded leads, and they write its description.
+        const own = takes === "pictures" ? ownPictures : [];
+        if (!lead && own.length) lead = { fileId: own[0]!, kind: "other", alt: "", caption: "" };
+        if (lead) {
+          // The rest follow the lead, as many as the layout shows (FORMAT_LIMITS): the others stay among the exhbt's files.
+          const room = Math.max(0, formatLimits(format).sections.image - 1);
+          placed = await placeFigure(data.id, lead, own.filter((id) => id !== lead!.fileId).slice(0, room));
           if (!placed) news = "failed";
-        } else news = fig.status === "none" && leftOut ? "partial" : fig.status;
+        } else if (!fig) {
+          const files = items.filter((it) => it.status === "ready");
+          if (files.length && !files.some((it) => isPdfFile(it.file) || isOfficeFile(it.file) || isPlainPicture(it.file))) news = "unread";
+        } else if (fig.status === "none") news = chartFile ? "chart" : leftOut ? "partial" : "none";
+        else if (fig.status === "failed") news = "failed";
       }
       dropUnplaced();
       setFigure((f) => (f === "none" ? f : "done"));
@@ -351,7 +442,7 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
         >
           <Upload aria-hidden size={26} strokeWidth={1.75} />
           <span className="text-[1.05rem] font-semibold">{items.length ? "Add more files" : "Choose or drop your project files"}</span>
-          <span className="hint text-graphite">Reports, slides as PDF, Word, text, CSV or Excel, and photos. Up to {maxFileMb} MB each.</span>
+          <span className="hint text-graphite">Reports and slides as PDF, Word or PowerPoint, text, CSV or Excel, and pictures. Up to {maxFileMb} MB each.</span>
           <input
             id="files"
             type="file"
@@ -377,7 +468,7 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
                     <span className="shrink-0 text-sm font-normal text-graphite">{sizeLabel(it.file.size)}</span>
                   </p>
                   <p className="mt-0.5 text-sm" data-testid="file-status">
-                    {statusText(it)}
+                    {statusText(it, reading.get(it.key))}
                   </p>
                   {it.truncated && (
                     <p className="mt-0.5 text-sm text-error" data-testid="file-truncated">
@@ -403,7 +494,7 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
                   </p>
                   <p className="mt-1 text-sm text-graphite">
                     {it.needs === "image"
-                      ? "We can send it to our AI reader to turn it into text. Only the text comes back, and the file stays private to you."
+                      ? "We can send it to our AI reader to turn it into text and to see if it is the picture to lead your exhbt. Only the text and a short description and caption of the picture come back, and the file stays private to you."
                       : "We can send it to our AI reader to turn it into text and to look for a figure, such as a graph, for your exhbt. Only the text, where the figure is, and a short description and caption of it come back, and the file stays private to you."}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-3">
@@ -486,19 +577,34 @@ export function DraftForm({ maxFileMb, into, preload = [] }: { maxFileMb: number
   );
 }
 
-function statusText(it: Item): React.ReactNode {
+/** What the draft reads of one file: the text it is sent, the file's words and the words sent, and whether that is all of it. */
+type Reading = { kept: string; whole: boolean; words: number; keptWords: number };
+
+function readingOf(text: string, share: number): Reading {
+  const kept = keepStartAndEnd(text, share);
+  const words = countWords(text);
+  return kept === text ? { kept, whole: true, words, keptWords: words } : { kept, whole: false, words, keptWords: countWords(kept.replace(LEFT_OUT, "")) };
+}
+
+/** What the draft reads of a file, said plainly: all of it, its start and its end, or, for a scan the AI reader stopped part-way through, its first part. */
+function whatWasRead(it: Item, r: Reading): string {
+  const count = (x: number) => x.toLocaleString("en-GB");
+  if (it.truncated) return `We read the first ${count(r.keptWords)} words`;
+  return r.whole ? `We read all ${count(r.words)} words` : `We read ${count(r.keptWords)} of your ${count(r.words)} words: the start and the end`;
+}
+
+function statusText(it: Item, read: Reading | undefined): React.ReactNode {
   if (it.status === "reading") return "Reading…";
   if (it.status === "transcribing") return "Reading it with the AI reader. Scans can take up to 30 seconds…";
   if (it.status === "consent") return "Not read yet";
   if (it.status === "error") return null;
-  const words = countWords(it.text);
   const uploaded = it.kept ? " · from the team project" : it.upload === "uploading" ? " · uploading…" : it.upload === "done" ? " · uploaded" : "";
   return (
     <span className="inline-flex items-center gap-1.5">
-      {words > 0 && (
+      {read && read.keptWords > 0 && (
         <Tick size="xs" />
       )}
-      {words > 0 ? `${words.toLocaleString("en-GB")} words` : "Not read"}
+      {read && read.keptWords > 0 ? whatWasRead(it, read) : "Not read"}
       {uploaded}
     </span>
   );
