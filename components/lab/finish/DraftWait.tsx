@@ -89,7 +89,9 @@ export function DraftWait({ words, draftPage }: { words: FinishWords; draftPage:
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, [run]);
 
-  const said = arrived ? "Your first draft is ready." : `Step ${step + 1} of ${STEPS.length}: ${STEPS[step]!.label}.`;
+  const said = arrived
+    ? "Here's your first draft. We wrote it from your files and nothing else. Check each number, then publish."
+    : `Step ${step + 1} of ${STEPS.length}: ${STEPS[step]!.label}.`;
 
   return (
     <section className="fin-stage lab-content" aria-labelledby="fin-stage-title">

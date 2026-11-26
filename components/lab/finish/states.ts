@@ -6,7 +6,7 @@ export const FINISH_STATES = [
   {
     id: "first",
     tab: "First publish",
-    note: "Amara is on a paid plan and publishes her first exhbt. Press Review and publish.",
+    note: "Amara is on a paid plan and publishes this exhbt for the first time. Press Review and publish.",
   },
   {
     id: "changes",
