@@ -115,6 +115,10 @@ async function capture(page: Page, url: string): Promise<{ html: string; boxes: 
       const half = (v: number) => Math.round(v * 2) / 2;
       return [root, ...root.querySelectorAll("*")].map((el): [string, number, number, number, number] => {
         const r = el.getBoundingClientRect();
+        // An element that draws no box (display: none, say) has its rect at the viewport's origin, not in the layout, so
+        // relative to the article it moves whenever anything above the article changes height (the site header did, by 8px,
+        // in pull request 38). It is kept as a zero box at no position: its tag still counts, its place does not.
+        if (r.width === 0 && r.height === 0) return [el.tagName.toLowerCase(), 0, 0, 0, 0];
         return [el.tagName.toLowerCase(), half(r.x - r0.x), half(r.y - r0.y), half(r.width), half(r.height)];
       });
     });
