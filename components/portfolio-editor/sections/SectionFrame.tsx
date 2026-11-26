@@ -66,6 +66,8 @@ export function SectionFrame({ sectionKey, index, count, children }: SectionFram
   const at = `[data-section-frame="${sectionKey}"]`;
   const first = index === 0;
   const last = index === count - 1;
+  // The page keeps at least one section (removeSection does nothing to the last one).
+  const lone = count <= 1;
 
   const move = (by: -1 | 1, act: string) => {
     const to = rt.state.get().arrangement.sections.indexOf(sectionKey) + by;
@@ -76,6 +78,7 @@ export function SectionFrame({ sectionKey, index, count, children }: SectionFram
   };
   const remove = () => {
     const list = rt.state.get().arrangement.sections;
+    if (list.length <= 1) return api.say(W.keepOne);
     const i = list.indexOf(sectionKey);
     const next = list[i + 1] ?? list[i - 1];
     api.change((s) => removeSection(s, sectionKey), W.removed(name));
@@ -121,7 +124,7 @@ export function SectionFrame({ sectionKey, index, count, children }: SectionFram
           { id: "open", label: W.open(bandTitle), run: () => (window.location.href = `/exhbts/${band}/edit`) },
         ] as ItemAction[])
       : []),
-    { id: "remove", label: W.sectionRemove(name), run: remove },
+    { id: "remove", label: W.sectionRemove(name), off: lone ? W.keepOne : undefined, run: remove },
   ];
 
   return (
@@ -159,7 +162,7 @@ export function SectionFrame({ sectionKey, index, count, children }: SectionFram
               <IconButton data-act="hide" variant="ghost" label={W.hide(bandTitle)} tooltip={W.hideTip} onClick={hideBand} icon={<EyeOff aria-hidden size={16} strokeWidth={2} />} />
             </>
           )}
-          <IconButton data-act="remove" variant="ghost" label={W.sectionRemove(name)} tooltip={W.sectionRemove(name)} onClick={remove} icon={<X aria-hidden size={16} strokeWidth={2.25} />} />
+          <IconButton data-act="remove" variant="ghost" label={W.sectionRemove(name)} tooltip={lone ? W.keepOne : W.sectionRemove(name)} isDisabled={lone} onClick={remove} icon={<X aria-hidden size={16} strokeWidth={2.25} />} />
         </ToolRow>
       )}
       <div ref={body} className="pe-sec-body">
