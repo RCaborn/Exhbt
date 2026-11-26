@@ -794,8 +794,8 @@ test.describe("an empty flowchart", () => {
     await page.keyboard.type("The only step");
     expect(await stepsNow(page)).toEqual(["The only step"]);
     await expect(page.getByRole("button", { name: "Add a box", exact: true })).toHaveCount(0);
-    // The count issue is on the list until there are three.
-    await expect(list(page)).toHaveAttribute("data-invalid", "");
+    // One box is nothing to fix: since decision 0032 the fewest boxes is a suggestion, and the list carries no issue for it.
+    await expect(list(page)).not.toHaveAttribute("data-invalid", "");
   });
 
   for (const f of offered()) {
@@ -968,7 +968,7 @@ test.describe("by touch", () => {
 test.describe("blank boxes as a visitor sees them", () => {
   const visitorList = (page: Page) => page.locator(`${READY} section[aria-label="Preview"]`).getByRole("list", { name: "Methodology" });
 
-  test("a blank last box is left out of 'See as a visitor', so the last filled step keeps the result box; the editing page still shows it; typing brings it in; all blank shows them all", async ({ page }) => {
+  test("a blank last box is left out of 'See as a visitor', so the last filled step keeps the result box; the editing page still shows it; typing brings it in; all blank shows no flowchart", async ({ page }) => {
     const base = sampleDoc("case-study");
     const filled = base.flow.slice(0, 3);
     await openDoc(page, freshName("blankflow"), { ...base, flow: [...filled, { step: "" }] });
@@ -988,7 +988,8 @@ test.describe("blank boxes as a visitor sees them", () => {
     await seeAsVisitor(page, true);
     await expect(items).toHaveCount(4);
     await expect(items.last()).toContainText("Wrote it up");
-    // Every box blank (a new exhbt): they all show.
+    // Every box blank (a new exhbt): a visitor is shown no flowchart at all (decision 0032: a flowchart with no box
+    // filled in is not drawn), and the editing page still has every box to type in.
     await seeAsVisitor(page, false);
     await page.evaluate(() =>
       [0, 1, 2, 3].forEach((n) => {
@@ -997,6 +998,8 @@ test.describe("blank boxes as a visitor sees them", () => {
       }),
     );
     await seeAsVisitor(page, true);
-    await expect(items).toHaveCount(4);
+    await expect(visitorList(page)).toHaveCount(0);
+    await seeAsVisitor(page, false);
+    expect(await keysNow(page)).toHaveLength(4);
   });
 });
