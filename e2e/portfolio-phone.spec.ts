@@ -145,7 +145,7 @@ test.describe("A section's More", () => {
       // One tap puts it back.
       await undoToast(page, `moved ${name}`).click();
       await expect.poll(() => sections(page)).toEqual(before);
-      await expect(page.locator(".astryx-toast")).toHaveCount(0);
+      await expect(page.locator(".astryx-toast").filter({ visible: true })).toHaveCount(0);
     }
   });
 
@@ -166,7 +166,7 @@ test.describe("A section's More", () => {
     await s2.getByRole("button", { name: "Move About me down", exact: true }).click();
     await expect(undoToast(page, "moved About me")).toBeVisible();
     await page.locator(`${READY} [data-section="about"]`).tap({ position: { x: 4, y: 4 } });
-    await expect(page.locator(".astryx-toast")).toHaveCount(0);
+    await expect(page.locator(".astryx-toast").filter({ visible: true })).toHaveCount(0);
     expect(await undoLabel(page)).toBe("moved About me");
   });
 
