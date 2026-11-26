@@ -316,10 +316,13 @@ export const PORTFOLIO_PAGES: PortfolioPage[] = [
   },
 
   // A job link's page on the person's own host: the portfolio's cards (ProjectCard) in the person's look.
+  // On a person's host every address is read as one of their pages, so in development the stand-in
+  // Storage's /dev/files pictures cannot load there: these two pages have no photo and no picture.
   {
     name: "job-link",
     fixture: {
       ...fullFixture("pp-job-link", "studio-pink"),
+      person: { ...FULL_PERSON, photo: false },
       jobLinks: [
         {
           slug: "northfield-analyst",
@@ -328,7 +331,7 @@ export const PORTFOLIO_PAGES: PortfolioPage[] = [
           intro: "I like finding the one change that makes a busy service run better, then measuring it.\n\nThese three pieces show how I time a process, test a change and report what happened.",
           picks: [
             { exhbt: "queue", reason: "A timed trial of a change to a busy service, with the before and after." },
-            { exhbt: "poster", reason: "Shows I can test a small change and count what it does." },
+            { exhbt: "survey", reason: "Shows I can measure a change over weeks and report what it did." },
             { exhbt: "rota", reason: "" },
           ],
         },
@@ -339,7 +342,12 @@ export const PORTFOLIO_PAGES: PortfolioPage[] = [
   },
 
   // An exhbt's page in its frame on the person's own host: the look's variables, the pager's cards, the sign-off.
-  { name: "exhbt-frame", fixture: fullFixture("pp-exhbt-frame", "classic-burgundy"), view: { exhbt: "library-seats" }, root: "[data-look]:has([data-exhbt-route])" },
+  {
+    name: "exhbt-frame",
+    fixture: { ...fullFixture("pp-exhbt-frame", "classic-burgundy"), person: { ...FULL_PERSON, photo: false } },
+    view: { exhbt: "library-seats" },
+    root: "[data-look]:has([data-exhbt-route])",
+  },
 ];
 
 /**
