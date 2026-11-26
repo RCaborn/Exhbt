@@ -1,0 +1,604 @@
+/*
+ * The kit page (/lab/design/kit). Layered, like everything in the lab (see components/lab/lab.css).
+ * Sizes and colours come from the proposed theme's tokens and the site's Tailwind tokens; the few
+ * lengths written here are the page's own layout.
+ */
+@layer components {
+  .kit {
+    margin-inline: auto;
+    max-width: 82rem;
+    padding: 3rem 1rem 8rem;
+  }
+  .kit-top {
+    display: grid;
+    gap: 2rem 4rem;
+    padding-bottom: 4rem;
+  }
+  .kit-body {
+    display: grid;
+    gap: 3rem;
+  }
+  .kit-rail {
+    display: none;
+  }
+  @media (width >= 640px) {
+    .kit {
+      padding: 5rem 2rem 10rem;
+    }
+  }
+  @media (width >= 1024px) {
+    .kit-top {
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      align-items: end;
+      padding-bottom: 6rem;
+    }
+    .kit-body {
+      grid-template-columns: 10.5rem minmax(0, 1fr);
+      gap: 3.5rem;
+    }
+    .kit-rail {
+      display: block;
+      position: sticky;
+      top: 1.5rem;
+      align-self: start;
+      max-height: calc(100dvh - 3rem);
+      overflow-y: auto;
+    }
+  }
+
+  /* A section: an ink rule, its title in the display face, and one line that is the rule being shown. */
+  .kit-section {
+    border-top: 2px solid var(--color-ink);
+    padding-top: 1.25rem;
+    scroll-margin-top: 1.5rem;
+  }
+  .kit-section + .kit-section {
+    margin-top: 6rem;
+  }
+  .kit-section-head {
+    display: grid;
+    gap: 0.75rem 3rem;
+  }
+  @media (width >= 768px) {
+    .kit-section + .kit-section {
+      margin-top: 8rem;
+    }
+    .kit-section-head {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      align-items: start;
+    }
+  }
+  .kit-block {
+    margin-top: 3rem;
+  }
+  .kit-block-title {
+    margin-bottom: 1.25rem;
+  }
+
+  /* Today beside proposed. On a phone, today first and proposed under it. */
+  .kit-compare {
+    display: grid;
+    gap: 2.5rem;
+  }
+  .kit-col {
+    min-width: 0;
+  }
+  .kit-col-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+    color: var(--color-slate);
+  }
+  .kit-col[data-col="proposed"] > .kit-col-label {
+    color: var(--color-ink);
+  }
+  .kit-col[data-col="proposed"] > .kit-col-label::before {
+    content: "";
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--color-mint);
+    box-shadow: 0 0 0 1.5px var(--color-jade);
+  }
+  @media (width >= 768px) {
+    .kit-compare {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      gap: 0;
+    }
+    .kit-col[data-col="today"] {
+      border-right: 1px solid var(--color-line);
+      padding-right: 2.5rem;
+    }
+    .kit-col[data-col="proposed"] {
+      padding-left: 2.5rem;
+    }
+    .kit-compare[data-even] {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+    .kit-compare[data-stacked] {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 2.5rem;
+    }
+    .kit-compare[data-stacked] > .kit-col[data-col="today"] {
+      border-right: 0;
+      border-bottom: 1px solid var(--color-line);
+      padding-right: 0;
+      padding-bottom: 2.5rem;
+    }
+    .kit-compare[data-stacked] > .kit-col[data-col="proposed"],
+    .kit-col[data-solo] {
+      padding-left: 0;
+    }
+  }
+  .kit-note {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--color-slate);
+  }
+
+  /* A row of samples that wraps, and a column of them. */
+  .kit-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .kit-stack {
+    display: grid;
+    gap: 1.25rem;
+    min-width: 0;
+  }
+  .kit-stack[data-gap="lg"] {
+    gap: 2rem;
+  }
+  .kit-stack[data-gap="sm"] {
+    gap: 0.75rem;
+  }
+
+  /* A specimen list: each line of type with what it is called and how big it is. */
+  .kit-specimens {
+    display: grid;
+    gap: 1.75rem;
+  }
+  .kit-specimen {
+    display: grid;
+    gap: 0.375rem;
+    min-width: 0;
+  }
+  .kit-specimen > :first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .kit-spec {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.75rem;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--color-slate);
+    font-variant-numeric: tabular-nums;
+  }
+  .kit-spec > b {
+    font-weight: 600;
+    color: var(--color-graphite);
+  }
+
+  /* A facts table: what a token is and what it is set to. */
+  .kit-facts {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .kit-facts caption {
+    padding-bottom: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+  }
+  .kit-facts th,
+  .kit-facts td {
+    border-top: 1px solid var(--color-line);
+    padding: 0.625rem 1rem 0.625rem 0;
+    text-align: left;
+    vertical-align: top;
+  }
+  .kit-facts th {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .kit-facts td {
+    color: var(--color-graphite);
+  }
+  .kit-facts tr:last-child > * {
+    border-bottom: 1px solid var(--color-line);
+  }
+  .kit-facts code {
+    font: inherit;
+    font-size: 0.8125rem;
+    color: var(--color-slate);
+    overflow-wrap: anywhere;
+  }
+
+  /* Colour: the four that are fixed, large, and the greys under them. */
+  .kit-swatches {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  @media (width >= 768px) {
+    .kit-swatches {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  .kit-swatch {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 9rem;
+    border-radius: var(--radius-container);
+    padding: 1rem;
+    font-size: 0.9375rem;
+    line-height: 1.35;
+  }
+  .kit-swatch b {
+    font-family: var(--font-family-heading);
+    font-size: 1.5625rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .kit-swatch span {
+    opacity: 0.8;
+    font-variant-numeric: tabular-nums;
+  }
+  .kit-greys {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+  }
+  @media (width >= 768px) {
+    .kit-greys {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+  }
+  .kit-grey {
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: var(--color-graphite);
+  }
+  .kit-grey > i {
+    display: block;
+    margin-bottom: 0.5rem;
+    height: 3rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-inner);
+  }
+  .kit-grey > b {
+    display: block;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+
+  /* A ground to show something on: mist, mint or ink. */
+  .kit-ground {
+    border-radius: var(--radius-container);
+    padding: 1.5rem;
+  }
+  .kit-ground[data-ground="mist"] {
+    background: var(--color-mist);
+  }
+  .kit-ground[data-ground="mint"] {
+    background: var(--color-mint);
+  }
+  .kit-ground[data-ground="ink"] {
+    background: var(--color-ink);
+    color: #fff;
+  }
+  .kit-ground[data-ground="line"] {
+    border: 1px solid var(--color-line);
+  }
+  /* Behind the work: plain mist, with room for the frame's shadow. */
+  .kit-ground[data-ground="work"] {
+    border-radius: 24px;
+    background: var(--color-mist);
+    padding: 0.75rem 0.75rem 1.5rem;
+  }
+  @media (width >= 640px) {
+    .kit-ground[data-ground="work"] {
+      padding: 1.25rem 1.25rem 2.5rem;
+    }
+  }
+
+  /* The rings, drawn standing so they can be read without pressing Tab. */
+  .kit-rings {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  @media (width >= 768px) {
+    .kit-rings {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  .kit-ring-ground {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    border-radius: var(--radius-container);
+    padding: 1.75rem 1rem 1rem;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    text-align: center;
+  }
+  .kit-ring-ground[data-ground="white"] {
+    border: 1px solid var(--color-line);
+  }
+  .kit-ring-ground[data-ground="mist"] {
+    background: var(--color-mist);
+  }
+  .kit-ring-ground[data-ground="mint"] {
+    background: var(--color-mint);
+  }
+  .kit-ring-ground[data-ground="ink"] {
+    background: var(--color-ink);
+    color: var(--color-on-ink);
+    /* On ink the ring is mint (the theme's onDark tokens). */
+    --focus-outline-color: var(--color-mint);
+  }
+  .kit-ring {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    border-radius: 999px;
+    padding-inline: 1.25rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    outline: var(--focus-outline-width) var(--focus-outline-style) var(--focus-outline-color);
+    outline-offset: var(--focus-outline-offset);
+  }
+  .kit-ring[data-on="white"] {
+    border: 1.5px solid var(--color-ink);
+    background: #fff;
+    color: var(--color-ink);
+  }
+  .kit-ring[data-on="mint"] {
+    background: var(--color-ink);
+    color: #fff;
+  }
+  .kit-ring[data-on="ink"] {
+    background: var(--color-mint);
+    color: var(--color-ink);
+  }
+  /* Today's two rings, drawn standing: the site's own (globals.css) and the one an Astryx button gets under today's theme. */
+  .kit-rings-today {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    padding: 0.75rem;
+  }
+  .kit-ring-today {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    border: 1.5px solid var(--color-ink);
+    border-radius: 999px;
+    background: #fff;
+    padding-inline: 1.25rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--color-ink);
+    box-shadow:
+      0 0 0 5px var(--color-surface),
+      0 0 0 7px var(--color-ink);
+  }
+  .kit-ring-today[data-ring="site"] {
+    outline: 3px solid var(--color-jade);
+    outline-offset: 2px;
+  }
+  .kit-ring-today[data-ring="astryx"] {
+    outline: 2px solid var(--color-mint);
+    outline-offset: 3px;
+  }
+
+  /* Dialogs drawn standing, side by side on a wide window. */
+  .kit-stage {
+    display: grid;
+    gap: 1.5rem;
+    align-items: start;
+  }
+  @media (width >= 1024px) {
+    .kit-stage {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      padding: 2.5rem;
+    }
+  }
+  .kit-toasts {
+    justify-items: start;
+  }
+
+  /* ── Motion ─────────────────────────────────────────────────────────────── */
+  .kit-tempo {
+    display: grid;
+    gap: 1.25rem;
+  }
+  .kit-tempo-row {
+    display: grid;
+    grid-template-columns: 9.5rem minmax(0, 1fr);
+    align-items: center;
+    gap: 1rem;
+  }
+  .kit-track {
+    position: relative;
+    height: 2.75rem;
+    border-radius: 999px;
+    background: var(--color-mist);
+  }
+  .kit-dot {
+    position: absolute;
+    top: 0.375rem;
+    left: 0.375rem;
+    width: 2rem;
+    height: 2rem;
+    border: 1.5px solid var(--color-ink);
+    border-radius: 999px;
+    background: var(--color-mint);
+  }
+  /* The resting state is wherever it was last sent; only the travel is motion. */
+  .kit-tempo[data-at="end"] .kit-dot {
+    left: calc(100% - 2.375rem);
+  }
+  .kit-curve {
+    display: block;
+    width: 100%;
+    max-width: 11rem;
+    height: auto;
+    overflow: visible;
+  }
+  .kit-curves {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+  @media (width >= 768px) {
+    .kit-curves {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  /* Each moment is a row: what it is on the left, the thing itself on the right. */
+  .kit-moments {
+    border-bottom: 1px solid var(--color-line);
+  }
+  .kit-moment {
+    display: grid;
+    gap: 1rem 2rem;
+    align-items: center;
+    border-top: 1px solid var(--color-line);
+    padding-block: 1.5rem;
+  }
+  .kit-moment-stage {
+    min-width: 0;
+  }
+  @media (width >= 768px) {
+    .kit-moment {
+      grid-template-columns: 16rem minmax(0, 1fr);
+      min-height: 8.5rem;
+    }
+  }
+  .kit-ticks {
+    display: grid;
+    gap: 0.625rem;
+    font-weight: 500;
+  }
+  .kit-ticks > li {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+  .kit-stroke {
+    background-image: linear-gradient(var(--color-mint), var(--color-mint));
+    background-repeat: no-repeat;
+    background-position: 0 88%;
+    background-size: 100% 0.42em;
+    padding: 0 0.06em;
+    margin: 0 -0.06em;
+  }
+  .kit-arrive {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-element);
+    background: #fff;
+    box-shadow: var(--shadow-low);
+    padding: 0.75rem 1rem;
+    font-weight: 500;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    [data-motion="on"] .kit-dot {
+      transition: left var(--kit-duration, var(--duration-medium)) var(--ease-move);
+    }
+    [data-motion="on"] .kit-ticks[data-run] [data-tick] {
+      animation: kit-tick-in var(--duration-medium) var(--ease-entrance) both;
+      animation-delay: calc(var(--i) * var(--duration-fast-max));
+    }
+    [data-motion="on"] .kit-ticks[data-run] li > span:last-child {
+      animation: kit-fade-in var(--duration-medium) var(--ease-standard) both;
+      animation-delay: calc(var(--i) * var(--duration-fast-max));
+    }
+    [data-motion="on"] .kit-stroke[data-run] {
+      animation: kit-stroke-in var(--duration-slow) var(--ease-standard) both;
+    }
+    [data-motion="on"] .kit-arrive[data-run] {
+      animation: kit-arrive-in var(--duration-medium) var(--ease-entrance) both;
+    }
+  }
+  @keyframes kit-tick-in {
+    from {
+      opacity: 0;
+      transform: scale(0.4);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes kit-fade-in {
+    from {
+      opacity: 0.35;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes kit-stroke-in {
+    from {
+      background-size: 0% 0.42em;
+    }
+    to {
+      background-size: 100% 0.42em;
+    }
+  }
+  @keyframes kit-arrive-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.75rem) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* The app's frame, small: a window with the themed top bar in it. */
+  .kit-window {
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-container);
+    background: #fff;
+  }
+  .kit-window-body {
+    padding: 2rem 1.5rem 2.5rem;
+  }
+
+  /* Skeleton laid out as an exhbt taking shape. */
+  .kit-skeleton {
+    display: grid;
+    gap: 1rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-container);
+    padding: 1.5rem;
+  }
+  .kit-skeleton-flow {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+}
