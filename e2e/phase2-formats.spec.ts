@@ -15,8 +15,9 @@ import {
   type ExhbtDoc,
   type Section,
 } from "../lib/exhbt/blocks";
+import { DRAFT_TARGETS, draftTargets, overTargets } from "../lib/ai/draft-targets";
 import { applyBlock } from "../lib/exhbt/draft-blocks";
-import { CLASSIC_FORMATS, formatOf, hiddenSections, OFFERED_FORMATS, shownSections, withFormat } from "../lib/exhbt/formats";
+import { CLASSIC_FORMATS, FORMATS, formatOf, hiddenSections, OFFERED_FORMATS, shownSections, withFormat } from "../lib/exhbt/formats";
 import { fitCaption } from "../lib/figures/rules";
 import { keyFigureOf } from "../lib/portfolio-home";
 import { referencesFrom } from "../lib/exhbt/references";
@@ -104,9 +105,36 @@ test.describe("model: old docs are unchanged", () => {
     expect(L.findings).toEqual(LIMITS.findings);
     expect(L.images).toEqual(LIMITS.images);
     expect(L.sections).toEqual(LIMITS.sections);
-    expect(L.gapWords).toBe(LIMITS.gapWords);
+    expect(L.link).toEqual(LIMITS.link);
+    // No part has a word limit of its own (decision 0030), in any layout.
+    for (const f of FORMATS) for (const key of ["gapWords", "summaryWords", "evidenceCaptionWords", "reflection", "aim", "conclusion", "pullquote"]) expect(formatLimits(f), `${f} ${key}`).not.toHaveProperty(key);
     expect(L.targetWords).toBe(LIMITS.targetWords);
     expect(L.totalWords).toBe(200);
+  });
+
+  test("the AI keeps each layout's old word caps as its own targets; a draft past them is marked for the eval, never refused", () => {
+    expect(DRAFT_TARGETS).toEqual({ summaryWords: 25, gapWords: 40, findingWords: 20, captionWords: 15, quoteWords: 30, reflectionWords: 35, aimWords: 20, conclusionWords: 25, pullquoteWords: 30 });
+    const pick = (f: Parameters<typeof draftTargets>[0]) => {
+      const t = draftTargets(f);
+      return [t.gapWords, t.findingWords, t.captionWords, t.reflectionWords];
+    };
+    // The context line, each finding, a caption and what I'd do next, as decisions 0024 and 0028 set them per layout.
+    expect(pick("case-study")).toEqual([40, 20, 15, 35]);
+    expect(pick("gallery")).toEqual([30, 15, 10, 35]);
+    expect(pick("research")).toEqual([25, 15, 20, 25]);
+    expect(pick("build")).toEqual([30, 15, 10, 35]);
+    expect(pick("essay")).toEqual([30, 20, 15, 25]);
+    expect(pick("before-after")).toEqual([30, 20, 10, 35]);
+    expect(pick("event")).toEqual([30, 15, 10, 35]);
+
+    // A 21-word finding in a case study: past the AI's target, so the eval marks it, and still publishable.
+    const at = libraryDoc.sections.findIndex((s) => s.kind === "findings");
+    const long: ExhbtDoc = { ...libraryDoc, sections: libraryDoc.sections.map((s) => (s.kind === "findings" ? { ...s, items: [text(nWords(21)), ...s.items.slice(1)] } : s)) };
+    expect(overTargets(long).map((i) => i.path)).toEqual([`sections.${at}.items.0`]);
+    expect(overTargets(libraryDoc)).toEqual([]);
+    expect(validateForPublish(long)).toEqual([]);
+    // The same finding in a gallery is past a gallery's 15.
+    expect(overTargets(withFormat({ ...long, sections: [...long.sections] }, "gallery")).map((i) => i.path)).toContain(`sections.${at}.items.0`);
   });
 });
 
@@ -224,10 +252,11 @@ test.describe("model: publishing", () => {
     expect(messages({ ...g, sections: [...g.sections, image(9)] })).toContain("sections: Up to 8 images.");
     // Findings are optional.
     expect(messages({ ...g, sections: g.sections.filter((s) => s.kind !== "findings") })).toEqual([]);
-    // A caption over the gallery cap fails, though 15 words would pass in a case study.
-    const long = { ...g, sections: g.sections.map((s) => (s.id === "image-2" && s.kind === "image" ? { ...s, caption: text(nWords(11)) } : s)) };
-    const n = long.sections.findIndex((s) => s.id === "image-2");
-    expect(pathsOf(long)).toContain(`sections.${n}.caption`);
+    // A caption has no word limit of its own (decision 0030): one of 30 words passes, far past the 10 a gallery's caption
+    // was held to until 25 Nov 2026. Only the page's 200 words hold it.
+    const long = { ...g, sections: g.sections.map((s) => (s.id === "image-2" && s.kind === "image" ? { ...s, caption: text(nWords(30)) } : s)) };
+    expect(wordCount(long)).toBeLessThanOrEqual(LIMITS.totalWords);
+    expect(messages(long)).toEqual([]);
     // One graph only.
     const graph = (k: number): Section => ({ id: `graph-${k}`, kind: "graph", chart: { kind: "bar", title: "T", unit: "%", rows: [{ label: "A", value: 1 }, { label: "B", value: 2 }] } });
     expect(messages({ ...g, sections: [...g.sections, graph(1), graph(2)] })).toContain("sections: Only one graph.");
@@ -243,11 +272,13 @@ test.describe("model: publishing", () => {
     expect(messages(without(["findings"]))).toContain("sections: Add your results.");
     const four = { ...r, sections: [...r.sections, image(2), image(3)] };
     expect(messages(four)).toContain("sections: Up to 3 figures, graphs and images together.");
+    // The aim has no word limit of its own (decision 0030): one of 30 words, past the 20 it was held to, adds no issue of its own.
     const aimIndex = r.sections.findIndex((s) => s.kind === "aim");
-    const over = { ...r, sections: r.sections.map((s) => (s.kind === "aim" ? { ...s, text: text(nWords(LIMITS.aim.words + 1)) } : s)) };
-    expect(pathsOf(over)).toContain(`sections.${aimIndex}.text`);
-    // Research asks for two to three results of fifteen words.
-    expect(formatLimits("research").findings).toMatchObject({ min: 2, max: 3, wordsEach: 15 });
+    const over = { ...r, sections: r.sections.map((s) => (s.kind === "aim" ? { ...s, text: text(nWords(30)) } : s)) };
+    expect(pathsOf(over)).not.toContain(`sections.${aimIndex}.text`);
+    // Research asks for two to three results; the AI writes each in at most fifteen words, a target people aren't held to.
+    expect(formatLimits("research").findings).toEqual({ min: 2, max: 3 });
+    expect(draftTargets("research").findingWords).toBe(15);
   });
 
   test("a case study holding an empty aim and conclusion passes: they are hidden, not checked", () => {

@@ -23,7 +23,8 @@
     "eval:fixtures": "tsx evals/exhbt-draft/fixtures/build.ts",
     "eval:figures": "tsx scripts/eval-figures.ts",
     "eval:figures:crops": "tsx scripts/eval-figures.ts --redraw",
-    "eval:figures:fixtures": "node evals/figure-pick/fixtures/build.mjs"
+    "eval:figures:fixtures": "node evals/figure-pick/fixtures/build.mjs",
+    "eval:figures:fixtures:office": "node evals/figure-pick/fixtures/build-office.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",

@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import Link from "next/link";
 import { publishExhbt, unpublishExhbt } from "@/app/(app)/exhbts/[id]/actions";
 import { confirmNumber, unverifiedOf } from "@/components/editor/model";
 import { ConfirmAction } from "@/components/editor/ConfirmAction";
+import { SeeYourPortfolio, WhereItGoes } from "@/components/editor/PublishWhere";
+import { liveLine } from "@/lib/exhbt/publish-words";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { CopyLink } from "@/components/ui/CopyLink";
@@ -22,7 +23,8 @@ import "../css/sheets.css";
 /*
  * "Review and publish" (decision 0026, "What the page does not draw"): the plan, the username, what
  * stops publishing, the numbers to check, the tick, and Publish. A port of the classic editor's
- * publish section.
+ * publish section. Before publishing it says where the exhbt goes, on the person's portfolio, and
+ * after it, that it is live there (components/editor/PublishWhere.tsx, the same in both editors).
  */
 export function PublishSheet(): ReactNode {
   return (
@@ -77,6 +79,7 @@ function PublishBody() {
   }
 
   const base = env.liveBase;
+  const hidden = env.hiddenOnPortfolio === true;
   const justUrl = result?.ok && base ? `${base}/${result.slug}` : null;
   const liveUrl = base && live.slug ? `${base}/${live.slug}` : null;
   const shortOf = (u: string) => u.replace(/^https:\/\//, "");
@@ -95,7 +98,7 @@ function PublishBody() {
     <div className="xe-sheet-stack">
       {result?.ok && justUrl ? (
         <div role="status" className="xe-live">
-          <p className="text-[1.25rem] font-semibold">{result.changed ? "Your changes are live." : "It's live."}</p>
+          <p className="text-[1.25rem] font-semibold">{liveLine(result.changed, hidden)}</p>
           <p className="mt-2 text-graphite">Paste this into an application:</p>
           <p className="mt-1 font-mono text-sm break-words">
             <a href={justUrl} className="link font-semibold">
@@ -107,6 +110,7 @@ function PublishBody() {
               View it
             </Button>
             <CopyLink href={justUrl} />
+            {base && <SeeYourPortfolio liveBase={base} />}
             <Button href="/exhbts">Back to your exhbts</Button>
           </div>
         </div>
@@ -122,14 +126,7 @@ function PublishBody() {
         )
       )}
       {env.planBlock && <UpgradePrompt reason={env.planBlock.reason} upgradeTo={env.planBlock.upgradeTo} primary={false} />}
-      {!env.liveBase && (
-        <p className="text-graphite">
-          You need a username to publish.{" "}
-          <Link href="/account/portfolio" className="link font-semibold text-ink">
-            Choose one
-          </Link>
-        </p>
-      )}
+      {(!base || (!published && !result?.ok)) && <WhereItGoes liveBase={base} hidden={hidden} className="text-graphite" />}
       {first && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-graphite">{issues.all.length === 1 ? "1 thing" : `${issues.all.length} things`} to fix before this can go live.</p>

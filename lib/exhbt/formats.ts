@@ -85,55 +85,47 @@ export type FormatRule = {
   needs: readonly Need[];
 };
 
-/** What differs from LIMITS (lib/exhbt/blocks.ts); formatLimits() merges it over them. A case study has no differences. */
+/**
+ * What differs from LIMITS (lib/exhbt/blocks.ts); formatLimits() merges it over them. A case study has no
+ * differences. No part has a word limit of its own (decision 0030): how long the AI writes each part, layout
+ * by layout, is draftTargets in lib/ai/draft-targets.ts.
+ */
 export const FORMAT_LIMITS = {
   "case-study": {},
   gallery: {
-    gapWords: 30,
-    findings: { min: 1, max: 3, wordsEach: 15 },
-    images: { max: 8, captionWords: 10 },
-    link: { descriptionWords: 10 },
+    findings: { min: 1, max: 3 },
+    images: { max: 8 },
     sections: { graph: 1, image: 8, link: 2 },
     minImages: 2,
   },
   research: {
-    gapWords: 25,
-    findings: { min: 2, max: 3, wordsEach: 15 },
-    images: { captionWords: 20 },
-    reflection: { words: 25 },
-    link: { labelWords: 12, descriptionWords: 10 },
+    findings: { min: 2, max: 3 },
+    link: { labelWords: 12 },
     sections: { link: 3 },
     maxFigures: 3,
     targetWords: 170,
   },
   // The four of decision 0028. Everything not here is as a case study.
   build: {
-    gapWords: 30,
-    findings: { min: 1, max: 3, wordsEach: 15 },
-    images: { max: 4, captionWords: 10 },
-    link: { descriptionWords: 10 },
+    findings: { min: 1, max: 3 },
+    images: { max: 4 },
     sections: { graph: 1, image: 4, link: 2 },
   },
   essay: {
-    gapWords: 30,
-    images: { max: 1, captionWords: 15 },
-    reflection: { words: 25 },
-    link: { labelWords: 12, descriptionWords: 10, hrefOptional: true },
+    images: { max: 1 },
+    link: { labelWords: 12, hrefOptional: true },
     sections: { graph: 1, image: 1, link: 4 },
     targetWords: 170,
   },
   "before-after": {
-    gapWords: 30,
-    findings: { min: 2, max: 3, wordsEach: 20 },
-    images: { max: 6, captionWords: 10 },
+    findings: { min: 2, max: 3 },
+    images: { max: 6 },
     sections: { graph: 1, image: 6 },
     minImages: 2,
   },
   event: {
-    gapWords: 30,
-    findings: { min: 1, max: 3, wordsEach: 15 },
-    images: { max: 6, captionWords: 10 },
-    link: { descriptionWords: 10 },
+    findings: { min: 1, max: 3 },
+    images: { max: 6 },
     sections: { graph: 1, image: 6, link: 2 },
     minImages: 1,
   },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { askForPick, candidatesOf, drawPages, type PickAnswer } from "@/app/(app)/exhbts/new/figure";
+import { askForPick, candidatesOf, drawPages, officeCandidates, pictureCandidates, readOffice, readPicture, withinCaps, type Candidate, type PictureSource, type PickAnswer } from "@/app/(app)/exhbts/new/figure";
 import type { FigureBox } from "@/lib/exhbt/blocks";
 
 /**
@@ -15,6 +15,10 @@ import type { FigureBox } from "@/lib/exhbt/blocks";
  *         answer of no figure, and a PDF with no page worth sending are told apart.
  *   draw  a page, or a box on it, as a PNG, with boxes outlined on it if asked: for looking at
  *         what was expected and what was cut.
+ *   pickFiles  the same for Word, PowerPoint and picture files together, as the draft page reads them:
+ *         the pictures read out of each file (lib/figures/office.ts), the PNG and JPEG files as the
+ *         person's own pictures, one pick, the cut. Says whether a file holds a chart drawn in
+ *         Word or PowerPoint, which can't be lifted.
  *
  * Nothing is uploaded, placed or saved.
  */
@@ -41,6 +45,22 @@ export type EvalPick = {
   ms: number;
 };
 export type Outline = { box: FigureBox; token: "jade" | "error" };
+/** The answer for a set of Word, PowerPoint and picture files. `picture` names what was picked: its path in the file, or the picture file's name. */
+export type EvalFilesPick = {
+  /** The images sent, in order, with what each is. */
+  sent: { image: number; label: string; picture: string }[];
+  status: "picked" | "none" | "failed" | "skipped";
+  http: number | null;
+  error?: string;
+  pick?: PickAnswer;
+  picture?: string;
+  /** A Word or PowerPoint file holds a chart drawn in it. */
+  nativeChart: boolean;
+  cut?: FigureBox;
+  crop?: string;
+  debug?: unknown;
+  ms: number;
+};
 
 declare global {
   interface Window {
@@ -48,6 +68,7 @@ declare global {
       pages: (pdfBase64: string, name: string) => Promise<{ pageCount: number; pages: EvalPage[] } | null>;
       pick: (pdfBase64: string, name: string) => Promise<EvalPick>;
       draw: (pdfBase64: string, name: string, page: number, box: FigureBox | null, outlines?: Outline[]) => Promise<string>;
+      pickFiles: (files: { name: string; type: string; base64: string }[]) => Promise<EvalFilesPick>;
     };
   }
 }
@@ -94,6 +115,50 @@ async function pick(pdfBase64: string, name: string): Promise<EvalPick> {
   return { ...base, status: "picked", http: asked.http, pick: asked.pick, page: asked.candidate.page, cut: cut.box, crop: await dataUrl(cut.file), debug: asked.debug, ms };
 }
 
+async function pickFiles(input: { name: string; type: string; base64: string }[]): Promise<EvalFilesPick> {
+  const t0 = performance.now();
+  const done = () => Math.round(performance.now() - t0);
+  const all: Candidate[] = [];
+  const pictures: PictureSource[] = [];
+  let nativeChart = false;
+  let no = 0;
+  for (const f of input) {
+    const file = new File([Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0))], f.name, { type: f.type });
+    no++;
+    if (/\.(docx|pptx)$/i.test(f.name)) {
+      const o = await readOffice(file);
+      if (!o) continue;
+      if (o.read.nativeChart) nativeChart = true;
+      all.push(...(await officeCandidates({ name: f.name, file, read: o.read }, no)));
+    } else if (/\.(png|jpe?g)$/i.test(f.name)) {
+      const r = await readPicture(file);
+      if (r) pictures.push({ name: f.name, file, fileId: `eval-${no}`, ...r });
+    }
+  }
+  all.push(...(await pictureCandidates(pictures, no - pictures.length + 1)));
+  const candidates = withinCaps(all);
+  const identity = (c: Candidate) => c.media ?? c.from;
+  const sent = candidates.map((c, i) => ({ image: i + 1, label: c.label, picture: identity(c) }));
+  if (!candidates.length) return { sent, status: "skipped", http: null, nativeChart, ms: done() };
+  const asked = await askForPick(candidates);
+  if (asked.status === "failed") return { sent, status: "failed", http: asked.http, error: asked.error, nativeChart, ms: done() };
+  if (asked.status === "none") return { sent, status: "none", http: asked.http, nativeChart, debug: asked.debug, ms: done() };
+  const ms = done();
+  // An office picture is cut as the draft page cuts it; a picture the person uploaded goes on as it is.
+  const cut = await asked.candidate.cut(asked.pick.box);
+  return {
+    sent,
+    status: "picked",
+    http: asked.http,
+    pick: asked.pick,
+    picture: identity(asked.candidate),
+    nativeChart,
+    ...(asked.candidate.own ? {} : { cut: cut.box ?? { x: 0, y: 0, w: 1, h: 1 }, crop: await dataUrl(cut.file) }),
+    debug: asked.debug,
+    ms,
+  };
+}
+
 async function draw(pdfBase64: string, name: string, page: number, box: FigureBox | null, outlines: Outline[] = []): Promise<string> {
   const { pdfFigure } = await import("@/lib/figures/pdf");
   const bytes = new Uint8Array(await toFile(pdfBase64, name).arrayBuffer());
@@ -127,7 +192,7 @@ function tokenColour(token: Outline["token"]): string {
 export function FigureEval() {
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    window.figureEval = { pages, pick, draw };
+    window.figureEval = { pages, pick, draw, pickFiles };
     setReady(true);
     return () => {
       delete window.figureEval;

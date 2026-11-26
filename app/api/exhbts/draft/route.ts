@@ -9,7 +9,7 @@ import { draftVerdict } from "@/lib/drafting";
 import { aiVersionOf } from "@/lib/exhbt/draft-blocks";
 import { safeHref } from "@/lib/exhbt/blocks";
 import { formatOf } from "@/lib/exhbt/formats";
-import { normaliseNumber, unverifiedNumbers } from "@/lib/exhbt/verify";
+import { misquoted, normaliseNumber, unverifiedNumbers } from "@/lib/exhbt/verify";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
 import { recordAIFailure, tooManyFailures, TOO_MANY_FAILURES } from "@/lib/ai-failures";
@@ -85,10 +85,8 @@ export async function POST(req: Request) {
   });
 
   // Flag numbers missing from the material, and any the model listed with a quote that isn't there.
-  const squash = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
-  const flat = squash(source);
   const fromText = unverifiedNumbers(result.doc, source);
-  const badQuotes = result.numbers.filter((n) => n.sourceQuote.trim() && !flat.includes(squash(n.sourceQuote))).map((n) => n.value.trim());
+  const badQuotes = misquoted(result.numbers, source);
   const seen = new Set<string>();
   const unverified = [...fromText, ...badQuotes].filter((v) => {
     const key = normaliseNumber(v) ?? v;

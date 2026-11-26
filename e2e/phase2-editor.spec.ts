@@ -119,7 +119,7 @@ test.describe("the exhbt editor", () => {
     await expect(page.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
     await expect(publishSheet(page).getByRole("link", { name: /Upgrade to Premium/ })).toBeVisible();
     await expect(publishSheet(page).getByText(/comes with Premium/)).toBeVisible();
-    await expect(page.getByText("It's live.")).toHaveCount(0);
+    await expect(page.getByText(/^(It's live|Your changes are live)\b/)).toHaveCount(0);
 
     // On Premium it still waits for the confirmation.
     await page.goto(`/dev/plan?plan=premium&next=${encodeURIComponent(new URL(editor).pathname)}`);
@@ -128,11 +128,11 @@ test.describe("the exhbt editor", () => {
     await expect(page.getByText(/comes with Premium/)).toHaveCount(0);
     await page.getByRole("button", { name: "Publish", exact: true }).click();
     await expect(page.getByText("Tick the box to confirm this is your work and the numbers are true.")).toBeVisible();
-    await expect(page.getByText("It's live.")).toHaveCount(0);
+    await expect(page.getByText(/^(It's live|Your changes are live)\b/)).toHaveCount(0);
 
     await page.getByLabel("This is my work, and the numbers are true").check();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(page.getByText("It's live.")).toBeVisible();
+    await expect(page.getByText("It's live on your portfolio.")).toBeVisible();
     await expect(page.getByRole("link", { name: `/p/eddie/${SLUG}` })).toBeVisible();
 
     // The portfolio shows it: the tile, then the project with its flowchart and findings.
@@ -225,7 +225,7 @@ test.describe("the exhbt editor", () => {
     await page.getByLabel("This is my work, and the numbers are true").check();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
     await expect(page.getByText(/^Fix \d+ things first/)).toBeVisible();
-    await expect(page.getByText("It's live.")).toHaveCount(0);
+    await expect(page.getByText(/^(It's live|Your changes are live)\b/)).toHaveCount(0);
     await page.goto("/exhbts");
     await expect(page.getByRole("listitem").filter({ hasText: "Draft" })).toHaveCount(1);
   });
@@ -247,7 +247,7 @@ test.describe("the exhbt editor", () => {
       await page.getByLabel("This is my work, and the numbers are true").check();
       await page.getByRole("button", { name: "Publish", exact: true }).click();
       await expect(page.getByText(/^Fix \d+ things? first/)).toBeVisible();
-      await expect(page.getByText("It's live.")).toHaveCount(0);
+      await expect(page.getByText(/^(It's live|Your changes are live)\b/)).toHaveCount(0);
     });
   }
 

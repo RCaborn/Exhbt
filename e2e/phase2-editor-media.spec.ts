@@ -31,10 +31,10 @@ test.describe("images and the work as a file", () => {
     await page.getByLabel("This is my work, and the numbers are true").check();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
     // The top list says what is wrong and takes you to the field.
-    await expect(page.getByText("It's live.")).toHaveCount(0);
+    await expect(page.getByText(/^(It's live|Your changes are live)\b/)).toHaveCount(0);
     const problems = await openThingsToFix(page);
     await expect(problems.getByRole("button", { name: /Image 1: Describe the image/ })).toBeVisible();
-    await expect(page.getByText("It's live.")).toHaveCount(0);
+    await expect(page.getByText(/^(It's live|Your changes are live)\b/)).toHaveCount(0);
 
     await page.keyboard.press("Escape");
     await fillPlain(page, page.getByLabel(/Image 1: describe it/), "A queue at the cafe till");
@@ -215,14 +215,19 @@ test.describe("the save status for a screen reader", () => {
 });
 
 test.describe("guidance", () => {
-  test("over 200 words: the bar turns red and the issue is shown with the field", async ({ page }) => {
+  test("over 200 words: the bar turns red and the page's limit is listed to fix; the context line has no limit of its own", async ({ page }) => {
     await signInAs(page, "walt", "premium");
     await startFromScratch(page);
     const long = Array.from({ length: LIMITS.totalWords + 30 }, (_, i) => `word${i}`).join(" ");
     await fillContext(page, long);
     await expect(page.getByText(`aim for ${LIMITS.targetWords}, at most ${LIMITS.totalWords}`)).toBeVisible();
     await expect(page.locator(`${READY} [data-word-bar]`)).toHaveAttribute("data-over", "true");
-    await expect(page.getByText(`Keep the context to ${LIMITS.gapWords} words.`)).toBeVisible();
+    // The only word limit is the page's (decision 0030): the field itself is not marked, and nothing names a limit for it.
+    await expect(fieldAt(page, "gap")).not.toHaveAttribute("data-invalid");
+    await expect(page.getByText(/Keep the context to/)).toHaveCount(0);
+    const fixes = await openThingsToFix(page);
+    await expect(fixes).toContainText(`Keep the whole exhbt to ${LIMITS.totalWords} words (it's ${LIMITS.totalWords + 30}).`);
+    await expect(fixes).not.toContainText(/Keep the context/);
   });
 
   test("the badge waits for the confirmation", async ({ page }) => {

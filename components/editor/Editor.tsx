@@ -27,6 +27,8 @@ import { IMAGE_ACCEPT, WORK_ACCEPT, checkFile, fileIdsOf, prepareImage, readSize
 import { cardOf, cardWords, confirmNumber, issuesAt, labelOf, unverifiedOf, visibleIssues, type CardKey } from "./model";
 import { Card, TextInput } from "./parts";
 import { PreviewArrange } from "./PreviewArrange";
+import { SeeYourPortfolio, WhereItGoes } from "./PublishWhere";
+import { liveLine } from "@/lib/exhbt/publish-words";
 import { Sections } from "./Sections";
 import { SkillsInput } from "./SkillsInput";
 import { clearBackup, readBackup, useAutosave, type Backup } from "./useAutosave";
@@ -44,6 +46,8 @@ export type EditorProps = {
   slug: string | null;
   /** Where live exhbts are: https://alex.exhbt.co.uk, or /p/alex in development. Null with no username yet. */
   liveBase: string | null;
+  /** Hidden from the portfolio's home page by the person (decision 0014): still live at its own link. Absent means false. */
+  hiddenOnPortfolio?: boolean;
   owner: Owner;
   imageUrls: Record<string, string | null>;
   /** Signed URL for an attached file (links are read from the doc). */
@@ -95,7 +99,7 @@ const GUIDE_KEY = "exhbt-guide-hidden";
 const sameCopy = (now: Backup | null, offered: Backup) => Boolean(now && now.at === offered.at && JSON.stringify(now.doc) === JSON.stringify(offered.doc));
 
 export function Editor(props: EditorProps & { /** This editor only: how this person gets to the new editor, if they may use it (LayoutPicker). */ newEditor?: NewEditorWay }) {
-  const { id, status, slug, liveBase, owner, planBlock, canGoLive, maxFileMb } = props;
+  const { id, status, slug, liveBase, hiddenOnPortfolio, owner, planBlock, canGoLive, maxFileMb } = props;
   const [doc, setDoc] = useState<ExhbtDoc>(props.initialDoc);
   // What the draft page passed on, kept from the first render: it comes off the address below, so a
   // later render of this page on the server (after publishing, say) no longer carries it.
@@ -633,7 +637,6 @@ export function Editor(props: EditorProps & { /** This editor only: how this per
               id="card-gap"
               title={copy.gap}
               words={cw.gap}
-              limit={L.gapWords}
               hint={f === "case-study" ? "Why the question matters, in one or two short sentences. Select the gap nobody has filled yet and press Highlight." : `${copy.gapHint} Select the words and press Highlight.`}
               flagged={flaggedBy("gap")}
               heaviest={heaviest === "gap"}
@@ -761,7 +764,7 @@ export function Editor(props: EditorProps & { /** This editor only: how this per
                 <>
                   {justLive && justLiveUrl ? (
                     <div role="status" className="mt-3 rounded-[16px] border border-ink bg-wash p-4">
-                      <p className="text-[1.25rem] font-semibold">{justLive?.changed ? "Your changes are live." : "It's live."}</p>
+                      <p className="text-[1.25rem] font-semibold">{liveLine(Boolean(justLive?.changed), hiddenOnPortfolio === true)}</p>
                       <p className="mt-2 text-graphite">Paste this into an application:</p>
                       <p className="mt-1 font-mono text-sm break-words">
                         <a href={justLiveUrl} className="link font-semibold">
@@ -773,6 +776,7 @@ export function Editor(props: EditorProps & { /** This editor only: how this per
                           View it
                         </Button>
                         <CopyLink href={justLiveUrl} />
+                        {liveBase && <SeeYourPortfolio liveBase={liveBase} />}
                         <Button href="/exhbts">Back to your exhbts</Button>
                       </div>
                     </div>
@@ -788,14 +792,7 @@ export function Editor(props: EditorProps & { /** This editor only: how this per
                     )
                   )}
                   {planBlock && <UpgradePrompt reason={planBlock.reason} upgradeTo={planBlock.upgradeTo} primary={false} className="mt-3" />}
-                  {!liveBase && (
-                    <p className="mt-2 text-graphite">
-                      You need a username to publish.{" "}
-                      <Link href="/account/portfolio" className="link font-semibold text-ink">
-                        Choose one
-                      </Link>
-                    </p>
-                  )}
+                  {(!liveBase || (status !== "published" && !justLive)) && <WhereItGoes liveBase={liveBase} hidden={hiddenOnPortfolio === true} className="mt-2 text-graphite" />}
                   <FieldIssues id="overall-issues" issues={issuesAt(issues, "")} />
                   {all.length > 0 && (
                     <p className="mt-2 text-sm text-graphite">

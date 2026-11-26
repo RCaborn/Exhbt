@@ -27,6 +27,21 @@ export type EvalCase = {
   expect: Expected | null;
 };
 
+/**
+ * A case made of Word, PowerPoint or picture files (fixtures/cases-office.json). The figure is a picture, named by its path
+ * in the file ("word/media/image2.png") or, for a picture the person uploaded, by its file name. `box` is its true box inside
+ * that picture; null when the picture goes on as it is (an uploaded picture is not cut). `nativeChart`: a file holds a chart
+ * drawn in Word or PowerPoint, so the files must be reported as holding one that can't be lifted.
+ */
+export type OfficeCase = {
+  id: string;
+  files: string[];
+  what: string;
+  expect: { picture: string; kind: FigureKind; box: FigureBox | null } | null;
+  nativeChart?: boolean;
+};
+export type OfficeAnswer = { status: "picked"; picture: string; kind: FigureKind; box: FigureBox } | { status: "none" } | { status: "skipped" } | { status: "failed"; error: string };
+
 export type Answer =
   | { status: "picked"; page: number; kind: FigureKind; box: FigureBox }
   | { status: "none" }
@@ -72,6 +87,47 @@ export function grade(c: EvalCase, a: Answer): Verdict {
   if (contains < CONTAIN_MIN) why.push(`the cut holds ${Math.round(contains * 100)}% of the figure; at least ${CONTAIN_MIN * 100}% is needed`);
   if (areaRatio > AREA_MAX) why.push(`the cut is ${areaRatio.toFixed(2)} times a perfect cut; at most ${AREA_MAX} is allowed`);
   return { result: why.length ? "fail" : "pass", why: why.length ? why : ["right page, right kind, the whole figure and little else"], cut, contains: round(contains), areaRatio: round(areaRatio) };
+}
+
+/** Marks the answer for a set of Word, PowerPoint or picture files: the right picture, the right kind, and, where it is cut, the whole figure and little else. */
+export function gradeOffice(c: OfficeCase, a: OfficeAnswer, nativeChartSeen: boolean): Verdict {
+  if (a.status === "failed") return { result: "error", why: [`the pick didn't run: ${a.error}`] };
+  const chartWhy = c.nativeChart && !nativeChartSeen ? ["the file's chart, drawn in Word or PowerPoint, was not noticed"] : [];
+  if (!c.expect) {
+    if (a.status === "picked") return { result: "fail", why: [`picked a ${a.kind} (${a.picture}); the files have no picture to take`, ...chartWhy] };
+    return chartWhy.length ? { result: "fail", why: chartWhy } : { result: "pass", why: [c.nativeChart ? "nothing sent, and the chart that can't be lifted was noticed" : "no figure, as expected"] };
+  }
+  if (a.status !== "picked") return { result: "fail", why: [`${a.status === "none" ? "no figure" : "nothing sent"}; expected the ${c.expect.kind} ${c.expect.picture}`] };
+  if (a.picture !== c.expect.picture) return { result: "fail", why: [`picked ${a.picture}; expected ${c.expect.picture}`] };
+  if (!c.expect.box) return a.kind === c.expect.kind ? { result: "pass", why: ["the right picture, and the right kind"] } : { result: "fail", why: [`kind "${a.kind}"; expected "${c.expect.kind}"`] };
+  // Cut as the draft page cuts it: the box with the app's margin, or the whole picture when that is most of it.
+  const as = (kind: FigureKind): Answer => ({ status: "picked", page: 1, kind, box: a.box });
+  return grade({ id: c.id, file: "", what: c.what, pages: 1, expect: { page: 1, kind: c.expect.kind, box: c.expect.box } }, as(a.kind));
+}
+
+/** The marking of Word, PowerPoint and picture cases, marked: a perfect answer passes and each kind of wrong answer does not. */
+export function selfTestOffice(cases: OfficeCase[]): string[] {
+  const problems: string[] = [];
+  const want = (id: string, name: string, got: Verdict, result: Verdict["result"]) => {
+    if (got.result !== result) problems.push(`${id}: ${name} marked ${got.result}, should be ${result} (${got.why.join("; ")})`);
+  };
+  for (const c of cases) {
+    want(c.id, "a request that failed", gradeOffice(c, { status: "failed", error: "HTTP 502" }, true), "error");
+    if (!c.expect) {
+      want(c.id, "nothing sent", gradeOffice(c, { status: "skipped" }, true), "pass");
+      want(c.id, "a pick", gradeOffice(c, { status: "picked", picture: "word/media/image1.png", kind: "other", box: { x: 0, y: 0, w: 1, h: 1 } }, true), "fail");
+      if (c.nativeChart) want(c.id, "a chart nobody noticed", gradeOffice(c, { status: "skipped" }, false), "fail");
+      continue;
+    }
+    const { picture, kind, box } = c.expect;
+    const answer: OfficeAnswer = { status: "picked", picture, kind, box: box ?? { x: 0, y: 0, w: 1, h: 1 } };
+    want(c.id, "the true answer", gradeOffice(c, answer, false), "pass");
+    want(c.id, "no figure", gradeOffice(c, { status: "none" }, false), "fail");
+    want(c.id, "nothing sent", gradeOffice(c, { status: "skipped" }, false), "fail");
+    want(c.id, "the wrong picture", gradeOffice(c, { ...answer, picture: `${picture}.other` }, false), "fail");
+    want(c.id, "the wrong kind", gradeOffice(c, { ...answer, kind: kind === "other" ? "graph" : "other" }, false), "fail");
+  }
+  return problems;
 }
 
 /**

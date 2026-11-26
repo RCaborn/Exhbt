@@ -18,7 +18,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { selfTest, type EvalCase } from "../evals/figure-pick/grade";
+import { selfTest, selfTestOffice, type EvalCase, type OfficeCase } from "../evals/figure-pick/grade";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey } from "../lib/ai/model";
 
 const ROOT = process.cwd();
@@ -51,6 +51,8 @@ function parseArgs(argv: string[]): Args {
 }
 
 const cases = () => JSON.parse(readFileSync(join(EVAL_DIR, "fixtures/cases.json"), "utf8")) as EvalCase[];
+/** The Word, PowerPoint and picture cases, made by fixtures/build-office.mjs. */
+const officeCases = () => JSON.parse(readFileSync(join(EVAL_DIR, "fixtures/cases-office.json"), "utf8")) as OfficeCase[];
 const stamp = () => new Date().toISOString().replace(/[:.]/g, "-");
 
 /** Every eval line in a file: a results.jsonl, or a job log with a timestamp before each line. */
@@ -84,8 +86,9 @@ function main() {
 
   if (args.selfTest) {
     const all = cases();
-    const problems = selfTest(all);
-    console.log(`Self-test of the marking on ${all.length} reports (no browser, no API calls):`);
+    const office = officeCases();
+    const problems = [...selfTest(all), ...selfTestOffice(office)];
+    console.log(`Self-test of the marking on ${all.length} reports and ${office.length} Word, PowerPoint and picture cases (no browser, no API calls):`);
     for (const p of problems) console.log(`  ${p}`);
     console.log(problems.length ? "Self-test failed: fix the marking before trusting a run." : "Self-test passed: a perfect answer passes every report, and each kind of wrong answer does not.");
     process.exit(problems.length ? 1 : 0);
@@ -119,7 +122,7 @@ function main() {
     process.exit(1);
   }
 
-  const wanted = cases().filter((c) => !args.only || args.only.split(",").some((o) => c.id === o.trim() || c.id.startsWith(`${o.trim()}-`)));
+  const wanted: { id: string }[] = [...cases(), ...officeCases()].filter((c) => !args.only || args.only.split(",").some((o) => c.id === o.trim() || c.id.startsWith(`${o.trim()}-`)));
   if (!wanted.length) {
     console.error("No reports matched.");
     process.exit(1);

@@ -5,17 +5,25 @@
  * placeFigure puts it on the exhbt. The draft carries on whatever happens here; the outcome
  * (a figure, none found, or it couldn't look) is said once when the editor opens.
  *
- * A candidate is any image a figure could be cut from. Today each one is a page of a PDF
- * (pdfCandidates). Nothing after that knows it is a page: a picture inside a Word or PowerPoint
- * file, or a picture uploaded with the work, only needs its own function that returns Candidates.
+ * A candidate is any image a figure could be cut from: a page of a PDF (pdfCandidates), a picture
+ * inside a Word or PowerPoint file (officeCandidates), or a picture uploaded with the work
+ * (pictureCandidates). Nothing after those knows which it is: each is a function that returns
+ * Candidates and nothing else.
  */
 import { removeFile, uploadForExhbt } from "@/components/editor/media";
 import type { FigureBox, FigureKind } from "@/lib/exhbt/blocks";
+import type { OfficeRead } from "@/lib/figures/office";
 import type { PdfPages } from "@/lib/figures/pdf";
 import { FIGURE, clampBox, mayHoldFigure, withMargin } from "@/lib/figures/rules";
 
 /** A PDF read on the person's device, with its pages drawn. `fileId` once it is uploaded. */
 export type FigureSource = { name: string; file: File; fileId?: string; pages: PdfPages };
+
+/** A Word or PowerPoint file read on the device, with the pictures inside it worth offering (lib/figures/office.ts). */
+export type OfficeSource = { name: string; file: File; fileId?: string; read: OfficeRead };
+
+/** A PNG or JPEG the person uploaded with the work and agreed to send, already stored as `fileId`. */
+export type PictureSource = { name: string; file: File; fileId: string; bytes: Uint8Array; type: "image/png" | "image/jpeg"; width: number; height: number };
 
 /** One image a figure could be cut from, whatever it came from. */
 export type Candidate = {
@@ -29,6 +37,8 @@ export type Candidate = {
   /** Where in the file: a PDF's page (from 1), or a picture's path inside a Word or PowerPoint file. */
   page?: number;
   media?: string;
+  /** A picture the person uploaded themselves, already stored: it goes on as it is, with no cut, no upload and no "may share" tick. */
+  own?: { fileId: string };
   /**
    * The picture to upload for a box the AI gave on `image` (in fractions of it), at full size.
    * `box` is the box that was cut, when the editor can crop it again from the stored file.
@@ -42,7 +52,8 @@ export type ReadyFigure = {
   kind: FigureKind;
   alt: string;
   caption: string;
-  picked: { from: string; sourceFileId?: string; page?: number; media?: string; box?: FigureBox };
+  /** Where it was picked from. Absent for a picture the person uploaded themselves. */
+  picked?: { from: string; sourceFileId?: string; page?: number; media?: string; box?: FigureBox };
 };
 
 /** What came of looking for a figure: one ready to place, none in the files, or it couldn't look. */
@@ -76,6 +87,75 @@ export function pdfCandidates(source: FigureSource): Candidate[] {
         return { file: new File([blob], name, { type: blob.type }), box: kept };
       },
     }));
+}
+
+/**
+ * The pictures inside a Word or PowerPoint file, one candidate each: its small copy goes to the AI, and the cut
+ * is taken from the picture itself at full size. Labelled "File 2, slide 3" or "File 1, picture 2".
+ */
+export async function officeCandidates(source: OfficeSource, fileNo: number): Promise<Candidate[]> {
+  const { pictureThumb, pictureCut } = await import("@/lib/figures/pictures");
+  const { pictures } = source.read;
+  const onSlide = new Map<number, number>();
+  for (const p of pictures) if (p.slide) onSlide.set(p.slide, (onSlide.get(p.slide) ?? 0) + 1);
+  const seen = new Map<number, number>();
+  const out: Candidate[] = [];
+  for (const [i, pic] of pictures.entries()) {
+    let where = `picture ${i + 1}`;
+    if (pic.slide) {
+      const nth = (seen.get(pic.slide) ?? 0) + 1;
+      seen.set(pic.slide, nth);
+      where = `slide ${pic.slide}${(onSlide.get(pic.slide) ?? 0) > 1 ? `, picture ${nth}` : ""}`;
+    }
+    let thumb: { jpeg: Blob };
+    try {
+      thumb = await pictureThumb(pic.bytes, pic.type, pic.width, pic.height);
+    } catch {
+      // A picture the browser can't decode is left out; the others still go.
+      continue;
+    }
+    out.push({
+      label: `File ${fileNo}, ${where}`,
+      image: thumb.jpeg,
+      from: source.name,
+      ...(source.fileId ? { sourceFileId: source.fileId } : {}),
+      media: pic.path,
+      async cut(box: FigureBox) {
+        // The whole picture when the box is nearly all of it; otherwise the box, with a small margin. The editor can't crop it again, so no box is kept.
+        const kept = withMargin(clampBox(box));
+        const whole = kept.w * kept.h > 0.9;
+        const blob = await pictureCut(pic.bytes, pic.type, pic.width, pic.height, whole ? null : kept);
+        const name = `${stem(source.name)}-${where.replace(/[^\w]+/g, "-")}.${blob.type === "image/png" ? "png" : "jpg"}`;
+        return { file: new File([blob], name, { type: blob.type }) };
+      },
+    });
+  }
+  return out;
+}
+
+/** The person's own uploaded pictures that they agreed to send: one candidate each, labelled "File 3, picture". They go on as they are. */
+export async function pictureCandidates(sources: PictureSource[], firstNo: number): Promise<Candidate[]> {
+  const { pictureThumb } = await import("@/lib/figures/pictures");
+  const out: Candidate[] = [];
+  for (const [i, s] of sources.entries()) {
+    let thumb: { jpeg: Blob };
+    try {
+      thumb = await pictureThumb(s.bytes, s.type, s.width, s.height);
+    } catch {
+      continue;
+    }
+    out.push({
+      label: `File ${firstNo + i}, picture`,
+      image: thumb.jpeg,
+      from: s.name,
+      sourceFileId: s.fileId,
+      own: { fileId: s.fileId },
+      async cut() {
+        return { file: s.file };
+      },
+    });
+  }
+  return out;
 }
 
 /**
@@ -131,6 +211,9 @@ export async function prepareFigure(candidates: Candidate[], signal: AbortSignal
     if (asked.status === "none") return { status: "none" };
     const { pick, candidate } = asked;
 
+    // A picture the person uploaded is already stored: it goes on as it is, described by what the AI read on it.
+    if (candidate.own) return { status: "ready", figure: { fileId: candidate.own.fileId, kind: "other", alt: pick.alt, caption: pick.caption } };
+
     const { file, box } = await candidate.cut(pick.box);
     if (signal.aborted) return { status: "failed" };
     fileId = await uploadForExhbt(file, "image");
@@ -160,20 +243,55 @@ export async function prepareFigure(candidates: Candidate[], signal: AbortSignal
   }
 }
 
-/** Puts an uploaded figure on the exhbt just drafted. False (and the picture deleted) if it can't. */
-export async function placeFigure(exhbtId: string, f: ReadyFigure): Promise<boolean> {
+/**
+ * Puts an uploaded figure on the exhbt just drafted, and, for a gallery, the person's other uploaded pictures after it (`more`, in
+ * the order uploaded). False if it can't. A figure cut out of the person's file is then deleted; a picture they uploaded themselves
+ * (no `picked`) never is: it is theirs.
+ */
+export async function placeFigure(exhbtId: string, f: ReadyFigure, more: string[] = []): Promise<boolean> {
   try {
     const res = await fetch(`/api/exhbts/${exhbtId}/figure`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(f),
+      body: JSON.stringify({ ...f, ...(more.length ? { more } : {}) }),
     });
     if (res.ok) return true;
   } catch {
     // Carried on without it, below.
   }
-  void removeFile(f.fileId);
+  if (f.picked) void removeFile(f.fileId);
   return false;
+}
+
+/** Reads a Word or PowerPoint file's pictures on the device. Null when it can't be read within the caps (the draft goes ahead without). */
+export async function readOffice(file: File): Promise<{ kind: "docx" | "pptx"; read: OfficeRead } | null> {
+  try {
+    const { detectKind } = await import("@/lib/doc-readers");
+    const { readOfficePictures } = await import("@/lib/figures/office");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const kind = detectKind(bytes, file.name, file.type);
+    if (kind !== "docx" && kind !== "pptx") return null;
+    const read = await readOfficePictures(bytes, kind);
+    return read ? { kind, read } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A PNG or JPEG the person uploaded, read for sending: its bytes, type from the bytes and size within the caps. Null for anything else. */
+export async function readPicture(file: File): Promise<Pick<PictureSource, "bytes" | "type" | "width" | "height"> | null> {
+  try {
+    const { OFFICE, sniffImage } = await import("@/lib/figures/office");
+    const { imageSize } = await import("@/lib/figures/image-size");
+    if (file.size === 0 || file.size > OFFICE.maxPictureBytes * 2) return null;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const type = sniffImage(bytes);
+    const size = type ? imageSize(bytes) : null;
+    if (!type || !size || size.width * size.height > OFFICE.maxPixels) return null;
+    return { bytes, type, ...size };
+  } catch {
+    return null;
+  }
 }
 
 /** Draws a PDF's pages for the pick; null when it can't be read (the draft carries on without a figure). */

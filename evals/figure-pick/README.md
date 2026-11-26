@@ -6,7 +6,7 @@ It measures. It doesn't change the prompt or anything the app does.
 
 ## What's here
 
-- `fixtures/`: fourteen reports as PDFs, and `cases.json`, the answer key. `build.mjs` makes both.
+- `fixtures/`: fourteen reports as PDFs, and `cases.json`, the answer key (`build.mjs` makes both); four Word, PowerPoint and picture cases and `cases-office.json` (`build-office.mjs`).
 - `grade.ts`: the marking, and a self-test of the marking.
 - `figures.eval.ts`, `playwright.config.ts`: the run, in a real browser against the app in development.
 - `../../scripts/eval-figures.ts`: the runner behind the npm scripts.
@@ -36,6 +36,19 @@ Every person, university, society and result in the reports is made up.
 | `14-poster` | a design project whose key visual is the finished poster, pasted in | page 2, other |
 
 Only pages that paint a shape or a picture are sent, as in the app. So `08-text-only` sends nothing and makes no model call: it passes because the app never asks, which is what happens to a real essay. `09-cover-logo` and `13-essay-styled` do send pages, and the model has to say there is no figure. `04`, `05`, `10` and `12` send several pages, so the model has to choose between them. Each line of the results lists the pages sent.
+
+### The Word, PowerPoint and picture cases
+
+Four more cases are files other than PDFs, made by `fixtures/build-office.mjs` (`npm run eval:figures:fixtures:office`) and listed in `fixtures/cases-office.json`. They run the draft page's own reading of a Word or PowerPoint file (`lib/figures/office.ts`: the pictures in `word/media/` or `ppt/media/`, logos and tiny ones left out) and of uploaded PNG and JPEG files, then one pick, then the cut. The figure is a picture, named by its path in the file or, for an uploaded picture, by its file name; where it is cut, its true box is measured inside that picture.
+
+| Case | What it is | Expected |
+|---|---|---|
+| `15-word-chart-picture` | a Word report with the results chart pasted in as a picture, a university crest on the title page, and the crest again only in the header (not offered) | `word/media/image2.png`, graph |
+| `16-pptx-chart-and-photo` | a PowerPoint with a chart picture on slide 2 and a photo on slide 3; a logo on every slide and a crest on the master (neither offered) | `ppt/media/image7.png`, graph |
+| `17-uploaded-pictures` | three pictures uploaded with a design project: a wireframe sketch, a photo of a desk and the finished poster | the poster, other (not cut: it goes on as it is) |
+| `18-word-native-chart` | a Word report whose only chart is drawn in Word itself, so there is no picture | no figure, nothing sent, and the chart that can't be lifted is noticed |
+
+`grade.ts` marks them with `gradeOffice` (the right picture, the right kind and, where it is cut, the whole figure and little else), and `--self-test` checks that marking too. Their lines in `results.jsonl` carry `files`, `sent` (each label with the picture it stands for), `picture` and `nativeChart` in place of the PDF fields.
 
 ### The answer key
 

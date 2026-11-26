@@ -49,8 +49,8 @@ export const SEL = {
   wordBar: "[data-word-bar]",
   publishConfirm: "This is my work, and the numbers are true",
   publishButton: "Publish",
-  liveText: "It's live.",
-  liveOrChangedText: /^(It's live\.|Your changes are live\.)$/,
+  liveText: "It's live on your portfolio.",
+  liveOrChangedText: /^(It's live|Your changes are live) on your portfolio\.$/,
   toolsTestId: (block: string) => `tools-${block}`,
   rewritesLeftTestId: "rewrites-left",
   rewriteThisBlock: "Rewrite this block",
@@ -269,8 +269,8 @@ export async function openPublishSheet(page: Page) {
 
 /**
  * Opens "Review and publish", ticks the confirmation, presses Publish and waits for the live message.
- * By default the button is exactly "Publish" and the message is "It's live."; pass `changes: true` to accept
- * "Publish changes" and "Your changes are live." too (a republish).
+ * By default the button is exactly "Publish" and the message is "It's live on your portfolio."; pass `changes: true` to
+ * accept "Publish changes" and "Your changes are live on your portfolio." too (a republish).
  */
 export async function publish(page: Page, opts: { changes?: boolean } = {}) {
   await openPublishSheet(page);
