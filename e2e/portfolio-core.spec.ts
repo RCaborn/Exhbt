@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { FULL, SPARSE, fullFixture, sparseFixture } from "./fixtures/portfolio-pages";
 import type { Page } from "@playwright/test";
+import { SKEW_MS, staleness } from "../components/portfolio-editor/pending";
 import { applyUndo, entryFor } from "../components/portfolio-editor/undo";
 import type { BuilderState } from "../app/(app)/portfolio/steps";
 import { HOME, READY, boxes, call, changeWith, differences, expect, field, focusedPath, renders, fresh, openEditor, saveState, seed, setKind, settle, signIn, signUpToEditor, stateNow, test, textbox, typeIn, uiNow, undoLabel, valueAt, waitReady, waitSaved, waitSavedOnPage } from "./portfolio-editor";
@@ -429,6 +430,81 @@ test.describe("Coming back to the page", () => {
   });
 });
 
+test.describe("Coming back to the page, and the servers' clocks", () => {
+  // loadedAt and savedAt are stamped by whichever server instance answers, so the gate allows their clocks
+  // SKEW_MS of difference (pending.ts). These check the rule in-process, then the wait it costs in a browser.
+  const T = Date.parse("2026-12-01T12:00:00.000Z");
+  const at = (ms: number) => new Date(T + ms).toISOString();
+  const saved = at(0);
+
+  test("a load made before the save on a server whose clock is 1.5s ahead is still behind, and is fetched again", () => {
+    expect(SKEW_MS).toBe(2000);
+    // Truly loaded 0.5s before the save landed; its server's clock reads 1.5s ahead.
+    expect(staleness(at(-500 + 1500), saved, 0)).toBe("margin");
+    // The plain cases.
+    expect(staleness(at(-1), saved, 0)).toBe("older");
+    expect(staleness(at(0), saved, 0)).toBe("older");
+    expect(staleness(at(SKEW_MS), saved, 0)).toBe("margin");
+    expect(staleness(at(SKEW_MS + 1), saved, 0)).toBe("fresh");
+    expect(staleness(at(-5000), saved, 1)).toBe("saving");
+    expect(staleness(at(-5000), null, 0)).toBe("fresh");
+  });
+
+  test("the limit: a load made before the save on a server whose clock is 3s ahead passes as fresh", () => {
+    // Truly loaded 0.5s before the save; its clock 3s ahead: it reads 2.5s after the save, past the margin.
+    // This is the fault the margin does not cover (e-handover.md, "The Back fix's limit").
+    expect(staleness(at(-500 + 3000), saved, 0)).toBe("fresh");
+  });
+
+  test("coming back within the margin after a save waits a moment on the page as left, then opens the editor on the new words", async ({ page }) => {
+    const f = fresh(FULL, "margin");
+    await openEditor(page, f);
+    expect((await page.request.get("/account")).status()).toBe(200);
+    await typeIn(page, "profile.headline", "Analyst, back within two seconds");
+    await waitSaved(page);
+    const landed = Date.now();
+    let fetched = 0;
+    page.on("request", (r) => {
+      if (new URL(r.url()).pathname === "/portfolio" && r.headers()["rsc"] === "1") fetched++;
+    });
+    // Away and straight back by the header's links, well inside the margin.
+    await page.getByRole("link", { name: "Account", exact: true }).first().click();
+    await page.waitForURL(/\/account$/);
+    await page.getByRole("link", { name: "Your portfolio", exact: true }).first().click();
+    await expect(page.locator('[data-editor="portfolio"][data-loading]')).toBeAttached();
+    expect(Date.now() - landed, "back inside the margin").toBeLessThan(SKEW_MS);
+    await waitReady(page);
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, back within two seconds");
+    await expect(page.locator("[data-stale-data]")).toHaveCount(0);
+    // A short wait, not the ten seconds of the warning: the move's own fetch, then one more once past the margin.
+    expect(Date.now() - landed).toBeLessThan(SKEW_MS + 4000);
+    expect(fetched).toBe(2);
+  });
+});
+
+test.describe("Coming back to the page, past the margin", () => {
+  test("coming back more than the margin after the last save opens the editor at once: one fetch of the page, no second", async ({ page }) => {
+    const f = fresh(FULL, "pastmargin");
+    await openEditor(page, f);
+    expect((await page.request.get("/account")).status()).toBe(200);
+    await typeIn(page, "profile.headline", "Analyst, back after a pause");
+    await waitSaved(page);
+    await page.getByRole("link", { name: "Account", exact: true }).first().click();
+    await page.waitForURL(/\/account$/);
+    await page.waitForTimeout(SKEW_MS + 500);
+    // The page's data as Next fetches it on a move inside the app (an RSC request to /portfolio).
+    let fetched = 0;
+    page.on("request", (r) => {
+      if (new URL(r.url()).pathname === "/portfolio" && r.headers()["rsc"] === "1") fetched++;
+    });
+    await page.getByRole("link", { name: "Your portfolio", exact: true }).first().click();
+    await waitReady(page);
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, back after a pause");
+    await page.waitForTimeout(1000);
+    expect(fetched, "the move's own fetch, and no refresh for the margin").toBe(1);
+  });
+});
+
 test.describe("Coming back to the page, with nothing of development's", () => {
   // The same journeys as above, built only from what a production build has: the site's own sign-up, the
   // header's links, and the words on the page (no /dev route, no /auth/dev, no development handle). They
@@ -610,15 +686,52 @@ test.describe("See as a visitor", () => {
     expect((await uiNow(page)).sheet).toBe("address");
   });
 
-  test("with an address and every exhbt hidden, the line says to publish one", async ({ page }) => {
+  test("with no exhbt at all, the line says to add one, with Add an exhbt", async ({ page }) => {
+    const base = fullFixture("x", null, "premium");
+    const f = fresh({ ...base, exhbts: [] }, "vnone");
+    await openEditor(page, f);
+    await call(page, "seeAsVisitor", true);
+    await expect(notOnline(page)).toHaveAttribute("data-not-online", "no-exhbt");
+    await expect(notOnline(page)).toContainText("Not online yet: add an exhbt");
+    await expect(page.locator("[data-canvas=visitor]").getByRole("link", { name: "Add an exhbt" })).toHaveAttribute("href", "/exhbts/new");
+  });
+
+  test("with drafts only, the line says to publish one and opens the newest draft by its title", async ({ page }) => {
+    const base = fullFixture("x", null, "premium");
+    const f = fresh({ ...base, exhbts: [{ ...base.exhbts[0]!, draft: true }] }, "vdrafts");
+    const seeded = await openEditor(page, f);
+    await call(page, "seeAsVisitor", true);
+    await expect(notOnline(page)).toHaveAttribute("data-not-online", "drafts-only");
+    await expect(notOnline(page)).toContainText("Not online yet: publish an exhbt");
+    // "Would a second till cut the lunch queue?", shortened for a button.
+    const open = page.locator("[data-canvas=visitor]").getByRole("link", { name: /^Open Would a second till/ });
+    await expect(open).toHaveAttribute("href", `/exhbts/${seeded.ids.queue}/edit`);
+    expect((await open.textContent())!.length).toBeLessThanOrEqual("Open ".length + 32);
+
+    // A draft with no title yet.
+    const untitled = fresh({ ...base, exhbts: [{ ...base.exhbts[0]!, draft: true, doc: { ...(base.exhbts[0]!.doc as object), title: "" } }] }, "vuntitled");
+    const s2 = await openEditor(page, untitled);
+    await call(page, "seeAsVisitor", true);
+    await expect(page.locator("[data-canvas=visitor]").getByRole("link", { name: "Open your draft" })).toHaveAttribute("href", `/exhbts/${s2.ids.queue}/edit`);
+  });
+
+  test("with every live exhbt hidden, the line says so, and Show one goes back to the page at the hidden exhbts", async ({ page }) => {
     const base = fullFixture("x", null, "premium");
     const f = fresh({ ...base, exhbts: base.exhbts.map((e) => ({ ...e, hidden: true })) }, "vhidden");
     await openEditor(page, f);
     await call(page, "seeAsVisitor", true);
-    await expect(notOnline(page)).toHaveAttribute("data-not-online", "nothing-live");
-    await expect(notOnline(page)).toContainText("Not online yet: publish an exhbt");
-    await expect(page.locator("[data-canvas=visitor]").getByRole("link", { name: "Add an exhbt" })).toHaveAttribute("href", "/exhbts/new");
+    await expect(notOnline(page)).toHaveAttribute("data-not-online", "all-hidden");
+    await expect(notOnline(page)).toContainText("Not online yet: every exhbt is hidden");
     await expect(page.locator(`[data-canvas=visitor] ${HOME} [data-card]`)).toHaveCount(0);
+    await page.locator("[data-canvas=visitor]").getByRole("button", { name: "Show one" }).click();
+    await expect(page.locator("[data-canvas=visitor]")).toHaveCount(0);
+    expect((await uiNow(page)).visitor).toBe(false);
+    // The hidden exhbts' row (F's, [data-hidden-row]) has the focus once it is on the page; without it, the work is in view.
+    const row = page.locator(`${READY} [data-hidden-row]`);
+    if ((await row.count()) > 0) {
+      await expect.poll(() => page.evaluate(() => Boolean(document.activeElement?.closest("[data-hidden-row]")))).toBe(true);
+      await expect(row).toBeInViewport();
+    } else await expect(page.locator(`${READY} [data-section="work"]`)).toBeInViewport();
   });
 
   test("a draft, a hidden exhbt and a look being previewed are not in it, and switching back keeps what was typed", async ({ page }) => {

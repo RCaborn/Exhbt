@@ -6,7 +6,7 @@ import { Component, createContext, useContext, useEffect, useState, type ErrorIn
 import { Banner } from "@astryxdesign/core/Banner";
 import { again } from "@/components/exhbt-editor/again";
 import { Button } from "@/components/ui/Button";
-import { flushPending, isBehind, lastState, settledSaves } from "./pending";
+import { behind, flushPending, isBehind, lastState, marginLeft, settledSaves } from "./pending";
 import type { PortfolioEditorProps } from "./PortfolioEditor";
 import { StandInPage } from "./StandIn";
 
@@ -47,6 +47,8 @@ const PortfolioEditor = dynamic(() => again(() => import("./PortfolioEditor")).t
 
 /** The longest the fallback waits for the newest state to reach the server before it reloads. */
 const FLUSH_MS = 3000;
+/** Within the clocks' margin (pending.ts, SKEW_MS), the shortest wait before data is asked for again. */
+const MARGIN_STEP_MS = 250;
 /** How long newer data is waited for before the gate says it could not be fetched. */
 const FRESH_MS = 10_000;
 
@@ -125,16 +127,25 @@ function useFresh(owner: string, loadedAt: string): { state: "yes" | "wait" | "f
     if (fresh) return;
     let live = true;
     const timer = setTimeout(() => live && setFailed(true), FRESH_MS);
+    let later: ReturnType<typeof setTimeout> | undefined;
     void settledSaves().then(() => {
       if (!live) return;
+      const why = behind(owner, loadedAt);
       // Data loaded after the newest save: nothing is behind after all (the save that was on its way landed before the load).
-      if (!isBehind(owner, loadedAt)) return setFresh(true);
-      // New props arrive with a later loadedAt, and this runs again.
-      router.refresh();
+      if (why === "fresh") return setFresh(true);
+      // Loaded just after the newest save, within the margin for the servers' clocks: a load asked for now
+      // would be within it too. So wait, on this browser's clock, until a load is sure to be past it, then
+      // fetch once. New props arrive with a later loadedAt, and this runs again.
+      // A server whose clock is behind the saving one can answer within the margin again: never ask
+      // again sooner than MARGIN_STEP_MS, so the gate does not spin.
+      const wait = why === "margin" ? Math.max(marginLeft(), MARGIN_STEP_MS) : 0;
+      if (wait > 0) later = setTimeout(() => live && router.refresh(), wait);
+      else router.refresh();
     });
     return () => {
       live = false;
       clearTimeout(timer);
+      clearTimeout(later);
     };
   }, [fresh, owner, loadedAt, router, attempt]);
 
