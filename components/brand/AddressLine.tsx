@@ -17,8 +17,10 @@ export function AddressLine({ username, tone = "on-white", size = 2, as: Tag = "
   const nameColour = tone === "on-ink" ? "text-mint" : "text-jade";
   const restColour = tone === "on-ink" ? "text-white" : "text-ink";
   return (
-    <Tag className={`font-display font-bold leading-tight tracking-tight [overflow-wrap:anywhere] ${SIZE[size]}`}>
-      <span className={nameColour}>{name}</span>
+    <Tag className={`font-display font-bold leading-tight tracking-tight [overflow-wrap:break-word] ${SIZE[size]}`}>
+      <span className={`whitespace-nowrap ${nameColour}`}>{name}</span>
+      {/* A line may break before the host, never inside the name. */}
+      <wbr />
       <span className={restColour}>{rest}</span>
     </Tag>
   );

@@ -42,7 +42,7 @@ export default async function DevAstryx({ searchParams }: { searchParams: Promis
       </Text>
 
       <Group id="type" title="Type" purpose="The headings and text types. Nothing here carries its own styling.">
-        <Row>
+        <div className="grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
           <Stack>
             <Heading level={1}>Heading 1</Heading>
             <Heading level={2}>Heading 2</Heading>
@@ -66,7 +66,7 @@ export default async function DevAstryx({ searchParams }: { searchParams: Promis
               </Text>
             ))}
           </Stack>
-        </Row>
+        </div>
       </Group>
 
       <Controls />
@@ -80,7 +80,11 @@ export default async function DevAstryx({ searchParams }: { searchParams: Promis
         <Block title="A question that opens (the home page's Faq)">
           <Compare
             astryx={<Text as="p" color="secondary">Astryx 0.7.11 has no accordion, so the native details stays.</Text>}
-            today={<Faq items={[{ q: "Is it free?", a: "Yes. The roadmap is free." }, { q: "Who checks the work?", a: "You confirm it is yours; we check it is attached." }]} />}
+            today={<Faq items={[
+              { q: "Will the AI make things up?", a: "It’s told to use only what you gave it, and any number it can’t find in your files is flagged for you to fix. Nothing goes live until you’ve confirmed it’s accurate and your own." },
+              { q: "Who can see my exhbts?", a: "Only you, until you publish one. A published exhbt is on your public portfolio, and you can ask search engines to leave it out." },
+              { q: "What if I stop paying?", a: "Nothing is deleted. Your portfolio shows as many published exhbts as your new plan allows, in your order." },
+            ]} />}
           />
         </Block>
       </Group>

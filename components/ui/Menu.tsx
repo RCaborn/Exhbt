@@ -24,8 +24,9 @@ function toItems(items: MenuItem[]) {
 }
 
 /**
- * An Astryx DropdownMenu. `trigger` is the visible text of its button (a ReactNode could not be anchored: Astryx's
- * menu needs a real control it can attach to); `label` names the menu for a screen reader.
+ * An Astryx DropdownMenu. `trigger` is the visible text of its button, a string and not a node: Astryx's menu has to
+ * anchor to a real control (it hands that control a ref and the open and keyboard handlers), and a node the caller
+ * passes, such as our Button, cannot take them. `label` is the button's tooltip.
  */
 export function Menu({ trigger, items, label }: { trigger: string; items: MenuItem[]; label: string }) {
   return <DropdownMenu items={toItems(items)} button={{ label: trigger, tooltip: label }} presentation="adaptive" />;

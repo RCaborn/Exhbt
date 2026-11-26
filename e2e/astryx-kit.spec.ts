@@ -86,6 +86,28 @@ test.describe("Field", () => {
   });
 });
 
+test.describe("Menu", () => {
+  test("opened and closed from the keyboard alone, it returns focus to its trigger", async ({ page }) => {
+    await open(page);
+    const trigger = page.getByRole("button", { name: "Choose a layout" });
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("menu")).toBeVisible();
+    await expect(page.getByRole("menuitem").first()).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
+  test("an item that is off says why, and is not selectable", async ({ page }) => {
+    await open(page);
+    await page.getByRole("button", { name: "Choose a layout" }).click();
+    const off = page.getByRole("menuitem", { name: /Research/ });
+    await expect(off).toBeDisabled();
+    await expect(off).toContainText("Needs a figure first");
+  });
+});
+
 test.describe("Notice", () => {
   test("info sits in a status region and error in an alert", async ({ page }) => {
     await open(page);
@@ -134,8 +156,19 @@ test.describe("Sheet on a touch phone", () => {
     const sheet = page.locator('[data-sheet="actions"]');
     await expect(sheet).toBeVisible();
     await expect(page.locator('[class*="bottom-sheet"]').first()).toBeAttached();
-    const box = (await sheet.boundingBox())!;
-    expect(box.y).toBeGreaterThan(300); // it hugs a short list: it does not cover the screen
+    // It hugs its short list: the part of the sheet on screen is its content plus its own padding, not a share of
+    // the screen. Measured on 390 by 844 with two buttons: content 160.7px, padding 20px + 20px, on screen 202px
+    // (about 24% of the height; Astryx's "capped" would be about 62%). The 3px is the sheet's edge.
+    const measure = () => sheet.evaluate((content) => {
+      const pad = getComputedStyle(content.parentElement!);
+      const top = content.closest(".astryx-bottom-sheet")!.getBoundingClientRect().top;
+      return { content: content.getBoundingClientRect().height, padding: parseFloat(pad.paddingTop) + parseFloat(pad.paddingBottom), onScreen: window.innerHeight - top };
+    });
+    // It slides in first: wait until it has come to rest.
+    await expect.poll(async () => { const m = await measure(); return Math.abs(m.onScreen - (m.content + m.padding)); }).toBeLessThan(3);
+    const m = await measure();
+    expect(m.padding).toBe(40);
+    expect(m.onScreen).toBeLessThan(844 * 0.4);
     await page.keyboard.press("Escape");
     await expect(sheet).toBeHidden();
     await expect(opener).toBeFocused();
