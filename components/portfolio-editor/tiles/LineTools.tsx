@@ -7,6 +7,7 @@ import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { HomeLinesSlot } from "@/components/portfolio/home-ctx";
 import { joinYear, splitYear } from "@/lib/portfolio-layout";
+import { useIssue } from "../fields/issue";
 import { usePortfolioApi, useRuntime } from "../runtime";
 import { addLine, moveLine, removeLine } from "../sections/arrange";
 import { ToolRow } from "../sections/ToolRow";
@@ -41,6 +42,8 @@ export function LineTools({ path, kind, count, max }: HomeLinesSlot): ReactNode 
   const rt = useRuntime();
   const own = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState<number | null>(null);
+  // The list's own problem ("too many lines"): a line's own is shown on its words.
+  const issue = useIssue(path);
   const [hint, setHint] = useState<HTMLElement | null>(null);
   const hintRef = useRef<HTMLElement | null>(null);
   hintRef.current = hint;
@@ -128,7 +131,7 @@ export function LineTools({ path, kind, count, max }: HomeLinesSlot): ReactNode 
   };
 
   return (
-    <div ref={own} className="pe-line-tools" data-path={path} data-pe-lines={kind} data-active={n ?? undefined}>
+    <div ref={own} className="pe-line-tools" data-path={path} data-issue={issue ? "true" : undefined} data-pe-lines={kind} data-active={n ?? undefined}>
       <ToolRow spot={{ x: 0, y: 0, where: "edge" }} kind="line" label={W.lineTools(kind, (n ?? 0) + 1)}>
         {count < max && (
           <Button size="sm" label={W.addLine(kind)} onClick={add} {...({ "data-act": "add-line" } as object)}>
@@ -143,6 +146,11 @@ export function LineTools({ path, kind, count, max }: HomeLinesSlot): ReactNode 
           </>
         )}
       </ToolRow>
+      {issue && (
+        <p className="pe-lines-issue" role="status" data-pe-issue>
+          {issue}
+        </p>
+      )}
       {hint && <Tooltip key={hint.id || "hint"} anchorRef={hintRef} content={W.yearHint} isOpen placement="below" alignment="end" />}
     </div>
   );
