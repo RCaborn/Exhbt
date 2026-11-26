@@ -158,12 +158,11 @@ export function FirstRun(): ReactNode {
     return (
       <section className="pe-first" aria-label={STRIP.title} data-first-run="narrow" data-step={step.id}>
         <div className="pe-first-head">
-          <Text type="body" weight="semibold">
+          <Text type="body" weight="semibold" className="pe-first-line">
             {`Step ${current + 1} of ${steps.length}: ${step.label}`}
-            {next && <span className="pe-first-next">{` · ${next.label}`}</span>}
           </Text>
           <span className="pe-first-actions">
-            <Button size={size} onClick={go}>
+            <Button size={size} onClick={go} label={next ? `${STRIP.next}: ${next.label}` : step.action ? `${STRIP.next}: ${step.action.label}` : STRIP.next}>
               {STRIP.next}
             </Button>
             {hideButton}

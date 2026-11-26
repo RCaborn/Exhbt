@@ -31,6 +31,7 @@ const UNREACHABLE = "We couldn't reach the server. Check your connection and try
 function SuggestIntro(): ReactNode {
   const api = usePortfolioApi();
   const profile = usePortfolioState((s) => s.profile);
+  const filled = profile.bio.trim().length > 0;
   const size = useBarSize();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ text: string; error: boolean } | null>(null);
@@ -46,7 +47,7 @@ function SuggestIntro(): ReactNode {
   }
 
   return (
-    <span className="pe-tools" data-where="intro" data-tools="intro">
+    <span className="pe-tools" data-where="intro" data-tools="intro" data-filled={filled ? "" : undefined}>
       <Button size={size} onClick={suggest} loading={busy} disabled={busy} label="Suggest an intro">
         <Sparkles aria-hidden size={15} strokeWidth={2} />
         Suggest an intro

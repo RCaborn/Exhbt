@@ -37,7 +37,13 @@ export function PhotoButton({ children }: { children: ReactNode }): ReactNode {
       const base = own.offsetParent ?? document.body;
       const f = face.getBoundingClientRect();
       const b = base.getBoundingClientRect();
-      const next = { left: f.left - b.left + f.width / 2 + base.scrollLeft, top: f.bottom - b.top + base.scrollTop - 4 };
+      // Kept inside what it is placed in, which may clip (Studio's band block): a gap of 8px from its edges.
+      const o = own.getBoundingClientRect();
+      const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+      const next = {
+        left: clamp(f.left - b.left + f.width / 2 + base.scrollLeft, o.width / 2 + 8, Math.max(o.width / 2 + 8, base.clientWidth - o.width / 2 - 8)),
+        top: clamp(f.bottom - b.top + base.scrollTop - 4, o.height / 2 + 8, Math.max(o.height / 2 + 8, base.clientHeight - o.height / 2 - 8)),
+      };
       setSpot((s) => (s && Math.abs(s.left - next.left) < 0.5 && Math.abs(s.top - next.top) < 0.5 ? s : next));
     };
     place();

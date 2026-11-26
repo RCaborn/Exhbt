@@ -71,9 +71,10 @@ export function EditorBar({ team, jobLinks }: { team: ReactNode; jobLinks: React
           gap={2}
           startContent={
             <span className="pe-bar-start">
-              <h1 id={HEADING_ID} tabIndex={-1} className="pe-bar-heading">
+              {/* An h2: the page's own h1 is the person's name, in visitors' markup. */}
+              <h2 id={HEADING_ID} tabIndex={-1} className="pe-bar-heading">
                 {BAR.heading}
-              </h1>
+              </h2>
               <Chip />
             </span>
           }
@@ -128,7 +129,7 @@ function Chip(): ReactNode {
   return (
     <span className="pe-chip" data-chip={standing} title={c.means}>
       <StatusDot variant={c.variant} label={c.label} />
-      <Text type="supporting" weight="semibold" color={standing === "live" ? "primary" : "secondary"}>
+      <Text type="supporting" weight="semibold" color={standing === "live" ? "primary" : "secondary"} className="pe-chip-word">
         {c.label}
       </Text>
       <span className="sr-only">{c.means}</span>

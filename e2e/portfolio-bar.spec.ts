@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { FULL, fullFixture } from "./fixtures/portfolio-pages";
 import { READY, call, expect, focusedPath, fresh, openEditor, setKind, stateNow, test, valueAt, waitReady, waitSaved } from "./portfolio-editor";
@@ -174,7 +175,7 @@ test.describe("The first minute", () => {
     await newPerson(page, "first-narrow");
     const strip = page.locator('[data-first-run="narrow"]');
     await expect(strip).toContainText("Step 2 of 3");
-    await strip.getByRole("button", { name: "Next" }).click();
+    await strip.getByRole("button", { name: /^Next/ }).click();
     await expect.poll(() => focusedPath(page)).toBe("profile.name");
   });
 });
@@ -366,3 +367,29 @@ test.describe("Job links and Team", () => {
   });
 });
 
+test.describe("Accessibility", () => {
+  test("axe finds nothing with the strip, and with each menu and sheet open", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await newPerson(page, "axe", "premium");
+    const check = async (where: string) => {
+      const { violations } = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+      expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`), where).toEqual([]);
+    };
+    await expect(page.locator('[data-first-run="wide"]')).toBeVisible();
+    await check("the first-run strip");
+    for (const [name, sel] of [
+      ["look", "[data-look-menu]"],
+      ["address", '[data-sheet="address"] [data-address]'],
+      ["photo", "[data-photo-sheet]"],
+      ["job-links", "[data-job-links-menu]"],
+      ["team", "[data-team-sheet]"],
+      ["links", "[data-links-panel]"],
+    ] as const) {
+      await call(page, "open", name);
+      await expect(page.locator(sel)).toBeVisible();
+      await check(`the ${name} menu or sheet`);
+      await call(page, "close");
+      await expect(page.locator(sel)).toBeHidden();
+    }
+  });
+});

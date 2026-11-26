@@ -39,6 +39,20 @@
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-medium);
   }
+  /* On a phone the row keeps the status and the main button: the screen's name is in the site's
+     header already, so the bar's heading is kept for screen readers only, and the chip keeps its dot
+     (named) without the word. */
+  @media (width < 30rem) {
+    .pe-bar-heading,
+    .pe-chip-word {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
   /* A thin rule between the groups of the row: what you see, what you have done, where it goes. */
   .pe-bar-rule {
     align-self: stretch;
@@ -265,6 +279,22 @@
     inset-inline-end: 0;
     translate: 0 -50%;
   }
+  /* Suggest an intro sits just above the intro's end, clear of its words. Once the intro has words it
+     shows while the intro is pointed at or has the cursor (still reachable by Tab: it is only faded). */
+  .pe-tools[data-where="intro"] {
+    translate: 0 calc(-100% - var(--spacing-1));
+    transition: opacity var(--duration-fast) var(--ease-standard);
+  }
+  @media (hover: hover) {
+    [data-intro]:not(:hover):not(:focus-within) > .pe-tools[data-filled] {
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pe-tools[data-where="intro"] {
+      transition: none;
+    }
+  }
   .pe-tools[data-where="contact"] {
     inset-block-start: var(--spacing-2);
     translate: none;
@@ -329,7 +359,7 @@
   }
   @media (width >= 64rem) {
     .pe-first-body {
-      grid-template-columns: minmax(18rem, 26rem) minmax(0, 1fr);
+      grid-template-columns: minmax(24rem, 30rem) minmax(0, 1fr);
     }
   }
   .pe-first-now {
@@ -350,6 +380,16 @@
   .pe-first-next {
     color: var(--color-text-secondary);
     font-weight: var(--font-weight-normal);
+  }
+  [data-first-run="narrow"] .pe-first-head {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  .pe-first-line {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .pe-first-todo {
     display: flex;
