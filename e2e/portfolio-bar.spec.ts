@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
+import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import { FULL, fullFixture } from "./fixtures/portfolio-pages";
 import { HOME, READY, call, expect, focusedPath, fresh, openEditor, setKind, settle, stateNow, test, valueAt, waitReady, waitSaved } from "./portfolio-editor";
 
@@ -57,6 +58,51 @@ async function lowContrast(page: Page, sel: string): Promise<string[]> {
     }
     return out;
   });
+}
+
+/**
+ * The words on the page the tool's button meets, measured apart from the code that places it: text by its
+ * Range; a field's words with a canvas in the field's own type, wrapped word by word in its box.
+ */
+function coveredWords(t: Element): string[] {
+  const b = t.querySelector("button")!.getBoundingClientRect();
+  const meets = (r: DOMRect) => r.width > 0 && r.height > 0 && r.left < b.right - 1 && r.right > b.left + 1 && r.top < b.bottom - 1 && r.bottom > b.top + 1;
+  const home = t.closest("[data-portfolio-home]")!;
+  const out: string[] = [];
+  const walker = document.createTreeWalker(home, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const el = n.parentElement;
+    if (!el || !n.textContent?.trim() || t.contains(n) || el.closest("[data-tools], .pe-photo-button, [aria-hidden=true], .sr-only, textarea")) continue;
+    const r = document.createRange();
+    r.selectNodeContents(n);
+    if ([...r.getClientRects()].some(meets)) out.push(`"${n.textContent.trim().slice(0, 24)}"`);
+  }
+  for (const f of home.querySelectorAll<HTMLTextAreaElement>("textarea")) {
+    const text = f.value || f.placeholder;
+    if (!text.trim()) continue;
+    const s = getComputedStyle(f);
+    const ctx = document.createElement("canvas").getContext("2d")!;
+    ctx.font = s.font;
+    const box = f.getBoundingClientRect();
+    const padL = parseFloat(s.paddingLeft);
+    const room = box.width - padL - parseFloat(s.paddingRight);
+    const lh = parseFloat(s.lineHeight) || parseFloat(s.fontSize) * 1.3;
+    const lines: number[] = [];
+    let line = "";
+    for (const word of text.split(/\s+/)) {
+      const longer = line ? `${line} ${word}` : word;
+      if (ctx.measureText(longer).width > room && line) {
+        lines.push(ctx.measureText(line).width);
+        line = word;
+      } else line = longer;
+    }
+    if (line) lines.push(ctx.measureText(line).width);
+    lines.forEach((w, i) => {
+      const left = s.textAlign === "right" || s.textAlign === "end" ? box.right - parseFloat(s.paddingRight) - w : s.textAlign === "center" ? box.left + (box.width - w) / 2 : box.left + padL;
+      if (meets(new DOMRect(left, box.top + parseFloat(s.paddingTop) + i * lh, w, lh))) out.push(`${f.getAttribute("aria-label")}, line ${i + 1}`);
+    });
+  }
+  return out;
 }
 
 test.describe("The bar", () => {
@@ -327,6 +373,35 @@ test.describe("On the page", () => {
     await expect(tool).toHaveCSS("opacity", "0");
     await page.locator(`${READY} [data-intro]`).first().hover();
     await expect(tool).toHaveCSS("opacity", "1");
+  });
+
+  test("Suggest an intro covers no word in any of the eight looks, at 1440 and 390, empty and filled", async ({ page }) => {
+    test.setTimeout(240_000);
+    await newPerson(page, "intro-looks", "max");
+    await call(page, "setAt", "profile.name", "Maya Clarke");
+    await call(page, "setAt", "profile.headline", "Final-year Economics student at Leeds, into data analysis and public policy");
+    await call(page, "setAt", "profile.location", "Leeds");
+    await call(page, "setAt", "profile.lookingFor", "Graduate data roles in the public sector");
+    const tool = page.locator(`${READY} [data-tools="intro"]`);
+    const missed: string[] = [];
+    for (const filled of [false, true]) {
+      await call(page, "setAt", "profile.bio", filled ? "I study economics at Leeds and like turning messy public data into clear charts that people actually read. Last year I built a dashboard of bus delays." : "");
+      for (const id of PORTFOLIO_THEMES.map((t) => t.id)) {
+        await call(page, "setAt", "arrangement.themeId", id);
+        for (const width of [1440, 390]) {
+          await page.setViewportSize({ width, height: 900 });
+          await tool.scrollIntoViewIfNeeded();
+          // Filled, it shows while the intro is pointed at; empty, it is always there.
+          if (filled) await page.locator(`${READY} [data-intro]`).first().hover({ position: { x: 10, y: 10 } });
+          else await page.mouse.move(0, 0);
+          await expect(tool.getByRole("button", { name: "Suggest an intro" })).toBeVisible();
+          await page.waitForTimeout(150);
+          const hits = await tool.evaluate(coveredWords);
+          if (hits.length) missed.push(`${filled ? "filled" : "empty"} ${id} at ${width}: ${hits.join(", ")}`);
+        }
+      }
+    }
+    expect(missed).toEqual([]);
   });
 
   test("Suggest an intro fills the intro from the stand-in, and Undo takes it back", async ({ page }) => {

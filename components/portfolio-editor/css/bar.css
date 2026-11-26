@@ -296,11 +296,10 @@
     inset-inline-end: 0;
     translate: 0 -50%;
   }
-  /* Suggest an intro, on an empty intro: on the placeholder's own line, at its end (on a narrow window
-     only its icon, PartTools.tsx), so it sits on no other part's words. Once the intro has words it moves
-     just above the intro, clear of them, and shows only while the intro is pointed at or edited, on every
-     pointer: above the intro is the headline, covered then only while the person is busy below it. It
-     stays reachable by Tab (it is only faded, and focusing it is focus within the intro). */
+  /* Suggest an intro: PartTools places it where it meets no word (tools/place.ts), as inline insets;
+     these are where it sits until then. Once the intro has words it shows only while the intro is
+     pointed at or edited, on every pointer, and stays reachable by Tab (it is only faded, and focusing
+     it is focus within the intro). */
   .pe-tools[data-where="intro"] {
     inset-block-start: 0.5lh;
     translate: 0 -50%;

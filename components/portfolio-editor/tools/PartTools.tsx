@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Link2, Sparkles } from "lucide-react";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Popover } from "@astryxdesign/core/Popover";
@@ -12,13 +12,15 @@ import type { HomePath } from "@/components/portfolio/home-ctx";
 import { Button } from "@/components/ui/Button";
 import { useBarSize, useNarrow } from "../bar/hooks";
 import { usePortfolioApi, usePortfolioState, usePortfolioUi } from "../runtime";
+import { placeTool, type Spot } from "./place";
 
 /*
  * The corner tools of the two parts with no frame of their own (decision 0031, "What is edited where"),
  * drawn over the page and taking no room:
- *  - "intro": Suggest an intro, the last child of `[data-intro]` (relative while editing): on an empty
- *    intro's own line, at its end; once the intro has words, just above it while it is pointed at or
- *    edited (css/bar.css), so it never sits on the headline otherwise. It drafts an
+ *  - "intro": Suggest an intro, the last child of `[data-intro]` (relative while editing), placed where
+ *    it meets no word (tools/place.ts): on the intro's line, beside it, above or below it, as an icon when
+ *    its name does not fit. Once the intro has words it shows while the intro is pointed at or edited
+ *    (css/bar.css). It drafts an
  *    intro only from what the person has given (suggestIntroAction) and fills the field, with an Undo
  *    step, since it replaces what was there. Its daily limit's words are the action's own.
  *  - "contact": Your links, a grid child of Get in touch (relative while editing), so absolute. A
@@ -31,12 +33,75 @@ export function PartTools({ where }: { where: "intro" | "contact" }): ReactNode 
 
 const UNREACHABLE = "We couldn't reach the server. Check your connection and try again.";
 
+/** The spots Suggest an intro is tried in (tools/place.ts): on the intro's own line (only clear while it is empty or its first line is short), beside it, above it, below it. */
+const INTRO_SPOTS: Spot[] = ["line", "beside", "above", "below"];
+
+type Placed = { spot: Spot | "none"; x: number; y: number; compact: boolean };
+
+/**
+ * Places Suggest an intro where it meets no word (placeTool): first at its full size, then as an icon
+ * alone; if neither fits anywhere, as an icon above the intro. Again when the page's words, its look or
+ * the window change.
+ */
+function useIntroPlace(span: React.RefObject<HTMLSpanElement | null>, size: "sm" | "md", deps: unknown[]): Placed {
+  const [placed, setPlaced] = useState<Placed>({ spot: "none", x: 0, y: 0, compact: false });
+  const full = useRef<{ w: number; h: number } | null>(null);
+  const place = useCallback(() => {
+    const tool = span.current;
+    const intro = tool?.parentElement;
+    const button = tool?.querySelector("button");
+    if (!tool || !intro || !button) return;
+    const b = button.getBoundingClientRect();
+    if (!placedRef.current.compact && b.width > 0) full.current = { w: b.width, h: b.height };
+    const icon = size === "md" ? 44 : 36;
+    const next: Placed = (() => {
+      if (full.current) {
+        const p = placeTool(intro, tool, full.current, INTRO_SPOTS);
+        if (p) return { ...p, compact: false };
+      }
+      const p = placeTool(intro, tool, { w: icon, h: icon }, INTRO_SPOTS);
+      if (p) return { ...p, compact: true };
+      return { spot: "above", x: intro.getBoundingClientRect().width - icon, y: -icon - 4, compact: true };
+    })();
+    setPlaced((now) => (now.spot === next.spot && now.compact === next.compact && Math.abs(now.x - next.x) < 0.5 && Math.abs(now.y - next.y) < 0.5 ? now : next));
+  }, [span, size]);
+  const placedRef = useRef(placed);
+  placedRef.current = placed;
+
+  useLayoutEffect(() => {
+    place();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [place, ...deps]);
+
+  useEffect(() => {
+    const page = span.current?.closest("[data-portfolio-home]");
+    if (!page) return;
+    let frame = 0;
+    const soon = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(place);
+    };
+    const seen = new ResizeObserver(soon);
+    seen.observe(page);
+    page.addEventListener("input", soon, true);
+    document.fonts?.ready.then(soon).catch(() => {});
+    return () => {
+      cancelAnimationFrame(frame);
+      seen.disconnect();
+      page.removeEventListener("input", soon, true);
+    };
+  }, [span, place]);
+  return placed;
+}
+
 function SuggestIntro(): ReactNode {
   const api = usePortfolioApi();
   const profile = usePortfolioState((s) => s.profile);
+  const themeId = usePortfolioState((s) => s.arrangement.themeId);
   const filled = profile.bio.trim().length > 0;
   const size = useBarSize();
-  const narrow = useNarrow();
+  const span = useRef<HTMLSpanElement>(null);
+  const placed = useIntroPlace(span, size, [profile, themeId, filled]);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ text: string; error: boolean } | null>(null);
 
@@ -51,9 +116,17 @@ function SuggestIntro(): ReactNode {
   }
 
   return (
-    <span className="pe-tools" data-where="intro" data-tools="intro" data-filled={filled ? "" : undefined}>
-      {/* On a narrow window, beside an empty intro's placeholder, only the icon fits: its name stays its label. */}
-      {narrow && !filled ? (
+    <span
+      ref={span}
+      className="pe-tools"
+      data-where="intro"
+      data-tools="intro"
+      data-spot={placed.spot}
+      data-filled={filled ? "" : undefined}
+      style={placed.spot === "none" ? undefined : { insetInlineStart: placed.x, insetBlockStart: placed.y, insetInlineEnd: "auto", translate: "none" }}
+    >
+      {/* Where its full name meets words wherever it goes, only the icon: its name stays its label. */}
+      {placed.compact ? (
         <IconButton size={size} onClick={suggest} isLoading={busy} label="Suggest an intro" tooltip="Suggest an intro" icon={<Sparkles aria-hidden size={16} strokeWidth={2} />} />
       ) : (
         <Button size={size} onClick={suggest} loading={busy} disabled={busy} label="Suggest an intro">
