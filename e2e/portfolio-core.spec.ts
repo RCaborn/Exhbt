@@ -1,6 +1,6 @@
 import { FULL, SPARSE, fullFixture, sparseFixture } from "./fixtures/portfolio-pages";
 import type { Page } from "@playwright/test";
-import { HOME, READY, expect, field, focusedPath, fresh, openEditor, saveState, seed, settle, signIn, stateNow, test, textbox, typeIn, valueAt, waitReady, waitSaved } from "./portfolio-editor";
+import { HOME, READY, call, expect, field, focusedPath, fresh, openEditor, saveState, seed, setKind, settle, signIn, stateNow, test, textbox, typeIn, uiNow, valueAt, waitReady, waitSaved } from "./portfolio-editor";
 
 // The one-page portfolio editor's core (decision 0031; brief E of docs/briefs/portfolio-first): which
 // builder a person gets, the page drawn as the visitor's with every word typed where it sits, each field
@@ -421,5 +421,158 @@ test.describe("Coming back to the page", () => {
     await waitReady(page);
     expect(await valueAt(page, "profile.location")).toBe("Bradford");
     expect(await valueAt(page, "profile.headline")).toBe("Operations analyst");
+  });
+});
+
+test.describe("What the address asks for", () => {
+  /** The address as the page has it now, without the origin. */
+  const address = (page: Page) => page.evaluate(() => `${location.pathname}${location.search}${location.hash}`);
+
+  test("?open= opens each menu, sheet and popover by name and leaves /portfolio clean; an unknown value is left alone", async ({ page }) => {
+    const f = fresh(FULL, "open");
+    await openEditor(page, f);
+    for (const sheet of ["look", "address", "job-links", "team", "links"] as const) {
+      await page.goto(`/portfolio?open=${sheet}`);
+      await waitReady(page);
+      await expect.poll(async () => (await uiNow(page)).sheet, `?open=${sheet}`).toBe(sheet);
+      await expect.poll(() => address(page)).toBe("/portfolio");
+    }
+    // The two hashes sent emails and other pages carry.
+    for (const [hash, sheet] of [["#team-projects", "team"], ["#job-links", "job-links"]] as const) {
+      await page.goto(`/portfolio${hash}`);
+      await waitReady(page);
+      await expect.poll(async () => (await uiNow(page)).sheet, hash).toBe(sheet);
+      await expect.poll(() => address(page)).toBe("/portfolio");
+    }
+    // What the editor does not know stays where it is, and nothing opens.
+    await page.goto("/portfolio?open=nothing&utm_source=email");
+    await waitReady(page);
+    await settle(page);
+    expect((await uiNow(page)).sheet).toBeNull();
+    expect(await address(page)).toBe("/portfolio?open=nothing&utm_source=email");
+  });
+
+  test("the step builder's ?step= addresses: you puts the cursor in the name, look and publish open their sheets", async ({ page }) => {
+    const f = fresh(FULL, "step");
+    await openEditor(page, f, { query: "?step=you" });
+    await expect.poll(() => focusedPath(page)).toBe("profile.name");
+    await expect.poll(() => address(page)).toBe("/portfolio");
+    await page.goto("/portfolio?step=look");
+    await waitReady(page);
+    await expect.poll(async () => (await uiNow(page)).sheet).toBe("look");
+    await page.goto("/portfolio?step=publish");
+    await waitReady(page);
+    await expect.poll(async () => (await uiNow(page)).sheet).toBe("address");
+    await page.goto("/portfolio?step=projects");
+    await waitReady(page);
+    await expect.poll(() => address(page)).toBe("/portfolio");
+    expect((await uiNow(page)).sheet).toBeNull();
+  });
+
+  test("?joined=1 opens Team with its note, and the note's words stay in the address until Team closes; ?full=1 alone is read and taken out", async ({ page }) => {
+    const f = fresh(FULL, "team");
+    await openEditor(page, f, { query: "?joined=1&full=1#team-projects" });
+    await expect.poll(async () => (await uiNow(page)).sheet).toBe("team");
+    let ui = await uiNow(page);
+    expect(ui.team).toBe("joined");
+    expect(ui.full).toBe(true);
+    // The server draws the Team sheet from the address: a refresh while it is open must still have them.
+    await expect.poll(() => address(page)).toBe("/portfolio?joined=1&full=1");
+    await call(page, "close");
+    await expect.poll(() => address(page)).toBe("/portfolio");
+    ui = await uiNow(page);
+    expect(ui.team).toBeNull();
+    // Opened again, Team has no note: it was said once.
+    await call(page, "open", "team");
+    expect((await uiNow(page)).team).toBeNull();
+
+    await page.goto("/portfolio?full=1");
+    await waitReady(page);
+    await expect.poll(async () => (await uiNow(page)).full).toBe(true);
+    await expect.poll(() => address(page)).toBe("/portfolio");
+    expect((await uiNow(page)).sheet).toBeNull();
+  });
+
+  test("?at= marks the exhbt's tile for two seconds, and for a live exhbt the note at the foot gives its link with Copy link", async ({ page }) => {
+    const f = fresh(FULL, "at");
+    const seeded = await openEditor(page, f, { query: `?at=${"x"}` });
+    // An id the page does not have: nothing is marked for long and nothing is said.
+    await expect.poll(() => address(page)).toBe("/portfolio");
+    const id = seeded.ids.library!;
+    await page.goto(`/portfolio?at=${id}`);
+    await waitReady(page);
+    const card = page.locator(`${READY} [data-card="${id}"]`);
+    await expect(card).toHaveAttribute("data-marked", "");
+    expect((await uiNow(page)).marked).toBe(id);
+    await expect.poll(() => address(page)).toBe("/portfolio");
+    const note = page.locator(".astryx-toast", { hasText: "Where do students sit in the library? is live at" });
+    await expect(note).toContainText(`localhost:${new URL(page.url()).port}/p/${f.username}/library-seats`);
+    await expect(note.getByRole("button", { name: "Copy link" })).toBeVisible();
+    // The mark goes after two seconds; the note stays until it is closed, since it carries the link.
+    await expect(card).not.toHaveAttribute("data-marked", "", { timeout: 4000 });
+    expect((await uiNow(page)).marked).toBeNull();
+    await expect(note).toBeVisible();
+  });
+});
+
+test.describe("See as a visitor", () => {
+  const notOnline = (page: Page) => page.locator("[data-canvas=visitor] [data-not-online]");
+
+  test("on Free the line says only you can see the page, with See plans", async ({ page }) => {
+    const f = fresh(fullFixture("x", null, "free"), "vfree");
+    await openEditor(page, f);
+    await call(page, "seeAsVisitor", true);
+    await expect(page.locator(`[data-canvas=visitor] ${HOME}`)).toBeVisible();
+    await expect(page.locator("[data-canvas=edit]")).toHaveCount(0);
+    await expect(notOnline(page)).toHaveAttribute("data-not-online", "plan");
+    await expect(notOnline(page)).toContainText("Only you can see this page on Free");
+    await expect(page.locator("[data-canvas=visitor]").getByRole("link", { name: "See plans" })).toHaveAttribute("href", "/account/billing");
+  });
+
+  test("on Premium with no address yet, the line asks for one", async ({ page }) => {
+    const email = `pe-vnoaddr-${Math.random().toString(36).slice(2, 8)}@example.com`;
+    await setKind(page, "page");
+    await page.goto(`/auth/dev?email=${encodeURIComponent(email)}&next=/account`);
+    await page.goto(`/dev/plan?plan=premium&next=${encodeURIComponent("/portfolio")}`);
+    await waitReady(page);
+    await call(page, "seeAsVisitor", true);
+    await expect(notOnline(page)).toHaveAttribute("data-not-online", "address");
+    await expect(notOnline(page)).toContainText("Not online yet: claim your address");
+    await page.locator("[data-canvas=visitor]").getByRole("button", { name: "Claim your address" }).click();
+    expect((await uiNow(page)).sheet).toBe("address");
+  });
+
+  test("with an address and every exhbt hidden, the line says to publish one", async ({ page }) => {
+    const base = fullFixture("x", null, "premium");
+    const f = fresh({ ...base, exhbts: base.exhbts.map((e) => ({ ...e, hidden: true })) }, "vhidden");
+    await openEditor(page, f);
+    await call(page, "seeAsVisitor", true);
+    await expect(notOnline(page)).toHaveAttribute("data-not-online", "nothing-live");
+    await expect(notOnline(page)).toContainText("Not online yet: publish an exhbt");
+    await expect(page.locator(`[data-canvas=visitor] ${HOME} [data-card]`)).toHaveCount(0);
+  });
+
+  test("a draft, a hidden exhbt and a look being previewed are not in it, and switching back keeps what was typed", async ({ page }) => {
+    const base = fullFixture("x", null, "max");
+    const f = fresh({ ...base, exhbts: base.exhbts.map((e) => ({ ...e, draft: e.key === "poster", hidden: e.key === "rota" })) }, "vmix");
+    const seeded = await openEditor(page, f);
+    await typeIn(page, "profile.name", "Robin Okafor  ");
+    await call(page, "previewLook", "studio");
+    await expect(page.locator(`[data-canvas=edit] ${HOME}`)).toHaveAttribute("data-look", "studio");
+    await call(page, "seeAsVisitor", true);
+    const visitor = page.locator(`[data-canvas=visitor] ${HOME}`);
+    await expect(visitor).toHaveAttribute("data-look", "exhbt");
+    await expect(notOnline(page)).toHaveCount(0);
+    // The visitor's page, in public mode: no fields, its links live, the words tidied as a save tidies them.
+    await expect(visitor.locator("h1")).toHaveText("Robin Okafor");
+    await expect(visitor.locator("textarea, [contenteditable]")).toHaveCount(0);
+    await expect(visitor.locator(`[data-card="${seeded.ids.poster}"], [data-card="${seeded.ids.rota}"]`)).toHaveCount(0);
+    await expect(visitor.locator(`[data-card="${seeded.ids.library}"]`)).toHaveCount(1);
+    await expect(visitor.locator("nav[aria-label=Portfolio]")).not.toHaveAttribute("inert", "");
+
+    await call(page, "seeAsVisitor", false);
+    await expect(page.locator("[data-canvas=visitor]")).toHaveCount(0);
+    await expect(textbox(page, "profile.name")).toHaveValue("Robin Okafor  ");
+    await waitSaved(page);
   });
 });

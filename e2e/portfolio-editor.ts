@@ -150,6 +150,9 @@ export async function valueAt(page: Page, path: string): Promise<unknown> {
   return v;
 }
 
+/** The editor's view as it is now: the open sheet, "See as a visitor", the marked tile, the team's note (development only). */
+export const uiNow = (page: Page) => page.evaluate(() => window.__portfolioEditor!.ui());
+
 /** What Undo would undo ("removed Experience"), or null. */
 export const undoLabel = (page: Page): Promise<string | null> => page.evaluate(() => window.__portfolioEditor!.undoLabel());
 
