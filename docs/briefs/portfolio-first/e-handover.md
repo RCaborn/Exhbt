@@ -88,6 +88,7 @@ Added 26 Nov 2026 by E's successor.
 - **What the margin costs.** A load made within two seconds after a save counts as behind. The gate then waits on the stand-in until two seconds have passed since the save's answer, measured on the browser's own clock and used only as a delay. It then fetches once.
   - It never asks again sooner than 250ms, so it does not spin.
   - Coming back more than two seconds after the last save costs nothing.
+  - When the server that answers the load has a clock behind the one that took the save, each fetch can land inside the margin again until real time catches up. Such a person waits up to about two seconds plus the gap between the clocks. This is accepted (main session, 26 Nov).
   - Both cases are tested.
 - **The proper fix (decided against before launch: it writes to the live database and puts a trigger on every profile update).** Use a counter from one source in place of the two times.
   - A migration:
