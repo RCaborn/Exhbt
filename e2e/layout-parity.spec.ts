@@ -117,8 +117,9 @@ async function capture(page: Page, url: string): Promise<{ html: string; boxes: 
         const r = el.getBoundingClientRect();
         // An element that draws no box (display: none, say) has its rect at the viewport's origin, not in the layout, so
         // relative to the article it moves whenever anything above the article changes height (the site header did, by 8px,
-        // in pull request 38). It is kept as a zero box at no position: its tag still counts, its place does not.
-        if (r.width === 0 && r.height === 0) return [el.tagName.toLowerCase(), 0, 0, 0, 0];
+        // in pull request 38). It is kept as a zero box at no position: its tag still counts, its place does not. A zero-size
+        // element laid out at a real position (an empty span) is not at the origin, so it keeps its place and the gate sees it move.
+        if (r.width === 0 && r.height === 0 && r.x === 0 && r.y === 0) return [el.tagName.toLowerCase(), 0, 0, 0, 0];
         return [el.tagName.toLowerCase(), half(r.x - r0.x), half(r.y - r0.y), half(r.width), half(r.height)];
       });
     });
