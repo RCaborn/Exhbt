@@ -45,7 +45,7 @@ Tokens live in the `@theme` block of `app/globals.css`. The same values feed the
 ## Type
 - Display: **Bricolage Grotesque** (variable), weight 600, tracking −0.03em. Headings and the wordmark only.
 - Everything else: **Inter** 400/500/600. Two typefaces only on the site: no serif, no mono. Figures use Inter with tabular numbers (the `font-mono` class). The exception is a portfolio look (below): on that person's portfolio and exhbt pages a look sets its own display and body faces (decision 0018). Marketing and app pages always use Bricolage Grotesque and Inter, and the wordmark keeps Bricolage everywhere (`--font-brand`).
-- One heading scale, set on `h1`–`h3` in `globals.css` (36/48, 28/32, 22 px). Don't size headings per page. Marketing pages add two display steps: `.display` (the page's opening line) and `.display-2` (section titles).
+- One heading scale, set on `h1`–`h3` in `globals.css` (36/48, 28/32, 22 px). Don't size headings per page. Astryx's `Heading` draws the same scale: the theme sets its sizes, line heights and tracking to these (`themes/exhbt/exhbtTheme.ts`), so change both together. Where a heading's size and its place in the outline differ, give `Heading` the size's `level` and the outline's `accessibilityLevel`. Marketing pages add two display steps: `.display` (the page's opening line) and `.display-2` (section titles).
 - Body 16px; captions 13px. Self-hosted via `@fontsource`.
 
 ## Shape and depth
@@ -65,6 +65,9 @@ Feedback only: buttons respond to hover and press (Astryx), link underlines dark
 - The theme is `themes/exhbt/exhbtTheme.ts`. `npm run theme` builds `exhbt.css`/`exhbt.js` beside it (committed); `npm run check` fails if they're stale.
 - `app/providers.tsx` wraps the app in the theme (light only) and makes Astryx links Next.js links. `globals.css` declares the layer order: Astryx sits under the site's own classes and Tailwind utilities.
 - Other Astryx components (dialogs, menus, tabs, inputs) are there to use: `npm run astryx -- component --list`. Fields, tags and cards are still the site's own classes; move them over one at a time, with the e2e tests.
+- **"Add an exhbt" (`/exhbts/new`) is the first screen built from Astryx components**: `Card`, `Grid`, `VStack`/`HStack`, `Heading`, `Text`, `Link`, `Section` and `Banner`, with its own stylesheet (`app/(app)/exhbts/new/add-exhbt.css`) holding only what they lack, in Astryx's tokens (`--spacing-*`, `--radius-*`, `--color-*`, `--duration-*`, `--ease-*`) and nothing fixed. Copy it for the next one.
+- **A card with one action is pressed anywhere on it, without scripts.** Astryx's `ClickableCard` follows its link in script, and its real link is hidden, so with scripts off a pointer can't use it. Use a `Card` with one Astryx `Button` (a link or a submit) and stretch the button's `::after`, which Astryx leaves to the caller, over the card (`.add-go` in that stylesheet). The card's edge goes to ink and it lifts 2px on hover, and its button turns mint, so the one mint button on a screen of equal choices is the one under the pointer or the keyboard.
+- The pictures on that screen are the editor's own layout sketches (`SKETCHES` in `components/exhbt-editor/topbar/LayoutMenu.tsx`) on a wash stage: hairlines that keep their weight at any size, white boxes, ink for what is written, mint and jade for the key figure.
 
 ## Identity
 Full rules, sizes and don'ts are in `docs/brand.md`. In short:
@@ -138,6 +141,7 @@ An exhbt has one of three layouts (decision 0024, `lib/exhbt/formats.ts`); the s
 ## Flow patterns
 - **Click-through, not long pages**, for the roadmap builder and result. Marketing pages scroll normally.
 - **Builder:** one question per screen inside a white card on mist. "Step N of 3" with a progress bar segment per step; Back (secondary) on the left, Continue (primary) on the right; the step is in the URL (`?step=`). Validation messages sit under the field and are announced. Step 2 (the CV) has a text button, "Skip for now", under the upload; it goes once a CV is in. Minimal words on every step: a title, the fields, at most one short line.
+- **Add an exhbt:** two screens (`?start=`). The chooser says what an exhbt is in one sentence, offers two ways to start as two equal cards (neither has the primary button), each with what happens straight after under its button, and ends on where the exhbt goes, beside a real example. "Build it yourself" opens the layouts as a gallery of cards, a list of rows on a phone; pressing one makes the exhbt.
 - **Result:** five views (`?view=`) in a white card: Overview, Gaps, Already strong, Projects, What next. Pill tabs on desktop, "N / 5 · Label" on mobile; the bottom bar has the previous view on the left and the next view as the primary button. Each view has its own `h1`.
 - **Project-ideas gate:** Projects asks for name, email and LinkedIn (optional) before showing ideas, prefilled from the CV with "From your CV. Change anything that's wrong." There's no Next button past it.
 - **The plan:** three idea cards, each with a secondary "Swap" button; the optional "Make some tweaks" note sits above them and steers swaps; "N swaps left" and "Keep this plan" (primary) sit below. Settled, the page reads "Your plan" with no controls.

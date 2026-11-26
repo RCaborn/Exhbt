@@ -161,7 +161,8 @@ Where Phase 2 lives:
 | An exhbt's layout (case study, gallery, research) | `lib/exhbt/formats.ts`, `lib/exhbt/layouts.ts` (the order and rows), `components/portfolio/LayoutMain.tsx` with `layout-rows.ts` (the renderer), `components/editor/LayoutPicker.tsx` (decision 0024) |
 | The editor | `app/(app)/exhbts/[id]/edit/`, `components/exhbt-editor/` (the page itself, decision 0026; `css/` holds each owner's styles), `components/editor/` (the classic editor, for one release) |
 | Which editor a person gets | `lib/editor-kind.ts` (the rule and `DEFAULT_EDITOR`), `lib/editor-kind-server.ts`, `app/api/exhbts/editor/route.ts` (an admin's own choice) |
-| Uploads and AI drafts | `app/(app)/exhbts/new/`, `lib/uploads.ts`, `lib/files.ts`, `lib/ai/exhbt-draft.ts`, `lib/exhbt/verify.ts` |
+| Adding an exhbt: the two ways to start and the layouts | `app/(app)/exhbts/new/` (`Chooser.tsx`, `LayoutGallery.tsx`), `lib/add-exhbt.ts` |
+| Uploads and AI drafts | `app/(app)/exhbts/new/` (`DraftForm.tsx`, at `?start=draft`), `lib/uploads.ts`, `lib/files.ts`, `lib/ai/exhbt-draft.ts`, `lib/exhbt/verify.ts` |
 | The portfolio builder (profile, look, projects, address) | `app/(app)/portfolio/` (decision 0016) |
 | Portfolio pages | `app/(portfolio)/` (hosts: decision 0001; the subdomain routing is being built separately) |
 | Billing | `app/(app)/account/billing/`, `lib/stripe.ts`, `app/api/stripe/webhook/route.ts` |
