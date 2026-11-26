@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Text } from "@astryxdesign/core/Text";
-import { Block, Compare, Group, Row, Stack } from "./parts";
+import { Block, Compare, Group, Stack } from "./parts";
 import { AppParts } from "./AppParts";
 import { Controls, Feedback, Overlays, Structure } from "./Kit";
 import { Faq } from "@/components/home/Faq";

@@ -68,21 +68,36 @@ test.describe("Field", () => {
     await expect(page.getByTestId("field-form").getByRole("textbox", { name: "Notes (optional)", exact: true })).toBeVisible();
   });
 
-  test("a TextField reached by Tab has a jade outline", async ({ page }) => {
-    test.fixme(true, "Waits for 1a's milestone 1 (the focus ring in jade) to be merged into this branch; remove this line then. Today the ring is ink (rgb(14, 15, 18)).");
+  test("a button reached by Tab has a jade ring, 3px wide and 2px clear", async ({ page }) => {
+    await open(page);
+    const form = page.getByTestId("field-form");
+    // Reached by Tab, as a keyboard does it: the ring is :focus-visible, not :focus.
+    await form.getByRole("button", { name: "Post the form" }).focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    const button = form.getByRole("button", { name: "Post the form" });
+    await expect(button).toBeFocused();
+    const ring = await button.evaluate((e) => {
+      const s = getComputedStyle(e);
+      return { style: s.outlineStyle, colour: s.outlineColor, width: s.outlineWidth, offset: s.outlineOffset };
+    });
+    expect(ring).toEqual({ style: "solid", colour: "rgb(0, 117, 93)", width: "3px", offset: "2px" });
+  });
+
+  test("a TextField reached by Tab has the same jade ring", async ({ page }) => {
+    test.fixme(true, "Open, reported to 1b's parent: on a focused TextField the native input has outline-style none, so the 3px jade outline never draws. What shows is the control box's own ink edge with a mint halo (the input also carries the page's ink double ring as a box-shadow). Remove this line when the field's ring is jade, and keep the assertion below.");
     await open(page);
     const form = page.getByTestId("field-form");
     await form.getByRole("textbox", { name: "Your name" }).focus();
     await page.keyboard.press("Shift+Tab");
     await page.keyboard.press("Tab");
-    await expect(form.getByRole("textbox", { name: "Your name" })).toBeFocused();
-    const ring = await form.getByRole("textbox", { name: "Your name" }).evaluate((el) => {
-      const box = el.closest("[class*=text-input]") ?? el;
+    const field = form.getByRole("textbox", { name: "Your name" });
+    await expect(field).toBeFocused();
+    const ring = await field.evaluate((el) => {
       const s = getComputedStyle(el);
-      const b = getComputedStyle(box);
-      return `${s.outlineColor} ${b.outlineColor} ${b.borderColor} ${b.boxShadow}`;
+      return { style: s.outlineStyle, colour: s.outlineColor, width: s.outlineWidth, offset: s.outlineOffset };
     });
-    expect(ring).toContain("rgb(0, 117, 93)");
+    expect(ring).toEqual({ style: "solid", colour: "rgb(0, 117, 93)", width: "3px", offset: "2px" });
   });
 });
 
