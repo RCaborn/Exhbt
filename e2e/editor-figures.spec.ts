@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+import { DRAFT_WITH_AI } from "./add-exhbt";
 import { expect, test, type Locator, type Page } from "./editor-test";
 import { text, validateForPublish, type ExhbtDoc, type Section, type SectionOf } from "../lib/exhbt/blocks";
 import { normaliseNumber } from "../lib/exhbt/verify";
@@ -82,7 +83,7 @@ async function draftFromReport(page: Page, tag: string, opts: { failPick?: boole
   if (opts.failPick) await page.route("**/api/exhbts/figure-pick", (r) => r.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "We couldn't pick a figure just now." }) }));
   const username = freshName(tag);
   await page.goto(`/dev/portfolio?username=${username}&plan=premium&count=0`);
-  await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts/new`);
+  await page.goto(`/auth/dev?email=${username}@example.com&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
   await expect(page.locator("form[data-ready=true]")).toBeAttached();
   await page.locator("#files").setInputFiles(CHART_PDF);
   await expect(page.getByTestId("file-status")).toContainText("uploaded");

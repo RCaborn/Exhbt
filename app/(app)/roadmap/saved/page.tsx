@@ -5,7 +5,9 @@ import { BuildThis, type BuildState } from "@/components/roadmap/BuildThis";
 import { IdeaCard } from "@/components/roadmap/IdeaCard";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
+import { isAdmin } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth";
+import { portfolioKind } from "@/lib/portfolio-kind-server";
 import { canCreateExhbt, canSaveIdeas, getPlan } from "@/lib/plan";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
@@ -34,7 +36,11 @@ export default async function SavedIdeasPage({ searchParams }: { searchParams: P
   const selected = job && jobs.includes(job) ? job : null;
 
   const exhbtVerdict = canCreateExhbt(plan, await store.listExhbts(user.id));
-  const build: BuildState = exhbtVerdict.ok ? { state: "ok" } : { state: "full", reason: exhbtVerdict.reason };
+  const build: BuildState = {
+    ...(exhbtVerdict.ok ? { state: "ok" as const } : { state: "full" as const, reason: exhbtVerdict.reason }),
+    // Portfolio first (decision 0031): the idea is added to the portfolio as an exhbt.
+    ...((await portfolioKind(await isAdmin(user))) === "page" ? { portfolioFirst: true as const } : {}),
+  };
 
   return (
     <div className="min-h-[calc(100svh-4.75rem)] bg-mist px-4 pt-8 pb-16 sm:px-8 sm:pt-12">

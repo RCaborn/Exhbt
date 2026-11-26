@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import { isAdmin } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth";
+import { portfolioKind } from "@/lib/portfolio-kind-server";
 import { canView } from "@/lib/access";
 import { getStore, type ProjectIdea } from "@/lib/store";
 import { Generating } from "@/components/roadmap/Generating";
@@ -75,6 +77,8 @@ export default async function RoadmapPage({
         ? { state: "ok", saved: await getStore().savedTitlesForRoadmap(user.id, id) }
         : { state: "locked", reason: canSave.reason, upgradeTo: canSave.upgradeTo };
     }
+    // Portfolio first (decision 0031): the idea is added to the portfolio as an exhbt.
+    if (build && (await portfolioKind(user ? await isAdmin(user) : false)) === "page") build = { ...build, portfolioFirst: true };
   }
 
   return (

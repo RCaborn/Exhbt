@@ -5,6 +5,7 @@ import { ENTITLEMENTS } from "../lib/entitlements";
 import { DocError, extractTextInBrowser, parseCsv, readXlsxRows, tableToText, TABLE_LIMITS } from "../lib/doc-readers";
 import { emptyDoc, text } from "../lib/exhbt/blocks";
 import { unverifiedNumbers } from "../lib/exhbt/verify";
+import { DRAFT_WITH_AI } from "./add-exhbt";
 import { makeDocx, makePdf } from "./doc-fixtures";
 import { uniqueEmail } from "./helpers";
 import { uniqueBytes } from "./unique-bytes";
@@ -81,7 +82,7 @@ test.describe("Document readers", () => {
 });
 
 async function signIn(page: Page, tag: string) {
-  await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(tag))}&next=/exhbts/new`);
+  await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(tag))}&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
   await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
 }
 
@@ -180,7 +181,7 @@ test.describe("Draft an exhbt", () => {
   });
 
   test("signed out, the page asks you to sign in", async ({ page }) => {
-    await page.goto("/exhbts/new");
+    await page.goto(DRAFT_WITH_AI);
     await expect(page).toHaveURL(/\/login\?next=%2Fexhbts%2Fnew|\/login\?next=\/exhbts\/new/);
     expect((await page.request.post("/api/exhbts/draft", { data: { text: "x" } })).status()).toBe(401);
   });

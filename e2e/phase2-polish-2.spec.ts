@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { devices, expect, test, type Page } from "@playwright/test";
+import { startBlank } from "./add-exhbt";
 import { uniqueEmail } from "./helpers";
 import { cardMenuButton, draftAndOpen, fillBox, finding, openCardMenu, seeAsVisitor, visitorRegion } from "./editor";
 import { READY } from "./page-editor";
@@ -226,7 +227,7 @@ test.describe("Profile photo on Free", () => {
 
     // It shows beside the name on the editing page.
     await page.goto("/exhbts");
-    await page.getByRole("button", { name: /start from scratch/i }).click();
+    await startBlank(page);
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
     await expect(page.locator(`${READY} article [data-avatar="photo"]`)).toBeVisible();
 

@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { AI_LONG_PROMPT_TOKENS } from "../lib/ai/model";
 import { extractTextInBrowser } from "../lib/doc-readers";
 import { filesBudget, keepStartAndEnd, LEFT_OUT, MAX_MATERIAL_CHARS, NOTES_ROOM, sharesOf } from "../lib/material";
+import { DRAFT_WITH_AI } from "./add-exhbt";
 import { makeDocx } from "./doc-fixtures";
 import { uniqueEmail } from "./helpers";
 import { waitEditor } from "./editor";
@@ -60,7 +61,7 @@ function pagedPdf(lines: string[], perPage: number): Buffer {
 }
 
 async function signIn(page: Page, name: string) {
-  await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(name))}&next=/exhbts/new`);
+  await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(name))}&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
   await expect(page.locator("form[data-ready=true]")).toBeAttached();
 }
 async function stored(page: Page) {

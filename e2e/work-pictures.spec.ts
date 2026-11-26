@@ -6,6 +6,7 @@ import { emptyDoc, formatLimits, text, type ExhbtDoc, type Section } from "../li
 import { FORMAT_LIMITS, FORMAT_RULES, type Format } from "../lib/exhbt/formats";
 import { withMoreImages, withWorkVisual } from "../lib/exhbt/sections";
 import { readOfficePictures } from "../lib/figures/office";
+import { DRAFT_WITH_AI } from "./add-exhbt";
 import { openLayoutMenu, waitEditor } from "./editor";
 import { uniqueEmail } from "./helpers";
 import { freshName, png, READY } from "./page-editor";
@@ -124,14 +125,14 @@ test.describe("Where the lead and the other pictures go (lib/exhbt/sections.ts)"
 /* ---------------- The draft page ---------------- */
 
 async function signInFree(page: Page, name: string) {
-  await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(name))}&next=/exhbts/new`);
+  await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(name))}&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
   await expect(page.locator("form[data-ready=true]")).toBeAttached();
 }
 /** A new development user on Premium (eight drafts), signed in on the draft page: for a test that drafts twice. */
 async function signInPremium(page: Page, name: string) {
   const username = freshName(name);
   await page.goto(`/dev/portfolio?username=${username}&plan=premium&count=0`);
-  await page.goto(`/auth/dev?email=${username}@example.com&next=/exhbts/new`);
+  await page.goto(`/auth/dev?email=${username}@example.com&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
   await expect(page.locator("form[data-ready=true]")).toBeAttached();
 }
 
@@ -559,7 +560,7 @@ test.describe("The figure route with a picture the person uploaded", () => {
     expect(imgs.some((s) => s.picked)).toBe(false);
     expect(sections.some((s) => s.kind === "graph")).toBe(true);
     // A case study ignores `more`.
-    await page.goto("/exhbts/new");
+    await page.goto(DRAFT_WITH_AI);
     await expect(page.locator("form[data-ready=true]")).toBeAttached();
     await page.locator("#notes").fill(NOTES);
     await page.locator("#files").setInputFiles(fixture(NATIVE));
