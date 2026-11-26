@@ -162,6 +162,9 @@ export function SelectionBar({ editor, highlight, links, flags, barRef, linking,
   const addLink = () => {
     const href = safeHref(address.trim());
     if (!href) return setError(true);
+    // Only ever on words: with no words selected any more (the selection was lost while the address was typed), the
+    // link goes on nothing, rather than on whatever the editor would make of an empty selection.
+    if (editor.state.selection.empty) return cancelLink();
     editor.chain().focus(null, { scrollIntoView: false }).extendMarkRange("link").setLink({ href }).run();
     stopLinking();
   };
@@ -210,6 +213,12 @@ export function SelectionBar({ editor, highlight, links, flags, barRef, linking,
                   setError(false);
                 }}
                 onEnter={addLink}
+                // The Enter is the address field's, and goes no further. In Safari tiptap gives the words the focus at
+                // once (its focus(), as addLink calls it), so the rest of the key press went to them: a new paragraph
+                // over the words selected, and the field's words were lost (WebKit, editor-inplace.spec.ts).
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.preventDefault();
+                }}
                 status={error ? { type: "error" } : undefined}
               />
               <IconButton label="Add link" tooltip="Add link" size="sm" variant="ghost" icon={<Check aria-hidden size={16} strokeWidth={2.5} />} onClick={addLink} />
