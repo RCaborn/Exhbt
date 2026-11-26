@@ -24,6 +24,12 @@
     gap: 0.875rem;
     max-width: 44rem;
   }
+  /* A link given a finger-sized target (44px) without moving its line: padding makes the target, the negative margin keeps the line. */
+  .fin-hit {
+    display: inline-block;
+    padding-block: 0.75rem;
+    margin-block: -0.75rem;
+  }
   /* The states: one Selector on a phone, tabs from a tablet up (StateTabs). */
   .fin-tabs-wide {
     display: none;

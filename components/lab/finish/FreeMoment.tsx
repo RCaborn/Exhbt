@@ -45,7 +45,7 @@ export function FreeMoment({ words, freePage, onClose }: { words: FinishWords; f
         </ul>
         <div className="fin-free-actions">
           <Button label={words.free.upgrade} variant="primary" size="lg" href="/pricing" />
-          <Link href="/pricing">Compare plans</Link>
+          <Link href="/pricing" className="fin-hit">Compare plans</Link>
         </div>
       </div>
       <div className="fin-free-back">

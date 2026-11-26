@@ -23,6 +23,12 @@
   .hl-nav-start {
     display: none;
   }
+  /* The logo in the bar is a finger-sized link (44px tall), as the bar's other links are. */
+  .hl-header a[aria-label="Exhbt home"] {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+  }
   .hl-nav-end {
     display: flex;
     align-items: center;
