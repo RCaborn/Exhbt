@@ -491,16 +491,24 @@ function BlockHero({ person, theme, edit }: HeroProps) {
           {edit ? edit.photo(face) : face}
         </div>
         <div className="min-w-0 border-t-2 border-[color:var(--pf-edge)] p-6 @3xl:border-t-0 @3xl:border-l-2 @3xl:p-10">
-          {/* One word per line; while editing the name is one field (decision 0031's list of what differs). */}
-          <h1 style={nameFit(person.name, theme, 4.2)} className="pf-display text-[calc(clamp(3rem,10cqw,7.5rem)*var(--fit))] leading-[0.88] break-words">
-            {edit
-              ? nameOf({ person, edit })
-              : words.map((w, i) => (
-                  <span key={i} className="block">
-                    {w}
-                  </span>
-                ))}
-          </h1>
+          {/*
+            One word per line. While editing, the name is one field (decision 0031's sixth difference), and a
+            space as wide as the page breaks the line after every word, so the name keeps its lines and the
+            hero its height as it is typed. (A field that is a <textarea> must take `word-spacing: inherit`.)
+          */}
+          {edit ? (
+            <h1 style={nameFit(person.name, theme, 4.2)} className="pf-display text-[calc(clamp(3rem,10cqw,7.5rem)*var(--fit))] leading-[0.88] break-words [word-spacing:100cqw]">
+              {nameOf({ person, edit })}
+            </h1>
+          ) : (
+            <h1 style={nameFit(person.name, theme, 4.2)} className="pf-display text-[calc(clamp(3rem,10cqw,7.5rem)*var(--fit))] leading-[0.88] break-words">
+              {words.map((w, i) => (
+                <span key={i} className="block">
+                  {w}
+                </span>
+              ))}
+            </h1>
+          )}
           <Headline person={person} edit={edit} className="mt-6 text-[1.125rem] font-semibold" />
           <Intro person={person} edit={edit} className="mt-4" />
           <Meta person={person} edit={edit} />
