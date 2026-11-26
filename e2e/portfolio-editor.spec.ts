@@ -117,11 +117,6 @@ for (const look of BASE_LOOKS) {
   });
 
   test(`${look}: axe finds no WCAG 2.1 AA violation on the empty page, with the vision, the Add tile and the Add a section menu`, async ({ page }) => {
-    // FAULT (F, components/portfolio-editor/tiles/LineTools.tsx), reported 26 Nov: with no line of education,
-    // About's <dl> holds the lines' toolbar as a <div data-pe-lines> with no <dt> or <dd> in it, which axe's
-    // definition-list rule refuses ("definition-list" on the <dl class="@3xl:mt-2">), in all eight looks. This
-    // test turns green when it is fixed; then take this line out.
-    test.fail();
     test.slow();
     const stored = look === "exhbt" ? null : look;
     // The vision band with the look's own Add an exhbt, and the Add tile. Its sections are the default few,
