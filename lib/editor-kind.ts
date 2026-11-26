@@ -20,7 +20,7 @@ export type EditorKind = "page" | "classic";
  * Cloudflare dashboard, overrides this for everyone. "page" switches the new editor on, "classic" forces
  * the classic one (the emergency switch after launch); deleted, or set to anything else, this line decides.
  */
-export const DEFAULT_EDITOR: EditorKind = "classic";
+export const DEFAULT_EDITOR: EditorKind = "page";
 
 /**
  * An admin's own choice, remembered in their browser for a year. It is honoured only while the signed-in
