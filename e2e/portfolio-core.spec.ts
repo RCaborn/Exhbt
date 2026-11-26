@@ -3,7 +3,7 @@ import { FULL, SPARSE, fullFixture, sparseFixture } from "./fixtures/portfolio-p
 import type { Page } from "@playwright/test";
 import { applyUndo, entryFor } from "../components/portfolio-editor/undo";
 import type { BuilderState } from "../app/(app)/portfolio/steps";
-import { HOME, READY, boxes, call, changeWith, differences, expect, field, focusedPath, renders, fresh, openEditor, saveState, seed, setKind, settle, signIn, stateNow, test, textbox, typeIn, uiNow, undoLabel, valueAt, waitReady, waitSaved } from "./portfolio-editor";
+import { HOME, READY, boxes, call, changeWith, differences, expect, field, focusedPath, renders, fresh, openEditor, saveState, seed, setKind, settle, signIn, signUpToEditor, stateNow, test, textbox, typeIn, uiNow, undoLabel, valueAt, waitReady, waitSaved, waitSavedOnPage } from "./portfolio-editor";
 
 // The one-page portfolio editor's core (decision 0031; brief E of docs/briefs/portfolio-first): which
 // builder a person gets, the page drawn as the visitor's with every word typed where it sits, each field
@@ -429,6 +429,65 @@ test.describe("Coming back to the page", () => {
   });
 });
 
+test.describe("Coming back to the page, with nothing of development's", () => {
+  // The same journeys as above, built only from what a production build has: the site's own sign-up, the
+  // header's links, and the words on the page (no /dev route, no /auth/dev, no development handle). They
+  // run on the development server like every other test, and against `next build` and `next start` with
+  // the stand-in store and EXHBT_PORTFOLIO=page, which is where the Back fix has to hold.
+  /** The words in a field as the page shows them: a textarea's value, or a span's text. */
+  const value = (page: Page, path: string) => textbox(page, path).evaluate((el) => (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement ? el.value : (el.textContent ?? "")));
+  async function leave(page: Page) {
+    await page.getByRole("link", { name: "Account", exact: true }).first().click();
+    await page.waitForURL(/\/account$/);
+    await expect(page.locator("[data-editor]")).toHaveCount(0);
+  }
+
+  test("after Back and after the header's link, the newest saved words are on the page, and a key never saves older ones over them", async ({ page }) => {
+    await signUpToEditor(page, "prodback");
+    expect((await page.request.get("/account")).status()).toBe(200);
+    await typeIn(page, "profile.name", "Robin Okafor");
+    await typeIn(page, "profile.headline", "Analyst, queues and rotas");
+    await waitSavedOnPage(page);
+
+    await leave(page);
+    await page.goBack();
+    await waitReady(page);
+    expect(await value(page, "profile.name")).toBe("Robin Okafor");
+    expect(await value(page, "profile.headline")).toBe("Analyst, queues and rotas");
+    await typeIn(page, "profile.location", "Leeds");
+    await waitSavedOnPage(page);
+
+    await leave(page);
+    await page.getByRole("link", { name: "Your portfolio", exact: true }).first().click();
+    await waitReady(page);
+    expect(await value(page, "profile.location")).toBe("Leeds");
+    expect(await value(page, "profile.name")).toBe("Robin Okafor");
+
+    await page.reload();
+    await waitReady(page);
+    expect(await value(page, "profile.name")).toBe("Robin Okafor");
+    expect(await value(page, "profile.headline")).toBe("Analyst, queues and rotas");
+    expect(await value(page, "profile.location")).toBe("Leeds");
+  });
+
+  test("Back while the last change is on its way waits for it, and no key saves over it", async ({ page }) => {
+    await signUpToEditor(page, "prodfast");
+    expect((await page.request.get("/account")).status()).toBe(200);
+    await typeIn(page, "profile.location", "Bradford");
+    // Not waited for: the editor sends what is waiting as it leaves.
+    await leave(page);
+    await page.goBack();
+    await waitReady(page);
+    expect(await value(page, "profile.location")).toBe("Bradford");
+    await typeIn(page, "profile.headline", "Operations analyst");
+    await waitSavedOnPage(page);
+    await page.reload();
+    await waitReady(page);
+    expect(await value(page, "profile.location")).toBe("Bradford");
+    expect(await value(page, "profile.headline")).toBe("Operations analyst");
+  });
+});
+
 test.describe("What the address asks for", () => {
   /** The address as the page has it now, without the origin. */
   const address = (page: Page) => page.evaluate(() => `${location.pathname}${location.search}${location.hash}`);
@@ -621,11 +680,11 @@ test.describe("Problems at the field", () => {
     await waitSaved(page);
     expect(await valueAt(page, "profile.headline")).toBe(thirteen.replace(/ thirteen$/, ""));
 
-    // A line of education with fifteen words, its year among them: the problem is at that line, on its words half.
+    // A line of education with fifteen words beside its year: the problem is at that line, on its words half.
     const path = "arrangement.tiles.education.lines.1";
-    await typeIn(page, path, "One two three four five six seven eight nine ten eleven twelve thirteen fourteen", { part: "label" });
+    await typeIn(page, path, "One two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen", { part: "label" });
     await expect(status).toHaveAttribute("data-save", "invalid");
-    await expect(status).toContainText("Not saved: Keep each line to 14 words or fewer.");
+    await expect(status).toContainText("Not saved: Keep each line to 14 words or fewer, not counting the year.");
     expect(Object.keys((await uiNow(page)).issues)).toEqual([path]);
     await expect(textbox(page, path, { part: "label" })).toHaveAttribute("aria-invalid", "true");
     await expect(textbox(page, path, { part: "year" })).not.toHaveAttribute("aria-invalid", "true");
@@ -633,11 +692,12 @@ test.describe("Problems at the field", () => {
     await status.getByRole("button", { name: "Show me" }).click();
     await expect.poll(() => focusedPath(page)).toBe(path);
     await page.keyboard.press("ControlOrMeta+End");
-    for (let i = 0; i < " fourteen".length; i++) await page.keyboard.press("Backspace");
+    for (let i = 0; i < " fifteen".length; i++) await page.keyboard.press("Backspace");
+    // Fourteen words and the year: saved.
     await waitSaved(page);
     await page.reload();
     await waitReady(page);
-    expect(await valueAt(page, path)).toBe("One two three four five six seven eight nine ten eleven twelve thirteen, 2022–2023");
+    expect(await valueAt(page, path)).toBe("One two three four five six seven eight nine ten eleven twelve thirteen fourteen, 2022–2023");
   });
 });
 
