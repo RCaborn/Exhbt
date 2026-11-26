@@ -17,10 +17,6 @@ const NAV = [
 /** The one marketing call to action that stays in the header. The page's own button is the mint one. */
 const ROADMAP = { href: "/roadmap/new", label: "Build your roadmap", variant: "secondary" } as const;
 
-export function Wordmark() {
-  return <Logo href="/" />;
-}
-
 type HeaderProps = { signedIn?: boolean; phase2?: boolean; portfolio?: PortfolioKind };
 
 /**

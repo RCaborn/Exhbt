@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Wordmark } from "@/components/site/SiteHeader";
+import { Wordmark } from "@/components/site/Wordmark";
 import { StartForm } from "@/components/home/StartForm";
 
 export const metadata: Metadata = {
