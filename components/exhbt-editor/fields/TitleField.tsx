@@ -60,8 +60,9 @@ export const TitleField = memo(function TitleField({ path: given, fallback, labe
 
   const value = stored ?? fallback;
   return (
-    // Cleared, it is no heading for a screen reader either: the field in it says what it is for.
-    <Sub id={id} className={className} role={value.trim() ? undefined : "none"} data-title={given}>
+    // Cleared, it is no heading for a screen reader either: the field in it says what it is for. Its data-title is the path
+    // as it is now, like every other attribute here: the given one carries the frame's stand-in index (Frame.tsx, FRAME_AT).
+    <Sub id={id} className={className} role={value.trim() ? undefined : "none"} data-title={path}>
       <span className="xe-field">
         <BlockText
           path={path}
