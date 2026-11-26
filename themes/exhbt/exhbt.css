@@ -289,6 +289,9 @@
     --size-element-sm: 36px;
     --size-element-md: 44px;
     --size-element-lg: 48px;
+    --focus-outline-width: 3px;
+    --focus-outline-color: #00755D;
+    --focus-outline-offset: 2px;
     --color-icon-info: light-dark(#0E0F12, #0E0F12);
     --color-border-info: light-dark(#0E0F12, #0E0F12);
     --color-icon-success: light-dark(#00755D, #00755D);

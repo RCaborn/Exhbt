@@ -289,6 +289,9 @@
     --size-element-sm: 36px;
     --size-element-md: 44px;
     --size-element-lg: 48px;
+    --focus-outline-width: 3px;
+    --focus-outline-color: #00755D;
+    --focus-outline-offset: 2px;
     --color-icon-info: light-dark(#0E0F12, #0E0F12);
     --color-border-info: light-dark(#0E0F12, #0E0F12);
     --color-icon-success: light-dark(#00755D, #00755D);
@@ -299,9 +302,6 @@
     --color-icon-error: light-dark(#C92324, #C92324);
     --color-background-inverted: light-dark(#0E0F12, #0E0F12);
     --color-track: light-dark(#E5E6E8, #E5E6E8);
-    --focus-outline-width: 3px;
-    --focus-outline-color: #00755D;
-    --focus-outline-offset: 2px;
     --duration-exit: var(--duration-fast);
     --astryx-theme-neutral-color-status-fill-accent: light-dark(#0074e2, #6d9cfe);
     --exhbt-hero-size: clamp(3rem, 8.4vw, 6rem);

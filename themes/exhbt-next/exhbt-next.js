@@ -222,6 +222,9 @@ export const exhbtNextTheme = {
     "--size-element-sm": "36px",
     "--size-element-md": "44px",
     "--size-element-lg": "48px",
+    "--focus-outline-width": "3px",
+    "--focus-outline-color": "#00755D",
+    "--focus-outline-offset": "2px",
     "--color-icon-info": "light-dark(#0E0F12, #0E0F12)",
     "--color-border-info": "light-dark(#0E0F12, #0E0F12)",
     "--color-icon-success": "light-dark(#00755D, #00755D)",
@@ -231,10 +234,7 @@ export const exhbtNextTheme = {
     "--color-background-error-inverted": "light-dark(#C92324, #C92324)",
     "--color-icon-error": "light-dark(#C92324, #C92324)",
     "--color-background-inverted": "light-dark(#0E0F12, #0E0F12)",
-    "--color-track": "light-dark(#E5E6E8, #E5E6E8)",
-    "--focus-outline-width": "3px",
-    "--focus-outline-color": "#00755D",
-    "--focus-outline-offset": "2px"
+    "--color-track": "light-dark(#E5E6E8, #E5E6E8)"
   },
   localTokens: {
     "--astryx-theme-neutral-color-status-fill-accent": "light-dark(#0074e2, #6d9cfe)",
