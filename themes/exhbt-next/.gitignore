@@ -1,0 +1,3 @@
+# Written by `astryx theme build`, and not kept: its triple-slash reference fails this repo's lint
+# outside themes/exhbt/ (eslint.config.mjs), and index.ts gives the theme its type instead.
+exhbt-next.d.ts
