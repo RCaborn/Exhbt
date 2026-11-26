@@ -173,6 +173,7 @@ const Shell = memo(function Shell({ ready, team, jobLinks }: { ready: boolean; t
         <EditorBar team={team} jobLinks={jobLinks} />
         <FirstRun />
         <Body />
+        <UndoKeys />
         <LiveRegion />
         {ready && <Address />}
         {devParam("crash") === "change" && <CrashOnChange />}
@@ -185,6 +186,28 @@ const Shell = memo(function Shell({ ready, team, jobLinks }: { ready: boolean; t
 function Body(): ReactNode {
   const visitor = usePortfolioUi((u) => u.visitor);
   return visitor ? <VisitorView /> : <Canvas />;
+}
+
+/** Inside a text field Ctrl or Cmd and Z is the field's own undo; nothing of the editor's takes it there. */
+const inField = (el: Element | null) => Boolean(el?.closest('textarea, input, select, [contenteditable]:not([contenteditable="false"])'));
+
+/**
+ * Ctrl or Cmd and Z outside a text field: the editor's Undo, as the bar's button does it (decision 0031,
+ * "Undo"). Shift or Alt with it is left to the browser, and so is the key when there is nothing to undo.
+ */
+function UndoKeys(): ReactNode {
+  const rt = useRuntime();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "z") return;
+      if (inField(document.activeElement) || !rt.undo.get().label) return;
+      e.preventDefault();
+      rt.undoLast();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [rt]);
+  return null;
 }
 
 /** The one polite live region: what `say` says. */

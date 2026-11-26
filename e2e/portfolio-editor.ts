@@ -183,6 +183,28 @@ export function call(page: Page, name: "open" | "close" | "say" | "jumpTo" | "pr
   );
 }
 
+/** A change the bar or a section's tools would make, named for Undo (development only). */
+export type LabelledChange = { removeSection: string } | { moveSection: { from: number; to: number } };
+
+/**
+ * Makes a labelled change through the editor's own `change` (an Undo step), as F's and G's parts do: the
+ * update is written inside the page, since a function cannot be handed over from the test.
+ */
+export function changeWith(page: Page, what: LabelledChange, label: string): Promise<void> {
+  return page.evaluate(
+    ([w, l]) => {
+      const api = window.__portfolioEditor!.api;
+      api.change((s) => {
+        const sections = [...s.arrangement.sections];
+        if ("removeSection" in w) sections.splice(sections.indexOf(w.removeSection as never), 1);
+        else sections.splice(w.moveSection.to, 0, ...sections.splice(w.moveSection.from, 1));
+        return { ...s, arrangement: { ...s.arrangement, sections } };
+      }, l);
+    },
+    [what, label] as const,
+  );
+}
+
 /* ------------------------------------------------------------------------------------------------
  * Measuring the page
  * ---------------------------------------------------------------------------------------------- */

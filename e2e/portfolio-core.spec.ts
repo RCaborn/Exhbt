@@ -1,6 +1,8 @@
 import { FULL, SPARSE, fullFixture, sparseFixture } from "./fixtures/portfolio-pages";
 import type { Page } from "@playwright/test";
-import { HOME, READY, call, expect, field, focusedPath, fresh, openEditor, saveState, seed, setKind, settle, signIn, stateNow, test, textbox, typeIn, uiNow, valueAt, waitReady, waitSaved } from "./portfolio-editor";
+import { applyUndo, entryFor } from "../components/portfolio-editor/undo";
+import type { BuilderState } from "../app/(app)/portfolio/steps";
+import { HOME, READY, call, changeWith, expect, field, focusedPath, fresh, openEditor, saveState, seed, setKind, settle, signIn, stateNow, test, textbox, typeIn, uiNow, undoLabel, valueAt, waitReady, waitSaved } from "./portfolio-editor";
 
 // The one-page portfolio editor's core (decision 0031; brief E of docs/briefs/portfolio-first): which
 // builder a person gets, the page drawn as the visitor's with every word typed where it sits, each field
@@ -630,5 +632,69 @@ test.describe("Problems at the field", () => {
     await page.reload();
     await waitReady(page);
     expect(await valueAt(page, path)).toBe("One two three four five six seven eight nine ten eleven twelve thirteen, 2022–2023");
+  });
+});
+
+test.describe("Undo", () => {
+  const SIX = ["featured", "work", "about", "experience", "quote", "contact"];
+
+  test("Undo takes back the newest step and names the next, keeps what was typed since, and Ctrl+Z does it outside a field", async ({ page }) => {
+    const f = fresh(FULL, "undo");
+    await openEditor(page, f);
+    const undo = page.locator("#pe-undo");
+    await expect(undo).toHaveAccessibleName("Undo");
+    await expect(undo).toHaveAttribute("aria-disabled", "true");
+
+    await changeWith(page, { removeSection: "experience" }, "removed Experience");
+    await expect(undo).toHaveAccessibleName("Undo: removed Experience");
+    await changeWith(page, { moveSection: { from: 2, to: 0 } }, "moved About me");
+    await expect(undo).toHaveAccessibleName("Undo: moved About me");
+    expect((await stateNow(page)).arrangement.sections).toEqual(["about", "featured", "work", "quote", "contact"]);
+    // Typing is never a step, and an Undo never takes it back.
+    await typeIn(page, "profile.headline", "Analyst, queues and rotas");
+    expect(await undoLabel(page)).toBe("moved About me");
+
+    await undo.click();
+    expect((await stateNow(page)).arrangement.sections).toEqual(["featured", "work", "about", "quote", "contact"]);
+    await expect(undo).toHaveAccessibleName("Undo: removed Experience");
+    await expect(page.locator("[data-said]").last()).toContainText("Undone: moved About me.");
+
+    // Ctrl or Cmd and Z, with the focus outside a text field (on Undo itself).
+    await undo.focus();
+    await page.keyboard.press("ControlOrMeta+z");
+    await expect.poll(async () => (await stateNow(page)).arrangement.sections).toEqual(SIX);
+    expect(await undoLabel(page)).toBeNull();
+    await expect(undo).toHaveAccessibleName("Undo");
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, queues and rotas");
+    await waitSaved(page);
+    await page.reload();
+    await waitReady(page);
+    expect((await stateNow(page)).arrangement.sections).toEqual(SIX);
+    expect(await valueAt(page, "profile.headline")).toBe("Analyst, queues and rotas");
+
+    // In a text field, Ctrl+Z is the field's own undo: the editor's steps are left alone.
+    await changeWith(page, { removeSection: "quote" }, "removed Quote");
+    await textbox(page, "profile.location").click();
+    await page.keyboard.press("End");
+    await page.keyboard.type("x");
+    await page.keyboard.press("ControlOrMeta+z");
+    expect(await undoLabel(page)).toBe("removed Quote");
+    expect((await stateNow(page)).arrangement.sections).not.toContain("quote");
+  });
+
+  test("undo's rules: a line removed, another typed in since, then Undo brings the line back and keeps the typing", () => {
+    const state = (lines: string[], headline = "") =>
+      ({ profile: { headline }, arrangement: { sections: SIX, tiles: { education: { lines, tools: "" } } } }) as unknown as BuilderState;
+    const start = state(["BSc Geography, 2026", "A levels, 2022", "GCSEs, 2020"]);
+    const removed = state(["A levels, 2022", "GCSEs, 2020"]);
+    const entry = entryFor("removed a line of education", start, removed)!;
+    expect(entry.steps).toHaveLength(1);
+    // Typed since: the second line now, and the headline.
+    const typed = state(["A levels, 2022", "GCSEs: nine, 2020"], "Analyst");
+    const back = applyUndo(typed, entry);
+    expect(back.arrangement.tiles.education!.lines).toEqual(["BSc Geography, 2026", "A levels, 2022", "GCSEs: nine, 2020"]);
+    expect(back.profile.headline).toBe("Analyst");
+    // A change that changes nothing is no step.
+    expect(entryFor("nothing", start, start)).toBeNull();
   });
 });
