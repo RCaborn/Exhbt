@@ -1071,10 +1071,11 @@ test.describe("release 4's new rows: no flicker on a boundary, and a drop lands 
     const mover = afters[afters.length - 1]!;
     const lone = afters[0]!;
     expect((await rowsNow(page)).some((r) => r.row === "group" && r.of === "before-after" && r.items.some((c) => c.item.id === lone)), "the marked image has no After straight after it").toBe(false);
-    const at = await client(page);
-    const B = at[lone]!;
     await pickUp(page, mover);
     await arm(page);
+    // Measured after the pick-up: picking up scrolls to the carried section, and nothing slides until the place changes.
+    const at = await client(page);
+    const B = at[lone]!;
     // Down the Before: across its middle is the boundary between the place before it and the place after it, where After joins it.
     const x = B.x + B.w / 2;
     const shown = await rest(page, { x, y: B.y + B.h * 0.2 }, { x, y: B.y + B.h * 0.85 }, "down the lone Before");
@@ -1094,15 +1095,17 @@ test.describe("release 4's new rows: no flicker on a boundary, and a drop lands 
     expect(pair, "the sample has a Before and after pair").toBeTruthy();
     const [b, a] = pair.items.map((c) => c.item.id) as [string, string];
     const mover = order[order.length - 1]!;
-    const at = await client(page);
     await pickUp(page, mover);
     await arm(page);
+    const at = await client(page);
     const B = at[b]!;
     const A = at[a]!;
     const y = B.y + B.h / 2;
-    // From the Before's side towards the After's, and back.
-    await rest(page, { x: B.x + B.w * 0.55, y }, { x: A.x + A.w * 0.45, y }, "across a Before and After pair, left to right");
-    await rest(page, { x: A.x + A.w * 0.45, y }, { x: B.x + B.w * 0.55, y }, "across a Before and After pair, right to left");
+    // The plan gives each tile's half nearer a gap to that gap (components/exhbt-editor/drag/plan.ts, anchorFor: "in a group"), so
+    // from the Before's right half to the After's left half is one place, the gap between them. The boundaries are the tiles'
+    // middles: the Before's, where "before the Before" gives way to "between", and the After's, where "between" gives way to "after the After".
+    await rest(page, { x: B.x + B.w * 0.2, y }, { x: B.x + B.w * 0.8, y }, "across the Before's middle, left to right");
+    await rest(page, { x: A.x + A.w * 0.8, y }, { x: A.x + A.w * 0.2, y }, "across the After's middle, right to left");
     await page.keyboard.press("Escape");
     await expect(lifting(page)).toHaveCount(0);
     expect(await pageOrder(page)).toEqual(order);
@@ -1166,12 +1169,15 @@ test.describe("release 4's new rows: no flicker on a boundary, and a drop lands 
     await rest(page, { x: R.x + R.w * 0.45, y: mid }, { x: L.x + L.w * 0.55, y: mid }, "across the pair, pull quote to key points");
     // Down each side to the pair's foot: the key points' side, and the pull quote's.
     await rest(page, { x: L.x + L.w * 0.2, y: L.y + L.h * 0.3 }, { x: L.x + L.w * 0.2, y: foot }, "down the key points' side");
-    const right = await rest(page, { x: R.x + R.w * 0.8, y: R.y + R.h * 0.3 }, { x: R.x + R.w * 0.8, y: foot }, "down the pull quote's side");
-    // And up the pull quote's side from below the pair.
-    await rest(page, { x: R.x + R.w * 0.8, y: foot }, { x: R.x + R.w * 0.8, y: R.y + R.h * 0.3 }, "up the pull quote's side");
+    // The pull quote's side has no boundary to rest on: its outer edge is the end of the pair's row, which is the place after the
+    // pair all the way down (plan.ts, anchorFor: "the end of a row that holds things side by side"). So the place there is one place,
+    // the same at the top of the pull quote and below the pair, and a drop there is that place.
+    const after = order.indexOf(ids(pair.right)[ids(pair.right).length - 1]!) + 1;
+    await page.mouse.move(R.x + R.w * 0.8, R.y + R.h * 0.3, { steps: 10 });
+    expect(await place(page), "beside the pull quote's outer half").toBe(after);
     await page.mouse.move(R.x + R.w * 0.8, foot, { steps: 10 });
-    await dropAt(page, order, mover, (await place(page))!, "dropped under the pair");
-    expect(right).toBeGreaterThanOrEqual(0);
+    expect(await place(page), "under the pull quote").toBe(after);
+    await dropAt(page, order, mover, after, "dropped at the end of the pair's row");
   });
 
   test("Event: along the image grid, and between it and the poster row above it", async ({ page }) => {
@@ -1183,16 +1189,17 @@ test.describe("release 4's new rows: no flicker on a boundary, and a drop lands 
     expect(tiles, "Event's sample has a grid of pictures").toBeTruthy();
     const ts = tiles.items.map((c) => c.item.id);
     const mover = order[order.length - 1]!;
+    await pickUp(page, mover);
+    await arm(page);
     const at = await client(page);
     const [t1, t2] = [at[ts[0]!]!, at[ts[1]!]!];
     const pair = firstPair(rows)!;
     const P = union([...ids(pair.left), ...ids(pair.right)].map((id) => at[id]!));
-    await pickUp(page, mover);
-    await arm(page);
     const y = t1.y + t1.h / 2;
     const along = await rest(page, { x: t1.x + t1.w * 0.3, y }, { x: t2.x + t2.w * 0.7, y }, "along the grid, left to right");
     await rest(page, { x: t2.x + t2.w * 0.7, y }, { x: t1.x + t1.w * 0.3, y }, "along the grid, right to left");
-    await rest(page, { x: t1.x + t1.w / 2, y: P.y + P.h * 0.8 }, { x: t1.x + t1.w / 2, y: t1.y + t1.h * 0.5 }, "between the stacked row above and the grid");
+    // From the grid up into the row above it (the lower part of that row is already the place before the grid, so the walk starts below).
+    await rest(page, { x: t1.x + t1.w / 2, y: t1.y + t1.h * 0.5 }, { x: t1.x + t1.w / 2, y: P.y + P.h * 0.1 }, "from the grid up into the stacked row above it");
     // Back to the gap in the grid, and drop: the stored order is the place shown.
     await page.mouse.move((t1.x + t1.w + t2.x) / 2, y, { steps: 20 });
     await expect.poll(() => place(page)).toBe(along);
