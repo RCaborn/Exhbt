@@ -24,10 +24,10 @@ permissions:
   contents: read
 
 jobs:
-  # One job, in groups: the desktop specs in three (about 110 tests each; six groups of 55 took 5 to 10 minutes on
-  # 24 Nov 2026), the phone's and the tablet's together in one, and the same four again under Safari's rule about the
-  # focus. Eight groups, so that with CI's eleven a push stays under twenty jobs at once. In these projects each test is
-  # its own shard unit, so a long spec is split between groups.
+  # One job, in groups: the desktop specs in four (about 160 tests each; four since e2e/your-way.spec.ts joined them on
+  # 26 Nov 2026, when the slowest of three groups already took 32 of its 38 minutes), the phone's and the tablet's
+  # together in one, and the same five again under Safari's rule about the focus. Ten groups, so with CI's eleven a push
+  # runs 21 jobs at once. In these projects each test is its own shard unit, so a long spec is split between groups.
   e2e-webkit:
     name: e2e-webkit (${{ matrix.name }} ${{ matrix.shard }}/${{ matrix.of }}${{ matrix.focus && ', the focus rule' || '' }})
     runs-on: ubuntu-latest
