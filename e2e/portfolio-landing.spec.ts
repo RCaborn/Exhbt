@@ -27,8 +27,8 @@ async function say(page: Page, setting: Setting) {
 }
 
 /**
- * page.goto, once more if the dev server's own reload aborts it. The first visit to a route makes `next dev` build it,
- * and a reload when it finishes can cancel a navigation that is under way (ERR_ABORTED). Nothing about the app is retried.
+ * page.goto, once more if it is aborted (ERR_ABORTED). Seen twice on /login/reset against `next dev`, once on a
+ * first visit and once on a repeat; cause not found, so it is not explained here. Nothing about the app is retried.
  */
 async function open(page: Page, url: string) {
   try {
@@ -128,6 +128,10 @@ for (const { setting, logIn: logInTo, signUp, password, nav } of SETTINGS) {
 
     test("the development sign-in route lands where the setting says, and a next wins", async ({ page }) => {
       await say(page, setting);
+      // Read the redirect itself: /roadmap goes on to /roadmap/new for someone with no roadmap, which would hide a wrong landing.
+      const res = await page.request.get(`/auth/dev?email=${uniqueEmail("dr")}`, { maxRedirects: 0 });
+      expect(res.status()).toBe(307);
+      expect(new URL(res.headers()["location"]!, "http://localhost").pathname).toBe(logInTo.replace("(?:/new)?", ""));
       await open(page, `/auth/dev?email=${uniqueEmail("dv")}`);
       await expect(page).toHaveURL(new RegExp(`${logInTo}$`));
       await open(page, `/auth/dev?email=${uniqueEmail("dw")}&next=/exhbts`);
