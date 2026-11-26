@@ -347,7 +347,9 @@
      tried ("Grip thing good"), so in the gallery's grid it never lies over the caption of the picture
      above; where a tile can't hold the row, it is one column down its right edge from the grip, and
      only where the picture is too short for that, the column goes on in a second (data-shape). The
-     grip is at the section's corner in every one. A phone places its grips itself (phone.css). */
+     grip is at the section's corner in every one, but for the compact pair's last resort: where even
+     it would cover something at the corner, it moves along the top edge to the left (--xe-tools-dx
+     below 0). A phone places its grips itself (phone.css). */
   @media not all and (max-width: 47.99rem) and (pointer: coarse) {
     .xe-frame[data-kind="image"] > .xe-tools {
       top: 0.5rem;
