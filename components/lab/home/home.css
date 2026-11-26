@@ -120,6 +120,20 @@
   .hl-hero-scroll {
     height: 100%;
   }
+  /* On a phone at maximal the opening line is larger, so the window is shorter and its caption goes, keeping the button in the first screen. */
+  .hl-hero-work > .astryx-text {
+    display: none;
+  }
+  @media (width < 640px) {
+    [data-level="maximal"] .hl-hero-work .astryx-aspect-ratio {
+      aspect-ratio: 2 / 1;
+    }
+  }
+  @media (width >= 640px) {
+    .hl-hero-work > .astryx-text {
+      display: block;
+    }
+  }
   /* At maximal the window works: its page scrolls inside it, and doesn't hand the scroll on to the page around it. */
   .hl-hero-window[data-live] .hl-hero-scroll {
     overflow-y: auto;
