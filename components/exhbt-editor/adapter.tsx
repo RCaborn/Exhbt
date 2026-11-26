@@ -124,14 +124,19 @@ const AimSwitch = memo(function AimSwitch({ sectionId }: { sectionId: string }) 
           type="button"
           className="xe-chip"
           aria-pressed={heading === h}
-          // The switch names the heading. A title the person typed over it would hide what the switch does, so pressing it puts the layout's heading back.
+          // The switch names the heading. A title the person typed over it would hide what the switch does, so pressing it puts
+          // the layout's heading back, as one step Undo takes back, the title with it. The one already on changes nothing.
           onClick={() =>
-            store.patch(sectionId, (x) => {
-              if (x.kind !== "aim") return x;
-              const next = { ...x, heading: h };
-              delete next.title;
-              return next;
-            })
+            store.patch(
+              sectionId,
+              (x) => {
+                if (x.kind !== "aim" || (x.heading ?? "aim") === h) return x;
+                const next = { ...x, heading: h };
+                delete next.title;
+                return next;
+              },
+              h === "aim" ? "switch to Aim" : "switch to Hypothesis",
+            )
           }
         >
           {h === "aim" ? "Aim" : "Hypothesis"}

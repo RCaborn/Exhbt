@@ -392,6 +392,30 @@ test.describe("A part's title, typed in place", () => {
     expect(await section(page, "quote")).not.toHaveProperty("title");
   });
 
+  test("the aim's switch puts the layout's heading back over a typed title, as one step Undo takes back; the one already on changes nothing", async ({ page }) => {
+    await openDoc(page, freshName("ywaim"), sampleDoc("research"));
+    const i = await at(page, "aim");
+    const id = (await docNow(page)).sections[i]!.id;
+    await typeIn(page, `sections.${i}.title`, "What I set out to test");
+    expect((await section(page, "aim")).title).toBe("What I set out to test");
+    const chip = (name: string) => frame(page, id).getByRole("group", { name: "Aim or hypothesis" }).getByRole("button", { name, exact: true });
+    await frame(page, id).hover();
+    // The sample's is a hypothesis. The one already on: nothing changes, and there is nothing new to undo.
+    expect(await section(page, "aim")).toMatchObject({ heading: "hypothesis" });
+    const label = await page.evaluate(() => window.__exhbtEditor!.undoLabel());
+    await chip("Hypothesis").click();
+    expect((await section(page, "aim")).title).toBe("What I set out to test");
+    expect(await page.evaluate(() => window.__exhbtEditor!.undoLabel())).toBe(label);
+    // The other: the layout's heading again, the typed title gone, and Undo brings it back.
+    await chip("Aim").click();
+    expect(await section(page, "aim")).toMatchObject({ heading: "aim" });
+    expect((await section(page, "aim")).title).toBeUndefined();
+    expect(await page.evaluate(() => window.__exhbtEditor!.undoLabel())).toBe("switch to Aim");
+    await page.evaluate(() => window.__exhbtEditor!.undo());
+    expect((await section(page, "aim")).title).toBe("What I set out to test");
+    expect(await section(page, "aim")).toMatchObject({ heading: "hypothesis" });
+  });
+
   test("a case study's flowchart has no heading until one is added: a chip adds it, and an empty one goes again", async ({ page }) => {
     await openDoc(page, freshName("ywf"), caseStudy());
     await settle(page);
