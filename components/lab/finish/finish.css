@@ -1,0 +1,501 @@
+/*
+ * The finish screen (/lab/design/finish). Layered, like everything in the lab (components/lab/lab.css):
+ * app/globals.css declares the layer order, and CSS outside a layer would beat all of it.
+ *
+ * Sizes, colours, corners, shadows and timings are the proposed theme's tokens (themes/exhbt-next)
+ * and the site's colour tokens; the lengths written here are this screen's own layout. Every
+ * movement sits inside both motion guards and rests on the finished picture:
+ *   @media (prefers-reduced-motion: no-preference) { [data-motion="on"] … }
+ */
+@layer components {
+  /* ── The page: its line, the states, and the setting ─────────────────────────────── */
+  .fin {
+    padding-bottom: 5rem;
+  }
+  .fin-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+    padding-top: 2.5rem;
+    padding-bottom: 1.75rem;
+  }
+  .fin-head-words {
+    display: grid;
+    gap: 0.875rem;
+    max-width: 44rem;
+  }
+  @media (width >= 640px) {
+    .fin-head {
+      gap: 2rem;
+      padding-top: 3.5rem;
+      padding-bottom: 2.25rem;
+    }
+  }
+
+  /* The setting: a stand-in for the exhbt editor. Chrome and the page lie flat; only the work raised at the finish casts a shadow. */
+  .fin-window {
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-container);
+    background: #fff;
+  }
+  .fin-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 3.75rem;
+    border-bottom: 1px solid var(--color-line);
+    padding: 0.5rem 0.75rem;
+  }
+  .fin-bar-gap {
+    flex: 1 1 auto;
+  }
+  .fin-bar-wide {
+    display: none;
+  }
+  @media (width >= 640px) {
+    .fin-bar {
+      gap: 0.75rem;
+      padding-inline: 1rem;
+    }
+    .fin-bar-wide {
+      display: inline-flex;
+      align-items: center;
+    }
+    .fin-bar-narrow {
+      display: none;
+    }
+  }
+  .fin-window-page {
+    margin: 0;
+  }
+  .fin-window-crop {
+    max-height: 30rem;
+    overflow: hidden;
+  }
+  @media (width >= 640px) {
+    .fin-window-crop {
+      max-height: 36rem;
+    }
+  }
+
+  /* ── Inside the dialog ───────────────────────────────────────────────────────────── */
+  .fin-overlay {
+    position: relative;
+  }
+  /* In a bottom sheet the grab handle sits over the top 24px of the content: start below it. */
+  .fin-overlay[data-form="sheet"] {
+    padding-top: 1.25rem;
+  }
+  .fin-overlay[data-form="sheet"] .fin-review > .astryx-layout-header {
+    padding-top: 0.5rem;
+  }
+  /* A check that hasn't happened: a hollow ring the size of the site's large tick. */
+  .fin-hollow {
+    display: inline-block;
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border: 1.5px dashed var(--color-field);
+    border-radius: 999px;
+  }
+
+  /* The review step: what publishing does, the checks as they stand, the person's tick, Publish.
+     The dialog has no padding of its own (the finish's label is inset), so each part pads itself. */
+  .fin-review > .astryx-layout-header {
+    padding: 1.25rem 1rem 0.5rem 1.5rem;
+  }
+  .fin-review-body {
+    display: grid;
+    gap: 1.25rem;
+    padding: 0 var(--spacing-6, 1.5rem) 1.5rem;
+  }
+  .fin-review-host {
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+  .fin-review-checks {
+    display: grid;
+    gap: 0.625rem;
+    border-block: 1px solid var(--color-line);
+    padding-block: 1rem;
+  }
+  .fin-review-checks > li {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-weight: 500;
+  }
+  .fin-review-foot {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 var(--spacing-6, 1.5rem) 1.5rem;
+  }
+  .fin-publish {
+    display: inline-flex;
+    border-radius: 999px;
+  }
+
+  /* ── The finish: the label (on ink) and the work (on white) ──────────────────────── */
+  .fin-live {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0.5rem;
+  }
+  @media (width >= 640px) {
+    .fin-live {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    }
+  }
+  /* The label: the inset panel, its corners concentric with the dialog's (28px less the 8px inset). */
+  .fin-label {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+    border-radius: var(--radius-container);
+    background: var(--color-mist);
+    padding: 1.25rem 1.25rem 1.5rem;
+    color: var(--color-ink);
+  }
+  .fin-label[data-ink] {
+    background: var(--color-ink);
+    color: #fff;
+  }
+  @media (width >= 640px) {
+    .fin-label {
+      padding: 1.5rem 2.25rem 2.5rem;
+      min-height: 100%;
+    }
+  }
+  /* The header's own padding is the dialog's; inside the label the label's padding is enough. */
+  .fin-label .astryx-layout-header,
+  .fin-free-words .astryx-layout-header {
+    padding: 0;
+  }
+  .fin-checks {
+    display: grid;
+    gap: 0.625rem;
+    font-weight: 500;
+  }
+  .fin-checks > li {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+  .fin-label[data-ink] .fin-checks {
+    color: var(--color-on-ink);
+  }
+  /* The tick sits on a hollow ring, so a tick that fills fills a place that was waiting for it. */
+  .fin-check {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+  }
+  .fin-check::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 1.5px dashed currentColor;
+    border-radius: 999px;
+    opacity: 0.5;
+  }
+
+  /* The address: the one loud line. Display type; the name in mint on ink (jade on mist); the rest of
+     the link below it, smaller. It breaks after the name's dot, and anywhere at all before it overflows. */
+  .fin-address {
+    margin-top: auto;
+    font-family: var(--font-family-heading);
+    font-size: var(--text-display-1-size);
+    font-weight: 600;
+    line-height: 1.02;
+    letter-spacing: -0.04em;
+    overflow-wrap: anywhere;
+  }
+  /* The highlighter, drawn as a stroke under the name (not behind it: white on mint can't be read).
+     One stroke, under the part of the address that is hers, wherever the line breaks. */
+  .fin-name {
+    background-image: linear-gradient(var(--color-mint), var(--color-mint));
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 100% 0.11em;
+    padding-bottom: 0.08em;
+  }
+  [data-level="restrained"] .fin-name {
+    background-image: none;
+  }
+  .fin-path {
+    display: block;
+    margin-top: 0.35em;
+    font-size: 0.5em;
+    letter-spacing: -0.03em;
+    color: var(--color-graphite);
+  }
+  .fin-label[data-ink] .fin-path {
+    color: var(--color-on-ink);
+  }
+  .fin-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  /* The work: the live page raised, the seal on its corner, the link as it pastes, the next step. */
+  .fin-work {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 1.75rem;
+    padding: 1.75rem 0.75rem 1rem;
+  }
+  @media (width >= 640px) {
+    .fin-work {
+      gap: 1.5rem;
+      padding: 2.5rem 2.25rem 1.5rem 2.5rem;
+    }
+  }
+  .fin-frame {
+    position: relative;
+  }
+  /* The seal, pressed on the frame's lower corner like a gallery's stamp. */
+  .fin-seal {
+    position: absolute;
+    right: 1.25rem;
+    bottom: -0.85rem;
+    z-index: 1;
+    transform: rotate(-3deg) scale(1.2);
+    transform-origin: 100% 50%;
+  }
+  [data-level="restrained"] .fin-seal {
+    transform: none;
+  }
+  .fin-share {
+    display: grid;
+    gap: 0.75rem;
+  }
+  .fin-next {
+    display: flex;
+    border-top: 1px solid var(--color-line);
+    padding-top: 1.25rem;
+  }
+
+  /* The close button: in the label on a phone (on ink), in the corner of the white side on a wide window. */
+  .fin-close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 2;
+  }
+  .fin-close-wide {
+    display: none;
+  }
+  @media (width >= 640px) {
+    .fin-close-narrow {
+      display: none;
+    }
+    .fin-close-wide {
+      display: block;
+      top: 1rem;
+      right: 1rem;
+    }
+  }
+
+  /* A link as it shows once pasted: the picture beside the words an app prints under it. */
+  .fin-unfurl {
+    display: grid;
+    grid-template-columns: minmax(0, 13rem) minmax(0, 1fr);
+    align-items: center;
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-element);
+    background: #fff;
+  }
+  .fin-unfurl-picture {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1200 / 630;
+    background: var(--color-ink);
+  }
+  .fin-unfurl-words {
+    display: grid;
+    align-content: center;
+    gap: 0.2rem;
+    min-width: 0;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+  }
+  .fin-unfurl-title,
+  .fin-unfurl-description {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .fin-unfurl-description {
+    -webkit-line-clamp: 1;
+  }
+  .fin-unfurl-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+  .fin-unfurl-description {
+    color: var(--color-graphite);
+  }
+  .fin-unfurl-host {
+    color: var(--color-slate);
+  }
+
+  /* ── Free: a draft only its owner can see ───────────────────────────────────────── */
+  /* A phone reads it in order (the line, the page, the offer, the way back); a wide window puts the page beside the words. */
+  .fin-free {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+    padding: 0.5rem 1rem 1.25rem;
+  }
+  @media (width >= 640px) {
+    .fin-free {
+      grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+      grid-template-areas:
+        "top work"
+        "offer work"
+        "back work";
+      align-content: start;
+      gap: 1.5rem 2.75rem;
+      padding: 2.5rem 2.5rem 2.25rem;
+    }
+    .fin-free-top {
+      grid-area: top;
+    }
+    .fin-free-work {
+      grid-area: work;
+      align-self: center;
+    }
+    .fin-free-offer {
+      grid-area: offer;
+    }
+    .fin-free-back {
+      grid-area: back;
+    }
+  }
+  .fin-free-top {
+    display: grid;
+    gap: 0.875rem;
+    padding-right: 2.5rem;
+  }
+  .fin-free-line {
+    font-family: var(--font-family-heading);
+    font-size: var(--text-display-2-size);
+    font-weight: 600;
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+  }
+  .fin-free-offer {
+    display: grid;
+    gap: 0.75rem;
+    border-top: 1px solid var(--color-line);
+    padding-top: 1.25rem;
+  }
+  .fin-free-gives {
+    display: grid;
+    gap: 0.375rem;
+    padding-left: 1.1rem;
+    list-style: disc;
+  }
+  .fin-free-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
+    margin-top: 0.5rem;
+  }
+  .fin-free-back {
+    margin-left: -0.75rem;
+  }
+  .fin-close-any {
+    top: 0.75rem;
+    right: 0.75rem;
+  }
+  .fin-overlay[data-form="sheet"] .fin-close-any {
+    top: 1.75rem;
+  }
+
+  /* ── Motion: about a second, once ───────────────────────────────────────────────── */
+  @media (prefers-reduced-motion: no-preference) {
+    /* The checks fill one after another. At every level: it is the confirmation itself. */
+    [data-motion="on"] .fin-live .fin-check [data-tick] {
+      animation: fin-tick var(--duration-medium) var(--ease-entrance) both;
+      animation-delay: calc(120ms + var(--i) * var(--duration-fast-max));
+    }
+    [data-motion="on"] .fin-live .fin-check::before {
+      animation: fin-ring var(--duration-medium) var(--ease-standard) both;
+      animation-delay: calc(120ms + var(--i) * var(--duration-fast-max));
+    }
+    /* The live page rises into its frame; the highlighter is drawn under the address; the seal is pressed on. */
+    [data-motion="on"]:not([data-level="restrained"]) .fin-live .fin-frame {
+      animation: fin-rise var(--duration-slow) var(--ease-entrance) both;
+      animation-delay: 60ms;
+    }
+    [data-motion="on"]:not([data-level="restrained"]) .fin-live .fin-name {
+      animation: fin-stroke var(--duration-slow) var(--ease-standard) both;
+      animation-delay: 420ms;
+    }
+    [data-motion="on"]:not([data-level="restrained"]) .fin-live .fin-seal {
+      animation: fin-stamp var(--duration-medium) var(--ease-entrance) both;
+      animation-delay: 760ms;
+    }
+  }
+  @keyframes fin-tick {
+    from {
+      opacity: 0;
+      transform: scale(0.3);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes fin-ring {
+    from {
+      opacity: 0.5;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes fin-rise {
+    from {
+      opacity: 0;
+      transform: translateY(1.75rem) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes fin-stroke {
+    from {
+      background-size: 0% 0.11em;
+    }
+    to {
+      background-size: 100% 0.11em;
+    }
+  }
+  @keyframes fin-stamp {
+    from {
+      opacity: 0;
+      transform: rotate(-14deg) scale(2);
+    }
+    to {
+      opacity: 1;
+      transform: rotate(-3deg) scale(1.2);
+    }
+  }
+}
