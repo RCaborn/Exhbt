@@ -4,6 +4,23 @@ Written by agent E on 26 Nov 2026 for whoever takes over E's files. Read `e-edit
 
 ## Where things stand
 
+**Update, 26 Nov 2026 (E's successor, branch `phase-2-pf-e2`): milestone 2 is built and merged into `phase-2-pf2` (7b0e4cf). Everything below this note is E's hand-over as written, kept for its traps.**
+- **Done, each with its tests in `e2e/portfolio-core.spec.ts`:**
+  - steps 12 to 18;
+  - step 19's render counts, charts counted from the spec;
+  - the box-for-box check of the six looks, by `HOME_BOXES` landmarks;
+  - the mirror path (`E2E_GROW=mirror`);
+  - axe;
+  - `WorkRow` for F.
+- **Since then:**
+  - a line's limit no longer counts its year (`lineWords`, `lib/portfolio-layout.ts`);
+  - See as a visitor says why nothing is live, by case;
+  - the Back check allows the servers' clocks two seconds (below, "The Back fix's limit").
+- **Not done:**
+  - the Back tests on a production build. Sign-in needs `/auth/dev` to honour `EXHBT_ALLOW_MEMORY_STORE`, which is B's file. The two tests in "Coming back to the page, with nothing of development's" are ready for it.
+  - nothing has run on WebKit itself.
+
+
 - **Milestone 1** is merged into `phase-2-pf2` (67e13c8).
 - **Milestone 2, step 17's safety half** is done and tested (a72bbd9): the browser's Back can no longer bring old words back (below, "The Back fix"). The same commit adds `usePortfolioUndo()` to `runtime.ts` for G and exports `WRAP`, `ROWS` and `CARD` from `PortfolioHome.tsx` for F.
 - **Everything else in milestone 2 is not built.** For four of the steps a draft is in this branch, **written and typechecked but never run**. None of them is imported by anything, so none changes what the editor does today. Wire them one at a time, each with its test.
