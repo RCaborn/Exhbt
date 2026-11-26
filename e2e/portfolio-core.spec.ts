@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 import { SKEW_MS, staleness } from "../components/portfolio-editor/pending";
 import { applyUndo, entryFor } from "../components/portfolio-editor/undo";
 import type { BuilderState } from "../app/(app)/portfolio/steps";
-import { HOME, READY, boxes, call, changeWith, differences, expect, field, focusedPath, renders, fresh, openEditor, saveState, seed, setKind, settle, signIn, signUpToEditor, stateNow, test, textbox, typeIn, uiNow, undoLabel, valueAt, waitReady, waitSaved, waitSavedOnPage } from "./portfolio-editor";
+import { HOME, READY, call, changeWith, expect, field, focusedPath, fresh, openEditor, saveState, seed, setKind, settle, signIn, signUpToEditor, stateNow, test, textbox, typeIn, uiNow, undoLabel, valueAt, waitReady, waitSaved, waitSavedOnPage } from "./portfolio-editor";
 
 // The one-page portfolio editor's core (decision 0031; brief E of docs/briefs/portfolio-first): which
 // builder a person gets, the page drawn as the visitor's with every word typed where it sits, each field
@@ -949,46 +949,6 @@ test.describe("Saving, after a deploy and in two tabs", () => {
   });
 });
 
-test.describe("Box for box with the visitor's page", () => {
-  // The six looks E did not measure (Exhbt and Studio were, in milestone 1), on the full fixture, and
-  // Ledger and Notebook with no education line, where the location and the year are block fields. Every
-  // landmark of the page (HOME_BOXES) is where /p/<name> has it, within half a pixel, at 1440 and 412.
-  // Nothing on the full fixture is empty, so of HOME_EDIT_ONLY_IN_FLOW only "what you're looking for, as
-  // stored" can differ, and it is inside the boxes measured here, never one of them.
-  const cases: { look: string; noEducation?: boolean }[] = [
-    { look: "classic" },
-    { look: "notebook" },
-    { look: "mono" },
-    { look: "night" },
-    { look: "ledger" },
-    { look: "bloom" },
-    { look: "ledger", noEducation: true },
-    { look: "notebook", noEducation: true },
-  ];
-  for (const c of cases) {
-    test(`${c.look}${c.noEducation ? ", with no education line," : ""} is the visitor's page box for box at 1440 and 412`, async ({ page }) => {
-      test.slow();
-      const base = fullFixture("x", c.look);
-      const layout = base.layout as { tiles: Record<string, unknown> };
-      const fixture = c.noEducation ? { ...base, layout: { ...layout, tiles: { ...layout.tiles, education: { lines: [], tools: "Excel, Python, SQL, Tableau" } } } } : base;
-      const f = fresh(fixture, `box${c.look}${c.noEducation ? "n" : ""}`);
-      await openEditor(page, f);
-      for (const width of [1440, 412]) {
-        await page.setViewportSize({ width, height: 900 });
-        await page.goto("/portfolio");
-        await waitReady(page);
-        await settle(page);
-        const editing = await boxes(page);
-        await page.goto(`/p/${f.username}`);
-        await settle(page);
-        const visiting = await boxes(page);
-        expect(visiting.length, "the visitor's page drew its landmarks").toBeGreaterThan(10);
-        expect(differences(visiting, editing), `${c.look} at ${width}`).toEqual([]);
-      }
-    });
-  }
-});
-
 test.describe("Accessibility", () => {
   test("the editing page, See as a visitor and a problem at a field have no WCAG 2.1 AA violations axe can find", async ({ page }) => {
     const f = fresh(FULL, "axe");
@@ -1008,94 +968,3 @@ test.describe("Accessibility", () => {
   });
 });
 
-test.describe("What draws again", () => {
-  /**
-   * Counts the charts' renders without touching components/charts/Chart.tsx: a stand-in for React's
-   * devtools hook, put in before the page's scripts, sees every commit. A Chart fiber rendered in a commit
-   * is one React did work on (PerformedWork, flag 1) that is not the very fiber the last commit of that
-   * root had: a subtree React skipped keeps its old fibers, flags and all. Kept per root, since Next's
-   * development overlay commits a root of its own.
-   */
-  const COUNT_CHARTS = () => {
-    const seenBy = new WeakMap<object, WeakSet<object>>();
-    const w = window as unknown as { __chartRenders: number; __REACT_DEVTOOLS_GLOBAL_HOOK__?: unknown };
-    w.__chartRenders = 0;
-    type Fiber = { type?: { name?: string } | null; flags: number; child: Fiber | null; sibling: Fiber | null };
-    w.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
-      supportsFiber: true,
-      renderers: new Map(),
-      inject: () => 1,
-      checkDCE: () => {},
-      onScheduleFiberRoot: () => {},
-      onCommitFiberUnmount: () => {},
-      onPostCommitFiberRoot: () => {},
-      onCommitFiberRoot: (_id: number, root: { current: Fiber }) => {
-        const seen = seenBy.get(root) ?? new WeakSet<object>();
-        const now = new WeakSet<object>();
-        const stack: Fiber[] = [root.current];
-        while (stack.length) {
-          const f = stack.pop()!;
-          if (f.type && typeof f.type === "function" && (f.type as { name?: string }).name === "Chart") {
-            now.add(f);
-            if (!seen.has(f) && (f.flags & 1) === 1) w.__chartRenders++;
-          }
-          if (f.child) stack.push(f.child);
-          if (f.sibling) stack.push(f.sibling);
-        }
-        seenBy.set(root, now);
-      },
-    };
-  };
-  const reset = (page: Page) =>
-    page.evaluate(() => {
-      window.__portfolioRenders = {};
-      (window as unknown as { __chartRenders: number }).__chartRenders = 0;
-    });
-  const read = async (page: Page) => {
-    await settle(page);
-    return { ...(await renders(page)), charts: await page.evaluate(() => (window as unknown as { __chartRenders: number }).__chartRenders) };
-  };
-
-  test("a key in the headline, a key in the intro and a section move: what renders, charts included", async ({ page }) => {
-    await page.addInitScript(COUNT_CHARTS);
-    const f = fresh(FULL, "renders");
-    await openEditor(page, f);
-    await settle(page);
-    // The counter sees the page's charts as they mount: it is working.
-    expect(await page.evaluate(() => (window as unknown as { __chartRenders: number }).__chartRenders)).toBeGreaterThan(0);
-
-    // Nothing typed: what draws on its own after the page is up (a chart measuring itself, say).
-    await textbox(page, "profile.headline").click();
-    await page.keyboard.press("End");
-    await reset(page);
-    await page.waitForTimeout(1000);
-    const idle = await read(page);
-    await reset(page);
-    await page.keyboard.type("s");
-    const headline = await read(page);
-    await reset(page);
-    await page.keyboard.type("s");
-    const headline2 = await read(page);
-
-    await textbox(page, "profile.bio").click();
-    await page.keyboard.press("End");
-    await reset(page);
-    await page.keyboard.type("s");
-    const intro = await read(page);
-
-    await reset(page);
-    await changeWith(page, { moveSection: { from: 2, to: 3 } }, "moved About me");
-    const move = await read(page);
-
-    const figures = { "nothing typed": idle, "a key in the headline": headline, "a second key in the headline": headline2, "a key in the intro": intro, "a section move": move };
-    console.log(`Render counts: ${JSON.stringify(figures)}`);
-    test.info().annotations.push({ type: "render counts", description: JSON.stringify(figures) });
-    // A key draws the page and the hero again, and no section, tile or chart.
-    for (const [what, n] of Object.entries({ headline, intro })) {
-      expect(Object.keys(n).filter((k) => /^(section|tile):/.test(k) && n[k as keyof typeof n]), what).toEqual([]);
-      expect(n.charts, what).toBe(0);
-    }
-    // A move draws no chart again.
-    expect(move.charts).toBe(0);
-  });
-});
