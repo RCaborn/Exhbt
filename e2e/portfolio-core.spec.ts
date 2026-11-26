@@ -36,7 +36,7 @@ test.describe("Which builder a person gets", () => {
     const f = fresh(FULL, "page");
     await openEditor(page, f);
     await expect(page).toHaveTitle(/Your portfolio/);
-    await expect(page.getByRole("heading", { level: 1, name: "Your portfolio" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Your portfolio", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", STEP_BUILDER)).toHaveCount(0);
     // The page is the visitor's page, in the person's look, with the name a field in its own heading.
     const home = page.locator(`${READY} ${HOME}`);

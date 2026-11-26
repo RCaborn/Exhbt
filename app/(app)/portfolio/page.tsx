@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import { STRIP_COOKIE, stripHiddenFor } from "@/components/portfolio-editor/bar/strip-cookie";
 import { PortfolioGate } from "@/components/portfolio-editor/PortfolioGate";
 import { TeamPanel } from "@/components/team/TeamPanel";
 import { isAdmin } from "@/lib/admin";
@@ -62,9 +63,11 @@ export default async function BuildPortfolioPage({ searchParams }: { searchParam
   // Make my own; the editor's Address keeps them in the address until the Team sheet closes, so a refresh
   // meanwhile draws the panel with them still.
   const said = asked.joined ? "joined" : asked.left ? "left" : null;
+  // "Hide this" on the first-run strip, read here so neither the loading view nor the editor draws it.
+  const stripHidden = stripHiddenFor((await cookies()).get(STRIP_COOKIE)?.value, user.id);
   return (
     <PortfolioGate
-      data={data}
+      data={{ ...data, stripHidden }}
       team={<TeamPanel userId={user.id} host={host} said={said} full={asked.full === "1"} />}
       jobLinks={<JobLinksSection compact userId={user.id} />}
     />

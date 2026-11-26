@@ -4,6 +4,7 @@ import type { HomeEdit } from "@/components/portfolio/home-ctx";
 import { PortfolioHome } from "@/components/portfolio/PortfolioHome";
 import { lookAttrs, themeStyle } from "@/components/portfolio/themeFonts";
 import { BAR_H, GROUND } from "./geometry";
+import { StripStandIn } from "./bar/strip";
 import { editingHome } from "./home-props";
 import { OwnerPartsStill } from "./tiles/OwnerView";
 
@@ -60,7 +61,8 @@ export function standInAdapter(owner: HomeEdit["owner"] = () => null): HomeEdit 
 
 /**
  * The editing page as the stand-in draws it: an empty bar where the editor's bar will be, exactly as
- * tall, then the page in the person's look. The page is inert: nothing in it is a control yet. `state`
+ * tall, then the first-run strip as the editor will first draw it (bar/strip.tsx; none once hidden), then
+ * the page in the person's look. The page is inert: nothing in it is a control yet. `state`
  * is the words to draw when they are newer than the data's own (the gate waiting for newer data).
  */
 export function StandInPage({ data, state }: { data: PortfolioData; state?: BuilderState }) {
@@ -68,6 +70,7 @@ export function StandInPage({ data, state }: { data: PortfolioData; state?: Buil
   return (
     <>
       <div aria-hidden className="border-b border-line bg-surface" style={{ height: BAR_H }} />
+      <StripStandIn data={data} state={state ?? data.builder.initial} />
       <div {...lookAttrs(home.theme)} style={themeStyle(home.theme)} className={GROUND} data-canvas="stand-in" inert>
         <PortfolioHome {...home} edit={standInAdapter((where) => <OwnerPartsStill where={where} data={data} state={state} />)} />
       </div>

@@ -293,6 +293,10 @@ const DOCS: Record<string, Doc> = {
             back to one before you sign in. It holds a signed list of roadmap ids, not your name or email, and lasts up
             to 90 days.
           </li>
+          <li>
+            <strong>Portfolio steps (exhbt_strip_hidden).</strong> Set only if you hide the steps at the top of your
+            portfolio editor, so they stay hidden. It holds your account&rsquo;s id and lasts a year.
+          </li>
         </ul>
         <h2>Referral cookie (not in use yet)</h2>
         <p>
