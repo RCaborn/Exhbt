@@ -34,6 +34,8 @@ export type AddRoom =
 export type VisitorSource = { publicPlan: boolean; published: { id: string; home: HomeProject }[] };
 
 export type PortfolioData = {
+  /** The person's own id: what the editor keeps in the browser for them is kept under it, so it is never offered to anyone else. */
+  owner: string;
   /** Exactly what page.tsx gives Builder today, but `step`. */
   builder: Omit<BuilderProps, "step">;
   ownerOnly: OwnerOnlyExhbt[];
@@ -140,6 +142,7 @@ export async function loadPortfolioData(userId: string, host: string | null, adm
   const published = await Promise.all(visibleOnPortfolio(plan, exhbts).map(async (e) => ({ id: e.id, home: await homeOf(e, e.published!, viewHref ? `${viewHref}/${e.slug}` : "#") })));
 
   return {
+    owner: userId,
     builder: {
       initial: { profile: draftFromProfile(profile), arrangement },
       projects,
