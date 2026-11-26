@@ -1,9 +1,12 @@
 "use client";
 
 import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { lookAttrs, themeStyle } from "@/components/portfolio/themeFonts";
+import { lookOf } from "../home-props";
 import { closestCenter, DndContext, DragOverlay, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { rectSortingStrategy, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { usePortfolioApi } from "../runtime";
+import { usePortfolioApi, usePortfolioState, usePortfolioUi } from "../runtime";
 import { moveTile } from "../sections/arrange";
 import { announcementsFor, DraggingContext, EASE, MOVE_MS, useDragSensors, useReducedMotion } from "../sections/drag";
 import { W } from "../sections/words";
@@ -66,6 +69,9 @@ export function TileBoard({ children }: { children: ReactNode }): ReactNode {
   }
 
   const lifted = active ? nodes.get(active) : undefined;
+  const themeId = usePortfolioState((s) => s.arrangement.themeId);
+  const previewing = usePortfolioUi((u) => u.previewing);
+  const theme = lookOf(themeId, previewing);
   return (
     <NodesContext value={nodes}>
       <DraggingContext value={dragging}>
@@ -81,13 +87,17 @@ export function TileBoard({ children }: { children: ReactNode }): ReactNode {
           <SortableContext items={arranged.work} strategy={treatment === "cards" ? rectSortingStrategy : verticalListSortingStrategy}>
             {children}
           </SortableContext>
-          <DragOverlay dropAnimation={reduced ? null : { duration: MOVE_MS, easing: EASE }}>
-            {lifted ? (
-              <div className="pe-lifted pe-lifted-tile" data-testid="lifted-tile" data-treatment={treatment} inert aria-hidden>
-                {lifted}
-              </div>
-            ) : null}
-          </DragOverlay>
+          {/* In the body, so its fixed place is the window's; in the look's own variables, as a container of its own. */}
+          {createPortal(
+            <DragOverlay dropAnimation={reduced ? null : { duration: MOVE_MS, easing: EASE }}>
+              {lifted ? (
+                <div {...lookAttrs(theme)} style={themeStyle(theme)} className="pe-lifted pe-lifted-tile @container text-[color:var(--pf-ink)]" data-testid="lifted-tile" data-treatment={treatment} inert aria-hidden>
+                  {lifted}
+                </div>
+              ) : null}
+            </DragOverlay>,
+            document.body,
+          )}
         </DndContext>
       </DraggingContext>
     </NodesContext>

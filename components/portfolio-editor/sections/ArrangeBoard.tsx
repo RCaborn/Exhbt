@@ -2,6 +2,7 @@
 
 import "../css/arrange.css";
 import { useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { closestCenter, DndContext, DragOverlay, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { SectionKey } from "@/lib/portfolio-layout";
@@ -60,7 +61,8 @@ export function ArrangeBoard({ children }: { children: ReactNode }): ReactNode {
         <SortableContext items={sections} strategy={verticalListSortingStrategy}>
           {children}
         </SortableContext>
-        <DragOverlay dropAnimation={reduced ? null : { duration: MOVE_MS, easing: EASE }}>{active ? <Lifted sectionKey={active} /> : null}</DragOverlay>
+        {/* In the body, so its fixed place is the window's and not a container's (the page's own wrappers are containers). */}
+        {createPortal(<DragOverlay dropAnimation={reduced ? null : { duration: MOVE_MS, easing: EASE }}>{active ? <Lifted sectionKey={active} /> : null}</DragOverlay>, document.body)}
       </DndContext>
     </DraggingContext>
   );

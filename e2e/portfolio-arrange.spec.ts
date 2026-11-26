@@ -109,18 +109,18 @@ test.describe("Sections", () => {
   test("a section is dragged by its grip with a mouse, its lifted copy follows, and Undo puts it back", async ({ page }) => {
     await openEditor(page, fresh(FULL, "mouse"));
     const before = await sections(page);
-    await pointAt(page, "quote");
+    // Experience's top and the quote's grip, both in the window.
+    await frame(page, "experience").evaluate((el) => el.scrollIntoView({ block: "start" }));
+    await frame(page, "quote").hover({ position: { x: 40, y: 60 } });
     const grip = (await tools(page, "quote").getByRole("button", { name: "Drag A quote" }).boundingBox())!;
-    const target = (await frame(page, "about").boundingBox())!;
+    const target = (await frame(page, "experience").boundingBox())!;
     await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
     await page.mouse.down();
     await page.mouse.move(grip.x + grip.width / 2, grip.y - 20, { steps: 4 });
     await expect(page.getByTestId("lifted-section")).toBeVisible();
     await page.mouse.move(grip.x + grip.width / 2, target.y + 20, { steps: 16 });
-    console.log("DEBUG grip", JSON.stringify(grip), "target", JSON.stringify(target), "lifted", JSON.stringify(await page.getByTestId("lifted-section").boundingBox()), "scroll", await page.evaluate(() => scrollY));
-    await page.screenshot({ path: "/tmp/claude-0/-home-user-Exhbt/8f68944d-9b6a-5167-8a40-0d82c10fe3df/scratchpad/dbg-drag.png" });
     await page.mouse.up();
-    await expect.poll(async () => (await sections(page)).indexOf("quote")).toBe(before.indexOf("about"));
+    await expect.poll(async () => (await sections(page)).indexOf("quote")).toBe(before.indexOf("experience"));
     expect(await undoLabel(page)).toBe("moved A quote");
     await page.getByRole("button", { name: "Undo: moved A quote" }).click();
     expect(await sections(page)).toEqual(before);
@@ -167,7 +167,7 @@ test.describe("Sections", () => {
       await expect(item).toHaveAttribute("aria-disabled", "true");
       await expect(item).not.toContainText("Already on your page");
     }
-    await expect(page.getByRole("link", { name: "See plans" })).toBeVisible();
+    await expect(page.locator(".pe-menu-foot").getByRole("link", { name: "See plans" })).toBeVisible();
     await menu.getByRole("menuitem", { name: /Experience/ }).click({ force: true });
     expect(await sections(page)).toEqual(["featured", "work", "about", "contact"]);
   });
