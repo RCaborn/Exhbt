@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import type { Page } from "@playwright/test";
+import { devices, type Page } from "@playwright/test";
 import { BASE_LOOKS, fullFixture, sparseFixture } from "./fixtures/portfolio-pages";
 import { canUseTheme } from "../lib/plan-rules";
 import { themeById } from "../lib/portfolio-themes";
@@ -210,4 +210,71 @@ test("a new person's first journey: the strip, then the vision's Add an exhbt, a
   await expect(tile).toContainText("Draft");
   // What was typed in the strip's first step is the page's.
   await expect(page.locator(`${READY} ${HOME} h1`).getByRole("textbox", { name: "Your name" })).toHaveValue("Sam Taylor");
+});
+
+// I's phone parts (brief I), on a phone: Playwright's Pixel 7 (a touch screen, 412 wide, a coarse pointer). I's
+// own spec checks what each part does; here, axe with each of them open in all eight looks, and the editing
+// page against the visitor's page box for box as a phone draws it.
+const { defaultBrowserType: _browser, ...PHONE } = devices["Pixel 7"];
+void _browser;
+
+test.describe("On a phone", () => {
+  test.use(PHONE);
+
+  for (const look of BASE_LOOKS) {
+    test(`${look}: axe finds no WCAG 2.1 AA violation with a section's More, a tile's More, Reorder sections and the one-tap Undo`, async ({ page }) => {
+      test.slow();
+      const stored = look === "exhbt" ? null : look;
+      const plan = canUseTheme("premium", themeById(look)!).ok ? "premium" : "max";
+      await openEditor(page, fresh(fullFixture("x", stored, plan), `axep${look}`));
+      expect(await axe(page), `${look}: the page on a phone`).toEqual([]);
+
+      // A section's More, and a move from it: the sheet, then the one-tap Undo it leaves.
+      const tools = (key: string) => page.locator(`${READY} [data-section-frame="${key}"] > [data-pe-tools]`);
+      await tools("about").getByRole("button", { name: "More for About me" }).click({ timeout: 10_000 });
+      const sectionSheet = page.getByRole("dialog", { name: "About me", exact: true });
+      await expect(sectionSheet).toBeVisible();
+      expect(await axe(page), `${look}: a section's More`).toEqual([]);
+      await sectionSheet.getByRole("button", { name: "Remove About me", exact: true }).click({ timeout: 10_000 });
+      const undo = page.locator(".astryx-toast").getByRole("button", { name: "Undo: removed About me", exact: true });
+      await expect(undo).toBeVisible();
+      expect(await axe(page), `${look}: the one-tap Undo`).toEqual([]);
+      await undo.click();
+
+      // A tile's More.
+      const tile = page.locator(`${READY} [data-section="work"] [data-tile-frame]`).first();
+      await tile.scrollIntoViewIfNeeded();
+      await tile.locator(":scope > [data-pe-tools]").getByRole("button", { name: /^More for / }).click({ timeout: 10_000 });
+      await expect(page.getByRole("dialog").filter({ has: page.locator("[data-item-actions]") })).toBeVisible();
+      expect(await axe(page), `${look}: a tile's More`).toEqual([]);
+      await page.keyboard.press("Escape");
+      await expect(page.locator("[data-item-actions]")).toBeHidden();
+
+      // Reorder sections, from the bar's menu.
+      await page.locator(`${READY} [data-bar]`).getByRole("button", { name: "More", exact: true }).click({ timeout: 10_000 });
+      await page.getByRole("menuitem", { name: "Reorder sections" }).or(page.getByRole("dialog", { name: "More" }).getByRole("button", { name: "Reorder sections" })).click({ timeout: 10_000 });
+      await expect(page.getByRole("dialog", { name: "Reorder sections" })).toBeVisible();
+      expect(await axe(page), `${look}: Reorder sections`).toEqual([]);
+    });
+  }
+
+  for (const look of BASE_LOOKS)
+    for (const kind of ["full", "empty"] as const) {
+      test(`${look}, ${kind}: on a phone the editing page is the visitor's page box for box, but for what 0031 lets it add`, async ({ page }) => {
+        test.slow();
+        const stored = look === "exhbt" ? null : look;
+        const f = fresh(kind === "full" ? fullFixture("x", stored) : sparseFixture("x", stored), `edp${look}${kind}`);
+        await openEditor(page, f);
+        await page.goto(`/p/${f.username}`);
+        await settle(page);
+        const visiting = await boxes(page);
+        await page.goto("/portfolio");
+        await waitReady(page);
+        await settle(page);
+        const own = await allowEditOnly(page);
+        await settle(page);
+        const off = differences(visiting, await boxes(page)).filter((d) => !own.some((k) => d.startsWith(`${k} `)));
+        expect(off, `${look} ${kind} on a phone`).toEqual([]);
+      });
+    }
 });
