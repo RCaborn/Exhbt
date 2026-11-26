@@ -485,7 +485,10 @@ export const EDIT_ONLY_IN_FLOW: { name: string; selector: string; always: boolea
   { name: "a flowchart box's detail", selector: ".xp-flow-detail:has([data-empty])", always: false },
   { name: "an image's caption", selector: 'figcaption:has([data-path$=".caption"][data-empty])', always: false },
   { name: "a quote's role", selector: '[data-part="quote"] [data-path$=".role"][data-empty]', always: false },
-  { name: "a link's description", selector: ':is(p, span.block):has(> .xe-field > [data-path$=".description"][data-empty])', always: false },
+  // A formatted field since decision 0032 (it takes bold and italic): the field's own box takes the place of the page's <p>.
+  { name: "a link's description", selector: '[data-field="rich"][data-path$=".description"][data-empty]', always: false },
+  // A part's title the person has cleared (decision 0032): a visitor sees no heading, and the editor keeps "Add a title" in its place.
+  { name: "a cleared title", selector: ':is(h2, h3):has(> .xe-field > :is([data-path$=".title"], [data-path="flowTitle"], [data-path="refsTitle"])[data-empty])', always: false },
   { name: "an aim or a conclusion with no words", selector: ':is([data-kind="aim"], [data-kind="conclusion"])[data-section-id]:has([data-path$=".text"][data-empty])', always: false },
   { name: "an empty title", selector: '[data-path="title"][data-empty]', always: false },
   { name: "an empty flowchart box", selector: '[data-path$=".step"][data-empty]', always: false },

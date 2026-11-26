@@ -1,0 +1,84 @@
+/* Decision 0032, "write it your way": the bar that comes to a selection, a quote's marks round a
+   formatted field, and the way in to a title where the layout draws none. On the page every colour is
+   one of the page's --xp-* variables; the selection bar is app chrome, drawn by Astryx components in
+   Astryx's own tokens. Nothing here takes room on the page. */
+@layer components {
+  /* ---------- The bar at the selection (fields/SelectionBar.tsx) ---------- */
+  /* Its layer is Astryx's (a fixed one, in the browser's top layer), and so are its surface, its buttons and
+     its field. This is only what Astryx has no prop for: the bar is as wide as what it holds, and nothing in
+     it can be picked up as words. */
+  .xe-selbar {
+    width: max-content;
+    max-width: calc(100vw - var(--spacing-4));
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  /* The reason an address was refused, under its field: Astryx's error colour and its supporting text size. */
+  .xe-selbar-error {
+    margin: var(--spacing-1) var(--spacing-1) 0;
+    color: var(--color-text-error);
+    font-family: var(--font-family-body);
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+  }
+  /* While the bar is up it is the one set of formatting buttons: the field's own, at the end of its line, go.
+     They are hidden, not taken out, so nothing is drawn again and the one that had the focus cannot keep it. */
+  .xe-rich[data-selecting] > .xe-format,
+  .xe-rich[data-selecting]:focus-within > .xe-format {
+    visibility: hidden;
+  }
+
+  /* ---------- A quote's marks round a formatted field ---------- */
+  /* The page writes the marks as text round the words (“…”). A formatted field is a block, so it draws them
+     itself, at the start and end of its one paragraph: the words wrap exactly as the published ones do. */
+  .xe-rich[data-quoted] > .xe-rest:not(:empty)::before,
+  .xe-rich[data-quoted] .xe-rich-cell:not([data-empty]) .xe-pm p::before {
+    content: "\201C";
+  }
+  .xe-rich[data-quoted] > .xe-rest:not(:empty)::after,
+  .xe-rich[data-quoted] .xe-rich-cell:not([data-empty]) .xe-pm p::after {
+    content: "\201D";
+  }
+  /* Empty, the placeholder carries the marks, in its own colour (RichEditor.tsx writes them into its own). */
+  .xe-rich[data-quoted] > .xe-rest:empty::before {
+    content: "\201C" attr(data-placeholder) "\201D";
+  }
+
+  /* ---------- "Add a title", where the layout draws no heading (fields/TitleField.tsx) ---------- */
+  /* Over the part's top left edge, as the aim's switch is (css/core.css, .xe-above): it shows while the
+     pointer or the focus is in the part, and always under a finger, where nothing hovers. */
+  .xe-title-add {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .xe-frame:hover .xe-title-add,
+  .xe-frame:focus-within .xe-title-add,
+  .xe-title-add:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  @media (pointer: coarse) {
+    .xe-title-add {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+
+  /* ---------- Suggestions, in "Things to fix" and in "Review and publish" (topbar/Suggestions.tsx) ---------- */
+  /* The list and its rows are Astryx's. This is only where the group sits: a rule and some room between it
+     and what has to be fixed, when there is anything above it. Astryx's own tokens. */
+  .xe-suggest:not(:first-child) {
+    margin-top: var(--spacing-3);
+    padding-top: var(--spacing-3);
+    border-top: 1px solid var(--color-border);
+  }
+  /* In the sheet the parts are already spaced as a stack, so the rule alone marks the group off. */
+  .xe-sheet-stack > .xe-suggest:not(:first-child) {
+    margin-top: 0;
+  }
+  /* The top bar's button when suggestions are all there is: quiet, in the bar's secondary ink, where "things
+     to fix" is in the error colour. Its count and its words swap by width as that button's do (css/topbar.css). */
+  .xe-topbar .xe-suggest-button {
+    color: var(--color-text-secondary);
+  }
+}

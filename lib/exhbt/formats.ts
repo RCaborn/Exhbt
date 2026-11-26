@@ -59,10 +59,13 @@ export type FromWork = (typeof FROM_WORK)[number];
 export type PageKind = SectionKind | "flow";
 /** One place in a layout's usual order. `first` means only the first section of these kinds (the lead image, the key figure). */
 export type Slot = { kinds: readonly PageKind[]; first?: true };
-/** What a layout needs before it can be published, beyond each part's own checks. Every issue has the path "sections", or "myRole". */
+/**
+ * What a layout suggests a page of its kind has. None of it stops publishing (decision 0032): each one the page
+ * lacks is a suggestion, at the path "sections", or "myRole" (suggestionsFor in lib/exhbt/blocks.ts).
+ */
 export type Need =
   | { need: "count"; kinds: readonly SectionKind[]; min: number; message: string }
-  /** A findings section, a graph, or an image picked from the work as a graph or a table (decision 0025): what a case study needs today. */
+  /** A findings section, a graph, or an image picked from the work as a graph or a table (decision 0025): what a case study is for. */
   | { need: "results"; message: string }
   | { need: "stages"; message: string }
   | { need: "myRole"; message: string };
@@ -74,14 +77,13 @@ export type FormatRule = {
   kinds: readonly SectionKind[];
   /** What it takes from the person's work when drafted (decision 0025). */
   fromWork: FromWork;
-  /** Whether the flowchart can be taken off the page in this layout. */
-  flowRemovable: boolean;
   /** The usual order: what picking this layout sorts the sections into. */
   template: readonly Slot[];
   /** How a doc with no flow marker is drawn. "flow-first" is today's case study: the flowchart, then the sections in the doc's order. */
   legacy: "flow-first" | "template";
   /** The first section of these kinds is drawn as the lead image or the key figure. */
   first?: { kinds: readonly SectionKind[]; as: "lead" | "key" };
+  /** What a page of this kind usually has: suggestions, never requirements (decision 0032). */
   needs: readonly Need[];
 };
 
@@ -145,9 +147,10 @@ const PICTURES_FIRST: readonly Slot[] = [
 
 /**
  * Each layout's facts (decisions 0024, 0025, 0027 and 0028): the kinds it draws, what it takes
- * from the work, whether the flowchart can go, its usual order, how a doc with no marker is
- * drawn, its lead or key item, and what it needs to publish (read by validateForPublish and
- * layoutNotes, with these messages, in this order).
+ * from the work, its usual order, how a doc with no marker is drawn, its lead or key item, and
+ * what a page of its kind usually has (`needs`: read by suggestionsFor and layoutNotes, with these
+ * messages, in this order). The flowchart can be taken off every layout, and none of the needs stops
+ * publishing (decision 0032): they are what the editor suggests.
  */
 export const FORMAT_RULES: Record<Format, FormatRule> = {
   "case-study": {
@@ -155,7 +158,6 @@ export const FORMAT_RULES: Record<Format, FormatRule> = {
     bestFor: "A question, how you answered it and what you found. Analysis, business, data and software.",
     kinds: SIX,
     fromWork: "figure",
-    flowRemovable: false,
     template: [{ kinds: ["flow"] }, { kinds: ["findings"] }, { kinds: ["graph"] }, { kinds: ["image"] }, { kinds: ["quote"] }, { kinds: ["reflection"] }, { kinds: ["link"] }],
     legacy: "flow-first",
     needs: [{ need: "results", message: "Add findings or a graph, so the exhbt shows what came of the work." }],
@@ -165,18 +167,16 @@ export const FORMAT_RULES: Record<Format, FormatRule> = {
     bestFor: "Pictures first, with the brief and what happened. Campaigns, design, architecture, film and products.",
     kinds: SIX,
     fromWork: "pictures",
-    flowRemovable: true,
     template: PICTURES_FIRST,
     legacy: "template",
     first: { kinds: ["image"], as: "lead" },
-    needs: [{ need: "count", kinds: ["image"], min: FORMAT_LIMITS.gallery.minImages, message: `A gallery needs at least ${FORMAT_LIMITS.gallery.minImages} images.` }],
+    needs: [{ need: "count", kinds: ["image"], min: FORMAT_LIMITS.gallery.minImages, message: `A gallery works best with at least ${FORMAT_LIMITS.gallery.minImages} images.` }],
   },
   research: {
     name: "Research",
     bestFor: "Question, aim, method, one key figure, results and conclusion. Lab work, experiments and dissertations.",
     kinds: [...SIX, "aim", "conclusion"],
     fromWork: "figure",
-    flowRemovable: false,
     template: [
       { kinds: ["aim"] },
       { kinds: ["flow"] },
@@ -190,7 +190,6 @@ export const FORMAT_RULES: Record<Format, FormatRule> = {
     ],
     legacy: "template",
     first: { kinds: ["graph", "image"], as: "key" },
-    // The cap on graphs and images together is checked straight after the need for a figure (validateForPublish).
     needs: [
       { need: "count", kinds: ["aim"], min: 1, message: "Add your aim or hypothesis." },
       { need: "count", kinds: ["conclusion"], min: 1, message: "Add your conclusion." },
@@ -203,7 +202,6 @@ export const FORMAT_RULES: Record<Format, FormatRule> = {
     bestFor: "Something you made that works. Software, apps, engineering and hardware.",
     kinds: SIX,
     fromWork: "figure",
-    flowRemovable: true,
     template: PICTURES_FIRST,
     legacy: "template",
     first: { kinds: ["image"], as: "lead" },
@@ -214,7 +212,6 @@ export const FORMAT_RULES: Record<Format, FormatRule> = {
     bestFor: "An argument and the sources behind it. Law, history, English and politics.",
     kinds: [...SIX, "pullquote"],
     fromWork: "none",
-    flowRemovable: true,
     template: [{ kinds: ["flow"] }, { kinds: ["findings"] }, { kinds: ["pullquote"] }, { kinds: ["graph"] }, { kinds: ["image"] }, { kinds: ["quote"] }, { kinds: ["reflection"] }, { kinds: ["link"] }],
     legacy: "template",
     needs: [{ need: "count", kinds: ["findings"], min: 1, message: "Add your key points." }],
@@ -224,11 +221,10 @@ export const FORMAT_RULES: Record<Format, FormatRule> = {
     bestFor: "A redesign, shown as it was and as it is now. UX, product and design.",
     kinds: SIX,
     fromWork: "pictures",
-    flowRemovable: true,
     template: [{ kinds: ["image"] }, { kinds: ["flow"] }, { kinds: ["findings"] }, { kinds: ["graph"] }, { kinds: ["quote"] }, { kinds: ["reflection"] }, { kinds: ["link"] }],
     legacy: "template",
     needs: [
-      { need: "count", kinds: ["image"], min: FORMAT_LIMITS["before-after"].minImages, message: `A before and after needs at least ${FORMAT_LIMITS["before-after"].minImages} images.` },
+      { need: "count", kinds: ["image"], min: FORMAT_LIMITS["before-after"].minImages, message: `A before and after works best with at least ${FORMAT_LIMITS["before-after"].minImages} images.` },
       { need: "stages", message: "Mark one image Before and one After." },
       { need: "count", kinds: ["findings"], min: 1, message: "Add what changed and why." },
     ],
@@ -238,7 +234,6 @@ export const FORMAT_RULES: Record<Format, FormatRule> = {
     bestFor: "Something you put on or took part in. Music, drama, sport and societies.",
     kinds: SIX,
     fromWork: "pictures",
-    flowRemovable: true,
     template: PICTURES_FIRST,
     legacy: "template",
     first: { kinds: ["image"], as: "lead" },
@@ -252,7 +247,11 @@ export const FORMAT_RULES: Record<Format, FormatRule> = {
 /** What a doc's layout takes from the work. A layout this code doesn't know reads as a case study, as everywhere. */
 export const fromWorkOf = (d: { format?: unknown }): FromWork => FORMAT_RULES[formatOf(d)].fromWork;
 
-/** The words the editor and the page use, per layout. */
+/**
+ * The words the editor and the page use, per layout. The headings among them (`flow`, `findings`, `reflection`,
+ * `quote`, `refs`) are what the page draws until the person types a title of their own (decision 0032:
+ * flowHeading, sectionHeading and refsHeading below say which heading goes over what).
+ */
 export type FormatCopy = {
   title: string;
   titleHint: string;
@@ -261,8 +260,7 @@ export type FormatCopy = {
   emptyTitle: string;
   gap: string;
   gapHint: string;
-  gapMissing: string;
-  /** The flowchart's heading. */
+  /** The flowchart's heading, and its section's name. A case study draws no heading over its flowchart (flowHeading). */
   flow: string;
   findings: string;
   reflection: string;
@@ -292,7 +290,6 @@ export const FORMAT_COPY: Record<Format, FormatCopy> = {
     emptyTitle: "Your question",
     gap: "Context",
     gapHint: "Why the question matters. Make the gap bold to highlight it.",
-    gapMissing: "Add the context: why the question matters.",
     flow: "Process",
     findings: "What I found",
     reflection: "What I'd do next",
@@ -312,7 +309,6 @@ export const FORMAT_COPY: Record<Format, FormatCopy> = {
     emptyTitle: "Name of the work",
     gap: "The brief",
     gapHint: "What you were asked to do, and for whom. Make the ask bold to highlight it.",
-    gapMissing: "Add the brief: what you were asked to do, and for whom.",
     flow: "What I did",
     findings: "What happened",
     reflection: "What I'd do next",
@@ -332,7 +328,6 @@ export const FORMAT_COPY: Record<Format, FormatCopy> = {
     emptyTitle: "Your research question",
     gap: "Background",
     gapHint: "What was known, and what wasn't. Make the gap bold to highlight it.",
-    gapMissing: "Add the background: what was known, and the gap.",
     flow: "Method",
     findings: "Results",
     reflection: "Limitations and next steps",
@@ -353,7 +348,6 @@ export const FORMAT_COPY: Record<Format, FormatCopy> = {
     emptyTitle: "What you built",
     gap: "The problem",
     gapHint: "The problem it solves, and for whom. Make the problem bold to highlight it.",
-    gapMissing: "Add the problem: what it solves, and for whom.",
     flow: "How I built it",
     findings: "What it does",
     reflection: "What's next",
@@ -373,7 +367,6 @@ export const FORMAT_COPY: Record<Format, FormatCopy> = {
     emptyTitle: "Your question or thesis",
     gap: "Context",
     gapHint: "Why the question matters. Make the key point bold to highlight it.",
-    gapMissing: "Add the context: why the question matters.",
     flow: "How the argument runs",
     findings: "Key points",
     reflection: "What I'd look at next",
@@ -394,7 +387,6 @@ export const FORMAT_COPY: Record<Format, FormatCopy> = {
     emptyTitle: "What you redesigned",
     gap: "The problem",
     gapHint: "What was wrong with it, and for whom. Make the problem bold to highlight it.",
-    gapMissing: "Add the problem: what was wrong with it, and for whom.",
     flow: "What I did",
     findings: "What changed and why",
     reflection: "What I'd do next",
@@ -414,7 +406,6 @@ export const FORMAT_COPY: Record<Format, FormatCopy> = {
     emptyTitle: "The event",
     gap: "The brief",
     gapHint: "What it was for, and who it was for. Make the aim bold to highlight it.",
-    gapMissing: "Add the brief: what it was for, and who it was for.",
     flow: "How we put it on",
     findings: "How it went",
     reflection: "What I'd do next",
@@ -441,11 +432,51 @@ export const hiddenSections = (d: Laid): Shown[] => d.sections.flatMap((s, i) =>
 
 /* ---------------- The flowchart's place (decision 0027) ---------------- */
 
-type Flowed = Pick<ExhbtDoc, "sections" | "flowOff"> & { format?: unknown };
-
 /** The doc has the flowchart's marker in its sections. */
 export const hasMarker = (doc: Pick<ExhbtDoc, "sections">): boolean => doc.sections.some((s) => s.kind === "flow");
 /** Touched by the edit-on-page editor: it has the marker, or the flowchart has been taken off. */
 export const isArranged = (doc: Pick<ExhbtDoc, "sections" | "flowOff">): boolean => hasMarker(doc) || doc.flowOff === true;
-/** False only when the layout lets the flowchart go and the doc says it has gone (flowOff, and no marker). */
-export const flowShown = (doc: Flowed): boolean => hasMarker(doc) || !(FORMAT_RULES[formatOf(doc)].flowRemovable && doc.flowOff === true);
+/**
+ * False only when the doc says the flowchart has gone (flowOff, and no marker). Every layout lets it go
+ * (decision 0032); until then a case study and research always drew one, flowOff or not.
+ */
+export const flowShown = (doc: Pick<ExhbtDoc, "sections" | "flowOff">): boolean => hasMarker(doc) || doc.flowOff !== true;
+
+/* ---------------- Section titles (decision 0032) ---------------- */
+
+/**
+ * The heading a layout draws over its flowchart: its own word for it ("Method", "What I did"), or "" in a
+ * case study, which draws none ("Process" there is only the section's name, for a screen reader).
+ */
+export const flowHeading = (f: Format): string => (f === "case-study" ? "" : FORMAT_COPY[f].flow);
+
+/** The heading a layout draws over a list of links: research's "References", an essay's "Sources". */
+export const refsHeading = (f: Format): string => FORMAT_COPY[f].refs ?? FORMAT_COPY[f].link;
+
+/**
+ * The heading a layout draws over a section of this kind, or null for a kind it draws none over (a graph, an
+ * image, a link, a pull quote). The aim's is "Aim" or "Hypothesis", by its own switch.
+ */
+export function sectionHeading(s: { kind: string; heading?: unknown }, f: Format): string | null {
+  switch (s.kind) {
+    case "findings":
+      return FORMAT_COPY[f].findings;
+    case "quote":
+      return FORMAT_COPY[f].quote;
+    case "reflection":
+      return FORMAT_COPY[f].reflection;
+    case "aim":
+      return s.heading === "hypothesis" ? "Hypothesis" : "Aim";
+    case "conclusion":
+      return "Conclusion";
+    default:
+      return null;
+  }
+}
+
+/**
+ * The title to draw over a part: the person's own when they typed one, nothing ("") when they cleared it, and
+ * the layout's heading while they have never touched it (`own` undefined), so an untouched heading follows a
+ * layout switch and a typed one is kept through it.
+ */
+export const titleShown = (own: string | undefined, layoutHeading: string): string => (own === undefined ? layoutHeading : own.trim());

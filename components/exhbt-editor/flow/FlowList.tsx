@@ -26,7 +26,7 @@ import { useRuntime } from "../context";
 import { FLOW_BOX_STYLE } from "../drag/options";
 import { IssueNote, useFieldIssue } from "../fields/issues";
 import { useStoreInternal } from "../store";
-import { EASE, MIN_ID, MIN_WORDS, MOVE_MS } from "./FlowBox";
+import { EASE, MOVE_MS } from "./FlowBox";
 import { lineAt, placeAt, within, type Span } from "./geometry";
 
 /*
@@ -320,9 +320,6 @@ export function FlowList({ children }: { children: ReactNode }) {
             look,
           )}
       </DndContext>
-      <span id={MIN_ID} hidden>
-        {MIN_WORDS}
-      </span>
       <IssueNote id="flow-issue" text={issue} />
     </div>
   );

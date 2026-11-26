@@ -1,6 +1,6 @@
 import { z } from "zod/v4";
-import { flowShown, FORMAT_COPY, FORMAT_LIMITS, FORMAT_RULES, FORMATS, formatOf, isFormat, isShown, shownSections, type Format, type Need } from "./formats";
-import { asChart, CHART_LIMITS, ChartSchema, chartIssues, chartTexts, publicChart, type Chart } from "./charts";
+import { flowShown, FORMAT_LIMITS, FORMAT_RULES, FORMATS, formatOf, isFormat, isShown, shownSections, type Format, type Need } from "./formats";
+import { asChart, CHART_LIMITS, ChartSchema, chartIssues, chartTexts, publicChart, untouchedChart, type Chart } from "./charts";
 
 /**
  * An exhbt as stored (exhbts.blocks): the layout Rory set on 12 Nov 2026, as data, with the
@@ -19,6 +19,12 @@ import { asChart, CHART_LIMITS, ChartSchema, chartIssues, chartTexts, publicChar
  * Drafts may break the limits (saving is never blocked); publishing may not (validateForPublish,
  * run on the server). Docs saved before sections existed are read by normaliseDoc. The page layout
  * (16 Nov 2026) is decision 0022: `whereWhen` and `summary` are optional, so older docs read as they are.
+ *
+ * Decision 0032 (26 Nov 2026): no part has to be filled in. A part with nothing in it is kept in the
+ * working copy and not drawn for a visitor (isBlank, filledFlow); what a layout usually has is a
+ * suggestion (suggestionsFor). A section's title can be the person's own (`title`, and `flowTitle`
+ * and `refsTitle` on the doc), and a quote, a pull quote and a link's description can hold bold and
+ * italic, kept as runs beside the plain words (`textRuns`, `descriptionRuns`; richOf).
  */
 
 export const SCHEMA_VERSION = 2;
@@ -38,10 +44,19 @@ export type SectionKind = (typeof SECTION_KINDS)[number];
  * Rory, 25 Nov 2026). What is here keeps the page's shape: how many of each thing there may be, the
  * characters a one-line field holds, a link's label, and the flowchart's boxes, whose words have to fit
  * the diagram. How long the AI writes each part is its own target, `draftTargets` in lib/ai/draft-targets.ts.
+ *
+ * Every `max` is a limit. Every `min` is only what the editor suggests (decision 0032): a flowchart of
+ * two boxes or a single finding can be published.
  */
 export const LIMITS = {
   /** The title is the question the work answers (decision 0022). */
   titleChars: 80,
+  /**
+   * A section's own title (decision 0032): one line. At this length a title of ordinary words holds on one
+   * line in every look at 390px, in the large heading the findings and the flowchart take; one of the
+   * widest letters wraps to a second line and nothing overflows (e2e/write-your-way.spec.ts measures both).
+   */
+  sectionTitleChars: 28,
   /** "What it is", e.g. "MSc Finance dissertation" (stored as `context`). */
   contextChars: 90,
   /** "Where and when", e.g. "University of St Andrews, August 2026". */
@@ -143,7 +158,15 @@ export const EvidenceSchema = z.union([
 /** Stable within a doc, so the editor keeps each section's fields as it moves. */
 const SectionId = z.string().min(1).max(40);
 
-export const FindingsSectionSchema = z.object({ id: SectionId, kind: z.literal("findings"), items: z.array(RichTextSchema) });
+/**
+ * A section's own title (decision 0032), on the kinds a layout draws a heading over. Absent: the layout's
+ * heading, which follows a layout switch. "": cleared, so no heading is drawn. Anything else is the
+ * person's, kept through a switch. One line (LIMITS.sectionTitleChars). The flowchart's is `flowTitle` and
+ * a list of links' is `refsTitle`, on the doc: the flowchart's marker holds nothing, and a list is no one section.
+ */
+const SectionTitle = z.string().optional();
+
+export const FindingsSectionSchema = z.object({ id: SectionId, kind: z.literal("findings"), items: z.array(RichTextSchema), title: SectionTitle });
 export const GraphSectionSchema = z.object({ id: SectionId, kind: z.literal("graph"), chart: ChartSchema });
 /** Where a picked figure sits on its page: fractions of the page's width and height, from the top left. */
 export const FigureBoxSchema = z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() });
@@ -186,17 +209,22 @@ export const PickedSchema = z.object({
 export type Picked = z.infer<typeof PickedSchema>;
 
 export const ImageSectionSchema = ImageSchema.extend({ id: SectionId, kind: z.literal("image"), picked: PickedSchema.optional() });
-/** Someone else's words, so plain text: no formatting to put words in their mouth. */
-export const QuoteSectionSchema = z.object({ id: SectionId, kind: z.literal("quote"), text: z.string(), name: z.string(), role: z.string() });
-export const ReflectionSectionSchema = z.object({ id: SectionId, kind: z.literal("reflection"), text: RichTextSchema });
-/** `href` is checked by safeHref; only the label and description show (and count). */
-export const LinkSectionSchema = z.object({ id: SectionId, kind: z.literal("link"), href: z.string(), label: z.string(), description: z.string() });
+/**
+ * Someone else's words. `text` is the words, plain, and what every count and check reads. `textRuns` is the
+ * same words with their bold and italic (decision 0032), there only when some of them are formatted: it is
+ * beside the string, not in its place, so code from before 0032 still reads a quote (richOf says how the two
+ * are read together). Who said it is optional, and a role is drawn only with a name.
+ */
+export const QuoteSectionSchema = z.object({ id: SectionId, kind: z.literal("quote"), text: z.string(), textRuns: RichTextSchema.optional(), name: z.string(), role: z.string(), title: SectionTitle });
+export const ReflectionSectionSchema = z.object({ id: SectionId, kind: z.literal("reflection"), text: RichTextSchema, title: SectionTitle });
+/** `href` is checked by safeHref; only the label and description show (and count). `descriptionRuns`: the description's bold and italic, beside it as a quote's are. */
+export const LinkSectionSchema = z.object({ id: SectionId, kind: z.literal("link"), href: z.string(), label: z.string(), description: z.string(), descriptionRuns: RichTextSchema.optional() });
 
 /** Research only: the aim or hypothesis, and the conclusion (decision 0024). Short formatted text, like "What I'd do next". */
-export const AimSectionSchema = z.object({ id: SectionId, kind: z.literal("aim"), text: RichTextSchema, heading: z.enum(["aim", "hypothesis"]).optional() });
-export const ConclusionSectionSchema = z.object({ id: SectionId, kind: z.literal("conclusion"), text: RichTextSchema });
-/** Your own words, drawn large (the essay layout). Plain text. */
-export const PullquoteSectionSchema = z.object({ id: SectionId, kind: z.literal("pullquote"), text: z.string() });
+export const AimSectionSchema = z.object({ id: SectionId, kind: z.literal("aim"), text: RichTextSchema, heading: z.enum(["aim", "hypothesis"]).optional(), title: SectionTitle });
+export const ConclusionSectionSchema = z.object({ id: SectionId, kind: z.literal("conclusion"), text: RichTextSchema, title: SectionTitle });
+/** Your own words, drawn large (the essay layout). `textRuns`: their bold and italic, beside the plain string as a quote's are. */
+export const PullquoteSectionSchema = z.object({ id: SectionId, kind: z.literal("pullquote"), text: z.string(), textRuns: RichTextSchema.optional() });
 
 export const FLOW_ID = "flow";
 /** Where the flowchart sits among the sections. Its boxes stay in doc.flow. At most one. */
@@ -246,10 +274,14 @@ const DocSchema = z.object({
    * highlighted phrase, the gap (decision 0022). Called "The question" before the title became one.
    */
   gap: RichTextSchema,
-  /** The process flowchart's boxes, 3 to 6. Where it sits is the marker in `sections`. */
+  /** The process flowchart's boxes, up to 6. Where it sits is the marker in `sections`. */
   flow: z.array(FlowStepSchema),
-  /** The flowchart has been taken off the page (decision 0027). Never there with a marker: normaliseDoc deletes it. */
+  /** The flowchart has been taken off the page (decision 0027), which every layout allows (decision 0032). Never there with a marker: normaliseDoc deletes it. */
   flowOff: z.boolean().optional(),
+  /** The flowchart's own title (decision 0032), as a section's `title` is: absent for the layout's heading, "" for none. Kept while the flowchart is off the page. */
+  flowTitle: SectionTitle,
+  /** The title over a list of links (research's "References", an essay's "Sources"), as a section's `title` is. */
+  refsTitle: SectionTitle,
   /** The sections in page order, with the flowchart's marker among them once the doc is arranged (decision 0027). */
   sections: z.array(SectionSchema),
   /** The work, in the footer beside the trust badge (not a section: the badge's "source attached" reads it). */
@@ -293,8 +325,21 @@ function withIds(sections: unknown[]): unknown[] {
     seen.add(id);
     const out: Record<string, unknown> = { ...s, id };
     if (out.kind === "graph" && isObject(out.chart)) out.chart = asChart(out.chart as Chart);
+    // Formatting kept beside a plain string (decision 0032) is read only while it spells that string, and has some formatting in it.
+    const beside = BESIDE[String(out.kind)];
+    if (beside && beside[1] in out && !spells(out[beside[1]], out[beside[0]])) delete out[beside[1]];
     return out;
   });
+}
+
+/** The fields stored as a plain string with their formatting beside it (decision 0032), by kind: [the words, their runs]. */
+const BESIDE: Record<string, readonly [words: string, runs: string]> = { quote: ["text", "textRuns"], pullquote: ["text", "textRuns"], link: ["description", "descriptionRuns"] };
+
+/** Whether `runs` are the formatting of exactly these words: runs that spell the string, at least one of them bold, italic or a link. */
+function spells(runs: unknown, words: unknown): boolean {
+  if (typeof words !== "string" || !Array.isArray(runs) || !runs.every((r) => isObject(r) && typeof r.t === "string")) return false;
+  const list = runs as Run[];
+  return list.map((r) => r.t).join("") === words && list.some((r) => r.b === true || r.i === true || typeof r.href === "string");
 }
 
 /**
@@ -359,6 +404,86 @@ export function emptyDoc(): ExhbtDoc {
 
 export const plain = (rt: RichText): string => rt.map((r) => r.t).join("");
 export const words = (s: string): number => s.trim().split(/\s+/).filter(Boolean).length;
+/** Whether formatted text has any words in it. */
+export const hasWords = (rt: RichText): boolean => rt.some((r) => r.t.trim().length > 0);
+const said = (s: string | undefined): boolean => (s ?? "").trim().length > 0;
+
+/* ---------------- Formatting kept beside a plain string (decision 0032) ---------------- */
+
+/** Whether any of the runs is bold, italic or a link. */
+export const isFormatted = (rt: RichText): boolean => rt.some((r) => r.b === true || r.i === true || r.href !== undefined);
+
+/**
+ * The words of a field stored as a plain string with its formatting beside it (a quote's and a pull quote's
+ * `text` and `textRuns`, a link's `description` and `descriptionRuns`), as runs to draw. The string owns the
+ * words: the runs are used only while they spell exactly that string, so a change made to the string alone
+ * (by the classic editor, or by code from before 0032, which reads and writes only the string) is never drawn
+ * in the formatting of the words it replaced. Otherwise the string, as one plain run.
+ */
+export const richOf = (plainWords: string, runs: RichText | undefined): RichText => (runs && isFormatted(runs) && plain(runs) === plainWords ? runs : text(plainWords));
+
+/** What to store for such a field from the runs an editor holds: the plain words, and the runs only when some of them are formatted. */
+export const besideOf = (runs: RichText): { words: string; runs: RichText | undefined } => ({ words: plain(runs), runs: isFormatted(runs) ? runs : undefined });
+
+/** Runs without the spaces at their two ends, as a plain string is trimmed before it is drawn. */
+export function trimRuns(rt: RichText): RichText {
+  const out = rt.map((r) => ({ ...r }));
+  while (out.length && !out[0]!.t.trim()) out.shift();
+  while (out.length && !out[out.length - 1]!.t.trim()) out.pop();
+  if (out.length) {
+    out[0]!.t = out[0]!.t.trimStart();
+    out[out.length - 1]!.t = out[out.length - 1]!.t.trimEnd();
+  }
+  return out;
+}
+
+/* ---------------- What a visitor is shown (decision 0032) ---------------- */
+
+/** A flowchart box with words in it: its step or its detail. */
+export const boxFilled = (b: FlowStep): boolean => said(b.step) || said(b.detail);
+/** The flowchart's boxes as a visitor sees them: the ones with words. With none, no flowchart is drawn at all. */
+export const filledFlow = (flow: FlowStep[]): FlowStep[] => flow.filter(boxFilled);
+
+/**
+ * Whether a section has nothing to show a visitor. Nothing has to be filled in or removed (decision 0032):
+ * a blank section stays in the working copy and the editor draws it with its placeholders, and the public
+ * page, print, the published copy, the word count and the publish check all leave it out. The one
+ * definition of "empty" for a section; a flowchart's is filledFlow.
+ *  - findings: no finding has words;
+ *  - a graph: nothing typed in it, its title included;
+ *  - an image: never (a picture is something; one the page has no address for is left out by the page itself);
+ *  - a quote or a pull quote: no words (a name with no quote is not a quote);
+ *  - what I'd do next, an aim, a conclusion: no words;
+ *  - a link: no label, no description and no address.
+ */
+export function isBlank(s: ContentSection): boolean {
+  switch (s.kind) {
+    case "findings":
+      return !s.items.some(hasWords);
+    case "graph":
+      return !said(s.chart.title) && untouchedChart(s.chart);
+    case "image":
+      return false;
+    case "quote":
+    case "pullquote":
+      return !said(s.text);
+    case "reflection":
+    case "aim":
+    case "conclusion":
+      return !hasWords(s.text);
+    case "link":
+      return !said(s.label) && !said(s.description) && !said(s.href);
+  }
+}
+
+/** Who said a quote, as the page draws it under the words: the name, then the role. "" with no name: a role is drawn only with a name. */
+export const attributionOf = (s: Pick<SectionOf<"quote">, "name" | "role">): string => (said(s.name) ? [s.name.trim(), s.role.trim()].filter(Boolean).join(", ") : "");
+
+/**
+ * Whether the page has anything on it besides its title: a context line, a flowchart box with words, or a
+ * section with something in it. Publishing needs it (decision 0032): a title alone is not a page.
+ */
+export const hasBody = (d: ExhbtDoc): boolean => hasWords(d.gap) || (flowShown(d) && filledFlow(d.flow).length > 0) || shownSections(d).some(({ s }) => !isBlank(s));
 
 /**
  * One sentence on what the exhbt found, for portfolio cards and the featured band: the summary
@@ -371,8 +496,14 @@ export function exhbtSummary(d: Pick<ExhbtDoc, "summary" | "sections">): string 
   return first ? plain(first).trim() : "";
 }
 
-/** Every text a section puts on the page, for the word cap. Image alt text and link addresses don't show, so they're left out. The flowchart's marker has none: its boxes are doc.flow. */
+/**
+ * Every text a section puts on the page, for the word cap. Image alt text and link addresses don't show, so
+ * they're left out. The flowchart's marker has none: its boxes are doc.flow. A section with nothing to show
+ * (isBlank) puts nothing on the page, and a quote's role shows only with a name (decision 0032). A section's
+ * title is not counted, the person's own no more than the layout's ever was: it is one short line.
+ */
 export function sectionTexts(s: Section): string[] {
+  if (s.kind !== "flow" && isBlank(s)) return [];
   switch (s.kind) {
     case "flow":
       return [];
@@ -385,7 +516,7 @@ export function sectionTexts(s: Section): string[] {
     case "image":
       return [plain(s.caption)];
     case "quote":
-      return [s.text, s.name, s.role];
+      return said(s.name) ? [s.text, s.name, s.role] : [s.text];
     case "reflection":
       return [plain(s.text)];
     case "link":
@@ -403,7 +534,8 @@ export function sectionTexts(s: Section): string[] {
  * flowchart, every section (findings, every word on the graphs, image captions, the quote with its
  * name and role, what I'd do next, the link's label and description, the pull quote) and the
  * evidence label. Only image alt text and link addresses are left out: they aren't shown on the
- * page. A flowchart taken off the page (decision 0027) isn't counted.
+ * page. A flowchart taken off the page (decision 0027) isn't counted, nor is a section with nothing
+ * to show, nor any section's title (decision 0032; sectionTexts).
  */
 export function wordCount(d: ExhbtDoc): number {
   return [
@@ -460,14 +592,18 @@ function oneOf(kind: SectionKind, L: Limits): string {
   }
 }
 
-/** Whether the doc has what one of its layout's needs asks for (FORMAT_RULES[f].needs): read by validateForPublish and layoutNotes. */
-export function needMet(doc: ExhbtDoc, n: Need): boolean {
+/**
+ * Whether the doc has what one of its layout's needs asks for (FORMAT_RULES[f].needs). `counts` says which
+ * sections count towards it: every one that is there (layoutNotes, for the classic editor's list), or only
+ * those with something to show a visitor (suggestionsFor passes `(s) => !isBlank(s)`).
+ */
+export function needMet(doc: ExhbtDoc, n: Need, counts: (s: ContentSection) => boolean = () => true): boolean {
   switch (n.need) {
     case "count":
-      return n.kinds.reduce((sum, k) => sum + sectionsOf(doc, k).length, 0) >= n.min;
+      return n.kinds.reduce((sum, k) => sum + sectionsOf(doc, k).filter(counts).length, 0) >= n.min;
     case "results":
       // The work's own graph or results table, picked in place of a drafted graph (decision 0025), shows what came of the work as a graph does.
-      return doc.sections.some((s) => s.kind === "findings" || s.kind === "graph" || (s.kind === "image" && (s.picked?.kind === "graph" || s.picked?.kind === "table")));
+      return doc.sections.some((s) => isContent(s) && counts(s) && (s.kind === "findings" || s.kind === "graph" || (s.kind === "image" && (s.picked?.kind === "graph" || s.picked?.kind === "table"))));
     case "stages": {
       const images = sectionsOf(doc, "image");
       return images.some((s) => s.stage === "before") && images.some((s) => s.stage === "after");
@@ -481,18 +617,35 @@ export function needMet(doc: ExhbtDoc, n: Need): boolean {
  * What stops publishing. Each issue has a path the editor can point at
  * (e.g. "flow.2.step", "sections.0.items.1"). Empty means it can be published.
  *
+ * Since decision 0032 (Rory, 26 Nov 2026: "optionality in filling in all sections or not") nothing has to
+ * be filled in, and what a layout usually has is a suggestion (suggestionsFor), not a rule. What is left is
+ * what keeps a page honest, readable by everyone and in one piece:
+ *  - a title, and something on the page besides it (hasBody);
+ *  - the page's total of words (decision 0030);
+ *  - a description for each picture, and the tick that a figure taken from the person's files may be shared;
+ *  - the most there may be of each thing, and the room a one-line field has: the title, the sidebar's
+ *    facts, a skill, a flowchart box and its detail, a quote's name and role, a link's label, a section's
+ *    own title;
+ *  - links that open: https only, in formatted text, in a link section and for the work; a link section with
+ *    words but no address (except where the layout lets a source go without one);
+ *  - a graph that has been started: its own checks (lib/exhbt/charts.ts), because half a graph misleads.
+ * A section with nothing to show (isBlank) and a flowchart box with no words are not drawn, so they are not
+ * checked either. The server adds the plan, the username, the "this is my work" tick and the numbers to check.
+ *
  * Most paths name a field on the page. These name none, and the new editor puts an anchor on the
  * page for each (decision 0026); a new shape of path added here must be given one there too:
  *  - ""                  the whole exhbt: the word cap, and a doc that can't be read at all.
- *  - "sections"          how many of a kind (more than the layout allows), what the layout needs
- *                        (each need but My role), and research's cap on graphs and images together.
- *  - "flow"              how many boxes the flowchart has (too few or too many).
+ *  - "sections"          how many of a kind (more than the layout allows), and research's cap on graphs
+ *                        and images together.
+ *  - "flow"              how many boxes the flowchart has (too many).
  *  - "skills"            how many skills there are (too many).
- *  - "sections.N.items"  how many findings that findings section has (too few or too many).
+ *  - "sections.N.items"  how many findings that findings section has (too many).
  *  - "sections.N.chart…" anything inside graph N (its title, rows, series, points, tiles, labels):
  *                        a graph's figures are edited in its sheet, not on the page.
  * Some name a field the page doesn't draw, edited in an edit-only control over its part instead:
  * "sections.N.alt", "sections.N.href", "sections.N.picked.shareOk", and "evidence" (the work, in the sidebar).
+ * "A title alone is not a page" is reported at "gap", the first thing under the title: it is empty whenever
+ * that issue arises, so, like any empty field, it is not mentioned until the person tries to publish.
  */
 export function validateForPublish(d: ExhbtDoc): Issue[] {
   const out: Issue[] = [];
@@ -507,6 +660,7 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
   const L = formatLimits(F);
   const kinds = new Set<SectionKind>(FORMAT_RULES[F].kinds);
   const httpsOnly = (rt: RichText, path: string) => need(!rt.some((r) => r.href !== undefined && safeHref(r.href) === null), path, "Links must start with https://.");
+  const titled = (own: string | undefined, path: string) => need((own ?? "").length <= L.sectionTitleChars, path, `Keep this title to ${L.sectionTitleChars} characters.`);
 
   need(doc.title.trim().length > 0, "title", "Add a title.");
   need(doc.title.length <= L.titleChars, "title", `Keep the title to ${L.titleChars} characters.`);
@@ -515,48 +669,37 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
   need((doc.myRole ?? "").length <= L.myRoleChars, "myRole", `Keep "My role" to ${L.myRoleChars} characters.`);
 
   need(doc.skills.length <= L.skills.max, "skills", `Up to ${L.skills.max} skills.`);
-  doc.skills.forEach((s, i) => {
-    need(s.trim().length > 0, `skills.${i}`, "Fill in this skill or remove it.");
-    need(words(s) <= L.skills.wordsEach && s.length <= L.skills.charsEach, `skills.${i}`, "Keep each skill short.");
-  });
+  doc.skills.forEach((s, i) => need(words(s) <= L.skills.wordsEach && s.length <= L.skills.charsEach, `skills.${i}`, "Keep each skill short."));
 
-  need(words(plain(doc.gap)) > 0, "gap", FORMAT_COPY[F].gapMissing);
   httpsOnly(doc.gap, "gap");
+  // A title alone is not a page. Reported at the context line, which is empty whenever this arises.
+  need(hasBody(doc), "gap", "Add something besides the title: a line of context here, or a section below.");
 
-  // A flowchart taken off the page (decision 0027) is kept, not checked.
+  // A flowchart taken off the page (decision 0027) is kept, not checked. A box with no words is not drawn.
   if (flowShown(doc)) {
-    need(doc.flow.length >= L.flow.min, "flow", `The flowchart needs at least ${L.flow.min} boxes.`);
     need(doc.flow.length <= L.flow.max, "flow", `Up to ${L.flow.max} boxes in the flowchart.`);
     doc.flow.forEach((s, i) => {
-      need(s.step.trim().length > 0, `flow.${i}.step`, "Type in this box or remove it.");
       need(words(s.step) <= L.flow.stepWords, `flow.${i}.step`, `Keep each box to ${L.flow.stepWords} words.`);
       need(words(s.detail ?? "") <= L.flow.detailWords, `flow.${i}.detail`, `Keep the detail to ${L.flow.detailWords} words.`);
     });
+    titled(doc.flowTitle, "flowTitle");
   }
+  titled(doc.refsTitle, "refsTitle");
 
-  // Sections: how many of each (more than the layout allows is an error; nothing is hidden), and what the layout needs.
+  // Sections: how many of each (more than the layout allows is an error; nothing is hidden), and research's cap on graphs and images together.
   for (const kind of SECTION_KINDS) if (kinds.has(kind)) need(sectionsOf(doc, kind).length <= L.sections[kind], "sections", oneOf(kind, L));
   const nFigures = sectionsOf(doc, "image").length + sectionsOf(doc, "graph").length;
-  // Research's cap on graphs and images together is checked straight after its need for a figure, or after every need when there is none.
-  const figuresCap = () => need(L.maxFigures === null || nFigures <= L.maxFigures, "sections", `Up to ${L.maxFigures} figures, graphs and images together.`);
-  const isFigureNeed = (n: Need) => n.need === "count" && n.kinds.includes("graph") && n.kinds.includes("image");
-  for (const n of FORMAT_RULES[F].needs) {
-    need(needMet(doc, n), n.need === "myRole" ? "myRole" : "sections", n.message);
-    if (isFigureNeed(n)) figuresCap();
-  }
-  if (!FORMAT_RULES[F].needs.some(isFigureNeed)) figuresCap();
+  need(L.maxFigures === null || nFigures <= L.maxFigures, "sections", `Up to ${L.maxFigures} figures, graphs and images together.`);
 
   doc.sections.forEach((s, n) => {
-    if (s.kind === "flow" || !kinds.has(s.kind)) return;
+    // A kind the layout doesn't draw, and a section with nothing to show: kept, not drawn, so not checked.
+    if (s.kind === "flow" || !kinds.has(s.kind) || isBlank(s)) return;
     const p = `sections.${n}`;
     switch (s.kind) {
       case "findings":
-        need(s.items.length >= L.findings.min, `${p}.items`, `Add at least ${L.findings.min} findings.`);
+        titled(s.title, `${p}.title`);
         need(s.items.length <= L.findings.max, `${p}.items`, `Up to ${L.findings.max} findings.`);
-        s.items.forEach((f, i) => {
-          need(words(plain(f)) > 0, `${p}.items.${i}`, "Fill in this finding or remove it.");
-          httpsOnly(f, `${p}.items.${i}`);
-        });
+        s.items.forEach((f, i) => httpsOnly(f, `${p}.items.${i}`));
         break;
       case "graph":
         out.push(...chartIssues(s.chart, `${p}.chart`));
@@ -568,31 +711,25 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
         httpsOnly(s.caption, `${p}.caption`);
         break;
       case "quote":
-        need(words(s.text) > 0, `${p}.text`, "Type in the quote or remove it.");
-        need(s.name.trim().length > 0, `${p}.name`, "Say who said it.");
+        titled(s.title, `${p}.title`);
+        httpsOnly(s.textRuns ?? [], `${p}.text`);
         need(s.name.length <= L.quote.nameChars, `${p}.name`, `Keep the name to ${L.quote.nameChars} characters.`);
         need(s.role.length <= L.quote.roleChars, `${p}.role`, `Keep the role to ${L.quote.roleChars} characters.`);
         break;
       case "reflection":
-        need(words(plain(s.text)) > 0, `${p}.text`, "Say what you'd do next, or remove this.");
+      case "aim":
+      case "conclusion":
+        titled(s.title, `${p}.title`);
         httpsOnly(s.text, `${p}.text`);
         break;
       case "link":
         // A layout may allow a link with no address (an essay's sources); one it has must still be https.
         need(safeHref(s.href) !== null || (L.link.hrefOptional && s.href.trim() === ""), `${p}.href`, "Use a full https:// link.");
-        need(s.label.trim().length > 0, `${p}.label`, "Say what the link is.");
         need(words(s.label) <= L.link.labelWords, `${p}.label`, `Keep the label to ${L.link.labelWords} words.`);
-        break;
-      case "aim":
-        need(words(plain(s.text)) > 0, `${p}.text`, "Write your aim or hypothesis, or remove this.");
-        httpsOnly(s.text, `${p}.text`);
-        break;
-      case "conclusion":
-        need(words(plain(s.text)) > 0, `${p}.text`, "Write your conclusion, or remove this.");
-        httpsOnly(s.text, `${p}.text`);
+        httpsOnly(s.descriptionRuns ?? [], `${p}.description`);
         break;
       case "pullquote":
-        need(words(s.text) > 0, `${p}.text`, "Type in the pull quote or remove it.");
+        httpsOnly(s.textRuns ?? [], `${p}.text`);
         break;
     }
   });
@@ -600,6 +737,32 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
   if (doc.evidence?.kind === "link") need(safeHref(doc.evidence.href) !== null, "evidence", "Use a full https:// link to the work.");
 
   need(wordCount(doc) <= L.totalWords, "", `Keep the whole exhbt to ${L.totalWords} words (it's ${wordCount(doc)}).`);
+  return out;
+}
+
+/**
+ * What the editor suggests and nothing requires (decision 0032): what a page of the doc's layout usually
+ * has and this one lacks (FORMAT_RULES[f].needs, in their order and words), then a flowchart of fewer boxes
+ * than most have, then a findings section of fewer points than most have. Only what a visitor would see
+ * counts, so an aim section with no words does not answer "Add your aim or hypothesis". Each has a path as an
+ * issue has, for the jump: "sections" (the "+" at the end of the page), "myRole", "flow", "sections.N.items".
+ * None of them stops publishing, counts in "things to fix" or marks a field. Empty for a doc that can't be read.
+ */
+export function suggestionsFor(d: ExhbtDoc): Issue[] {
+  const parsed = ExhbtDocSchema.safeParse(d);
+  if (!parsed.success) return [];
+  const doc = parsed.data;
+  const F = formatOf(doc);
+  const L = formatLimits(F);
+  const drawn = (s: ContentSection) => !isBlank(s);
+  const out: Issue[] = FORMAT_RULES[F].needs.filter((n) => !needMet(doc, n, drawn)).map((n) => ({ path: n.need === "myRole" ? "myRole" : "sections", message: n.message }));
+  const boxes = flowShown(doc) ? filledFlow(doc.flow).length : 0;
+  if (boxes > 0 && boxes < L.flow.min) out.push({ path: "flow", message: `Most flowcharts have at least ${L.flow.min} boxes. Add another if it helps.` });
+  for (const { s, i } of shownSections(doc)) {
+    if (s.kind !== "findings") continue;
+    const points = s.items.filter(hasWords).length;
+    if (points > 0 && points < L.findings.min) out.push({ path: `sections.${i}.items`, message: `Most pages have at least ${L.findings.min} points here. Add another if you have one.` });
+  }
   return out;
 }
 
@@ -613,23 +776,38 @@ export function validateForPublish(d: ExhbtDoc): Issue[] {
  * The published copy keeps the order (decision 0027): the flowchart's marker stays where it is and
  * flowOff is kept, so an arranged doc goes live as arranged. A flowchart taken off the page goes live
  * with no boxes (`flow: []`); its boxes stay in the working copy.
+ *
+ * It holds only what a visitor is shown (decision 0032): a section with nothing in it, a finding or a
+ * flowchart box with no words, an empty skill and a role with no name all stay in the working copy.
+ * The marker and the order are never changed for that: a flowchart with no box left goes live with its
+ * marker and `flow: []`, and the page draws no flowchart for it.
  */
 export function publicDoc(raw: ExhbtDoc): ExhbtDoc {
   const d = normaliseDoc(raw);
-  return {
-    ...d,
-    ...(flowShown(d) ? {} : { flow: [] }),
-    // A kind the layout doesn't draw stays in the working copy, not in what employers see.
-    sections: d.sections.filter((s) => s.kind === "flow" || isShown(d, s)).map((s) => {
-      if (s.kind === "graph") return { ...s, chart: publicChart(s.chart) };
-      if (s.kind === "image" && s.picked) {
+  const sections = d.sections.flatMap((s): Section[] => {
+    if (s.kind === "flow") return [s];
+    // A kind the layout doesn't draw, and a section with nothing to show, stay in the working copy, not in what employers see.
+    if (!isShown(d, s) || isBlank(s)) return [];
+    switch (s.kind) {
+      case "graph":
+        return [{ ...s, chart: publicChart(s.chart) }];
+      case "image": {
+        if (!s.picked) return [s];
         const rest = { ...s };
         delete rest.picked;
-        return rest;
+        return [rest];
       }
-      return s;
-    }),
-  };
+      case "findings":
+        return [s.items.every(hasWords) ? s : { ...s, items: s.items.filter(hasWords) }];
+      case "quote":
+        return [said(s.name) || !said(s.role) ? s : { ...s, role: "" }];
+      default:
+        return [s];
+    }
+  });
+  const next: ExhbtDoc = { ...d, flow: flowShown(d) ? filledFlow(d.flow) : [], sections };
+  if (d.skills.some((s) => !said(s))) next.skills = d.skills.filter(said);
+  return next;
 }
 
 /** Plain text to runs, for drafts and for tests. */

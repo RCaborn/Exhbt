@@ -287,7 +287,8 @@ export function withWorkVisual(doc: ExhbtDoc, visual: WorkVisual, opts: { wants?
  * Pure: every number comes from formatLimits.
  *  - hidden: the kinds the layout keeps but doesn't draw ("Aim or hypothesis").
  *  - over: a drawn kind with more than the layout allows (a publishing error; nothing is hidden).
- *  - missing: what the layout needs that isn't there yet, with the kind to add where one button fixes it.
+ *  - missing: what a page of this layout usually has that isn't there yet, with the kind to add where one
+ *    button fixes it. Suggestions since decision 0032: none of them stops publishing.
  */
 export function layoutNotes(doc: ExhbtDoc): { hidden: string[]; over: string[]; missing: { text: string; add?: SectionKind }[] } {
   const f = formatOf(doc);
@@ -311,17 +312,16 @@ export function layoutNotes(doc: ExhbtDoc): { hidden: string[]; over: string[]; 
   if (L.maxFigures !== null && figures > L.maxFigures) {
     over.push(`This layout shows up to ${L.maxFigures} figures, graphs and images together; you have ${figures}. Remove some before you publish, or switch back.`);
   }
-  // What the layout needs (its `needs`, in order), then empty findings. A case study lists nothing: the publish check says what it lacks.
+  // What the layout usually has (its `needs`, in order). A case study lists nothing here. An empty finding is no longer
+  // listed: a part left empty is not drawn for a visitor, so there is nothing to fill in or remove (decision 0032).
   const missing = FORMAT_RULES[f].needs.flatMap((n) => (needMet(doc, n) ? [] : missingOf(n, f)));
-  const emptyFindings = sectionsOf(doc, "findings").some((s) => s.items.some((it) => !words(it.map((r) => r.t).join(""))));
-  if (f !== "case-study" && emptyFindings) missing.push({ text: "Fill in or remove the empty findings" });
   return { hidden, over, missing };
 }
 
 const withArticle = (kind: SectionKind) => (kind === "image" ? "an image" : `a ${SECTION_NAMES[kind].toLowerCase()}`);
 const plural = (kind: SectionKind) => (kind === "image" ? "images" : `${SECTION_NAMES[kind].toLowerCase()}s`);
 
-/** One need, as the line the editor lists under "To finish this layout", with the kind to add where one button fixes it. */
+/** One need, as the line the classic editor lists under "Suggestions for this layout", with the kind to add where one button fixes it. */
 function missingOf(n: Need, f: Format): { text: string; add?: SectionKind }[] {
   const plainly = (message: string) => message.replace(/\.$/, "");
   switch (n.need) {
