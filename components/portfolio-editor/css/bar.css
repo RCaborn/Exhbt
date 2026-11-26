@@ -404,4 +404,30 @@
       padding-inline: var(--spacing-2);
     }
   }
+  /* The loading view's copy of the strip (bar/strip.tsx, StripStandIn): one copy for each width and
+     pointer the editor's strip can be drawn at, and only the one that applies is shown, so its room is
+     the room the editor's strip takes. The width is useNarrow's (under 48rem), the pointer useCoarse's. */
+  .pe-first-standin > [data-variant] {
+    display: none;
+  }
+  @media (width >= 48rem) and (not (pointer: coarse)) {
+    .pe-first-standin > [data-variant="wide-sm"] {
+      display: block;
+    }
+  }
+  @media (width >= 48rem) and (pointer: coarse) {
+    .pe-first-standin > [data-variant="wide-md"] {
+      display: block;
+    }
+  }
+  @media (width < 48rem) and (not (pointer: coarse)) {
+    .pe-first-standin > [data-variant="narrow-sm"] {
+      display: block;
+    }
+  }
+  @media (width < 48rem) and (pointer: coarse) {
+    .pe-first-standin > [data-variant="narrow-md"] {
+      display: block;
+    }
+  }
 }
