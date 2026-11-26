@@ -3,6 +3,8 @@ import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/Button";
 import { HeaderLinks } from "./HeaderLinks";
 import { MobileNav } from "./MobileNav";
+import { appNav } from "./app-nav";
+import type { PortfolioKind } from "@/lib/portfolio-kind";
 
 /** Signed out: the information pages. The roadmap button sits between them. */
 const NAV = [
@@ -13,13 +15,6 @@ const NAV = [
 /** The one marketing call to action that stays in the header. The page's own button is the mint one. */
 const ROADMAP = { href: "/roadmap/new", label: "Build your roadmap", variant: "secondary" } as const;
 
-/** The app: roadmaps, exhbts and the portfolio. Account is the corner control, not a nav item. Job links live on the portfolio page. */
-const APP_NAV = [
-  { href: "/roadmap", label: "Roadmaps" },
-  { href: "/exhbts", label: "Your exhbts" },
-  { href: "/portfolio", label: "Portfolio" },
-];
-
 export function Wordmark() {
   return <Logo href="/" />;
 }
@@ -29,13 +24,15 @@ export function Wordmark() {
  * (app/(app)/layout.tsx) reads the session on the server and passes `signedIn`, which swaps
  * the marketing links and "Log in" for the person's own links: no flash, no extra request.
  * With Phase 2 off (`phase2` false) there are no exhbts or portfolio yet, so the nav is just Roadmaps.
+ * `portfolio` is the structure the person gets (lib/portfolio-kind.ts); the nav for each is in app-nav.ts.
  * Job links are a section of the portfolio page, so the header does not list them.
  */
 export function SiteHeader({
   signedIn = false,
   phase2 = false,
-}: { signedIn?: boolean; phase2?: boolean } = {}) {
-  const nav = signedIn ? APP_NAV.filter((n) => phase2 || n.href === "/roadmap") : NAV;
+  portfolio = "steps",
+}: { signedIn?: boolean; phase2?: boolean; portfolio?: PortfolioKind } = {}) {
+  const nav = signedIn ? appNav(portfolio, phase2) : NAV;
   return (
     <header className="relative border-b border-line bg-surface">
       <div className="mx-auto flex max-w-[78rem] items-center justify-between gap-x-8 gap-y-3 px-4 py-4 sm:px-8">

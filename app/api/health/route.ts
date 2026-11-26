@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { AI_MODEL, ANTHROPIC_API_KEYS_ENV, anthropicApiKey } from "@/lib/ai/model";
 import { editorForEveryone } from "@/lib/editor-kind-server";
+import { portfolioKindForEveryone } from "@/lib/portfolio-kind-server";
 import { isSupabaseConfigured, supabaseAdmin } from "@/lib/store";
 import { isStripeConfigured, priceForPlan, stripe, PAID_PLANS } from "@/lib/stripe";
 
@@ -107,7 +108,12 @@ export async function GET(req: Request) {
   // everyone. An admin's own choice never shows here, even when an admin asks.
   const editor = await editorForEveryone();
   // ?only=editor answers at once, without the other checks (the end-to-end tests read it, and the full route calls Stripe).
-  if (new URL(req.url).searchParams.get("only") === "editor") return NextResponse.json({ editor }, { headers: { "Cache-Control": "no-store" } });
+  const only = new URL(req.url).searchParams.get("only");
+  if (only === "editor") return NextResponse.json({ editor }, { headers: { "Cache-Control": "no-store" } });
+  // The structure an ordinary person gets (lib/portfolio-kind.ts): "steps" until portfolio first is switched on for
+  // everyone; never an admin's own choice. ?only=portfolio answers at once, as ?only=editor does.
+  const portfolio = await portfolioKindForEveryone();
+  if (only === "portfolio") return NextResponse.json({ portfolio }, { headers: { "Cache-Control": "no-store" } });
   const settings: Record<string, boolean> = Object.fromEntries(REQUIRED.map((k) => [k, Boolean(process.env[k])]));
   // Read under either name (lib/ai/model.ts).
   settings[ANTHROPIC_API_KEYS_ENV] = Boolean(anthropicApiKey());
@@ -129,7 +135,7 @@ export async function GET(req: Request) {
     storage,
   };
   return NextResponse.json(
-    { ok, editor, settings, misnamed, database, ai, phase2 },
+    { ok, editor, portfolio, settings, misnamed, database, ai, phase2 },
     { status: ok ? 200 : 503, headers: { "Cache-Control": "no-store" } },
   );
 }

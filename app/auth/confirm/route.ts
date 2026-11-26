@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { safeNext, supabaseServer } from "@/lib/auth";
+import { landingAfterSignIn } from "@/lib/landing";
+import { portfolioKindForEveryone } from "@/lib/portfolio-kind-server";
+import { isPhase2Enabled } from "@/lib/site";
 import { recordReferralFromCookie } from "@/lib/referrals";
 import { getStore, isSupabaseConfigured } from "@/lib/store";
 
@@ -12,7 +15,7 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const tokenHash = url.searchParams.get("token_hash");
   const type = (url.searchParams.get("type") ?? "magiclink") as EmailOtpType;
-  const next = safeNext(url.searchParams.get("next"));
+  const next = safeNext(url.searchParams.get("next"), landingAfterSignIn("log-in", await portfolioKindForEveryone(), isPhase2Enabled()));
   const fail = NextResponse.redirect(new URL("/login?error=link", url.origin));
   if (!isSupabaseConfigured() || !tokenHash) return fail;
 

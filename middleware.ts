@@ -27,6 +27,8 @@ const SESSION_PATHS = [
   "/api/username",
   "/job-links",
   "/team",
+  "/portfolio",
+  "/api/portfolio",
 ];
 
 const notFound = () => new NextResponse("Not found", { status: 404, headers: { "Content-Type": "text/plain" } });
