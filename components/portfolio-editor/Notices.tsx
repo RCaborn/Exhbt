@@ -46,6 +46,10 @@ function KeptOffer(): ReactNode {
     // Once, as the editor opens: a refresh of the page's data is not a reload.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // A Banner is what is seen; the live region is what a screen reader hears (decision 0033).
+  useEffect(() => {
+    if (kept) api.say("Your last changes were not saved before the reload. You can put them back.");
+  }, [kept, api]);
   if (!kept) return null;
   return (
     <Banner
@@ -59,7 +63,6 @@ function KeptOffer(): ReactNode {
       endContent={
         <Button
           size="sm"
-          variant="primary"
           onClick={() => {
             api.change(() => kept, PUT_BACK);
             api.say("Your changes are back on the page.");
@@ -113,6 +116,11 @@ function useOtherTab(): boolean {
 
 function OtherTab(): ReactNode {
   const open = useOtherTab();
+  const api = usePortfolioApi();
+  useEffect(() => {
+    if (open) api.say("This page is open in another tab. The last change saved wins.");
+  }, [open, api]);
   if (!open) return null;
-  return <Banner status="warning" data-other-tab title="This page is open in another tab" description="The last change saved wins." isDismissable />;
+  // Information, not something gone wrong: info, not warning (decision 0033).
+  return <Banner status="info" data-other-tab title="This page is open in another tab" description="The last change saved wins." isDismissable />;
 }

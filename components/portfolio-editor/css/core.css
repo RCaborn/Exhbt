@@ -99,10 +99,23 @@
     min-width: 100%;
   }
   /* The tile the address pointed at (?at=): an outline in the look's link colour for two seconds. An
-     outline, so nothing moves. */
+     outline, so nothing moves. It draws in on the theme's motion tokens, and is simply there under
+     reduced motion. */
   [data-editor="portfolio"] [data-marked] {
     outline: 3px solid var(--pf-accent);
     outline-offset: 4px;
     border-radius: var(--pf-radius);
+    animation: pe-mark var(--duration-slow) var(--ease-entrance) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-editor="portfolio"] [data-marked] {
+      animation: none;
+    }
+  }
+  @keyframes pe-mark {
+    from {
+      outline-color: transparent;
+      outline-offset: 12px;
+    }
   }
 }
