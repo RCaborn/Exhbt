@@ -3,15 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import type { PortfolioPerson } from "@/components/portfolio/PortfolioPage";
 import type { Plan } from "@/lib/entitlements";
-import { normaliseLinkedin } from "@/lib/cv-contact";
-import { checkTiles } from "@/lib/portfolio-customise";
-import { normaliseGithub, normaliseWebsite, SECTION_NAMES, tileKindsShownBy } from "@/lib/portfolio-layout";
+import { SECTION_NAMES } from "@/lib/portfolio-layout";
 import { profileProblems, type ProfileDraft } from "@/lib/portfolio-profile";
 import { DEFAULT_THEME, themeById } from "@/lib/portfolio-themes";
 import { useHydrated } from "@/lib/use-hydrated";
 import { saveBuilderAction } from "./actions";
+import { personOf, problemOf } from "./builder-state";
 import { homeFrom, Preview } from "./Preview";
 import { StepLook } from "./StepLook";
 import { StepProjects } from "./StepProjects";
@@ -43,7 +41,7 @@ const INTROS: Record<Step, string> = {
 
 const STATUS_TEXT = { saved: "Saved", pending: "Saving soon", saving: "Saving" } as const;
 
-type Props = {
+export type BuilderProps = {
   step: Step;
   initial: BuilderState;
   projects: BuilderProject[];
@@ -57,32 +55,7 @@ type Props = {
   viewHref: string | null;
 };
 
-/** The first thing stopping a save, or null. */
-function problemOf(s: BuilderState): string | null {
-  return Object.values(profileProblems(s.profile))[0] ?? Object.values(checkTiles(s.arrangement.tiles, tileKindsShownBy(s.arrangement.sections)).problems)[0] ?? null;
-}
-
-/** The person as the preview draws them: what's typed, with links only once they're real https addresses. */
-function personOf(p: ProfileDraft, username: string | null, photoUrl: string | null, showLinkedin: boolean): PortfolioPerson {
-  const email = p.contactEmail.trim();
-  return {
-    username,
-    name: p.name.trim() || username || "Your name",
-    headline: p.headline.trim() || null,
-    bio: p.bio.trim() || null,
-    location: p.location.trim() || null,
-    lookingFor: p.lookingFor.trim() || null,
-    photoUrl,
-    links: {
-      linkedin: showLinkedin && p.linkedin ? normaliseLinkedin(p.linkedin) : null,
-      github: p.github ? normaliseGithub(p.github) : null,
-      website: p.website ? normaliseWebsite(p.website) : null,
-      email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email.toLowerCase() : null,
-    },
-  };
-}
-
-export function Builder(props: Props) {
+export function Builder(props: BuilderProps) {
   const { initial, projects, drafts, photoUrl, username, plan, addressBlocked, locks, savedButLocked, viewHref } = props;
   const ready = useHydrated();
   const { state, status, change, undo, undoable, retry } = useBuilder<BuilderState>(initial, saveBuilderAction, problemOf);

@@ -117,15 +117,16 @@ export type BuilderSaveResult =
 const BuilderSchema = z.object({ profile: ProfileDraftSchema, arrangement: CustomiseSchema });
 
 /**
- * Saves the builder's whole state: the "You" fields and the arrangement (look, order, hidden,
- * featured, extra tiles, header bits). The page sends it about half a second after each change.
+ * Checks and stores the whole state: the "You" fields and the arrangement (look, order, hidden,
+ * featured, extra tiles, header bits). The one function both save actions below call, so the step
+ * builder and the one-page editor are held to exactly the same rules.
  *
  * The arrangement keeps the customiser's rules (decision 0014): only their exhbts the plan lists,
  * each once, any it missed on the end; extra tiles only on a plan that has them (saved ones are kept
  * where they were otherwise); the look only if the plan has it, and sending back the look already
  * showing never overwrites a stored choice that is held after a downgrade.
  */
-export async function saveBuilderAction(raw: unknown): Promise<BuilderSaveResult> {
+async function saveState(raw: unknown): Promise<BuilderSaveResult> {
   if (!isPhase2Enabled()) return { ok: false, error: OFF };
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: SIGNED_OUT };
@@ -199,8 +200,27 @@ export async function saveBuilderAction(raw: unknown): Promise<BuilderSaveResult
     hiddenIds: [...hidden, ...keptHidden],
     order: positions,
   });
-  revalidate();
   return { ok: true, savedAt: new Date().toISOString() };
+}
+
+/**
+ * The step builder's save (decision 0016). The page sends its whole state about half a second after
+ * each change; `saveState` checks and stores it, and the pages that list it are drawn afresh.
+ */
+export async function saveBuilderAction(raw: unknown): Promise<BuilderSaveResult> {
+  const result = await saveState(raw);
+  if (result.ok) revalidate();
+  return result;
+}
+
+/**
+ * The one-page portfolio editor's save (decision 0031, "Saving"): the same checks and the same writes
+ * as the step builder's, without `revalidate()`. The editor is the page being edited: revalidating its
+ * own path would send the whole page back with every save and draw it again under the person's cursor.
+ * What other pages show of the portfolio is read afresh when they are opened.
+ */
+export async function savePortfolioAction(raw: unknown): Promise<BuilderSaveResult> {
+  return saveState(raw);
 }
 
 /* ---------- "Suggest an intro" ---------- */

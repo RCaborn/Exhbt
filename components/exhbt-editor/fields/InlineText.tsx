@@ -41,6 +41,7 @@ function useFieldSizing(): boolean {
 const oneLine = (s: string) => s.replace(/\r?\n/g, " ");
 
 type Props = { path: string; value: string; label: string; placeholder: string; id: string; maxChars?: number; issue: string; onText(t: string): void };
+export type { Props as PlainFieldProps };
 
 /** Memoised: the page parts draw it with plain values, so it draws again only when its own words, name or place change. */
 export const InlineText = memo(function InlineText({ path: given, value, label, placeholder, id, maxChars }: TextSlot) {
@@ -64,7 +65,7 @@ export const InlineText = memo(function InlineText({ path: given, value, label, 
   );
 });
 
-function BlockText({ path, value, label, placeholder, id, maxChars, issue, onText }: Props) {
+export function BlockText({ path, value, label, placeholder, id, maxChars, issue, onText }: Props) {
   const forced = useContext(GrowContext);
   const supported = useFieldSizing();
   const mirror = forced === "mirror" || !supported;
@@ -103,7 +104,7 @@ function BlockText({ path, value, label, placeholder, id, maxChars, issue, onTex
   );
 }
 
-function InlineSpan({ path, value, label, placeholder, id, issue, onText }: Props) {
+export function InlineSpan({ path, value, label, placeholder, id, issue, onText }: Props) {
   const ref = useRef<HTMLSpanElement>(null);
   // The words are the DOM's own while the person types; they are written in only when they differ (a change from outside).
   useLayoutEffect(() => {
