@@ -6,14 +6,13 @@ import { Eye, Plus } from "lucide-react";
 import { createFromScratch } from "@/app/(app)/exhbts/[id]/actions";
 import type { OwnerOnlyExhbt } from "@/app/(app)/portfolio/load";
 import type { HomeOwnerPlace } from "@/components/portfolio/home-ctx";
-import { bandButtonClass, ROWS, WRAP } from "@/components/portfolio/PortfolioHome";
+import { bandButtonClass, ROWS, WorkRow, WRAP } from "@/components/portfolio/PortfolioHome";
 import { usePortfolioApi, usePortfolioData, usePortfolioState, usePortfolioUi } from "../runtime";
 import { showTile } from "../sections/arrange";
 import { AddSection } from "../sections/AddSection";
 import { W } from "../sections/words";
 import { lookOf } from "../home-props";
 import { useArranged, useWorkTreatment } from "./arranged";
-import { WorkRowLike } from "./WorkRowLike";
 
 /*
  * What only the owner sees on the page (brief F, steps 6 to 9), all in the person's own look, since it
@@ -70,10 +69,12 @@ function PageEnd(): ReactNode {
 
 function Parts({ shape, list }: { shape: "card" | "row"; list: boolean }): ReactNode {
   const { ownerOnly } = usePortfolioData();
+  // In the index look the owner's rows go on numbering after the work's.
+  const work = useArranged().work.length;
   const items = (
     <>
-      {ownerOnly.map((e) => (
-        <OwnerTile key={e.id} exhbt={e} shape={shape} />
+      {ownerOnly.map((e, i) => (
+        <OwnerTile key={e.id} exhbt={e} shape={shape} n={work + i} />
       ))}
       <AddTile shape={shape} />
       <HiddenRow shape={shape} />
@@ -93,7 +94,8 @@ function Chip({ children }: { children: ReactNode }): ReactNode {
 }
 
 /** A draft or an exhbt over the plan's limit: never dragged or starred, since the server does not arrange it. */
-function OwnerTile({ exhbt: e, shape }: { exhbt: OwnerOnlyExhbt; shape: "card" | "row" }): ReactNode {
+function OwnerTile({ exhbt: e, shape, n }: { exhbt: OwnerOnlyExhbt; shape: "card" | "row"; n: number }): ReactNode {
+  const treatment = useWorkTreatment();
   const draft = e.why === "draft";
   const chip = <Chip>{draft ? W.draft : W.overLimit}</Chip>;
   const action = (
@@ -105,7 +107,12 @@ function OwnerTile({ exhbt: e, shape }: { exhbt: OwnerOnlyExhbt; shape: "card" |
   if (shape === "row") {
     return (
       <li data-owner="owner-only" data-tile={e.id} data-why={e.why}>
-        <WorkRowLike title={e.title} summary={why} chip={chip} action={action} />
+        {/* The look's own row (PortfolioHome's WorkRow), then what only the owner sees, under its words. */}
+        <WorkRow project={{ title: e.title, summary: why, href: null }} n={n} look={treatment === "index" ? "index" : "list"} inert />
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pb-4 pl-[1.875rem]">
+          {chip}
+          {action}
+        </div>
       </li>
     );
   }
