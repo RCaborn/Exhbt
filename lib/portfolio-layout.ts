@@ -78,7 +78,8 @@ export const lineWords = (line: string) => countWords(splitYear(line).label);
 const LineSchema = z
   .string()
   .transform(oneLine)
-  .refine((s) => lineWords(s) <= TILE_LIMITS.lineWords && s.length <= TILE_LIMITS.lineChars, `Keep each line to ${TILE_LIMITS.lineWords} words or fewer, not counting the year.`);
+  .refine((s) => lineWords(s) <= TILE_LIMITS.lineWords, `Keep each line to ${TILE_LIMITS.lineWords} words or fewer, not counting the year.`)
+  .refine((s) => s.length <= TILE_LIMITS.lineChars, `Keep each line to ${TILE_LIMITS.lineChars} characters or fewer.`);
 const LinesSchema = z
   .array(LineSchema)
   .max(TILE_LIMITS.lines, `Use up to ${TILE_LIMITS.lines} lines.`)

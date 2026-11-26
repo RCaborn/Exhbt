@@ -16,9 +16,12 @@ Written by agent E on 26 Nov 2026 for whoever takes over E's files. Read `e-edit
   - a line's limit no longer counts its year (`lineWords`, `lib/portfolio-layout.ts`);
   - See as a visitor says why nothing is live, by case;
   - the Back check allows the servers' clocks two seconds (below, "The Back fix's limit").
-- **Not done:**
-  - the Back tests on a production build. Sign-in needs `/auth/dev` to honour `EXHBT_ALLOW_MEMORY_STORE`, which is B's file. The two tests in "Coming back to the page, with nothing of development's" are ready for it.
-  - nothing has run on WebKit itself.
+- **On a production build:** `npx playwright test -c playwright.prod.config.ts` builds the app and runs "Coming back to the page, with nothing of development's" against `next start`. It uses the stand-in store with `EXHBT_ALLOW_MEMORY_STORE`, and it signs in through `/auth/dev`.
+  - `/auth/dev` honours that switch only when Supabase is not configured.
+  - Checked by hand with `next start`: with Supabase settings present it answers 404 both with and without the switch, and it also answers 404 with neither.
+  - On 26 Nov both tests passed on the production build. Back behaved as on the development server: two fetches of the page, no wait on the stand-in.
+  - One difference: in production the header's link prefetches `/portfolio`.
+- **Not done:** nothing has run on WebKit itself.
 
 
 - **Milestone 1** is merged into `phase-2-pf2` (67e13c8).

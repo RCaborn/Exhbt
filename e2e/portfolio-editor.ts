@@ -88,22 +88,26 @@ export async function openEditor(page: Page, fixture: PortfolioFixture, opts: { 
  * server's own EXHBT_PORTFOLIO=page, which a production run must set. Opens /portfolio and waits for the
  * editor. It reads nothing of the editor's development handle.
  *
- * Not yet runnable on `next build` + `next start`: with no Supabase, sign-up there answers "try later"
- * (lib/password-auth.ts) and the only way to a session is /auth/dev, which is off in production. Run with
- * EXHBT_ALLOW_MEMORY_STORE=1 (the stand-in store's own switch, which only matters when no Supabase is
- * configured), the store works; a session still needs /auth/dev to honour the same switch.
+ * On a production build (playwright.prod.config.ts sets E2E_PROD) the session comes from /auth/dev, which
+ * EXHBT_ALLOW_MEMORY_STORE opens there with no database; in development, from the site's own sign-up.
  */
 export async function signUpToEditor(page: Page, tag: string): Promise<{ email: string }> {
   const email = `pe-${tag}-${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}@example.com`;
   const password = "correct-horse-battery";
-  const kind = await page.request.get("/dev/portfolio-kind?kind=page", { maxRedirects: 0 });
-  expect([307, 404], "the development cookie's route answers, or is off as in production").toContain(kind.status());
-  await page.goto("/login/new?next=%2Faccount");
-  await expect(page.locator("form[data-ready=true]")).toBeAttached();
-  await page.getByLabel("Email address").fill(email);
-  await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByLabel("Confirm password").fill(password);
-  await page.getByRole("button", { name: "Create account" }).click();
+  if (process.env.E2E_PROD) {
+    // A production build (playwright.prod.config.ts): EXHBT_PORTFOLIO=page is the server's, and a session
+    // comes from /auth/dev, which EXHBT_ALLOW_MEMORY_STORE opens there; sign-up with a password does not
+    // work without a database in production. No /dev route is asked for.
+    await page.goto(`/auth/dev?email=${encodeURIComponent(email)}&next=%2Faccount`);
+  } else {
+    await setKind(page, "page");
+    await page.goto("/login/new?next=%2Faccount");
+    await expect(page.locator("form[data-ready=true]")).toBeAttached();
+    await page.getByLabel("Email address").fill(email);
+    await page.getByLabel("Password", { exact: true }).fill(password);
+    await page.getByLabel("Confirm password").fill(password);
+    await page.getByRole("button", { name: "Create account" }).click();
+  }
   await expect(page).toHaveURL(/\/account$/);
   await page.goto("/portfolio");
   await waitReady(page);
