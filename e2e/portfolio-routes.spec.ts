@@ -60,8 +60,10 @@ test.describe("the exhbts list", () => {
     // The hash of a sent email's link stays with the browser across the redirect. (From another page: a
     // change of hash alone on the list's own address would not load it again.)
     await page.goto("/account");
-    await page.goto("/exhbts#team-projects");
-    await expect(page).toHaveURL(/\/portfolio#team-projects$/);
+    // Caught as the page commits: the portfolio editor takes the hash out of the address once it acts on it.
+    const landed = page.waitForURL(/\/portfolio#team-projects$/, { waitUntil: "commit" });
+    await page.goto("/exhbts#team-projects", { waitUntil: "commit" });
+    await landed;
   });
 });
 
@@ -89,7 +91,7 @@ test.describe("the exhbt editor's way back", () => {
     await back.click();
     await page.waitForTimeout(500);
     await expect(page).toHaveURL(new RegExp(`/exhbts/${id}/edit$`));
-    await page.waitForURL(new RegExp(`/portfolio\\?at=${id}$`));
+    await page.waitForURL(new RegExp(`/portfolio\\?at=${id}$`), { waitUntil: "commit" });
     expect((await readStored(page, id)).working.title).toBe(title);
   });
 });
@@ -119,7 +121,7 @@ test.describe("what follows a publish", () => {
     await openPublish(page);
     await sheet(page).getByLabel("This is my work, and the numbers are true").check();
     await sheet(page).getByRole("button", { name: "Publish", exact: true }).click();
-    await page.waitForURL(new RegExp(`/portfolio\\?at=${id}$`));
+    await page.waitForURL(new RegExp(`/portfolio\\?at=${id}$`), { waitUntil: "commit" });
     expect((await readStored(page, id)).published?.title).toBe(openBankingDoc.title);
 
     // Already live: publishing changes stays in the editor, with today's live panel.
@@ -242,7 +244,7 @@ test.describe("team invites", () => {
     await expect(page.locator("form[data-ready=true]")).toBeAttached();
     await page.getByLabel("Your name, as it shows on the project").fill("Sam Teammate");
     await page.getByRole("button", { name: "Join the team" }).click();
-    await page.waitForURL(/\/portfolio\?joined=1/);
+    await page.waitForURL(/\/portfolio\?joined=1/, { waitUntil: "commit" });
 
     await page.goto(link);
     await expect(page.getByRole("heading", { level: 1, name: "You're on this project" })).toBeVisible();
@@ -275,7 +277,7 @@ test.describe("roadmap ideas", () => {
     await expect(add.first()).toHaveText("Add as an exhbt");
     await expect(page.getByRole("button", { name: /^Build this as an exhbt/ })).toHaveCount(0);
     await add.first().click();
-    await page.waitForURL(/\/portfolio\?at=[0-9a-f-]{36}$/);
+    await page.waitForURL(/\/portfolio\?at=[0-9a-f-]{36}$/, { waitUntil: "commit" });
 
     await page.goto(`${roadmap}?view=projects`);
     await add.nth(1).click();
