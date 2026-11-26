@@ -306,6 +306,16 @@
     gap: 1rem;
     align-content: start;
   }
+  /*
+   * The space for her best project, drawn as a space: a flat mist panel as tall as the column, so
+   * the screen shows a place that asks to be filled, not a line of advice (the page for Rory, "a big
+   * 'Your best project goes here' panel and one button"). Flat: only the work is raised.
+   */
+  .app-first-next:has(.astryx-empty-state) {
+    border-radius: var(--radius-container);
+    background: var(--color-mist);
+    padding: clamp(1.25rem, 3vw, 2rem);
+  }
   @media (width >= 1024px) {
     .app-first-grid {
       grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
@@ -314,9 +324,16 @@
     .app-first-now {
       gap: 2.5rem;
     }
-    /* The empty state starts level with the loud line. */
+    /* The answer to the step (done, or loading) starts level with the loud line. */
     .app-first-next {
       padding-top: 4rem;
+    }
+    /* The empty space runs the height of the column, beside her page. */
+    .app-first-next:has(.astryx-empty-state) {
+      align-self: stretch;
+      align-content: center;
+      margin-top: 2.5rem;
+      padding: 2.5rem;
     }
   }
   /* The empty state's picture: an example exhbt, smaller and less raised than her page beside it. */
@@ -324,7 +341,7 @@
     display: grid;
     gap: 0.5rem;
     justify-items: start;
-    width: min(26rem, calc(100vw - 4rem));
+    width: min(26rem, 100%);
   }
   .app-example > [data-lab-frame] {
     width: 100%;

@@ -31,8 +31,13 @@ The level's own token values (type sizes, curves, durations, the frame's shadow)
 | The eight looks pinned and led by the scroll | | yes | yes |
 | "How it works" as a film the scroll plays | | | yes |
 | The hero's page works: its best project opens into its exhbt, the title travelling (a shared-element view transition) | | | yes |
+| The hero's window runs off the edge of the screen, larger (at rest) | | | yes |
 
 At restrained the looks are still there, picked by hand only. With Motion off (the lab bar), the device's reduced-motion setting, or a browser without scroll timelines, everything rests in its finished state: the exhbt whole, the looks unpinned, the still steps instead of the film.
+
+## The hero on a phone
+
+Below 640px the hero's page is drawn at phone width, full size, in a 4:5 window, and the window is a crop: `HeroPage.tsx` scrolls it to her best project's title (`[data-section="featured"] h2`), and once a name is typed, up to her name (`h1`), smoothly when motion is allowed. On a phone the field and the button come before the picture, and the free-roadmap line after it, so the button and the start of her page are both in the first screen. From 640px up the page is zoomed as before.
 
 ## How the moments are built
 
@@ -45,4 +50,4 @@ At restrained the looks are still there, picked by hand only. With Motion off (t
 
 ## Promoting it
 
-What it would replace, and what to watch, is in the screen's report (26 Nov 2026). In short: `app/(marketing)/page.tsx` and `components/home/` (`LookPreview`, `HowItWorks`, `SkillsGapExample`), on the real theme once `themes/exhbt-next` is promoted. The home page then holds two `[data-portfolio-home]` (the hero's and the looks') and its look radios are Astryx radios without a wrapping `label`, so the `home-look-*` targets in `e2e/portfolio-parity.spec.ts` need their root scoped to the looks scene and their click moved to the radio; the golden copies themselves don't change, because the looks draw her page with today's props. The helpers here (`address.ts`) belong beside `lib/hosts.ts`.
+What it would replace, and what to watch, is in the screen's report (26 Nov 2026). In short: `app/(marketing)/page.tsx` and `components/home/` (`LookPreview`, `HowItWorks`, `SkillsGapExample`), on the real theme once `themes/exhbt-next` is promoted. The home page then holds three `[data-portfolio-home]` (the hero's, the looks' and the close's) and its look radios are Astryx radios without a wrapping `label`, so the `home-look-*` targets in `e2e/portfolio-parity.spec.ts` need their root scoped to the looks scene and their click moved to the radio; the golden copies themselves don't change, because the looks draw her page with today's props. The helpers here (`address.ts`) belong beside `lib/hosts.ts`.
