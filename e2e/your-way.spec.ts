@@ -146,6 +146,9 @@ test.describe("Bold and italic at the words selected", () => {
 
   test("the bar comes for words chosen with the mouse too, and nothing on the page moves when it comes or goes", async ({ page }) => {
     await openDoc(page, freshName("ywm"), caseStudy());
+    // The formatted fields' editors have started, as select() waits for them: a double press on a field whose editor
+    // has not, hands the field over on the first press, and the second lands on the editor as a press of its own.
+    await waitLive(page);
     await settle(page);
     const path = `sections.${await at(page, "quote")}.text`;
     const rest = await boxes(page, { frames: true });
