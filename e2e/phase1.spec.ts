@@ -236,6 +236,10 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     await page.locator("a.next-view").click();
     await expect(page.getByRole("heading", { level: 1, name: "What next" })).toBeVisible();
     await expect(page.getByText(`We’ve emailed a copy to ${email}`)).toBeVisible();
+    // The last view says what to do with a project already finished, and links to Add an exhbt.
+    await expect(page.getByRole("heading", { level: 2, name: "Already finished a project?" })).toBeVisible();
+    await expect(page.getByText("A dissertation, a module project or placement work counts. Add it as your first exhbt; these ideas can be your second and third.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Add an exhbt", exact: true })).toHaveAttribute("href", "/exhbts/new");
 
     // The email is in the dev outbox, with a sign-in link back to this roadmap.
     await page.goto("/dev/emails");
@@ -245,6 +249,8 @@ test.describe("Phase 1: from the home page to a roadmap", () => {
     const frame = page.frameLocator("iframe");
     // Titled with the matched job from the jobs data (seed in development).
     await expect(frame.getByText(/^Your roadmap to /).first()).toBeVisible();
+    await expect(frame.getByText("Already finished a project?")).toBeVisible();
+    await expect(frame.getByRole("link", { name: "Add an exhbt" })).toHaveAttribute("href", /\/exhbts\/new$/);
     const signIn = await frame.getByRole("link", { name: "See your full roadmap" }).getAttribute("href");
     expect(signIn).toContain("/auth/dev?email=");
 
