@@ -1,6 +1,7 @@
 Status: accepted
 Date: 12 Nov 2026
 Amends: 0007 (how the 150–200 words are counted)
+Amended by: 0032 (a part's own title is not counted, as the layout's heading over it never was; nor is anything left empty, which a visitor is not shown)
 
 # The word cap counts everything on the page
 

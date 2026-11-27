@@ -1,10 +1,10 @@
 "use client";
 
 import "../css/phone.css";
-import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Bold, Highlighter, Italic, Link2, Plus, Star, Trash2, Undo2, Unlink, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { formatLimits, type ExhbtDoc } from "@/lib/exhbt/blocks";
+import type { ExhbtDoc } from "@/lib/exhbt/blocks";
 import type { DraftBlock } from "@/lib/exhbt/draft-blocks";
 import { FORMAT_COPY, formatOf, type Format } from "@/lib/exhbt/formats";
 import { pageItems, type PageItem } from "@/lib/exhbt/layouts";
@@ -15,7 +15,7 @@ import { jumpTo } from "../jump";
 import { labelOf } from "../labels";
 import { useStoreInternal } from "../store";
 import type { Store } from "../store-core";
-import { actionsFor, useRoving, whyFlowStays } from "../Toolbar";
+import { actionsFor, useRoving } from "../Toolbar";
 import { usePhone } from "./usePhone";
 
 /*
@@ -23,14 +23,14 @@ import { usePhone } from "./usePhone";
  * and not in "See as a visitor". It follows the part the focus is in, or was last in (or was last
  * tapped: a picture takes no focus), names it, and holds its actions at 44px:
  *  - a section: Move up, Move down, the layout's own action, More actions where the AI drafted it,
- *    Remove (on the flowchart where the layout always has one, there but off: a press shows why in
- *    the section's name's place), Reorder. They go through the drag
- *    board (`moveBy`, `remove`) and the store, as the section's own toolbar does;
+ *    Remove (on every section in every layout, the flowchart too: decision 0032), Reorder. They go
+ *    through the drag board (`moveBy`, `remove`) and the store, as the section's own toolbar does;
  *  - the title, the context line or the skills: the part's More actions, and Reorder; a tapped skill
  *    is named, with "Remove <skill>" (the pills' own remove buttons are hidden on a phone);
  *  - nothing yet: Add (the "+" at the end of the page) and Reorder;
  *  - while a formatted field has the cursor: its formatting buttons (Highlight on the context line;
- *    Bold and Italic elsewhere; Link), a finding's own move and remove, and Done. A press on them
+ *    Bold and Italic elsewhere; Link where the field takes links, so not in a quote, a pull quote or
+ *    a link's description: decision 0032), a finding's own move and remove, and Done. A press on them
  *    never takes the cursor out of the field.
  * After a move, a remove or a drop it offers "Undo: <what>" above the row until the next change, so a
  * wrong thumb is put right where it happened. It sits on the on-screen keyboard (visualViewport) and
@@ -236,16 +236,11 @@ function ReorderButton() {
 function SectionTools({ id, info }: { id: string; info: Info }) {
   const store = useStoreInternal();
   const board = useBoard();
-  const { uiApi } = useRuntime();
-  const why = useId();
-  // After a press on a Remove that is off, its reason in place of the section's name, until the bar follows another part.
-  const [told, setTold] = useState(false);
   const { label, place, count, kind, f } = info;
-  const stays = kind === "flow" ? whyFlowStays(f) : null;
   const block: DraftBlock | null = kind === "flow" ? "flow" : kind === "findings" ? "findings" : null;
   return (
     <>
-      <span className={told ? "xe-bar-name xe-bar-hint xe-bar-why" : "xe-bar-name"}>{told && stays ? stays : label}</span>
+      <span className="xe-bar-name">{label}</span>
       <Button size="sm" className="xe-bar-btn" data-tool="up" label={`Move ${label} up`} disabled={place <= 0} onClick={() => board.moveBy(id, -1)}>
         <ArrowUp {...ICON} />
       </Button>
@@ -263,32 +258,9 @@ function SectionTools({ id, info }: { id: string; info: Info }) {
           <MoreActions block={block} />
         </span>
       )}
-      {stays ? (
-        // Where the layout always has a flowchart (the review's vision-3): there but off, and a press says why, and shows it.
-        <>
-          <Button
-            size="sm"
-            className="xe-bar-btn xe-bar-off"
-            data-tool="remove"
-            label={`Remove ${label}`}
-            aria-disabled="true"
-            aria-describedby={why}
-            onClick={() => {
-              uiApi.say(stays);
-              setTold(true);
-            }}
-          >
-            <Trash2 {...ICON} />
-          </Button>
-          <span id={why} hidden>
-            {stays}
-          </span>
-        </>
-      ) : (
-        <Button size="sm" className="xe-bar-btn" data-tool="remove" label={`Remove ${label}`} onClick={() => board.remove(id)}>
-          <Trash2 {...ICON} />
-        </Button>
-      )}
+      <Button size="sm" className="xe-bar-btn" data-tool="remove" label={`Remove ${label}`} onClick={() => board.remove(id)}>
+        <Trash2 {...ICON} />
+      </Button>
       <ReorderButton />
     </>
   );
@@ -369,7 +341,6 @@ function Formatting({ rich, path }: { rich: ActiveRich; path: string | null }) {
     const s = d.sections[at];
     return s?.kind === "findings" ? s.items.length : 0;
   });
-  const min = useDocNumber(store, (d) => formatLimits(formatOf(d)).findings.min);
   const finding = m && n > 0 && k < n;
 
   const done = () => {
@@ -389,7 +360,8 @@ function Formatting({ rich, path }: { rich: ActiveRich; path: string | null }) {
     const s = store.get().sections[at];
     if (s?.kind !== "findings") return;
     store.listRemove(s.id, k);
-    requestAnimationFrame(() => jumpTo(`sections.${at}.items.${Math.min(k, n - 2)}`));
+    // The cursor goes to the finding that took its place; with none left, to "Add a finding" (the list's own anchor).
+    requestAnimationFrame(() => jumpTo(n > 1 ? `sections.${at}.items.${Math.min(k, n - 2)}` : `sections.${at}.items`));
   };
 
   return (
@@ -409,9 +381,11 @@ function Formatting({ rich, path }: { rich: ActiveRich; path: string | null }) {
           </Button>
         </>
       )}
-      <Button size="sm" className="xe-bar-btn" label={rich.link ? "Remove link" : "Link"} onClick={() => rich.toggleLink()}>
-        {rich.link ? <Unlink {...ICON} /> : <Link2 {...ICON} />}
-      </Button>
+      {rich.links && (
+        <Button size="sm" className="xe-bar-btn" label={rich.link ? "Remove link" : "Link"} onClick={() => rich.toggleLink()}>
+          {rich.link ? <Unlink {...ICON} /> : <Link2 {...ICON} />}
+        </Button>
+      )}
       {finding && (
         <>
           <Button size="sm" className="xe-bar-btn" label={`Move finding ${k + 1} up`} disabled={k === 0} onClick={() => moveFinding(k - 1)}>
@@ -420,7 +394,7 @@ function Formatting({ rich, path }: { rich: ActiveRich; path: string | null }) {
           <Button size="sm" className="xe-bar-btn" label={`Move finding ${k + 1} down`} disabled={k >= n - 1} onClick={() => moveFinding(k + 1)}>
             <ArrowDown {...ICON} />
           </Button>
-          <Button size="sm" className="xe-bar-btn" label={`Remove finding ${k + 1}`} disabled={n <= min} onClick={removeFinding}>
+          <Button size="sm" className="xe-bar-btn" label={`Remove finding ${k + 1}`} onClick={removeFinding}>
             <X {...ICON} />
           </Button>
         </>

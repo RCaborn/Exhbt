@@ -10,6 +10,7 @@ import { labelOf } from "../components/exhbt-editor/labels";
 import { HYSTERESIS, makePlan, orderWith, placeAt, pointFor, rowsInfo, type Box } from "../components/exhbt-editor/drag/plan";
 import { docNow, finger, frame, freshName, grip, offered, openDoc, openTiming, pageOrder, plusClashes, READY, SAMPLES, toolbarClashes, typeIn, waitLive, waitReady } from "./page-editor";
 import { uniqueBytes } from "./unique-bytes";
+import { sampleDoc } from "./page-editor";
 
 /*
  * Dragging on the edit-on-page editor (decision 0026, "Dragging" and "Smoothness"; the prototype's
@@ -332,30 +333,25 @@ test.describe("each section's toolbar, at 1440 wide", () => {
     }
   });
 
-  test("a case study's and research's flowchart: Remove is there but off, and says why when focused or pressed; a gallery's takes it off", async ({ page }) => {
-    const WHY = { "case-study": "A case study always has a flowchart. Choose another layout to take it off.", research: "Research always has a flowchart. Choose another layout to take it off." } as const;
-    for (const f of ["case-study", "research"] as const) {
+  test("the flowchart's Remove takes it off in every layout: a case study's and research's too, whose Remove was off until decision 0032", async ({ page }) => {
+    // Until decision 0032 a case study and research always drew their flowchart: Remove was there but off, and said why.
+    for (const f of offered()) {
       await openTiming(page, f, { full: true });
-      const order = await pageOrder(page);
-      const remove = frame(page, "flow").locator('[data-tool="remove"]');
-      await expect(remove).toHaveAttribute("aria-disabled", "true");
-      await expect(remove).toHaveAccessibleName("Remove Flowchart");
-      await expect(remove).toHaveAccessibleDescription(WHY[f]);
-      await expect(remove).toHaveAttribute("data-tip", WHY[f]);
+      const tools = frame(page, "flow").locator("> .xe-tools");
+      const remove = tools.locator('[data-tool="remove"]');
+      await expect(remove, f).not.toHaveAttribute("aria-disabled", "true");
+      await expect(remove, f).toHaveAccessibleName("Remove Flowchart");
+      await expect(remove, f).toHaveAccessibleDescription("");
+      await expect(remove, f).toHaveAttribute("data-tip", "Remove Flowchart");
       await frame(page, "flow").hover();
-      // aria-disabled, so Playwright won't press it unless told: a person can.
-      await remove.click({ force: true });
-      await expect(said(page)).toHaveText(WHY[f]);
-      expect(await pageOrder(page)).toEqual(order);
-      // Shown as well as said: the reason in its tooltip, while the button keeps the focus.
-      expect(await remove.evaluate((el) => getComputedStyle(el, "::after").content)).toBe(`"${WHY[f]}"`);
+      // Where the toolbar is its compact pair, Remove is in its menu.
+      if ((await tools.getAttribute("data-place")) === "compact" && (await tools.getAttribute("data-open")) === null) await tools.locator('[data-tool="menu"]').click();
+      await remove.click();
+      expect(await pageOrder(page), f).not.toContain("flow");
+      expect((await docNow(page)).flowOff, f).toBe(true);
+      // Its boxes are kept, to come back with it.
+      expect((await docNow(page)).flow.length, f).toBeGreaterThan(0);
     }
-    await openTiming(page, "gallery", { full: true });
-    const remove = frame(page, "flow").locator('[data-tool="remove"]');
-    await expect(remove).not.toHaveAttribute("aria-disabled", "true");
-    await frame(page, "flow").hover();
-    await remove.click();
-    expect(await pageOrder(page)).not.toContain("flow");
   });
 
   test("each toolbar is one Tab stop: the arrows, Home and End move along it; the grip's arrows move a section only while it is carried", async ({ page }) => {
@@ -990,6 +986,228 @@ function contrast(a: string, b: string): number {
   const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
   return (x! + 0.05) / (y! + 0.05);
 }
+
+/* ------------------------------------------------------------------------------------------------
+ * Release 4, brief Q: the rows the four new layouts bring. Each test carries a section to a place
+ * beside one of them, rests on the boundary there trembling 2px either side 40 times (the place
+ * and every section's transform must not change), then drops the section where the place was
+ * shown: the stored order is that place. A block of its own, so nothing above it is touched.
+ * ---------------------------------------------------------------------------------------------- */
+
+test.describe("release 4's new rows: no flicker on a boundary, and a drop lands where the place said", () => {
+  test.skip(({ isMobile }) => isMobile, "a mouse's checks; the touch checks are below");
+
+  /** Counts every change of place, and every time a section is given a new transform, from now on. */
+  const arm = (page: Page) =>
+    page.evaluate((sel) => {
+      const w = window as unknown as { __places: number; __slides: number };
+      w.__places = 0;
+      w.__slides = 0;
+      const main = document.querySelector<HTMLElement>("[data-xe-drag]")!;
+      new MutationObserver(() => (w.__places += 1)).observe(main, { attributes: true, attributeFilter: ["data-xe-place"] });
+      const slides = new MutationObserver((list) => (w.__slides += list.length));
+      document.querySelectorAll(sel).forEach((el) => slides.observe(el, { attributes: true, attributeFilter: ["style"] }));
+    }, FRAMES);
+  const seenCounts = (page: Page) => page.evaluate(() => ({ places: (window as unknown as { __places: number }).__places, slides: (window as unknown as { __slides: number }).__slides }));
+
+  /**
+   * Walks the pointer a pixel at a time from one point towards another until the place changes, rests there and
+   * trembles 2px either side 40 times, and checks that neither the place nor any section's transform moved. Leaves
+   * the pointer on the boundary, the button still down; returns the place it crossed to.
+   */
+  async function rest(page: Page, from: { x: number; y: number }, to: { x: number; y: number }, where: string): Promise<number> {
+    await page.mouse.move(from.x, from.y, { steps: 10 });
+    const start = await place(page);
+    const n = Math.ceil(Math.hypot(to.x - from.x, to.y - from.y));
+    let p = from;
+    for (let i = 1; i <= n && (await place(page)) === start; i++) {
+      p = { x: from.x + ((to.x - from.x) * i) / n, y: from.y + ((to.y - from.y) * i) / n };
+      await page.mouse.move(p.x, p.y);
+    }
+    expect(await place(page), `${where}: the pointer crossed a boundary`).not.toBe(start);
+    const crossed = (await place(page))!;
+    const ux = (to.x - from.x) / n;
+    const uy = (to.y - from.y) / n;
+    await page.waitForTimeout(250);
+    const before = await seenCounts(page);
+    for (let i = 0; i < 40; i++) {
+      const d = i % 2 ? 2 : -2;
+      await page.mouse.move(p.x + ux * d, p.y + uy * d);
+    }
+    await page.mouse.move(p.x, p.y);
+    await page.waitForTimeout(400);
+    expect(await seenCounts(page), where).toEqual(before);
+    expect(await place(page), where).toBe(crossed);
+    return crossed;
+  }
+
+  /** Drops where the pointer is, and checks the stored order is the place that was shown. */
+  async function dropAt(page: Page, order: string[], mover: string, shown: number, where: string) {
+    await expect(said(page)).toContainText(`would go to place ${shown + 1} of ${order.length}`);
+    await page.mouse.up();
+    expect(await pageOrder(page), `${where}: the stored order is the place shown`).toEqual(orderWith(order, mover, shown));
+    await expect(lifting(page)).toHaveCount(0);
+  }
+
+  /** The section of a kind, by its kind and (for images) its stage. */
+  const pick = (doc: ExhbtDoc, test: (s: Section) => boolean) => doc.sections.filter(test).map((s) => s.id);
+
+  test("Before and after: beside an image marked Before, at the place where an image marked After would form the pair", async ({ page }) => {
+    await page.setViewportSize(TALL);
+    // The sample's four pictures are two pairs (Before, After, Before, After). Any run of pictures that does not open with a
+    // Before then an After is one plain grid (lib/exhbt/layouts.ts, rowsFor: "before-after", then "group" of "images"), so a Before
+    // is alone only with something that is not a picture after it. So the page is arranged (it has the flowchart's marker): the
+    // first Before, then the flowchart, then the second pair, the rest, and the first After last of all, alone too. Carrying that
+    // After to straight after the lone Before is the place where the two would form a pair.
+    const base = sampleDoc("before-after");
+    const byId = (id: string) => base.sections.find((s) => s.id === id)!;
+    const [lone, mover] = ["image-1", "image-2"];
+    expect([byId(lone), byId(mover)].map((s) => (s.kind === "image" ? s.stage : null)), "the sample's first two pictures are a Before and an After").toEqual(["before", "after"]);
+    expect(base.sections.some((s) => s.kind === "flow"), "the sample has no marker of its own").toBe(false);
+    const others = base.sections.filter((s) => s.kind !== "image");
+    const doc: ExhbtDoc = { ...base, sections: [byId(lone), { id: "flow", kind: "flow" }, byId("image-3"), byId("image-4"), ...others, byId(mover)] };
+    await openDoc(page, freshName("flickba"), doc);
+    await waitLive(page);
+    await settle(page);
+    const order = await pageOrder(page);
+    expect([order[0], order[order.length - 1]], "the lone Before first, the lone After last").toEqual([lone, mover]);
+    const rowIds = (r: Row) => (r.row === "group" ? r.items.map((c) => c.item.id) : r.row === "one" ? ids(r.cell) : [...ids(r.left), ...ids(r.right)]);
+    expect((await rowsNow(page)).map(rowIds).find((r) => r.includes(lone)), "the Before is on a row of its own").toEqual([lone]);
+    await pickUp(page, mover);
+    await arm(page);
+    // Measured after the pick-up: picking up scrolls to the carried section, and nothing slides until the place changes.
+    const at = await client(page);
+    const B = at[lone]!;
+    // Down the Before: across its middle is the boundary between the place before it and the place after it, where After joins it.
+    const x = B.x + B.w / 2;
+    const shown = await rest(page, { x, y: B.y + B.h * 0.2 }, { x, y: B.y + B.h * 0.85 }, "down the lone Before");
+    expect(shown, "the place straight after the Before").toBe(order.filter((id) => id !== mover).indexOf(lone) + 1);
+    await dropAt(page, order, mover, shown, "dropped after the lone Before");
+    // And it did form the pair: the Before then the After, one row.
+    const pair = (await rowsNow(page)).find((r) => r.row === "group" && r.of === "before-after" && r.items.some((c) => c.item.id === lone));
+    expect(pair && pair.row === "group" ? pair.items.map((c) => c.item.id) : null, "the two form a Before and after pair").toEqual([lone, mover]);
+  });
+
+  test("Before and after: across the gap between a Before and its After, and out again", async ({ page }) => {
+    await page.setViewportSize(TALL);
+    await open(page, "before-after");
+    const order = await pageOrder(page);
+    const rows = await rowsNow(page);
+    const pair = rows.find((r): r is Extract<Row, { row: "group" }> => r.row === "group" && r.of === "before-after" && r.items.length === 2)!;
+    expect(pair, "the sample has a Before and after pair").toBeTruthy();
+    const [b, a] = pair.items.map((c) => c.item.id) as [string, string];
+    const mover = order[order.length - 1]!;
+    await pickUp(page, mover);
+    await arm(page);
+    const at = await client(page);
+    const B = at[b]!;
+    const A = at[a]!;
+    const y = B.y + B.h / 2;
+    // The plan gives each tile's half nearer a gap to that gap (components/exhbt-editor/drag/plan.ts, anchorFor: "in a group"), so
+    // from the Before's right half to the After's left half is one place, the gap between them. The boundaries are the tiles'
+    // middles: the Before's, where "before the Before" gives way to "between", and the After's, where "between" gives way to "after the After".
+    const between = order.filter((id) => id !== mover).indexOf(a);
+    expect(await rest(page, { x: B.x + B.w * 0.2, y }, { x: B.x + B.w * 0.8, y }, "across the Before's middle, left to right"), "into the gap from the Before").toBe(between);
+    expect(await rest(page, { x: A.x + A.w * 0.8, y }, { x: A.x + A.w * 0.2, y }, "across the After's middle, right to left"), "into the gap from the After").toBe(between);
+    // Dropped in the gap: the stored order is the place shown, between the Before and its After.
+    await dropAt(page, order, mover, between, "dropped between the Before and its After");
+  });
+
+  /** Build's sample: its row of buttons, the section straight above it, and a picture to carry that is on neither. */
+  async function buildRow(page: Page) {
+    await page.setViewportSize(TALL);
+    await open(page, "build");
+    const order = await pageOrder(page);
+    const buttons = (await rowsNow(page)).find((r): r is Extract<Row, { row: "group" }> => r.row === "group" && r.of === "buttons")!;
+    expect(buttons && buttons.items.length, "Build's sample has a row of buttons").toBeGreaterThan(1);
+    const bs = buttons.items.map((c) => c.item.id);
+    const above = order[order.indexOf(bs[0]!) - 1]!;
+    const doc = await docNow(page);
+    const mover = pick(doc, (s) => s.kind === "image")[1]!;
+    expect(mover, "a second picture to carry").toBeTruthy();
+    expect(bs.includes(mover) || mover === above, "the carried section is not on the row or straight above it").toBe(false);
+    return { order, bs, above, mover, at: await client(page) };
+  }
+
+  test("Build: along the row of link buttons", async ({ page }) => {
+    const { order, bs, mover, at } = await buildRow(page);
+    const [b1, b2] = [at[bs[0]!]!, at[bs[1]!]!];
+    await pickUp(page, mover);
+    await arm(page);
+    const along = await rest(page, { x: b1.x + b1.w * 0.3, y: b1.y + b1.h / 2 }, { x: b2.x + b2.w * 0.7, y: b1.y + b1.h / 2 }, "along the row of buttons");
+    await dropAt(page, order, mover, along, "dropped between two buttons");
+  });
+
+  test("Build: between the row of link buttons and the section above it", async ({ page }) => {
+    const { order, bs, above, mover, at } = await buildRow(page);
+    const row = union(bs.map((id) => at[id]!));
+    const U = at[above]!;
+    await pickUp(page, mover);
+    await arm(page);
+    const x = row.x + row.w * 0.3;
+    await rest(page, { x, y: U.y + U.h * 0.5 }, { x, y: row.y + row.h * 0.6 }, "from the section above down to the row of buttons");
+    await rest(page, { x, y: row.y + row.h * 0.6 }, { x, y: U.y + U.h * 0.5 }, "from the row of buttons up to the section above");
+    await page.mouse.move(x, row.y + row.h * 0.6, { steps: 20 });
+    await dropAt(page, order, mover, (await place(page))!, "dropped by the buttons");
+  });
+
+  test("Essay: beside the key points and the pull quote, on each side", async ({ page }) => {
+    await page.setViewportSize(TALL);
+    await open(page, "essay");
+    const order = await pageOrder(page);
+    const rows = await rowsNow(page);
+    const pair = firstPair(rows)!;
+    expect(pair, "Essay's sample has the key points beside the pull quote").toBeTruthy();
+    const at = await client(page);
+    const L = union(ids(pair.left).map((id) => at[id]!));
+    const R = union(ids(pair.right).map((id) => at[id]!));
+    const mover = order[order.length - 1]!;
+    const foot = Math.max(L.y + L.h, R.y + R.h) + 30;
+    await pickUp(page, mover);
+    await arm(page);
+    const mid = L.y + Math.min(L.h, R.h) / 2;
+    // The gap, each way.
+    await rest(page, { x: L.x + L.w * 0.55, y: mid }, { x: R.x + R.w * 0.45, y: mid }, "across the pair, key points to pull quote");
+    await rest(page, { x: R.x + R.w * 0.45, y: mid }, { x: L.x + L.w * 0.55, y: mid }, "across the pair, pull quote to key points");
+    // Down each side to the pair's foot: the key points' side, and the pull quote's.
+    await rest(page, { x: L.x + L.w * 0.2, y: L.y + L.h * 0.3 }, { x: L.x + L.w * 0.2, y: foot }, "down the key points' side");
+    // The pull quote's side has no boundary to rest on: its outer edge is the end of the pair's row, which is the place after the
+    // pair all the way down (plan.ts, anchorFor: "the end of a row that holds things side by side"). So the place there is one place,
+    // the same at the top of the pull quote and below the pair, and a drop there is that place.
+    const after = order.indexOf(ids(pair.right)[ids(pair.right).length - 1]!) + 1;
+    await page.mouse.move(R.x + R.w * 0.8, R.y + R.h * 0.3, { steps: 10 });
+    expect(await place(page), "beside the pull quote's outer half").toBe(after);
+    await page.mouse.move(R.x + R.w * 0.8, foot, { steps: 10 });
+    expect(await place(page), "under the pull quote").toBe(after);
+    await dropAt(page, order, mover, after, "dropped at the end of the pair's row");
+  });
+
+  test("Event: along the image grid, and between it and the poster row above it", async ({ page }) => {
+    await page.setViewportSize(TALL);
+    await open(page, "event");
+    const order = await pageOrder(page);
+    const rows = await rowsNow(page);
+    const tiles = grid(rows)!;
+    expect(tiles, "Event's sample has a grid of pictures").toBeTruthy();
+    const ts = tiles.items.map((c) => c.item.id);
+    const mover = order[order.length - 1]!;
+    await pickUp(page, mover);
+    await arm(page);
+    const at = await client(page);
+    const [t1, t2] = [at[ts[0]!]!, at[ts[1]!]!];
+    const pair = firstPair(rows)!;
+    const P = union([...ids(pair.left), ...ids(pair.right)].map((id) => at[id]!));
+    const y = t1.y + t1.h / 2;
+    const along = await rest(page, { x: t1.x + t1.w * 0.3, y }, { x: t2.x + t2.w * 0.7, y }, "along the grid, left to right");
+    await rest(page, { x: t2.x + t2.w * 0.7, y }, { x: t1.x + t1.w * 0.3, y }, "along the grid, right to left");
+    // From the grid up into the row above it (the lower part of that row is already the place before the grid, so the walk starts below).
+    await rest(page, { x: t1.x + t1.w / 2, y: t1.y + t1.h * 0.5 }, { x: t1.x + t1.w / 2, y: P.y + P.h * 0.1 }, "from the grid up into the stacked row above it");
+    // Back to the gap in the grid, and drop: the stored order is the place shown.
+    await page.mouse.move((t1.x + t1.w + t2.x) / 2, y, { steps: 20 });
+    await expect.poll(() => place(page)).toBe(along);
+    await dropAt(page, order, mover, along, "dropped between the two pictures of the grid");
+  });
+});
 
 test.describe("while carrying", () => {
   test.skip(({ isMobile }) => isMobile, "the touch checks are below");

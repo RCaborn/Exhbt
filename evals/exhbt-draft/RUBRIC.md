@@ -20,7 +20,7 @@ Checked by code: the number check (2 or 0). Judged: claims that aren't numbers.
 
 ## C2. Within the limits
 
-The draft could be published as it stands, and keeps each part as short as the AI is asked to: `validateForPublish` returns no issues, no part is longer than the AI's word target for its layout (`overTargets` in `lib/ai/draft-targets.ts`), and the whole page (every word except image alt text, `wordCount`) is at most 200 words. The editor aims for about 150. People have no word limit on a part, only on the page (decision 0030), but a draft is still held to the targets.
+The draft could be published as it stands, holds what its layout usually has, and keeps each part as short as the AI is asked to: `validateForPublish` returns no issues and `suggestionsFor` no suggestions (`draftIssues` in `marks.ts`; decision 0032 made the layout's needs suggestions to a person, and a draft is still held to them), no part is longer than the AI's word target for its layout (`overTargets` in `lib/ai/draft-targets.ts`), and the whole page (every word except image alt text, `wordCount`) is at most 200 words. The editor aims for about 150. People have no word limit on a part, only on the page (decision 0030), but a draft is still held to the targets.
 
 - 2: publishable, every part within its target, and 180 words or fewer.
 - 1: as 2 but 181 to 200 words, or the only problem is a total of 201 to 220 words.

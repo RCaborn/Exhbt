@@ -304,6 +304,68 @@ test.describe("what the other layouts write survives a visit", () => {
   });
 });
 
+// Decision 0032 ("write it your way"): a title typed over a part, a title cleared, and bold and italic in a quote, a pull
+// quote and a link's description are written by the new editor only. The classic editor has no control for any of them.
+// Its preview is the page's own renderer, so it draws them, and a save from here keeps every one.
+test.describe("what decision 0032 writes survives a visit", () => {
+  const BOLD = [{ t: "Lunch is " }, { t: "calmer", b: true }, { t: " now." }];
+  const SLANTED = [{ t: "Used and " }, { t: "not wanted", i: true }, { t: "." }];
+  const LINE = [{ t: "Two weeks", b: true }, { t: " of timings" }];
+  const yourWay = (): ExhbtDoc =>
+    core(
+      [
+        FLOW,
+        { ...findings(), title: "Results, in short" } as ContentSection,
+        { id: "pullquote-1", kind: "pullquote", text: "Used and not wanted.", textRuns: SLANTED },
+        // A quote with nobody named and its heading taken off.
+        { id: "quote-1", kind: "quote", text: "Lunch is calmer now.", textRuns: BOLD, name: "", role: "", title: "" },
+        { ...reflection(), title: "Next time" } as ContentSection,
+        { id: "link-1", kind: "link", href: "https://example.com/notes", label: "Field notes", description: "Two weeks of timings", descriptionRuns: LINE },
+      ],
+      "essay",
+      { flowTitle: "How I ran it", refsTitle: "Further reading" },
+    );
+  const of = (d: Stored, kind: Section["kind"]) => (d.sections as Section[]).find((s) => s.kind === kind);
+
+  test("titles, a cleared title, and bold and italic in a quote, a pull quote and a link's description", async ({ page }) => {
+    const { id } = await open(page, "yw", yourWay());
+    const preview = page.locator(SEL.previewArticle);
+    // The preview draws what the page draws: the typed titles, no heading over the quote, and the formatting.
+    for (const title of ["How I ran it", "Results, in short", "Next time", "Further reading"]) await expect(preview.getByRole("heading", { name: title, exact: true })).toBeVisible();
+    await expect(preview.locator('[data-part="quote"]').getByRole("heading")).toHaveCount(0);
+    await expect(preview.locator('[data-part="quote"] strong')).toHaveText("calmer");
+    await expect(preview.locator('[data-part="quote"] figcaption')).toHaveCount(0);
+    await expect(preview.locator('[data-part="pullquote"] em')).toHaveText("not wanted");
+    await expect(preview.locator('[data-part="references"] strong')).toHaveText("Two weeks");
+
+    const { before, after } = await retitle(page, id, "Did the second till help?");
+    expect(after).toEqual({ ...before, title: "Did the second till help?" });
+    expect(after).toMatchObject({ flowTitle: "How I ran it", refsTitle: "Further reading" });
+    expect(of(after, "findings")).toMatchObject({ title: "Results, in short" });
+    expect(of(after, "reflection")).toMatchObject({ title: "Next time" });
+    expect(of(after, "quote")).toMatchObject({ title: "", text: "Lunch is calmer now.", textRuns: BOLD, name: "" });
+    expect(of(after, "pullquote")).toMatchObject({ text: "Used and not wanted.", textRuns: SLANTED });
+    expect(of(after, "link")).toMatchObject({ description: "Two weeks of timings", descriptionRuns: LINE });
+  });
+
+  test("words changed here lose the formatting that belonged to the old words, and nothing else changes", async ({ page }) => {
+    const { id } = await open(page, "yx", yourWay());
+    const before = await stored(page.request, id);
+    // The classic field holds the plain words. New words cannot carry the old words' bold, so it goes with them.
+    await page.getByLabel("The quote, word for word").fill("The queue is out of the doorway.");
+    await waitForSave(page);
+    const after = await stored(page.request, id);
+    expect(of(after, "quote")).toMatchObject({ text: "The queue is out of the doorway.", title: "", name: "" });
+    expect(of(after, "quote")).not.toHaveProperty("textRuns");
+    await expect(page.locator(`${SEL.previewArticle} [data-part="quote"] strong`)).toHaveCount(0);
+    // Everything else is as it was: the titles, the pull quote's italic and the link's bold.
+    const rest = (d: Stored) => ({ ...d, sections: (d.sections as Section[]).filter((s) => s.kind !== "quote") });
+    expect(rest(after)).toEqual(rest(before));
+    expect(of(after, "pullquote")).toMatchObject({ textRuns: SLANTED });
+    expect(of(after, "link")).toMatchObject({ descriptionRuns: LINE });
+  });
+});
+
 // The copy kept in this browser, offered back (the review's data-safety-3, as the new editor's BackupOffer): the offer is
 // for that one copy. It goes as soon as the doc changes or the copy is gone or replaced, and "Discard them" takes out only
 // the copy it offered.

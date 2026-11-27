@@ -13,6 +13,7 @@ import { CopyLink } from "@/components/ui/CopyLink";
 import { pathOfNumber } from "@/lib/exhbt/verify";
 import type { FieldPath } from "@/components/portfolio/page-ctx";
 import { useEnv, useIssues, useSave, useUi } from "../context";
+import { Suggestions } from "../topbar/Suggestions";
 import { useFiles } from "../files";
 import { noteSaved } from "../pending";
 import { useDoc, useStore } from "../store";
@@ -23,7 +24,8 @@ import "../css/sheets.css";
 
 /*
  * "Review and publish" (decision 0026, "What the page does not draw"): the plan, the username, what
- * stops publishing, the numbers to check, the tick, and Publish. A port of the classic editor's
+ * stops publishing, the numbers to check, the suggestions (decision 0032: advice, which stops nothing),
+ * the tick, and Publish. A port of the classic editor's
  * publish section. Before publishing it says where the exhbt goes, on the person's portfolio, and
  * after it, that it is live there (components/editor/PublishWhere.tsx, the same in both editors).
  */
@@ -182,6 +184,8 @@ function PublishBody() {
           })}
         </ul>
       )}
+      {/* What the layout usually has and this page lacks (decision 0032): advice, said where the page is reviewed. It stops nothing. */}
+      <Suggestions onPick={(path) => showMe(path)} />
       <label className="flex items-start gap-3">
         <input type="checkbox" checked={ui.confirmed} onChange={(e) => ui.setConfirmed(e.target.checked)} className="mt-1.5 size-4 accent-jade" />
         <span>This is my work, and the numbers are true</span>

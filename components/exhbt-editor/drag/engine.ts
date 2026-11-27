@@ -10,6 +10,7 @@ import type { UiApi } from "../context";
 import type { FilesController } from "../files";
 import { labelOf } from "../labels";
 import type { Store } from "../store-core";
+import { holdFocus, notePointer } from "./grip";
 import { draftItem, measureOrder, type Frozen } from "./measure";
 import { FLOW_SECTION_STYLE, SECTION_STYLE } from "./options";
 import { lineFor, makePlan, orderWith, placeAt, rowsInfo, type Box, type Measured, type Plan } from "./plan";
@@ -529,7 +530,12 @@ function createEngine(store: Store, ui: UiApi, files: FilesController) {
       } else ui.say(`${blockOptions(store.get()).find((o) => o.kind === draft.kind)?.full ?? "There is no room for it"}.`);
     } else if (!drop) ui.say(`Moving ${lowerFirst(name)} cancelled. It's back where it was.`);
     else ui.say(moved ? `${name} dropped in place ${p + 1} of ${places}.` : `${name} dropped where it was.`);
-    if (mode === "keys") mainColumn()?.querySelector<HTMLElement>(`[data-section-id="${CSS.escape(plan.id)}"] [data-grip]`)?.focus({ preventScroll: true });
+    // The section carried keeps its grip in focus, from the keyboard and after a mouse too (its toolbar shows while the
+    // focus is in it). The press gave the grip the focus (grip.ts), but a section dropped into another row is drawn anew,
+    // and the focus went with the old one. Safari's engine can lose the hover of a section a drop moved under the pointer,
+    // until the pointer leaves it: without the focus its toolbar hid there, and a press on the grip went to the words.
+    const mouse = mode === "pointer" && !draft && !(l.sensor && byTouch.has(l.sensor));
+    if (mode === "keys" || mouse) mainColumn()?.querySelector<HTMLElement>(`[data-section-id="${CSS.escape(plan.id)}"] [data-grip]`)?.focus({ preventScroll: true });
   }
 
   /* ---------------- The pointer: dnd-kit's sensors ---------------- */
@@ -636,7 +642,10 @@ function createEngine(store: Store, ui: UiApi, files: FilesController) {
         return;
       }
       const frame = mainColumn() && frameIn(mainColumn()!, id);
-      const field = frame?.querySelector<HTMLElement>(FIELD) ?? frame?.querySelector<HTMLElement>("[data-grip]");
+      // Its words, not its title: since decision 0032 a section's own title is a field over them (TitleField.tsx, data-title),
+      // and the cursor in the title sent what the person typed next into the heading.
+      const words = frame ? [...frame.querySelectorAll<HTMLElement>(FIELD)].find((el) => !el.closest("[data-title]")) : undefined;
+      const field = words ?? frame?.querySelector<HTMLElement>("[data-grip]");
       field?.focus({ preventScroll: true });
       frame?.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
     });
@@ -671,7 +680,12 @@ function createEngine(store: Store, ui: UiApi, files: FilesController) {
       if (!props) {
         props = {
           "aria-describedby": HOW_ID,
-          onMouseDown: (e: ReactMouseEvent) => sense(e.nativeEvent, (at, token) => pickUp(id, "pointer", at, token)),
+          onPointerDown: notePointer,
+          // A mouse's press leaves the focus on the grip, in Safari too (grip.ts).
+          onMouseDown: (e: ReactMouseEvent<HTMLElement>) => {
+            sense(e.nativeEvent, (at, token) => pickUp(id, "pointer", at, token));
+            holdFocus(e);
+          },
           onTouchStart: (e: ReactTouchEvent) => sense(e.nativeEvent, (at, token) => pickUp(id, "pointer", at, token)),
           onKeyDown: (e: ReactKeyboardEvent) => onGripKey(id, e),
           onBlur: () => onGripBlur(id),

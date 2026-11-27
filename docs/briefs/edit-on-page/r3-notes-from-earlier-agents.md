@@ -564,3 +564,75 @@ Still open:
 - The same hover dependence elsewhere, not tested: a section's toolbar (`.xe-frame:hover`) after a section is dropped with the mouse (the drag board moves sections in the page too), and a tablet's row chips after a box is dropped by touch.
 - Not checked on a real Mac: whether a real mouse meets the lost hover, and whether the grip, focused by script after a drop, draws a focus ring or its tooltip in Safari. Under the emulation on Chromium the list showed a focus ring after a press, so the grip may show one there.
 - In both runs with the temporary test, "the others slide aside" (Case study, the same test) failed on the first try in both groups and passed on the retry: the slide had not begun when the boxes were measured. With the temporary test and its log of every mousemove gone, the next run had no failed try in either group's flowchart tests. Watch for it.
+
+## From the Safari hover agent, 26 Nov 2026 (branch `phase-2-safari-hover`)
+
+The four risks the flow-lift agent left open (above), each read on WebKit's own runs. Run 45828414221 (b8cdadd) had temporary probes and no fix; run 45832960729 (ae42b2c) had the fix's first version and the same probes. Each probe round dropped something with the mouse (or a finger), went back to it, and wrote what the press met to the job's log, as the flow-lift agent's test did. The probes are gone now. The final version (e4a32c4) has no probe on WebKit: its evidence there is `editor-grip-focus`, which checks the same focus and tools.
+
+What WebKit showed before the fix (run 45828414221, 42 rounds a case in each group unless it says):
+1. A section dropped by mouse, under Safari's rule: after all 42 drops the focus was on nothing, so its toolbar showed only while the pointer was on the section. A section lands near the pointer, not under it, and in 32 rounds the drop left the pointer off it. 17 times a press where its grip is went to the page beneath, the toolbar hidden; in the other 15 the way to the grip crossed the section. Without the rule WebKit on Linux focuses the pressed grip: the grip had the focus after all 42 drops, and all 42 lifted. This is the focus rule's doing, and Chromium under the stand-in shows it as well. A lost hover on a section was not seen: in the 10 rounds that left the pointer on it, it kept its hover.
+2. A tablet's row of boxes after a touch drop (build, essay, before and after at 810px; 12 rounds a group): picked up again 24 times in 24, with the rule and without. The focus stays in the dropped box's words through the drop (React gives it back after moving the box), so its chips show. Touches made in the page never set the hover, so these runs say nothing about the hover half.
+3. A click on a box's grip after a drop, under the rule: 4 failures in 42 (essay 1, before and after 3). Each time WebKit had lost the box's hover with the pointer on it. `keepGrip` had focused the grip; the click moved the focus to the list; the tools hid; the next press went to the box. Without the rule the click focuses the grip: 42 of 42, with the hover lost in 6.
+4. Everything else in `css/` shown only on hover or focus (14 rounds of the flowchart as a section; 3 of a skill, 3 of a finding):
+   - The flowchart dropped as a section: in the 6 rounds that left the pointer on it, the list kept its hover, and its "+" showed (the case study's six boxes have none).
+   - Seen and not explained: before and after's flowchart dropped at the top, then the pointer moved onto the list's middle, onto a "+". The list was hovered and the box that "+" belongs to was not, so its grip and Remove were hidden. It happened in that round in all four groups of both runs, which a lost hover (it came and went) does not do, and the pointer had come onto the list from outside. Most likely the probe's own doing: a "+" takes the pointer only once the list is hovered, so the move that first entered the list hovered what lay under the "+", and the next move would have put it right. One more small move before reading would settle it, or a hand check on a Mac.
+   - A skill removed: the pills are keyed by their words, so none moves in the page; the badge is only faded, and still takes a press.
+   - A finding moved: findings are keyed by place, so the same `li` stays under the pointer, hovered.
+   - Not tried: "Make lead image" (its section moves away from the pointer) and a tablet toolbar after a touch drop (its grip is always shown there).
+
+The fix:
+- `drag/grip.ts`: a grip pressed with a mouse's main button has the focus once the press is over. The browser moves the focus first, as always; a task later, if that left the grip without it (Safari), the grip takes it. A finger's press is told apart by the pointerdown before it, and left as it was. Used by a section's grip (`board.grip` in `drag/engine.ts`) and a box's (`flow/FlowBox.tsx`).
+- `drag/engine.ts`, `finish`: after a drag by mouse the carried section's grip has the focus, as after one from the keyboard. A section dropped into another row is drawn anew, and the focus its press gave the grip went with the old one. That happens in Chromium too, where the hover kept the toolbar up all the same.
+- `keepGrip` in `FlowList.tsx` stays, as a backstop.
+- The first version (ae42b2c) stopped the press's own move of the focus (`preventDefault`) and focused the grip from script. In Chromium a focus given that way matches `:focus-visible`, so the grip drew its focus ring and its tooltip after every press. Chromium's own focus from a press draws neither, which is why it now goes first.
+- Run 45832960729 had that first version: case 1 lifted 42 of 42 under the rule and 42 of 42 without, the grip in focus after every drop; case 3 42 of 42 under the rule, 3 of them with the box's hover lost and the focus keeping its tools up (42 of 42 without, 5 with it lost). All 8 groups passed.
+
+Tests (`e2e/editor-grip-focus.spec.ts`, new; desktop and `safari`). Each check moves the pointer off first, so it reads the focus, not the hover.
+- Under Safari's rule (each page gets `safariFocus`, so Chromium's CI guards it), per layout, a section: a click and a nudge on its grip keep the focus; dropped at the top and back at the end, it keeps its grip in focus and its toolbar shown; a click after a drop; a drop out of a pair, where the section is drawn anew. And a section dropped where it was, or let go with Escape.
+- Under the rule, per layout, a box: a click and a nudge on its grip; dropped, then clicked, then picked up again.
+- Without the rule (skipped under `E2E_FOCUS=safari`, where the rule's stand-in moves the focus from script): a grip pressed or dropped with a mouse, a section's out of a pair too, draws no focus ring and no tooltip (`:focus-visible` false). The first version failed it.
+- The 15 tests under the rule all failed without the fix, on Chromium. With only `grip.ts` in, the drop out of a pair failed on all seven layouts.
+
+Runs of the final version:
+- WebKit, run 45856454547 (e4a32c4, no probe): all 8 groups passed, none failing and none left unrun. `editor-grip-focus` 17 of 17 in "safari 2/3" without the rule, the two ring checks among them, so WebKit too drew no ring for a grip focused from script after a drop out of a pair; 15 of 15 under the rule, the two ring checks skipped. `editor-drag`: 128 tests, none failed, with the rule and without; the iPhone and iPad groups passed both ways.
+- Passed there only on a retry, none of them new: "the others slide aside" (both "safari 2/3" groups, as in runs 45828414221 and 45832960729); the gallery's "+" menu (`editor-drag`, under the rule; run 45828414221 had the same first-try error, the menu not found); "a new graph opens its figures sheet" (`editor-drag`, "safari 1/3", as the flow-lift agent saw); and `editor-inplace`'s account deletion, whose first try had its move to `/account` cut short by the editor reloading as the classic one as the page was left.
+- "safari 1/3" without the rule took 35.5 minutes of its 38.
+- Chromium here, one worker: `editor-grip-focus` 17 of 17, some only after a crash; `editor-drag`'s click-or-nudge test and `editor-flow`'s mouse drag and keyboard tests, 21 of 21, the first on a warm server. CI's run on the final code (45859152403) was cancelled to free runners for the release.
+- Merged `phase-2-pf1` (bf55009) after those runs, with no conflict. Its changes move a finding's controls, a field's formatting buttons and some chips clear of the toolbars (`listsClear`, `clearOfToolbars`, `placeLinkChips`); none changes what shows on hover or focus. `editor-grip-focus` passed 17 of 17 on the merged code here.
+
+For whoever is next:
+- This machine is shared with other agents' runs. Under their load Chromium pages crashed and a dev server died; each test that crashed passed when run again. Next's dev server also takes `/home/user/Exhbt` as its workspace root here (it finds more than one lockfile), which may be why some loads were aborted while other agents were saving files.
+- `editor-flow`, "a box dragged along…", "the others slide aside" (Case study) failed its first try in both "safari 2/3" groups in run 45828414221, which changed no app code, and in 45832960729; it passed on the retry each time. As the flow-lift agent found, the slide has not begun when the boxes are measured. Not touched here.
+- `editor-phone`, "Take a figure from my report", failed on both tries in "iphone-ipad, the focus rule" in run 45828414221 (the sheet at y 83, and a 502 from `/api/exhbts/figure-pick`). It passed in run 45832960729. Not looked into.
+
+Still open (for a real Mac, iPhone or iPad):
+- On a Mac: whether a real mouse meets the lost hover, and whether the grip, focused from script after Safari's own move of the focus (and after a drop), shows its focus ring or its tooltip there. WebKit on Linux drew none after a drop out of a pair, but there the press had focused the grip first; under the rule's stand-in the focus moves from script anyway, so nothing here can say.
+- On an iPad: whether a tap leaves the hover on a box after a drag, and what a row's chips do after a touch drop when the focus was not in the box (a tap on its edge puts the focus on the list): then only the hover keeps them, and WebKit can lose it.
+- On an iPhone and an iPad: that a tap on a grip still does what it did (the change is for a mouse only).
+
+## From the editor-freedom agent, 26 Nov 2026 (branch `phase-2-editor-freedom`, decision 0032)
+
+What was built is in `docs/decisions/0032-write-it-your-way.md`. These are the things that would have saved time.
+
+How the doc is stored:
+- A quote's words, a pull quote's and a link's line are still plain strings (`text`, `description`). Their bold and italic are runs kept beside them (`textRuns`, `descriptionRuns`). Never put runs in the string's place: the build before 0032 reads the string, and so do the word count, the number check and the AI's source-quote check. Read them with `richOf(string, runs)`, write them with the store's `setBeside`. Runs that no longer spell their string are ignored, and `normaliseDoc` drops them.
+- A part's title is one optional string with three states: absent (the layout's own heading, which follows a layout switch), `""` (cleared, no heading for a visitor) and the person's words. `titleShown` in `lib/exhbt/formats.ts` is the one place that decides. The flowchart's and a list of links' are on the doc (`flowTitle`, `refsTitle`).
+- "Empty" has one definition: `isBlank`, `filledFlow` and `hasBody` in `lib/exhbt/blocks.ts`. The page, the published copy, the word count and the publish check all read it. Add a new kind there first.
+- What a layout usually has is `suggestionsFor`, not `validateForPublish`. The draft eval marks a draft on both (`draftIssues` in `evals/exhbt-draft/marks.ts`).
+
+The page must not change for a doc nobody has formatted or titled (`e2e/layout-parity.spec.ts` compares the markup byte for byte):
+- Unformatted words are written as the same expression as before (`wordsOf` in `exhbt-parts.tsx`), because `RichText` wraps each run in a span.
+- On this machine four of the parity gate's cases fail on `main` too: `demo-gp-reminders`, `demo-ae-forecast`, `demo-bed-dashboard`, `demo-study-habits`, each with "N boxes moved" at 1440. Their markup matches. Every box that "moved" has no size (it is not drawn), so its place is only the article's distance from the top of the page, which is 209px now and was 217px when the golden boxes were written on 19 Nov. Something above the article on the demo pages got 8px shorter since. CI compares only the markup, so it does not see it.
+
+Astryx, for the next control in the editor's chrome:
+- `useLayer({ mode: "fixed" })` puts a box in the browser's top layer at a place you give it, drawn where it is in the markup. That is how the bar sits at a selection and is still found as "this field's Bold".
+- A `ToggleButton` does not take a `Toolbar`'s size: give it `size` itself. A `Toolbar` in a `Card` pads itself 8px top and bottom and has no prop for it.
+- A `ListItem` cuts a string label off at one line. Pass a node (`<Text as="span">`) for words that should wrap.
+- Astryx's CSS is not in the editor's `@layer components`, so a rule there does not override it. Use the component's props.
+
+Tests:
+- A formatted field's editor starts in an idle moment, or on a click. Keys sent straight after the click can reach the editor before it has heard of the selection: `waitLive(page)` first, then wait two frames after selecting (`select` in `e2e/your-way.spec.ts`). On a loaded machine this failed about one run in three without the wait.
+- Tests that need no browser can be run with no dev server: a Playwright config with no `webServer`, and a `grep` made from the titles of tests whose callback takes no `page`, `browser` or `request`. Every such test in forty spec files ran in under two minutes.
+- With five or more agents each running a dev server (about 2.5GB each) the machine runs out of memory, and what goes is a browser tab or a dev server. "Page crashed" and `ECONNREFUSED` in a test's error mean that, not the code. `free -g` before a run, and run a spec again on its own before believing a failure.
+
+Not done, and not checked: see the end of decision 0032.

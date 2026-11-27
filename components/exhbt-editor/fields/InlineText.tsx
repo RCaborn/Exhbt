@@ -16,14 +16,17 @@ import { IssueNote, issueId, useFieldIssue } from "./issues";
  * field is a textarea that grows with `field-sizing: content`, or, where a browser lacks it, with a
  * hidden mirror of its words in the same grid cell (`?grow=mirror` forces that, in development).
  *
- * Where the page sets the words inline, among other words (a quote between its marks, the name and
- * the role on one line, a pull quote, a link's words beside its arrow), a textarea cannot flow with
- * the text round it, so the field is an inline span the person types in (`contenteditable` as plain
- * text only): it wraps exactly as the published words do.
+ * Where the page sets the words inline, among other words (a quote's name and role on one line, a
+ * link's words beside its arrow), a textarea cannot flow with the text round it, so the field is an
+ * inline span the person types in (`contenteditable` as plain text only): it wraps exactly as the
+ * published words do.
  */
 
-/** The paths whose words the page sets inline: a quote's words, name and role, a pull quote, a link's words. */
-const INLINE = /^sections\.\d+\.(text|name|role|label)$/;
+/**
+ * The paths whose words the page sets inline: a quote's name and role, a link's words. (A quote's own words and a
+ * pull quote's take bold and italic since decision 0032, so they are formatted fields: RichField.tsx.)
+ */
+const INLINE = /^sections\.\d+\.(name|role|label)$/;
 
 /** How the block fields grow: "css" (`field-sizing`) or "mirror". */
 export const GrowContext = createContext<"css" | "mirror" | null>(null);
@@ -40,7 +43,7 @@ function useFieldSizing(): boolean {
 
 const oneLine = (s: string) => s.replace(/\r?\n/g, " ");
 
-type Props = { path: string; value: string; label: string; placeholder: string; id: string; maxChars?: number; issue: string; onText(t: string): void };
+type Props = { path: string; value: string; label: string; placeholder: string; id: string; maxChars?: number; issue: string; onText(t: string): void; onBlur?(): void };
 export type { Props as PlainFieldProps };
 
 /** Memoised: the page parts draw it with plain values, so it draws again only when its own words, name or place change. */
@@ -65,7 +68,8 @@ export const InlineText = memo(function InlineText({ path: given, value, label, 
   );
 });
 
-export function BlockText({ path, value, label, placeholder, id, maxChars, issue, onText }: Props) {
+/** A plain field set as a block, in the type of whatever it sits in. Exported for a part's title (TitleField.tsx), which stores its words its own way. */
+export function BlockText({ path, value, label, placeholder, id, maxChars, issue, onText, onBlur }: Props) {
   const forced = useContext(GrowContext);
   const supported = useFieldSizing();
   const mirror = forced === "mirror" || !supported;
@@ -85,6 +89,7 @@ export function BlockText({ path, value, label, placeholder, id, maxChars, issue
       maxLength={maxChars}
       spellCheck
       onChange={(e) => onText(oneLine(e.target.value))}
+      onBlur={onBlur}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.preventDefault();
       }}
