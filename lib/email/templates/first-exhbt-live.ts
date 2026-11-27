@@ -12,12 +12,12 @@ const esc = (s: string) =>
 
 const COPY = {
   subject: "Your first exhbt is live",
-  preheader: "It has its own link now, and anyone you send it to can read it.",
+  preheader: "Its link, and your portfolio's address.",
   heading: "Your first exhbt is live",
   body: "Anyone with the link can read it now, with no account needed.",
-  use: "Send it with an application, or put it on your CV or your LinkedIn profile, so an employer can see the work behind the claim.",
+  use: "Send it with an application, or add the link to your CV or your LinkedIn profile, so an employer can read what you did.",
   button: "Open my exhbt",
-  after: "If you change it later and publish again, the link stays the same.",
+  after: "If you edit this exhbt and publish it again, its link stays the same.",
   reason: "You're getting this once, because you published your first exhbt on Exhbt.",
 } as const;
 

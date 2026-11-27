@@ -193,7 +193,7 @@ function Exhbts({ o }: { o: Overview }) {
 
 function PublishNumbers({ o }: { o: Overview }) {
   return (
-    <Panel id="publish-numbers" title="First and second exhbt" note="All time. An account is anyone with a login, including people who only asked for a roadmap by email. It counts once it has published an exhbt: unpublishing later does not undo that, deleting the exhbt does, and a draft never published does not count.">
+    <Panel id="publish-numbers" title="First and second exhbt" note="All time. Every account counts, roadmap-only sign-ups included; an exhbt counts once published, even if unpublished later, and stops counting when deleted.">
       <Part s={o.publishNumbers}>
         {(p) => (
           <DataTable

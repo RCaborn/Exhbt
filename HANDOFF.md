@@ -133,7 +133,7 @@ Development pages for Phase 2 (all 404 in production and when Supabase is connec
 - **`/dev/upload/<id>`** and **`/dev/files/<id>`**: the in-memory stand-in for Storage. Uploads PUT to the first; portfolio pages read from the second. Files are gone when the server restarts.
 - **`/dev/editor?kind=page`**: stands in for `EXHBT_EDITOR` in this browser alone. `kind=classic` and `kind=default` (the variable not set) are the other settings, and an empty `kind=` clears it.
 - **`/dev/portfolio-kind?kind=page`**: stands in for `EXHBT_PORTFOLIO` in this browser alone, then opens `/portfolio`. `kind=steps` and `kind=default` are the other settings.
-- **`/dev/measure`**: `?events=<name>` reads the signed-in person's events back, `?seed=<tag>` adds publishers for the admin's N1 and N2, `?claim=<tag>` makes ten simultaneous first-publish claims (development only, in-memory store).
+- **`/dev/measure`**: `?events=<name>` reads the signed-in person's events back, `?seed=<tag>` adds publishers for the admin's N1 and N2, `?gate=<plan>&tag=<tag>` runs the after-publish step for a new person on a plan, `?race=<tag>` runs it twice at once for one person, `?claim=<tag>` makes ten simultaneous first-publish claims (development only, in-memory store).
 - **`/dev/admin?role=admin`**: makes the signed-in dev user an admin (`role=user` takes it back), for `/admin` and the admin's own editor switch.
 
 ### The editor switch

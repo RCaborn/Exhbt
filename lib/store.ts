@@ -451,7 +451,8 @@ export interface Store {
   /**
    * Logs an event only if this user has none with this name yet, and returns its claim token (also in the event's
    * props as `claim`) to the caller that logged it, null to every other. For a thing that must happen once per
-   * person, ever (the first-publish email). At most one caller wins; it is possible, but rare, that none does.
+   * person, ever (the first-publish email). At most one caller wins. On Supabase, claims that overlap usually give no winner at all
+   * (see below), which means a missed email, never two.
    * In memory the check and the write are one step, so exactly one wins. On Supabase it writes its row, reads back,
    * and wins only if its row is the only one, so of two callers at the same moment the one whose read comes second
    * sees the other's row, and both can back off, which sends nothing rather than twice. A unique index on

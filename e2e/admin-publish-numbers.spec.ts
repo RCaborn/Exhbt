@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { slugify } from "../lib/exhbt/slug";
 import { uniqueEmail } from "./helpers";
-import { fillValid, openPublishSheet, publish, publishSheet, signInAs, startFromScratch, waitForSave } from "./editor";
+import { closeOpenSheet, fillBox, fillValid, openPublishSheet, publish, publishSheet, signInAs, startFromScratch, waitForSave } from "./editor";
 
 // N1 and N2 on the admin page, the exhbt_published event and the one email at a first publish (M1 and M2 of the appeal plan).
 // The in-memory store is shared by the whole run, so the admin numbers are read before and after seeding and compared as differences.
@@ -47,7 +47,7 @@ test.describe("N1 and N2 on the admin page", () => {
   test("count right on seeded data: a first and a second exhbt, an unpublished one, an account with none", async ({ page }) => {
     await adminSignIn(page);
     await expect(page.getByRole("heading", { name: "First and second exhbt" })).toBeVisible();
-    await expect(page.getByText(/deleting the exhbt does, and a draft never published does not count/)).toBeVisible();
+    await expect(page.getByText(/stops counting when deleted/)).toBeVisible();
     const before = { n1: await readStat(page, "n1"), n2: await readStat(page, "n2") };
 
     const seeded = await page.request.get(`/dev/measure?seed=${stamp()}`);
@@ -55,9 +55,9 @@ test.describe("N1 and N2 on the admin page", () => {
     await page.reload();
     const after = { n1: await readStat(page, "n1"), n2: await readStat(page, "n2") };
 
-    // Four new accounts: a draft only (in the base, not counted), one published, two published, and one published then
-    // taken down beside a draft (still counted once: unpublishing does not undo a publish).
-    expect(after.n1.accounts - before.n1.accounts).toBe(4);
+    // Five new accounts: one with no exhbt at all and one with a draft only (both in the base, not counted), one published,
+    // two published, and one published then taken down beside a draft (still counted once: unpublishing does not undo a publish).
+    expect(after.n1.accounts - before.n1.accounts).toBe(5);
     expect(after.n1.count - before.n1.count).toBe(3);
     expect(after.n2.count - before.n2.count).toBe(1);
     expect(after.n1.share).toBe(`${Math.round((after.n1.count / after.n1.accounts) * 100)}%`);
@@ -144,7 +144,42 @@ test.describe("a publish: the event and the first email", () => {
     expect(await (await page.request.get(`/dev/measure?gate=premium&tag=${tag}`)).json()).toEqual({ published: 1, claims: 1, emails: 1 });
   });
 
-  test("two presses at the same moment send one email", async ({ page, context }) => {
+  test("a republish of a live exhbt logs its own event and sends no second email", async ({ page }) => {
+    const user = `pubchanges${stamp()}`.toLowerCase();
+    await signInAs(page, user, "premium");
+    await publishNew(page, "Changed after going live");
+    await expect.poll(async () => (await eventsOf(page, "exhbt_published")).length).toBe(1);
+    await closeOpenSheet(page);
+    await fillBox(page, 2, "Added a second till and a sign");
+    await waitForSave(page);
+    await publish(page, { changes: true });
+    await expect.poll(async () => (await eventsOf(page, "exhbt_published")).length).toBe(2);
+    expect((await eventsOf(page, "exhbt_published"))[1]!.props).toEqual({ n: 1, republish: true });
+    await page.waitForTimeout(500);
+    await expect(await firstEmails(page, `${user}@example.com`)).toHaveCount(1);
+    expect((await eventsOf(page, "first_publish_emailed")).length).toBe(1);
+  });
+
+  test("someone who published before this deploy (no claim row) gets no first-exhbt email on their next publish", async ({ page }) => {
+    const user = `prepub${stamp()}`.toLowerCase();
+    // /dev/portfolio publishes through the store with no event and no claim, as every publish did before this deploy.
+    await page.goto(`/dev/portfolio?username=${user}&plan=premium&count=1`);
+    await page.goto(`/auth/dev?email=${user}@example.com&next=/exhbts`);
+    await publishNew(page, "Second ever, first since deploy");
+    await expect.poll(async () => (await eventsOf(page, "exhbt_published")).length).toBe(1);
+    expect((await eventsOf(page, "exhbt_published"))[0]!.props).toEqual({ n: 2, republish: false });
+    await page.waitForTimeout(500);
+    await expect(await firstEmails(page, `${user}@example.com`)).toHaveCount(0);
+    expect((await eventsOf(page, "first_publish_emailed")).length).toBe(0);
+  });
+
+  test("two publishes at the same moment on the server: one claim, one email", async ({ page }) => {
+    // Both runs read the person's exhbts before either publish, so the first-publish check lets both through and only the claim stops one.
+    const tag = stamp();
+    expect(await (await page.request.get(`/dev/measure?race=${tag}`)).json()).toEqual({ published: 2, claims: 1, emails: 1 });
+  });
+
+  test("presses in two tabs send one email in all", async ({ page, context }) => {
     const user = `pubrace${stamp()}`.toLowerCase();
     await signInAs(page, user, "premium");
     await startFromScratch(page);
