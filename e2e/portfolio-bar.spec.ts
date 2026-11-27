@@ -492,14 +492,26 @@ test.describe("The address sheet", () => {
     await expect(toolbar(page).getByRole("button", { name: "Share" })).toBeVisible();
   });
 
-  test("with an address: Copy link, Change and Hide from search", async ({ page }) => {
+  test("with an address: Copy link, Change and Hide from search", async ({ page, browserName }) => {
     await openEditor(page, fresh(fullFixture("x", null, "premium"), "addr-share"));
     await toolbar(page).getByRole("button", { name: "Share" }).click();
     const sheet = page.locator('[data-sheet="address"]');
     await expect(sheet.locator('[data-address="share"]')).toBeVisible();
-    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    // Chromium writes and reads the clipboard only with both permissions. WebKit has no clipboard-write (Playwright
+    // throws "Unknown permission" for it): a press writes there with none, and clipboard-read lets a test read it back.
+    await page.context().grantPermissions(browserName === "webkit" ? ["clipboard-read"] : ["clipboard-read", "clipboard-write"]);
     await sheet.getByRole("button", { name: "Copy link" }).click();
     await expect(page.getByText("Link copied", { exact: true }).first()).toBeVisible();
+    // What was copied is the address the sheet links to, made whole with this site's origin, wherever the browser lets
+    // a test read the clipboard back: Chromium must; a WebKit that refuses the read is noted on the test.
+    const href = (await sheet.locator("[data-address-host] a").getAttribute("href")) ?? "";
+    expect(href, "the sheet links to the address").not.toBe("");
+    const copied = await page.evaluate(() => navigator.clipboard.readText().catch((e: unknown) => ({ refused: String(e) })));
+    if (typeof copied === "string") expect(copied).toBe(href.startsWith("/") ? `${new URL(page.url()).origin}${href}` : href);
+    else {
+      expect(browserName, `the clipboard could not be read: ${copied.refused}`).toBe("webkit");
+      test.info().annotations.push({ type: "clipboard", description: `WebKit did not let the test read the clipboard: ${copied.refused}` });
+    }
     await sheet.getByRole("button", { name: "Change" }).click();
     await expect(sheet.getByRole("textbox", { name: "Username" })).toBeVisible();
     await expect(sheet).toContainText("redirects to the new one for 30 days");
