@@ -3,7 +3,7 @@
 import "@/components/exhbt-editor/css/core.css";
 import "./css/core.css";
 import { memo, useEffect, useState, type ReactNode } from "react";
-import { unstable_isUnrecognizedActionError, useRouter } from "next/navigation";
+import { unstable_isUnrecognizedActionError } from "next/navigation";
 import { savePortfolioAction } from "@/app/(app)/portfolio/actions";
 import { problemOf } from "@/app/(app)/portfolio/builder-state";
 import type { PortfolioData } from "@/app/(app)/portfolio/load";
@@ -179,7 +179,6 @@ export function PortfolioEditor({
   visit.host.change = builder.change;
   visit.host.retry = builder.retry;
   const [ready, setReady] = useState(false);
-  const router = useRouter();
   // An iPhone zooms in on a field under 16px, and much of the page's own type is under it.
   useNoZoomOnFocus();
 
@@ -206,15 +205,28 @@ export function PortfolioEditor({
     return registerSender({ send: visit.send }, visit.owner, visit.loaded);
   }, [rt, visit]);
 
-  // The browser's Back, bringing this document back whole from its own cache: what other pages did since
-  // (an exhbt's title, a publish) is fetched. The editor's state is as the person left it.
+  // The browser's Back, bringing this document back whole from its own cache: its editor holds the state of
+  // when it was left, and the server may have newer words since (the step builder's, another tab's, another
+  // page's). Saved over them, they would be lost, so the page is loaded afresh. Nothing is lost by it:
+  // anything that was waiting was sent as the page was left (useBuilder sends when the tab is hidden).
   useEffect(() => {
     const shown = (e: PageTransitionEvent) => {
-      if (e.persisted) router.refresh();
+      if (e.persisted) window.location.reload();
     };
     window.addEventListener("pageshow", shown);
     return () => window.removeEventListener("pageshow", shown);
-  }, [router]);
+  }, []);
+
+  // Leaving by a link inside the app (a tile, the Add link, the header) while a save is refused or has
+  // failed: those words reach no server, and the next visit's editor starts from what the server has. So
+  // they are kept in this browser and offered back once on the next visit (keep.ts, Notices.tsx).
+  useEffect(
+    () => () => {
+      const kind = rt.save.get().status.kind;
+      if ((kind === "invalid" || kind === "error") && hasPending()) keepUnsaved(visit.owner, rt.state.get(), "left");
+    },
+    [rt, visit],
+  );
 
   return (
     <RuntimeContext value={rt}>

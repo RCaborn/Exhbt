@@ -93,7 +93,5 @@ export async function sendMagicLink(email: string, next: string): Promise<{ devL
 
 export const DEV_USER_COOKIE = DEV_COOKIE;
 
-/** Only allow same-site relative redirects after login. */
-export function safeNext(next: string | null | undefined, fallback = "/roadmap") {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : fallback;
-}
+// The check is pure, so it lives apart from this server-only file and is tested on its own (e2e/safe-next.spec.ts).
+export { safeNext } from "./safe-next";

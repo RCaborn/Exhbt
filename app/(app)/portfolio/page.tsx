@@ -14,7 +14,7 @@ import { loadPortfolioData } from "./load";
 import { isStep, type Step } from "./steps";
 import { TryNewPortfolio } from "./TryNewPortfolio";
 
-type Search = { step?: string; builder?: string; joined?: string; left?: string; full?: string };
+type Search = { crash?: string; step?: string; builder?: string; joined?: string; left?: string; full?: string };
 
 /** The address's own word for the step builder: the escape, and where the editor's crash fallback reloads to. */
 const stepsAsked = (q: Search) => q.builder === "steps";
@@ -41,10 +41,13 @@ export default async function BuildPortfolioPage({ searchParams }: { searchParam
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/portfolio");
   const asked = await searchParams;
+  // Development only: the page failing on the server, for its error page's test (e2e/portfolio-safety.spec.ts).
+  if (process.env.NODE_ENV !== "production" && asked.crash === "server") throw new Error("The portfolio page was told to fail (?crash=server, development only).");
   const admin = await isAdmin(user);
   const kind = stepsAsked(asked) ? "steps" : await portfolioKind(admin);
   const host = await headers().then((h) => h.get("x-forwarded-host") ?? h.get("host"));
-  const data = await loadPortfolioData(user.id, host, admin);
+  // The step builder reads only what it always read; the editor's own parts are loaded only for the editor.
+  const data = await loadPortfolioData(user.id, host, admin, { editor: kind === "page" });
 
   if (kind === "steps") {
     const step: Step = isStep(asked.step) ? asked.step : "you";
