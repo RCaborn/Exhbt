@@ -330,7 +330,7 @@ function Next({ emailedTo, signedIn, id, unlocked }: { emailedTo: string | null;
       )}
 
       <div className="mt-10 rounded-[16px] bg-ink p-6 text-white sm:p-8">
-        <h2 className="">{isPhase2Enabled() ? "Already finished a project?" : "Your finished projects"}</h2>
+        <h2 className="text-white">{isPhase2Enabled() ? "Already finished a project?" : "Your finished projects"}</h2>
         {isPhase2Enabled() ? (
           <>
             <p className="mt-3 max-w-[34rem] text-[#c9cbcf]">
