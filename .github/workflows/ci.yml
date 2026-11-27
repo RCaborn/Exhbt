@@ -34,15 +34,17 @@ jobs:
       - run: npm run lint
       - run: npm run build
 
-  # The end-to-end suite, split across ten runners (by spec file), each with its own dev server.
-  # Eight shards still left one at 27.7 minutes (release 3, shard 7), so ten shards and a 60-minute limit (45 until shard 2's tests took 34.9 minutes, 26 Nov 2026); the main session watches the shard times.
+  # The end-to-end suite, split across twelve runners (by spec file), each with its own dev server.
+  # Ten shards and a 60-minute limit (45 until shard 2's tests took 34.9 minutes, 26 Nov 2026). Twelve since 27 Nov 2026:
+  # on 2e42e78 shard 7 of ten spent 48.0 of its 60 minutes in tests (50.7 the run before), because the portfolio editor's
+  # specs sit together there (portfolio-editor, portfolio-core, -arrange, -bar and -landing); twelve shards split them. The main session watches the shard times.
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -51,7 +53,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/10
+      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/12
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
