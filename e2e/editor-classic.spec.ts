@@ -209,6 +209,47 @@ test.describe("the crash fallback", () => {
     expect(new URL(page.url()).searchParams.get("editor")).toBe("classic");
   });
 
+  // Safari stops a page's loads the moment the person goes somewhere else, and keeps the page until the next one
+  // arrives, which can take far longer than a chunk's three tries (components/exhbt-editor/again.ts). Here any browser
+  // is made to do the same: the next page is held back for eight seconds, and from the moment the person leaves, the
+  // formatted fields' chunk fails each time it is asked for. The page that was left opens nothing after it.
+  test("a chunk cut off by leaving the page opens no classic editor, however long the next page takes", async ({ page }) => {
+    const { edit } = await seed(page, "leave");
+    const fellBack: string[] = [];
+    page.on("console", (m) => {
+      if (m.type() === "error" && m.text().includes("The new editor failed")) fellBack.push(m.text());
+    });
+    // In development the chunk is named after its file (components/exhbt-editor/fields/RichEditor.tsx). It is on its
+    // way and does not come; once the person has left it fails, and so does every asking after.
+    let asked = 0;
+    let gone = false;
+    let failedAfter = 0;
+    let leave!: () => void;
+    const left = new Promise<void>((done) => (leave = done));
+    await page.route(/RichEditor/, async (route) => {
+      asked++;
+      if (!gone) await left;
+      failedAfter++;
+      await route.abort().catch(() => {});
+    });
+    await page.goto(edit);
+    await expect(page.locator(NEW_READY)).toBeAttached();
+    await expect.poll(() => asked).toBeGreaterThan(0);
+    // The list, the next page, is eight seconds on its way: the person has left once its request goes out.
+    await page.route(/\/exhbts$/, async (route) => {
+      if (route.request().resourceType() !== "document") return route.continue();
+      gone = true;
+      leave();
+      await new Promise((done) => setTimeout(done, 8000));
+      await route.continue();
+    });
+    await page.goto("/exhbts");
+    await expect(page.getByRole("heading", SEL.listHeading)).toBeVisible();
+    expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe("/exhbts");
+    expect(failedAfter, "the chunk was cut off by the leave").toBeGreaterThan(0);
+    expect(fellBack).toEqual([]);
+  });
+
   test("a page that fails on the server (?crash=server) shows the route's error page, with the way to the classic editor", async ({ page }) => {
     const { edit } = await seed(page, "server");
     await page.goto(`${edit}?crash=server`);

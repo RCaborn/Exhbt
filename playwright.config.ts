@@ -33,9 +33,17 @@ const NOT_ON_WEBKIT: [name: RegExp, why: string][] = [
 const NOT_UNDER_SAFARI_FOCUS: [name: RegExp, why: string][] = [];
 const LEFT_OUT = [...NOT_ON_WEBKIT, ...(process.env.E2E_FOCUS === "safari" ? NOT_UNDER_SAFARI_FOCUS : [])].map(([name]) => name);
 const ONLY_WEBKIT = /[\\/][a-z-]+\.webkit\.ts$/;
+/*
+ * The one-page portfolio editor's specs (decision 0031; docs/briefs/portfolio-first). Its phone spec runs only on
+ * the phones; its arranging spec with a mouse and by touch; and on Safari's engine at 1440, the four that type,
+ * drag and open the bar's parts. Every other portfolio spec runs on `desktop` only.
+ */
+const PORTFOLIO_PHONE = /[\\/]portfolio-phone\.spec\.ts$/;
+const PORTFOLIO_TOUCH = /[\\/]portfolio-(arrange|phone)\.spec\.ts$/;
+const PORTFOLIO_SAFARI = /[\\/]portfolio-(core|arrange|bar|editor)\.spec\.ts$/;
 const webkitProjects = [
-  { name: "safari", fullyParallel: true, use: { ...devices["Desktop Safari"], viewport: { width: 1440, height: 900 }, ...engine }, testMatch: [/[\\/]editor-[a-z-]+\.spec\.ts$/, /[\\/]your-way\.spec\.ts$/, ONLY_WEBKIT], testIgnore: /editor-(phone|tablet)\.spec\.ts/, grepInvert: LEFT_OUT },
-  { name: "iphone", fullyParallel: true, use: { ...devices["iPhone 14"], ...engine }, testMatch: [/editor-(drag|flow|phone|figures)\.spec\.ts/, ONLY_WEBKIT], grepInvert: LEFT_OUT },
+  { name: "safari", fullyParallel: true, use: { ...devices["Desktop Safari"], viewport: { width: 1440, height: 900 }, ...engine }, testMatch: [/[\\/]editor-[a-z-]+\.spec\.ts$/, /[\\/]your-way\.spec\.ts$/, PORTFOLIO_SAFARI, ONLY_WEBKIT], testIgnore: /editor-(phone|tablet)\.spec\.ts/, grepInvert: LEFT_OUT },
+  { name: "iphone", fullyParallel: true, use: { ...devices["iPhone 14"], ...engine }, testMatch: [/editor-(drag|flow|phone|figures)\.spec\.ts/, PORTFOLIO_TOUCH, ONLY_WEBKIT], grepInvert: LEFT_OUT },
   { name: "ipad", fullyParallel: true, use: { ...devices["iPad (gen 7)"], ...engine }, testMatch: /editor-tablet\.spec\.ts/, grepInvert: LEFT_OUT },
 ];
 
@@ -60,9 +68,9 @@ export default defineConfig({
   // The edit-on-page editor's drag and flowchart specs run with a mouse and by touch; its phone and
   // tablet specs only on their own devices (docs/briefs/edit-on-page/README.md).
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } }, testIgnore: /editor-(phone|tablet)\.spec\.ts/ },
+    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } }, testIgnore: [/editor-(phone|tablet)\.spec\.ts/, PORTFOLIO_PHONE] },
     { name: "mobile", use: { ...devices["Pixel 7"] }, testMatch: /responsive\.spec\.ts/ },
-    { name: "touch", use: { ...devices["Pixel 7"] }, testMatch: /editor-(drag|flow|phone|figures)\.spec\.ts/ },
+    { name: "touch", use: { ...devices["Pixel 7"] }, testMatch: [/editor-(drag|flow|phone|figures)\.spec\.ts/, PORTFOLIO_TOUCH] },
     { name: "tablet", use: { browserName: "chromium", viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 }, testMatch: /editor-tablet\.spec\.ts/ },
     ...(WEBKIT ? webkitProjects : []),
   ],

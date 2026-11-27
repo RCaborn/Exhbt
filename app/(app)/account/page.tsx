@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { isAdmin } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
 import { PLAN_NAMES, REFERRAL_CREDIT } from "@/lib/entitlements";
@@ -9,6 +10,7 @@ import { referralLink, referralsLive } from "@/lib/referrals";
 import { getPlan } from "@/lib/plan";
 import { CopyLink } from "@/components/ui/CopyLink";
 import { portfolioHost } from "@/lib/hosts";
+import { portfolioKind } from "@/lib/portfolio-kind-server";
 import { portfolioHref } from "@/lib/portfolio-links";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
@@ -57,8 +59,14 @@ export default async function AccountPage() {
       {phase2 && (
         <nav aria-label="Account settings" className="mt-6">
           <ul className="flex flex-wrap gap-x-6 gap-y-2 font-semibold">
-            <li><Link href="/exhbts" className="link">Your exhbts</Link></li>
-            <li><Link href="/portfolio" className="link">Build your portfolio</Link></li>
+            {(await portfolioKind(await isAdmin(user))) === "page" ? (
+              <li><Link href="/portfolio" className="link">Your portfolio</Link></li>
+            ) : (
+              <>
+                <li><Link href="/exhbts" className="link">Your exhbts</Link></li>
+                <li><Link href="/portfolio" className="link">Build your portfolio</Link></li>
+              </>
+            )}
             <li><Link href="/account/billing" className="link">Billing</Link></li>
           </ul>
         </nav>

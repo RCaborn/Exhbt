@@ -4,21 +4,20 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { deleteExhbt, moveExhbt } from "./[id]/actions";
-import { leaveAction, makeOwnAction } from "@/app/(app)/team/actions";
-import { ConfirmAction } from "@/components/editor/ConfirmAction";
 import { DeleteExhbt } from "@/components/editor/DeleteExhbt";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
+import { JoinRequests, TeamProjects } from "@/components/team/TeamPanel";
 import { Button } from "@/components/ui/Button";
 import { ADD_EXHBT } from "@/lib/add-exhbt";
+import { isAdmin } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { ENTITLEMENTS, PLAN_NAMES } from "@/lib/entitlements";
 import { headlineFor } from "@/lib/exhbt/headline";
 import { canCreateExhbt, getPlan, limitsFor } from "@/lib/plan";
+import { portfolioKind } from "@/lib/portfolio-kind-server";
 import { portfolioHref } from "@/lib/portfolio-links";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
-import { joinRequestsFor } from "@/lib/duplicates";
-import { membershipsFor } from "@/lib/team";
 
 export const metadata: Metadata = { title: "Your exhbts", robots: { index: false } };
 // Per request: the EXHBT_PHASE2 switch and the session are read at runtime, never baked in at build.
@@ -26,17 +25,18 @@ export const dynamic = "force-dynamic";
 
 const updated = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
-/** What just happened on a team project, from the query string (app/(app)/team/actions.ts). */
-const TEAM_SAID: Record<string, string> = {
-  joined: "You're on the team. The project shows below.",
-  left: "You've left the project. Your own exhbt made from it, if you made one, is still yours.",
-};
-
 /** A person's exhbts, in portfolio order: start one, open one, reorder, delete. Then the team projects they're on. */
 export default async function ExhbtsPage({ searchParams }: { searchParams: Promise<{ joined?: string; left?: string; full?: string }> }) {
   if (!isPhase2Enabled()) notFound();
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/exhbts");
+  // Portfolio first: the list's jobs live on the portfolio now, so its address sends people there, query kept
+  // (?full, ?joined, ?left; the browser keeps #team-projects). The address stays for good: sent emails use it.
+  if ((await portfolioKind(await isAdmin(user))) === "page") {
+    const kept = new URLSearchParams();
+    for (const [k, v] of Object.entries(await searchParams)) for (const one of ([] as string[]).concat(v ?? [])) kept.append(k, one);
+    redirect(kept.size ? `/portfolio?${kept}` : "/portfolio");
+  }
   const store = getStore();
   const [plan, exhbts, profile, host, q] = await Promise.all([
     getPlan(user.id),
@@ -45,8 +45,7 @@ export default async function ExhbtsPage({ searchParams }: { searchParams: Promi
     headers().then((h) => h.get("x-forwarded-host") ?? h.get("host")),
     searchParams,
   ]);
-  const [requests, memberships] = await Promise.all([joinRequestsFor(user.id), membershipsFor(user.id, host)]);
-  const said = q.joined ? TEAM_SAID.joined : q.left ? TEAM_SAID.left : null;
+  const said = q.joined ? "joined" : q.left ? "left" : null;
   const max = limitsFor(plan).exhbts;
   const room = canCreateExhbt(plan, exhbts);
   const canGoLive = ENTITLEMENTS[plan].publicPortfolio;
@@ -86,25 +85,7 @@ export default async function ExhbtsPage({ searchParams }: { searchParams: Promi
           </p>
         )}
 
-        {requests.length > 0 && (
-          <section aria-labelledby="join-requests" className="mt-6 rounded-[20px] border border-ink bg-surface p-5 sm:p-6">
-            <h2 id="join-requests" className="text-[1.375rem]">
-              {requests.length === 1 ? "Someone asked to join your exhbt" : "People asked to join your exhbts"}
-            </h2>
-            <ul className="mt-3 space-y-2">
-              {requests.map((r) => (
-                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2">
-                  <span>
-                    <span className="font-semibold">{r.name}</span> asked to join <span className="font-semibold">{r.title}</span>
-                  </span>
-                  <Button href={`/exhbts/${r.exhbtId}/team`} size="sm" label={`Review ${r.name}'s request`}>
-                    Review
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
+        <JoinRequests userId={user.id} />
 
         {!canGoLive && (
           <section aria-labelledby="preview-only" className="mt-6 rounded-[20px] border border-line bg-surface p-5 sm:p-6">
@@ -172,59 +153,7 @@ export default async function ExhbtsPage({ searchParams }: { searchParams: Promi
           </ol>
         )}
 
-        {said && (
-          <p role="status" data-said className="mt-8 rounded-[14px] border border-line bg-surface px-4 py-3">
-            {said}
-          </p>
-        )}
-        {memberships.length > 0 && (
-          <section id="team-projects" aria-labelledby="team-projects-title" className="mt-10">
-            <h2 id="team-projects-title" className="text-[1.375rem]">
-              Team projects
-            </h2>
-            <p className="mt-1 text-graphite">Other people&apos;s exhbts you&apos;re on as a teammate. Your name shows on them when they&apos;re live.</p>
-            {q.full && !room.ok && <UpgradePrompt className="mt-3" reason={room.reason} upgradeTo={room.upgradeTo} tone="alert" />}
-            <ul className="mt-4 space-y-3" aria-label="Team projects you're on">
-              {memberships.map((m) => (
-                <li key={m.rootId} className="flex flex-col gap-3 rounded-[16px] border border-line bg-surface p-4">
-                  <div className="min-w-0">
-                    <p className="font-semibold break-words">{m.title}</p>
-                    <p className="text-sm text-graphite">
-                      {m.ownerName}&apos;s exhbt{m.role ? ` · Your part: ${m.role}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {m.ownId ? (
-                      <Button href={`/exhbts/${m.ownId}/edit`} size="sm" label={`Open your own exhbt of ${m.title}`}>
-                        Open your own exhbt
-                      </Button>
-                    ) : room.ok ? (
-                      <form action={makeOwnAction.bind(null, m.rootId)}>
-                        <Button type="submit" size="sm" label={`Make my own exhbt from ${m.title}`}>
-                          Make my own exhbt from this project
-                        </Button>
-                      </form>
-                    ) : (
-                      <span className="text-sm text-graphite">Your plan is full, so you can&apos;t make your own exhbt of this yet.</span>
-                    )}
-                    {m.liveHref && (
-                      <Button href={m.liveHref} size="sm" label={`View ${m.title}`}>
-                        View
-                      </Button>
-                    )}
-                    <ConfirmAction
-                      label="Leave"
-                      accessibleLabel={`Leave ${m.title}`}
-                      question="Take your name off it?"
-                      confirmLabel="Yes, leave"
-                      action={leaveAction.bind(null, m.rootId)}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
+        <TeamProjects userId={user.id} host={host} said={said} full={Boolean(q.full)} />
       </div>
     </div>
   );

@@ -2,11 +2,16 @@ import Link from "next/link";
 import { createFromIdea, createFromSavedIdea } from "@/app/(app)/exhbts/[id]/actions";
 import { Button } from "@/components/ui/Button";
 
-/** What the Projects view knows about building an idea as an exhbt (null when Phase 2 is off). */
-export type BuildState =
+/**
+ * What the Projects view knows about building an idea as an exhbt (null when Phase 2 is off).
+ * `portfolioFirst` is set when the portfolio switch is at "page" (lib/portfolio-kind.ts, decision 0031):
+ * the button then says "Add as an exhbt", since the exhbt goes on the person's portfolio.
+ */
+export type BuildState = (
   | { state: "signed-out" }
   | { state: "ok" }
-  | { state: "full"; reason: string };
+  | { state: "full"; reason: string }
+) & { portfolioFirst?: true };
 
 /**
  * "Build this as an exhbt" under a project idea: starts an exhbt prefilled from the idea and
@@ -50,18 +55,19 @@ export function BuildThis({
     );
   }
   const action = savedId ? createFromSavedIdea.bind(null, savedId) : createFromIdea.bind(null, roadmapId ?? "", ideaId ?? "");
-  const label = `Build this as an exhbt: ${title}`;
+  const words = build.portfolioFirst ? "Add as an exhbt" : "Build this as an exhbt";
+  const label = build.portfolioFirst ? `Add to your portfolio as an exhbt: ${title}` : `Build this as an exhbt: ${title}`;
   if (inForm) {
     return (
       <Button type="submit" size="sm" formAction={action} label={label}>
-        Build this as an exhbt
+        {words}
       </Button>
     );
   }
   return (
     <form action={action}>
       <Button type="submit" size="sm" label={label}>
-        Build this as an exhbt
+        {words}
       </Button>
     </form>
   );

@@ -1,120 +1,78 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import { STRIP_COOKIE, stripHiddenFor } from "@/components/portfolio-editor/bar/strip-cookie";
+import { PortfolioGate } from "@/components/portfolio-editor/PortfolioGate";
+import { TeamPanel } from "@/components/team/TeamPanel";
+import { isAdmin } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth";
-import { ENTITLEMENTS, PLAN_NAMES } from "@/lib/entitlements";
-import { signedFileUrl } from "@/lib/files";
-import { canClaimUsername, canPublish as publishVerdict, canUseExtraTiles, canUseTheme, customisableExhbts, getPlan } from "@/lib/plan";
-import type { CustomiseState } from "@/lib/portfolio-customise";
-import { portfolioHref } from "@/lib/portfolio-links";
-import { homeProject } from "@/lib/portfolio-home";
-import { EXTRA_SECTIONS, sectionsOf, TILE_KINDS } from "@/lib/portfolio-layout";
-import { draftFromProfile } from "@/lib/portfolio-profile";
-import { PORTFOLIO_THEMES, themeById, themeFor } from "@/lib/portfolio-themes";
+import { portfolioKind, portfolioServed } from "@/lib/portfolio-kind-server";
 import { isPhase2Enabled } from "@/lib/site";
-import { getStore } from "@/lib/store";
 import { Builder } from "./Builder";
 import { JobLinksSection } from "./JobLinksSection";
-import { isStep, type BuilderProject, type Step, type ThemeLock } from "./steps";
+import { loadPortfolioData } from "./load";
+import { isStep, type Step } from "./steps";
+import { TryNewPortfolio } from "./TryNewPortfolio";
 
-export const metadata: Metadata = { title: "Build your portfolio", robots: { index: false } };
+type Search = { crash?: string; step?: string; builder?: string; joined?: string; left?: string; full?: string };
+
+/** The address's own word for the step builder: the escape, and where the editor's crash fallback reloads to. */
+const stepsAsked = (q: Search) => q.builder === "steps";
+
+/** The tab's title follows the builder served: "Your portfolio" for the page itself, the step builder's own otherwise. */
+export async function generateMetadata({ searchParams }: { searchParams: Promise<Search> }): Promise<Metadata> {
+  const page = !stepsAsked(await searchParams) && (await portfolioServed()) === "page";
+  return { title: page ? "Your portfolio" : "Build your portfolio", robots: { index: false } };
+}
 // Per person, and EXHBT_PHASE2 is read at request time: never prerender (it would bake in the 404).
 export const dynamic = "force-dynamic";
 
 /**
- * Build your portfolio (decision 0016): one guided flow in four steps, You, Your look, Your projects
- * and Publish, with a live preview of the whole page beside it. It replaces portfolio settings and
- * the customiser, which redirect here. This page only loads; Builder.tsx does the work and every
- * change goes through the checks in actions.ts.
+ * A person's portfolio, to build (decisions 0016 and 0031). One switch decides which builder they get
+ * (lib/portfolio-kind.ts):
+ *  - "steps", today's for everyone: one guided flow in four steps, You, Your look, Your projects and
+ *    Publish, with a live preview beside it (Builder.tsx), and the job links under it;
+ *  - "page": the page itself, edited where it sits, in their look (components/portfolio-editor).
+ * `?builder=steps` serves the step builder for this request whatever the switch says. This page only
+ * loads (load.ts gives both builders the same data); every change goes through the checks in actions.ts.
  */
-export default async function BuildPortfolioPage({ searchParams }: { searchParams: Promise<{ step?: string }> }) {
+export default async function BuildPortfolioPage({ searchParams }: { searchParams: Promise<Search> }) {
   if (!isPhase2Enabled()) notFound();
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/portfolio");
-  const asked = (await searchParams).step;
-  const step: Step = isStep(asked) ? asked : "you";
+  const asked = await searchParams;
+  // Development only: the page failing on the server, for its error page's test (e2e/portfolio-safety.spec.ts).
+  if (process.env.NODE_ENV !== "production" && asked.crash === "server") throw new Error("The portfolio page was told to fail (?crash=server, development only).");
+  const admin = await isAdmin(user);
+  const kind = stepsAsked(asked) ? "steps" : await portfolioKind(admin);
+  const host = await headers().then((h) => h.get("x-forwarded-host") ?? h.get("host"));
+  // The step builder reads only what it always read; the editor's own parts are loaded only for the editor.
+  const data = await loadPortfolioData(user.id, host, admin, { editor: kind === "page" });
 
-  const store = getStore();
-  const [plan, exhbts, profile, host] = await Promise.all([
-    getPlan(user.id),
-    store.listExhbts(user.id),
-    store.getPortfolioProfile(user.id),
-    headers().then((h) => h.get("x-forwarded-host") ?? h.get("host")),
-  ]);
-  const photoUrl = await signedFileUrl(profile.photoFileId, user.id);
-  const isPublic = ENTITLEMENTS[plan].publicPortfolio;
-  const tilesVerdict = canUseExtraTiles(plan);
-  const held = isPublic ? null : publishVerdict(plan, exhbts, "");
-
-  // The exhbts the portfolio lists (any exhbt on Free, which can't publish, so there is something to arrange).
-  const candidates = customisableExhbts(plan, exhbts);
-  const projects: BuilderProject[] = await Promise.all(
-    candidates.map(async (e) => {
-      const doc = isPublic && e.published ? e.published : e.doc;
-      const home = homeProject(e.id, doc, "#");
-      if (home.figure.kind === "image") home.imageUrl = await signedFileUrl(home.figure.fileId, user.id);
-      return { id: e.id, title: home.title, home, live: e.status === "published" };
-    }),
-  );
-  const listed = new Set(projects.map((p) => p.id));
-  const drafts = exhbts.filter((e) => !listed.has(e.id)).map((e) => ({ id: e.id, title: e.doc.title.trim() || "Untitled exhbt", live: e.status === "published" }));
-
-  // Experience and a quote are held, not deleted, when a plan doesn't have them: they come back with the plan.
-  const storedSections = sectionsOf(profile.layout);
-  const order = projects.map((p) => p.id);
-  const sections = storedSections.filter((k) => tilesVerdict.ok || !EXTRA_SECTIONS.includes(k));
-  const featured = profile.featuredExhbtId && listed.has(profile.featuredExhbtId) ? profile.featuredExhbtId : null;
-  const hidden = candidates.filter((e) => e.hiddenOnPortfolio).map((e) => e.id);
-  const shown = themeFor(profile, plan);
-  const stored = profile.layout.tiles;
-  const stateTiles: CustomiseState["tiles"] = tilesVerdict.ok ? stored : { about: stored.about, education: stored.education, links: stored.links };
-  const arrangement: CustomiseState = {
-    order,
-    sections,
-    hidden,
-    featured: featured && !hidden.includes(featured) ? featured : null,
-    themeId: shown.id,
-    header: profile.layout.header,
-    tiles: Object.fromEntries(TILE_KINDS.filter((k) => stateTiles[k]).map((k) => [k, stateTiles[k]])) as CustomiseState["tiles"],
-  };
-
-  const locks: Record<string, ThemeLock> = {};
-  // By look: a look's colourways come with it.
-  for (const t of PORTFOLIO_THEMES) {
-    const v = canUseTheme(plan, t);
-    if (!v.ok) locks[t.look] = { reason: v.reason, upgradeTo: v.upgradeTo, planName: PLAN_NAMES[v.upgradeTo ?? "max"] };
+  if (kind === "steps") {
+    const step: Step = isStep(asked.step) ? asked.step : "you";
+    return (
+      <>
+        {admin && <TryNewPortfolio />}
+        <Builder step={step} {...data.builder} />
+        <JobLinksSection userId={user.id} />
+      </>
+    );
   }
-  const storedTheme = themeById(profile.themeId);
-  const address = canClaimUsername(plan);
 
+  // The editor is drawn in the browser, inside the gate's boundary. The two panels it shows that keep
+  // their own server actions are drawn here and handed in: the team's (TeamPanel) and the job links (the
+  // compact menu). `joined`, `left` and `full` are the team's notes after a join, a leave or a refused
+  // Make my own; the editor's Address keeps them in the address until the Team sheet closes, so a refresh
+  // meanwhile draws the panel with them still.
+  const said = asked.joined ? "joined" : asked.left ? "left" : null;
+  // "Hide this" on the first-run strip, read here so neither the loading view nor the editor draws it.
+  const stripHidden = stripHiddenFor((await cookies()).get(STRIP_COOKIE)?.value, user.id);
   return (
-    <>
-    <Builder
-      step={step}
-      initial={{ profile: draftFromProfile(profile), arrangement }}
-      projects={projects}
-      drafts={drafts}
-      photoUrl={photoUrl}
-      username={profile.username}
-      plan={{
-        name: PLAN_NAMES[plan],
-        isPublic,
-        publishNote: held && !held.ok ? { reason: held.reason, upgradeTo: held.upgradeTo } : null,
-        extraTiles: tilesVerdict.ok,
-        extraTilesReason: tilesVerdict.ok ? null : tilesVerdict.reason,
-        heldTiles: !tilesVerdict.ok && storedSections.some((k) => EXTRA_SECTIONS.includes(k)),
-        uploadMb: ENTITLEMENTS[plan].uploadMbPerFile,
-      }}
-      addressBlocked={
-        address.ok
-          ? null
-          : { reason: profile.username ? `Changing your address comes with ${PLAN_NAMES.premium}.` : address.reason, upgradeTo: address.upgradeTo }
-      }
-      locks={locks}
-      savedButLocked={storedTheme && storedTheme.id !== shown.id ? storedTheme.name : null}
-      viewHref={profile.username ? portfolioHref(profile.username, host) : null}
+    <PortfolioGate
+      data={{ ...data, stripHidden }}
+      team={<TeamPanel userId={user.id} host={host} said={said} full={asked.full === "1"} />}
+      jobLinks={<JobLinksSection compact userId={user.id} />}
     />
-    <JobLinksSection userId={user.id} />
-    </>
   );
 }

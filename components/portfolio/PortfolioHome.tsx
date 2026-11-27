@@ -60,10 +60,10 @@ export type HomeProps = {
   edit?: HomeEdit;
 };
 
-const WRAP = "mx-auto w-full max-w-[68rem] px-5 @3xl:px-10";
+export const WRAP = "mx-auto w-full max-w-[68rem] px-5 @3xl:px-10";
 const H2 = "pf-display text-[1.75rem] leading-tight [letter-spacing:calc(var(--pf-tracking)*0.6)] @3xl:text-[2rem]";
-const ROWS = "pf-rows border-y border-[color:var(--pf-line)] [border-style:var(--pf-rule-style)]";
-const CARD = "border-[length:var(--pf-edge-width)] border-[color:var(--pf-edge)] bg-[var(--pf-card)]";
+export const ROWS = "pf-rows border-y border-[color:var(--pf-line)] [border-style:var(--pf-rule-style)]";
+export const CARD = "border-[length:var(--pf-edge-width)] border-[color:var(--pf-edge)] bg-[var(--pf-card)]";
 
 /** What each section needs before visitors see it. */
 export function sectionHasContent(key: SectionKey, p: Pick<HomeProps, "projects" | "featuredId" | "sections" | "tiles" | "person">): boolean {
@@ -722,6 +722,41 @@ function Vision({ theme, edit }: { theme: PortfolioTheme; edit: HomeEdit }) {
   );
 }
 
+/**
+ * One row of the work in the list and index looks: what sits inside each `<li>` of the list. `n` is the
+ * row's place in the list from 0 (the index look prints it as [01]). `inert` while editing: a click
+ * reaches the editor's frame, not the link. Exported so the editor draws its owner-only rows (a draft,
+ * a hidden exhbt) in the look's own row; it must draw for visitors exactly as it did inside `Work`.
+ */
+export function WorkRow({ project: p, n, look, inert }: { project: Pick<HomeProject, "title" | "summary" | "href">; n: number; look: "list" | "index"; inert?: boolean }) {
+  const body = (
+    <>
+      {look === "index" ? (
+        <span aria-hidden className="shrink-0 font-semibold text-[color:var(--pf-faint)] tabular-nums">
+          [{String(n + 1).padStart(2, "0")}]
+        </span>
+      ) : (
+        <ChevronRight aria-hidden size={18} strokeWidth={2} className="mt-[0.2em] shrink-0 text-[color:var(--pf-faint)]" />
+      )}
+      <span className="min-w-0">
+        <span
+          className={`block text-[1.125rem] leading-snug font-semibold ${p.href ? "underline decoration-[color:var(--pf-line)] decoration-2 underline-offset-[5px] group-hover:decoration-[color:var(--pf-ink)]" : ""}`}
+        >
+          {p.title}
+        </span>
+        {p.summary && <span className="mt-1 block text-[0.95rem] leading-relaxed text-[color:var(--pf-soft)]">{p.summary}</span>}
+      </span>
+    </>
+  );
+  return p.href ? (
+    <Link href={p.href} inert={inert || undefined} className="group flex gap-3 py-4">
+      {body}
+    </Link>
+  ) : (
+    <div className="flex gap-3 py-4">{body}</div>
+  );
+}
+
 function Work({ projects, more, theme, edit }: { projects: HomeProject[]; more: boolean; theme: PortfolioTheme; edit?: HomeEdit }) {
   const heading = (
     <h2 id="work-h" className={H2}>
@@ -738,32 +773,7 @@ function Work({ projects, more, theme, edit }: { projects: HomeProject[]; more: 
         {heading}
         <List className={`mt-6 max-w-[48rem] ${ROWS}`}>
           {projects.map((p, i) => {
-            const body = (
-              <>
-                {index ? (
-                  <span aria-hidden className="shrink-0 font-semibold text-[color:var(--pf-faint)] tabular-nums">
-                    [{String(i + 1).padStart(2, "0")}]
-                  </span>
-                ) : (
-                  <ChevronRight aria-hidden size={18} strokeWidth={2} className="mt-[0.2em] shrink-0 text-[color:var(--pf-faint)]" />
-                )}
-                <span className="min-w-0">
-                  <span
-                    className={`block text-[1.125rem] leading-snug font-semibold ${p.href ? "underline decoration-[color:var(--pf-line)] decoration-2 underline-offset-[5px] group-hover:decoration-[color:var(--pf-ink)]" : ""}`}
-                  >
-                    {p.title}
-                  </span>
-                  {p.summary && <span className="mt-1 block text-[0.95rem] leading-relaxed text-[color:var(--pf-soft)]">{p.summary}</span>}
-                </span>
-              </>
-            );
-            const row = p.href ? (
-              <Link href={p.href} inert={edit ? true : undefined} className="group flex gap-3 py-4">
-                {body}
-              </Link>
-            ) : (
-              <div className="flex gap-3 py-4">{body}</div>
-            );
+            const row = <WorkRow project={p} n={i} look={index ? "index" : "list"} inert={Boolean(edit)} />;
             return (
               <li key={p.id} data-card={p.id}>
                 {edit ? edit.tile({ id: p.id, where: "row", index: i, count: projects.length }, row) : row}
@@ -888,32 +898,38 @@ function Rows({ lines, extra, className = "" }: { lines: string[]; extra?: { lab
 /**
  * The rows while editing: every stored line, empty ones too, so a line's path is its place in the
  * stored list (`arrangement.tiles.education.lines.0` is the first), each as two fields at that path,
- * the words and the year; then the extra row; then the controls over the list (`lineTools`, last, so
- * the hairlines between the rows stay where they are).
+ * the words and the year; then the extra row. The controls over the list (`lineTools`) come right after
+ * the </dl>, in a wrapper that takes the list's place and margins, so the list holds only its lines (a
+ * <dl> may hold nothing else) and the Tab order reaches the controls right after the lines they act on.
+ * The wrapper is a flex column and the list grows to fill it: where About's two columns stretch the
+ * wrapper to the row, the list fills it, as the visitor's list fills the row. Its width, and the least
+ * width a long word gives it, are the list's own, as without the wrapper.
  */
 function LinesEditing({ kind, lines, edit, extra, className = "" }: { kind: "education" | "experience"; lines: string[]; edit: HomeEdit; extra?: { label: string; value: React.ReactNode }; className?: string }) {
   const path = `arrangement.tiles.${kind}.lines`;
   const words = LINE[kind];
   return (
-    <dl className={`${ROWS} relative text-[0.95rem] ${className}`}>
-      {lines.map((l, i) => {
-        const { label, year } = splitYear(l);
-        const at = `${path}.${i}`;
-        return (
-          <div key={i} className="flex items-baseline justify-between gap-6 py-3">
-            <dt className="min-w-0 font-semibold">{edit.text({ path: at, value: label, label: words.label(i + 1), placeholder: words.placeholder, as: "block", part: "label" })}</dt>
-            <dd className="shrink-0 text-[color:var(--pf-faint)] tabular-nums">{edit.text({ path: at, value: year ?? "", label: words.year, placeholder: words.yearPlaceholder, as: "block", part: "year" })}</dd>
+    <div className={`relative flex flex-col ${className}`} data-lines-box={kind}>
+      <dl className={`${ROWS} relative grow text-[0.95rem]`}>
+        {lines.map((l, i) => {
+          const { label, year } = splitYear(l);
+          const at = `${path}.${i}`;
+          return (
+            <div key={i} className="flex items-baseline justify-between gap-6 py-3">
+              <dt className="min-w-0 font-semibold">{edit.text({ path: at, value: label, label: words.label(i + 1), placeholder: words.placeholder, as: "block", part: "label" })}</dt>
+              <dd className="shrink-0 text-[color:var(--pf-faint)] tabular-nums">{edit.text({ path: at, value: year ?? "", label: words.year, placeholder: words.yearPlaceholder, as: "block", part: "year" })}</dd>
+            </div>
+          );
+        })}
+        {extra && (
+          <div className="flex items-baseline justify-between gap-6 py-3">
+            <dt className="font-semibold">{extra.label}</dt>
+            <dd className="min-w-0 text-right text-[color:var(--pf-faint)]">{extra.value}</dd>
           </div>
-        );
-      })}
-      {extra && (
-        <div className="flex items-baseline justify-between gap-6 py-3">
-          <dt className="font-semibold">{extra.label}</dt>
-          <dd className="min-w-0 text-right text-[color:var(--pf-faint)]">{extra.value}</dd>
-        </div>
-      )}
+        )}
+      </dl>
       {edit.lineTools({ path, kind, count: lines.length, max: TILE_LIMITS.lines })}
-    </dl>
+    </div>
   );
 }
 

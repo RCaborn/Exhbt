@@ -6,9 +6,14 @@ import { isPhase2Enabled } from "@/lib/site";
 import { recordReferralFromCookie } from "@/lib/referrals";
 import { getStore, isSupabaseConfigured } from "@/lib/store";
 
-/** Local development stand-in for the magic link. Disabled whenever Supabase is configured or in production. */
+/**
+ * Local development stand-in for the magic link. Disabled whenever Supabase is configured, and in
+ * production unless EXHBT_ALLOW_MEMORY_STORE is set: the stand-in store's own switch, which lets a
+ * production build run with no database for the browser tests (playwright.prod.config.ts). With Supabase
+ * configured it is off whatever that switch says, so it can never be on with a real database.
+ */
 export async function GET(req: NextRequest) {
-  if (isSupabaseConfigured() || process.env.NODE_ENV === "production") {
+  if (isSupabaseConfigured() || (process.env.NODE_ENV === "production" && !process.env.EXHBT_ALLOW_MEMORY_STORE)) {
     return new NextResponse("Not found", { status: 404 });
   }
   const url = new URL(req.url);

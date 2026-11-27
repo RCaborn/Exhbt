@@ -1,0 +1,212 @@
+/* Sections and tiles on the portfolio editor's page (brief F). Two kinds of thing, kept apart:
+   - app chrome (the corner toolbars, "Add a section", the lines' controls): Astryx components, placed
+     here with Astryx's own tokens (--color-*, --spacing-*, --radius-*, --shadow-*, --duration-*,
+     --ease-*), never a hard-coded colour, space, radius, shadow or timing;
+   - the page (the frames' outlines, the lifted copy, the chips over a card, the marked line): the
+     person's own page in their look, so every colour and corner is one of the look's variables (--pf-*).
+   Nothing here takes room on the page. */
+@layer components {
+  /* ---------- The page: frames ---------- */
+  [data-editor="portfolio"] .pe-frame {
+    position: relative;
+  }
+  /* The outline: shown with the toolbar, inside the frame's edge, never a border. */
+  [data-editor="portfolio"] .pe-sec:is(:hover, :focus-within) {
+    outline: 2px dashed color-mix(in srgb, var(--pf-accent) 45%, transparent);
+    outline-offset: -2px;
+  }
+  [data-editor="portfolio"] .pe-tile:is(:hover, :focus-within) {
+    outline: 2px solid var(--pf-accent);
+    outline-offset: 3px;
+    border-radius: var(--pf-radius);
+  }
+  /* A card's frame passes the card's height through (the card is h-full in its <li>). */
+  [data-editor="portfolio"] .pe-tile-card,
+  [data-editor="portfolio"] .pe-tile-card > a:first-child,
+  [data-editor="portfolio"] .pe-tile-card > div:first-child {
+    height: 100%;
+  }
+  /* What is being dragged stays where it was, faint, while its lifted copy follows the pointer. */
+  [data-editor="portfolio"] .pe-frame[data-dragging="true"] {
+    opacity: 0.4;
+  }
+  [data-editor="portfolio"] .pe-frame[data-dragging="true"] > .pe-tools {
+    visibility: hidden;
+  }
+
+  /* The whole card or row opens the exhbt: a link laid over it, under its toolbar. */
+  [data-editor="portfolio"] .pe-open {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: var(--pf-radius);
+  }
+  [data-editor="portfolio"] .pe-open:focus-visible {
+    outline: 3px solid var(--pf-accent);
+    outline-offset: 3px;
+  }
+  [data-editor="portfolio"] .pe-tile-band > .pe-open {
+    border-radius: 0;
+  }
+
+  /* "Draft" over a card's top edge, at its left: in the look's own colours. */
+  [data-editor="portfolio"] .pe-chip {
+    position: absolute;
+    top: 0;
+    left: 0.75rem;
+    z-index: 2;
+    transform: translateY(-50%);
+    padding: 0.125rem 0.625rem;
+    border: 1px solid var(--pf-line);
+    border-radius: var(--pf-radius-pill);
+    background: var(--pf-card);
+    color: var(--pf-soft);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.4;
+    pointer-events: none;
+  }
+  [data-editor="portfolio"] .pe-tile-band > .pe-chip {
+    top: 0.75rem;
+    transform: none;
+  }
+
+  /* The line the lines' controls are for. */
+  [data-editor="portfolio"] dl > div[data-pe-line="active"] {
+    outline: 2px solid color-mix(in srgb, var(--pf-accent) 60%, transparent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* The lifted copy: the part as the page draws it, with the pack shadow and an outline in the look's
+     link colour, never scaled. */
+  .pe-lifted {
+    cursor: grabbing;
+    box-shadow: var(--shadow-pack);
+    outline: 2px solid var(--pf-accent);
+    background: var(--pf-ground);
+    border-radius: var(--pf-radius);
+    overflow: hidden;
+  }
+  .pe-lifted-tile {
+    height: 100%;
+  }
+  .pe-lifted-tile > * {
+    height: 100%;
+  }
+
+  /* ---------- App chrome: the toolbars ---------- */
+  [data-editor="portfolio"] .pe-tools {
+    position: absolute;
+    z-index: 5;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--duration-fast) var(--ease-standard);
+  }
+  [data-editor="portfolio"] .pe-tools > * {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-element);
+    box-shadow: var(--shadow-high);
+    background: var(--color-background-surface);
+    color: var(--color-text-primary);
+    font-family: var(--font-family-body);
+    padding-inline: var(--spacing-1);
+  }
+  /* Shown while the pointer is over its part or the focus is in it, once it has been placed. */
+  [data-editor="portfolio"] .pe-frame:is(:hover, :focus-within) > .pe-tools[data-placed],
+  [data-editor="portfolio"] .pe-tools[data-placed]:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* A section's toolbar shows over its own section, not while a tile inside it is pointed at. */
+  [data-editor="portfolio"] .pe-sec:has(.pe-tile:hover):not(:focus-within) > .pe-tools {
+    opacity: 0;
+    pointer-events: none;
+  }
+  /* On a touch screen every toolbar always shows (its buttons are 44px: ToolRow.tsx). */
+  @media (pointer: coarse) {
+    [data-editor="portfolio"] .pe-tools[data-placed] {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+  [data-editor="portfolio"] .pe-tile > .pe-tools {
+    z-index: 6;
+  }
+  [data-editor="portfolio"] .pe-grip {
+    cursor: grab;
+    touch-action: none;
+  }
+  [data-editor="portfolio"] .pe-grip:active {
+    cursor: grabbing;
+  }
+
+  /* "Add a section": over the last section's bottom edge, in the middle; in the flow at the page's end when no section is left. */
+  [data-editor="portfolio"] .pe-add-section {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    z-index: 5;
+    transform: translate(-50%, 50%);
+  }
+  [data-editor="portfolio"] .pe-add-section-flow {
+    position: static;
+    transform: none;
+    display: flex;
+    justify-content: center;
+    padding-block: var(--spacing-4);
+  }
+  [data-editor="portfolio"] .pe-menu-foot {
+    display: flex;
+    justify-content: flex-end;
+    padding: var(--spacing-2) var(--spacing-3);
+    border-top: 1px solid var(--color-border);
+  }
+
+  /* The lines' controls: just under the list's bottom edge, at its right (in the section's own bottom
+     padding, clear of the last line's year), without the rows' hairline. */
+  [data-editor="portfolio"] .pe-line-tools {
+    /* A fixed point at the list's bottom right, after the </dl> in the page's wrapper: it takes no room
+       and never changes size; its body is drawn from it. */
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 0;
+    height: 0;
+    z-index: 5;
+    border: 0 !important;
+  }
+  [data-editor="portfolio"] .pe-line-tools-body {
+    position: absolute;
+    top: var(--spacing-1);
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  [data-editor="portfolio"] .pe-line-tools-body > .pe-tools {
+    position: static;
+  }
+  /* The list's own problem, under its controls, in the look's error colour. */
+  [data-editor="portfolio"] .pe-lines-issue {
+    margin: 0.375rem 0 0;
+    color: var(--pf-error);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-align: right;
+    white-space: nowrap;
+  }
+  [data-editor="portfolio"] .pe-line-tools-body:not(:has(button, .pe-lines-issue)) {
+    display: none;
+  }
+  [data-editor="portfolio"] [data-lines-box]:is(:hover, :focus-within) > .pe-line-tools > .pe-line-tools-body > .pe-tools {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-editor="portfolio"] .pe-tools {
+      transition: none;
+    }
+  }
+}
