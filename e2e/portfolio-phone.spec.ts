@@ -145,7 +145,7 @@ test.describe("A section's More", () => {
       // One tap puts it back.
       await undoToast(page, `moved ${name}`).click();
       await expect.poll(() => sections(page)).toEqual(before);
-      await expect(page.locator(".astryx-toast")).toHaveCount(0);
+      await expect(page.locator(".astryx-toast").filter({ visible: true })).toHaveCount(0);
     }
   });
 
@@ -166,7 +166,7 @@ test.describe("A section's More", () => {
     await s2.getByRole("button", { name: "Move About me down", exact: true }).click();
     await expect(undoToast(page, "moved About me")).toBeVisible();
     await page.locator(`${READY} [data-section="about"]`).tap({ position: { x: 4, y: 4 } });
-    await expect(page.locator(".astryx-toast")).toHaveCount(0);
+    await expect(page.locator(".astryx-toast").filter({ visible: true })).toHaveCount(0);
     expect(await undoLabel(page)).toBe("moved About me");
   });
 
@@ -365,6 +365,9 @@ test.describe("Press and hold", () => {
     await f.up();
     await expect.poll(async () => (await sections(page)).indexOf("contact")).toBe(before.indexOf("quote"));
     expect(await undoLabel(page)).toBe("moved Get in touch");
+    // A drop on a phone gets the one-tap Undo too: an accidental drag is undone with a thumb.
+    await undoToast(page, "moved Get in touch").click();
+    await expect.poll(() => sections(page)).toEqual(before);
 
     // A tile: the lifted card's middle onto the next one's (the place a drop is judged by, closest centre).
     const ids = await workIds(page);
@@ -384,6 +387,8 @@ test.describe("Press and hold", () => {
     await f.up();
     await expect.poll(async () => (await workIds(page)).indexOf(ids[0]!)).toBe(1);
     expect(await undoLabel(page)).toMatch(/^moved /);
+    await undoToast(page, (await undoLabel(page))!).click();
+    await expect.poll(() => workIds(page)).toEqual(ids);
 
     // A swipe that does not start on a grip scrolls the page (a real finger only: Chromium's).
     if (f.native) {

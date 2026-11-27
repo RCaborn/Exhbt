@@ -15,12 +15,14 @@ import { W } from "./words";
 export const MOVE_MS = 180;
 export const EASE = "cubic-bezier(0.2, 0, 0, 1)";
 
+// The sensors' options are made once: dnd-kit keeps a sensor while its options are the same object, and new
+// ones on every render of the board (each key typed on the page) drew every section and tile again.
+const MOUSE = { activationConstraint: { distance: 6 } };
+const TOUCH = { activationConstraint: { delay: 160, tolerance: 8 } };
+const KEYS = { coordinateGetter: sortableKeyboardCoordinates };
+
 export function useDragSensors() {
-  return useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 160, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+  return useSensors(useSensor(MouseSensor, MOUSE), useSensor(TouchSensor, TOUCH), useSensor(KeyboardSensor, KEYS));
 }
 
 const REDUCED = "(prefers-reduced-motion: reduce)";

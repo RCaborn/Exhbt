@@ -15,6 +15,9 @@ import { useRuntime } from "../runtime";
 
 export const UNDO_TOAST = "pe-phone-undo";
 
+/** What counts as the next action: a press of any kind (a finger, a mouse, a click made by code) or a key. */
+const ACTS = ["pointerdown", "touchstart", "mousedown", "click", "keydown"] as const;
+
 /** The toast showing now, and how to take it away. */
 let shown: { label: string; dismiss(): void; stop(): void } | null = null;
 
@@ -26,28 +29,33 @@ export function useOfferUndo(): () => void {
   const toast = useToast();
   return () => {
     const label = rt.undo.get().label;
+    // One at a time: the last one goes before a new one shows (not by Astryx's uniqueID, whose namesake
+    // keeps the first toast's id, so the new one's dismiss would not reach it).
     shown?.stop();
-    if (!label) {
-      shown?.dismiss();
-      shown = null;
-      return;
-    }
+    shown?.dismiss();
+    shown = null;
+    if (!label) return;
+    /** The toast's card, made invisible at once when it goes (its own exit still runs, unseen): Astryx's leaving toast stays on the screen if a
+     * modal sheet (the bar's menu under a finger) opens while it leaves. */
+    let card: HTMLElement | null = null;
     const undo = () => {
       take();
       rt.undoLast();
     };
     const dismiss = toast({
       body: cap(label),
-      uniqueID: UNDO_TOAST,
       isAutoHide: false,
       endContent: (
-        <Button size="sm" label={`Undo: ${label}`} onClick={undo}>
-          Undo
-        </Button>
+        <span ref={(el) => void (card = el?.closest<HTMLElement>(".astryx-toast") ?? card)}>
+          <Button size="sm" label={`Undo: ${label}`} onClick={undo}>
+            Undo
+          </Button>
+        </span>
       ),
     });
     const take = () => {
       stop();
+      if (card) card.style.visibility = "hidden";
       dismiss();
       if (shown?.dismiss === dismiss) shown = null;
     };
@@ -62,14 +70,12 @@ export function useOfferUndo(): () => void {
     });
     // From the next event on: the press that made this change is still being handled.
     const timer = setTimeout(() => {
-      document.addEventListener("pointerdown", onAct, true);
-      document.addEventListener("keydown", onAct, true);
+      for (const type of ACTS) document.addEventListener(type, onAct, true);
     }, 0);
     const stop = () => {
       clearTimeout(timer);
       off();
-      document.removeEventListener("pointerdown", onAct, true);
-      document.removeEventListener("keydown", onAct, true);
+      for (const type of ACTS) document.removeEventListener(type, onAct, true);
     };
     shown = { label, dismiss, stop };
   };
