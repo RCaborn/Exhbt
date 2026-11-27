@@ -200,7 +200,7 @@ test.describe("The chooser's headings on a touch screen", () => {
       const got = await p.evaluate(() => ({
         coarse: matchMedia("(pointer: coarse)").matches,
         sizes: ["h1", "h2"].map((t) => {
-          const s = getComputedStyle(document.querySelector(`main ${t}`)!);
+          const s = getComputedStyle(document.querySelector(`#main ${t}`)!);
           return `${t} ${s.fontSize} / ${s.lineHeight}`;
         }),
       }));
@@ -346,15 +346,15 @@ test.describe("Addresses that skip the chooser", () => {
     await expect(page.locator(SEL.draftForm)).toBeAttached();
     await expect(page.getByRole("heading", ADD.chooserHeading)).toHaveCount(0);
     // Its way back is to the list, where the teammate's draft is: they came by no chooser.
-    await expect(page.locator("main").getByRole("link", { name: "Your exhbts", exact: true })).toHaveAttribute("href", "/exhbts");
-    await expect(page.locator("main").getByRole("link", { name: "Add an exhbt", exact: true })).toHaveCount(0);
+    await expect(page.locator("#main").getByRole("link", { name: "Your exhbts", exact: true })).toHaveAttribute("href", "/exhbts");
+    await expect(page.locator("#main").getByRole("link", { name: "Add an exhbt", exact: true })).toHaveCount(0);
 
     // An exhbt that can't be drafted into: someone else's goes to a fresh upload form, never the chooser.
     await page.goto(`${ADD_EXHBT}?into=${original}`);
     await page.waitForURL(exactly(DRAFT_WITH_AI));
     await expect(page.getByRole("heading", SEL.draftHeading)).toBeVisible();
     // The upload form's way back is to the chooser (from the review of 26 Nov: it had none).
-    const back = page.locator("main").getByRole("link", { name: "Add an exhbt", exact: true });
+    const back = page.locator("#main").getByRole("link", { name: "Add an exhbt", exact: true });
     await expect(back).toHaveAttribute("href", ADD_EXHBT);
     await back.click();
     await page.waitForURL(exactly(ADD_EXHBT));
