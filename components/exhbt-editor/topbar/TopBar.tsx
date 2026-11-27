@@ -8,6 +8,7 @@ import { ArrowLeft, Eye, IdCard } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useEnv, useLive, useUi } from "../context";
 import { flushPending } from "../pending";
+import { FirstDraftNotice } from "./FirstDraftNotice";
 import { LayoutMenu, useDraftedLine } from "./LayoutMenu";
 import { MenuButton } from "./MenuButton";
 import { useNarrow } from "./Popover";
@@ -66,6 +67,7 @@ export function TopBar(): ReactNode {
   );
 
   return (
+    <>
     <header className="xe-topbar" data-topbar>
       <div className="xe-topbar-row">
         <Link href={back.href} className="xe-back" aria-label={back.text} onClick={env.portfolioFirst ? waitThenGo : undefined}>
@@ -109,5 +111,7 @@ export function TopBar(): ReactNode {
         </Button>
       </div>
     </header>
+    <FirstDraftNotice />
+    </>
   );
 }

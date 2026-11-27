@@ -677,23 +677,46 @@ test("a swipe on a section's words scrolls and moves nothing; a 260ms press on a
  * At 390px: no sideways scroll, and every control takes a thumb
  * ---------------------------------------------------------------------------------------------- */
 
-test("Review and publish: two lines at most, inside its pill", async ({ page }) => {
-  await openTiming(page, "case-study", { full: true });
-  const fit = await page.getByRole("button", { name: "Review and publish" }).evaluate((b) => {
-    const r = b.getBoundingClientRect();
-    const range = document.createRange();
-    const lines: DOMRect[] = [];
-    const walker = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
-    for (let t = walker.nextNode(); t; t = walker.nextNode()) {
-      if (!t.textContent?.trim()) continue;
-      range.selectNodeContents(t);
-      lines.push(...[...range.getClientRects()].filter((q) => q.width > 0));
-    }
-    return { inside: lines.length > 0 && lines.every((q) => q.left >= r.left - 0.5 && q.right <= r.right + 0.5 && q.top >= r.top - 0.5 && q.bottom <= r.bottom + 0.5), lines: new Set(lines.map((q) => Math.round(q.top))).size };
+/* Brief 5b: "Review and publish" is one line at 360 and 390 wide, the bar does not overflow, and every control keeps its 44px press. */
+for (const width of [360, 390]) {
+  test(`at ${width}px "Review and publish" is one line in the bar, nothing overflows and every control takes a thumb`, async ({ page }) => {
+    await openTiming(page, "case-study", { full: true });
+    await page.setViewportSize({ width, height: 800 });
+    const publish = page.getByRole("button", { name: "Review and publish" });
+    await expect(publish).toBeVisible();
+    const fit = await publish.evaluate((b) => {
+      const r = b.getBoundingClientRect();
+      const range = document.createRange();
+      const lines: DOMRect[] = [];
+      const walker = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
+      for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+        if (!t.textContent?.trim()) continue;
+        range.selectNodeContents(t);
+        lines.push(...[...range.getClientRects()].filter((q) => q.width > 0));
+      }
+      const inside = lines.length > 0 && lines.every((q) => q.left >= r.left - 0.5 && q.right <= r.right + 0.5 && q.top >= r.top - 0.5 && q.bottom <= r.bottom + 0.5);
+      return { inside, lines: new Set(lines.map((q) => Math.round(q.top))).size, tall: Math.max(...lines.map((q) => q.height)), box: r.height };
+    });
+    expect(fit.inside).toBe(true);
+    // One line box: the words' rectangles all sit at one height.
+    expect(fit.lines).toBe(1);
+    const row = await page.evaluate(() => {
+      const header = document.querySelector<HTMLElement>('[data-editor="page"] [data-topbar]')!;
+      const rowEl = header.querySelector<HTMLElement>(".xe-topbar-row")!;
+      const hr = header.getBoundingClientRect();
+      const small = [...header.querySelectorAll<HTMLElement>("a, button, [role=button]")]
+        .filter((el) => el.getBoundingClientRect().width > 0)
+        .map((el) => ({ name: el.getAttribute("aria-label") || el.textContent?.trim() || el.className, w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height }))
+        .filter((c) => c.h < 43.5);
+      const out = [...rowEl.children].filter((el) => el.getBoundingClientRect().width > 0 && (el.getBoundingClientRect().right > hr.right + 0.5 || el.getBoundingClientRect().left < hr.left - 0.5));
+      return { small, outside: out.map((el) => el.className), rowOver: rowEl.scrollWidth - rowEl.clientWidth, pageOver: document.documentElement.scrollWidth - window.innerWidth };
+    });
+    expect(row.small).toEqual([]);
+    expect(row.outside).toEqual([]);
+    expect(row.rowOver).toBeLessThanOrEqual(0);
+    expect(row.pageOver).toBeLessThanOrEqual(0);
   });
-  expect(fit.inside).toBe(true);
-  expect(fit.lines).toBeLessThanOrEqual(2);
-});
+}
 
 for (const f of offered()) {
   test(`${FORMAT_RULES[f].name.toLowerCase()}: a flowchart box's chips, on its top corners, clear its words by 4px and more and take a 44px press; no + covers them or words`, async ({ page }) => {
