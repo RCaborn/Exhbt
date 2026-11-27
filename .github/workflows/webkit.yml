@@ -13,6 +13,9 @@ on:
     paths-ignore:
       - "docs/**"
       - "**/*.md"
+  # By hand, for a branch whose code has not had a WebKit run (its code pushes carried [skip ci]
+  # and its last push changed only the docs).
+  workflow_dispatch:
 
 # One run per branch at a time. A newer push takes the place of a run still waiting;
 # the run already in progress finishes, so its results are not lost.
