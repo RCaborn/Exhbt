@@ -7,5 +7,5 @@ import { portfolioHost } from "@/lib/hosts";
  * as a real address ("you.exhbt.co.uk") in the checklist, so it's spelled out here.
  */
 export function marketingFeatures(plan: "free" | "premium" | "max"): string[] {
-  return planFeatures(plan).map((line) => line.replace(portfolioHost("you"), `your own address (${portfolioHost("name")})`));
+  return planFeatures(plan).map((line) => line.replace(portfolioHost("you"), `your address (${portfolioHost("name")})`));
 }

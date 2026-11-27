@@ -48,7 +48,7 @@ export default async function PricingPage(props: Props) {
       <div className="max-w-2xl">
         <h1 className="display">Pricing</h1>
         <p className="mt-4 text-lg text-graphite">
-          The roadmap is free, and so is trying an exhbt. {PLAN_NAMES.premium} puts your exhbts on your own link, and{" "}
+          The roadmap is free, and so is trying an exhbt. {PLAN_NAMES.premium} puts your exhbts online at your address, and{" "}
           {PLAN_NAMES.max} {maxExtra(sell)}. Employers never pay.
         </p>
       </div>

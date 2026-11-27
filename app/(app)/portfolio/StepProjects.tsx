@@ -235,7 +235,7 @@ export function StepProjects({
           <p className="mt-1 text-graphite">Write up a project and it shows here, ready to put in order.</p>
           <div className="mt-4 flex justify-center">
             <Button href="/exhbts/new" variant="primary" size="sm">
-              Start an exhbt
+              Add an exhbt
             </Button>
           </div>
         </div>
@@ -409,8 +409,8 @@ export function StepProjects({
             </ul>
           )}
           <div className="mt-4">
-            <Button href="/exhbts/new" size="sm" label="Start an exhbt">
-              <Plus aria-hidden size={15} strokeWidth={2.5} /> Start an exhbt
+            <Button href="/exhbts/new" size="sm" label="Add an exhbt">
+              <Plus aria-hidden size={15} strokeWidth={2.5} /> Add an exhbt
             </Button>
           </div>
         </section>

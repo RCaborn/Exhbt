@@ -73,7 +73,7 @@ export default function WhatIsAnExhbt() {
             {WHAT_AN_EXHBT_IS} You make a few of them, and together they&rsquo;re your portfolio.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Button href="/exhbts/new" size="lg">Build your exhbt</Button>
+            <Button href="/exhbts/new" size="lg">Add an exhbt</Button>
             <Button href="/roadmap/new" size="lg" variant="secondary">Build your roadmap</Button>
           </div>
         </div>
@@ -153,7 +153,7 @@ export default function WhatIsAnExhbt() {
       <section aria-labelledby="address" className="bg-surface">
         <div className="mx-auto grid max-w-[72rem] items-center gap-10 px-4 py-20 sm:px-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-16 lg:py-28">
           <div>
-            <h2 id="address" className="display-2 max-w-[14ch]">Your own address</h2>
+            <h2 id="address" className="display-2 max-w-[14ch]">Your address</h2>
             <p className="mt-5 max-w-[34rem] text-lg text-graphite">
               Publish and your exhbts sit together at <span className="font-semibold text-ink">{address}</span>,
               where name is the one you choose. Put it on your CV, your LinkedIn and your email signature, and anyone
@@ -190,7 +190,7 @@ export default function WhatIsAnExhbt() {
           <h2 id="start" className="display-2 max-w-[14ch]">Start with the free roadmap.</h2>
           <div className="flex flex-wrap gap-3">
             <Button href="/roadmap/new" size="xl" variant="ink">Build your roadmap</Button>
-            <Button href="/exhbts/new" size="xl" variant="secondary">Build your exhbt</Button>
+            <Button href="/exhbts/new" size="xl" variant="secondary">Add an exhbt</Button>
           </div>
         </div>
       </section>

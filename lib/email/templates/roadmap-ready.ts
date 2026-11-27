@@ -1,4 +1,5 @@
 import type { Project, Roadmap } from "@/lib/ai/schemas";
+import { isPhase2Enabled } from "@/lib/site";
 
 /**
  * "Your roadmap is ready" email. Table layout and inline styles because email clients
@@ -34,6 +35,10 @@ export function roadmapReadyEmail(opts: {
   const gaps = r.gaps.slice(0, 3);
   const projects = (ideas ?? r.projects).slice(0, 2);
   const subject = `Your roadmap to ${role}`;
+  // Where "Add an exhbt" goes, on the same site as the roadmap's own link. Left out while exhbts are not switched on.
+  const addExhbtUrl = isPhase2Enabled() ? new URL("/exhbts/new", viewUrl).href : "";
+  const FINISHED = "Already finished a project?";
+  const FINISHED_LINE = "A dissertation, a module project or placement work counts. Add it as your first exhbt; these ideas can be your second and third.";
 
   const gapRows = gaps
     .map(
@@ -67,6 +72,7 @@ ${r.summary ? `<tr><td style="padding:12px 32px 0;font:400 16px/1.55 Arial,sans-
 <tr><td style="padding:24px 32px 0">${button(signInUrl, "See your full roadmap", true)}</td></tr>
 ${gaps.length ? `<tr><td style="padding:32px 32px 4px;font:800 18px/1.2 Arial,sans-serif;color:${C.ink}">Gaps to close</td></tr><tr><td style="padding:0 32px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${gapRows}</table></td></tr>` : ""}
 ${projects.length ? `<tr><td style="padding:28px 32px 12px;font:800 18px/1.2 Arial,sans-serif;color:${C.ink}">Projects that would prove them</td></tr><tr><td style="padding:0 32px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${projectRows}</table></td></tr>` : ""}
+${addExhbtUrl ? `<tr><td style="padding:24px 32px 0;font:400 15px/1.55 Arial,sans-serif;color:${C.ink2}"><strong style="color:${C.ink}">${FINISHED}</strong> ${FINISHED_LINE} <a href="${esc(addExhbtUrl)}" style="color:${C.ink};font-weight:700">Add an exhbt</a></td></tr>` : ""}
 <tr><td style="padding:24px 32px 0">${button(signInUrl, "Open my full roadmap", false)}</td></tr>
 <tr><td style="padding:16px 32px 32px;font:400 14px/1.6 Arial,sans-serif;color:${C.ink2}">These buttons sign you in and save the roadmap to your account, so you can open it on any device. After that, log in with your email or username and a password. If the link has expired, go to <a href="${esc(viewUrl)}" style="color:${C.ink}">${esc(viewUrl)}</a> and log in there.</td></tr>
 </table>
@@ -87,6 +93,9 @@ You're getting this because you asked for a roadmap on Exhbt. <a href="${esc(uns
     "",
     projects.length ? "Projects that would prove them" : "",
     ...projects.map((p) => `- ${p.title} (${p.weeks} weeks): ${p.brief} You end up with: ${p.deliverable}`),
+    "",
+    addExhbtUrl ? `${FINISHED} ${FINISHED_LINE}` : "",
+    addExhbtUrl ? `Add an exhbt: ${addExhbtUrl}` : "",
     "",
     `If that link has expired, go to ${viewUrl} and log in with your email or username and password.`,
     "",

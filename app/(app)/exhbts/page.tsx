@@ -90,9 +90,9 @@ export default async function ExhbtsPage({ searchParams }: { searchParams: Promi
         {!canGoLive && (
           <section aria-labelledby="preview-only" className="mt-6 rounded-[20px] border border-line bg-surface p-5 sm:p-6">
             <h2 id="preview-only" className="text-[1.375rem]">Preview only on {PLAN_NAMES[plan]}</h2>
-            <p className="mt-2 text-graphite">Build and preview your exhbts here. Publishing them to your own link comes with {PLAN_NAMES.premium}.</p>
+            <p className="mt-2 text-graphite">Build and preview your exhbts here. Putting them online at your address comes with {PLAN_NAMES.premium}.</p>
             {/* When the plan is full, the upgrade prompt below says so instead. */}
-            {room.ok && <UpgradePrompt className="mt-3" reason={`Ready to share them? ${PLAN_NAMES.premium} publishes to your own link.`} upgradeTo="premium" />}
+            {room.ok && <UpgradePrompt className="mt-3" reason={`Ready to share them? ${PLAN_NAMES.premium} puts them online at your address.`} upgradeTo="premium" />}
           </section>
         )}
 
