@@ -400,6 +400,25 @@ test.describe("the top bar", () => {
       els.filter((e) => (e as HTMLElement).offsetParent !== null).map((e) => ({ name: e.getAttribute("aria-label") ?? e.textContent?.trim(), w: e.getBoundingClientRect().width, h: e.getBoundingClientRect().height })).filter((e) => e.w < 43.5 || e.h < 43.5),
     );
     expect(small).toEqual([]);
+    // The busiest row (a number to check, so the Things to fix button shows), narrower still: Review and publish stays one line, nothing overflows.
+    await page.setViewportSize({ width: 360, height: 800 });
+    const publish = bar(page).getByRole("button", { name: "Review and publish" });
+    expect(
+      await publish.evaluate((b) => {
+        const range = document.createRange();
+        const tops = new Set<number>();
+        for (const w = document.createTreeWalker(b, NodeFilter.SHOW_TEXT); w.nextNode(); ) {
+          if (!w.currentNode.textContent?.trim()) continue;
+          range.selectNodeContents(w.currentNode);
+          for (const q of range.getClientRects()) if (q.width > 0) tops.add(Math.round(q.top));
+        }
+        return tops.size;
+      }),
+    ).toBe(1);
+    expect(await row.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    // (The page itself at 360 is e2e/editor-phone.spec.ts: this mouse project draws the "+" and tables for a wider page.)
+    expect(await bar(page).evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await expect(bar(page).getByRole("button", { name: "1 number to check" })).toBeVisible();
     await openMenu(page);
     for (const name of [/^Layout:/, /^Undo/, "See as a visitor", "Card and link details"]) await expect(bar(page).getByRole("button", { name })).toBeVisible();
   });

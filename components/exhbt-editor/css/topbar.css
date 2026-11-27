@@ -390,6 +390,12 @@
     }
   }
 
+  @media (width < 24rem) {
+    .xe-save:not(.xe-save-bad) {
+      display: none;
+    }
+  }
+
   /* A phone: the row keeps its short list, every control 44px, and the panels are as wide as the screen. */
   @media (width < 48rem) {
     .xe-topbar .xe-topbar-row {
@@ -416,16 +422,24 @@
     .xe-wordbar {
       font-size: 0.75rem;
     }
+    /* "Review and publish" is one line here, and the bar's one mint button. Its room comes from the parts that
+       yield: the word count stacks its unit under the number (it was one long line), the gaps are small, and under
+       24rem the routine "Saved" gives way (a failed save still shows, below). */
+    .xe-topbar .xe-publish {
+      padding-inline: 0.375rem;
+    }
     .xe-topbar .xe-publish,
     .xe-topbar .xe-publish * {
-      white-space: normal;
-      line-height: 1.1;
-      text-align: center;
+      font-size: 0.75rem;
     }
-    .xe-topbar .xe-publish {
-      height: auto;
-      padding-inline: 0.625rem;
-      max-width: 6.25rem;
+    .xe-wordbar-text {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      line-height: 1.15;
+    }
+    .xe-wordbar-unit {
+      font-size: 0.6875rem;
     }
     .xe-fix-words {
       display: none;

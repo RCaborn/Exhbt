@@ -18,7 +18,9 @@ export function WordBar(): ReactNode {
   return (
     <div className="xe-wordbar" data-word-bar data-over={over || undefined} data-path="" tabIndex={-1}>
       <span className="xe-wordbar-text font-mono">
-        <span className={over ? "font-semibold text-error" : "text-ink"}>{total}</span> words<span className="xe-wordbar-limits"> · aim for {targetWords}, at most {totalWords}</span>
+        <span className={over ? "font-semibold text-error" : "text-ink"}>{total}</span>
+        <span className="xe-wordbar-unit"> words</span>
+        <span className="xe-wordbar-limits"> · aim for {targetWords}, at most {totalWords}</span>
       </span>
       <span aria-hidden className="xe-wordbar-bar">
         <span className={`absolute inset-y-0 left-0 rounded-full ${over ? "bg-error" : total > targetWords ? "bg-ink" : "bg-jade"}`} style={{ width: `${pct}%` }} />
