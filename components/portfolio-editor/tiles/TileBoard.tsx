@@ -8,6 +8,8 @@ import { closestCenter, DndContext, DragOverlay, type DragEndEvent, type DragSta
 import { rectSortingStrategy, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { usePortfolioApi, usePortfolioState, usePortfolioUi } from "../runtime";
 import { moveTile } from "../sections/arrange";
+import { usePhone } from "@/components/exhbt-editor/phone/usePhone";
+import { useOfferUndo } from "../phone/PhoneUndo";
 import { announcementsFor, DraggingContext, EASE, MOVE_MS, useDragSensors, useReducedMotion } from "../sections/drag";
 import { W } from "../sections/words";
 import { useArranged, useWorkTreatment } from "./arranged";
@@ -35,6 +37,8 @@ export function TileBoard({ children }: { children: ReactNode }): ReactNode {
   const arranged = useArranged();
   const treatment = useWorkTreatment();
   const sensors = useDragSensors();
+  const phone = usePhone();
+  const offerUndo = useOfferUndo();
   const reduced = useReducedMotion();
   const nodes = useRef<Nodes>(new Map()).current;
   const [active, setActive] = useState<string | null>(null);
@@ -62,6 +66,9 @@ export function TileBoard({ children }: { children: ReactNode }): ReactNode {
     const id = String(a.id);
     const to = work.indexOf(String(over.id));
     api.change((s) => moveTile(s, work, known, id, to), W.movedTile(title(id)));
+    // On a phone a drop gets the one-tap Undo the More sheet's moves get (phone/PhoneUndo.tsx): an
+    // accidental drag is the main reason a phone needs one.
+    if (phone) offerUndo();
   }
   function onCancel() {
     dragging.current = false;
