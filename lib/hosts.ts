@@ -57,21 +57,21 @@ export type HostKind =
   | { kind: "unknown" };
 
 /**
- * The move to the app host is off until EXHBT_TOOL_HOST=1. Sign-in cookies are host-only, so turning
- * it on signs everyone out once, and app.exhbt.co.uk must already reach this Worker (the routes ship
- * with the phase-2 launch). Until then sign-in stays on www.
+ * Production sets EXHBT_TOOL_HOST=1 in wrangler.jsonc. Sign-in cookies are host-only, so the
+ * first deploy with it on signs everyone out once. app.exhbt.co.uk is already attached to the
+ * Worker. Tests and local dev leave the variable unset. Localhost and workers.dev never move.
  */
 export function toolHostEnabled(): boolean {
   return process.env.EXHBT_TOOL_HOST === "1";
 }
 
 /**
- * Paths that belong on the app host: sign-in, roadmaps, exhbts, the portfolio, job links and the account.
+ * Paths that belong on the app host: sign-in, roadmaps, exhbts, the portfolio, job links, team invites and the account.
  * /auth is included too: the sign-in cookie is host-only, so a confirm link opened on www
  * would set it there and the next page would open on app without a session.
  * /start stays on www: it is an ad landing page, not the tool.
  */
-const TOOL_PATHS = ["/login", "/roadmap", "/auth", "/account", "/exhbts", "/portfolio", "/job-links"];
+const TOOL_PATHS = ["/login", "/roadmap", "/auth", "/account", "/exhbts", "/portfolio", "/job-links", "/team"];
 
 /**
  * Where www and the apex should send a tool path, or null when the request stays put.
