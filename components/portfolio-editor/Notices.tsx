@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import type { BuilderState } from "@/app/(app)/portfolio/steps";
 import { Button } from "@/components/ui/Button";
-import { takeUnsaved } from "./keep";
+import { takeUnsaved, type KeptWhy } from "./keep";
 import { usePortfolioApi, usePortfolioData } from "./runtime";
 
 /*
@@ -17,6 +17,26 @@ import { usePortfolioApi, usePortfolioData } from "./runtime";
 
 /** What Undo calls the change that puts the kept state back. */
 export const PUT_BACK = "put back the changes from before the reload";
+/** What Undo calls it when the changes were kept because the person left the page before they were saved. */
+export const PUT_BACK_LEFT = "put back your last changes";
+
+/** The offer's words, by why the changes were kept (keep.ts). */
+const OFFER: Record<KeptWhy, { title: string; description: string; button: string; said: string; undo: string }> = {
+  stale: {
+    title: "Your last changes were not saved before the reload",
+    description: "The site was updated while you were editing, so they were kept in this browser.",
+    button: "Put back the changes from before the reload",
+    said: "Your last changes were not saved before the reload. You can put them back.",
+    undo: PUT_BACK,
+  },
+  left: {
+    title: "Your last changes were not saved",
+    description: "You left the page before they could be saved, so they were kept in this browser.",
+    button: "Put back your last changes",
+    said: "Your last changes were not saved when you left the page. You can put them back.",
+    undo: PUT_BACK_LEFT,
+  },
+};
 
 export function Notices(): ReactNode {
   return (
@@ -37,26 +57,28 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 function KeptOffer(): ReactNode {
   const data = usePortfolioData();
   const api = usePortfolioApi();
-  const [kept, setKept] = useState<BuilderState | null>(null);
+  const [kept, setKept] = useState<{ state: BuilderState; why: KeptWhy } | null>(null);
   const { owner } = data;
   const { initial } = data.builder;
   useEffect(() => {
     const found = takeUnsaved(owner);
-    if (found && !same(found, initial)) setKept(found);
+    if (found && !same(found.state, initial)) setKept(found);
     // Once, as the editor opens: a refresh of the page's data is not a reload.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // A Banner is what is seen; the live region is what a screen reader hears (decision 0033).
   useEffect(() => {
-    if (kept) api.say("Your last changes were not saved before the reload. You can put them back.");
+    if (kept) api.say(OFFER[kept.why].said);
   }, [kept, api]);
   if (!kept) return null;
+  const words = OFFER[kept.why];
   return (
     <Banner
       status="info"
       data-kept-offer
-      title="Your last changes were not saved before the reload"
-      description="The site was updated while you were editing, so they were kept in this browser."
+      data-kept-why={kept.why}
+      title={words.title}
+      description={words.description}
       isDismissable
       dismissLabel="Leave them out"
       onDismiss={() => setKept(null)}
@@ -64,12 +86,12 @@ function KeptOffer(): ReactNode {
         <Button
           size="sm"
           onClick={() => {
-            api.change(() => kept, PUT_BACK);
+            api.change(() => kept.state, words.undo);
             api.say("Your changes are back on the page.");
             setKept(null);
           }}
         >
-          Put back the changes from before the reload
+          {words.button}
         </Button>
       }
     />

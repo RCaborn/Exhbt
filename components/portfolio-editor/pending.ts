@@ -37,7 +37,8 @@ let savedHereAt = 0;
 let sender: Sender | null = null;
 /** Saves on their way: the gate and the crash fallback wait for them. */
 let sending = 0;
-let settled: Promise<void> = Promise.resolve();
+/** Each save on its way, until it is answered (settledSaves waits on all of them). */
+const onTheirWay = new Set<Promise<void>>();
 
 /** The editor's newest state, noted in every change before any part of the page is told. */
 export function notePending(state: BuilderState): void {
@@ -56,18 +57,27 @@ export function noteSaved(state: BuilderState, at?: string): void {
 /** A save is on its way: until it is answered, nobody is to think the server is up to date. */
 export function noteSending(save: Promise<unknown>): void {
   sending++;
-  const done = save.then(
+  const done: Promise<void> = save.then(
     () => {},
     () => {},
   );
-  settled = done.finally(() => void sending--);
+  onTheirWay.add(done);
+  void done.then(() => {
+    onTheirWay.delete(done);
+    sending--;
+  });
 }
 
-/** Resolves once no save is on its way (one that ends may start the next: the newest state always follows). */
+/**
+ * Resolves once no save is on its way (one that ends may start the next: the newest state always follows).
+ * It waits on every save still on its way, not only the newest: when two overlap and the later lands
+ * first, waiting on that one alone would come back at once while the count is still above 0, and the loop
+ * would turn on resolved promises without ever letting the earlier save's answer in.
+ */
 export async function settledSaves(): Promise<void> {
   // A turn first: an editor that is leaving the page starts its own last save as it goes (useBuilder).
   await new Promise((done) => setTimeout(done, LEAVING_MS));
-  while (sending > 0) await settled;
+  while (onTheirWay.size > 0) await Promise.all([...onTheirWay]);
 }
 
 /** Whether there is a state the server has not got. */
