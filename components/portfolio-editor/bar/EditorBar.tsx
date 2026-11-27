@@ -18,7 +18,7 @@ import { TeamNotice, TeamSheet, TEAM_WORDS } from "../sheets/TeamSheet";
 import { SaveStatus } from "../ui/SaveStatus";
 import { Sheet } from "../ui/Sheet";
 import { HEADING_ID, UndoButton } from "../ui/UndoButton";
-import { useBarSize, useCoarse, useNarrow, useStanding, type Standing } from "./hooks";
+import { useBarSize, useCoarse, useNarrow, usePopoverOpener, useStanding, type Standing } from "./hooks";
 import { LookPanel, PreviewNotice } from "./LookMenu";
 import { LinksPanel } from "../tools/PartTools";
 import { ReorderSheet } from "../phone/ReorderSheet";
@@ -143,19 +143,12 @@ function Chip(): ReactNode {
   );
 }
 
-/** A bar button that opens a popover the runtime keeps (`ui.sheet === name`). */
-function usePanel(name: PortfolioSheet) {
-  const api = usePortfolioApi();
-  const open = usePortfolioUi((u) => u.sheet === name);
-  return { open, onOpenChange: (next: boolean) => (next ? api.open(name) : open && api.close()) };
-}
-
 function LookButton(): ReactNode {
-  const p = usePanel("look");
+  const p = usePopoverOpener("look");
   const size = useBarSize();
   return (
     <Popover isOpen={p.open} onOpenChange={p.onOpenChange} label="Your look" placement="below" alignment="start" width={432} padding={4} content={<LookPanel />}>
-      <Button size={size} label={BAR.look} aria-expanded={p.open}>
+      <Button size={size} label={BAR.look} aria-expanded={p.open} {...p.press}>
         <Palette aria-hidden size={16} strokeWidth={2.25} />
         {BAR.look}
       </Button>
@@ -164,11 +157,11 @@ function LookButton(): ReactNode {
 }
 
 function JobLinksButton({ jobLinks }: { jobLinks: ReactNode }): ReactNode {
-  const p = usePanel("job-links");
+  const p = usePopoverOpener("job-links");
   const size = useBarSize();
   return (
     <Popover isOpen={p.open} onOpenChange={p.onOpenChange} label={BAR.jobLinks} placement="below" alignment="end" width={432} padding={4} content={<div data-job-links-menu>{jobLinks}</div>}>
-      <Button size={size} label={BAR.jobLinks} aria-expanded={p.open}>
+      <Button size={size} label={BAR.jobLinks} aria-expanded={p.open} {...p.press}>
         <BriefcaseBusiness aria-hidden size={16} strokeWidth={2.25} />
         {BAR.jobLinks}
       </Button>
@@ -194,7 +187,7 @@ function PrimaryButton(): ReactNode {
   const size = useBarSize();
   const label = username ? BAR.share : BAR.claim;
   return (
-    <Button variant="primary" size={size} label={label} aria-expanded={open} onClick={() => api.open("address")}>
+    <Button variant="primary" size={size} label={label} aria-expanded={open} onClick={(e) => api.open("address", e.currentTarget as HTMLElement)}>
       {username && <Link2 aria-hidden size={16} strokeWidth={2.25} />}
       {label}
     </Button>
@@ -214,6 +207,9 @@ function MoreMenu(): ReactNode {
   const visitor = usePortfolioUi((u) => u.visitor);
   const undo = usePortfolioUndo();
   const form = useRef<HTMLFormElement>(null);
+  // A choice that opens a sheet goes with the menu, so the sheet gives the focus back to the menu's own button.
+  const button = useRef<HTMLButtonElement>(null);
+  const openSheet = (name: PortfolioSheet) => api.open(name, button.current);
 
   const leave = async (go: () => void) => {
     // Whatever is waiting to be saved is sent first, so nothing typed is lost on the way out.
@@ -225,13 +221,13 @@ function MoreMenu(): ReactNode {
     ...(narrow
       ? ([
           { label: undo.label ? `Undo: ${undo.label}` : "Undo", icon: <Undo2 aria-hidden size={16} />, isDisabled: !undo.label, onClick: () => undo.undo() },
-          { label: BAR.look, icon: <Palette aria-hidden size={16} />, onClick: () => api.open("look") },
+          { label: BAR.look, icon: <Palette aria-hidden size={16} />, onClick: () => openSheet("look") },
           { label: visitor ? "Back to editing" : BAR.visitor, icon: <Eye aria-hidden size={16} />, onClick: () => api.seeAsVisitor(!visitor) },
-          { label: BAR.jobLinks, icon: <BriefcaseBusiness aria-hidden size={16} />, onClick: () => api.open("job-links") },
+          { label: BAR.jobLinks, icon: <BriefcaseBusiness aria-hidden size={16} />, onClick: () => openSheet("job-links") },
         ] satisfies DropdownMenuOption[])
       : []),
-    { label: TEAM_WORDS.title, onClick: () => api.open("team") },
-    ...(coarse ? [{ label: BAR.reorder, onClick: () => api.open("reorder") }] : []),
+    { label: TEAM_WORDS.title, onClick: () => openSheet("team") },
+    ...(coarse ? [{ label: BAR.reorder, onClick: () => openSheet("reorder") }] : []),
     { type: "divider" },
     { label: BAR.steps, description: "The guided builder, for this visit.", onClick: () => void leave(() => window.location.assign("/portfolio?builder=steps")) },
     ...(admin ? [{ label: BAR.stepsForGood, description: "Admins only: in this browser.", onClick: () => void leave(() => form.current?.requestSubmit()) }] : []),
@@ -240,7 +236,7 @@ function MoreMenu(): ReactNode {
   return (
     <>
       <DropdownMenu
-        button={{ label: BAR.more, icon: <MoreHorizontal aria-hidden size={18} />, isIconOnly: true, size, variant: "ghost", tooltip: BAR.more }}
+        button={{ label: BAR.more, icon: <MoreHorizontal aria-hidden size={18} />, isIconOnly: true, size, variant: "ghost", tooltip: BAR.more, ref: button }}
         hasChevron={false}
         items={items}
         alignment="end"

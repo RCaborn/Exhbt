@@ -26,8 +26,13 @@ export type PortfolioEditorApi = {
   change(update: (s: BuilderState) => BuilderState, undo?: string): void;
   /** Writes one field by its path, with no undo entry (typing). */
   setAt(path: HomePath, value: unknown): void;
-  /** Opens a menu, sheet or popover by name; close() puts the focus back where it was. */
-  open(sheet: PortfolioSheet): void;
+  /**
+   * Opens a menu, sheet or popover by name; close() puts the focus back where it was. `trigger` is what was pressed to
+   * open it (for a choice in a menu, the menu's button): it takes the focus first if it lacks it, as a pressed button
+   * does everywhere but Safari, so the sheet gives the focus back to it when it closes. Without one (a field's "Show
+   * me", the address's ?open=) the focus goes back to whatever had it.
+   */
+  open(sheet: PortfolioSheet, trigger?: HTMLElement | null): void;
   close(): void;
   /** Says something in the polite live region. */
   say(message: string): void;

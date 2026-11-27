@@ -1,5 +1,5 @@
 import "../css/bar.css";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { Check, Circle, X } from "lucide-react";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Step, Stepper } from "@astryxdesign/core/Stepper";
@@ -22,7 +22,8 @@ export { writeStripHidden } from "./strip-cookie";
 /** What the strip knows to tick its items. */
 export type Facts = { name: boolean; headline: boolean; photo: boolean; look: boolean; exhbt: boolean };
 
-type Item = { id: keyof Facts; label: string; optional?: boolean; go(api: PortfolioEditorApi): void };
+/** `go` is given the strip's button that was pressed: what opens a sheet passes it to `open`, which gives the focus back to it. */
+type Item = { id: keyof Facts; label: string; optional?: boolean; go(api: PortfolioEditorApi, pressed?: HTMLElement): void };
 export type StripStep = { id: string; label: string; description: string; lead: string; items: Item[]; done(f: Facts): boolean; action?: { label: string; go(api: PortfolioEditorApi): void } };
 
 /** Scrolls to where the first exhbt goes: the band that says "Your best project goes here", else the Add tile. */
@@ -61,8 +62,8 @@ export const STRIP = {
       items: [
         { id: "name", label: "Your name", go: (api) => api.jumpTo("profile.name") },
         { id: "headline", label: "One line about you", go: (api) => api.jumpTo("profile.headline") },
-        { id: "photo", label: "A photo", optional: true, go: (api) => api.open("photo") },
-        { id: "look", label: "Pick a look", go: (api) => api.open("look") },
+        { id: "photo", label: "A photo", optional: true, go: (api, pressed) => api.open("photo", pressed) },
+        { id: "look", label: "Pick a look", go: (api, pressed) => api.open("look", pressed) },
       ],
       done: (f) => f.name && f.headline && f.look,
     },
@@ -109,12 +110,12 @@ type Handlers = { api: PortfolioEditorApi; hide(): void; skip(): void; view(step
 export function StripView({ facts, current, narrow, size, on }: { facts: Facts; current: number; narrow: boolean; size: "sm" | "md"; on?: Handlers }): ReactNode {
   const steps = STRIP.steps;
   const step = steps[current]!;
-  const press = (run: (h: Handlers) => void) => (on ? () => run(on) : undefined);
+  const press = (run: (h: Handlers, pressed: HTMLElement) => void) => (on ? (e: MouseEvent) => run(on, e.currentTarget as HTMLElement) : undefined);
   const hideButton = <IconButton label={STRIP.hide} tooltip={STRIP.hide} variant="ghost" size={size} icon={<X aria-hidden size={18} />} onClick={press((h) => h.hide())} />;
 
   if (narrow) {
     const next = step.items.find((i) => !facts[i.id]);
-    const go = (h: Handlers) => (next ? next.go(h.api) : step.action ? step.action.go(h.api) : h.view(Math.min(steps.length - 1, current + 1)));
+    const go = (h: Handlers, pressed: HTMLElement) => (next ? next.go(h.api, pressed) : step.action ? step.action.go(h.api) : h.view(Math.min(steps.length - 1, current + 1)));
     return (
       <section className="pe-first" aria-label={STRIP.title} data-first-run={on ? "narrow" : undefined} data-step={step.id}>
         <div className="pe-first-head">
@@ -170,7 +171,7 @@ export function StripView({ facts, current, narrow, size, on }: { facts: Facts; 
                 const done = facts[item.id];
                 return (
                   <li key={item.id} data-todo={item.id} data-done={done ? "true" : undefined}>
-                    <Button size={size} onClick={press((h) => item.go(h.api))} label={`${item.label}${item.optional ? " (optional)" : ""}${done ? ", done" : ""}`}>
+                    <Button size={size} onClick={press((h, pressed) => item.go(h.api, pressed))} label={`${item.label}${item.optional ? " (optional)" : ""}${done ? ", done" : ""}`}>
                       {done ? <Check aria-hidden size={16} strokeWidth={2.75} className="pe-first-tick" /> : <Circle aria-hidden size={16} strokeWidth={2} className="pe-first-open" />}
                       {item.label}
                       {item.optional && <span className="pe-first-optional">optional</span>}

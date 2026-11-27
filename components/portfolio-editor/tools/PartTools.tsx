@@ -10,7 +10,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { suggestIntroAction } from "@/app/(app)/portfolio/actions";
 import type { HomePath } from "@/components/portfolio/home-ctx";
 import { Button } from "@/components/ui/Button";
-import { useBarSize, useNarrow } from "../bar/hooks";
+import { useBarSize, useNarrow, usePopoverOpener } from "../bar/hooks";
 import { usePortfolioApi, usePortfolioState, usePortfolioUi } from "../runtime";
 import { placeLinks, placeTool, type Spot } from "./place";
 
@@ -209,8 +209,7 @@ const LINKS: { path: HomePath; key: "linkedin" | "github" | "website" | "contact
 ];
 
 function YourLinks(): ReactNode {
-  const api = usePortfolioApi();
-  const open = usePortfolioUi((u) => u.sheet === "links");
+  const p = usePopoverOpener("links");
   const size = useBarSize();
   const narrow = useNarrow();
   const themeId = usePortfolioState((s) => s.arrangement.themeId);
@@ -239,8 +238,8 @@ function YourLinks(): ReactNode {
       style={at ? { insetInlineStart: at.x, insetBlockStart: at.y, insetInlineEnd: "auto", translate: "none" } : undefined}
     >
       <Popover
-        isOpen={open}
-        onOpenChange={(next) => (next ? api.open("links") : open && api.close())}
+        isOpen={p.open}
+        onOpenChange={p.onOpenChange}
         label="Your links"
         placement="below"
         alignment="end"
@@ -249,7 +248,7 @@ function YourLinks(): ReactNode {
         presentation="adaptive"
         content={<LinksPanel />}
       >
-        <Button size={size} label="Your links" aria-expanded={open}>
+        <Button size={size} label="Your links" aria-expanded={p.open} {...p.press}>
           <Link2 aria-hidden size={16} strokeWidth={2.25} />
           Your links
         </Button>

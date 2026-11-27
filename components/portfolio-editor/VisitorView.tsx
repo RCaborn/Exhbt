@@ -64,7 +64,7 @@ function NotOnline({ data, home }: { data: PortfolioData; home: Home }): ReactNo
         title="Not online yet: claim your address"
         description="Your page needs an address before anyone can visit it. This is how it will look."
         endContent={
-          <Button size="sm" onClick={() => api.open("address")}>
+          <Button size="sm" onClick={(e) => api.open("address", e.currentTarget as HTMLElement)}>
             Claim your address
           </Button>
         }

@@ -31,6 +31,18 @@ const PRESSABLE = "button, a[href], [tabindex]";
 /** The editor's root on the page. */
 const root = () => document.querySelector<HTMLElement>('[data-editor="portfolio"]');
 
+/**
+ * Gives `el` the focus, without scrolling, unless it has it already: what a press gives a button in every browser
+ * but Safari. There a pressed button gets no focus, and the focus goes to the nearest thing round it that takes one
+ * (the page's main region, #main) or nowhere. A sheet, a popover or a menu gives the focus back, when it closes, to
+ * what had it as it opened, so whatever opens one takes the focus first (`open`, below; and the bar's popover
+ * buttons, before Astryx's Popover reads where the focus is). Nothing happens to an element no longer on the page,
+ * and a focus that cannot move (the rest of the page is inert under an open modal sheet) stays where it is.
+ */
+export function takeFocus(el: HTMLElement | null | undefined): void {
+  if (el?.isConnected && document.activeElement !== el) el.focus({ preventScroll: true });
+}
+
 const sameIssues = (a: Record<string, string>, b: Record<string, string>) => {
   const ka = Object.keys(a);
   const kb = Object.keys(b);
@@ -101,10 +113,14 @@ export function createRuntime(initial: BuilderState, host: Host): Runtime {
     });
   }
 
-  function open(sheet: PortfolioSheet): void {
+  function open(sheet: PortfolioSheet, trigger?: HTMLElement | null): void {
     if (ui.get().sheet === sheet) return;
+    // Before the sheet opens: Astryx's Drawer gives the focus back to what had it as it opened, and a pressed button
+    // in Safari has none (takeFocus). Without a trigger (a field's "Show me", the address's ?open=) the focus goes
+    // back to whatever had it.
+    takeFocus(trigger);
     const a = document.activeElement;
-    if (!ui.get().sheet) opener = a instanceof HTMLElement && a !== document.body ? a : null;
+    if (!ui.get().sheet) opener = trigger?.isConnected ? trigger : a instanceof HTMLElement && a !== document.body ? a : null;
     ui.set((u) => ({ ...u, sheet }));
   }
 

@@ -13,7 +13,11 @@ const KEEP_MS = 400;
  * and on a phone a section's or a tile's More): Astryx's Drawer, opened by `open(name)` and closed by
  * `close()`. At the side on a desktop; under 640px it covers the screen, so a phone's sheet is the whole
  * screen. Titled; the focus is trapped while it is open; Escape, its close button or a press outside it
- * closes it, and the focus goes back to what opened it. Its contents are drawn only while it is open
+ * closes it, and the Drawer gives the focus back to what had it as the sheet opened. That is the opener:
+ * whatever opens a sheet passes itself to `open(name, trigger)` (for a choice in the bar's menu, the
+ * menu's button), which gives it the focus first when it lacks it, as a pressed button does everywhere
+ * but Safari (runtime-core.ts, takeFocus). Opened with no trigger (a field's "Show me", the address's
+ * ?open=), it gives the focus back to whatever had it. Its contents are drawn only while it is open
  * (and for a moment after, while it slides away).
  *
  * `purpose="form"` for a sheet holding a form a stray press outside must not lose (the address);

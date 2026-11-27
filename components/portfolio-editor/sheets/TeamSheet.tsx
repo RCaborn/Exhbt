@@ -57,7 +57,7 @@ export function TeamNotice(): ReactNode {
         container="section"
         title={TEAM_WORDS.notice}
         endContent={
-          <Button size="sm" aria-expanded={open} onClick={() => api.open("team")}>
+          <Button size="sm" aria-expanded={open} onClick={(e) => api.open("team", e.currentTarget as HTMLElement)}>
             Review
           </Button>
         }

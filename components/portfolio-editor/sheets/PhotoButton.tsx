@@ -63,7 +63,7 @@ export function PhotoButton({ children }: { children: ReactNode }): ReactNode {
     <span ref={wrap} className="pe-photo" data-photo-slot>
       {children}
       <span ref={button} className="pe-photo-button" data-photo-button style={spot ? { left: spot.left, top: spot.top } : { visibility: "hidden" }}>
-        <Button size={size} onClick={() => api.open("photo")} label={label}>
+        <Button size={size} onClick={(e) => api.open("photo", e.currentTarget as HTMLElement)} label={label}>
           <Camera aria-hidden size={16} strokeWidth={2.25} />
           {label}
         </Button>
