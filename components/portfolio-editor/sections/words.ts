@@ -24,6 +24,8 @@ export const W = {
   firstAlready: (n: string) => `${n} is already at the top`,
   lastAlready: (n: string) => `${n} is already at the bottom`,
   keepOne: "Your portfolio keeps at least one section.",
+  keepWork: "Your portfolio always shows your work.",
+  keepAnchor: "Your portfolio keeps your work, your best piece of work or Get in touch.",
   moved: (n: string) => `moved ${n}`,
   removed: (n: string) => `removed ${n}`,
   added: (n: string) => `added ${n}`,

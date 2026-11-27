@@ -33,16 +33,45 @@ export function moveSection(s: BuilderState, key: SectionKey, to: number): Build
  * no sections reads as the defaults (sectionsOf), so the page keeps at least one.
  */
 export function removeSection(s: BuilderState, key: SectionKey): BuilderState {
-  if (!s.arrangement.sections.includes(key) || s.arrangement.sections.length <= 1) return s;
+  if (!s.arrangement.sections.includes(key) || removeBlocked(s.arrangement.sections, key)) return s;
   return withA(s, { ...s.arrangement, sections: s.arrangement.sections.filter((k) => k !== key) });
+}
+
+/** The sections that make a stored layout read as the person's own (sectionsOf): one of them is always kept. */
+const ANCHORS: readonly SectionKey[] = ["featured", "work", "contact"];
+
+/**
+ * Why a section cannot be taken off, or null when it can. More of my work always stays: a stored layout
+ * with none of the band, the work and Get in touch is read as the defaults (sectionsOf, which stored
+ * layouts rely on), so ["about"] would come back as four sections. A layout from before this rule that
+ * has no work keeps its last anchor and its last section for the same reason.
+ */
+export function removeBlocked(sections: readonly SectionKey[], key: SectionKey): "work" | "anchor" | "one" | null {
+  if (key === "work") return "work";
+  if (sections.length <= 1) return "one";
+  if (ANCHORS.includes(key) && !sections.some((k) => k !== key && ANCHORS.includes(k))) return "anchor";
+  return null;
 }
 
 /** Puts a section at the end, with empty words for whatever it holds that has none yet. */
 export function addSection(s: BuilderState, key: SectionKey): BuilderState {
   if (s.arrangement.sections.includes(key)) return s;
+  const t = withSectionWords(s, key);
+  return withA(t, { ...t.arrangement, sections: [...t.arrangement.sections, key] });
+}
+
+/**
+ * The empty words a section holds, for whatever of it has none yet; the same state when it has them.
+ * AddSection writes these as a change of their own, with no Undo step, before the labelled add: Undo of
+ * "added About me" then takes only the section off the page and keeps what was typed into it since, as
+ * Remove does, so adding it again brings the words back (decision 0026: Undo never throws away typing).
+ */
+export function withSectionWords(s: BuilderState, key: SectionKey): BuilderState {
+  const missing = (WRITTEN[key] ?? []).filter((kind) => !s.arrangement.tiles[kind]);
+  if (!missing.length) return s;
   const tiles = { ...s.arrangement.tiles };
-  for (const kind of WRITTEN[key] ?? []) if (!tiles[kind]) (tiles as Record<string, unknown>)[kind] = emptyTile(kind);
-  return withA(s, { ...s.arrangement, sections: [...s.arrangement.sections, key], tiles });
+  for (const kind of missing) (tiles as Record<string, unknown>)[kind] = emptyTile(kind);
+  return withA(s, { ...s.arrangement, tiles });
 }
 
 /**

@@ -143,14 +143,15 @@ test.describe("Sections", () => {
     await expect(textbox(page, "arrangement.tiles.experience.lines.0", { part: "label" })).toHaveValue("Shift supervisor, campus cafe");
   });
 
-  test("the last section cannot be removed: its Remove is off with the reason, and nothing changes", async ({ page }) => {
+  test("More of my work cannot be removed: its Remove is off with the reason, and nothing changes", async ({ page }) => {
     await openEditor(page, withLayout("lone", ["work"]));
     expect(await sections(page)).toEqual(["work"]);
     await pointAt(page, "work");
     const remove = tools(page, "work").getByRole("button", { name: "Remove More of my work" });
     await expect(remove).toHaveAttribute("aria-disabled", "true");
     await remove.hover();
-    await expect(page.getByRole("tooltip").filter({ hasText: "Your portfolio keeps at least one section." })).toBeVisible();
+    // The work always stays: a stored layout with no band, work or Get in touch reads as the defaults.
+    await expect(page.getByRole("tooltip").filter({ hasText: "Your portfolio always shows your work." })).toBeVisible();
     await remove.click({ force: true });
     // The keyboard: Enter and Space on it do nothing either.
     await remove.focus();
@@ -166,6 +167,44 @@ test.describe("Sections", () => {
     expect(await sections(page)).toEqual(["work"]);
     await page.getByRole("button", { name: "Undo: removed About me" }).click();
     expect(await sections(page)).toEqual(["work", "about"]);
+  });
+
+  test("a layout with no work keeps its last section and its last of the band and Get in touch, each with its reason", async ({ page }) => {
+    // From before the work always stayed: About and Get in touch.
+    await openEditor(page, withLayout("anchor", ["about", "contact"]));
+    expect(await sections(page)).toEqual(["about", "contact"]);
+    await pointAt(page, "contact");
+    const remove = tools(page, "contact").getByRole("button", { name: "Remove Get in touch" });
+    await expect(remove).toHaveAttribute("aria-disabled", "true");
+    await remove.hover();
+    await expect(page.getByRole("tooltip").filter({ hasText: "Your portfolio keeps your work, your best piece of work or Get in touch." })).toBeVisible();
+    await remove.click({ force: true });
+    expect(await sections(page)).toEqual(["about", "contact"]);
+    // About can go; then Get in touch is the last section.
+    await pointAt(page, "about");
+    await tools(page, "about").getByRole("button", { name: "Remove About me" }).click();
+    expect(await sections(page)).toEqual(["contact"]);
+    await pointAt(page, "contact");
+    await tools(page, "contact").getByRole("button", { name: "Remove Get in touch" }).hover();
+    await expect(page.getByRole("tooltip").filter({ hasText: "Your portfolio keeps at least one section." })).toBeVisible();
+  });
+
+  test("Undo of adding a section takes it off the page but keeps what was typed into it, and adding it again brings the words", async ({ page }) => {
+    await openEditor(page, withLayout("add-undo", ["featured", "work", "contact"]));
+    const add = page.locator(`${READY} [data-path="arrangement.sections"]`).getByRole("button", { name: "Add a section" });
+    await add.click();
+    await page.getByRole("menu").getByRole("menuitem", { name: /About me/ }).click();
+    await expect.poll(() => sections(page)).toEqual(["featured", "work", "contact", "about"]);
+    await typeIn(page, "arrangement.tiles.about.text", "I like charts that people read.");
+    await expect.poll(() => valueAt(page, "arrangement.tiles.about.text")).toBe("I like charts that people read.");
+    expect(await undoLabel(page)).toBe("added About me");
+    await page.getByRole("button", { name: "Undo: added About me" }).click();
+    await expect.poll(() => sections(page)).toEqual(["featured", "work", "contact"]);
+    // The words are kept, as a Remove keeps them.
+    expect(await valueAt(page, "arrangement.tiles.about.text")).toBe("I like charts that people read.");
+    await add.click();
+    await page.getByRole("menu").getByRole("menuitem", { name: /About me/ }).click();
+    await expect(textbox(page, "arrangement.tiles.about.text")).toHaveValue("I like charts that people read.");
   });
 
   test("Add a section lists the six, dims those on the page, and puts a new one at the end with the cursor in it", async ({ page }) => {

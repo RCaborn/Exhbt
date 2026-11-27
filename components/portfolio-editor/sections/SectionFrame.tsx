@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import { memo, useRef, type ReactNode, type RefObject } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS as Dnd } from "@dnd-kit/utilities";
 import { IconButton } from "@astryxdesign/core/IconButton";
@@ -9,10 +9,10 @@ import { usePhone } from "@/components/exhbt-editor/phone/usePhone";
 import type { HomeSectionSlot } from "@/components/portfolio/home-ctx";
 import type { SectionKey } from "@/lib/portfolio-layout";
 import { ItemMore, type ItemAction } from "../phone/ItemMore";
-import { usePortfolioApi, useRuntime } from "../runtime";
+import { usePortfolioApi, usePortfolioState, useRuntime } from "../runtime";
 import { TileBoard } from "../tiles/TileBoard";
 import { useArranged } from "../tiles/arranged";
-import { hideTile, moveSection, removeSection, setStar } from "./arrange";
+import { hideTile, moveSection, removeBlocked, removeSection, setStar } from "./arrange";
 import { AddSection } from "./AddSection";
 import { EASE, gripAttributes, MOVE_MS, useReducedMotion } from "./drag";
 import { placeSection, useSpot } from "./place";
@@ -44,20 +44,60 @@ export function refocus(selector: string) {
   requestAnimationFrame(() => document.querySelector<HTMLElement>(selector)?.focus());
 }
 
-export function SectionFrame({ sectionKey, index, count, children }: SectionFrameProps): ReactNode {
-  const api = usePortfolioApi();
-  const rt = useRuntime();
-  const phone = usePhone();
+/** What the grip needs of the sortable item: each keeps its identity while the section is not dragged. */
+type Grip = Pick<ReturnType<typeof useSortable>, "attributes" | "listeners" | "setActivatorNodeRef">;
+
+/**
+ * The sortable item: dnd-kit's useSortable and the frame's own node, and nothing else. Every item reads
+ * the sortable list's context, so each one draws again when the sections' order changes; the frame
+ * inside it (toolbar, More, the section's body) is memoised and draws again only when its own place
+ * changes, so a move draws the two frames that changed places and no other (e2e/portfolio-smooth.spec.ts).
+ */
+function SortableSection({ sectionKey, index, count, children }: SectionFrameProps): ReactNode {
   const reduced = useReducedMotion();
-  const arranged = useArranged();
-  const frame = useRef<HTMLDivElement | null>(null);
-  const body = useRef<HTMLDivElement | null>(null);
-  const tools = useRef<HTMLDivElement | null>(null);
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: sectionKey,
     transition: reduced ? null : { duration: MOVE_MS, easing: EASE },
-    attributes: { roleDescription: "draggable section" },
+    attributes: SORTABLE,
   });
+  return (
+    <div
+      ref={setNodeRef}
+      className="pe-frame pe-sec"
+      data-section-frame={sectionKey}
+      data-dragging={isDragging ? "true" : undefined}
+      style={{ transform: Dnd.Translate.toString(transform), transition: transition ?? undefined }}
+    >
+      <Frame sectionKey={sectionKey} index={index} count={count} attributes={attributes} listeners={listeners} setActivatorNodeRef={setActivatorNodeRef}>
+        {children}
+      </Frame>
+    </div>
+  );
+}
+
+const SORTABLE = { roleDescription: "draggable section" };
+
+/** The frame, as the adapter draws it (E's adapter.tsx). */
+export { SortableSection as SectionFrame };
+
+type FrameProps = SectionFrameProps & Grip;
+
+const Frame = memo(function SectionFrame({ sectionKey, index, count, children, attributes, listeners, setActivatorNodeRef }: FrameProps): ReactNode {
+  const api = usePortfolioApi();
+  const rt = useRuntime();
+  const phone = usePhone();
+  const arranged = useArranged();
+  // A word, not the list: the list changes on every move, and would draw every frame again.
+  const blocked = usePortfolioState((s) => removeBlocked(s.arrangement.sections, sectionKey));
+  const body = useRef<HTMLDivElement | null>(null);
+  const tools = useRef<HTMLDivElement | null>(null);
+  // The frame's node is the shell's (SortableSection): found through the body, whose ref is set before this
+  // frame's layout effects run, which the shell's own ref is not on the first one.
+  const frame = useRef<RefObject<HTMLElement | null>>({
+    get current() {
+      return body.current?.parentElement ?? null;
+    },
+  }).current;
   const spot = useSpot(frame, () => (frame.current && body.current && tools.current ? placeSection(frame.current, body.current, tools.current) : null), [sectionKey, index, count, phone]);
 
   const name = sectionName(sectionKey);
@@ -66,8 +106,8 @@ export function SectionFrame({ sectionKey, index, count, children }: SectionFram
   const at = `[data-section-frame="${sectionKey}"]`;
   const first = index === 0;
   const last = index === count - 1;
-  // The page keeps at least one section (removeSection does nothing to the last one).
-  const lone = count <= 1;
+  // Why Remove is off (removeSection does nothing then): the work always stays, and so does the page's last section.
+  const keep = blocked === "work" ? W.keepWork : blocked === "anchor" ? W.keepAnchor : blocked === "one" ? W.keepOne : undefined;
 
   const move = (by: -1 | 1, act: string) => {
     const to = rt.state.get().arrangement.sections.indexOf(sectionKey) + by;
@@ -78,7 +118,7 @@ export function SectionFrame({ sectionKey, index, count, children }: SectionFram
   };
   const remove = () => {
     const list = rt.state.get().arrangement.sections;
-    if (list.length <= 1) return api.say(W.keepOne);
+    if (keep) return api.say(keep);
     const i = list.indexOf(sectionKey);
     const next = list[i + 1] ?? list[i - 1];
     api.change((s) => removeSection(s, sectionKey), W.removed(name));
@@ -124,20 +164,11 @@ export function SectionFrame({ sectionKey, index, count, children }: SectionFram
           { id: "open", label: W.open(bandTitle), run: () => (window.location.href = `/exhbts/${band}/edit`) },
         ] as ItemAction[])
       : []),
-    { id: "remove", label: W.sectionRemove(name), off: lone ? W.keepOne : undefined, run: remove },
+    { id: "remove", label: W.sectionRemove(name), off: keep, run: remove },
   ];
 
   return (
-    <div
-      ref={(el) => {
-        frame.current = el;
-        setNodeRef(el);
-      }}
-      className="pe-frame pe-sec"
-      data-section-frame={sectionKey}
-      data-dragging={isDragging ? "true" : undefined}
-      style={{ transform: Dnd.Translate.toString(transform), transition: transition ?? undefined }}
-    >
+    <>
       {phone ? (
         <ToolRow ref={tools} spot={spot} kind="section" label={W.sectionTools(name)}>
           {grip}
@@ -162,13 +193,13 @@ export function SectionFrame({ sectionKey, index, count, children }: SectionFram
               <IconButton data-act="hide" variant="ghost" label={W.hide(bandTitle)} tooltip={W.hideTip} onClick={hideBand} icon={<EyeOff aria-hidden size={16} strokeWidth={2} />} />
             </>
           )}
-          <IconButton data-act="remove" variant="ghost" label={W.sectionRemove(name)} tooltip={lone ? W.keepOne : W.sectionRemove(name)} isDisabled={lone} onClick={remove} icon={<X aria-hidden size={16} strokeWidth={2.25} />} />
+          <IconButton data-act="remove" variant="ghost" label={W.sectionRemove(name)} tooltip={keep ?? W.sectionRemove(name)} isDisabled={Boolean(keep)} onClick={remove} icon={<X aria-hidden size={16} strokeWidth={2.25} />} />
         </ToolRow>
       )}
       <div ref={body} className="pe-sec-body">
         {sectionKey === "work" ? <TileBoard>{children}</TileBoard> : children}
       </div>
       {last && <AddSection />}
-    </div>
+    </>
   );
-}
+});

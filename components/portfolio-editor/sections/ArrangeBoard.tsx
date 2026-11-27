@@ -44,10 +44,12 @@ export function ArrangeBoard({ children }: { children: ReactNode }): ReactNode {
     if (!over || a.id === over.id) return;
     const key = a.id as SectionKey;
     const to = rt.state.get().arrangement.sections.indexOf(over.id as SectionKey);
-    api.change((s) => moveSection(s, key, to), W.moved(sectionName(key)));
+    const drop = () => api.change((s) => moveSection(s, key, to), W.moved(sectionName(key)));
+
     // On a phone a drop gets the one-tap Undo the More sheet's moves get (phone/PhoneUndo.tsx): an
     // accidental drag is the main reason a phone needs one.
-    if (phone) offerUndo();
+    if (phone) offerUndo(drop);
+    else drop();
   }
   function onCancel() {
     dragging.current = false;

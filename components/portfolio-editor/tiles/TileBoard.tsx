@@ -65,10 +65,12 @@ export function TileBoard({ children }: { children: ReactNode }): ReactNode {
     const { work, known, title } = latest.current;
     const id = String(a.id);
     const to = work.indexOf(String(over.id));
-    api.change((s) => moveTile(s, work, known, id, to), W.movedTile(title(id)));
+    const drop = () => api.change((s) => moveTile(s, work, known, id, to), W.movedTile(title(id)));
+
     // On a phone a drop gets the one-tap Undo the More sheet's moves get (phone/PhoneUndo.tsx): an
     // accidental drag is the main reason a phone needs one.
-    if (phone) offerUndo();
+    if (phone) offerUndo(drop);
+    else drop();
   }
   function onCancel() {
     dragging.current = false;
