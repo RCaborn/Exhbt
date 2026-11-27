@@ -3,6 +3,8 @@ name: CI
 on:
   push:
   pull_request:
+  # By hand, for a branch whose pushes all carried the CI-skip marker (builders' commits do).
+  workflow_dispatch:
 
 # One run per branch at a time. A newer push takes the place of a run still waiting;
 # the run already in progress finishes, so its results are not lost.
