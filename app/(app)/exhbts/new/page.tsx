@@ -17,7 +17,7 @@ import { portfolioHref } from "@/lib/portfolio-links";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
 import { canDraftInto, teamFilesFor } from "@/lib/team";
-import { Back, Chooser, NoRoom, type Where } from "./Chooser";
+import { Back, Chooser, FreePrivateLine, NoRoom, type Where } from "./Chooser";
 import { DraftForm, type PreloadFile } from "./DraftForm";
 import { LayoutGallery } from "./LayoutGallery";
 
@@ -95,7 +95,7 @@ async function DraftPage({ user, intoParam }: { user: SessionUser; intoParam?: s
       if (url) preload.push({ fileId: f.id, name: f.path.split("/").pop() ?? "file", mime: f.mime, url });
     }
   }
-  const v = await draftVerdict(user.id, undefined, into);
+  const [v, plan] = await Promise.all([draftVerdict(user.id, undefined, into), getPlan(user.id)]);
 
   return (
     <div className="min-h-[calc(100svh-4.75rem)] bg-mist px-4 pt-10 pb-16 sm:px-8 sm:pt-14">
@@ -110,6 +110,8 @@ async function DraftPage({ user, intoParam }: { user: SessionUser; intoParam?: s
               ? "Your team's project files are below. Add your own files and notes about your part; we draft your exhbt from them, and you check every word."
               : "Add your project files and a few notes. We draft it from them; you check every word."}
           </p>
+          {/* The chooser's Free line, from the same component, for a Free account that came straight here. */}
+          {!ENTITLEMENTS[plan].publicPortfolio && <FreePrivateLine className="mt-4" />}
           <p className="mt-4 text-sm text-graphite" id="allowance">
             {v.left} of {v.perPeriod} AI {v.perPeriod === 1 ? "draft" : "drafts"} left · files up to {v.uploadMbPerFile} MB each
           </p>

@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import { FULL, fullFixture, type PortfolioFixture } from "./fixtures/portfolio-pages";
 import { finger } from "./page-editor";
+import { W } from "../components/portfolio-editor/sections/words";
 import { HOME, READY, expect, fresh, openEditor, stateNow, test, textbox, typeIn, undoLabel, valueAt, waitReady, waitSaved } from "./portfolio-editor";
 
 // Arranging the page on the page (brief F of docs/briefs/portfolio-first, decision 0031): each
@@ -232,7 +233,7 @@ test.describe("Sections", () => {
     for (const name of [/Experience/, /A quote/]) {
       const item = menu.getByRole("menuitem", { name });
       await expect(item).toHaveAttribute("aria-disabled", "true");
-      await expect(item).not.toContainText("Already on your page");
+      await expect(item).not.toContainText(W.onPageAlready);
     }
     await expect(page.locator(".pe-menu-foot").getByRole("link", { name: "See plans" })).toBeVisible();
     await menu.getByRole("menuitem", { name: /Experience/ }).click({ force: true });

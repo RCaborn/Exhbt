@@ -37,8 +37,8 @@ export function StepPublish({
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const checks = [
     { done: Boolean(username), text: username ? `Your address is ${portfolioHost(username)}` : "Choose your address" },
-    { done: counts.live > 0, text: counts.live > 0 ? `${plural(counts.live, "exhbt is", "exhbts are")} on your page` : "Publish an exhbt from the editor" },
-    { done: plan.isPublic, text: plan.isPublic ? `Your page is public on ${plan.name}` : `Pages go public on a paid plan` },
+    { done: counts.live > 0, text: counts.live > 0 ? `${plural(counts.live, "exhbt is", "exhbts are")} on your portfolio` : "Publish an exhbt from the editor" },
+    { done: plan.isPublic, text: plan.isPublic ? `Your portfolio is public on ${plan.name}` : `Your portfolio goes public on a paid plan` },
   ];
 
   return (
@@ -52,7 +52,7 @@ export function StepPublish({
 
       <section aria-labelledby="live-heading">
         <h3 id="live-heading" className="text-[1.0625rem] font-sans font-semibold tracking-normal">
-          {online ? "Your page is live" : "Before your page goes live"}
+          {online ? "Your portfolio is live" : "Before your portfolio goes live"}
         </h3>
         <ul className="mt-3 space-y-2.5" data-testid="publish-checklist">
           {checks.map((c) => (
@@ -71,7 +71,7 @@ export function StepPublish({
         </ul>
         {(counts.hidden > 0 || counts.drafts > 0) && (
           <p className="mt-4 text-sm text-graphite">
-            {[counts.hidden > 0 && `${plural(counts.hidden, "exhbt is", "exhbts are")} hidden from your page`, counts.drafts > 0 && `${plural(counts.drafts, "draft isn’t", "drafts aren’t")} published yet`]
+            {[counts.hidden > 0 && `${plural(counts.hidden, "exhbt is", "exhbts are")} hidden from your portfolio`, counts.drafts > 0 && `${plural(counts.drafts, "draft isn’t", "drafts aren’t")} published yet`]
               .filter(Boolean)
               .join(", and ")}
             .{" "}

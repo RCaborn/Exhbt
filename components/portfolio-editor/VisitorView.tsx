@@ -46,7 +46,7 @@ function NotOnline({ data, home }: { data: PortfolioData; home: Home }): ReactNo
         container="section"
         data-not-online="plan"
         title={`Only you can see this page on ${plan}`}
-        description="Visitors get “not found” for now. This is how your page will look once it is online."
+        description="Visitors get “not found” for now. This is how your portfolio will look once it is online."
         endContent={
           <Button href="/account/billing" size="sm">
             See plans
@@ -62,7 +62,7 @@ function NotOnline({ data, home }: { data: PortfolioData; home: Home }): ReactNo
         container="section"
         data-not-online="address"
         title="Not online yet: claim your address"
-        description="Your page needs an address before anyone can visit it. This is how it will look."
+        description="Your portfolio needs an address before anyone can visit it. This is how it will look."
         endContent={
           <Button size="sm" onClick={() => api.open("address")}>
             Claim your address
@@ -92,7 +92,7 @@ function NothingLive({ data }: { data: PortfolioData }): ReactNode {
         container="section"
         data-not-online="all-hidden"
         title="Not online yet: every exhbt is hidden"
-        description="Visitors get “not found” while none of your live exhbts is shown on your portfolio. This is how your page will look."
+        description="Visitors get “not found” while none of your live exhbts is shown on your portfolio. This is how your portfolio will look."
         endContent={
           <Button size="sm" onClick={() => showHidden(api)}>
             Show one
@@ -108,7 +108,7 @@ function NothingLive({ data }: { data: PortfolioData }): ReactNode {
         container="section"
         data-not-online="drafts-only"
         title="Not online yet: publish an exhbt"
-        description="Visitors get “not found” until one of your exhbts is live. Finish a draft and publish it. This is how your page will look."
+        description="Visitors get “not found” until one of your exhbts is live. Finish a draft and publish it. This is how your portfolio will look."
         endContent={
           <Button href={`/exhbts/${draft.id}/edit`} size="sm">
             {draft.title ? `Open ${short(draft.title)}` : "Open your draft"}
@@ -123,7 +123,7 @@ function NothingLive({ data }: { data: PortfolioData }): ReactNode {
       container="section"
       data-not-online="no-exhbt"
       title="Not online yet: add an exhbt"
-      description="Visitors get “not found” until one of your exhbts is live. This is how your page will look."
+      description="Visitors get “not found” until one of your exhbts is live. This is how your portfolio will look."
       endContent={
         <Button href="/exhbts/new" size="sm">
           Add an exhbt

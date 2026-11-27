@@ -24,6 +24,18 @@ import { Glyph } from "./glyphs";
 import "./add-exhbt.css";
 
 /**
+ * The Free line, said before anyone starts: on Free an exhbt is private. One component for the chooser and for the
+ * draft form, so a Free account reaching either says the same sentence (job 3a; `?start=draft` skips the chooser).
+ */
+export function FreePrivateLine({ className = "max-w-2xl" }: { className?: string }) {
+  return (
+    <Text as="p" weight="semibold" className={className} data-free-private="">
+      On {PLAN_NAMES.free}, an exhbt stays private: only you can see it until you pay to put it online.
+    </Text>
+  );
+}
+
+/**
  * The page's frame: the app's mist ground and one column, shared by the chooser, the layouts and the full-plan
  * notice. The classes are the frame the upload form and the app's other one-task pages have (page.tsx), so a
  * short screen, the full-plan notice, still fills the window down to the footer.
@@ -93,9 +105,7 @@ export function Chooser({ draft, offered, where, portfolioFirst = false }: { dra
         </Text>
         {/* Before anyone starts: on Free an exhbt is private. (A plan with a public portfolio says where it goes, below.) */}
         {!where.live && (
-          <Text as="p" weight="semibold" className="max-w-2xl" data-free-private="">
-            On {PLAN_NAMES.free}, an exhbt stays private: only you can see it until you pay to put it online.
-          </Text>
+          <FreePrivateLine />
         )}
       </VStack>
 

@@ -248,7 +248,7 @@ test.describe("The first minute", () => {
     await expect(strip).toBeVisible();
     await expect(strip.getByRole("heading", { name: "Your portfolio in three steps" })).toBeVisible();
     // Three steps, the first already done: signing up was it.
-    for (const name of ["Account", "Your page", "Your first exhbt"]) await expect(strip).toContainText(name);
+    for (const name of ["Account", "Your portfolio", "Your first exhbt"]) await expect(strip.locator(".pe-first-steps")).toContainText(name);
     await expect(strip).toHaveAttribute("data-step", "page");
     await strip.getByRole("button", { name: /^One line about you/ }).click();
     await expect.poll(() => focusedPath(page)).toBe("profile.headline");
@@ -457,7 +457,7 @@ test.describe("On the page", () => {
     await expect(page.locator(`${READY} [data-save]`)).toHaveAttribute("data-save", "invalid");
     await panel.getByRole("textbox", { name: /Email/ }).fill("maya@example.com");
     await waitSaved(page);
-    const show = panel.getByRole("switch", { name: "Show LinkedIn on your page" });
+    const show = panel.getByRole("switch", { name: "Show LinkedIn on your portfolio" });
     const was = await show.isChecked();
     await show.click();
     await expect.poll(() => valueAt(page, "arrangement.header.linkedin")).toBe(!was);

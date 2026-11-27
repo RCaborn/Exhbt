@@ -61,7 +61,7 @@ export function LookPanel(): ReactNode {
   return (
     <div className="pe-look" data-look-menu>
       <Text type="body" color="secondary" className="pe-look-lead">
-        Colours, type and layout. Your words and exhbts stay the same in every look, on your page and on each exhbt.
+        Colours, type and layout. Your words and exhbts stay the same in every look, on your portfolio and on each exhbt.
       </Text>
       {savedButLocked && (
         <Banner
