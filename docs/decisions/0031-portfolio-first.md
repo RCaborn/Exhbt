@@ -258,7 +258,7 @@ The editing page matches the visitor's page box for box except for these, which 
 
 Everything else the editor adds is drawn over the page and takes no room: section and tile toolbars, "Add a line", the photo button, Suggest an intro, the "Your links" button. The bar, the first-run strip, the team notice and the note after a publish are app chrome above or below the page.
 
-The lines' controls ("Add a line", and each line's move and remove) come right after the list's `</dl>`, not inside it: a `<dl>` may hold only its lines (axe's definition-list rule). While editing, the page draws the list and its controls in a wrapper (`[data-lines-box]`, `LinesEditing` in `PortfolioHome.tsx`) that takes the list's place exactly, its margins and its box. The box-for-box tests compare the list in it with the visitor's list.
+The lines' controls ("Add a line", and each line's move and remove) come right after the list's `</dl>`, not inside it: a `<dl>` may hold only its lines (axe's definition-list rule). While editing, the page draws the list and its controls in a wrapper (`[data-lines-box]`, `LinesEditing` in `PortfolioHome.tsx`) that takes the list's place exactly, its margins and its box: where About's two columns stretch the visitor's list to the row, the list in the wrapper is stretched too. The box-for-box tests compare the list in it with the visitor's list.
 
 ### See as a visitor
 

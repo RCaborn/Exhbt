@@ -22,14 +22,23 @@ import { BASE_LOOKS, fullFixture, sparseFixture, type PortfolioFixture } from ".
  *
  * In all eight looks, with brief A's full fixture and its sparse one (e2e/fixtures/portfolio-pages.ts,
  * seeded through /dev/portfolio-parity), and the full one drawn four more ways by the harness: no
- * exhbt yet, one exhbt, More of my work off the page, and every word section empty.
+ * exhbt yet, one exhbt, More of my work off the page, and every word section empty. And the full one
+ * with one line of education: at 1440 About's words are then taller than its list, so the visitor's
+ * list stretches to the row, and the editing page's list must too.
  *
  * joinYear, with no browser: a line of education or experience is typed as two fields, the words and
  * the year, and written back as one line that splitYear reads.
  */
 
 const HOME = "[data-portfolio-home]";
-const FIXTURES = { full: fullFixture("pp-hs-full", null), sparse: sparseFixture("pp-hs-sparse", null) };
+/** The full fixture with one line of education, its tools kept. */
+function oneEducationLine(username: string): PortfolioFixture {
+  const base = fullFixture(username, null);
+  const layout = base.layout as { tiles: Tiles };
+  const education = layout.tiles.education!;
+  return { ...base, layout: { ...layout, tiles: { ...layout.tiles, education: { ...education, lines: education.lines.slice(0, 1) } } } };
+}
+const FIXTURES = { full: fullFixture("pp-hs-full", null), sparse: sparseFixture("pp-hs-sparse", null), oneLine: oneEducationLine("pp-hs-one-line") };
 type FixtureName = keyof typeof FIXTURES;
 /** The harness's ways of drawing a seeded page (app/dev/home-slots/stand-in.tsx, `CASES`). */
 type CaseName = "full" | "none" | "one" | "no-work" | "empty";
@@ -40,6 +49,7 @@ const RUNS: { name: string; fixture: FixtureName; case: CaseName }[] = [
   { name: "one exhbt", fixture: "full", case: "one" },
   { name: "work off the page", fixture: "full", case: "no-work" },
   { name: "every word section empty", fixture: "full", case: "empty" },
+  { name: "one education line", fixture: "oneLine", case: "full" },
 ];
 
 /* ---------------- Seeding and opening ---------------- */

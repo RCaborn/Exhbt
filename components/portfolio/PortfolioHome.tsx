@@ -901,13 +901,16 @@ function Rows({ lines, extra, className = "" }: { lines: string[]; extra?: { lab
  * the words and the year; then the extra row. The controls over the list (`lineTools`) come right after
  * the </dl>, in a wrapper that takes the list's place and margins, so the list holds only its lines (a
  * <dl> may hold nothing else) and the Tab order reaches the controls right after the lines they act on.
+ * The wrapper is a flex column and the list grows to fill it: where About's two columns stretch the
+ * wrapper to the row, the list fills it, as the visitor's list fills the row. Its width, and the least
+ * width a long word gives it, are the list's own, as without the wrapper.
  */
 function LinesEditing({ kind, lines, edit, extra, className = "" }: { kind: "education" | "experience"; lines: string[]; edit: HomeEdit; extra?: { label: string; value: React.ReactNode }; className?: string }) {
   const path = `arrangement.tiles.${kind}.lines`;
   const words = LINE[kind];
   return (
-    <div className={`relative ${className}`} data-lines-box={kind}>
-      <dl className={`${ROWS} relative text-[0.95rem]`}>
+    <div className={`relative flex flex-col ${className}`} data-lines-box={kind}>
+      <dl className={`${ROWS} relative grow text-[0.95rem]`}>
         {lines.map((l, i) => {
           const { label, year } = splitYear(l);
           const at = `${path}.${i}`;
