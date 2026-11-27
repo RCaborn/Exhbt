@@ -39,7 +39,7 @@ function toFirstExhbt(): void {
 /** The strip's words and steps, in one place. */
 export const STRIP = {
   title: "Your portfolio in three steps",
-  lead: "This is your own page, as employers will see it. Type straight onto it.",
+  lead: "This is your portfolio, as employers will see it. Type straight onto it.",
   skip: "Skip to your first exhbt",
   hide: "Hide this",
   next: "Next",
