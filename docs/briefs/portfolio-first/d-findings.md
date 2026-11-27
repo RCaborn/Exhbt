@@ -17,7 +17,7 @@ Agent D built the portfolio page's edit slots (`components/portfolio/home-ctx.ts
 
 - **`owner("work-end")`** is the last child of the work's `<ul>` or `<ol>` (the card grid, or the rows). It must return `<li>`s.
 - **`owner("page-end")`** is a bare child of the page root, after the last section and before the footer, with no wrapper.
-- **`lineTools`** is the last child of the lines' `<dl>`, which is `relative` while editing. It picks up the `.pf-rows > * + *` hairline, so make it absolute and drop that border.
+- **`lineTools`** comes right after the lines' `</dl>`, the last child of the `relative` wrapper that `LinesEditing` draws round the list while editing (`[data-lines-box]`), which takes the list's place. It is not inside the `<dl>`, which may hold only its lines (axe's definition-list rule; changed at 605fd8d, decision 0031). It is absolute and takes no room.
 - **`tools("intro")`** is the last child of `[data-intro]`, which is `relative` while editing.
 - **`tools("contact")`** is a grid child of the Get in touch section, which is `relative` while editing. It must be absolute.
 - **`photo(face)`:** the face is a grid item with `order-*` classes in Classic, Mono and Ledger. A box wrapped round it moves it at phone width.

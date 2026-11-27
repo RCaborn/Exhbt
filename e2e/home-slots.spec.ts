@@ -14,7 +14,9 @@ import { BASE_LOOKS, fullFixture, sparseFixture, type PortfolioFixture } from ".
  *  - box for box, at 1440 and 412 wide, the editing page is the visitor's page (the same harness with
  *    no adapter, ?read=1) to half a pixel, every element in it, but for what 0031 lists as taking room
  *    in the editor only, each named: placeholders, empty sections drawn whole, the vision, an empty
- *    More of my work, and Studio's name as one field (its <h1> may differ; nothing else moves);
+ *    More of my work, and Studio's name as one field (its <h1> may differ; nothing else moves). While
+ *    editing, a list of lines and its controls sit in a wrapper that takes the list's place (0031, "What
+ *    the editing page adds that takes room"): the list in it is compared with the visitor's list;
  *  - the harness's visitor page is the public page (/p/<username>), so the comparison is with what
  *    visitors get.
  *
@@ -163,7 +165,7 @@ function readSlots(page: Page) {
         afterSections: e.parentElement === root && !e.nextElementSibling?.matches("[data-slot=section]") && e.nextElementSibling?.tagName === "FOOTER" && e.previousElementSibling?.matches("[data-slot=section], header, div") === true,
       })),
       tools: of("tools").map((e) => ({ where: e.dataset.where!, place: e.parentElement?.hasAttribute("data-intro") ? "intro" : e.parentElement?.getAttribute("data-section") })),
-      lineTools: of("line-tools").map((e) => ({ path: e.dataset.path!, kind: e.dataset.kind!, count: Number(e.dataset.count), max: Number(e.dataset.max), lastOfList: e.parentElement?.tagName === "DL" && e === e.parentElement.lastElementChild })),
+      lineTools: of("line-tools").map((e) => ({ path: e.dataset.path!, kind: e.dataset.kind!, count: Number(e.dataset.count), max: Number(e.dataset.max), afterList: Boolean(e.parentElement?.matches(`[data-lines-box="${e.dataset.kind}"]`) && e.previousElementSibling?.tagName === "DL" && !e.nextElementSibling) })),
       photos: of("photo").map((e) => e.querySelectorAll("[data-avatar]").length),
       // Every link on the page (the top bar's, the cards' and rows', the band's button, Get in touch's, the footer's): none may be followed while editing.
       liveLinks: [...root.querySelectorAll("a[href]")].filter((a) => !a.closest("[inert]")).map((a) => a.getAttribute("href")),
@@ -179,8 +181,10 @@ type Box = [key: string, x?: number, y?: number, w?: number, h?: number];
 /**
  * The box of every element in the page, relative to its root, to the half pixel, keyed by its place in
  * the page with the stand-in's marks taken out: a `display: contents` mark is replaced by what it holds,
- * and a mark that takes no room (`hidden`) is left out. `inside` is an element whose own box is compared
- * and whose insides are not.
+ * and a mark that takes no room (`hidden`) is left out. The wrapper the editing page draws round a list of
+ * lines and its controls (`[data-lines-box]`, LinesEditing in PortfolioHome; 0031) is replaced by what it
+ * holds too, so the list in it is compared with the visitor's list, which has no wrapper. `inside` is an
+ * element whose own box is compared and whose insides are not.
  */
 function measure(page: Page, inside: string | null): Promise<{ boxes: Box[]; widthFree: string[] }> {
   return page.locator(HOME).evaluate((root, inside) => {
@@ -190,7 +194,7 @@ function measure(page: Page, inside: string | null): Promise<{ boxes: Box[]; wid
     const widthFree: string[] = [];
     const notInside = inside ? root.querySelector(inside) : null;
     const kids = (el: Element): Element[] =>
-      [...el.children].flatMap((c) => (c.hasAttribute("data-slot") ? ((c as HTMLElement).hidden ? [] : kids(c)) : [c]));
+      [...el.children].flatMap((c) => (c.hasAttribute("data-slot") ? ((c as HTMLElement).hidden ? [] : kids(c)) : c.hasAttribute("data-lines-box") ? kids(c) : [c]));
     const walk = (el: Element, key: string) =>
       kids(el).forEach((c, i) => {
         const k = `${key} > ${c.tagName.toLowerCase()}:${i}`;
@@ -368,12 +372,13 @@ for (const look of BASE_LOOKS) {
         ];
         expect.soft(got.owner, "the owner's places").toEqual(owner);
 
-        // The corner tools: the intro's always, Get in touch's with it; the lines' controls last in each list.
+        // The corner tools: the intro's always, Get in touch's with it. The lines' controls right after each
+        // list's </dl>, last in the wrapper round the two: a <dl> holds only its lines (0031).
         expect.soft(got.tools, "the corner tools").toEqual([{ where: "intro", place: "intro" }, ...(w.sections.includes("contact") ? [{ where: "contact", place: "contact" }] : [])]);
         const lists = (["education", "experience"] as const)
           .filter((k) => w.sections.includes(k === "education" ? "about" : "experience"))
           .sort((a, b) => w.sections.indexOf(a === "education" ? "about" : "experience") - w.sections.indexOf(b === "education" ? "about" : "experience"))
-          .map((kind) => ({ path: `arrangement.tiles.${kind}.lines`, kind, count: w.tiles[kind]?.lines.length ?? 0, max: 3, lastOfList: true }));
+          .map((kind) => ({ path: `arrangement.tiles.${kind}.lines`, kind, count: w.tiles[kind]?.lines.length ?? 0, max: 3, afterList: true }));
         expect.soft(got.lineTools, "the lines' controls").toEqual(lists);
 
         // Box for box: with each part on 0031's list taken out by name, nothing else differs at either width.
