@@ -20,7 +20,7 @@ const clip = (s, n = 260) => (s.length > n ? `${s.slice(0, n)}…` : s);
 const secs = (ms) => `${(ms / 1000).toFixed(1)}s`;
 const mins = (ms) => `${(ms / 60000).toFixed(1)}m`;
 
-/** Every test in the report, flat: { project, file, line, title, status, results }. */
+/** Every test in the report, flat: { project, file, line, title, status, annotations, results }. A test's annotations are its last try's only; each try's own are on results[].annotations. */
 const tests = [];
 (function walk(suites, path) {
   for (const s of suites ?? []) {
@@ -122,9 +122,12 @@ if (unrun.length) {
 // clipboard back, or notes that WebKit refused) says which it took. Playwright's own (skip, fixme, slow, fail, tag) are many and
 // alike, so each different one is listed once with how many tests carry it.
 const own = new Set(["skip", "fixme", "slow", "fail", "tag"]);
-const all = tests.flatMap((t) => (t.annotations ?? []).map((a) => ({ t, a })));
+// A test that was tried more than once keeps only its last try's annotations at test level (Playwright 1.63), so the path a
+// flaky test took on its first try is read from each try's own, and listed with the try's number.
+const perTry = (t) => (t.results.length > 1 && t.results.some((r) => r.annotations?.length) ? t.results.flatMap((r, i) => (r.annotations ?? []).map((a) => ({ t, a, tried: i + 1 }))) : (t.annotations ?? []).map((a) => ({ t, a })));
+const all = tests.flatMap(perTry);
 console.log(`\n-- annotations: ${all.length ? `${all.length}, as "type: description"` : "none"}`);
-for (const { t, a } of all.filter(({ a }) => !own.has(a.type))) console.log(`  ${a.type}: ${clip(plain(a.description ?? ""), 300)}\n      in ${name(t)} (${t.status})`);
+for (const { t, a, tried } of all.filter(({ a }) => !own.has(a.type))) console.log(`  ${a.type}: ${clip(plain(a.description ?? ""), 300)}\n      in ${name(t)} (${t.status}${tried ? `, try ${tried} of ${t.results.length}` : ""})`);
 const builtIn = new Map();
 for (const { t, a } of all.filter(({ a }) => own.has(a.type))) {
   const k = `${a.type}: ${clip(plain(a.description ?? ""), 300)}`;
