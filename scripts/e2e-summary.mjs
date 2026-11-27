@@ -4,7 +4,8 @@
 // The WebKit job (.github/workflows/webkit.yml) ends with it, because its log is all that a machine
 // without WebKit sees of the run: the totals, the time each spec took, every failure grouped by the
 // line it failed on with the error once, the tests that passed only on a retry, the tests that never
-// ran, and the page errors the tests heard (e2e/page-editor.ts, hear). It always exits 0.
+// ran, the annotations the tests made (type and description, whatever the test's result: a test
+// that takes a path of its own says so there), and the page errors the tests heard (e2e/page-editor.ts, hear). It always exits 0.
 import fs from "node:fs";
 
 const file = process.argv[2] ?? "test-results/webkit.json";
@@ -24,7 +25,7 @@ const tests = [];
 (function walk(suites, path) {
   for (const s of suites ?? []) {
     const here = s.title && s.title !== s.file ? [...path, s.title] : path;
-    for (const spec of s.specs ?? []) for (const t of spec.tests ?? []) tests.push({ project: t.projectName, file: spec.file, line: spec.line, title: [...here, spec.title].join(" › "), status: t.status, results: t.results ?? [] });
+    for (const spec of s.specs ?? []) for (const t of spec.tests ?? []) tests.push({ project: t.projectName, file: spec.file, line: spec.line, title: [...here, spec.title].join(" › "), status: t.status, annotations: t.annotations ?? [], results: t.results ?? [] });
     walk(s.suites, here);
   }
 })(report.suites, []);
@@ -115,6 +116,23 @@ if (unrun.length) {
   for (const t of unrun) by.set(`[${t.project}] ${t.file}`, (by.get(`[${t.project}] ${t.file}`) ?? 0) + 1);
   for (const [k, n] of by) console.log(`  ${k}: ${n}`);
 }
+
+// What the tests said of themselves: every annotation (test.info().annotations) of every test, as "type: description". The
+// ones a test adds on purpose are listed one by one, so a test with two paths (e2e/portfolio-bar.spec.ts: "Copy link" reads the
+// clipboard back, or notes that WebKit refused) says which it took. Playwright's own (skip, fixme, slow, fail, tag) are many and
+// alike, so each different one is listed once with how many tests carry it.
+const own = new Set(["skip", "fixme", "slow", "fail", "tag"]);
+const all = tests.flatMap((t) => (t.annotations ?? []).map((a) => ({ t, a })));
+console.log(`\n-- annotations: ${all.length ? `${all.length}, as "type: description"` : "none"}`);
+for (const { t, a } of all.filter(({ a }) => !own.has(a.type))) console.log(`  ${a.type}: ${clip(plain(a.description ?? ""), 300)}\n      in ${name(t)} (${t.status})`);
+const builtIn = new Map();
+for (const { t, a } of all.filter(({ a }) => own.has(a.type))) {
+  const k = `${a.type}: ${clip(plain(a.description ?? ""), 300)}`;
+  const row = builtIn.get(k) ?? { n: 0, first: name(t) };
+  row.n += 1;
+  builtIn.set(k, row);
+}
+for (const [k, r] of builtIn) console.log(`  ${k}  (${r.n} test${r.n > 1 ? "s" : ""}, first ${r.first})`);
 
 // What the pages said: uncaught errors and console errors, each once, with how often and in how many tests.
 const heard = new Map();

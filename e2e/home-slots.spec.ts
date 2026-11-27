@@ -193,18 +193,23 @@ type Box = [key: string, x?: number, y?: number, w?: number, h?: number];
  * the page with the stand-in's marks taken out: a `display: contents` mark is replaced by what it holds,
  * and a mark that takes no room (`hidden`) is left out. The wrapper the editing page draws round a list of
  * lines and its controls (`[data-lines-box]`, LinesEditing in PortfolioHome; 0031) is replaced by what it
- * holds too, so the list in it is compared with the visitor's list, which has no wrapper. `inside` is an
- * element whose own box is compared and whose insides are not.
+ * holds too, so the list in it is compared with the visitor's list, which has no wrapper. The wrapper's own box is
+ * returned apart, in `wrappers`, under the key of the list in it, for the test to compare with the visitor's list: 0031
+ * says the wrapper takes the list's place exactly. `inside` is an element whose own box is compared and whose insides
+ * are not.
  */
-function measure(page: Page, inside: string | null): Promise<{ boxes: Box[]; widthFree: string[] }> {
+type Measured = { boxes: Box[]; widthFree: string[]; wrappers: Box[] };
+function measure(page: Page, inside: string | null): Promise<Measured> {
   return page.locator(HOME).evaluate((root, inside) => {
     const r0 = root.getBoundingClientRect();
     const half = (v: number) => Math.round(v * 2) / 2;
     const out: [string, number?, number?, number?, number?][] = [];
     const widthFree: string[] = [];
+    const wrapperOf = new Map<Element, Element>();
     const notInside = inside ? root.querySelector(inside) : null;
     const kids = (el: Element): Element[] =>
-      [...el.children].flatMap((c) => (c.hasAttribute("data-slot") ? ((c as HTMLElement).hidden ? [] : kids(c)) : c.hasAttribute("data-lines-box") ? kids(c) : [c]));
+      [...el.children].flatMap((c) => (c.hasAttribute("data-slot") ? ((c as HTMLElement).hidden ? [] : kids(c)) : c.hasAttribute("data-lines-box") ? kids(c).map((x) => (x.tagName === "DL" ? (wrapperOf.set(x, c), x) : x)) : [c]));
+    const wrappers: [string, number?, number?, number?, number?][] = [];
     const walk = (el: Element, key: string) =>
       kids(el).forEach((c, i) => {
         const k = `${key} > ${c.tagName.toLowerCase()}:${i}`;
@@ -214,10 +219,15 @@ function measure(page: Page, inside: string | null): Promise<{ boxes: Box[]; wid
           const r = c.getBoundingClientRect();
           out.push([k, half(r.x - r0.x), half(r.y - r0.y), half(r.width), half(r.height)]);
         }
+        const wrapper = wrapperOf.get(c);
+        if (wrapper) {
+          const r = wrapper.getBoundingClientRect();
+          wrappers.push([k, half(r.x - r0.x), half(r.y - r0.y), half(r.width), half(r.height)]);
+        }
         if (c !== notInside) walk(c, k);
       });
     walk(root, "home");
-    return { boxes: out, widthFree };
+    return { boxes: out, widthFree, wrappers };
   }, inside);
 }
 
@@ -319,7 +329,7 @@ const SIZES = [
 
 /** The page's boxes at each width: measured at 1440, then the window narrowed (the page lays itself out by its width alone, with container queries). */
 async function measureBoth(page: Page, inside: string | null) {
-  const out: Record<number, { boxes: Box[]; widthFree: string[] }> = {};
+  const out: Record<number, Measured> = {};
   for (const [width, height] of SIZES) {
     await page.setViewportSize({ width, height });
     await settle(page);
@@ -397,6 +407,14 @@ for (const look of BASE_LOOKS) {
         const editing = await measureBoth(page, inside);
         for (const [width] of SIZES)
           expect.soft(differences(visitor[width]!.boxes, editing[width]!.boxes, editing[width]!.widthFree), `at ${width}, with ${named.length ? named.join("; ") : "nothing"} taken out`).toEqual([]);
+        // The wrapper round a list of lines takes the list's place exactly (0031): its own box is the visitor's list's.
+        for (const [width] of SIZES) {
+          const wrappers = editing[width]!.wrappers;
+          const theirs = visitor[width]!.boxes.filter((b) => wrappers.some((w) => w[0] === b[0]));
+          expect.soft(wrappers.length, `at ${width}, a wrapper for each list of lines the page draws`).toBe(lists.length);
+          expect.soft(theirs.length, `at ${width}, and the visitor's page has the list each one holds`).toBe(wrappers.length);
+          expect.soft(differences(theirs, wrappers), `at ${width}, the wrapper round a list of lines against the visitor's list`).toEqual([]);
+        }
       });
     }
   });
