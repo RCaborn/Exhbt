@@ -4,11 +4,13 @@ import {
   chartsOf,
   findingsOf,
   imagesOf,
+  isBlank,
   normaliseDoc,
   publicDoc,
   SCHEMA_VERSION,
   sectionsOf,
   sectionTexts,
+  suggestionsFor,
   text,
   validateForPublish,
   wordCount,
@@ -69,6 +71,10 @@ const skipOf = (f: OrderFixture) => (f.skip ? (s: ContentSection) => f.skip!.inc
 const FIXTURES = [...SAMPLE_FIXTURES, ...ORDER_FIXTURES];
 const docOf = (f: OrderFixture) => normaliseDoc(f.doc);
 const messages = (d: ExhbtDoc) => validateForPublish(d).map((i) => `${i.path}: ${i.message}`);
+/** What the editor suggests and nothing requires (decision 0032): each layout's needs, a short flowchart, a single point. */
+const suggested = (d: ExhbtDoc) => suggestionsFor(d).map((i) => `${i.path}: ${i.message}`);
+/** The page's items as a visitor sees them: a section with nothing to show is left out (decision 0032), as the published copy leaves it out. */
+const shownIds = (d: ExhbtDoc) => itemIds(d, (s) => isBlank(s));
 
 /* ---------------- The schema ---------------- */
 
@@ -110,7 +116,8 @@ test.describe("The model: the marker and the new fields", () => {
     expect(offeredIn("page")).toEqual([...FORMATS]);
     expect(offeredIn("classic")).toEqual(["case-study", "gallery", "research"]);
     expect(FORMATS.map((f) => fromWorkOf({ format: f }))).toEqual(["figure", "pictures", "figure", "figure", "none", "pictures", "pictures"]);
-    expect(FORMATS.map((f) => FORMAT_RULES[f].flowRemovable)).toEqual([false, true, false, true, true, true, true]);
+    // The flowchart can be taken off every layout (decision 0032; a case study and research kept theirs until then).
+    expect(FORMATS.map((f) => flowShown(removeItem(core([FLOW, findings()], f), "flow")))).toEqual([false, false, false, false, false, false, false]);
   });
 
   test("an old reader (the code before release 2) reads what later releases write as a page it can draw", () => {
@@ -197,7 +204,10 @@ test.describe("The model: a removed flowchart and the published copy", () => {
     expect(pageItems(off).map((it) => it.id)).toEqual(["findings", "image-1", "image-2"]);
     expect(wordCount(off)).toBe(wordCount({ ...on, flow: [] }));
     expect(messages(off)).toEqual([]);
-    expect(messages({ ...off, flowOff: undefined })).toEqual(["flow: The flowchart needs at least 3 boxes.", "flow.0.step: Type in this box or remove it."]);
+    // Back on the page with its one empty box: nothing to fix, since a box with no words is not drawn and how many boxes
+    // there are is a suggestion (decision 0032). Before it: "The flowchart needs at least 3 boxes." and "Type in this box or remove it."
+    expect(messages({ ...off, flowOff: undefined })).toEqual([]);
+    expect(suggested({ ...off, flowOff: undefined, flow: [{ step: "Timed it" }] })).toEqual(["flow: Most flowcharts have at least 3 boxes. Add another if it helps."]);
     const pub = publicDoc(off);
     expect(pub.flow).toEqual([]);
     expect(pub.flowOff).toBe(true);
@@ -205,13 +215,15 @@ test.describe("The model: a removed flowchart and the published copy", () => {
     expect(tileFromDoc(on).methodology).toHaveLength(3);
   });
 
-  test("a case study and research always draw the flowchart, first when it has no marker", () => {
+  test("a flowchart taken off stays off in a case study and research too (decision 0032: until then they always drew one, first)", () => {
     for (const format of ["case-study", "research"] as const) {
       const d = core([findings(), graph()], format, { flowOff: true });
-      expect(flowShown(d)).toBe(true);
-      expect(pageItems(d)[0]).toMatchObject({ id: "flow", kind: "flow", index: -1 });
-      expect(wordCount(d)).toBe(wordCount({ ...d, flowOff: undefined }));
-      expect(publicDoc(d).flow).toEqual(d.flow);
+      expect(flowShown(d)).toBe(false);
+      // Arranged (flowOff), so drawn in its stored order, with no flowchart.
+      expect(pageItems(d).map((it) => it.id)).toEqual(["findings", "graph-1"]);
+      expect(wordCount(d)).toBe(wordCount({ ...d, flow: [] }));
+      expect(publicDoc(d).flow).toEqual([]);
+      expect(messages({ ...d, flow: Array.from({ length: 9 }, () => ({ step: "" })) })).toEqual(messages(d));
     }
   });
 
@@ -230,7 +242,8 @@ test.describe("The model: a removed flowchart and the published copy", () => {
       const moved = items[1]!;
       const sections = a.sections.filter((_, i) => i !== moved.index);
       const arranged = { ...a, sections: [...sections, a.sections[moved.index]!] };
-      for (const doc of [d, a, arranged]) expect(itemIds(publicDoc(doc)), f.name).toEqual(itemIds(doc));
+      // Of what is shown: a section with nothing in it (one fixture's aim has no words) stays in the working copy (decision 0032).
+      for (const doc of [d, a, arranged]) expect(itemIds(publicDoc(doc)), f.name).toEqual(shownIds(doc));
       expect(hasMarker(publicDoc(arranged))).toBe(true);
     }
   });
@@ -240,7 +253,8 @@ test.describe("The model: a removed flowchart and the published copy", () => {
     expect(wordCount(essay)).toBe(wordCount({ ...essay, myRole: undefined }) + 1);
     expect(messages(essay)).toEqual([]);
     expect(messages({ ...essay, myRole: "x".repeat(61) })).toEqual(['myRole: Keep "My role" to 60 characters.']);
-    expect(messages(core([findings(), { ...pull(), text: "" } as ContentSection], "essay"))).toEqual(["sections.1.text: Type in the pull quote or remove it."]);
+    // A pull quote left empty is not drawn, so there is nothing to fix (decision 0032; before it, "Type in the pull quote or remove it.").
+    expect(messages(core([findings(), { ...pull(), text: "" } as ContentSection], "essay"))).toEqual([]);
     // No word limit of its own (decision 0030): a 31-word pull quote passes, past the 30 it was held to; only the page's 200 words hold it.
     expect(messages(core([findings(), { ...pull(), text: "word ".repeat(31) } as ContentSection], "essay"))).toEqual([]);
     expect(messages(core([findings(), link(1, "")]))).toEqual(["sections.1.href: Use a full https:// link."]);
@@ -251,29 +265,29 @@ test.describe("The model: a removed flowchart and the published copy", () => {
     expect(keptItems(kept).map((it) => it.id)).toEqual(["pullquote-1"]);
   });
 
-  test("each layout's needs, with today's messages in today's order", () => {
-    // Research: the cap on figures together sits between the need for a figure and the need for results, as before.
-    expect(messages(core([image(1), image(2), image(3), image(4)], "research"))).toEqual([
-      "sections: Up to 2 images.",
-      "sections: Add your aim or hypothesis.",
-      "sections: Add your conclusion.",
-      "sections: Up to 3 figures, graphs and images together.",
-      "sections: Add your results.",
-    ]);
-    expect(messages(core([], "gallery"))).toEqual(["sections: A gallery needs at least 2 images."]);
-    expect(messages(core([quote()]))).toEqual(["sections: Add findings or a graph, so the exhbt shows what came of the work."]);
+  test("each layout's needs are suggestions, in their order, and stop nothing; the caps still do (decision 0032)", () => {
+    // Research with too many pictures: the two caps are all there is to fix, and what the layout usually has is suggested.
+    const crowded = core([image(1), image(2), image(3), image(4)], "research");
+    expect(messages(crowded)).toEqual(["sections: Up to 2 images.", "sections: Up to 3 figures, graphs and images together."]);
+    expect(suggested(crowded)).toEqual(["sections: Add your aim or hypothesis.", "sections: Add your conclusion.", "sections: Add your results."]);
+    const needs = (d: ExhbtDoc) => {
+      expect(messages(d), d.format ?? "case-study").toEqual([]);
+      return suggested(d);
+    };
+    expect(needs(core([], "gallery"))).toEqual(["sections: A gallery works best with at least 2 images."]);
+    expect(needs(core([quote()]))).toEqual(["sections: Add findings or a graph, so the exhbt shows what came of the work."]);
     // The four new layouts.
-    expect(messages(core([findings()], "build"))).toEqual(["sections: Add a screenshot or a link, so people can see it working."]);
-    expect(messages(core([findings(), link()], "build"))).toEqual([]);
-    expect(messages(core([], "essay"))).toEqual(["sections: Add your key points."]);
-    expect(messages(core([image(1)], "before-after"))).toEqual([
-      "sections: A before and after needs at least 2 images.",
+    expect(needs(core([findings()], "build"))).toEqual(["sections: Add a screenshot or a link, so people can see it working."]);
+    expect(needs(core([findings(), link()], "build"))).toEqual([]);
+    expect(needs(core([], "essay"))).toEqual(["sections: Add your key points."]);
+    expect(needs(core([image(1)], "before-after"))).toEqual([
+      "sections: A before and after works best with at least 2 images.",
       "sections: Mark one image Before and one After.",
       "sections: Add what changed and why.",
     ]);
-    expect(messages(core([image(1, "before"), image(2, "after"), findings()], "before-after"))).toEqual([]);
-    expect(messages(core([], "event"))).toEqual(["sections: Add at least one picture, such as the poster.", "myRole: Say what your role was."]);
-    expect(messages(core([image(1)], "event", { myRole: "Stage manager" }))).toEqual([]);
+    expect(needs(core([image(1, "before"), image(2, "after"), findings()], "before-after"))).toEqual([]);
+    expect(needs(core([], "event"))).toEqual(["sections: Add at least one picture, such as the poster.", "myRole: Say what your role was."]);
+    expect(needs(core([image(1)], "event", { myRole: "Stage manager" }))).toEqual([]);
   });
 
   test("layoutNotes lists what each of the seven layouts still needs (step 7)", () => {
@@ -286,7 +300,8 @@ test.describe("The model: a removed flowchart and the published copy", () => {
     expect(miss(core([image(1)], "before-after"))).toEqual(["Add at least 2 images [image]", "Mark one image Before and one After", "Add what changed and why [findings]"]);
     expect(miss(core([], "event"))).toEqual(["Add at least one picture, such as the poster [image]", "Say what your role was"]);
     expect(miss(core([image(1)], "event", { myRole: "Stage manager" }))).toEqual([]);
-    expect(miss(core([{ ...findings(), items: [[], text("Sales held.")] } as ContentSection], "essay"))).toEqual(["Fill in or remove the empty findings"]);
+    // An empty finding is not drawn for a visitor, so it is no longer listed (decision 0032; before it, "Fill in or remove the empty findings").
+    expect(miss(core([{ ...findings(), items: [[], text("Sales held.")] } as ContentSection], "essay"))).toEqual([]);
   });
 
   test("pathOfNumber finds the first field on the page that holds a number", () => {
@@ -477,13 +492,13 @@ test.describe("The engine: applyTemplate and structureKey", () => {
     const back = applyTemplate(g, "case-study");
     expect("format" in back).toBe(false);
     expect(ids(back)).toEqual(["flow", "findings", "graph-1", "image-1", "image-2", "aim-1", "quote-1"]);
-    // Off in a gallery, and research always has one: it comes back, in its usual place.
+    // Off in a gallery: it stays off whatever layout is picked (decision 0032; until then research and a case study brought it back).
     const off: ExhbtDoc = { ...core([findings(), aim()], "gallery"), flowOff: true };
     const r = applyTemplate(off, "research");
-    expect(ids(r)).toEqual(["aim-1", "flow", "findings"]);
-    expect("flowOff" in r).toBe(false);
-    // Into a layout that lets it go, it stays off.
+    expect(ids(r)).toEqual(["aim-1", "findings"]);
+    expect(r.flowOff).toBe(true);
     expect(applyTemplate(off, "essay").flowOff).toBe(true);
+    expect(applyTemplate(off, "case-study").flowOff).toBe(true);
   });
 
   test("structureKey changes on a move, an add, a stage and a layout, and not on typing", () => {
@@ -523,7 +538,9 @@ test.describe("The engine: structural changes (step 6b)", () => {
     // Nothing is after the flowchart's usual place: at the end.
     expect(ids(restoreFlow({ ...off, sections: [image(1)] }))).toEqual(["image-1", "flow"]);
     // Shown already: the same object.
-    for (const d of [back, adopt(core([findings()], "gallery")), core([findings()], "gallery"), { ...core([findings()]), flowOff: true }]) expect(restoreFlow(d, 0)).toBe(d);
+    for (const d of [back, adopt(core([findings()], "gallery")), core([findings()], "gallery"), core([findings()])]) expect(restoreFlow(d, 0)).toBe(d);
+    // A case study whose flowchart was taken off gets it back the same way (decision 0032: it used to count as shown there).
+    expect(ids(restoreFlow({ ...core([findings()]), flowOff: true }, 0))).toEqual(["flow", "findings"]);
   });
 
   test("insertBlock with the flowchart is restoreFlow at that place, and null once it is on the page", () => {
@@ -575,10 +592,10 @@ test.describe("The engine: structural changes (step 6b)", () => {
     expect(imagesOf(im.doc)[0]).toEqual({ id: "image-1", kind: "image", fileId: "f9", alt: "", caption: [], w: 800, h: 600 });
     expect(imagesOf(insertImage(d, { fileId: "f9" }, 0)!.doc)[0]).toEqual({ id: "image-1", kind: "image", fileId: "f9", alt: "", caption: [] });
     expect(insertImage(core([image(1), image(2)]), { fileId: "f9" }, 0)).toBeNull();
-    // A case study with flowOff draws its flowchart first: a change writes the marker there.
-    const pinned = insertBlock({ ...core([findings()]), flowOff: true }, "quote", 0)!.doc;
-    expect(ids(pinned)).toEqual(["quote-1", "flow", "findings"]);
-    expect("flowOff" in pinned).toBe(false);
+    // A case study with its flowchart taken off has none (decision 0032), so a change writes no marker and leaves it off.
+    const stillOff = insertBlock({ ...core([findings()]), flowOff: true }, "quote", 0)!.doc;
+    expect(ids(stillOff)).toEqual(["quote-1", "findings"]);
+    expect(stillOff.flowOff).toBe(true);
   });
 
   test("moveItem: the place counts page items with the item taken out; a kept section stays put", () => {
@@ -595,7 +612,7 @@ test.describe("The engine: structural changes (step 6b)", () => {
     expect(moveItem(d, "aim-1", 0)).toBe(d);
   });
 
-  test("removeItem: a section, or the flowchart where the layout lets it go", () => {
+  test("removeItem: a section, or the flowchart, in any layout", () => {
     const g = core([image(1), findings(), image(2)], "gallery");
     const off = removeItem(g, "flow");
     expect(off.flowOff).toBe(true);
@@ -603,8 +620,13 @@ test.describe("The engine: structural changes (step 6b)", () => {
     expect(off.flow).toEqual(g.flow);
     expect(itemIds(off)).toEqual(["image-1", "findings", "image-2"]);
     expect(removeItem(off, "flow")).toBe(off);
-    // A case study and research always draw it.
-    for (const d of [core([findings()]), core([findings()], "research")]) expect(removeItem(d, "flow")).toBe(d);
+    // A case study and research let it go too (decision 0032; until then removeItem gave the doc back unchanged).
+    for (const d of [core([findings()]), core([findings()], "research")]) {
+      const gone = removeItem(d, "flow");
+      expect(gone.flowOff).toBe(true);
+      expect(itemIds(gone)).toEqual(["findings"]);
+      expect(gone.flow).toEqual(d.flow);
+    }
     const c = core([findings(), aim()]);
     const r = removeItem(c, "findings");
     expect(ids(r)).toEqual(["flow", "aim-1"]);
@@ -623,7 +645,7 @@ test.describe("The engine: structural changes (step 6b)", () => {
         [items[items.length - 1]!.id, 0],
       ] as const) {
         const moved = moveItem(d, id, place);
-        expect(itemIds(publicDoc(moved)), f.name).toEqual(itemIds(moved));
+        expect(itemIds(publicDoc(moved)), f.name).toEqual(shownIds(moved));
         expect(hasMarker(publicDoc(moved)), f.name).toBe(true);
         expect(structureKey(moved), f.name).not.toBe(structureKey(d));
       }

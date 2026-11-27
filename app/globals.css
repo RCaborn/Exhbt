@@ -716,6 +716,13 @@
     }
   }
 
+  /* A part's own title may be one long word (a hashtag, an event's name in capitals, decision 0032): it breaks where it
+     must rather than run off a phone's screen. Every part title is an h2 or h3 in the page (page-ctx.ts, Sub); the
+     editor's title field breaks the same way (css/your-way.css). Ordinary titles are unchanged (e2e/golden boxes). */
+  article[data-exhbt-page] :is(h2, h3) {
+    overflow-wrap: anywhere;
+  }
+
   .xp-label {
     font-family: inherit;
     font-size: 0.8125rem;
@@ -1030,5 +1037,15 @@
   .xp-tile,
   .xp-figure {
     break-inside: avoid;
+  }
+}
+
+/* Bold in an essay's pull quote (decision 0032). The pull quote is set in the look's display face at its
+   heading weight, so the body's bold (600) would not show in it, or would be lighter than the words round
+   it: bold there is a step heavier than the quote. In the utilities layer because it corrects a utility
+   (font-semibold, on the strong that RichText and the editor both write). */
+@layer utilities {
+  [data-part="pullquote"] strong.font-semibold {
+    font-weight: bolder;
   }
 }

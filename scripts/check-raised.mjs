@@ -46,12 +46,21 @@ const BASELINE = new Set([
   "components/team/MatchPrompt.tsx",
 ]);
 
+/**
+ * Files allowed to raise something because it floats over the page for a moment (decision 0033, the second: "nothing
+ * is raised but what floats or what is the work"). Unlike the baseline, these stay: add one only when it truly floats.
+ */
+const FLOATS = new Set([
+  // The bar that comes to the words selected in the exhbt editor (decision 0032), in the browser's top layer.
+  "components/exhbt-editor/fields/SelectionBar.tsx",
+]);
+
 const RAISED = /shadow-pack|elevation=\{?["'](?:low|med|high)/;
 const roots = process.argv.length > 2 ? process.argv.slice(2) : ["app", "components"];
 const found = [];
 for (const root of roots) for (const f of walk(root, isLab, /\.(ts|tsx|css|mdx)$/)) if (RAISED.test(readFileSync(f, "utf8"))) found.push(f);
 
-const fresh = found.filter((f) => !BASELINE.has(f));
+const fresh = found.filter((f) => !BASELINE.has(f) && !FLOATS.has(f));
 const gone = [...BASELINE].filter((f) => !found.includes(f));
 if (fresh.length) {
   console.error("Raised check failed: these files raise something and are not on the baseline (shadow-pack, or elevation low, med or high):\n");

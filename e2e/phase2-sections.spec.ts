@@ -9,6 +9,7 @@ import {
   normaliseDoc,
   plain,
   publicDoc,
+  suggestionsFor,
   text,
   validateForPublish,
   wordCount,
@@ -125,13 +126,21 @@ test.describe("Sections: the model", () => {
     expect(odd.sections.map((s) => s.id)).toEqual(["quote-1", "link-1", "reflection-1"]);
   });
 
-  test("publishing needs the core and findings or a graph; each kind has its cap of how many; no part has a word cap of its own", () => {
+  test("publishing needs a title and something besides it; each kind has its cap of how many; no part has a word cap of its own or has to be filled in", () => {
+    const hints = (d: ExhbtDoc) => suggestionsFor(d).map((i) => `${i.path}: ${i.message}`);
     expect(paths(core([F]))).toEqual([]);
     expect(paths(core([graph()]))).toEqual([]);
     expect(paths(core([F, graph(), image(), quote(), next(), link()]))).toEqual([]);
-    // Neither findings nor a graph.
-    expect(paths(core([quote(), next(), link()]))).toEqual(["sections"]);
-    expect(paths(core([]))).toEqual(["sections"]);
+    expect(hints(core([F]))).toEqual([]);
+    // Neither findings nor a graph: a suggestion since decision 0032 (Rory, 26 Nov 2026: "optionality in filling in all
+    // sections or not"). Until then it stopped publishing, at "sections".
+    const RESULTS = "sections: Add findings or a graph, so the exhbt shows what came of the work.";
+    expect(paths(core([quote(), next(), link()]))).toEqual([]);
+    expect(hints(core([quote(), next(), link()]))).toEqual([RESULTS]);
+    expect(paths(core([]))).toEqual([]);
+    expect(hints(core([]))).toEqual([RESULTS]);
+    // A title alone is still not a page.
+    expect(validateForPublish({ ...core([]), gap: [], flow: [] })).toEqual([{ path: "gap", message: "Add something besides the title: a line of context here, or a section below." }]);
     // One of each, except graphs and images: two each.
     expect(paths(core([F, { ...F, id: "findings-2" }]))).toEqual(["sections"]);
     expect(paths(core([F, quote(), { ...quote(), id: "quote-2" }]))).toEqual(["sections"]);
@@ -143,19 +152,30 @@ test.describe("Sections: the model", () => {
     // Each field of each kind. No part has a word cap of its own, only the page (decision 0030): a 40-word quote, a 45-word
     // "what I'd do next" and a 25-word description pass, well past the 30, 35 and 15 words each was held to until 25 Nov 2026.
     expect(paths(core([F, quote(nWords(40))]))).toEqual([]);
-    expect(paths(core([F, quote("", "")]))).toEqual(["sections.1.text", "sections.1.name"]);
+    // A quote with no words is not drawn, so nothing about it is checked; one with words and nobody named passes (0032).
+    expect(paths(core([F, quote("", "")]))).toEqual([]);
+    expect(paths(core([F, quote(undefined, "", "")]))).toEqual([]);
     expect(paths(core([F, quote(undefined, "x".repeat(LIMITS.quote.nameChars + 1))]))).toEqual(["sections.1.name"]);
     expect(paths(core([F, next(nWords(45))]))).toEqual([]);
-    expect(paths(core([F, next("")]))).toEqual(["sections.1.text"]);
+    // "What I'd do next" left empty is not drawn, and is nothing to fix.
+    expect(paths(core([F, next("")]))).toEqual([]);
     expect(paths(core([F, { ...next(), text: [{ t: "notes", href: "http://example.com" }] } as Section]))).toEqual(["sections.1.text"]);
     for (const bad of ["http://example.com/code", "javascript:alert(1)", "not a link", ""]) expect(paths(core([F, link(bad)])), bad).toEqual(["sections.1.href"]);
     expect(paths(core([F, link(undefined, nWords(LIMITS.link.labelWords + 1))]))).toEqual(["sections.1.label"]);
-    expect(paths(core([F, link(undefined, " ")]))).toEqual(["sections.1.label"]);
+    // A link with an address and no label goes live under the layout's own word for a link; one with nothing in it at all is not drawn.
+    expect(paths(core([F, link(undefined, " ")]))).toEqual([]);
+    expect(paths(core([F, link("", "", "")]))).toEqual([]);
     expect(paths(core([F, link(undefined, "Code", nWords(25))]))).toEqual([]);
     expect(paths(core([F, { ...image(), alt: " " } as Section]))).toEqual(["sections.1.alt"]);
-    expect(paths(core([{ ...F, items: [text("Only one.")] } as Section]))).toEqual(["sections.0.items"]);
-    // The core is still checked: the flowchart needs its boxes.
-    expect(paths({ ...core([F]), flow: [{ step: "Only one box" }] })).toEqual(["flow"]);
+    // One finding where most pages have two, and one box where most flowcharts have three: suggestions, each at its part.
+    const one = core([{ ...F, items: [text("Only one.")] } as Section]);
+    expect(paths(one)).toEqual([]);
+    expect(hints(one)).toEqual(["sections.0.items: Most pages have at least 2 points here. Add another if you have one."]);
+    const oneBox = { ...core([F]), flow: [{ step: "Only one box" }] };
+    expect(paths(oneBox)).toEqual([]);
+    expect(hints(oneBox)).toEqual(["flow: Most flowcharts have at least 3 boxes. Add another if it helps."]);
+    // The most there may be still holds: a seventh box stops publishing.
+    expect(paths({ ...core([F]), flow: Array.from({ length: LIMITS.flow.max + 1 }, () => ({ step: "A box" })) })).toEqual(["flow"]);
   });
 
   test("every word in every section counts; alt text and link addresses don't", () => {
@@ -473,34 +493,39 @@ test.describe("Sections in the editor", () => {
     await expect(page.getByText(/^(It's live|Your changes are live)\b/)).toHaveCount(0);
   });
 
-  test("the flowchart stays on every exhbt, with 3 to 6 boxes", async ({ page }) => {
+  // Until decision 0032 the flowchart stayed on every case study with 3 to 6 boxes, and a page with no findings and no
+  // graph could not be published. Nothing has to be filled in now: the most there may be of each thing still holds.
+  test("the flowchart has up to 6 boxes, any of them removable; with every section taken away the page still publishes, and findings or a graph are suggested", async ({ page }) => {
     await signInAs(page, "flo");
     await startWithCore(page, "Sections: the flowchart stays");
-    // Not a section: nothing removes it, and the menu doesn't offer it while it is on the page.
-    await onSection(page, "flow");
-    await expect(page.locator(`${READY} [data-section-id="flow"]`).getByRole("button", { name: /^Remove process/i })).toHaveCount(0);
+    // The menu doesn't offer the flowchart while it is on the page.
     await openAddSectionMenu(page);
     expect(await page.locator(`${READY} [data-xe-menu] [data-block]`).evaluateAll((bs) => bs.map((b) => b.getAttribute("data-block")))).toEqual(["findings", "graph", "image", "quote", "reflection", "link"]);
     await page.keyboard.press("Escape");
 
-    // 3 to 6 boxes.
-    await expect(page.getByRole("button", { name: "Remove box 1" })).toBeDisabled();
+    // Up to 6 boxes, and a box can be removed at any count.
+    await onSection(page, "flow");
+    await expect(page.getByRole("button", { name: "Remove box 1" })).toBeEnabled();
     for (let n = 4; n <= LIMITS.flow.max; n++) await addBox(page);
     await expect(page.getByLabel(/^Box \d$/)).toHaveCount(LIMITS.flow.max);
     await expect(page.getByRole("button", { name: "Add a box at the end" })).toHaveCount(0);
 
-    // With every section taken away, the flowchart is still drawn, and publishing asks for findings or a graph.
+    // With every section taken away, the flowchart is still drawn. Findings or a graph are a suggestion, which goes to the "+".
     await onSection(page, "findings");
     await page.getByRole("button", { name: "Remove findings" }).click();
     expect(await listOrder(page)).toEqual([]);
     await expect(page.getByRole("list", { name: "Methodology" })).toBeVisible();
     for (let n = 4; n <= LIMITS.flow.max; n++) await fillBox(page, n, `Step ${n}`);
+    const NEED = "Add findings or a graph, so the exhbt shows what came of the work.";
+    await page.getByRole("button", { name: "1 suggestion", exact: true }).click();
+    await page.getByRole("region", { name: "Suggestions" }).getByText(NEED, { exact: true }).click();
+    await expect(page.getByRole("button", { name: "Add a section", exact: true })).toBeFocused();
+    // And it stops nothing: the sheet says it again, and the page goes live.
     await openPublishSheet(page);
+    await expect(publishSheet(page).getByText(NEED, { exact: true })).toBeVisible();
     await publishSheet(page).getByLabel(SEL.publishConfirm).check();
     await publishSheet(page).getByRole("button", { name: "Publish", exact: true }).click();
-    const problems = await openThingsToFix(page);
-    await problems.getByRole("button", { name: "Sections: Add findings or a graph, so the exhbt shows what came of the work." }).click();
-    await expect(page.getByRole("button", { name: "Add a section", exact: true })).toBeFocused();
+    await expect(publishSheet(page).getByText(SEL.liveText)).toBeVisible();
   });
 
   test("an exhbt saved before sections shows the same page as the same exhbt in sections", async ({ page }) => {
@@ -613,11 +638,12 @@ test.describe("Sections in the editor: blank boxes as a visitor sees them", () =
     await expect(list.getByRole("listitem").last()).toContainText("Wrote it up");
   });
 
-  test("with every box blank (a new exhbt) the page still lists them", async ({ page }) => {
+  test("with every box blank (a new exhbt) the editing page lists them, and a visitor is shown no flowchart", async ({ page }) => {
     await signInAs(page, "blankall");
     await startFromScratch(page, { waitForContext: false });
     await expect(page.getByRole("list", { name: "Methodology" }).getByRole("listitem")).toHaveCount(3);
+    // Decision 0032: a flowchart with no box filled in is not drawn for a visitor. Until then every blank box was shown.
     await seeAsVisitor(page);
-    await expect(methodology(page).getByRole("listitem")).toHaveCount(3);
+    await expect(methodology(page)).toHaveCount(0);
   });
 });

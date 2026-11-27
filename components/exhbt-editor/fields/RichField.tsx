@@ -34,6 +34,11 @@ import { IssueNote, issueId, useFieldIssue } from "./issues";
  * resting field's words (read from what is on the screen) and its selection go to the editor, the
  * resting field goes and the editor takes its place, and the editor takes the caret where it was.
  * No key can come in between, so none is lost, and nothing moves.
+ *
+ * Decision 0032: a quote's words, a pull quote and a link's description are formatted fields too. Their
+ * formatting is stored beside their plain words (`beside`: store.setBeside), and a quote's marks, which the
+ * page writes as text round the words, are drawn round the field's words by CSS (`quoted`, css/your-way.css).
+ * Ctrl or Cmd with B or I pressed before the editor exists is not lost: it is done at the hand-over.
  */
 
 const loadEditor = () => again(() => import("./RichEditor"));
@@ -123,6 +128,12 @@ export const RichField = memo(function RichField(given: RichSlot) {
   const empty = !hasWords(o.value);
   const pathNow = useRef(o.path);
   pathNow.current = o.path;
+  // Where the field's words go: runs at its path, or, for a field stored as a plain string, the string with its runs beside it.
+  const besideNow = useRef(Boolean(o.beside));
+  besideNow.current = Boolean(o.beside);
+  const write = (runs: RichTextValue) => (besideNow.current ? store.setBeside(pathNow.current, runs) : store.setAt(pathNow.current, runs));
+  // Ctrl or Cmd with B or I, pressed in the resting field: done once the editor has the words (below).
+  const keys = useRef<("bold" | "italic")[]>([]);
 
   // The resting words are drawn once per outside change (an undo, a rewrite), never for the person's own typing,
   // so React never touches what the browser changed. A new key draws them again from the doc.
@@ -178,7 +189,13 @@ export const RichField = memo(function RichField(given: RichSlot) {
         editor.chain().setTextSelection({ from: clamp(sel?.from ?? Number.MAX_SAFE_INTEGER), to: clamp(sel?.to ?? Number.MAX_SAFE_INTEGER) }).focus(null, { scrollIntoView: false }).run();
         // Tiptap takes the focus a frame later; taken now too, the focus goes straight from the one field to the other.
         editor.view.focus();
+        // The formatting keys pressed while the words were still the resting field's, in the order they were pressed.
+        for (const key of keys.current) {
+          if (key === "bold") editor.chain().toggleBold().run();
+          else editor.chain().toggleItalic().run();
+        }
       }
+      keys.current = [];
       for (const done of readyWaiters.current.splice(0)) done();
     });
 
@@ -189,7 +206,7 @@ export const RichField = memo(function RichField(given: RichSlot) {
     const runs = runsFromDom(el);
     // Emptied: no stray <br>, so the placeholder shows again.
     if (!runs.length && el.childNodes.length) el.replaceChildren();
-    store.setAt(pathNow.current, runs);
+    write(runs);
   };
 
   return (
@@ -199,6 +216,7 @@ export const RichField = memo(function RichField(given: RichSlot) {
       data-field="rich"
       data-empty={empty || undefined}
       data-live={ready || undefined}
+      data-quoted={o.quoted ? "" : undefined}
       data-invalid={issue ? "" : undefined}
       // Nothing navigates in the editor: a link in the words is words.
       onClickCapture={(e) => {
@@ -240,6 +258,12 @@ export const RichField = memo(function RichField(given: RichSlot) {
           onDrop={(e) => e.preventDefault()}
           onKeyDown={(e) => {
             if (e.key === "Enter") e.preventDefault();
+            // Bold and italic are the editor's to do, in runs: kept for the hand-over, a moment away, never done by the browser here.
+            const k = e.key.toLowerCase();
+            if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (k === "b" || k === "i")) {
+              e.preventDefault();
+              keys.current.push(k === "b" ? "bold" : "italic");
+            }
           }}
           onInput={onInput}
         >
@@ -248,7 +272,7 @@ export const RichField = memo(function RichField(given: RichSlot) {
       )}
       {start && (
         <Suspense fallback={null}>
-          <RichEditor slot={o} id={id} issue={issue} live={ready} onReady={onReady} />
+          <RichEditor slot={o} id={id} issue={issue} live={ready} write={write} onReady={onReady} />
         </Suspense>
       )}
       <IssueNote id={issueId(id)} text={issue} />

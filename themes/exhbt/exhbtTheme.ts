@@ -26,6 +26,7 @@ const GRAPHITE = "#3E4044";
 const SLATE = "#6F7278";
 const LINE = "#E5E6E8";
 const MIST = "#F6F7F8";
+
 const WASH = "#E3FCF0";
 const ERROR = "#C92324";
 const WHITE = "#FFFFFF";

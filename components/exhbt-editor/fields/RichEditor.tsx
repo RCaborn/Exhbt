@@ -12,11 +12,11 @@ import Link from "@tiptap/extension-link";
 import History from "@tiptap/extension-history";
 import { Bold as BoldIcon, Highlighter, Italic as ItalicIcon, Link2, Unlink } from "lucide-react";
 import type { RichSlot } from "@/components/portfolio/page-ctx";
-import { safeHref } from "@/lib/exhbt/blocks";
+import { safeHref, type RichText } from "@/lib/exhbt/blocks";
 import { docToRuns, runsToDoc, sameRuns, type TiptapNode } from "@/lib/exhbt/richtext-tiptap";
 import { useRuntime, type ActiveRich } from "../context";
-import { useStore } from "../store";
 import { issueId } from "./issues";
+import { SelectionBar } from "./SelectionBar";
 
 /*
  * One formatted field's Tiptap editor (RichField.tsx makes it), in its own chunk. Tiptap's stylesheet
@@ -25,9 +25,16 @@ import { issueId } from "./issues";
  * field needs. The marks are drawn as the page draws them (components/exhbt/RichText.tsx): bold as
  * semibold, the context line's bold as the highlight, a link with the page's link classes.
  *
- * While it has the cursor its formatting buttons (Highlight on the context line; bold, italic and link
- * elsewhere) float above the line's right end, out of the flow; on a section's first line, where the
- * section's toolbar sits, they go below the line instead, so the two never overlap.
+ * Where its formatting buttons are (Highlight on the context line; bold, italic and link elsewhere;
+ * bold and italic only in a quote, a pull quote and a link's description, which take no links):
+ *  - while words are selected, with a mouse or the keyboard, on a screen with a fine pointer: in a bar
+ *    just above the selection (SelectionBar.tsx, decision 0032), and the buttons below go, so there is
+ *    one set and it is where the eye is;
+ *  - while the field has the cursor and nothing is selected, and always under a finger on a screen wider
+ *    than a phone: above the line's right end, out of the flow; on a section's first line, where the
+ *    section's toolbar sits, below the line instead, so the two never overlap;
+ *  - on a phone: in the bar at the foot of the screen (phone/PhoneBar.tsx).
+ * Ctrl or Cmd with B and I do the same in every such field (Tiptap's own keys).
  */
 
 /** One paragraph per field, and Enter doesn't start another. */
@@ -58,22 +65,27 @@ const LINK_ERROR = "Links must start with https://.";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 
+/** Whether the screen's own pointer is a fine one (a mouse, a trackpad): only then do the buttons come to the selection. */
+const finePointer = () => typeof window !== "undefined" && window.matchMedia("(pointer: fine)").matches;
+
 /**
  * `live`: the resting field has handed over to this editor (RichField.tsx). Until then the editor is drawn
  * out of the flow, unseen and inert, while the resting field still takes the typing. `onReady` starts the
  * hand-over once the editor exists; `name` gives the editor its id, role and name once it is live.
+ * `write` stores the field's words (in the doc's own shape for the field: RichField.tsx).
  */
-type Props = { slot: RichSlot; id: string; issue: string; live: boolean; onReady(editor: Editor, name: () => void): void };
+type Props = { slot: RichSlot; id: string; issue: string; live: boolean; write(runs: RichText): void; onReady(editor: Editor, name: () => void): void };
 
-export default function RichEditor({ slot, id, issue, live, onReady }: Props) {
-  const store = useStore();
+export default function RichEditor({ slot, id, issue, live, write, onReady }: Props) {
   const rt = useRuntime();
-  const path = useRef(slot.path);
-  path.current = slot.path;
+  const writeNow = useRef(write);
+  writeNow.current = write;
   const [asking, setAsking] = useState(false);
   const [below, setBelow] = useState(false);
   const [aside, setAside] = useState(0);
   const cell = useRef<HTMLDivElement>(null);
+  // A field whose formatting is kept beside its plain words takes bold and italic, and no links (decision 0032).
+  const links = !slot.beside;
   // Tiptap compares its options on every render and hands the editor new ones when any differ, which
   // updates the whole view. The words and the attributes it starts with are kept from the first render,
   // so a render for anything else (the section moved, so the path changed) costs the editor nothing;
@@ -82,16 +94,17 @@ export default function RichEditor({ slot, id, issue, live, onReady }: Props) {
     content: runsToDoc(slot.value),
     // The id, the role and the name come when it is live (`name` below): until then the resting field has them.
     editorProps: { attributes: { "aria-multiline": "true", class: "xe-pm", spellcheck: "true" } },
+    extensions: [OneParagraph, Paragraph, Text, slot.highlight ? Highlight : PageBold, Italic, History, NoNewParagraphs, ...(links ? [PageLink] : [])],
   }));
 
   const editor = useEditor({
     immediatelyRender: false,
     injectCSS: false,
     shouldRerenderOnTransaction: false,
-    extensions: [OneParagraph, Paragraph, Text, slot.highlight ? Highlight : PageBold, Italic, History, NoNewParagraphs, PageLink],
+    extensions: start.extensions,
     content: start.content,
     editorProps: start.editorProps,
-    onUpdate: ({ editor: e }) => store.setAt(path.current, docToRuns(e.getJSON() as TiptapNode)),
+    onUpdate: ({ editor: e }) => writeNow.current(docToRuns(e.getJSON() as TiptapNode)),
     onFocus: () => {
       const under = onFirstLine(cell.current);
       setBelow(under);
@@ -140,13 +153,17 @@ export default function RichEditor({ slot, id, issue, live, onReady }: Props) {
     let mine: ActiveRich | null = null;
     const publish = () => {
       if (!editor.isFocused) return;
-      const flags = { highlight: Boolean(slot.highlight), bold: editor.isActive("bold"), italic: editor.isActive("italic"), link: editor.isActive("link") };
+      const flags = { highlight: Boolean(slot.highlight), links, bold: editor.isActive("bold"), italic: editor.isActive("italic"), link: links && editor.isActive("link") };
       if (mine && mine.bold === flags.bold && mine.italic === flags.italic && mine.link === flags.link && rt.activeRich.get() === mine) return;
       mine = {
         ...flags,
         toggleBold: () => void editor.chain().focus().toggleBold().run(),
         toggleItalic: () => void editor.chain().focus().toggleItalic().run(),
-        toggleLink: () => (editor.isActive("link") ? void editor.chain().focus().extendMarkRange("link").unsetLink().run() : ask.current()),
+        toggleLink: () => {
+          if (!links) return;
+          if (editor.isActive("link")) editor.chain().focus().extendMarkRange("link").unsetLink().run();
+          else ask.current();
+        },
       };
       rt.activeRich.set(mine);
     };
@@ -163,23 +180,82 @@ export default function RichEditor({ slot, id, issue, live, onReady }: Props) {
       editor.off("blur", leave);
       leave();
     };
-  }, [editor, rt, slot.highlight]);
+  }, [editor, rt, slot.highlight, links]);
+
+  // The bar at the selection (SelectionBar.tsx): while words are selected and the focus is in the field or in the bar
+  // itself, on a screen with a fine pointer. Not while the mouse is still drawing the selection out, nor before the
+  // hand-over. `linking`: the bar is asking for a link's address, and stays for as long as its field has the cursor.
+  const bar = useRef<HTMLDivElement>(null);
+  const [selecting, setSelecting] = useState(false);
+  const [linking, setLinking] = useState(false);
+  useEffect(() => {
+    if (!editor || !live) return;
+    const dom = editor.view.dom;
+    const field = cell.current?.closest(".xe-rich") ?? dom;
+    let down = false;
+    let timer = 0;
+    const decide = () => {
+      const active = document.activeElement;
+      const mine = Boolean(active && (dom.contains(active) || bar.current?.contains(active)));
+      const on = !down && mine && !editor.state.selection.empty && finePointer();
+      setSelecting(on);
+      if (!on) setLinking(false);
+    };
+    // The focus is nowhere for a moment while it moves from the words to the bar: look once it has landed.
+    const soon = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(decide, 0);
+    };
+    const onDown = () => {
+      down = true;
+      decide();
+    };
+    const onUp = () => {
+      if (!down) return;
+      down = false;
+      soon();
+    };
+    dom.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    field.addEventListener("focusin", soon);
+    field.addEventListener("focusout", soon);
+    editor.on("selectionUpdate", decide);
+    decide();
+    return () => {
+      window.clearTimeout(timer);
+      dom.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      field.removeEventListener("focusin", soon);
+      field.removeEventListener("focusout", soon);
+      editor.off("selectionUpdate", decide);
+    };
+  }, [editor, live]);
+  // The field's box says so, and the buttons at the end of the line go while the bar is up (css/your-way.css).
+  useEffect(() => {
+    const field = cell.current?.closest(".xe-rich");
+    if (!field) return;
+    field.toggleAttribute("data-selecting", selecting);
+    return () => field.removeAttribute("data-selecting");
+  }, [selecting]);
 
   // Draws again when emptiness or a mark under the cursor changes; the flags are read from the editor itself, which is never stale.
   useEditorState({ editor, selector: ({ editor: e }) => (e ? `${e.isEmpty ? 1 : 0}${e.isActive("bold") ? 1 : 0}${e.isActive("italic") ? 1 : 0}${e.isActive("link") ? 1 : 0}` : "") });
   const empty = editor ? editor.isEmpty : true;
   const bold = editor?.isActive("bold") ?? false;
   const italic = editor?.isActive("italic") ?? false;
-  const link = editor?.isActive("link") ?? false;
+  const link = links && (editor?.isActive("link") ?? false);
 
   if (!editor) return null;
   const keep = (e: React.MouseEvent) => e.preventDefault();
   const linkClick = () => (link ? editor.chain().focus().extendMarkRange("link").unsetLink().run() : setAsking(true));
   const content = (
-    <div ref={cell} className={cx("xe-rich-cell", !live && "xe-rich-pending")} inert={!live || undefined} aria-hidden={!live || undefined}>
+    <div ref={cell} className={cx("xe-rich-cell", !live && "xe-rich-pending")} data-empty={empty || undefined} inert={!live || undefined} aria-hidden={!live || undefined}>
       {empty && (
         <span aria-hidden className="xe-rich-ph">
-          {slot.placeholder}
+          {/* Between quotation marks the placeholder carries the marks itself: the words' own are off while there are none (css/your-way.css). */}
+          {slot.quoted ? `“${slot.placeholder}”` : slot.placeholder}
         </span>
       )}
       <EditorContent editor={editor} className="xe-rich-content" />
@@ -190,6 +266,7 @@ export default function RichEditor({ slot, id, issue, live, onReady }: Props) {
   return (
     <>
       {content}
+      {selecting && <SelectionBar editor={editor} highlight={Boolean(slot.highlight)} links={links} flags={{ bold, italic, link }} barRef={bar} linking={linking} setLinking={setLinking} />}
       <div
         role="toolbar"
         aria-label="Formatting"
@@ -212,9 +289,11 @@ export default function RichEditor({ slot, id, issue, live, onReady }: Props) {
             </button>
           </>
         )}
-        <button type="button" className="xe-tool xe-tool-sm" aria-label={link ? "Remove link" : "Link"} data-tip={link ? "Remove link" : "Link"} onClick={linkClick}>
-          {link ? <Unlink aria-hidden size={14} strokeWidth={2.5} /> : <Link2 aria-hidden size={14} strokeWidth={2.5} />}
-        </button>
+        {links && (
+          <button type="button" className="xe-tool xe-tool-sm" aria-label={link ? "Remove link" : "Link"} data-tip={link ? "Remove link" : "Link"} onClick={linkClick}>
+            {link ? <Unlink aria-hidden size={14} strokeWidth={2.5} /> : <Link2 aria-hidden size={14} strokeWidth={2.5} />}
+          </button>
+        )}
       </div>
       {asking && <LinkPrompt editor={editor} onDone={() => setAsking(false)} />}
     </>

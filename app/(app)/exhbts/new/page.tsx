@@ -16,7 +16,7 @@ import { portfolioHref } from "@/lib/portfolio-links";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
 import { canDraftInto, teamFilesFor } from "@/lib/team";
-import { Chooser, NoRoom, type Where } from "./Chooser";
+import { Back, Chooser, NoRoom, type Where } from "./Chooser";
 import { DraftForm, type PreloadFile } from "./DraftForm";
 import { LayoutGallery } from "./LayoutGallery";
 
@@ -97,6 +97,8 @@ async function DraftPage({ user, intoParam }: { user: SessionUser; intoParam?: s
     <div className="min-h-[calc(100svh-4.75rem)] bg-mist px-4 pt-10 pb-16 sm:px-8 sm:pt-14">
       <MatchPrompt />
       <div className="mx-auto max-w-[40rem]">
+        {/* The way back up: to the chooser it was reached from, or, drafting into a teammate's exhbt, to the list. */}
+        <div className="mb-4">{into ? <Back href="/exhbts">Your exhbts</Back> : <Back href={ADD_EXHBT}>Add an exhbt</Back>}</div>
         <div className="rounded-[24px] border border-line bg-surface p-6 shadow-pack sm:p-10">
           <h1 className="text-[2rem] sm:text-[2.6rem]">Draft an exhbt</h1>
           <p className="mt-3 text-graphite">

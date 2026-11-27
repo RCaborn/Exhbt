@@ -4,8 +4,8 @@ import { Chart } from "@/components/charts/Chart";
 import { MethodFlow } from "@/components/exhbt/MethodFlow";
 import { RichText } from "@/components/exhbt/RichText";
 import { ImageZoom } from "@/components/portfolio/ImageZoom";
-import { safeHref, type FlowStep, type Section, type SectionOf } from "@/lib/exhbt/blocks";
-import { FORMAT_COPY, type Format } from "@/lib/exhbt/formats";
+import { attributionOf, hasWords, isFormatted, richOf, safeHref, trimRuns, type FlowStep, type RichText as RichTextValue, type Section, type SectionOf } from "@/lib/exhbt/blocks";
+import { flowHeading, FORMAT_COPY, sectionHeading, titleShown, type Format } from "@/lib/exhbt/formats";
 import type { ItemAs } from "@/lib/exhbt/layouts";
 import { imageRatio, leadRatio } from "@/lib/exhbt/sections";
 import type { ImageUrls, PageCtx, Sub } from "./page-ctx";
@@ -24,6 +24,11 @@ import type { ImageUrls, PageCtx, Sub } from "./page-ctx";
  * an empty part is drawn with its field so its placeholder shows, nothing is a link or opens larger,
  * and the edit-only controls are slots called as the last child of a box that is `relative` in
  * edit mode only, so what the adapter returns sits over the part and takes no room.
+ *
+ * Decision 0032: a part's heading is the layout's own until the person types a title (`Title`), a quote,
+ * a pull quote and a link's description draw their bold and italic (`wordsOf`), and a finding with no
+ * words, a quote's missing name and a cleared heading are simply not drawn for a visitor. A page with no
+ * title typed and nothing formatted is drawn byte for byte as it was.
  */
 
 /** Defined in page-ctx.ts; re-exported here, where they were first, so older imports keep working. */
@@ -37,6 +42,39 @@ const p = (at: number | undefined, field: string) => `sections.${at ?? -1}.${fie
 /** The first sentence of a hint, as a short placeholder on the page. */
 export const firstSentence = (s: string) => s.match(/^[^.?!]*[.?!]/)?.[0] ?? s;
 
+/**
+ * Words stored as a plain string with their bold and italic beside it (decision 0032: a quote's, a pull
+ * quote's, a link's description), as the public page draws them. With nothing formatted it is exactly the
+ * trimmed string, so a page nobody has formatted is byte for byte the page it was.
+ */
+function wordsOf(plainWords: string, runs: RichTextValue | undefined): React.ReactNode {
+  const rich = richOf(plainWords, runs);
+  return isFormatted(rich) ? <RichText value={trimRuns(rich)} /> : plainWords.trim();
+}
+
+/**
+ * A part's heading (decision 0032): the layout's own until the person types a title, theirs from then on, and
+ * none once they have cleared it. On the editing page it is the editor's field, in the heading's own element
+ * and classes, there even when cleared so the title can come back. `name` is what the part is called.
+ */
+function Title({ Sub, id, className, own, layout, path, name, ctx }: { Sub: Sub; id: string; className: string; own: string | undefined; layout: string; path: string; name: string; ctx?: PageCtx }): React.ReactNode {
+  if (ctx?.edit) return ctx.edit.title({ Sub, id, className, path, fallback: layout, label: `${name}: title` });
+  const shown = titleShown(own, layout);
+  return shown ? (
+    <Sub id={id} className={className}>
+      {shown}
+    </Sub>
+  ) : null;
+}
+
+/**
+ * A titled part's name for a screen reader: its heading while one is drawn, else `name`. On the editing page
+ * the heading's element is always there where the layout has a heading (cleared, it holds the empty field),
+ * and where the layout has none (a case study's flowchart) the part keeps its name.
+ */
+const labelled = (id: string, own: string | undefined, layout: string, name: string, ctx?: PageCtx): { "aria-labelledby": string } | { "aria-label": string } =>
+  (ctx?.edit ? layout : titleShown(own, layout)) ? { "aria-labelledby": id } : { "aria-label": name };
+
 /** A heading over a rule, then the findings as a ruled list. "What I found", "What happened" or "Results". */
 const FINDING = "xp-finding border-b py-3.5 text-[0.9375rem] leading-relaxed last:border-b-0 print:py-1 print:text-[0.9rem] print:leading-snug";
 /**
@@ -44,6 +82,8 @@ const FINDING = "xp-finding border-b py-3.5 text-[0.9375rem] leading-relaxed las
  * longer :last-child; this keeps its bottom rule off, as on the page.
  */
 const LAST_FINDING_EDIT = "[&:nth-last-child(1_of_.xp-finding)]:border-b-0";
+/** The large heading over a rule: "What I found", and the flowchart's where a layout gives it one ("What I did"). */
+const BIG_HEADING = "xp-found-heading xp-display border-b pb-3 text-[1.5rem] leading-tight print:pb-1.5 print:text-[1.25rem]";
 
 export function Findings({
   s,
@@ -67,17 +107,10 @@ export function Findings({
   const edit = ctx?.edit;
   const n = s.items.length;
   const path = p(at, "items");
+  const hid = `${s.id}-h`;
   return (
-    <section aria-labelledby={`${s.id}-h`} data-part={part} className="min-w-0 break-inside-avoid">
-      {kicker ? (
-        <Sub id={`${s.id}-h`} className="xp-label">
-          {heading}
-        </Sub>
-      ) : (
-        <Sub id={`${s.id}-h`} className="xp-found-heading xp-display border-b pb-3 text-[1.5rem] leading-tight print:pb-1.5 print:text-[1.25rem]">
-          {heading}
-        </Sub>
-      )}
+    <section {...labelled(hid, s.title, heading, heading, ctx)} data-part={part} className="min-w-0 break-inside-avoid">
+      <Title Sub={Sub} id={hid} className={kicker ? "xp-label" : BIG_HEADING} own={s.title} layout={heading} path={p(at, "title")} name={heading} ctx={ctx} />
       <ul className={edit ? cx(kicker && "mt-1", "relative") : kicker ? "mt-1" : undefined}>
         {s.items.map((f, i) =>
           edit ? (
@@ -85,11 +118,12 @@ export function Findings({
               {edit.rich({ path: `${path}.${i}`, value: f, label: `Finding ${i + 1}`, placeholder: "A finding, in one sentence", className: "" })}
               {edit.list({ path, index: i, n })}
             </li>
-          ) : (
+          ) : // A finding with no words is not drawn for a visitor (decision 0032).
+          hasWords(f) ? (
             <li key={i} className={FINDING}>
               <RichText value={f} />
             </li>
-          ),
+          ) : null,
         )}
         {edit?.list({ path, index: n, n })}
       </ul>
@@ -251,24 +285,29 @@ export function KeyFigure({ s, imageUrls, rowClass, ctx, at }: { s: SectionOf<"g
  *    beside "What happened" (`as` "stacked") and a row that fits the room when on their own.
  * `rowClass` is its place: on the section itself, or for a heading-and-boxes section on its own, on
  * the grid today's gallery puts round it.
+ *
+ * `title` is the person's own (doc.flowTitle, decision 0032): it takes the place of the layout's heading,
+ * "" draws none, and in a case study, which has no heading of its own, it is a small label over the boxes.
  */
-export function FlowPart({ steps, as, rowClass = "", ctx }: { steps: FlowStep[]; as: ItemAs; rowClass?: string; ctx: PageCtx }) {
+export function FlowPart({ steps, title, as, rowClass = "", ctx }: { steps: FlowStep[]; title?: string; as: ItemAs; rowClass?: string; ctx: PageCtx }) {
   const { Sub, format } = ctx;
   const copy = FORMAT_COPY[format];
+  const layout = flowHeading(format);
+  // Whether a heading sits over the boxes: on the editing page the layout's own always does (cleared, it is the field that brings it back).
+  const headed = Boolean(ctx.edit ? layout : titleShown(title, layout));
   if (format === "case-study") {
     return (
-      <section aria-label={copy.flow} data-part="process" className={cx(rowClass, "break-inside-avoid")}>
+      <section {...labelled("flow-h", title, layout, copy.flow, ctx)} data-part="process" className={cx(rowClass, "break-inside-avoid")}>
+        <Title Sub={Sub} id="flow-h" className="xp-label mb-2" own={title} layout={layout} path="flowTitle" name="Flowchart" ctx={ctx} />
         <MethodFlow steps={steps} variant="page" ctx={ctx} />
       </section>
     );
   }
   if (format === "research") {
     return (
-      <section aria-labelledby="method-h" data-part="process" className={cx("break-inside-avoid", rowClass)}>
-        <Sub id="method-h" className="xp-label">
-          {copy.flow}
-        </Sub>
-        <div className="mt-2">
+      <section {...labelled("method-h", title, layout, copy.flow, ctx)} data-part="process" className={cx("break-inside-avoid", rowClass)}>
+        <Title Sub={Sub} id="method-h" className="xp-label" own={title} layout={layout} path="flowTitle" name="Flowchart" ctx={ctx} />
+        <div className={headed ? "mt-2" : undefined}>
           <MethodFlow steps={steps} variant="page" stack ctx={ctx} />
         </div>
       </section>
@@ -276,11 +315,9 @@ export function FlowPart({ steps, as, rowClass = "", ctx }: { steps: FlowStep[];
   }
   const stacked = as === "stacked";
   const did = (
-    <section aria-labelledby="did-h" data-part="did" className={cx("min-w-0 break-inside-avoid", stacked && rowClass)}>
-      <Sub id="did-h" className="xp-found-heading xp-display border-b pb-3 text-[1.5rem] leading-tight print:pb-1.5 print:text-[1.25rem]">
-        {copy.flow}
-      </Sub>
-      <div className="mt-4 print:mt-2">
+    <section {...labelled("did-h", title, layout, copy.flow, ctx)} data-part="did" className={cx("min-w-0 break-inside-avoid", stacked && rowClass)}>
+      <Title Sub={Sub} id="did-h" className={BIG_HEADING} own={title} layout={layout} path="flowTitle" name="Flowchart" ctx={ctx} />
+      <div className={headed ? "mt-4 print:mt-2" : undefined}>
         <MethodFlow steps={steps} variant="page" stack={stacked} ctx={ctx} />
       </div>
     </section>
@@ -314,11 +351,9 @@ export function ButtonLink({ s, ctx, at }: { s: SectionOf<"link">; ctx: PageCtx;
       ) : (
         <span className={button}>{label}</span>
       )}
-      {edit ? (
-        <p className={line}>{edit.text({ path: p(at, "description"), value: s.description, label: "One line about it (optional)", placeholder: "One line about it (optional)" })}</p>
-      ) : (
-        s.description.trim() && <p className={line}>{s.description.trim()}</p>
-      )}
+      {edit
+        ? edit.rich({ path: p(at, "description"), value: richOf(s.description, s.descriptionRuns), label: "One line about it (optional)", placeholder: "One line about it (optional)", className: line, beside: true })
+        : s.description.trim() && <p className={line}>{wordsOf(s.description, s.descriptionRuns)}</p>}
       {edit?.extra({ sectionId: s.id, kind: "link", where: "over" })}
     </div>
   );
@@ -339,11 +374,10 @@ export function AimStacked({ s, rowClass = "", ctx, at }: { s: SectionOf<"aim">;
   const { Sub, edit } = ctx;
   const heading = s.heading === "hypothesis" ? "Hypothesis" : "Aim";
   const text = "mt-1.5 text-[1.0625rem] leading-relaxed";
+  const hid = `${s.id}-h`;
   return (
-    <section aria-labelledby={`${s.id}-h`} data-part="aim" className={cx("xp-quote break-inside-avoid border-l-[3px] pl-4", rowClass, rel(ctx))}>
-      <Sub id={`${s.id}-h`} className="xp-label">
-        {heading}
-      </Sub>
+    <section {...labelled(hid, s.title, heading, heading, ctx)} data-part="aim" className={cx("xp-quote break-inside-avoid border-l-[3px] pl-4", rowClass, rel(ctx))}>
+      <Title Sub={Sub} id={hid} className="xp-label" own={s.title} layout={heading} path={p(at, "title")} name={heading} ctx={ctx} />
       {edit ? (
         edit.rich({ path: p(at, "text"), value: s.text, label: heading, placeholder: "What the study set out to find", className: text })
       ) : (
@@ -360,11 +394,10 @@ export function AimStacked({ s, rowClass = "", ctx, at }: { s: SectionOf<"aim">;
 export function ClosingBlock({ s, label, rowClass = "", ctx, at }: { s: SectionOf<"conclusion"> | SectionOf<"reflection">; label: string; rowClass?: string; ctx: PageCtx; at?: number }) {
   const { Sub, edit } = ctx;
   const text = "mt-1.5 text-[1.0625rem] leading-relaxed";
+  const hid = `${s.id}-h`;
   return (
-    <section aria-labelledby={`${s.id}-h`} data-part={s.kind} className={cx("break-inside-avoid", rowClass)}>
-      <Sub id={`${s.id}-h`} className="xp-label">
-        {label}
-      </Sub>
+    <section {...labelled(hid, s.title, label, label, ctx)} data-part={s.kind} className={cx("break-inside-avoid", rowClass)}>
+      <Title Sub={Sub} id={hid} className="xp-label" own={s.title} layout={label} path={p(at, "title")} name={label} ctx={ctx} />
       {edit ? (
         edit.rich({ path: p(at, "text"), value: s.text, label, placeholder: s.kind === "conclusion" ? "What the study found, in a sentence or two" : FORMAT_COPY[ctx.format].reflectionPlaceholder, className: text })
       ) : (
@@ -396,7 +429,7 @@ export function RefLine({ s, ctx, at }: { s: SectionOf<"link">; ctx: PageCtx; at
         ) : (
           <span className="font-semibold">{edit.text({ path: p(at, "label"), value: s.label, label: "What the link is", placeholder: copy.link })}</span>
         )}
-        <span className="xp-muted mt-0.5 block text-sm">{edit.text({ path: p(at, "description"), value: s.description, label: "One line about it (optional)", placeholder: "One line about it (optional)" })}</span>
+        {edit.rich({ path: p(at, "description"), value: richOf(s.description, s.descriptionRuns), label: "One line about it (optional)", placeholder: "One line about it (optional)", className: "xp-muted mt-0.5 block text-sm", beside: true })}
         {edit.extra({ sectionId: s.id, kind: "link", where: "over" })}
       </div>
     );
@@ -412,7 +445,7 @@ export function RefLine({ s, ctx, at }: { s: SectionOf<"link">; ctx: PageCtx; at
       ) : (
         <span className="font-semibold">{label}</span>
       )}
-      {s.description.trim() && <span className="xp-muted mt-0.5 block text-sm">{s.description.trim()}</span>}
+      {s.description.trim() && <span className="xp-muted mt-0.5 block text-sm">{wordsOf(s.description, s.descriptionRuns)}</span>}
     </>
   );
 }
@@ -471,29 +504,28 @@ export function PlainSection({
     case "image":
       return s.kind === "image" && !imageUrls[s.fileId] && !edit ? null : wrap(<Figure s={s} imageUrls={imageUrls} zoom={format !== "case-study"} ctx={ctx} at={at} />);
     case "quote": {
-      const name = s.name.trim();
-      const role = s.role.trim();
+      // Who said it is optional, and a role is drawn only with a name (decision 0032): with no name there is no line under the words.
+      const by = attributionOf(s);
+      const hid = `${s.id}-h`;
       return (
-        <section aria-labelledby={`${s.id}-h`} data-part="quote" className={cx(rowClass, "break-inside-avoid")}>
-          <Sub id={`${s.id}-h`} className="xp-label">
-            {copy.quote}
-          </Sub>
+        <section {...labelled(hid, s.title, copy.quote, copy.quote, ctx)} data-part="quote" className={cx(rowClass, "break-inside-avoid")}>
+          <Title Sub={Sub} id={hid} className="xp-label" own={s.title} layout={copy.quote} path={p(at, "title")} name={copy.quote} ctx={ctx} />
           <figure className="xp-quote m-0 mt-2 border-l-[3px] pl-4">
             {edit ? (
               <>
                 <blockquote className="text-[1.125rem] leading-relaxed">
-                  “{edit.text({ path: p(at, "text"), value: s.text, label: "The quote, word for word", placeholder: "The quote, word for word" })}”
+                  {edit.rich({ path: p(at, "text"), value: richOf(s.text, s.textRuns), label: "The quote, word for word", placeholder: "The quote, word for word", className: "", beside: true, quoted: true })}
                 </blockquote>
                 <figcaption className="xp-muted mt-1.5 text-sm">
-                  {edit.text({ path: p(at, "name"), value: s.name, label: "Who said it", placeholder: "Who said it" })}
+                  {edit.text({ path: p(at, "name"), value: s.name, label: "Who said it", placeholder: "Who said it (optional)" })}
                   {", "}
                   {edit.text({ path: p(at, "role"), value: s.role, label: "Their role (optional)", placeholder: "Their role (optional)" })}
                 </figcaption>
               </>
             ) : (
               <>
-                <blockquote className="text-[1.125rem] leading-relaxed">“{s.text.trim()}”</blockquote>
-                {(name || role) && <figcaption className="xp-muted mt-1.5 text-sm">{[name, role].filter(Boolean).join(", ")}</figcaption>}
+                <blockquote className="text-[1.125rem] leading-relaxed">“{wordsOf(s.text, s.textRuns)}”</blockquote>
+                {by && <figcaption className="xp-muted mt-1.5 text-sm">{by}</figcaption>}
               </>
             )}
           </figure>
@@ -502,11 +534,10 @@ export function PlainSection({
     }
     case "reflection": {
       const text = "mt-2 max-w-[42rem] text-[1.125rem] leading-relaxed";
+      const hid = `${s.id}-h`;
       return (
-        <section aria-labelledby={`${s.id}-h`} data-part="reflection" className={cx(rowClass, "xp-next break-inside-avoid border-t pt-6 print:pt-2")}>
-          <Sub id={`${s.id}-h`} className="xp-label">
-            {copy.reflection}
-          </Sub>
+        <section {...labelled(hid, s.title, copy.reflection, copy.reflection, ctx)} data-part="reflection" className={cx(rowClass, "xp-next break-inside-avoid border-t pt-6 print:pt-2")}>
+          <Title Sub={Sub} id={hid} className="xp-label" own={s.title} layout={copy.reflection} path={p(at, "title")} name={copy.reflection} ctx={ctx} />
           {edit ? (
             edit.rich({ path: p(at, "text"), value: s.text, label: copy.reflection, placeholder: copy.reflectionPlaceholder, className: text })
           ) : (
@@ -521,13 +552,12 @@ export function PlainSection({
     case "conclusion": {
       // Only research draws these; elsewhere they are kept but not shown (decision 0024).
       if (format !== "research") return null;
-      const heading = s.kind === "conclusion" ? "Conclusion" : s.heading === "hypothesis" ? "Hypothesis" : "Aim";
+      const heading = sectionHeading(s, format)!;
       const text = "mt-2 max-w-[42rem] text-[1.125rem] leading-relaxed";
+      const hid = `${s.id}-h`;
       return (
-        <section aria-labelledby={`${s.id}-h`} data-part={s.kind} className={cx(rowClass, "break-inside-avoid", s.kind === "aim" && rel(ctx))}>
-          <Sub id={`${s.id}-h`} className="xp-label">
-            {heading}
-          </Sub>
+        <section {...labelled(hid, s.title, heading, heading, ctx)} data-part={s.kind} className={cx(rowClass, "break-inside-avoid", s.kind === "aim" && rel(ctx))}>
+          <Title Sub={Sub} id={hid} className="xp-label" own={s.title} layout={heading} path={p(at, "title")} name={heading} ctx={ctx} />
           {edit ? (
             edit.rich({ path: p(at, "text"), value: s.text, label: heading, placeholder: `Your ${heading.toLowerCase()}`, className: text })
           ) : (
@@ -555,7 +585,7 @@ export function PlainSection({
                 ) : (
                   <p className="font-semibold">{edit.text({ path: p(at, "label"), value: s.label, label: "What the link is", placeholder: "What the link is" })}</p>
                 )}
-                <p className="xp-muted mt-0.5 text-sm">{edit.text({ path: p(at, "description"), value: s.description, label: "One line about it (optional)", placeholder: "One line about it (optional)" })}</p>
+                {edit.rich({ path: p(at, "description"), value: richOf(s.description, s.descriptionRuns), label: "One line about it (optional)", placeholder: "One line about it (optional)", className: "xp-muted mt-0.5 text-sm", beside: true })}
                 {edit.extra({ sectionId: s.id, kind: "link", where: "over" })}
               </>
             ) : (
@@ -568,7 +598,7 @@ export function PlainSection({
                 ) : (
                   <p className="font-semibold">{label}</p>
                 )}
-                {s.description.trim() && <p className="xp-muted mt-0.5 text-sm">{s.description.trim()}</p>}
+                {s.description.trim() && <p className="xp-muted mt-0.5 text-sm">{wordsOf(s.description, s.descriptionRuns)}</p>}
               </>
             )}
           </div>
@@ -580,7 +610,11 @@ export function PlainSection({
       const big = "xp-quote xp-display border-l-[3px] pl-5 text-[1.75rem] leading-[1.2] text-balance print:text-[1.2rem]";
       return (
         <section aria-label="Pull quote" data-part="pullquote" className={cx(rowClass, "break-inside-avoid")}>
-          <blockquote className={big}>“{edit ? edit.text({ path: p(at, "text"), value: s.text, label: "Pull quote", placeholder: "One sentence of your own" }) : s.text.trim()}”</blockquote>
+          {edit ? (
+            <blockquote className={big}>{edit.rich({ path: p(at, "text"), value: richOf(s.text, s.textRuns), label: "Pull quote", placeholder: "One sentence of your own", className: "", beside: true, quoted: true })}</blockquote>
+          ) : (
+            <blockquote className={big}>“{wordsOf(s.text, s.textRuns)}”</blockquote>
+          )}
         </section>
       );
     }

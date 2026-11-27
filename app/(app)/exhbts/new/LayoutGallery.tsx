@@ -33,7 +33,7 @@ export function LayoutGallery({ offered, refused, canDraft }: { offered: readonl
         <Back href={ADD_EXHBT}>Add an exhbt</Back>
         <Heading level={1}>Choose a layout</Heading>
         <Text as="p" type="large" weight="normal" color="secondary" className="max-w-3xl">
-          Choose one and you land on an empty page in that layout, ready to type on.
+          Choose one and you land on an empty page in that layout. Type straight onto it, and add pictures, graphs and links with the “+”.
         </Text>
       </VStack>
       {refused && <Banner status="error" title={LAYOUT_NOT_OFFERED} />}

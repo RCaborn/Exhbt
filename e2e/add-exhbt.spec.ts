@@ -3,8 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { LAYOUT_REFUSED } from "../lib/add-exhbt";
 import { ENTITLEMENTS, PLAN_NAMES } from "../lib/entitlements";
 import { emptyDoc, LIMITS, type ExhbtDoc } from "../lib/exhbt/blocks";
-import { CLASSIC_FORMATS, FORMAT_RULES, LAYOUT_NOT_OFFERED, OFFERED_FORMATS, withFormat } from "../lib/exhbt/formats";
+import { CLASSIC_FORMATS, FORMAT_RULES, LAYOUT_NOT_OFFERED, OFFERED_FORMATS } from "../lib/exhbt/formats";
 import { whereAPublishedExhbtGoes } from "../lib/exhbt/publish-words";
+import { startingDoc } from "../lib/exhbt/sections";
 import { WHAT_AN_EXHBT_IS } from "../lib/exhbt/what-it-is";
 import { portfolioHost } from "../lib/hosts";
 import { ADD, ADD_EXHBT, BUILD_IT_YOURSELF, DRAFT_WITH_AI } from "./add-exhbt";
@@ -183,6 +184,39 @@ test.describe("The chooser", () => {
   });
 });
 
+test.describe("The chooser's headings on a touch screen", () => {
+  test("are the site's heading sizes and leadings, as with a mouse at the same width: an iPad in portrait and a phone", async ({ page, browser }) => {
+    // From the review of 26 Nov: the base theme's touch rule set Astryx's headings back to its own type scale under
+    // 1024px (on an iPad in portrait the h1 was 26px, not 48), and kept loose leadings on a phone.
+    await signInAs(page, freshName("addtouch"), "premium");
+    const storageState = await page.context().storageState();
+    const headings = async (touch: boolean, width: number, height: number) => {
+      const ctx = await browser.newContext({ storageState, viewport: { width, height }, hasTouch: touch, isMobile: touch, deviceScaleFactor: touch ? 2 : 1 });
+      const p = await ctx.newPage();
+      await p.goto(ADD_EXHBT);
+      await expect(p.getByRole("heading", ADD.chooserHeading)).toBeVisible();
+      const got = await p.evaluate(() => ({
+        coarse: matchMedia("(pointer: coarse)").matches,
+        sizes: ["h1", "h2"].map((t) => {
+          const s = getComputedStyle(document.querySelector(`main ${t}`)!);
+          return `${t} ${s.fontSize} / ${s.lineHeight}`;
+        }),
+      }));
+      await ctx.close();
+      return got;
+    };
+    for (const [width, height] of [[810, 1080], [390, 844]] as const) {
+      const mouse = await headings(false, width, height);
+      const finger = await headings(true, width, height);
+      expect(finger.coarse, `${width}px: the touch screen is one`).toBe(true);
+      expect(finger.sizes, `${width}px`).toEqual(mouse.sizes);
+    }
+    // And they are the site's: 48px for the h1 on an iPad, 36px on a phone.
+    expect((await headings(true, 810, 1080)).sizes[0]).toMatch(/^h1 48px/);
+    expect((await headings(true, 390, 844)).sizes[0]).toMatch(/^h1 36px/);
+  });
+});
+
 test.describe("Write it myself", () => {
   test("each layout on offer makes an empty exhbt in that layout and opens the new editor", async ({ page }) => {
     test.setTimeout(300_000); // seven exhbts, each opened in the editor
@@ -209,8 +243,9 @@ test.describe("Write it myself", () => {
       await page.getByRole("button", { name: ADD.layoutButton(f) }).click();
       await page.waitForURL(ADD.editUrl);
       const id = idIn(page.url());
-      // Stored as an empty doc in that layout and nothing else.
-      expect((await stored(page)).find((e) => e.id === id)!.doc, f).toEqual(withFormat(emptyDoc(), f));
+      // Stored as an empty doc in that layout, with the layout's own parts that can start empty (research's aim and
+      // conclusion, an essay's pull quote), and nothing else.
+      expect((await stored(page)).find((e) => e.id === id)!.doc, f).toEqual(startingDoc(f));
       // The new editor opens on it, in that layout, with nothing typed.
       await waitEditor(page);
       await expect(page.locator(`${READY} article[data-exhbt-page]`)).toHaveAttribute("data-format", f);
@@ -257,7 +292,8 @@ test.describe("Write it myself", () => {
     await page.getByRole("button", { name: ADD.layoutButton("research") }).click();
     await page.waitForURL(ADD.editUrl);
     const made = (await stored(page)).find((e) => e.id === idIn(page.url()))!;
-    expect(made.doc).toEqual(withFormat(emptyDoc(), "research"));
+    expect(made.doc).toEqual(startingDoc("research"));
+    expect(made.doc.sections.map((s) => s.kind)).toEqual(["findings", "aim", "conclusion"]);
     await expect(page.getByRole("radiogroup", { name: "Layout" }).getByRole("radio", { name: /^Research/ })).toBeChecked();
   });
 });
@@ -307,11 +343,20 @@ test.describe("Addresses that skip the chooser", () => {
     await expect(page.getByText("Your team's project files are below.")).toBeVisible();
     await expect(page.locator(SEL.draftForm)).toBeAttached();
     await expect(page.getByRole("heading", ADD.chooserHeading)).toHaveCount(0);
+    // Its way back is to the list, where the teammate's draft is: they came by no chooser.
+    await expect(page.locator("main").getByRole("link", { name: "Your exhbts", exact: true })).toHaveAttribute("href", "/exhbts");
+    await expect(page.locator("main").getByRole("link", { name: "Add an exhbt", exact: true })).toHaveCount(0);
 
     // An exhbt that can't be drafted into: someone else's goes to a fresh upload form, never the chooser.
     await page.goto(`${ADD_EXHBT}?into=${original}`);
     await page.waitForURL(exactly(DRAFT_WITH_AI));
     await expect(page.getByRole("heading", SEL.draftHeading)).toBeVisible();
+    // The upload form's way back is to the chooser (from the review of 26 Nov: it had none).
+    const back = page.locator("main").getByRole("link", { name: "Add an exhbt", exact: true });
+    await expect(back).toHaveAttribute("href", ADD_EXHBT);
+    await back.click();
+    await page.waitForURL(exactly(ADD_EXHBT));
+    await expect(page.getByRole("heading", ADD.chooserHeading)).toBeVisible();
 
     // ?start=draft is the form too, and the bare address is the chooser, which says the plan is full.
     await page.goto(ADD_EXHBT);

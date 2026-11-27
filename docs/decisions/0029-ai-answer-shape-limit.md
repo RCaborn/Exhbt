@@ -3,6 +3,7 @@ Date: 23 Nov 2026
 Numbered 0025 on `main` until release 2, which already had a 0025 (the key visual from the work).
 Amends: 0007 (the shape of the draft's answer; the stored exhbt doc is unchanged)
 Added to in place on 25 Nov 2026: "Emphasis inside the answer", at the end (the draft and the rewrite mark bold and italic inside the text they return, with no field added)
+Amended by: 0032 (a person may now format three of the fields the AI's emphasis is kept out of: a quote, a pull quote and a link's line; the AI still sets none there, and sets no titles)
 
 # The AI draft's answer must fit the API's grammar limit
 

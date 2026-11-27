@@ -48,7 +48,9 @@ test.describe("the store checks the doc it publishes", () => {
     for (const doc of [
       { ...openBankingDoc, title: "T".repeat(90) },
       withWork("javascript:alert(1)"),
-      { ...openBankingDoc, sections: [] },
+      // Nothing on the page but the title. (No sections alone was refused until decision 0032 made every part optional;
+      // a title alone is still not a page: hasBody in lib/exhbt/blocks.ts.)
+      { ...openBankingDoc, gap: [], flow: [], sections: [] },
     ]) {
       expect(validateForPublish(doc as ExhbtDoc).length).toBeGreaterThan(0);
       expect(await publishStored(request, "pubcheck", doc)).toEqual({ published: false, status: "draft", live: false });

@@ -3,17 +3,17 @@ import { join } from "node:path";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { markLayout, needsThePerson } from "../evals/exhbt-draft/marks";
+import { draftIssues, markLayout, needsThePerson } from "../evals/exhbt-draft/marks";
 import { DraftSchema, DraftSchemaSeven, leftOff, repairDraft, toDoc, type Draft } from "../lib/ai/draft-answer";
 import { DRAFT_TARGETS } from "../lib/ai/draft-targets";
-import { formatLimits, LIMITS, validateForPublish, wordCount, words, type ExhbtDoc } from "../lib/exhbt/blocks";
+import { formatLimits, LIMITS, suggestionsFor, validateForPublish, wordCount, words, type ExhbtDoc } from "../lib/exhbt/blocks";
 import { checkedReason, CLASSIC_REASONS, isLayoutReason, LAYOUT_REASONS, layoutSentence } from "../lib/exhbt/drafted";
 import { CLASSIC_FORMATS, FORMAT_RULES, FORMATS, formatOf, type Format } from "../lib/exhbt/formats";
 import { blockOptions } from "../lib/exhbt/layouts";
 import { pullquoteFrom, unsupportedParts } from "../lib/exhbt/references";
 import { beforeAfterDoc, buildDoc, essayDoc, eventDoc, openBankingDoc } from "../lib/exhbt/sample";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
-import { addSection, framesOf, layoutGroup, openAddSectionMenu, openLayoutMenu, openThingsToFix, pressTool, previewArticle, signInAs, thingsButton, waitEditor } from "./editor";
+import { addSection, framesOf, layoutGroup, openAddSectionMenu, openLayoutMenu, pressTool, previewArticle, signInAs, waitEditor } from "./editor";
 import * as classicEditor from "./editor-classic-helpers";
 import { docNow, frame, freshName, openDoc, READY, readStored, sampleDoc, waitSaved } from "./page-editor";
 
@@ -510,26 +510,29 @@ test.describe("The draft eval's fixtures and marks for seven layouts", () => {
   test("what only the person can clear (pictures, Before and After marks) is told apart from what a draft got wrong", () => {
     // A drafted before and after: no pictures yet, so nothing is marked. Its three points on what changed are there.
     const drafted = toDoc(answer({ format: "before-after", findings: ["The total is on one screen.", "Buttons are bigger.", "Repeat orders take two taps."] }), MATERIAL);
-    const issues = validateForPublish(drafted);
+    // What a layout usually has is a suggestion to a person since decision 0032 and stops no one publishing. A draft
+    // is still marked on it (draftIssues: what stops publishing, then the suggestions), so the marks mean what they did.
+    expect(validateForPublish(drafted)).toEqual([]);
+    const issues = draftIssues(drafted);
     const person = issues.filter((i) => needsThePerson(i, drafted)).map((i) => i.message);
-    expect(person).toEqual(["A before and after needs at least 2 images.", "Mark one image Before and one After."]);
+    expect(person).toEqual(["A before and after works best with at least 2 images.", "Mark one image Before and one After."]);
     // Without its findings, the missing "what changed" is the draft's own failing.
     const thin = toDoc(answer({ format: "before-after", findings: [] }), MATERIAL);
-    const thinIssues = validateForPublish(thin).filter((i) => !needsThePerson(i, thin)).map((i) => i.message);
+    const thinIssues = draftIssues(thin).filter((i) => !needsThePerson(i, thin)).map((i) => i.message);
     expect(thinIssues).toContain("Add what changed and why.");
     // An event's poster is the person's to add; its role is the draft's to find in the material.
     const event = toDoc(answer({ format: "event", myRole: "" }), MATERIAL);
-    const eventIssues = validateForPublish(event);
+    const eventIssues = draftIssues(event);
     expect(eventIssues.filter((i) => needsThePerson(i, event)).map((i) => i.message)).toEqual(["Add at least one picture, such as the poster."]);
     expect(eventIssues.filter((i) => !needsThePerson(i, event)).map((i) => i.message)).toContain("Say what your role was.");
     // A gallery's two pictures, and a build's screenshot or link.
     const gallery = toDoc(answer({ format: "gallery" }), MATERIAL);
-    expect(validateForPublish(gallery).filter((i) => needsThePerson(i, gallery)).map((i) => i.message)).toEqual(["A gallery needs at least 2 images."]);
+    expect(draftIssues(gallery).filter((i) => needsThePerson(i, gallery)).map((i) => i.message)).toEqual(["A gallery works best with at least 2 images."]);
     const build = toDoc(answer({ format: "build" }), MATERIAL);
-    expect(validateForPublish(build).filter((i) => needsThePerson(i, build)).map((i) => i.message)).toEqual(["Add a screenshot or a link, so people can see it working."]);
+    expect(draftIssues(build).filter((i) => needsThePerson(i, build)).map((i) => i.message)).toEqual(["Add a screenshot or a link, so people can see it working."]);
     // Research's key figure can be drafted from the material's figures, so it stays the draft's.
     const research = toDoc(answer({ format: "research", aim: "To test it.", conclusion: "It held." }), MATERIAL);
-    expect(validateForPublish(research).filter((i) => needsThePerson(i, research))).toEqual([]);
+    expect(draftIssues(research).filter((i) => needsThePerson(i, research))).toEqual([]);
   });
 });
 
@@ -697,19 +700,30 @@ test.describe("Each new layout in the editor", () => {
    * What stops publishing, as "Things to fix before publishing" lists it once publishing has been tried (before
    * that it leaves out parts that are only empty). Nothing to fix: no button, and "".
    */
-  async function toFix(page: Page): Promise<string> {
+  /**
+   * What the editor suggests for the page now, as the top bar's list words it ("" where it suggests nothing). What a
+   * layout usually has is a suggestion since decision 0032; until then each was a thing to fix that stopped publishing.
+   * None of them may be among the things that stop it, which this checks each time it is asked.
+   */
+  async function suggested(page: Page): Promise<string> {
     await page.evaluate(async () => {
       window.__exhbtUi!.setTried(true);
       await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
     });
-    if ((await thingsButton(page).count()) === 0) return "";
-    const words = (await (await openThingsToFix(page)).innerText()).replace(/\s+/g, " ");
+    const now = await docNow(page);
+    const stops = validateForPublish(now).map((i) => i.message);
+    for (const s of suggestionsFor(now)) expect(stops, "a suggestion is never among what stops publishing").not.toContain(s.message);
+    const button = page.locator(`${READY} .xe-suggest-button, ${READY} .xe-fix-button`).first();
+    if ((await button.count()) === 0) return "";
+    await button.click();
+    const group = page.locator(`${READY} [data-suggestions]`);
+    const words = (await group.count()) ? (await group.innerText()).replace(/\s+/g, " ") : "";
     await page.keyboard.press("Escape");
     return words;
   }
   const boxOf = async (page: Page, id: string) => (await frame(page, id).boundingBox())!;
 
-  test("build: the lead screenshot, what it does beside the graph, the links as a row of buttons; it needs a screenshot or a link", async ({ page }) => {
+  test("build: the lead screenshot, what it does beside the graph, the links as a row of buttons; it suggests a screenshot or a link", async ({ page }) => {
     await openDoc(page, freshName("rowsbuild"), sampleDoc("build"));
     const art = previewArticle(page);
     await expect(art).toHaveAttribute("data-format", "build");
@@ -738,18 +752,22 @@ test.describe("Each new layout in the editor", () => {
     expect(menu.find((o) => o.kind === "image")).toMatchObject({ off: false });
     expect(menu.map((o) => o.kind)).not.toContain("pullquote");
 
-    // With no screenshot and no link, it can't be published, and says why in its own words.
+    // With no screenshot and no link, it suggests one, in its own words (it stopped publishing until decision 0032).
     const NEED = "Add a screenshot or a link, so people can see it working.";
-    expect(await toFix(page)).not.toContain(NEED);
+    expect(await suggested(page)).not.toContain(NEED);
     await page.evaluate(() => ["image-1", "image-2", "link-1", "link-2"].forEach((id) => window.__exhbtEditor!.remove(id)));
-    expect(await toFix(page)).toContain(NEED);
-    // A link clears it (the link has its own things to fill in).
+    expect(await suggested(page)).toContain(NEED);
+    // A link added with nothing in it does not clear it: a visitor is not shown an empty part, so it answers nothing (decision 0032).
     await addSection(page, "Add a link");
     await expect(framesOf(page, "link")).toHaveCount(1);
-    expect(await toFix(page)).not.toContain(NEED);
+    expect(await suggested(page)).toContain(NEED);
+    // Its words typed in, it does.
+    const at = (await docNow(page)).sections.findIndex((s) => s.kind === "link");
+    await page.evaluate((path) => window.__exhbtEditor!.setAt(path, "The model code"), `sections.${at}.label`);
+    expect(await suggested(page)).not.toContain(NEED);
   });
 
-  test("essay: the key points beside the pull quote, the sources as a list; it needs its key points", async ({ page }) => {
+  test("essay: the key points beside the pull quote, the sources as a list; it suggests its key points", async ({ page }) => {
     await openDoc(page, freshName("rowsessay"), sampleDoc("essay"));
     const art = previewArticle(page);
     await expect(art).toHaveAttribute("data-format", "essay");
@@ -770,16 +788,20 @@ test.describe("Each new layout in the editor", () => {
     expect(menu.find((o) => o.kind === "link")).toMatchObject({ off: false, name: "Source" });
 
     const NEED = "Add your key points.";
-    expect(await toFix(page)).not.toContain(NEED);
+    expect(await suggested(page)).not.toContain(NEED);
     await page.evaluate(() => window.__exhbtEditor!.remove("findings"));
-    expect(await toFix(page)).toContain(NEED);
+    expect(await suggested(page)).toContain(NEED);
     await openAddSectionMenu(page);
     await page.locator(`${READY} [data-xe-menu] [data-block="findings"]`).click();
     await expect(framesOf(page, "findings")).toHaveCount(1);
-    expect(await toFix(page)).not.toContain(NEED);
+    // Added with no point written, it is not shown to a visitor, so it does not answer the suggestion (decision 0032); a point written does.
+    expect(await suggested(page)).toContain(NEED);
+    const at = (await docNow(page)).sections.findIndex((s) => s.kind === "findings");
+    await page.evaluate((path) => window.__exhbtEditor!.setAt(path, [{ t: "Letters show the reform was planned for years." }]), `sections.${at}.items.0`);
+    expect(await suggested(page)).not.toContain(NEED);
   });
 
-  test("before and after: two pictures become a labelled pair once one is marked Before and the other After, and until then it can't be published", async ({ page }) => {
+  test("before and after: two pictures become a labelled pair once one is marked Before and the other After, and until then the marks are suggested", async ({ page }) => {
     // The sample with no picture marked, as an AI draft with the person's pictures added would be.
     const sample = sampleDoc("before-after");
     const unmarked: ExhbtDoc = { ...sample, sections: sample.sections.map((s) => (s.kind === "image" ? { ...s, stage: undefined } : s)) };
@@ -789,7 +811,7 @@ test.describe("Each new layout in the editor", () => {
     const pairs = art.getByRole("group", { name: "Before and after" });
     await expect(pairs).toHaveCount(0);
     const NEED = "Mark one image Before and one After.";
-    expect(await toFix(page)).toContain(NEED);
+    expect(await suggested(page)).toContain(NEED);
 
     // The marks are the person's: Before on the first picture, After on the second.
     await pressTool(page, "Image 1", "Before");
@@ -800,7 +822,7 @@ test.describe("Each new layout in the editor", () => {
     await expect(pairs.locator("[data-section-id]")).toHaveCount(2);
     await expect(pairs.locator('[data-section-id="image-1"]')).toHaveCount(1);
     await expect(pairs.locator('[data-section-id="image-2"]')).toHaveCount(1);
-    expect(await toFix(page)).not.toContain(NEED);
+    expect(await suggested(page)).not.toContain(NEED);
 
     // One link and one graph, and room for more pictures (it has four of six).
     const menu = await plusMenu(page);
@@ -808,14 +830,14 @@ test.describe("Each new layout in the editor", () => {
     expect(menu.find((o) => o.kind === "link")).toMatchObject({ off: true, full: "One link in a before and after" });
     expect(menu.find((o) => o.kind === "image")).toMatchObject({ off: false });
 
-    // Its other two needs, each in its own words: two pictures, and what changed.
+    // What else it usually has, each in its own words: two pictures, and what changed.
     await page.evaluate(() => ["image-2", "image-3", "image-4", "findings"].forEach((id) => window.__exhbtEditor!.remove(id)));
-    const fix = await toFix(page);
-    expect(fix).toContain("A before and after needs at least 2 images.");
+    const fix = await suggested(page);
+    expect(fix).toContain("A before and after works best with at least 2 images.");
     expect(fix).toContain("Add what changed and why.");
   });
 
-  test("event: the poster as the lead, the other pictures in a grid, My role in the sidebar; it needs a picture and a role", async ({ page }) => {
+  test("event: the poster as the lead, the other pictures in a grid, My role in the sidebar; it suggests a picture and a role", async ({ page }) => {
     await openDoc(page, freshName("rowsevent"), sampleDoc("event"));
     const art = previewArticle(page);
     await expect(art).toHaveAttribute("data-format", "event");
@@ -830,19 +852,19 @@ test.describe("Each new layout in the editor", () => {
     expect(menu.find((o) => o.kind === "link")).toMatchObject({ off: true, full: "Up to 2 links in an event" });
     expect(menu.find((o) => o.kind === "image")).toMatchObject({ off: false });
 
-    // No role: it can't be published, and says so. Typing one clears it.
+    // No role: it suggests one, and says so. Typing one clears it.
     const NEED = "Say what your role was.";
-    expect(await toFix(page)).not.toContain(NEED);
+    expect(await suggested(page)).not.toContain(NEED);
     await role.fill("");
     await expect.poll(async () => (await docNow(page)).myRole ?? "").toBe("");
-    expect(await toFix(page)).toContain(NEED);
+    expect(await suggested(page)).toContain(NEED);
     await role.fill("Producer");
     await expect.poll(async () => (await docNow(page)).myRole).toBe("Producer");
-    expect(await toFix(page)).not.toContain(NEED);
+    expect(await suggested(page)).not.toContain(NEED);
 
-    // And with no picture at all, its other need.
+    // And with no picture at all, its other suggestion.
     await page.evaluate(() => ["image-1", "image-2", "image-3"].forEach((id) => window.__exhbtEditor!.remove(id)));
-    expect(await toFix(page)).toContain("Add at least one picture, such as the poster.");
+    expect(await suggested(page)).toContain("Add at least one picture, such as the poster.");
   });
 });
 

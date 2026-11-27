@@ -1,4 +1,4 @@
-import { FLOW_ID, formatLimits, isContent, type ContentSection, type ExhbtDoc, type FlowMarker, type FlowStep, type Section, type SectionKind, type SectionOf } from "./blocks";
+import { filledFlow, FLOW_ID, formatLimits, isContent, type ContentSection, type ExhbtDoc, type FlowMarker, type FlowStep, type Section, type SectionKind, type SectionOf } from "./blocks";
 import { flowShown, FORMAT_COPY, FORMAT_RULES, formatOf, hasMarker, isArranged, isShown, withFormat, type Format, type PageKind } from "./formats";
 import { newImageSection, newSection, roomFor, sectionName } from "./sections";
 
@@ -12,9 +12,12 @@ import { newImageSection, newSection, roomFor, sectionName } from "./sections";
 
 export { flowShown, hasMarker, isArranged };
 
-/** One thing the page draws in the main column, in page order. `index` is its place in doc.sections as stored (for issue paths); -1 for a flowchart with no marker. */
+/**
+ * One thing the page draws in the main column, in page order. `index` is its place in doc.sections as stored (for issue paths);
+ * -1 for a flowchart with no marker. The flowchart carries its own title when the doc has one (doc.flowTitle, decision 0032).
+ */
 export type PageItem =
-  | { id: "flow"; kind: "flow"; index: number; steps: FlowStep[] }
+  | { id: "flow"; kind: "flow"; index: number; steps: FlowStep[]; title?: string }
   | { id: string; kind: SectionKind; index: number; s: ContentSection };
 
 /** How one item is drawn. "plain" is the item on its own row. */
@@ -184,17 +187,13 @@ export function adopt(doc: ExhbtDoc): ExhbtDoc {
   return { ...doc, sections };
 }
 
-/** A layout switch in the new editor: adopt, set the layout, sort the sections into its usual order (a stable sort). */
+/**
+ * A layout switch in the new editor: adopt, set the layout, sort the sections into its usual order (a stable sort).
+ * A flowchart that was taken off stays off, whatever the layout (decision 0032): the "+" and the tray offer it back.
+ */
 export function applyTemplate(doc: ExhbtDoc, to: Format): ExhbtDoc {
   const a = adopt(doc);
-  const next = withFormat(a, to);
-  let sections = a.sections;
-  // The flowchart was off and the new layout always has one: it comes back, in its usual place, with its boxes.
-  if (!hasMarker(a) && !FORMAT_RULES[to].flowRemovable) {
-    sections = [...sections, marker()];
-    delete next.flowOff;
-  }
-  return { ...next, sections: keepingHidden(sections, to, (drawn) => templateOrder(drawn, to)) };
+  return { ...withFormat(a, to), sections: keepingHidden(a.sections, to, (drawn) => templateOrder(drawn, to)) };
 }
 
 /**
@@ -206,11 +205,10 @@ export function pageItems(doc: ExhbtDoc, skip?: (s: ContentSection) => boolean):
   const stored = new Map<Section, number>(doc.sections.map((s, i) => [s, i]));
   const a = adopt(skip ? { ...doc, sections: doc.sections.filter((s) => !isContent(s) || !skip(s)) } : doc);
   const items: PageItem[] = [];
-  const shown = flowShown(a);
-  // A case study or research page always has its flowchart: with flowOff and no marker, it is drawn first.
-  if (shown && !hasMarker(a)) items.push({ id: FLOW_ID, kind: "flow", index: -1, steps: doc.flow });
+  // The flowchart is drawn where its marker is. A doc whose flowchart was taken off (flowOff) has none, in any layout (decision 0032).
+  const flow = (index: number): PageItem => ({ id: FLOW_ID, kind: "flow", index, steps: doc.flow, ...(doc.flowTitle !== undefined ? { title: doc.flowTitle } : {}) });
   for (const s of a.sections) {
-    if (!isContent(s)) items.push({ id: FLOW_ID, kind: "flow", index: stored.get(s) ?? -1, steps: doc.flow });
+    if (!isContent(s)) items.push(flow(stored.get(s) ?? -1));
     else if (isShown(a, s)) items.push({ id: s.id, kind: s.kind, index: stored.get(s) ?? -1, s });
   }
   return items;
@@ -301,18 +299,6 @@ function storedPlace(sections: Section[], items: PageItem[], at: number): number
   const p = Math.max(0, Math.min(Math.trunc(at) || 0, items.length));
   if (p < items.length) return items[p]!.index;
   return items.length ? items[items.length - 1]!.index + 1 : sections.length;
-}
-
-/**
- * An arranged doc whose flowchart is drawn with no marker (flowOff in a case study or research,
- * which always draw it, first) with the marker written in, first, so every page item has its
- * place in doc.sections. The page is the same. Any other doc as it is.
- */
-function pinned(doc: ExhbtDoc): ExhbtDoc {
-  if (hasMarker(doc) || !flowShown(doc)) return doc;
-  const next = { ...doc, sections: [marker(), ...doc.sections] };
-  delete next.flowOff;
-  return next;
 }
 
 /**
@@ -411,7 +397,7 @@ export function insertBlock(doc: ExhbtDoc, kind: Exclude<BlockKind, "image">, at
   if (kind === "flow") return flowShown(doc) ? null : { doc: restoreFlow(doc, at), id: FLOW_ID };
   const f = formatOf(doc);
   if (!drawsKind(f, kind) || roomFor(doc.sections, kind, f) === 0) return null;
-  const a = pinned(adopt(doc));
+  const a = adopt(doc);
   const s = newSection(kind, a.sections);
   return { doc: insertAt(a, s, at), id: s.id };
 }
@@ -420,14 +406,14 @@ export function insertBlock(doc: ExhbtDoc, kind: Exclude<BlockKind, "image">, at
 export function insertImage(doc: ExhbtDoc, image: { fileId: string; w?: number; h?: number }, at: number): { doc: ExhbtDoc; id: string } | null {
   const f = formatOf(doc);
   if (!drawsKind(f, "image") || roomFor(doc.sections, "image", f) === 0) return null;
-  const a = pinned(adopt(doc));
+  const a = adopt(doc);
   const s = newImageSection(image.fileId, a.sections, image.w && image.h ? { w: image.w, h: image.h } : undefined);
   return { doc: insertAt(a, s, at), id: s.id };
 }
 
 /** `place`: the item's index among the page items with the item itself taken out (0 is first). An id that is not a page item: the doc as it was. */
 export function moveItem(doc: ExhbtDoc, id: string, place: number): ExhbtDoc {
-  const a = pinned(adopt(doc));
+  const a = adopt(doc);
   const items = pageItems(a);
   const from = items.findIndex((it) => it.id === id);
   if (from < 0) return doc;
@@ -440,17 +426,17 @@ export function moveItem(doc: ExhbtDoc, id: string, place: number): ExhbtDoc {
 }
 
 /**
- * Takes a section out (one the layout draws or one it keeps). For the flowchart: removes the marker and sets flowOff; the boxes stay in doc.flow.
- * Nothing where the layout always draws a flowchart, or for an id the doc does not have: the doc as it was.
+ * Takes a section out (one the layout draws or one it keeps). For the flowchart, in any layout (decision 0032): removes the marker
+ * and sets flowOff; the boxes and the flowchart's title stay in the doc. For an id the doc does not have, or a flowchart already off: the doc as it was.
  */
 export function removeItem(doc: ExhbtDoc, id: string): ExhbtDoc {
   if (id === FLOW_ID) {
-    if (!FORMAT_RULES[formatOf(doc)].flowRemovable || !flowShown(doc)) return doc;
+    if (!flowShown(doc)) return doc;
     const a = adopt(doc);
     return { ...a, sections: a.sections.filter(isContent), flowOff: true };
   }
   if (!doc.sections.some((s) => s.id === id)) return doc;
-  const a = pinned(adopt(doc));
+  const a = adopt(doc);
   return { ...a, sections: a.sections.filter((s) => s.id !== id) };
 }
 
@@ -462,10 +448,8 @@ export function structureKey(doc: ExhbtDoc): string {
 
 /**
  * The flowchart's steps as a visitor's page draws them: blank boxes left out, so a box just added
- * doesn't draw as the dark result box or count as a step. If every box is blank (a new exhbt starts
- * with three) they all show. The classic preview and "See as a visitor" both use this.
+ * doesn't draw as the dark result box or count as a step. With every box blank there is nothing to
+ * draw, and the page draws no flowchart (decision 0032; until then they all showed). The page leaves
+ * blank boxes out itself now (LayoutMain); this is filledFlow under the name its older callers use.
  */
-export const drawnFlow = (flow: FlowStep[]): FlowStep[] => {
-  const filled = flow.filter((s) => s.step.trim() !== "" || (s.detail ?? "").trim() !== "");
-  return filled.length > 0 ? filled : flow;
-};
+export const drawnFlow = (flow: FlowStep[]): FlowStep[] => filledFlow(flow);

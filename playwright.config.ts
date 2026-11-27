@@ -9,7 +9,9 @@ const PORT = Number(process.env.E2E_PORT) || 3200;
  * projects below and nothing more. .github/workflows/webkit.yml sets E2E_WEBKIT=1 on a runner that installs
  * WebKit. E2E_WEBKIT=chromium runs the same two projects (their sizes, pixel ratios and user agents) on
  * Chromium, for a machine with no WebKit: a test that fails there too fails on the size, not on the engine.
- *  - `safari`: Playwright's "Desktop Safari" at the desktop project's 1440 by 900, on the desktop project's editor specs.
+ *  - `safari`: Playwright's "Desktop Safari" at the desktop project's 1440 by 900, on the desktop project's editor specs,
+ *    and e2e/your-way.spec.ts: the bar that comes to words selected with a mouse, which WebKit had never run (26 Nov:
+ *    its Link lost a finding's words in Safari).
  *  - `iphone`: Playwright's "iPhone 14" (390 by 664, a touch screen), on the touch project's specs.
  *  - `ipad`: Playwright's "iPad (gen 7)" (810 by 1080, a touch screen), on the tablet project's spec.
  * The first two also run e2e/*.webkit.ts: the tests of what only Safari does, which no other project's pattern matches.
@@ -32,7 +34,7 @@ const NOT_UNDER_SAFARI_FOCUS: [name: RegExp, why: string][] = [];
 const LEFT_OUT = [...NOT_ON_WEBKIT, ...(process.env.E2E_FOCUS === "safari" ? NOT_UNDER_SAFARI_FOCUS : [])].map(([name]) => name);
 const ONLY_WEBKIT = /[\\/][a-z-]+\.webkit\.ts$/;
 const webkitProjects = [
-  { name: "safari", fullyParallel: true, use: { ...devices["Desktop Safari"], viewport: { width: 1440, height: 900 }, ...engine }, testMatch: [/[\\/]editor-[a-z-]+\.spec\.ts$/, ONLY_WEBKIT], testIgnore: /editor-(phone|tablet)\.spec\.ts/, grepInvert: LEFT_OUT },
+  { name: "safari", fullyParallel: true, use: { ...devices["Desktop Safari"], viewport: { width: 1440, height: 900 }, ...engine }, testMatch: [/[\\/]editor-[a-z-]+\.spec\.ts$/, /[\\/]your-way\.spec\.ts$/, ONLY_WEBKIT], testIgnore: /editor-(phone|tablet)\.spec\.ts/, grepInvert: LEFT_OUT },
   { name: "iphone", fullyParallel: true, use: { ...devices["iPhone 14"], ...engine }, testMatch: [/editor-(drag|flow|phone|figures)\.spec\.ts/, ONLY_WEBKIT], grepInvert: LEFT_OUT },
   { name: "ipad", fullyParallel: true, use: { ...devices["iPad (gen 7)"], ...engine }, testMatch: /editor-tablet\.spec\.ts/, grepInvert: LEFT_OUT },
 ];

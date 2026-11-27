@@ -1,7 +1,7 @@
 Status: accepted
 Date: 15 Nov 2026
 Amends: 0007 (which parts are fixed, and their order), 0009 (the new sections' words count)
-Amended by: 0022 (how the sections are drawn on the page; the sections are unchanged), 0024 (two new kinds, aim and conclusion, used by research only; caps per layout; in a gallery or research page the page sets where each kind goes), 0026 (the editor: sections are edited and dragged on the page itself, not as cards), 0027 (the flowchart is a section: it can be moved, and removed in five layouts; a case study and research keep it), 0028 (one new kind, the pull quote; an image can be marked before or after), 0030 (no section has a word cap of its own: only the page's 200 words; the caps in the table below are now the AI's targets)
+Amended by: 0022 (how the sections are drawn on the page; the sections are unchanged), 0024 (two new kinds, aim and conclusion, used by research only; caps per layout; in a gallery or research page the page sets where each kind goes), 0026 (the editor: sections are edited and dragged on the page itself, not as cards), 0027 (the flowchart is a section: it can be moved, and removed in five layouts; a case study and research keep it), 0028 (one new kind, the pull quote; an image can be marked before or after), 0030 (no section has a word cap of its own: only the page's 200 words; the caps in the table below are now the AI's targets), 0032 (a quote takes bold and italic, and needs no name; there is no least number of boxes or findings; nothing has to be filled in, and an empty section is not drawn; a section can have a title of the person's own)
 
 # The flowchart stays; what goes below it is up to the person
 

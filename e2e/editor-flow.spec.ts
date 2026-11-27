@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "./editor-test";
 import { lineAt, moved, placeAt, within } from "../components/exhbt-editor/flow/geometry";
-import type { ExhbtDoc, FlowStep } from "../lib/exhbt/blocks";
+import { formatLimits, validateForPublish, type ExhbtDoc, type FlowStep } from "../lib/exhbt/blocks";
 import { FORMAT_RULES, type Format } from "../lib/exhbt/formats";
 import { PORTFOLIO_THEMES } from "../lib/portfolio-themes";
 import { allowEditOnly, boxes, differences, docNow, field, finger, focusedPath, freshName, full, offered, openDoc, openTiming, READY, renders, sampleDoc, SAMPLES, seeAsVisitor, settle, undoLabel, waitLive, waitReady } from "./page-editor";
@@ -21,7 +21,9 @@ import { allowEditOnly, boxes, differences, docNow, field, finger, focusedPath, 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 /** Tall enough for a whole sample, so a mouse drag never has to scroll. Widths (and so layouts) are a desktop's. */
 const TALL = { width: 1440, height: 3600 };
-const MIN = "The flowchart needs at least 3 boxes.";
+/** A flowchart with more boxes than a layout allows: the one count the flowchart is still held to (decision 0032 made the fewest a suggestion). */
+const MAX = (f: Format) => `Up to ${formatLimits(f).flow.max} boxes in the flowchart.`;
+const FEW = (f: Format) => `Most flowcharts have at least ${formatLimits(f).flow.min} boxes. Add another if it helps.`;
 
 const LIST = `${READY} article .xe-flow`;
 const BOX = `${READY} article [data-flow-step]`;
@@ -72,6 +74,7 @@ const EXTRA: FlowStep[] = [
   { step: "Wrote the method up", detail: "a day" },
   { step: "Checked the sums again", detail: "a morning" },
   { step: "Shared the draft", detail: "a week" },
+  { step: "Sent the final copy", detail: "a day" },
 ];
 /** The sample's flowchart with `n` boxes. */
 const withBoxes = (flow: FlowStep[], n: number): FlowStep[] => (n <= flow.length ? flow.slice(0, n) : [...flow, ...EXTRA.slice(0, n - flow.length)]);
@@ -278,15 +281,30 @@ for (const f of offered()) {
       await expect(f1).toBeFocused();
     });
 
-    test("with two boxes, Things to fix lists the count issue and jumps to the list; the issue takes no room", async ({ page }) => {
+    test("with two boxes there is nothing to fix: the list carries no issue, and the suggestion goes to the flowchart", async ({ page }) => {
+      // Until decision 0032 two boxes stopped publishing ("The flowchart needs at least 3 boxes."). It is a suggestion now.
       await open(page, f, 2, { full: true });
+      await expect(list(page)).not.toHaveAttribute("data-invalid", "");
+      await expect(page.locator(`${READY} #flow-issue`)).toHaveCount(0);
+      expect(validateForPublish(await docNow(page)).filter((i) => i.path.startsWith("flow"))).toEqual([]);
+      // Whatever else the top bar has to say, the suggestion is in its list, and pressed, it goes to the flowchart.
+      await page.locator(`${READY} .xe-suggest-button, ${READY} .xe-fix-button`).first().click();
+      await page.locator(`${READY} [data-suggestions]`).getByText(FEW(f), { exact: true }).click();
+      await expect.poll(() => focusedPath(page)).toBe("flow.0.step");
+      await expect(list(page)).not.toHaveAttribute("data-invalid", "");
+    });
+
+    test("with more boxes than the layout allows, Things to fix lists the count issue and jumps to the list; the issue takes no room", async ({ page }) => {
+      const over = formatLimits(f).flow.max + 1;
+      await open(page, f, over, { full: true });
+      expect(await keysNow(page)).toHaveLength(over);
       // The list is the anchor, with an outline in the look's error colour and its message tied to it, hidden until it has the focus.
       await expect(list(page)).toHaveAttribute("data-path", "flow");
       await expect(list(page)).toHaveAttribute("tabindex", "-1");
       await expect(list(page)).toHaveAttribute("data-invalid", "");
       const note = page.locator(`${READY} #flow-issue`);
       await expect(list(page)).toHaveAttribute("aria-describedby", "flow-issue");
-      await expect(note).toHaveText(MIN);
+      await expect(note).toHaveText(MAX(f));
       expect(await note.evaluate((el) => getComputedStyle(el).opacity)).toBe("0");
       const error = await list(page).evaluate((el) => {
         const probe = document.createElement("span");
@@ -317,17 +335,36 @@ for (const f of offered()) {
       expect(differences(await boxes(page), editing)).toEqual([]);
     });
 
-    test("a + on an arrow adds a box there with the cursor in it; at six there is none; Remove at three is off and says why", async ({ page }) => {
+    test("every box can be removed, down to none; then Add a box has the cursor and starts the flowchart again", async ({ page }) => {
+      // Until decision 0032 Remove was off at three boxes and said why. Nothing has to be filled in now.
+      await page.setViewportSize(TALL);
+      await open(page, f, 3);
+      for (let left = 3; left > 0; left--) {
+        await box(page, 0).hover();
+        await expect(removeOf(page, 0)).toBeEnabled();
+        await expect(removeOf(page, 0)).toHaveAccessibleDescription("");
+        await removeOf(page, 0).click();
+        await expect(said(page)).toHaveText("Box 1 removed.");
+        expect(await keysNow(page)).toHaveLength(left - 1);
+      }
+      expect((await docNow(page)).flow).toEqual([]);
+      const first = page.getByRole("button", { name: "Add a box", exact: true });
+      await expect(first).toBeFocused();
+      // An empty flowchart is nothing to fix, and a visitor is shown no flowchart for it.
+      expect(validateForPublish(await docNow(page)).filter((i) => i.path.startsWith("flow"))).toEqual([]);
+      await first.click();
+      await expect.poll(() => focusedPath(page)).toBe("flow.0.step");
+      await page.keyboard.type("Started again");
+      expect(await stepsNow(page)).toEqual(["Started again"]);
+    });
+
+    test("a + on an arrow adds a box there with the cursor in it; at six there is none; Remove takes one away at any count", async ({ page }) => {
       await page.setViewportSize(TALL);
       await open(page, f, 3);
       expect(await keysNow(page)).toHaveLength(3);
-      // Remove is off at three, says why, and takes nothing away.
+      // Remove is on at three, with nothing to explain (it was off there until decision 0032).
       await box(page, 1).hover();
-      await expect(removeOf(page, 1)).toBeDisabled();
-      await expect(removeOf(page, 1)).toHaveAccessibleDescription(MIN);
-      await removeOf(page, 1).click({ force: true });
-      await expect(said(page)).toHaveText(MIN);
-      expect(await keysNow(page)).toHaveLength(3);
+      await expect(removeOf(page, 1)).toBeEnabled();
       // Nothing moves when the "+" and the tools show: they take no room.
       await page.mouse.move(5, 5);
       const still = await drawn(page);
@@ -757,8 +794,8 @@ test.describe("an empty flowchart", () => {
     await page.keyboard.type("The only step");
     expect(await stepsNow(page)).toEqual(["The only step"]);
     await expect(page.getByRole("button", { name: "Add a box", exact: true })).toHaveCount(0);
-    // The count issue is on the list until there are three.
-    await expect(list(page)).toHaveAttribute("data-invalid", "");
+    // One box is nothing to fix: since decision 0032 the fewest boxes is a suggestion, and the list carries no issue for it.
+    await expect(list(page)).not.toHaveAttribute("data-invalid", "");
   });
 
   for (const f of offered()) {
@@ -766,7 +803,7 @@ test.describe("an empty flowchart", () => {
       await openDoc(page, freshName("flowemptyparity"), { ...sampleDoc(f), flow: [] });
       await waitLive(page);
       const taken = await allowEditOnly(page, "all");
-      expect(taken.some((t) => t.startsWith("the empty flowchart's")), taken.join("; ")).toBe(true);
+      expect(taken.some((t) => t.startsWith("the empty flowchart's row (")), taken.join("; ")).toBe(true);
       await settle(page);
       const editing = await boxes(page);
       await seeAsVisitor(page, true);
@@ -774,6 +811,31 @@ test.describe("an empty flowchart", () => {
       expect(differences(await boxes(page), editing), `with these taken out: ${taken.join("; ")}`).toEqual([]);
     });
   }
+
+  test("only the first Add a box moves the rows: typing in a blank box moves nothing round the flowchart", async ({ page }) => {
+    // A gallery pairs "What I did" with "What happened". With no boxes the flowchart has a row of its own and the findings
+    // are the visitor's, the width of the page; the first box puts the flowchart back in its pair (a press, as adding a section is).
+    await page.setViewportSize(TALL);
+    await openDoc(page, freshName("flowemptyrows"), { ...sampleDoc("gallery"), flow: [] });
+    await settle(page);
+    const findings = page.locator(`${READY} article [data-section-id="findings"]`);
+    const alone = (await findings.boundingBox())!;
+    await page.locator(`${LIST} [data-flow-add]`).click();
+    await expect.poll(() => focusedPath(page)).toBe("flow.0.step");
+    await settle(page);
+    const paired = (await findings.boundingBox())!;
+    expect(paired.width).toBeLessThan(alone.width - 100);
+    // From here the flowchart has a box, blank: it keeps its place in the rows whatever is typed in it.
+    const round = async () => (await boxes(page)).filter((b) => !b.key.startsWith("flowchart box"));
+    const before = await round();
+    await page.keyboard.type("T");
+    await settle(page);
+    expect(differences(before, await round())).toEqual([]);
+    await page.keyboard.press("Backspace");
+    await settle(page);
+    expect(differences(before, await round())).toEqual([]);
+    expect(await stepsNow(page)).toEqual([""]);
+  });
 });
 
 /* ------------------------------------------------------------------------------------------------
@@ -931,7 +993,7 @@ test.describe("by touch", () => {
 test.describe("blank boxes as a visitor sees them", () => {
   const visitorList = (page: Page) => page.locator(`${READY} section[aria-label="Preview"]`).getByRole("list", { name: "Methodology" });
 
-  test("a blank last box is left out of 'See as a visitor', so the last filled step keeps the result box; the editing page still shows it; typing brings it in; all blank shows them all", async ({ page }) => {
+  test("a blank last box is left out of 'See as a visitor', so the last filled step keeps the result box; the editing page still shows it; typing brings it in; all blank shows no flowchart", async ({ page }) => {
     const base = sampleDoc("case-study");
     const filled = base.flow.slice(0, 3);
     await openDoc(page, freshName("blankflow"), { ...base, flow: [...filled, { step: "" }] });
@@ -951,7 +1013,8 @@ test.describe("blank boxes as a visitor sees them", () => {
     await seeAsVisitor(page, true);
     await expect(items).toHaveCount(4);
     await expect(items.last()).toContainText("Wrote it up");
-    // Every box blank (a new exhbt): they all show.
+    // Every box blank (a new exhbt): a visitor is shown no flowchart at all (decision 0032: a flowchart with no box
+    // filled in is not drawn), and the editing page still has every box to type in.
     await seeAsVisitor(page, false);
     await page.evaluate(() =>
       [0, 1, 2, 3].forEach((n) => {
@@ -960,6 +1023,8 @@ test.describe("blank boxes as a visitor sees them", () => {
       }),
     );
     await seeAsVisitor(page, true);
-    await expect(items).toHaveCount(4);
+    await expect(visitorList(page)).toHaveCount(0);
+    await seeAsVisitor(page, false);
+    expect(await keysNow(page)).toHaveLength(4);
   });
 });
