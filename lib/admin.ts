@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { getCurrentUser, type SessionUser } from "./auth";
-import { accountPlan, ALL_TIME_TABLES, type AdminAccountDetail, type AdminAccountsPage, type AdminRowMap, type AdminTable } from "./admin-types";
+import { accountPlan, ALL_TIME_TABLES, type AdminAccountDetail, type AdminPublishNumbers, type AdminAccountsPage, type AdminRowMap, type AdminTable } from "./admin-types";
 import type { Plan } from "./entitlements";
 import { getStore, LIVE_SUBSCRIPTION_STATUSES } from "./store";
 import { FAILURE_WORDS, type AIFailureReason } from "./ai/failure";
@@ -113,6 +113,8 @@ export type Overview = {
     costUsd: number;
     features: { feature: string; label: string; failures: number; reasons: string; inputTokens: number; outputTokens: number; costUsd: number }[];
   }>;
+  /** N1 and N2, all time, from exhbts.published_at (Store.adminPublishNumbers). */
+  publishNumbers: Section<AdminPublishNumbers>;
   exhbts: Section<{ drafted: number; published: number; people: number; perPerson: { one: number; two: number; threePlus: number }; aiDrafts: number; aiRewrites: number }>;
   ai: Section<{
     calls: number;
@@ -157,6 +159,15 @@ export async function adminOverview(range: Range, now = Date.now()): Promise<Ove
     load("profiles"), load("subscriptions"), load("roadmaps"), load("exhbts"), load("events"), load("pageViews"), load("aiCalls"), load("ideas"), load("savedIdeas"),
     load("referrals"), load("waitlist"), load("leads"), load("jobLinks"), load("members"), load("invites"), load("files"), load("matches"),
   ]);
+
+  // N1 and N2 read their own table whole, whatever the range, and a failure shows as "could not load" like the others.
+  const publishNumbers: Section<AdminPublishNumbers> = await store.adminPublishNumbers(admin.id).then(
+    (data): Section<AdminPublishNumbers> => ({ ok: true, data, partial: data.partial }),
+    (e: Error): Section<AdminPublishNumbers> => {
+      console.error("admin: could not read the publish numbers:", e.message);
+      return { ok: false, note: "Could not load this part. It may need a database update; the server log has the reason." };
+    },
+  );
 
   type Loaded = { rows: unknown; truncated: boolean } | { error: string };
   const build = <T>(needs: Loaded[], make: () => T): Section<T> => {
@@ -342,6 +353,7 @@ export async function adminOverview(range: Range, now = Date.now()): Promise<Ove
     roadmaps: roadmapSection,
     ideas: ideasSection,
     aiFailures: failureSection,
+    publishNumbers,
     exhbts: exhbtSection,
     ai: aiSection,
     subscriptions: subsSection,

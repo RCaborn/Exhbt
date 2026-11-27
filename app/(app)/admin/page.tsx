@@ -16,7 +16,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
   await requireAdmin();
   const range = parseRange((await searchParams).range);
   const o = await adminOverview(range);
-  const partial = ([o.accounts, o.roadmaps, o.ideas, o.exhbts, o.ai, o.subscriptions, o.referrals, o.waitlist, o.leads, o.jobLinks, o.teammates, o.files, o.matches, o.pageViews] as Section<unknown>[]).some((s) => s.ok && s.partial);
+  const partial = ([o.accounts, o.roadmaps, o.ideas, o.exhbts, o.publishNumbers, o.ai, o.subscriptions, o.referrals, o.waitlist, o.leads, o.jobLinks, o.teammates, o.files, o.matches, o.pageViews] as Section<unknown>[]).some((s) => s.ok && s.partial);
   const label = RANGE_LABEL[range].toLowerCase();
 
   return (
@@ -50,6 +50,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
         <Roadmaps o={o} />
         <Ideas o={o} />
         <Exhbts o={o} />
+        <PublishNumbers o={o} />
         <Ai o={o} />
         <AiFailures o={o} />
         <Subscriptions o={o} />
@@ -184,6 +185,26 @@ function Exhbts({ o }: { o: Overview }) {
               ]}
             />
           </>
+        )}
+      </Part>
+    </Panel>
+  );
+}
+
+function PublishNumbers({ o }: { o: Overview }) {
+  return (
+    <Panel id="publish-numbers" title="First and second exhbt" note="All time. Every account counts, roadmap-only sign-ups included; an exhbt counts once published, even if unpublished later, and stops counting when deleted.">
+      <Part s={o.publishNumbers}>
+        {(p) => (
+          <DataTable
+            caption="Accounts that have published a first and a second exhbt"
+            head={["Published", "Accounts"]}
+            numeric={[1]}
+            rows={[
+              ["A first exhbt (N1)", <span key="n1" data-stat="n1">{`${num(p.first)} of ${num(p.accounts)} accounts (${pct(p.first, p.accounts)})`}</span>],
+              ["A second exhbt (N2)", <span key="n2" data-stat="n2">{`${num(p.second)} of ${num(p.accounts)} accounts (${pct(p.second, p.accounts)})`}</span>],
+            ]}
+          />
         )}
       </Part>
     </Panel>
