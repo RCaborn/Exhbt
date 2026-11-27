@@ -213,7 +213,7 @@ test.describe("the crash fallback", () => {
   // arrives, which can take far longer than a chunk's three tries (components/exhbt-editor/again.ts). Here any browser
   // is made to do the same: the next page is held back for eight seconds, and from the moment the person leaves, the
   // formatted fields' chunk fails each time it is asked for. The page that was left opens nothing after it.
-  test("a chunk cut off by leaving the page opens no classic editor, however long the next page takes", async ({ page }) => {
+  test("a chunk cut off by leaving the page opens no classic editor, however long the next page takes, up to a minute", async ({ page }) => {
     const { edit } = await seed(page, "leave");
     const fellBack: string[] = [];
     page.on("console", (m) => {
@@ -246,6 +246,8 @@ test.describe("the crash fallback", () => {
     await page.goto("/exhbts");
     await expect(page.getByRole("heading", SEL.listHeading)).toBeVisible();
     expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe("/exhbts");
+    // And nothing put the editor parameter (the classic editor's way in) on the address.
+    expect(new URL(page.url()).searchParams.get("editor")).toBeNull();
     expect(failedAfter, "the chunk was cut off by the leave").toBeGreaterThan(0);
     expect(fellBack).toEqual([]);
   });
