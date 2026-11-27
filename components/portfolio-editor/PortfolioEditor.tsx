@@ -120,20 +120,25 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
   let confirmed = loaded;
   /** Set once the editor has been taken off the page: from then on its state cannot change. */
   let gone = false;
+  /**
+   * Set once the gate has stopped waiting for this visit's saves (leftBehind): a later visit may have opened and taken
+   * what was kept, so from then on this visit writes nothing more to the browser.
+   */
+  let released = false;
   /** Lets the gate stop waiting for this visit's saves (leftBehind). */
   let letGo: () => void = () => {};
   const goneFor = new Promise<void>((done) => (letGo = done));
   /** Keeps the newest state in this browser, for the next visit to offer back, unless the server has it. */
   const keepNewest = () => {
     const newest = rt.state.get();
-    if (newest !== confirmed) keepUnsaved(owner, newest, rt.save.get().stale ? "stale" : "left");
+    if (newest !== confirmed && !released) keepUnsaved(owner, newest, rt.save.get().stale ? "stale" : "left");
   };
 
   async function send(state: BuilderState): Promise<SaveResult> {
     // Once the site has been updated under this tab nothing more can be saved from it: every later state
     // follows the first into the browser, to be offered back after the reload (keep.ts, Notices.tsx).
     if (rt.save.get().stale) {
-      keepUnsaved(owner, state);
+      if (!released) keepUnsaved(owner, state);
       return { ok: false, error: STALE_EDITOR };
     }
     try {
@@ -163,14 +168,15 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
         e,
       );
       rt.save.set((v) => ({ ...v, stale: true }));
-      keepUnsaved(owner, state);
+      if (!released) keepUnsaved(owner, state);
       return { ok: false, error: STALE_EDITOR };
     }
   }
   /**
    * Every save is noted while it is on its way: the gate and the crash fallback wait for it (pending.ts), until the
-   * editor has gone and leftBehind lets it go. Once the editor has gone nothing sends again a save that fails, so its
-   * words stay kept for the next visit; one that lands takes back what leftBehind kept.
+   * editor has gone and leftBehind lets it go. Once the editor has gone nothing sends again a save that fails, so the
+   * newest words are kept for the next visit (again: a stale answer has just kept the older words it carried); one
+   * that lands with the newest words takes back what was kept.
    */
   const tracked = (state: BuilderState) => {
     const run = send(state);
@@ -195,7 +201,7 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
    * lands drops it, and Next can lose a save asked for while a navigation is under way (a navigation that goes ahead
    * of a pending action leaves the end of Next's queue at that action, and an action added after it is never run, so
    * its save never answers). A save that lands takes the kept words back (tracked). The gate waits for the saves
-   * still on their way for LEFT_BEHIND_MS, and no longer.
+   * still on their way for LEFT_BEHIND_MS, and no longer; after that this visit writes nothing more to the browser.
    */
   let giveUp: ReturnType<typeof setTimeout> | undefined;
   function leftBehind(): void {
@@ -203,7 +209,11 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
     if (rt.state.get() === confirmed) return;
     keepNewest();
     clearTimeout(giveUp);
-    giveUp = setTimeout(() => gone && letGo(), LEFT_BEHIND_MS);
+    giveUp = setTimeout(() => {
+      if (!gone) return;
+      released = true;
+      letGo();
+    }, LEFT_BEHIND_MS);
   }
   /** On the page (again): React's development checks take an editor off the page and put it back as it mounts. */
   function here(): void {
