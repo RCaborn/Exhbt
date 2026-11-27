@@ -2,7 +2,6 @@ import "server-only";
 import { firstExhbtLiveEmail } from "@/lib/email/templates/first-exhbt-live";
 import { sendEmail } from "@/lib/email/send";
 import type { Plan } from "@/lib/entitlements";
-import { portfolioUrl } from "@/lib/hosts";
 import { visibleOnPortfolio } from "@/lib/plan-rules";
 import { getStore, type ExhbtRecord } from "@/lib/store";
 
@@ -16,14 +15,18 @@ export async function afterPublish(opts: {
   email: string;
   exhbtId: string;
   slug: string;
-  username: string;
+  /**
+   * Where this person's public pages are, as the publish sheet's own link has it (portfolioHref): their exhbt.co.uk
+   * subdomain on a real host, the /p/<username> path on this deployment in development and previews. Absolute.
+   */
+  portfolioBase: string;
   plan: Plan;
   /** The person's exhbts as they were read before this publish. */
   before: ExhbtRecord[];
   /** The site's origin, read in the request (it comes from the request's headers). */
   origin: string;
 }): Promise<void> {
-  const { userId, email, exhbtId, slug, username, plan, before, origin } = opts;
+  const { userId, email, exhbtId, slug, portfolioBase, plan, before, origin } = opts;
   const store = getStore();
   // published_at stays when an exhbt is unpublished, so "never published" also means "not republished".
   const republish = Boolean(before.find((e) => e.id === exhbtId)?.publishedAt);
@@ -48,8 +51,8 @@ export async function afterPublish(opts: {
     // It is kept if the send then fails: a missed email costs less than a second one.
     if (!(await store.claimEventOnce("first_publish_emailed", userId))) return;
     const content = firstExhbtLiveEmail({
-      exhbtUrl: `https://${portfolioUrl(username, slug)}`,
-      portfolioUrl: `https://${portfolioUrl(username)}`,
+      exhbtUrl: `${portfolioBase}/${slug}`,
+      portfolioUrl: portfolioBase,
       privacyUrl: `${origin}/legal/privacy`,
       logoUrl: `${origin}/brand/exhbt-mark.png`,
     });

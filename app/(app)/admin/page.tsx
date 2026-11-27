@@ -193,13 +193,16 @@ function Exhbts({ o }: { o: Overview }) {
 
 function PublishNumbers({ o }: { o: Overview }) {
   return (
-    <Panel id="publish-numbers" title="First and second exhbt" note="All time. An account is a sign-up. It counts once it has published, and taking an exhbt down later does not undo that; a draft never published does not count.">
+    <Panel id="publish-numbers" title="First and second exhbt" note="All time. An account is anyone with a login, including people who only asked for a roadmap by email. It counts once it has published an exhbt: unpublishing later does not undo that, deleting the exhbt does, and a draft never published does not count.">
       <Part s={o.publishNumbers}>
         {(p) => (
-          <Stats
-            items={[
-              { id: "n1", label: "Published a first exhbt (N1)", value: `${num(p.first)} of ${num(p.accounts)} accounts (${pct(p.first, p.accounts)})` },
-              { id: "n2", label: "Published a second exhbt (N2)", value: `${num(p.second)} of ${num(p.accounts)} accounts (${pct(p.second, p.accounts)})` },
+          <DataTable
+            caption="Accounts that have published a first and a second exhbt"
+            head={["Published", "Accounts"]}
+            numeric={[1]}
+            rows={[
+              ["A first exhbt (N1)", <span key="n1" data-stat="n1">{`${num(p.first)} of ${num(p.accounts)} accounts (${pct(p.first, p.accounts)})`}</span>],
+              ["A second exhbt (N2)", <span key="n2" data-stat="n2">{`${num(p.second)} of ${num(p.accounts)} accounts (${pct(p.second, p.accounts)})`}</span>],
             ]}
           />
         )}

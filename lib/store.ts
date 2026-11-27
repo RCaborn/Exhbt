@@ -449,10 +449,14 @@ export interface Store {
    */
   returnEvent(name: EventName, userId: string, claim: string): Promise<void>;
   /**
-   * Logs an event only if this user has none with this name yet, and says which one it was: the claim token
-   * (also in the event's props as `claim`) to the one caller that wins, null to every other. Two callers at the
-   * same moment cannot both win. For a thing that must happen once per person, ever (the first-publish email).
-   * A failure to reach the database is null as well: the event is never logged twice, at the price of missing one.
+   * Logs an event only if this user has none with this name yet, and returns its claim token (also in the event's
+   * props as `claim`) to the caller that logged it, null to every other. For a thing that must happen once per
+   * person, ever (the first-publish email). At most one caller wins; it is possible, but rare, that none does.
+   * In memory the check and the write are one step, so exactly one wins. On Supabase it writes its row, reads back,
+   * and wins only if its row is the only one, so of two callers at the same moment the one whose read comes second
+   * sees the other's row, and both can back off, which sends nothing rather than twice. A unique index on
+   * (user_id, name) for this event would make it exactly one (the 23505 branch is ready for it). A failure to reach
+   * the database is null as well: the event is never logged twice, at the price of missing one.
    */
   claimEventOnce(name: EventName, userId: string, props?: Record<string, unknown>): Promise<string | null>;
   /** Records an uploaded (or about-to-be-uploaded) file. The id is chosen by the caller, as it is part of the path. */
@@ -1299,21 +1303,18 @@ function supabaseStore(): Store {
       const claim = crypto.randomUUID();
       const mine = await db.from("events").insert({ name, user_id: userId, props: { ...props, claim } }).select("id").single();
       // A unique index on (user_id, name) for this event, if the database gets one, answers 23505 to the loser. Without it the
-      // rule below decides: the lowest id among this person's events of this name is the claim, and every other caller takes its own back.
+      // rule below decides. Ids are handed out before commit, so "lowest id wins" would let two callers both win; "only row
+      // wins" cannot: each reads after its own insert is committed, so whichever commits second sees the first's row.
       if (mine.error || !mine.data) {
         if (mine.error?.code !== "23505") console.error("event claim failed", mine.error?.message);
         return null;
       }
       const ownId = (mine.data as { id: number }).id;
-      const first = await db.from("events").select("id").eq("name", name).eq("user_id", userId).order("id", { ascending: true }).limit(1);
-      const firstId = (first.data as { id: number }[] | null)?.[0]?.id;
-      if (first.error || firstId === undefined) {
-        // Cannot tell who won: take the claim back and send nothing.
-        console.error("event claim check failed", first.error?.message);
-        await db.from("events").delete().eq("id", ownId);
-        return null;
-      }
-      if (firstId === ownId) return claim;
+      const rows = await db.from("events").select("id").eq("name", name).eq("user_id", userId).limit(2);
+      const ids = (rows.data as { id: number }[] | null)?.map((r) => r.id);
+      if (!rows.error && ids?.length === 1 && ids[0] === ownId) return claim;
+      if (rows.error) console.error("event claim check failed", rows.error.message);
+      // Someone else's row is there too, or it cannot be told: take ours back and send nothing.
       await db.from("events").delete().eq("id", ownId);
       return null;
     },

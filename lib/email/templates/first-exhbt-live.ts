@@ -24,7 +24,7 @@ const COPY = {
 export function firstExhbtLiveEmail(opts: {
   /** The exhbt's own address, on the person's portfolio host. */
   exhbtUrl: string;
-  /** The portfolio's address. */
+  /** The portfolio's address (its home page). */
   portfolioUrl: string;
   privacyUrl: string;
   /** Absolute URL of public/brand/exhbt-mark.png. Without it the header is the wordmark alone. */
@@ -45,7 +45,7 @@ ${logoUrl ? `<img src="${esc(logoUrl)}" width="24" height="24" alt="" style="dis
 <tr><td style="padding:12px 32px 0;font:400 16px/1.55 Arial,sans-serif;color:${C.ink2}">${esc(c.body)} <a href="${esc(exhbtUrl)}" style="color:${C.ink}">${esc(exhbtUrl)}</a></td></tr>
 <tr><td style="padding:12px 32px 0;font:400 16px/1.55 Arial,sans-serif;color:${C.ink2}">${esc(c.use)}</td></tr>
 <tr><td style="padding:24px 32px 0"><a href="${esc(exhbtUrl)}" style="display:inline-block;padding:14px 26px;border-radius:999px;font:700 16px/1 Arial,sans-serif;text-decoration:none;background:${C.mint};color:${C.ink};border:1.5px solid ${C.mint}">${esc(c.button)}</a></td></tr>
-<tr><td style="padding:20px 32px 0;font:400 14px/1.6 Arial,sans-serif;color:${C.ink2}">Your portfolio, which lists every exhbt you publish, is at <a href="${esc(portfolioUrl)}" style="color:${C.ink}">${esc(portfolioUrl)}</a>. ${esc(c.after)}</td></tr>
+<tr><td style="padding:20px 32px 0;font:400 14px/1.6 Arial,sans-serif;color:${C.ink2}">Your portfolio is at <a href="${esc(portfolioUrl)}" style="color:${C.ink}">${esc(portfolioUrl)}</a>. ${esc(c.after)}</td></tr>
 <tr><td style="height:32px"></td></tr>
 </table>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px"><tr><td style="padding:20px 32px;font:400 12px/1.6 Arial,sans-serif;color:${C.ink2}">
@@ -61,7 +61,7 @@ ${esc(c.reason)} <a href="${esc(privacyUrl)}" style="color:${C.ink2}">Privacy</a
     "",
     c.use,
     "",
-    `Your portfolio, which lists every exhbt you publish, is at ${portfolioUrl}. ${c.after}`,
+    `Your portfolio is at ${portfolioUrl}. ${c.after}`,
     "",
     c.reason,
     `Privacy: ${privacyUrl}`,

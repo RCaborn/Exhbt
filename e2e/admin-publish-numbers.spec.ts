@@ -47,7 +47,7 @@ test.describe("N1 and N2 on the admin page", () => {
   test("count right on seeded data: a first and a second exhbt, an unpublished one, an account with none", async ({ page }) => {
     await adminSignIn(page);
     await expect(page.getByRole("heading", { name: "First and second exhbt" })).toBeVisible();
-    await expect(page.getByText(/does not undo that; a draft never published does not count/)).toBeVisible();
+    await expect(page.getByText(/deleting the exhbt does, and a draft never published does not count/)).toBeVisible();
     const before = { n1: await readStat(page, "n1"), n2: await readStat(page, "n2") };
 
     const seeded = await page.request.get(`/dev/measure?seed=${stamp()}`);
@@ -87,9 +87,11 @@ test.describe("a publish: the event and the first email", () => {
     await mail.click();
     const frame = page.frameLocator("iframe");
     await expect(frame.getByText(SUBJECT, { exact: true })).toBeVisible();
-    await expect(frame.getByRole("link", { name: "Open my exhbt" })).toHaveAttribute("href", `https://${user}.exhbt.co.uk/${slug}`);
-    await expect(frame.getByRole("link", { name: `https://${user}.exhbt.co.uk`, exact: true })).toBeVisible();
-    await expect(frame.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", /\/legal\/privacy$/);
+    // The link is the one the publish sheet shows: on this development server, /p/<username>/<slug> (an exhbt.co.uk host gives the subdomain).
+    const origin = new URL(page.url()).origin;
+    await expect(frame.getByRole("link", { name: "Open my exhbt" })).toHaveAttribute("href", `${origin}/p/${user}/${slug}`);
+    await expect(frame.getByRole("link", { name: `${origin}/p/${user}`, exact: true })).toBeVisible();
+    await expect(frame.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", `${origin}/legal/privacy`);
     await expect(frame.locator("body")).not.toContainText(title);
     await expect((await eventsOf(page, "first_publish_emailed")).length).toBe(1);
   });
@@ -133,6 +135,13 @@ test.describe("a publish: the event and the first email", () => {
     await page.waitForTimeout(500);
     expect((await eventsOf(page, "exhbt_published")).length).toBe(0);
     await expect(await firstEmails(page, `${user}@example.com`)).toHaveCount(0);
+  });
+
+  test("a plan with no public page gets the event but no email, and one with a public page gets both", async ({ page }) => {
+    const tag = stamp();
+    // Free's publish is refused before this step, so it is reached here on its own: the gate is what holds the email back.
+    expect(await (await page.request.get(`/dev/measure?gate=free&tag=${tag}`)).json()).toEqual({ published: 1, claims: 0, emails: 0 });
+    expect(await (await page.request.get(`/dev/measure?gate=premium&tag=${tag}`)).json()).toEqual({ published: 1, claims: 1, emails: 1 });
   });
 
   test("two presses at the same moment send one email", async ({ page, context }) => {

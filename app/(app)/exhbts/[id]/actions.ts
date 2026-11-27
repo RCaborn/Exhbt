@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { unverifiedOf } from "@/components/editor/model";
 import { canView } from "@/lib/access";
@@ -15,6 +16,7 @@ import { slugify, uniqueSlug } from "@/lib/exhbt/slug";
 import { startingDoc } from "@/lib/exhbt/sections";
 import { canCreateExhbt, canPublish, getPlan } from "@/lib/plan";
 import { takenSlugs } from "@/lib/slugs";
+import { portfolioHref } from "@/lib/portfolio-links";
 import { portfolioKind } from "@/lib/portfolio-kind-server";
 import { afterPublish } from "@/lib/publish-follow-up";
 import { isPhase2Enabled } from "@/lib/site";
@@ -238,7 +240,11 @@ export async function publishExhbt(id: string, raw: unknown, confirmed: boolean)
   const publishedAt = (await store.getExhbt(id))?.publishedAt ?? null;
   // The event and the first-publish email run after the response: neither can fail or slow the publish.
   try {
-    runInBackground(afterPublish({ userId: user.id, email: user.email, exhbtId: id, slug, username: profile.username!, plan, before: all, origin: await siteOrigin() }));
+    const origin = await siteOrigin();
+    const reqHeaders = await headers();
+    // The same address the publish sheet shows: the person's subdomain on an exhbt.co.uk host, /p/<username> elsewhere.
+    const rel = portfolioHref(profile.username!, reqHeaders.get("x-forwarded-host") ?? reqHeaders.get("host"));
+    runInBackground(afterPublish({ userId: user.id, email: user.email, exhbtId: id, slug, portfolioBase: rel.startsWith("/") ? `${origin}${rel}` : rel, plan, before: all, origin }));
   } catch (e) {
     console.error("publish follow-up not started", (e as Error).message);
   }
