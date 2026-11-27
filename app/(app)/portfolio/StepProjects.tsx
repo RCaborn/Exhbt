@@ -277,7 +277,7 @@ export function StepProjects({
 
       {projects.length > 0 && shown.length === 0 && plan.isPublic && (
         <p role="alert" className="mt-4 rounded-[14px] border border-error/40 bg-surface px-4 py-3 text-error">
-          Every exhbt is hidden, so your portfolio page is offline. Show at least one.
+          Every exhbt is hidden, so your portfolio is offline. Show at least one.
         </p>
       )}
 

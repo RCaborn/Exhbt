@@ -248,7 +248,7 @@ test.describe("The first minute", () => {
     await expect(strip).toBeVisible();
     await expect(strip.getByRole("heading", { name: "Your portfolio in three steps" })).toBeVisible();
     // Three steps, the first already done: signing up was it.
-    for (const name of ["Account", "Your portfolio", "Your first exhbt"]) await expect(strip).toContainText(name);
+    for (const name of ["Account", "Your portfolio", "Your first exhbt"]) await expect(strip.locator(".pe-first-steps")).toContainText(name);
     await expect(strip).toHaveAttribute("data-step", "page");
     await strip.getByRole("button", { name: /^One line about you/ }).click();
     await expect.poll(() => focusedPath(page)).toBe("profile.headline");

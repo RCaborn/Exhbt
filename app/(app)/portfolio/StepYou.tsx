@@ -138,7 +138,7 @@ export function StepYou({
               onChange={(e) => setShowLinkedin(e.target.checked)}
               className="size-4.5 shrink-0 accent-[var(--color-jade)]"
             />
-            Show it on my page
+            Show it on my portfolio
           </label>
         </Field>
         <Field id="you-github" label="GitHub" optional error={problems.github}>

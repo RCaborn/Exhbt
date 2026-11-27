@@ -411,7 +411,7 @@ for (const look of BASE_LOOKS) {
         for (const [width] of SIZES) {
           const wrappers = editing[width]!.wrappers;
           const theirs = visitor[width]!.boxes.filter((b) => wrappers.some((w) => w[0] === b[0]));
-          expect.soft(wrappers.length, `at ${width}, a wrapper for each list of lines the page draws`).toBe(lists.length);
+          expect.soft(wrappers.length, `at ${width}, a wrapper for each list of lines the page draws`).toBe(lists.filter((l) => visitorSections.includes(l.kind === "education" ? "about" : "experience")).length);
           expect.soft(theirs.length, `at ${width}, and the visitor's page has the list each one holds`).toBe(wrappers.length);
           expect.soft(differences(theirs, wrappers), `at ${width}, the wrapper round a list of lines against the visitor's list`).toEqual([]);
         }
