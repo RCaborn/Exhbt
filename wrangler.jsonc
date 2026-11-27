@@ -21,6 +21,10 @@
     // reads this too (next.config.ts), so the production build step needs EXHBT_PUBLIC=1 as well.
     // env.preview below deliberately leaves it out, so the preview site keeps the bar.
     "EXHBT_PUBLIC": "1",
+    // Send sign-in, roadmaps, exhbts, the portfolio, job links, team invites and the account
+    // from www to app.exhbt.co.uk (lib/hosts.ts). The hostname is already on this Worker.
+    // Cookies are host-only, so the first deploy with this on signs everyone out once.
+    "EXHBT_TOOL_HOST": "1",
     // Stripe price ids for Premium and Max (not secret). Placeholders: replace with the real
     // price_... ids from the Stripe dashboard (LAUNCH.md, Stripe). Keys stay Worker secrets.
     "STRIPE_PRICE_PREMIUM": "price_REPLACE_WITH_PREMIUM",
