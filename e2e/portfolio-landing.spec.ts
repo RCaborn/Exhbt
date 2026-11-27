@@ -134,8 +134,9 @@ for (const { setting, logIn: logInTo, signUp, password, nav } of SETTINGS) {
       expect(new URL(res.headers()["location"]!, "http://localhost").pathname).toBe(logInTo.replace("(?:/new)?", ""));
       await open(page, `/auth/dev?email=${uniqueEmail("dv")}`);
       await expect(page).toHaveURL(new RegExp(`${logInTo}$`));
-      await open(page, `/auth/dev?email=${uniqueEmail("dw")}&next=/exhbts`);
-      await expect(page).toHaveURL(/\/exhbts$/);
+      // A next no route sends on (at "page", /exhbts goes on to /portfolio), so the case tests that the next wins.
+      await open(page, `/auth/dev?email=${uniqueEmail("dw")}&next=/account`);
+      await expect(page).toHaveURL(/\/account$/);
     });
 
     test("sign-up lands where the setting says, and a next wins", async ({ page }) => {

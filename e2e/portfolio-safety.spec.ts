@@ -1,7 +1,8 @@
 import type { Page } from "@playwright/test";
 import type { BuilderState } from "../app/(app)/portfolio/steps";
+import { noteSending, settledSaves } from "../components/portfolio-editor/pending";
 import { BUILDER_LOOK_CARDS, FULL, PORTFOLIO_PAGES, type PortfolioFixture } from "./fixtures/portfolio-pages";
-import { HOME, READY, call, changeWith, countActions, expect, fresh, openEditor, saveState, settle, stateNow, test, textbox, typeIn, valueAt, waitReady, waitSaved } from "./portfolio-editor";
+import { HOME, READY, call, changeWith, countActions, expect, fresh, openEditor, saveState, setKind, signIn, settle, stateNow, test, textbox, typeIn, valueAt, waitReady, waitSaved } from "./portfolio-editor";
 
 // What the one-page portfolio editor must never do to what a person has stored (decision 0031; brief J of
 // docs/briefs/portfolio-first): change it by being opened, lose words on a failed save, or disagree with the
@@ -130,5 +131,80 @@ test.describe("A save that fails", () => {
     await page.goto("/portfolio?builder=steps");
     await expect(page.getByLabel(/Headline/)).toHaveValue("Operations analyst, food service and retail");
     await expect(page.locator(READY)).toHaveCount(0);
+  });
+});
+
+test.describe("Waiting for saves on their way", () => {
+  test("two saves overlap and the later lands first: the wait ends when the earlier lands, and never spins", async () => {
+    // pending.ts's settledSaves once waited on the newest save alone: with the later one already answered, it
+    // turned on a resolved promise while the count was still above 0, and the earlier save's answer never got in.
+    let first!: () => void;
+    const earlier = new Promise<void>((r) => (first = r));
+    noteSending(earlier);
+    noteSending(Promise.resolve());
+    let landedEarlier = false;
+    setTimeout(() => {
+      landedEarlier = true;
+      first();
+    }, 200);
+    const waited = await Promise.race([settledSaves().then(() => "settled" as const), new Promise<"stuck">((r) => setTimeout(() => r("stuck"), 3000))]);
+    expect(waited).toBe("settled");
+    expect(landedEarlier, "it waited for the earlier save").toBe(true);
+  });
+});
+
+test.describe("The page failing on the server", () => {
+  test("with the editor served, the error page offers to load it again or to use the step builder, and words it truthfully", async ({ page }) => {
+    await openEditor(page, fresh(FULL, "errpage"));
+    await page.goto("/portfolio?crash=server");
+    const error = page.locator("[data-portfolio-error]");
+    await expect(error).toHaveAttribute("data-served", "page");
+    await expect(error).toContainText("What you saved is safe, but a change from the last moment may not have been saved.");
+    await expect(error.getByRole("button", { name: "Load it again" })).toBeVisible();
+    await expect(error.getByRole("button", { name: "Use the step builder" })).toBeVisible();
+  });
+
+  test("on the step builder, by the switch or by the address, it offers only to load the page again, with no word of the step builder", async ({ page }) => {
+    const f = fresh(FULL, "errsteps");
+    await openEditor(page, f);
+    // Asked for by the address, with the editor's switch on.
+    await page.goto("/portfolio?builder=steps&crash=server");
+    const error = page.locator("[data-portfolio-error]");
+    await expect(error).toHaveAttribute("data-served", "steps");
+    await expect(error.getByRole("button")).toHaveText(["Load it again"]);
+    await expect(error).not.toContainText("step builder");
+    // The switch as it ships.
+    await setKind(page, "default");
+    await signIn(page, f.username, "/portfolio?crash=server");
+    await expect(error).toHaveAttribute("data-served", "steps");
+    await expect(error.getByRole("button")).toHaveText(["Load it again"]);
+    await expect(error).not.toContainText("step builder");
+  });
+});
+
+test.describe("Leaving while a save is refused", () => {
+  test("words the rules refuse are kept when the person leaves by a link, and offered back on the next visit", async ({ page }) => {
+    const f = fresh(FULL, "leftwords");
+    await openEditor(page, f);
+    expect((await page.request.get("/account")).status()).toBe(200);
+    const thirteen = "One two three four five six seven eight nine ten eleven twelve thirteen";
+    await typeIn(page, "profile.headline", thirteen);
+    await expect(saveState(page)).toHaveAttribute("data-save", "invalid");
+    // Away by a link inside the app, which no browser warns about, and back by the header's link.
+    await page.getByRole("link", { name: "Account", exact: true }).first().click();
+    await page.waitForURL(/\/account$/);
+    await page.getByRole("link", { name: "Your portfolio", exact: true }).first().click();
+    await waitReady(page);
+    // The server never had them: the editor opens on its own words, and offers the kept ones.
+    expect(await valueAt(page, "profile.headline")).toBe("Operations analyst, food service and retail");
+    const offer = page.locator("[data-kept-offer]");
+    await expect(offer).toHaveAttribute("data-kept-why", "left");
+    await expect(offer).toContainText("Your last changes were not saved");
+    await expect(offer).toContainText("You left the page before they could be saved");
+    await offer.getByRole("button", { name: "Put back your last changes" }).click();
+    await expect(textbox(page, "profile.headline")).toHaveValue(thirteen);
+    expect(await page.evaluate(() => window.__portfolioEditor!.undoLabel())).toBe("put back your last changes");
+    // Still over the limit, so still not saved, and the status says why.
+    await expect(saveState(page)).toHaveAttribute("data-save", "invalid");
   });
 });
