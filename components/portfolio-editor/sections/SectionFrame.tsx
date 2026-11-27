@@ -8,6 +8,7 @@ import { ArrowDown, ArrowUp, EyeOff, GripVertical, Star, X } from "lucide-react"
 import { usePhone } from "@/components/exhbt-editor/phone/usePhone";
 import type { HomeSectionSlot } from "@/components/portfolio/home-ctx";
 import type { SectionKey } from "@/lib/portfolio-layout";
+import { useGoTo } from "../leaving";
 import { ItemMore, type ItemAction } from "../phone/ItemMore";
 import { usePortfolioApi, usePortfolioState, useRuntime } from "../runtime";
 import { TileBoard } from "../tiles/TileBoard";
@@ -86,6 +87,7 @@ const Frame = memo(function SectionFrame({ sectionKey, index, count, children, a
   const api = usePortfolioApi();
   const rt = useRuntime();
   const phone = usePhone();
+  const goTo = useGoTo();
   const arranged = useArranged();
   // A word, not the list: the list changes on every move, and would draw every frame again.
   const blocked = usePortfolioState((s) => removeBlocked(s.arrangement.sections, sectionKey));
@@ -161,7 +163,7 @@ const Frame = memo(function SectionFrame({ sectionKey, index, count, children, a
       ? ([
           { id: starred ? "unstar" : "star", label: starred ? W.unstar(bandTitle) : W.star(bandTitle), run: unstar },
           { id: "hide", label: W.hide(bandTitle), run: hideBand },
-          { id: "open", label: W.open(bandTitle), run: () => (window.location.href = `/exhbts/${band}/edit`) },
+          { id: "open", label: W.open(bandTitle), run: () => goTo(`/exhbts/${band}/edit`) },
         ] as ItemAction[])
       : []),
     { id: "remove", label: W.sectionRemove(name), off: keep, run: remove },

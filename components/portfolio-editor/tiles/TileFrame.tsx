@@ -9,6 +9,7 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { EyeOff, GripVertical, MoreHorizontal, Star } from "lucide-react";
 import { usePhone } from "@/components/exhbt-editor/phone/usePhone";
 import type { HomeTileSlot } from "@/components/portfolio/home-ctx";
+import { useGoTo } from "../leaving";
 import { ItemMore, type ItemAction } from "../phone/ItemMore";
 import { usePortfolioApi } from "../runtime";
 import { hideTile, moveTile, setStar } from "../sections/arrange";
@@ -59,6 +60,7 @@ function BandTile({ id, children }: HomeTileSlot & { children: ReactNode }): Rea
 function WorkTile({ id, where, index, count, children }: HomeTileSlot & { children: ReactNode }): ReactNode {
   const api = usePortfolioApi();
   const phone = usePhone();
+  const goTo = useGoTo();
   const reduced = useReducedMotion();
   const arranged = useArranged();
   const nodes = useTileNodes();
@@ -129,7 +131,7 @@ function WorkTile({ id, where, index, count, children }: HomeTileSlot & { childr
   );
 
   const actions: ItemAction[] = [
-    { id: "open", label: W.open(title), run: () => (window.location.href = `/exhbts/${id}/edit`) },
+    { id: "open", label: W.open(title), run: () => goTo(`/exhbts/${id}/edit`) },
     { id: "star", label: W.star(title), run: star },
     { id: "hide", label: W.hide(title), run: hide },
     { id: "up", label: W.tileUp, off: first ? W.tileFirst : undefined, run: () => move(-1) },

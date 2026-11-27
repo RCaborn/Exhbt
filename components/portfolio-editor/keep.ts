@@ -31,6 +31,21 @@ export function keepUnsaved(owner: string, state: BuilderState, why: KeptWhy = "
 }
 
 /**
+ * Takes out what was kept for `owner` if it is `state`: the server has it after all (a save that landed after the
+ * editor had gone, leaving.ts), so there is nothing to offer back. Anything else kept stays.
+ */
+export function forgetUnsaved(owner: string, state: BuilderState): void {
+  try {
+    const raw = window.localStorage.getItem(KEY);
+    if (!raw) return;
+    const kept = JSON.parse(raw) as Partial<Kept> | null;
+    if (kept?.owner === owner && JSON.stringify(kept.state) === JSON.stringify(state)) window.localStorage.removeItem(KEY);
+  } catch {
+    // Storage blocked, or something unreadable kept: the next visit's offer is checked against the server anyway.
+  }
+}
+
+/**
  * Takes the kept state out of the browser and returns it if it is this person's and recent: it is
  * offered once, so it is gone from the browser whether or not it is taken. Null when there is none.
  */
