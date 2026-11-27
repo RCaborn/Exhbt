@@ -20,7 +20,7 @@ export { keepClassic } from "./editor-classic-helpers";
  * ---------------------------------------------------------------------------------------------- */
 export const SEL = {
   listHeading: { level: 1 as const, name: "Your exhbts" },
-  draftHeading: { level: 1 as const, name: "Draft an exhbt" },
+  draftHeading: { level: 1 as const, name: "Draft it from your files" },
   draftForm: "form[data-ready=true]",
   /** The editor's h1 (visually hidden until a wide window). */
   editHeading: { level: 1 as const, name: "Edit exhbt" },
@@ -103,7 +103,7 @@ export async function startEditor(page: Page, username: string) {
   await startFromScratch(page, { waitForContext: false });
 }
 
-/** Signs in as a new address and waits for the "Draft an exhbt" page and its form. */
+/** Signs in as a new address and waits for the "Draft it from your files" page and its form. */
 export async function signInToDraft(page: Page, tag: string) {
   await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(tag))}&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
   await expect(page.getByRole("heading", SEL.draftHeading)).toBeVisible();

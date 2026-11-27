@@ -13,7 +13,7 @@ export { ADD_EXHBT, BUILD_IT_YOURSELF, DRAFT_WITH_AI };
 export const ADD = {
   /** On "Your exhbts": the one way to start an exhbt. */
   listLink: "Add an exhbt",
-  chooserHeading: { level: 1 as const, name: "Add an exhbt" },
+  chooserHeading: { level: 1 as const, name: "Add an exhbt to your portfolio" },
   /** The chooser's two ways, each a card (`data-way`) with one link. */
   draftWay: '[data-way="draft"]',
   draftLink: "Upload my files",

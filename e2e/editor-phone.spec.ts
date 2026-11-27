@@ -941,7 +941,7 @@ test("axe: on the page with the bar on a section, with the bar formatting, and w
 
 test("a drafted part: the bar offers its More actions, and the menu opens above the bar within the screen", async ({ page }) => {
   await page.goto(`/auth/dev?email=${freshName("phonedraft")}@example.com&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
-  await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Draft it from your files" })).toBeVisible();
   const res = await page.request.post("/api/exhbts/draft", {
     data: { text: "Final-year project on lunch queues. I timed the queue for two weeks, added a second till, and timed it again. Waits fell from 11 to 4 minutes." },
   });
@@ -990,7 +990,7 @@ test("a drafted part: the bar offers its More actions, and the menu opens above 
 // actions. The bar lays out More actions' parts in its own row (display: contents), so their wrapper has no box of its own.
 test("a drafted part's rewrite form on the bar closes with Escape, and the focus goes back to More actions", async ({ page }) => {
   await page.goto(`/auth/dev?email=${freshName("phoneescape")}@example.com&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
-  await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Draft it from your files" })).toBeVisible();
   const res = await page.request.post("/api/exhbts/draft", { data: { text: "Final-year project on lunch queues. I timed the queue for two weeks, added a second till, and timed it again. Waits fell from 11 to 4 minutes." } });
   expect(res.status()).toBe(200);
   const { id } = (await res.json()) as { id: string };

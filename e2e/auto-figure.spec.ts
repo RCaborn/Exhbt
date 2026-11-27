@@ -381,7 +381,7 @@ test.describe("What the editor says after a draft (decision 0025)", () => {
 async function signInPremium(page: Page, username: string) {
   await page.goto(`/dev/portfolio?username=${username}&plan=premium&count=0`);
   await page.goto(`/auth/dev?email=${username}@example.com&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
-  await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Draft it from your files" })).toBeVisible();
   await expect(page.locator("form[data-ready=true]")).toBeAttached();
 }
 

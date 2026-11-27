@@ -82,7 +82,7 @@ const scan = async (page: Page) => (await new AxeBuilder({ page }).include('[dat
 /** Drafts an exhbt with the placeholder AI (so the parts it drafted have "More actions"), opens its editor, and returns its id. */
 async function openDrafted(page: Page, tag: string, notes?: string): Promise<string> {
   await page.goto(`/auth/dev?email=${freshName(tag)}@example.com&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
-  await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Draft it from your files" })).toBeVisible();
   const res = await page.request.post("/api/exhbts/draft", {
     data: { text: "Final-year project on lunch queues. I timed the queue for two weeks, added a second till, and timed it again. Waits fell from 11 to 4 minutes.", notes },
   });
