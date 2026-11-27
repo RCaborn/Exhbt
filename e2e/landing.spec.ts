@@ -78,7 +78,7 @@ test.describe("Landing: phone", () => {
     await page.goto("/");
     const header = page.getByRole("banner");
     // The Menu button works once the page has hydrated (it has never opened without scripts); wait for that.
-    await expect(header.locator("[data-menu][data-ready=true]")).toBeAttached();
+    await expect(header.locator("[data-menu][data-menu-ready=true]")).toBeAttached();
     await header.getByRole("button", { name: "Menu" }).click();
     const menu = header.getByRole("navigation", { name: "Main menu" });
     await expect(menu.getByRole("link", { name: "What is an exhbt?" })).toBeVisible();
