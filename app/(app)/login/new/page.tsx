@@ -22,6 +22,7 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
           ? "Choose a password. We'll email you once to confirm the address, and after that you log in with the password."
           : "Choose a password. On this development server you're signed in straight away."}
       </p>
+      <p className="mt-2 font-semibold">Next: your page, then your first project.</p>
       <GoogleOrEmail next={next} />
       <div className="mt-8">
         <SignupForm next={next} />

@@ -21,6 +21,8 @@ test("rejects a short or mismatched password, then signs in with the email", asy
   const password = "correct-horse";
   await page.goto("/login/new?next=/account");
   await expect(page.locator("form[data-ready=true]")).toBeAttached();
+  // Sign-up says what comes next.
+  await expect(page.getByText("Next: your page, then your first project.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Email me a link" })).toHaveCount(0);
 
   await page.getByLabel("Email address").fill(email);
