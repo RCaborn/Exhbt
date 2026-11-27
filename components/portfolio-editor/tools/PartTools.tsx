@@ -110,9 +110,18 @@ function useReplace(span: React.RefObject<HTMLSpanElement | null>, place: () => 
       stop();
       frame = requestAnimationFrame(place);
     };
-    const quiet = () => {
+    // While its own part's words are being typed (the intro, Get in touch), the tool is hidden, with no
+    // move (data-typing, css/bar.css): it has not been placed for the words yet, so it could sit over
+    // them. It shows again once it has been.
+    const tool = span.current;
+    const placed = () => {
+      place();
+      if (tool) delete tool.dataset.typing;
+    };
+    const quiet = (e?: Event) => {
       stop();
-      timer = window.setTimeout(() => (waiting = idle.request(place, { timeout: 500 })), QUIET_MS);
+      if (tool && e?.target instanceof Node && tool.parentElement?.contains(e.target) && !tool.contains(e.target)) tool.dataset.typing = "";
+      timer = window.setTimeout(() => (waiting = idle.request(placed, { timeout: 500 })), QUIET_MS);
     };
     later.current = quiet;
     let width = page.getBoundingClientRect().width;

@@ -404,6 +404,32 @@ test.describe("On the page", () => {
     expect(missed).toEqual([]);
   });
 
+  test("while the intro is typed, key by key, Suggest an intro never covers its words: it is hidden until it is placed again", async ({ page }) => {
+    await newPerson(page, "intro-typing", "premium");
+    await call(page, "setAt", "profile.headline", "Final-year Economics student at Leeds, into data analysis and public policy");
+    const tool = page.locator(`${READY} [data-tools="intro"]`);
+    const words = "I study economics at Leeds and like turning messy public data into clear charts that people read.";
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      await call(page, "setAt", "profile.bio", "");
+      const intro = page.locator(`${READY} [data-path="profile.bio"] textarea[data-para]`).first();
+      await intro.scrollIntoViewIfNeeded();
+      await intro.click();
+      const missed: string[] = [];
+      for (const key of words) {
+        await page.keyboard.type(key);
+        // Seen, it covers no word; hidden (data-typing), it may sit anywhere.
+        const hits = await tool.evaluate((t, covered) => (getComputedStyle(t).visibility === "hidden" ? [] : (new Function(`return (${covered})`)() as (t: Element) => string[])(t)), coveredWords.toString());
+        if (hits.length) missed.push(`after "${key}" at ${width}: ${hits.join(", ")}`);
+      }
+      expect(missed).toEqual([]);
+      // Once typing pauses it is placed for the words and shown again, still covering none.
+      await expect(tool).not.toHaveAttribute("data-typing");
+      await expect.poll(() => tool.evaluate((t) => getComputedStyle(t).visibility)).toBe("visible");
+      expect(await tool.evaluate(coveredWords), `placed at ${width}`).toEqual([]);
+    }
+  });
+
   test("Suggest an intro fills the intro from the stand-in, and Undo takes it back", async ({ page }) => {
     await openEditor(page, fresh(FULL, "intro"));
     const before = await valueAt(page, "profile.bio");

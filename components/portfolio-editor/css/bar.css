@@ -292,6 +292,10 @@
     inset-inline-end: 0;
     translate: 0 -50%;
   }
+  /* While its own part's words are being typed, until it has been placed for them (PartTools.tsx). */
+  .pe-part-tools[data-typing] {
+    visibility: hidden;
+  }
   /* Suggest an intro: PartTools places it where it meets no word (tools/place.ts), as inline insets;
      these are where it sits until then. Once the intro has words it shows only while the intro is
      pointed at or edited, on every pointer, and stays reachable by Tab (it is only faded, and focusing
