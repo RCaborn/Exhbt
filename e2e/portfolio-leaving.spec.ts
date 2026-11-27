@@ -1,6 +1,6 @@
 import { devices, type Page, type Request, type Route } from "@playwright/test";
 import { FULL } from "./fixtures/portfolio-pages";
-import { READY, expect, fresh, openEditor, saveState, test, textbox, typeIn, valueAt, waitReady, waitSaved, type Seeded } from "./portfolio-editor";
+import { READY, expect, fresh, openEditor, saveState, setKind, test, textbox, typeIn, valueAt, waitReady, waitSaved, type Seeded } from "./portfolio-editor";
 
 /*
  * Leaving the one-page portfolio editor with words not yet saved (decision 0031, "Saving"; components/portfolio-editor/
@@ -362,6 +362,39 @@ test.describe("A save on its way when the person leaves", () => {
       facts.back = await backByTheHeader(page);
     } finally {
       say("newer words asked for while Roadmaps was under way", facts);
+    }
+    expect(facts.serverHasIt, "the newer save went as the editor went, and landed").toBe(true);
+    expect(facts.back, "back by the header's link, the editor opens on the newer words, with nothing to offer back").toEqual({ opened: true, shown: "The newer words", offer: null });
+  });
+
+  test("the same for a person with no roadmap yet, whom Roadmaps sends on to /roadmap/new: the newer words are saved", async ({ page }) => {
+    await setKind(page, "page");
+    const email = `pe-lv-noroadmap-${Math.random().toString(36).slice(2, 8)}@example.com`;
+    await page.goto(`/auth/dev?email=${encodeURIComponent(email)}&next=${encodeURIComponent("/portfolio")}`);
+    await waitReady(page);
+    await warm(page, ["/roadmap", "/roadmap/new"]);
+    const saves = watchSaves(page);
+    const held = await hold(page, isSave);
+    const next = await hold(page, isNextPage(/^\/roadmap(\/new)?$/));
+    const facts: Record<string, unknown> = {};
+    try {
+      await typeIn(page, HEADLINE, "The older words");
+      await expect.poll(() => held.held.length, { timeout: 5_000 }).toBe(1);
+      await typeIn(page, HEADLINE, "The newer words");
+      await ROADMAPS.follow(page);
+      await expect.poll(() => next.held.length, { timeout: 10_000 }).toBeGreaterThan(0);
+      await held.release();
+      await expect.poll(() => saves[0]?.ended, { timeout: 20_000 }).toBeDefined();
+      await page.waitForTimeout(1_000);
+      await next.release();
+      await page.waitForURL(/\/roadmap\/new/, { timeout: 60_000 });
+      facts.serverHasIt = await serverHasIt(page);
+      facts.landedOn = new URL(page.url()).pathname;
+      await settled(saves);
+      facts.saves = told(saves);
+      facts.back = await backByTheHeader(page);
+    } finally {
+      say("newer words asked for while Roadmaps was under way, no roadmap yet", facts);
     }
     expect(facts.serverHasIt, "the newer save went as the editor went, and landed").toBe(true);
     expect(facts.back, "back by the header's link, the editor opens on the newer words, with nothing to offer back").toEqual({ opened: true, shown: "The newer words", offer: null });
