@@ -130,6 +130,17 @@ test.describe("the top bar", () => {
     await expect(page.locator("[data-first-draft]")).toHaveCount(0);
   });
 
+  test("Add teammates is in the menu, and there is no strip above a plain exhbt", async ({ page }) => {
+    const { id } = await openDoc(page, freshName("tbteam"), openBankingDoc);
+    await expect(page.locator("[data-team-strip]")).toHaveCount(0);
+    await expect(page.getByText("Worked on this with other people?")).toHaveCount(0);
+    await openMenu(page);
+    const add = bar(page).getByRole("button", { name: "Add teammates" }).or(bar(page).getByRole("link", { name: "Add teammates" }));
+    await expect(add).toHaveAttribute("href", `/exhbts/${id}/team`);
+    await add.click();
+    await page.waitForURL(new RegExp(`/exhbts/${id}/team`));
+  });
+
   test("Undo is named for what it undoes, aria-disabled with nothing to undo, and gives the focus a place to go", async ({ page }) => {
     await openDoc(page, freshName("tbundo"), openBankingDoc);
     const undo = bar(page).getByRole("button", { name: /^Undo/ });

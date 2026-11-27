@@ -113,7 +113,8 @@ export default async function EditExhbtPage({ params, searchParams }: Params) {
   return (
     <>
     {/* Teammates and the file-match prompt sit outside the editor (decision 0013). */}
-    <TeamStrip exhbt={record} userId={user.id} skipped={skipped} />
+    {/* In the new editor the offer to add teammates is in its menu (⋯), so a plain exhbt has no strip above it. */}
+    <TeamStrip exhbt={record} userId={user.id} skipped={skipped} offerInMenu={!(asked || kind === "classic")} />
     <MatchPrompt />
     {asked || kind === "classic" ? (
       <div data-editor="classic">

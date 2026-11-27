@@ -1,12 +1,14 @@
 "use client";
 
 import { useSyncExternalStore, type ReactNode } from "react";
-import { Ellipsis } from "lucide-react";
+import { Ellipsis, UsersRound } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { deleteExhbt, unpublishExhbt } from "@/app/(app)/exhbts/[id]/actions";
 import { ConfirmAction } from "@/components/editor/ConfirmAction";
 import { DeleteExhbt } from "@/components/editor/DeleteExhbt";
 import { Button } from "@/components/ui/Button";
 import { setLive, useEnv, useLive, useSave, useUi } from "../context";
+import { flushPending } from "../pending";
 import { Popover } from "./Popover";
 
 const COARSE = "(pointer: coarse)";
@@ -28,7 +30,7 @@ function useCoarse(): boolean {
  * The menu at the end of the bar (decision 0026, "The chrome"). On a phone it also holds what the row has no
  * room for (`before`: the layout, Undo, See as a visitor, Card and link details). Then "Reorder sections" on a
  * touch screen only (with a mouse and keyboard the grip and the move buttons do it), "Unpublish" when live,
- * "Delete this exhbt", and "Use the classic editor".
+ * "Delete this exhbt", and "Use the classic editor". "Add teammates" comes first when there is no team yet.
  */
 export function MenuButton({ before }: { before?: (close: (restoreFocus?: boolean) => void) => ReactNode }): ReactNode {
   const env = useEnv();
@@ -36,6 +38,9 @@ export function MenuButton({ before }: { before?: (close: (restoreFocus?: boolea
   const save = useSave();
   const coarse = useCoarse();
   const status = useLive();
+  const router = useRouter();
+  // With no team yet the offer to add teammates is here, not in a strip above the editor (brief 5b). With a team, the strip says so.
+  const offerTeam = (env.team?.length ?? 0) === 0;
   const live = env.canGoLive && status.status === "published";
 
   async function classic() {
@@ -71,6 +76,24 @@ export function MenuButton({ before }: { before?: (close: (restoreFocus?: boolea
       {({ close }) => (
         <div className="xe-menu-items">
           {before?.(close)}
+          {offerTeam && (
+            <Button
+              size="sm"
+              className="xe-tb"
+              href={`/exhbts/${env.id}/team`}
+              label="Add teammates"
+              onClick={(e) => {
+                // The last change lands first; a new tab or window keeps the browser's own behaviour.
+                if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                e.preventDefault();
+                close();
+                void flushPending().then(() => router.push(`/exhbts/${env.id}/team`));
+              }}
+            >
+              <UsersRound aria-hidden size={16} strokeWidth={2.25} className="shrink-0" />
+              Add teammates
+            </Button>
+          )}
           {coarse && (
             <Button
               size="sm"

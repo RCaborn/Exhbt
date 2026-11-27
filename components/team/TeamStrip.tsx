@@ -9,13 +9,17 @@ import { namesList } from "@/lib/team-rules";
  * A slim line above the editor (decision 0013): who the project is with and a link to the
  * Teammates page, or an offer to add some. On a teammate's own, still empty exhbt it offers the
  * team project's files to draft from.
+ * With `offerInMenu` (the new editor, whose ⋯ menu has "Add teammates") the offer is not drawn: with no team, no
+ * team files and nothing skipped there is no strip at all (brief 5b). The strip stays for a team, files or skips.
  */
-export async function TeamStrip({ exhbt, userId, skipped = 0 }: { exhbt: ExhbtRecord; userId: string; skipped?: number }) {
+export async function TeamStrip({ exhbt, userId, skipped = 0, offerInMenu = false }: { exhbt: ExhbtRecord; userId: string; skipped?: number; offerInMenu?: boolean }) {
   const host = (await headers()).get("host");
   const team = await teamFor(exhbt, host);
   const files = exhbt.teamOf && canDraftInto(exhbt, userId) ? await teamFilesFor(userId, exhbt.id) : [];
   const root = files.length && exhbt.teamOf ? await getStore().getExhbt(exhbt.teamOf) : null;
   const from = root ? await displayNameFor(root.userId, "Your team") : "Your team";
+
+  if (offerInMenu && team.length === 0 && files.length === 0 && skipped === 0) return null;
 
   return (
     <div className="bg-mist">

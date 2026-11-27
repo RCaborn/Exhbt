@@ -252,7 +252,10 @@ test.describe("A teammate's own exhbt", () => {
     await page.waitForURL(/\/exhbts\?left=1/);
     await expect(page.getByRole("list", { name: "Team projects you're on" })).toHaveCount(0);
     await page.goto(`/exhbts/${mine}/edit`);
-    await expect(page.locator("[data-team-strip]")).toContainText("Worked on this with other people?");
+    // No team any more: the strip is gone and the offer is in the editor's menu (⋯).
+    await expect(page.locator("[data-team-strip]")).toHaveCount(0);
+    await page.getByRole("button", { name: "Menu" }).click();
+    await expect(page.getByRole("link", { name: "Add teammates" })).toHaveAttribute("href", `/exhbts/${mine}/team`);
 
     // The owner deletes the original: the teammate's copy of the file still opens.
     await signInAs(page, `${own}@example.com`);
