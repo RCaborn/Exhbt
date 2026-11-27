@@ -21,20 +21,28 @@ import { useRuntime, type Runtime } from "./runtime";
  *    one useBuilder starts as the tab is hidden goes with the page. A server action cannot be sent with keepalive or
  *    as a beacon, so as the page goes (`pagehide`) the newest state, unless the server has said it has it, is kept in
  *    this browser (keep.ts) and the next visit offers it back once, unless the server has it by then (Notices.tsx).
- *  - Newer words waiting behind a save on its way when a link is followed. Next lost the newer save: a navigation
- *    that goes ahead of a pending action leaves the end of Next's queue at that action, and an action added before the
- *    navigation is over is never run, so its save never answers, and back on /portfolio the gate waited for it and
- *    said it could not fetch the page. So once the editor is off the page what the server has not said it has is
- *    kept in this browser, and the gate waits for those saves for a few seconds at most (PortfolioEditor.tsx,
- *    startVisit's leftBehind).
+ *  - Newer words waiting behind a save on its way when a link is followed (or typed while the next page is coming).
+ *    Next lost the newer save: a navigation that goes ahead of a pending action leaves the end of Next's queue at that
+ *    action, and an action added before the navigation is over is never run, so its save never left the browser and
+ *    never answered, and back on /portfolio the gate waited for it and said it could not fetch the page. So the press
+ *    also tells the editor a navigation is under way (`rt.navigating`), and a save asked for until it is over waits
+ *    for it and then goes (PortfolioEditor.tsx, startVisit's `underWay`). So the gate waits for every save however
+ *    long it takes (one that has left the browser can still land), never for one that will not come, and never opens
+ *    on words an older save can still overwrite. Once the editor is off the page what the server has not said it has
+ *    is kept in this browser (startVisit's leftBehind).
  *
  * Nothing here sends a second save beside useBuilder's: one save at a time, always of the newest state, so an older
  * state never lands after a newer one.
  */
 
-/** Sends what is waiting now, if anything is: useBuilder's own send, which waits for a save on its way and then sends the newest. */
-function sendNow(rt: Runtime): void {
+/**
+ * The person is being taken to another page of the app: what is waiting is sent now, before Next starts the
+ * navigation (useBuilder's own send, which waits for a save on its way and then sends the newest), and a save asked
+ * for from now until the navigation is over waits for it.
+ */
+function leaving(rt: Runtime): void {
   if (hasPending()) rt.retry();
+  rt.navigating();
 }
 
 /**
@@ -56,7 +64,7 @@ function leavesThePage(a: HTMLAnchorElement, e: MouseEvent): boolean {
 export function watchLeaving(rt: Runtime, owner: string): () => void {
   const onPress = (e: MouseEvent) => {
     const a = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>("a[href]") : null;
-    if (a && leavesThePage(a, e)) sendNow(rt);
+    if (a && leavesThePage(a, e)) leaving(rt);
   };
   const onGone = () => {
     if (!hasPending()) return;
@@ -79,7 +87,7 @@ export function useGoTo(): (href: string) => void {
   const router = useRouter();
   const rt = useRuntime();
   return (href) => {
-    sendNow(rt);
+    leaving(rt);
     router.push(href);
   };
 }

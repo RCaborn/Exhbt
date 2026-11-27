@@ -22,6 +22,8 @@ export type Host = {
   change(update: (s: BuilderState) => BuilderState): void;
   /** Sends what is waiting now. */
   retry(): void;
+  /** A navigation the editor started is under way (leaving.ts): a save asked for until it is over waits for it. */
+  navigating(): void;
 };
 
 /** A field or anything else that takes the keyboard. */
@@ -175,5 +177,5 @@ export function createRuntime(initial: BuilderState, host: Host): Runtime {
     },
   };
 
-  return { state, ui, save, undo, said, lines, api, undoLast, retry: () => host.retry() };
+  return { state, ui, save, undo, said, lines, api, undoLast, retry: () => host.retry(), navigating: () => host.navigating() };
 }

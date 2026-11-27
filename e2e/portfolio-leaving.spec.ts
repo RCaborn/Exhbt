@@ -1,6 +1,6 @@
 import { devices, type Page, type Request, type Route } from "@playwright/test";
 import { FULL } from "./fixtures/portfolio-pages";
-import { READY, expect, fresh, openEditor, test, textbox, typeIn, valueAt, waitReady, waitSaved, type Seeded } from "./portfolio-editor";
+import { READY, expect, fresh, openEditor, saveState, test, textbox, typeIn, valueAt, waitReady, waitSaved, type Seeded } from "./portfolio-editor";
 
 /*
  * Leaving the one-page portfolio editor with words not yet saved (decision 0031, "Saving"; components/portfolio-editor/
@@ -22,6 +22,7 @@ import { READY, expect, fresh, openEditor, test, textbox, typeIn, valueAt, waitR
 test.describe.configure({ timeout: 180_000 });
 
 const HEADLINE = "profile.headline";
+const NAME = "profile.name";
 
 type Save = { url: string; request: Request; ended?: "answered" | "failed"; status?: number; error?: string };
 
@@ -302,7 +303,7 @@ test.describe("A save on its way when the person leaves", () => {
     await expectNewerWords(page, facts.back as Back, "The newer words");
   });
 
-  test("Next loses the newer save (it was asked for while the navigation was under way): the newer words are offered back, and the editor opens", async ({ page }) => {
+  test("newer words asked for while the navigation is under way (Next drops a save asked for then): they wait for the next page, then go, and are saved", async ({ page }) => {
     const seeded = await openEditor(page, fresh(FULL, "lv-lost"));
     await warm(page, [ADD.path(seeded)]);
     const saves = watchSaves(page);
@@ -320,16 +321,80 @@ test.describe("A save on its way when the person leaves", () => {
       await held.release();
       await expect.poll(() => saves[0]?.ended, { timeout: 20_000 }).toBeDefined();
       await page.waitForTimeout(1_000);
+      facts.sentWhileItWasComing = told(saves);
       await next.release();
       await page.waitForURL(ADD.lands, { timeout: 60_000 });
-      await page.waitForTimeout(2_000);
+      facts.serverHasIt = await serverHasIt(page);
+      await settled(saves);
       facts.saves = told(saves);
       facts.back = await backByTheHeader(page);
     } finally {
-      say("the newer save lost in Next's queue", facts);
+      say("newer words asked for while the navigation was under way", facts);
     }
-    expect(facts.back, "back by the header's link, the editor opens, with the newer words or an offer of them").toEqual(expect.objectContaining({ opened: true }));
-    await expectNewerWords(page, facts.back as Back, "The newer words");
+    expect(facts.sentWhileItWasComing, "the newer save waited while the next page was coming").toEqual([expect.stringMatching(/^POST \/portfolio 200 /)]);
+    expect(facts.serverHasIt, "the newer save went once the next page had come, and landed").toBe(true);
+    expect(facts.back, "back by the header's link, the editor opens on the newer words, with nothing to offer back").toEqual({ opened: true, shown: "The newer words", offer: null });
+  });
+
+  test("newer words asked for while the header's Roadmaps is under way: they go as the editor goes, past Next's redirect on arriving there, and are saved", async ({ page }) => {
+    await openEditor(page, fresh(FULL, "lv-lost-roadmap"));
+    await warm(page, ["/roadmap", "/roadmap/new"]);
+    const saves = watchSaves(page);
+    const held = await hold(page, isSave);
+    const next = await hold(page, isNextPage(/^\/roadmap$/));
+    const facts: Record<string, unknown> = {};
+    try {
+      await typeIn(page, HEADLINE, "The older words");
+      await expect.poll(() => held.held.length, { timeout: 5_000 }).toBe(1);
+      await typeIn(page, HEADLINE, "The newer words");
+      await ROADMAPS.follow(page);
+      await expect.poll(() => next.held.length, { timeout: 10_000 }).toBeGreaterThan(0);
+      // The older save is answered while the navigation is under way, so the newer one is asked for then.
+      await held.release();
+      await expect.poll(() => saves[0]?.ended, { timeout: 20_000 }).toBeDefined();
+      await page.waitForTimeout(1_000);
+      await next.release();
+      await page.waitForURL(/\/roadmap(\/new)?$/, { timeout: 60_000 });
+      facts.serverHasIt = await serverHasIt(page);
+      facts.landedOn = new URL(page.url()).pathname;
+      await settled(saves);
+      facts.saves = told(saves);
+      facts.back = await backByTheHeader(page);
+    } finally {
+      say("newer words asked for while Roadmaps was under way", facts);
+    }
+    expect(facts.serverHasIt, "the newer save went as the editor went, and landed").toBe(true);
+    expect(facts.back, "back by the header's link, the editor opens on the newer words, with nothing to offer back").toEqual({ opened: true, shown: "The newer words", offer: null });
+  });
+
+  test("words typed while the next page is coming (the save of what was waiting went at the press): they are saved once it has come", async ({ page }) => {
+    const seeded = await openEditor(page, fresh(FULL, "lv-meanwhile"));
+    await warm(page, [ADD.path(seeded)]);
+    const saves = watchSaves(page);
+    const next = await hold(page, isNextPage(/^\/exhbts\/new$/));
+    const words = "Typed while the next page was coming";
+    const facts: Record<string, unknown> = {};
+    try {
+      await typeIn(page, HEADLINE, "Typed just before the link");
+      // Inside the autosave's wait: the press sends these words, and the navigation goes ahead of that save.
+      await ADD.follow(page);
+      await expect.poll(() => next.held.length, { timeout: 10_000 }).toBeGreaterThan(0);
+      await expect(saveState(page), "that save has answered").toHaveAttribute("data-save", "saved", { timeout: 20_000 });
+      // Still on the editor (the next page has not come): more words, and well past the autosave's wait.
+      await typeIn(page, HEADLINE, words);
+      await page.waitForTimeout(2_000);
+      facts.sentWhileItWasComing = told(saves);
+      await next.release();
+      await page.waitForURL(ADD.lands, { timeout: 60_000 });
+      facts.serverHasIt = await serverHasIt(page);
+      await settled(saves);
+      facts.saves = told(saves);
+      facts.back = await backByTheHeader(page);
+    } finally {
+      say("typed while the next page was coming", facts);
+    }
+    expect(facts.serverHasIt, "the words typed meanwhile went once the next page had come, and landed").toBe(true);
+    expect(facts.back, "back by the header's link, the editor opens on them, with nothing to offer back").toEqual({ opened: true, shown: words, offer: null });
   });
 
   test("by a full page load: the words the server did not get are kept in this browser and offered back once", async ({ page }) => {
@@ -367,6 +432,111 @@ test.describe("A save on its way when the person leaves", () => {
     await waitSaved(page);
     expect(await storedHeadline(page)).toBe(words);
     expect(await offerWhy(page), "offered once").toBe(null);
+  });
+
+  test("slower than the gate's wait, left by a link and back by the header: the editor does not open on older words while it can still land, and the newer edit is what the server keeps", async ({ page }) => {
+    await openEditor(page, fresh(FULL, "lv-slow-save"));
+    await warm(page, ["/roadmap", "/roadmap/new"]);
+    const saves = watchSaves(page);
+    // Only the first save is held (a slow connection, or a busy server, for that one request); every later one goes through.
+    const slow: { route?: Route } = {};
+    await page.context().route("**/*", (route) => {
+      if (!slow.route && isSave(route.request())) {
+        slow.route = route;
+        return;
+      }
+      return route.fallback();
+    });
+    const first = "Headline typed in the first visit";
+    const second = "Name typed in the second visit";
+    const facts: Record<string, unknown> = {};
+    try {
+      await typeIn(page, HEADLINE, first);
+      await expect.poll(() => Boolean(slow.route), { timeout: 10_000 }).toBe(true);
+      await ROADMAPS.follow(page);
+      await page.waitForURL(/\/roadmap(\/new)?$/, { timeout: 60_000 });
+      await page.getByRole("link", { name: "Your portfolio", exact: true }).first().click();
+      // Longer than the gate waits before it says it could not fetch the page (PortfolioGate.tsx, ten seconds).
+      facts.openedWhileItWasOnItsWay = await page
+        .locator(READY)
+        .waitFor({ timeout: 12_000 })
+        .then(() => true)
+        .catch(() => false);
+      facts.saidSo = await page
+        .locator("[data-stale-data]")
+        .waitFor({ timeout: 15_000 })
+        .then(() => true)
+        .catch(() => false);
+      // The slow save reaches the server now.
+      await slow.route?.continue();
+      facts.opened = await page
+        .locator(READY)
+        .waitFor({ timeout: 30_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (facts.opened) {
+        facts.shown = await valueAt(page, HEADLINE);
+        facts.offer = await offerWhy(page);
+        // The person edits on.
+        await typeIn(page, NAME, second);
+        await waitSaved(page);
+      }
+      await settled(saves);
+      facts.saves = told(saves);
+      await page.goto("/portfolio");
+      await waitReady(page);
+      facts.stored = { headline: await valueAt(page, HEADLINE), name: await valueAt(page, NAME) };
+      facts.offerAfter = await offerWhy(page);
+    } finally {
+      say("a save slower than the gate's wait, left and back", facts);
+    }
+    expect(facts.openedWhileItWasOnItsWay, "the editor stays shut while the first visit's save can still land").toBe(false);
+    expect(facts.saidSo, "and the gate says it could not fetch the newest copy yet, with Try again").toBe(true);
+    expect(facts.opened, "once that save has landed, the editor opens").toBe(true);
+    expect(facts.shown, "on the words that save carried").toBe(first);
+    expect(facts.offer, "with nothing to offer back").toBe(null);
+    expect(facts.stored, "the second visit's edit is what the server keeps, over the first visit's words").toEqual({ headline: first, name: second });
+    expect(facts.offerAfter, "and nothing older is offered over it").toBe(null);
+  });
+
+});
+
+test.describe("A link whose page cannot be fetched", () => {
+  test("offline: Next asks for a full page load, the person stays when the browser asks Leave site?, and once the connection is back the editor saves again", async ({ page, context }) => {
+    const seeded = await openEditor(page, fresh(FULL, "lv-stay"));
+    await warm(page, [ADD.path(seeded)]);
+    const saves = watchSaves(page);
+    const dialogs: string[] = [];
+    page.on("dialog", (d) => {
+      dialogs.push(d.type());
+      // Stays on the page.
+      void d.dismiss();
+    });
+    const words = "Typed once the connection was back";
+    const facts: Record<string, unknown> = {};
+    try {
+      await context.setOffline(true);
+      await typeIn(page, HEADLINE, "Typed with the connection gone");
+      await expect(saveState(page)).toHaveAttribute("data-save", "error", { timeout: 15_000 });
+      await ADD.follow(page);
+      await expect.poll(() => dialogs.length, { timeout: 15_000 }).toBeGreaterThan(0);
+      await page.waitForTimeout(1_000);
+      facts.dialogs = [...dialogs];
+      facts.stillOn = new URL(page.url()).pathname;
+      await context.setOffline(false);
+      await typeIn(page, HEADLINE, words);
+      facts.saved = await waitSaved(page)
+        .then(() => true)
+        .catch(() => false);
+      facts.saves = told(saves);
+      facts.stored = await storedHeadline(page);
+    } finally {
+      say("offline, a link, and the person stays", facts);
+    }
+    expect(facts.dialogs, "the browser asked before leaving").toEqual(["beforeunload"]);
+    expect(facts.stillOn, "and the person stayed").toBe("/portfolio");
+    expect(facts.saved, "the editor saves again").toBe(true);
+    expect(facts.stored).toBe(words);
   });
 });
 

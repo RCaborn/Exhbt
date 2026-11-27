@@ -89,6 +89,8 @@ export type Runtime = {
   undoLast(): void;
   /** Sends what is waiting now (the status line's Retry). */
   retry(): void;
+  /** Next is taking the person to another page (a link, a phone's More, Open: leaving.ts): a save asked for until that is over waits for it. */
+  navigating(): void;
 };
 
 export const RuntimeContext = createContext<Runtime | null>(null);

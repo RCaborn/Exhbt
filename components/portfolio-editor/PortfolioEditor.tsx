@@ -105,40 +105,55 @@ type Visit = {
   here(): void;
   /** The editor has been taken off the page (a link inside the app): what the server has not got is kept for the next visit (leftBehind). */
   left(): void;
+  /**
+   * A navigation the editor started is over and the editor is still on the page: new data for the page has come (a
+   * navigation that came back here), or the page stayed when the browser was asked to leave it.
+   */
+  stayed(): void;
 };
 
-/**
- * How long after the editor has gone the gate waits for its saves still on their way (leftBehind): less than the gate
- * waits before it says it could not fetch the page (PortfolioGate.tsx, FRESH_MS), so a save Next lost never says so.
- */
-const LEFT_BEHIND_MS = 8000;
-
 function startVisit(loaded: BuilderState, owner: string): Visit {
-  const host: Host = { change: () => {}, retry: () => {} };
+  const host: Host = { change: () => {}, retry: () => {}, navigating: () => navigating() };
   const rt = createRuntime(loaded, host);
   /** What the server has said it has, for this visit alone (pending.ts's notes are the document's, and a later visit's). */
   let confirmed = loaded;
   /** Set once the editor has been taken off the page: from then on its state cannot change. */
   let gone = false;
-  /**
-   * Set once the gate has stopped waiting for this visit's saves (leftBehind): a later visit may have opened and taken
-   * what was kept, so from then on this visit writes nothing more to the browser.
-   */
-  let released = false;
-  /** Lets the gate stop waiting for this visit's saves (leftBehind). */
-  let letGo: () => void = () => {};
-  const goneFor = new Promise<void>((done) => (letGo = done));
+  /** Set just after that, once the work of that moment is done (useBuilder's own send as the editor goes): see `save`. */
+  let closed = false;
   /** Keeps the newest state in this browser, for the next visit to offer back, unless the server has it. */
   const keepNewest = () => {
     const newest = rt.state.get();
-    if (newest !== confirmed && !released) keepUnsaved(owner, newest, rt.save.get().stale ? "stale" : "left");
+    if (newest !== confirmed) keepUnsaved(owner, newest, rt.save.get().stale ? "stale" : "left");
   };
+
+  /**
+   * A navigation the editor started (a press on a link out of the page, a phone's More, Open: leaving.ts), from its
+   * start until it is over: the editor is off the page, or it is still here (`stayed`). Next runs one router action at
+   * a time, and a navigation goes ahead of the one that is running. When it does, an action asked for before the
+   * navigation is over can be dropped: the end of Next's queue is left at the action the navigation went ahead of, and
+   * one added after it is never run (next 15.5's app-router-instance.js, dispatchAction). A save dropped there never
+   * leaves the browser and never answers. One that is not dropped runs once the navigation is over. So a save asked for
+   * in that time waits until then (`tracked`) and goes, which costs it nothing, and the gate can wait for every save,
+   * however long it takes, without waiting for one that will never come: it never opens on words that an older save on
+   * its way can still overwrite.
+   */
+  let underWay = false;
+  /** The saves asked for while it is under way, each sent when it is over: at once, in that moment, before anything else is asked of Next. */
+  const waiting: (() => void)[] = [];
+  function navigating(): void {
+    underWay = true;
+  }
+  function navigationOver(): void {
+    underWay = false;
+    for (const go of waiting.splice(0)) go();
+  }
 
   async function send(state: BuilderState): Promise<SaveResult> {
     // Once the site has been updated under this tab nothing more can be saved from it: every later state
     // follows the first into the browser, to be offered back after the reload (keep.ts, Notices.tsx).
     if (rt.save.get().stale) {
-      if (!released) keepUnsaved(owner, state);
+      keepUnsaved(owner, state);
       return { ok: false, error: STALE_EDITOR };
     }
     try {
@@ -168,19 +183,20 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
         e,
       );
       rt.save.set((v) => ({ ...v, stale: true }));
-      if (!released) keepUnsaved(owner, state);
+      keepUnsaved(owner, state);
       return { ok: false, error: STALE_EDITOR };
     }
   }
   /**
-   * Every save is noted while it is on its way: the gate and the crash fallback wait for it (pending.ts), until the
-   * editor has gone and leftBehind lets it go. Once the editor has gone nothing sends again a save that fails, so the
-   * newest words are kept for the next visit (again: a stale answer has just kept the older words it carried); one
-   * that lands with the newest words takes back what was kept.
+   * Sends a state, noted while it is on its way and until it is answered: the gate and the crash fallback wait for it
+   * (pending.ts), however long it takes, because a save that has left the browser can still land. One asked for while a
+   * navigation the editor started is under way is sent once that is over (`underWay`). Once the editor has gone nothing
+   * sends again a save that fails, so the newest words are kept for the next visit (again: a stale answer has just kept
+   * the older words it carried); one that lands with the newest words takes back what was kept.
    */
-  const tracked = (state: BuilderState) => {
-    const run = send(state);
-    noteSending(Promise.race([run, goneFor]));
+  const tracked = (state: BuilderState): Promise<SaveResult> => {
+    const run = underWay ? new Promise<SaveResult>((done, fail) => waiting.push(() => void send(state).then(done, fail))) : send(state);
+    noteSending(run);
     void run.then(
       (r) => {
         if (!gone) return;
@@ -195,30 +211,38 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
   };
 
   /**
-   * The editor has been taken off the page by a link inside the app (leaving.ts), and its state cannot change now.
-   * What the server has not said it has is kept in this browser at once, for the next visit to offer back unless the
-   * server has it by then: a save refused or failed is sent again by nobody, a tab closed before the save on its way
-   * lands drops it, and Next can lose a save asked for while a navigation is under way (a navigation that goes ahead
-   * of a pending action leaves the end of Next's queue at that action, and an action added after it is never run, so
-   * its save never answers). A save that lands takes the kept words back (tracked). The gate waits for the saves
-   * still on their way for LEFT_BEHIND_MS, and no longer; after that this visit writes nothing more to the browser.
+   * The save useBuilder calls. Once the editor has gone, useBuilder asks again only when a save that was on its way has
+   * answered and newer words were waiting behind it, at a moment nothing here chooses: the next page may be in a
+   * navigation of its own (Next's redirect on arriving at /roadmap is one), which can drop it, and a save that never
+   * answers would keep the gate waiting. Not sent, then: those words were kept in this browser as the editor went
+   * (leftBehind), and the next visit offers them back. The save useBuilder sends in the moment the editor goes is sent.
    */
-  let giveUp: ReturnType<typeof setTimeout> | undefined;
+  const save = (state: BuilderState): Promise<SaveResult> => {
+    if (!closed) return tracked(state);
+    keepNewest();
+    return Promise.resolve({ ok: false, error: "The editor has closed: these changes were kept in this browser." });
+  };
+
+  /**
+   * The editor has been taken off the page by a link inside the app (leaving.ts), and its state cannot change now. The
+   * navigation that took it off is over, so a save that waited for it goes now. What the server has not said it has is
+   * kept in this browser at once, for the next visit to offer back unless the server has it by then: a save refused or
+   * failed is sent again by nobody, and a tab closed before the save on its way lands drops it. A save that lands takes
+   * the kept words back (tracked).
+   */
   function leftBehind(): void {
     gone = true;
+    queueMicrotask(() => {
+      if (gone) closed = true;
+    });
+    navigationOver();
     if (rt.state.get() === confirmed) return;
     keepNewest();
-    clearTimeout(giveUp);
-    giveUp = setTimeout(() => {
-      if (!gone) return;
-      released = true;
-      letGo();
-    }, LEFT_BEHIND_MS);
   }
   /** On the page (again): React's development checks take an editor off the page and put it back as it mounts. */
   function here(): void {
     gone = false;
-    clearTimeout(giveUp);
+    closed = false;
   }
 
   return {
@@ -226,11 +250,12 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
     host,
     loaded,
     owner,
-    save: tracked,
+    save,
     send: async (state) =>
       (await tracked(state).catch(() => ({ ok: false as const }))).ok,
     here,
     left: leftBehind,
+    stayed: navigationOver,
   };
 }
 
@@ -292,12 +317,23 @@ export function PortfolioEditor({
   }, []);
 
   // Leaving by a link inside the app (a tile, the Add link, the header): words no save will get to the server (a
-  // save refused, failed or lost on the way) reach no server, and the next visit's editor starts from what the
-  // server has. So they are kept in this browser and offered back once on the next visit (startVisit's leftBehind,
-  // keep.ts, Notices.tsx).
+  // save refused or failed) reach no server, and the next visit's editor starts from what the server has. So they
+  // are kept in this browser and offered back once on the next visit (startVisit's leftBehind, keep.ts, Notices.tsx).
   useEffect(() => {
     visit.here();
     return () => visit.left();
+  }, [visit]);
+
+  // A navigation the editor started is over, and the editor is still here (startVisit's `underWay`): new data for the
+  // page has come (the person came back to it before the next page did), or the browser was asked to leave the page
+  // and it stayed. Next turns a navigation whose page it cannot fetch into a full page load, and the browser asks
+  // "Leave site?" when a change is waiting: a person who stays carries on editing, and their saves go again. The
+  // check runs once the question is answered; a page that does go never runs it.
+  useEffect(() => visit.stayed(), [visit, data]);
+  useEffect(() => {
+    const asked = () => void setTimeout(visit.stayed, 0);
+    window.addEventListener("beforeunload", asked);
+    return () => window.removeEventListener("beforeunload", asked);
   }, [visit]);
 
   // A press on a link out of the editor sends what is waiting at once, and a page that goes for good keeps what the
