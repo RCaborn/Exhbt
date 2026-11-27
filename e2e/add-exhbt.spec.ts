@@ -92,6 +92,8 @@ test.describe("The chooser", () => {
     await expect(where).toContainText("Publishing puts this exhbt on your portfolio at");
     await expect(where).toContainText("with its own link to send with applications.");
     await expect(where.getByRole("link")).toHaveAttribute("href", `/p/${username}`);
+    // On a plan with a public portfolio nothing says an exhbt stays private.
+    await expect(page.locator("[data-free-private]")).toHaveCount(0);
 
     await axe(page);
 
@@ -364,7 +366,7 @@ test.describe("Addresses that skip the chooser", () => {
     await expect(page.getByTestId("upgrade-prompt")).toContainText(`Your plan holds ${ENTITLEMENTS.free.exhbts} exhbt`);
   });
 
-  test("a roadmap idea's Build this as an exhbt opens the editor prefilled, with no chooser on the way", async ({ page }) => {
+  test("a roadmap idea's Add as an exhbt opens the editor prefilled, with no chooser on the way", async ({ page }) => {
     const email = uniqueEmail("addidea");
     await buildRoadmap(page);
     // The roadmap's own pages are built on their first request here, so this waits longer than waitForResult would alone.
@@ -380,9 +382,9 @@ test.describe("Addresses that skip the chooser", () => {
     page.on("framenavigated", (frame) => {
       if (frame === page.mainFrame()) seen.push(new URL(frame.url()).pathname);
     });
-    const first = page.getByRole("listitem").filter({ has: page.getByRole("button", { name: /^Build this as an exhbt/ }) }).first();
+    const first = page.getByRole("listitem").filter({ has: page.getByRole("button", { name: /^Add as an exhbt/ }) }).first();
     const title = (await first.getByRole("heading", { level: 2 }).innerText()).trim();
-    await first.getByRole("button", { name: /^Build this as an exhbt/ }).click();
+    await first.getByRole("button", { name: /^Add as an exhbt/ }).click();
     await page.waitForURL(ADD.editUrl);
     await waitEditor(page);
     await expect(page.locator(SEL.titleField)).toHaveValue(title.slice(0, LIMITS.titleChars));
@@ -445,6 +447,8 @@ test.describe("The plan's rules", () => {
     await expect(page).toHaveURL(exactly(ADD_EXHBT));
     // On Free nothing is promised now: the page says where an exhbt goes once published, then the plan rule's own reason.
     await expect(page.getByTestId("where-it-goes")).toHaveCount(0);
+    // Before anyone starts: on Free an exhbt stays private.
+    await expect(page.locator("[data-free-private]")).toHaveText(`On ${PLAN_NAMES.free}, an exhbt stays private: only you can see it until you pay to put it online.`);
     await expect(page.locator('[data-where="later"]')).toHaveText(
       `${whereAPublishedExhbtGoes(portfolioHost("yourname"))} Publishing to your own link comes with ${PLAN_NAMES.premium}.`,
     );

@@ -83,12 +83,12 @@ test.describe("Document readers", () => {
 
 async function signIn(page: Page, tag: string) {
   await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(tag))}&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
-  await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Draft it from your files" })).toBeVisible();
 }
 
 const ready = (page: Page) => expect(page.locator("form[data-ready=true]")).toBeAttached();
 
-test.describe("Draft an exhbt", () => {
+test.describe("Draft it from your files", () => {
   test("a Word file is read, uploaded and drafted, then the editor opens", async ({ page }) => {
     await signIn(page, "draft");
     await ready(page);

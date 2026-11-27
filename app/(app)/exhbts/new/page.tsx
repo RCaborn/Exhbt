@@ -23,7 +23,7 @@ import { LayoutGallery } from "./LayoutGallery";
 
 type Query = { into?: string; start?: string; refused?: string };
 
-const TITLES = { choose: "Add an exhbt", draft: "Draft an exhbt", blank: "Choose a layout" };
+const TITLES = { choose: "Add an exhbt", draft: "Draft it from your files", blank: "Choose a layout" };
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<Query> }): Promise<Metadata> {
   return { title: TITLES[addExhbtView(await searchParams)], robots: { index: false } };
@@ -104,7 +104,7 @@ async function DraftPage({ user, intoParam }: { user: SessionUser; intoParam?: s
         {/* The way back up: to the chooser it was reached from, or, drafting into a teammate's exhbt, to the list. */}
         <div className="mb-4">{into ? <Back href="/exhbts">Your exhbts</Back> : <Back href={ADD_EXHBT}>Add an exhbt</Back>}</div>
         <div className="rounded-[24px] border border-line bg-surface p-6 shadow-pack sm:p-10">
-          <h1 className="text-[2rem] sm:text-[2.6rem]">Draft an exhbt</h1>
+          <h1 className="text-[2rem] sm:text-[2.6rem]">Draft it from your files</h1>
           <p className="mt-3 text-graphite">
             {into
               ? "Your team's project files are below. Add your own files and notes about your part; we draft your exhbt from them, and you check every word."

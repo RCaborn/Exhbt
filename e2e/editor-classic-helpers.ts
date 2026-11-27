@@ -20,7 +20,7 @@ export const SEL = {
   /** The page after /exhbts: the signed-in list with its heading and the button that makes a blank exhbt. */
   listHeading: { level: 1 as const, name: "Your exhbts" },
   /** The draft page (/exhbts/new) and the editor page's own heading. */
-  draftHeading: { level: 1 as const, name: "Draft an exhbt" },
+  draftHeading: { level: 1 as const, name: "Draft it from your files" },
   draftForm: "form[data-ready=true]",
   editHeading: { level: 1 as const, name: "Edit exhbt" },
   editUrl: /\/exhbts\/[0-9a-f-]{36}\/edit$/,
@@ -120,7 +120,7 @@ export async function startEditor(page: Page, username: string) {
   await startFromScratch(page, { waitForContext: false });
 }
 
-/** Signs in as a new address and waits for the "Draft an exhbt" page and its form. */
+/** Signs in as a new address and waits for the "Draft it from your files" page and its form. */
 export async function signInToDraft(page: Page, tag: string) {
   await keepClassic(page);
   await page.goto(`/auth/dev?email=${encodeURIComponent(uniqueEmail(tag))}&next=${encodeURIComponent(DRAFT_WITH_AI)}`);

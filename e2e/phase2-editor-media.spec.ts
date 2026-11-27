@@ -247,7 +247,7 @@ test.describe("guidance", () => {
 });
 
 test.describe("roadmap to exhbt", () => {
-  test("Build this as an exhbt opens the editor prefilled; the plan limit is explained", async ({ page }) => {
+  test("Add as an exhbt opens the editor prefilled; the plan limit is explained", async ({ page }) => {
     const email = uniqueEmail("build");
     await buildRoadmap(page);
     await waitForResult(page);
@@ -256,11 +256,11 @@ test.describe("roadmap to exhbt", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Projects that would prove them" })).toBeVisible();
 
     // Signed out: a way to sign in, then back here.
-    await expect(page.getByRole("link", { name: /Sign in to build this/ }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /Sign in to add this as an exhbt/ }).first()).toBeVisible();
     await page.goto(`/auth/dev?email=${encodeURIComponent(email)}&next=${encodeURIComponent(new URL(roadmapUrl).pathname + "?view=projects")}`);
-    const first = page.getByRole("listitem").filter({ has: page.getByRole("button", { name: /^Build this as an exhbt/ }) }).first();
+    const first = page.getByRole("listitem").filter({ has: page.getByRole("button", { name: /^Add as an exhbt/ }) }).first();
     const title = (await first.getByRole("heading", { level: 2 }).innerText()).trim();
-    await first.getByRole("button", { name: /^Build this as an exhbt/ }).click();
+    await first.getByRole("button", { name: /^Add as an exhbt/ }).click();
 
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
     await waitEditor(page);
@@ -271,7 +271,7 @@ test.describe("roadmap to exhbt", () => {
 
     // Free holds one exhbt: now the Projects page says why and points to billing.
     await page.goto(`${roadmapUrl}?view=projects`);
-    await expect(page.getByRole("button", { name: /^Build this as an exhbt/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Add as an exhbt/ })).toHaveCount(0);
     await expect(page.getByText(/Your plan holds \d+ exhbt/).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "See plans" }).first()).toHaveAttribute("href", "/account/billing");
   });

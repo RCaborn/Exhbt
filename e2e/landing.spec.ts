@@ -39,7 +39,7 @@ test.describe("Landing: pages", () => {
     await page.goto("/what-is-an-exhbt");
     await expect(page.getByRole("heading", { level: 1, name: "What is an exhbt?" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "How you make one" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Your own address" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your address" })).toBeVisible();
     await expect(page.getByRole("article").first()).toBeVisible();
     await expect(page.getByRole("list", { name: "Methodology" }).first()).toBeVisible();
   });

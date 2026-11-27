@@ -32,9 +32,11 @@ jobs:
   # a long spec is split between groups, by the count of tests and not by their time. Six since the portfolio editor's
   # specs joined the desktop ones on 27 Nov 2026: in four, the first group (most of e2e/editor-drag.spec.ts) ran out of
   # its 38 minutes under the focus rule with 14 tests not run, and the last took 37; by that run's test times the
-  # slowest of six takes about 28, and the limit below is 45. Fourteen groups: with CI's eleven a release pull request
-  # asks for 25 runners at once, five more than the 20 there are, so five groups wait for the first to finish (CI's
-  # check, after about three minutes, then its shortest groups and the phones', after ten to fifteen).
+  # slowest of six takes about 28, and the limit below is 45. Fourteen groups: CI has thirteen jobs (check and twelve
+  # shards) and WebKit fourteen. A push to a branch with an open pull request starts CI twice (once for the push and once
+  # for the pull request) and WebKit once, so it asks for 40 runners against the 20 there are. The main session cancels
+  # the push's CI run, which leaves 27, so seven jobs wait for the first to finish (CI's check, after about three
+  # minutes, then its shortest groups and the phones', after ten to fifteen).
   e2e-webkit:
     name: e2e-webkit (${{ matrix.name }} ${{ matrix.shard }}/${{ matrix.of }}${{ matrix.focus && ', the focus rule' || '' }})
     runs-on: ubuntu-latest

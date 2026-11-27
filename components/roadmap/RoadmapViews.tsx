@@ -330,16 +330,16 @@ function Next({ emailedTo, signedIn, id, unlocked }: { emailedTo: string | null;
       )}
 
       <div className="mt-10 rounded-[16px] bg-ink p-6 text-white sm:p-8">
-        <h2 className="">When a project is done, make it count</h2>
+        <h2 className="">{isPhase2Enabled() ? "Already finished a project?" : "Your finished projects"}</h2>
         {isPhase2Enabled() ? (
           <>
             <p className="mt-3 max-w-[34rem] text-[#c9cbcf]">
-              Turn a finished project into an exhbt: upload your notes or files and we draft it, you check it, and it goes on your own link.
+              A dissertation, a module project or placement work counts. Add it as your first exhbt; these ideas can be your second and third.
               {" "}{PLAN_NAMES.max} adds a custom link for each job you apply to.
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
               <Button href="/exhbts/new" variant="primary" size="lg">
-                Make an exhbt
+                Add an exhbt
               </Button>
               <Link href="/account/billing" className="link font-semibold text-white">
                 See the plans
@@ -349,7 +349,7 @@ function Next({ emailedTo, signedIn, id, unlocked }: { emailedTo: string | null;
         ) : (
           <>
             <p className="mt-3 max-w-[34rem] text-[#c9cbcf]">
-              {PLAN_NAMES.premium} drafts your exhbts from your files and puts them on your own link. {PLAN_NAMES.max} adds a
+              {PLAN_NAMES.premium} drafts your exhbts from your files and puts them online at your address. {PLAN_NAMES.max} adds a
               custom link for each job you apply to, with your best-fit projects. Both include an originality check when you publish (coming soon), and both open soon.
             </p>
             <div className="mt-6">

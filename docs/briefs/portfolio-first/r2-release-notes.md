@@ -9,6 +9,7 @@
 - After sign-in, a `next` that leaves the site is refused (`lib/safe-next.ts`). That closes an open redirect, `/\evil.com`, that was live before this release.
 - The step builder's line rule: a line of education or experience is limited to 14 words, not counting its year, and to 100 characters. Every line that saved before still saves.
 - The cookie policy names `exhbt_strip_hidden`. It is set only by the new editor's "Hide this".
+- The exhbt editor, which everyone uses: if part of its code is cut off because the person is leaving the page, the classic editor no longer opens. The part is asked for again every second until the page goes, for up to a minute (`components/exhbt-editor/again.ts`, `leaving.ts`). A part that fails when nobody is leaving still opens the classic editor after three tries.
 - Visitors' pages are unchanged: portfolio-parity, layout-parity and portfolio-visitor all pass.
 
 ## Built by
@@ -40,3 +41,8 @@ An independent review ran on 43751d1: two Opus finders and two Sonnet sceptics, 
 - When the bar's menu opens as a sheet while an Undo toast is leaving, an invisible toast node can stay in the page. That is Astryx's behaviour.
 - `maximum-scale=1` stops an iPhone zooming into the page's own fields, which follow the look's type sizes. It has not been tried on a real iPhone, which is why "nothing zooms" is on the checklist.
 - Typing speed was measured in production on a Pixel 7 profile at 4x CPU: p95 is 52 to 77ms a key across name, headline and intro. It has not been measured on WebKit or on a real iPhone.
+- Under Safari's rule about the focus, the bar's sheets other than More (Share, Look, Job links, Team, Reorder, the photo, See as a visitor) give the focus back to the page, not to their button, when they close. Only admins who opt in reach them while the switch is off. Fix before it goes on for everyone.
+- If someone answers "Stay" on the leave prompt while the formatted fields' code is loading, a real failure is asked for again every second for up to a minute before the classic editor opens.
+- The Copy link test passed on WebKit, but the run's log does not show whether WebKit let it read the clipboard back. When WebKit refuses, the test notes it and checks only "Link copied".
+- At 412 wide, a visitor's page scrolls sideways when an education line holds a long unbroken word, such as a web address. It was there before this release.
+- Decision 0031's paragraph on where the lines' controls sit was written in this release, from commit 605fd8d's message. Rory to confirm it.

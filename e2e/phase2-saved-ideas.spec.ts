@@ -139,7 +139,7 @@ test.describe("saved ideas", () => {
     await expect(saved).toHaveCount(2);
 
     // Build the product analyst one as an exhbt: the editor opens prefilled.
-    await saved.filter({ hasText: "Product analyst" }).getByRole("button", { name: "Build this as an exhbt" }).click();
+    await saved.filter({ hasText: "Product analyst" }).getByRole("button", { name: "Add as an exhbt" }).click();
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
     await expect(page.locator("[data-ready=true]")).toBeAttached();
     await expect(page.locator("#title")).toHaveValue(titleB);

@@ -326,7 +326,7 @@ test.describe("An open rewrite form stays up and takes the press", () => {
       const user = freshName(`ground${id}`);
       await page.goto(`/dev/portfolio?username=${user}&plan=max&count=0&look=${id}`);
       await page.goto(`/auth/dev?email=${user}@example.com&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
-      await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Draft it from your files" })).toBeVisible();
       const res = await page.request.post("/api/exhbts/draft", { data: { text: PROJECT } });
       expect(res.status()).toBe(200);
       const { id: exhbt } = (await res.json()) as { id: string };

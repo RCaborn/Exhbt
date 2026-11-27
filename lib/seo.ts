@@ -45,7 +45,7 @@ export const MARKETING_PAGES: Record<MarketingKey, MarketingPage> = {
     path: "/",
     title: HOME_TITLE,
     description:
-      "Get a free skills-gap roadmap for the job you want, then turn your projects into exhbts: short, checked write-ups on a website at your own address.",
+      "Get a free skills-gap roadmap for the job you want, then turn your projects into exhbts: short, checked write-ups on a website at your address.",
     card: { headline: "Your own website, built from your projects", sub: "A free skills-gap roadmap, then checked exhbts for employers" },
   },
   "what-is-an-exhbt": {
@@ -116,9 +116,9 @@ export const marketingImage = (key: MarketingKey) => ({
 
 /** Pricing's description: prices only while the plans are on sale, otherwise the waitlist wording. */
 export function pricingDescription(sell: boolean, maxExtra: string): string {
-  if (!sell) return `Free includes the roadmap and an exhbt to try. ${PLAN_NAMES.premium} puts your exhbts on your own link, and ${PLAN_NAMES.max} ${maxExtra}. Employers never pay.`;
+  if (!sell) return `Free includes the roadmap and an exhbt to try. ${PLAN_NAMES.premium} puts your exhbts online at your address, and ${PLAN_NAMES.max} ${maxExtra}. Employers never pay.`;
   const price = (p: "premium" | "max") => `${PRICES[p]} a ${BILLING_PERIOD}`;
-  return `Free includes the roadmap and an exhbt to try. ${PLAN_NAMES.premium} is ${price("premium")} and puts your exhbts on your own link. ${PLAN_NAMES.max} is ${price("max")} and ${maxExtra}. Employers never pay.`;
+  return `Free includes the roadmap and an exhbt to try. ${PLAN_NAMES.premium} is ${price("premium")} and puts your exhbts online at your address. ${PLAN_NAMES.max} is ${price("max")} and ${maxExtra}. Employers never pay.`;
 }
 
 /**

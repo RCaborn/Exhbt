@@ -29,7 +29,7 @@ export const ADDRESS_WORDS = {
   claim: `Your address is where your portfolio lives online, like ${portfolioHost("your-name")}. You send it with applications and put it on your CV.`,
   share: "Where your portfolio lives online. Send it with applications and put it on your CV.",
   blocked: (plan: string) =>
-    `On ${plan} your portfolio is a preview only you can see. A paid plan gives you your own address and lets you publish exhbts to it, so employers can see them.`,
+    `On ${plan} your portfolio is a preview only you can see. A paid plan gives you your address and lets you publish exhbts to it, so employers can see them.`,
   notFound: "Your address shows “not found” until you publish an exhbt.",
 };
 

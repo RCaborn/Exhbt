@@ -91,7 +91,7 @@ test.describe("Add an exhbt", () => {
       expect(await lands(page, `/exhbts/new?into=${into}`)).toEqual({ status: 307, to: `/login?next=${encodeURIComponent(`/exhbts/new?into=${into}`)}` });
 
       await signInAs(page, unique(`ad${k[0]}`), "premium", "/exhbts/new");
-      await expect(page.getByRole("heading", { level: 1, name: at ? "Add an exhbt to your portfolio" : "Add an exhbt", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Add an exhbt to your portfolio", exact: true })).toBeVisible();
       const back = page.locator("#main").getByRole("link", { name: at ? "Your portfolio" : "Your exhbts", exact: true });
       await expect(back).toHaveAttribute("href", at ? "/portfolio" : "/exhbts");
     });
@@ -288,7 +288,7 @@ test.describe("team invites", () => {
 });
 
 test.describe("roadmap ideas", () => {
-  test("steps: Build this as an exhbt; page: Add as an exhbt, the first lands on the portfolio and the next opens the editor", async ({ page }) => {
+  test("steps and page: Add as an exhbt (the page's names it for the portfolio), the first lands on the portfolio and the next opens the editor", async ({ page }) => {
     test.slow();
     await kind(page, "steps");
     const email = `${unique("idea")}@example.com`;
@@ -298,7 +298,7 @@ test.describe("roadmap ideas", () => {
     await unlockProjects(page, { email });
     await expect(page.getByRole("heading", { level: 1, name: "Projects that would prove them" })).toBeVisible();
     await page.goto(`/auth/dev?email=${encodeURIComponent(email)}&next=${encodeURIComponent(`${roadmap}?view=projects`)}`);
-    await expect(page.getByRole("button", { name: /^Build this as an exhbt/ }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Add as an exhbt/ }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /^Add to your portfolio as an exhbt/ })).toHaveCount(0);
     // Room for two.
     await page.goto(`/dev/plan?plan=premium&next=${encodeURIComponent(`${roadmap}?view=projects`)}`);
@@ -307,7 +307,7 @@ test.describe("roadmap ideas", () => {
     await page.goto(`${roadmap}?view=projects`);
     const add = page.getByRole("button", { name: /^Add to your portfolio as an exhbt/ });
     await expect(add.first()).toHaveText("Add as an exhbt");
-    await expect(page.getByRole("button", { name: /^Build this as an exhbt/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Add as an exhbt/ })).toHaveCount(0);
     await add.first().click();
     await page.waitForURL(/\/portfolio\?at=[0-9a-f-]{36}$/, { waitUntil: "commit" });
 

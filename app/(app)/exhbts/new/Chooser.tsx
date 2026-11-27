@@ -13,7 +13,7 @@ import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { BUILD_IT_YOURSELF, DRAFT_WITH_AI } from "@/lib/add-exhbt";
 import type { DraftVerdict } from "@/lib/drafting";
-import type { Plan } from "@/lib/entitlements";
+import { PLAN_NAMES, type Plan } from "@/lib/entitlements";
 import { demoExhbts, demoOwner } from "@/lib/exhbt";
 import type { Format } from "@/lib/exhbt/formats";
 import { whereAPublishedExhbtGoes } from "@/lib/exhbt/publish-words";
@@ -51,7 +51,7 @@ function Top({ portfolioFirst }: { portfolioFirst: boolean }) {
   ) : (
     <>
       <Back href="/exhbts">Your exhbts</Back>
-      <Heading level={1}>Add an exhbt</Heading>
+      <Heading level={1}>Add an exhbt to your portfolio</Heading>
     </>
   );
 }
@@ -91,6 +91,12 @@ export function Chooser({ draft, offered, where, portfolioFirst = false }: { dra
         <Text as="p" type="large" weight="normal" color="secondary" className="max-w-2xl">
           {WHAT_AN_EXHBT_IS}
         </Text>
+        {/* Before anyone starts: on Free an exhbt is private. (A plan with a public portfolio says where it goes, below.) */}
+        {!where.live && (
+          <Text as="p" weight="semibold" className="max-w-2xl" data-free-private="">
+            On {PLAN_NAMES.free}, an exhbt stays private: only you can see it until you pay to put it online.
+          </Text>
+        )}
       </VStack>
 
       <Grid columns={{ minWidth: 300, max: 2 }} gap={6}>
