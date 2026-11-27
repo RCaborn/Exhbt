@@ -53,6 +53,8 @@ const BASELINE = new Set([
 const FLOATS = new Set([
   // The bar that comes to the words selected in the exhbt editor (decision 0032), in the browser's top layer.
   "components/exhbt-editor/fields/SelectionBar.tsx",
+  // The portfolio editor's lifted copy while a part is dragged (.pe-lifted), DESIGN.md's dragging rule; portfolio release 2.
+  "components/portfolio-editor/css/arrange.css",
 ]);
 
 const RAISED = /shadow-pack|elevation=\{?["'](?:low|med|high)/;
