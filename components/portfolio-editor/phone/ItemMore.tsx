@@ -18,7 +18,9 @@ import { useOfferUndo } from "./PhoneUndo";
  * reason under its name and read out with it (aria-disabled, so it keeps the focus and is not skipped).
  *
  * After an action the sheet closes and the focus goes back to this button; after Remove or Hide, whose
- * part has gone from the page, to the More of the part that took its place. The frame's action says
+ * part has gone from the page, to the More of the part that took its place. Closed with nothing done
+ * (Escape, its close button, a press outside it), the sheet gives the focus back to this button too,
+ * which takes the focus when pressed, Safari included. The frame's action says
  * what happened in the live region; a move, a remove or a hide also offers a one-tap Undo
  * (PhoneUndo.tsx), since under 48rem the bar keeps its Undo in the menu.
  */
@@ -137,6 +139,10 @@ export function ItemMore({ name, actions }: { name: string; actions: ItemAction[
         aria-haspopup="dialog"
         aria-expanded={mine && open}
         onClick={() => {
+          // Safari gives a pressed button no focus, and the sheet gives the focus back on Escape, its close button or a
+          // press outside it to what had it when it opened: there, nothing. So the button takes it here, as the other
+          // browsers give it, before the sheet opens (as the exhbt editor's "+" does, Insert.tsx).
+          if (document.activeElement !== button.current) button.current?.focus({ preventScroll: true });
           setMine(true);
           api.open("item");
         }}
