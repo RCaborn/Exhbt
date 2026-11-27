@@ -11,7 +11,7 @@ export { STRIP };
  * The first minute (decision 0031, "A new student" and "Data": first run). Under the bar, in app chrome,
  * a strip that tells a stranger what this page is, what to do now and what comes next, in three steps:
  *   1. Account, done: signing up was the first step, so the strip starts one in (decision 0033, G5);
- *   2. Your page, about a minute: the name, a one-line headline, a photo (optional) and a look, each one
+ *   2. Your portfolio, about a minute: the name, a one-line headline, a photo (optional) and a look, each one
  *      going to its field or opening its menu, and ticked when done;
  *   3. Your first exhbt: it goes to the band ("Your best project goes here") or the Add tile.
  * "Skip to your first exhbt" is there from the start; "Hide this" is kept for this person in a cookie the
@@ -52,7 +52,7 @@ export function FirstRun(): ReactNode {
     hide: () => {
       writeStripHidden(data.owner);
       setHidden(true);
-      api.say("The steps are hidden. Everything they pointed to is on your page and in the bar.");
+      api.say("The steps are hidden. Everything they pointed to is on your portfolio and in the bar.");
     },
     skip: () => {
       setSkipped(true);

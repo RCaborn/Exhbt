@@ -232,7 +232,7 @@ test.describe("Sections", () => {
     for (const name of [/Experience/, /A quote/]) {
       const item = menu.getByRole("menuitem", { name });
       await expect(item).toHaveAttribute("aria-disabled", "true");
-      await expect(item).not.toContainText("Already on your page");
+      await expect(item).not.toContainText("Already on your portfolio");
     }
     await expect(page.locator(".pe-menu-foot").getByRole("link", { name: "See plans" })).toBeVisible();
     await menu.getByRole("menuitem", { name: /Experience/ }).click({ force: true });

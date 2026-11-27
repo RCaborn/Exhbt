@@ -19,7 +19,7 @@ export function TryNewPortfolio() {
         status="info"
         container="section"
         title="Admins only: the new portfolio editor"
-        description="Your page itself, edited where it sits. It stays on in this browser, and “Use the step builder” in its menu brings you back."
+        description="Your portfolio itself, edited where it sits. It stays on in this browser, and “Use the step builder” in its menu brings you back."
         endContent={
           <Button type="submit" size="sm">
             Try the new portfolio

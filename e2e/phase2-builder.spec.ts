@@ -93,7 +93,7 @@ test.describe("Build your portfolio", () => {
     await axe(page);
 
     // Your projects: keyboard reorder.
-    await page.getByRole("button", { name: "Continue to your page" }).click();
+    await page.getByRole("button", { name: "Continue to your portfolio" }).click();
     await page.getByRole("button", { name: `Move ${GP}`, exact: true }).focus();
     await page.keyboard.press("Space");
     await expect(page.locator("[id^=DndLiveRegion]:not(:empty)")).toContainText(`Picked up ${GP}`);
@@ -116,7 +116,7 @@ test.describe("Build your portfolio", () => {
 
     // Back and forward in the browser move between steps.
     await page.goBack();
-    await expect(stepHeading(page)).toHaveText("Your page");
+    await expect(stepHeading(page)).toHaveText("Your portfolio");
 
     // The public page: name first in the tab, the person's own icon, the intro, quiet contact lines.
     const res = await page.goto(`/p/${u}`);

@@ -36,7 +36,7 @@ import type { BuilderPlan, BuilderProject } from "./steps";
 import { TileEditor } from "./TileEditor";
 
 /**
- * Step 3, Your page (decisions 0014 and 0016): the exhbts in their order (drag a row by its grip with
+ * Step 3, Your portfolio (decisions 0014 and 0016): the exhbts in their order (drag a row by its grip with
  * the mouse, a short press on touch, or Space, arrows, Space on the keyboard), feature one for the band,
  * hide one (it stays live at its own link), open one in the editor; then the page's sections: add one,
  * fill in its words, take one off. The sections are put in order by dragging them in the preview.
@@ -241,7 +241,7 @@ export function StepProjects({
         </div>
       ) : (
         <>
-          <p className="text-graphite">Top to bottom, as your page shows them. Drag the grip, or focus it and press Space, then the arrow keys, then Space.</p>
+          <p className="text-graphite">Top to bottom, as your portfolio shows them. Drag the grip, or focus it and press Space, then the arrow keys, then Space.</p>
           <DndContext
             id="portfolio-tiles"
             sensors={sensors}
@@ -284,9 +284,9 @@ export function StepProjects({
       {state.hidden.some((id) => byId.has(id)) && (
         <section aria-labelledby="hidden-heading" className="mt-8" data-testid="hidden-tray">
           <h3 id="hidden-heading" className="text-[1.0625rem] font-sans font-semibold tracking-normal">
-            Hidden from your page
+            Hidden from your portfolio
           </h3>
-          <p className="mt-1 text-sm text-graphite">Still live at their own links, but not on your page.</p>
+          <p className="mt-1 text-sm text-graphite">Still live at their own links, but not on your portfolio.</p>
           <ul className="mt-3 space-y-2">
             {state.hidden
               .filter((id) => byId.has(id))
@@ -309,7 +309,7 @@ export function StepProjects({
 
       <section aria-labelledby="sections-heading" className="mt-10 border-t border-line pt-8" data-testid="sections-panel">
         <h3 id="sections-heading" className="text-[1.0625rem] font-sans font-semibold tracking-normal">
-          Sections on your page
+          Sections on your portfolio
         </h3>
         <p className="mt-1 text-sm text-graphite">Your name and intro stay at the top. Drag the sections into order in the preview.</p>
         <ul className="mt-3 space-y-2">
@@ -392,7 +392,7 @@ export function StepProjects({
       {(drafts.length > 0 || projects.length > 0) && (
         <section aria-labelledby="drafts-heading" className="mt-10 border-t border-line pt-8">
           <h3 id="drafts-heading" className="text-[1.0625rem] font-sans font-semibold tracking-normal">
-            {drafts.length ? "Not on your page yet" : "Another project?"}
+            {drafts.length ? "Not on your portfolio yet" : "Another project?"}
           </h3>
           {drafts.length > 0 && (
             <ul className="mt-3 space-y-2">
