@@ -336,7 +336,7 @@ test.describe("A save on its way when the person leaves", () => {
     expect(facts.back, "back by the header's link, the editor opens on the newer words, with nothing to offer back").toEqual({ opened: true, shown: "The newer words", offer: null });
   });
 
-  test("newer words asked for while the header's Roadmaps is under way: they go as the editor goes, past Next's redirect on arriving there, and are saved", async ({ page }) => {
+  test("newer words asked for while the header's Roadmaps is under way: they go in the moment the editor goes, and are saved", async ({ page }) => {
     await openEditor(page, fresh(FULL, "lv-lost-roadmap"));
     await warm(page, ["/roadmap", "/roadmap/new"]);
     const saves = watchSaves(page);
@@ -497,6 +497,39 @@ test.describe("A save on its way when the person leaves", () => {
     expect(facts.offer, "with nothing to offer back").toBe(null);
     expect(facts.stored, "the second visit's edit is what the server keeps, over the first visit's words").toEqual({ headline: first, name: second });
     expect(facts.offerAfter, "and nothing older is offered over it").toBe(null);
+  });
+
+  test("by a reload, when the server took the save but its answer had not come back: nothing is offered back as not saved", async ({ page }) => {
+    await openEditor(page, fresh(FULL, "lv-took-it"));
+    const saves = watchSaves(page);
+    const dialogs = watchDialogs(page);
+    // The first save reaches the server and is stored; its answer is held, as on a connection that drops the reply.
+    const sent = { taken: false, stored: false };
+    await page.context().route("**/*", async (route) => {
+      if (sent.taken || !isSave(route.request())) return route.fallback();
+      sent.taken = true;
+      await route
+        .fetch()
+        .then(() => void (sent.stored = true))
+        .catch(() => {});
+    });
+    // Typed as a person pauses between words: the words end in a space, which the server trims as it stores them.
+    const words = "Analyst in food service and ";
+    const facts: Record<string, unknown> = {};
+    try {
+      await typeIn(page, HEADLINE, words);
+      await expect.poll(() => sent.stored, { timeout: 20_000 }).toBe(true);
+      await page.reload();
+      await waitReady(page);
+      facts.dialogs = dialogs;
+      facts.saves = told(saves);
+      facts.shown = await valueAt(page, HEADLINE);
+      facts.offer = await offerWhy(page);
+    } finally {
+      say("the server took it, its answer lost, then a reload", facts);
+    }
+    expect(facts.shown, "the server has the words, as it stores them").toBe(words.trim());
+    expect(facts.offer, "so nothing is offered back as not saved").toBe(null);
   });
 
 });

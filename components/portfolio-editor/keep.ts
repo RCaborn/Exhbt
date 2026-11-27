@@ -1,9 +1,19 @@
 import type { BuilderState } from "@/app/(app)/portfolio/steps";
 
 /*
- * The unsaved state, kept in the browser when the site was updated under this tab (decision 0031,
- * "Saving": "After a deploy"). The tab's save action no longer exists, so nothing more can be saved
- * from it; what is on the page is put by here, and after the reload the editor offers it back once.
+ * The newest state, kept in this browser when the server may not have it, for the next visit to offer
+ * back once (Notices.tsx). It is kept:
+ *  - when the site was updated under this tab (decision 0031, "Saving": "After a deploy"): the tab's
+ *    save action no longer exists, so nothing more can be saved from it;
+ *  - as the editor is taken off the page by a link inside the app, when the server has not said it has
+ *    the newest state: a save refused or failed is sent again by nobody, a save still on its way may
+ *    never land, and newer words waiting behind it are not sent once the editor has gone
+ *    (PortfolioEditor.tsx, startVisit). A save that lands with the newest state takes the copy back
+ *    (`forgetUnsaved`);
+ *  - as the page goes for good (a reload, an address typed, the tab closed: leaving.ts, `pagehide`)
+ *    while a save has not answered, since the browser drops a save still on its way.
+ * The next visit offers it only if the server does not have it already, which a save whose answer was
+ * lost with the page may have.
  *
  * Kept by person: on a shared computer the next person to sign in must never be offered someone else's
  * words. Kept for a day: after that the page has moved on. Storage can be full, off or blocked, so
@@ -15,7 +25,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Why the state was kept: "stale", the site was updated under the tab and its save action is gone; "left",
- * the person left the page by a link inside the app while a save was refused or had failed.
+ * the page was left (by a link inside the app, or for good: a reload, an address typed, the tab closed)
+ * before the server had said it had the newest state.
  */
 export type KeptWhy = "stale" | "left";
 

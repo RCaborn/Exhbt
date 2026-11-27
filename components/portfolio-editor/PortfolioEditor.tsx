@@ -212,10 +212,11 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
 
   /**
    * The save useBuilder calls. Once the editor has gone, useBuilder asks again only when a save that was on its way has
-   * answered and newer words were waiting behind it, at a moment nothing here chooses: the next page may be in a
-   * navigation of its own (Next's redirect on arriving at /roadmap is one), which can drop it, and a save that never
-   * answers would keep the gate waiting. Not sent, then: those words were kept in this browser as the editor went
-   * (leftBehind), and the next visit offers them back. The save useBuilder sends in the moment the editor goes is sent.
+   * answered and newer words were waiting behind it, at a moment nothing here chooses or sees: the next page may have
+   * a navigation of its own under way (one the person started there, or Next's), which can drop it, and a save that
+   * never answers would keep the gate waiting. Not sent, then: those words were kept in this browser as the editor
+   * went (leftBehind), and the next visit offers them back. The save useBuilder sends in the moment the editor goes is
+   * sent.
    */
   const save = (state: BuilderState): Promise<SaveResult> => {
     if (!closed) return tracked(state);

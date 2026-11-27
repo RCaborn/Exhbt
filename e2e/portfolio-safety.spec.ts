@@ -200,7 +200,7 @@ test.describe("Leaving while a save is refused", () => {
     const offer = page.locator("[data-kept-offer]");
     await expect(offer).toHaveAttribute("data-kept-why", "left");
     await expect(offer).toContainText("Your last changes were not saved");
-    await expect(offer).toContainText("You left the page before they could be saved");
+    await expect(offer).toContainText("This page was left or reloaded before they could be saved");
     await offer.getByRole("button", { name: "Put back your last changes" }).click();
     await expect(textbox(page, "profile.headline")).toHaveValue(thirteen);
     expect(await page.evaluate(() => window.__portfolioEditor!.undoLabel())).toBe("put back your last changes");
