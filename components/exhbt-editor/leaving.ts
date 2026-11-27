@@ -1,12 +1,15 @@
 /*
  * Whether the person is on their way off this page, for a chunk that fails to load meanwhile (again.ts).
  *
- * What was seen. In the WebKit run of 27 Nov 2026 (CI; e2e/safari.webkit.ts), a chunk on its way failed after the person
- * went elsewhere, and so did its retries, because the next page was slow and the page was kept, still running, until it
- * came. Chromium does not do that unprompted: e2e/editor-classic.spec.ts makes it, by holding the next page back and
- * failing the chunk from the moment of leaving. There the guard below saw `beforeunload` first, and the page that was
- * left opened no fallback. That order, `beforeunload` and then the failing loads, was not looked at in WebKit itself:
- * only that the run failed before this guard and the test is written to pass with it.
+ * What was seen. In the WebKit CI run 45932577883 (27 Nov 2026), two tests failed: e2e/safari.webkit.ts:27 and
+ * e2e/your-way.spec.ts:369. What the commit that added this guard (7f8b314) read from it: the crash fallback's redirect
+ * to `?editor=classic` interrupted the navigation the test had asked for. Why the fallback ran is inferred, not
+ * observed: that a chunk on its way failed after the person went elsewhere, and its retries too, because the next page
+ * was slow and the old page was kept, still running, until it came. Chromium does not do that unprompted:
+ * e2e/editor-classic.spec.ts makes it, by holding the next page back and failing the chunk from the moment of leaving.
+ * There the guard below saw `beforeunload` first, and the page that was left opened no fallback. That order,
+ * `beforeunload` and then the failing loads, was not looked at in WebKit itself: only that the run failed before this
+ * guard and the test is written to pass with it.
  *
  * What was not seen. Whether Safari on an iPhone fires `beforeunload` at all, for Reload, Back or a link out, is
  * unknown: it has not been tried on a device, and WebKit on Linux is the same engine, not the same browser. If it does
@@ -18,6 +21,13 @@
  * (the press or key that started the leave is not that press: see `used`). It listens for `beforeunload` only while a
  * load is under way (`watchLeaving`), so a page with nothing loading carries no such listener (one can keep a page out
  * of some browsers' back-forward cache).
+ *
+ * The price of "not after the person's next press": during a real slow leave any press ends the guard, the second press of
+ * a double-click on a link out, or a finger put down to scroll while the next page loads (`pointerdown` fires when the
+ * touch starts). A failing chunk is then counted and can open the fallback. A "Stay" is only possible when something asked
+ * for the prompt, and the editor asks only while something is unsaved (components/editor/useAutosave.ts), so ending the
+ * guard only when the `beforeunload` that began it asked for a prompt (`defaultPrevented`) would keep the minute for a
+ * leave with nothing unsaved. That is not done, and is untested: a decision for Rory.
  */
 
 /** The longest a leave counts as one: a page still here a minute after it was left was not left. */
