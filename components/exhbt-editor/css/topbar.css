@@ -450,6 +450,10 @@
     .xe-save {
       font-size: 0.75rem;
     }
+    /* A failed save: the button says "Retry" here, so "Review and publish" keeps its one line; its accessible name and the card below say the rest. */
+    .xe-save-lead {
+      display: none;
+    }
     /* Why a save failed: under the bar, as wide as the screen, as the panels are here. */
     .xe-save-bad {
       position: static;

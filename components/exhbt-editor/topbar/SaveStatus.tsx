@@ -44,7 +44,7 @@ export function SaveStatus(): ReactNode {
       ) : failed ? (
         <span className="xe-save xe-save-bad">
           <Button size="sm" variant="danger" className="xe-tb" label="Not saved. Retry" onClick={() => void flush()}>
-            Not saved. Retry
+            <span className="xe-save-lead">Not saved. </span>Retry
           </Button>
           <span className="xe-save-words">Kept in this browser.{status.error ? ` ${status.error}` : ""}</span>
         </span>
