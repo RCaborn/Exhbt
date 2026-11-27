@@ -3,9 +3,11 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { FeatureList } from "@/components/site/FeatureList";
 import { Button } from "@/components/ui/Button";
+import { isAdmin } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { BILLING_PERIOD, PLAN_NAMES, PRICES, planFeatures, type Plan } from "@/lib/entitlements";
 import { getPlan } from "@/lib/plan";
+import { portfolioKind } from "@/lib/portfolio-kind-server";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore, isSupabaseConfigured, LIVE_SUBSCRIPTION_STATUSES } from "@/lib/store";
 import { isStripeConfigured, PAID_PLANS, type PaidPlan } from "@/lib/stripe";
@@ -52,6 +54,11 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         <p role="status" className="mt-6 rounded-[14px] border border-line bg-wash px-4 py-3">
           {message}
         </p>
+      )}
+      {status === "success" && (await portfolioKind(await isAdmin(user))) === "page" && (
+        <div className="mt-3">
+          <Button href="/portfolio" size="sm">Back to your portfolio</Button>
+        </div>
       )}
 
       <section aria-labelledby="current" className="mt-10">

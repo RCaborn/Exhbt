@@ -13,6 +13,9 @@ on:
     paths-ignore:
       - "docs/**"
       - "**/*.md"
+  # By hand, for a branch whose code has not had a WebKit run (its code pushes carried [skip ci]
+  # and its last push changed only the docs).
+  workflow_dispatch:
 
 # One run per branch at a time. A newer push takes the place of a run still waiting;
 # the run already in progress finishes, so its results are not lost.
@@ -24,28 +27,36 @@ permissions:
   contents: read
 
 jobs:
-  # One job, in groups: the desktop specs in four (about 160 tests each; four since e2e/your-way.spec.ts joined them on
-  # 26 Nov 2026, when the slowest of three groups already took 32 of its 38 minutes), the phone's and the tablet's
-  # together in one, and the same five again under Safari's rule about the focus. Ten groups, so with CI's eleven a push
-  # runs 21 jobs at once. In these projects each test is its own shard unit, so a long spec is split between groups.
+  # One job, in groups: the desktop specs in six (about 135 tests each), the phone's and the tablet's together in one,
+  # and the same seven again under Safari's rule about the focus. In these projects each test is its own shard unit, so
+  # a long spec is split between groups, by the count of tests and not by their time. Six since the portfolio editor's
+  # specs joined the desktop ones on 27 Nov 2026: in four, the first group (most of e2e/editor-drag.spec.ts) ran out of
+  # its 38 minutes under the focus rule with 14 tests not run, and the last took 37; by that run's test times the
+  # slowest of six takes about 28, and the limit below is 45. Fourteen groups: with CI's eleven a release pull request
+  # asks for 25 runners at once, five more than the 20 there are, so five groups wait for the first to finish (CI's
+  # check, after about three minutes, then its shortest groups and the phones', after ten to fifteen).
   e2e-webkit:
     name: e2e-webkit (${{ matrix.name }} ${{ matrix.shard }}/${{ matrix.of }}${{ matrix.focus && ', the focus rule' || '' }})
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 52
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { name: safari, projects: "--project=safari", shard: 1, of: 4 }
-          - { name: safari, projects: "--project=safari", shard: 2, of: 4 }
-          - { name: safari, projects: "--project=safari", shard: 3, of: 4 }
-          - { name: safari, projects: "--project=safari", shard: 4, of: 4 }
+          - { name: safari, projects: "--project=safari", shard: 1, of: 6 }
+          - { name: safari, projects: "--project=safari", shard: 2, of: 6 }
+          - { name: safari, projects: "--project=safari", shard: 3, of: 6 }
+          - { name: safari, projects: "--project=safari", shard: 4, of: 6 }
+          - { name: safari, projects: "--project=safari", shard: 5, of: 6 }
+          - { name: safari, projects: "--project=safari", shard: 6, of: 6 }
           - { name: iphone-ipad, projects: "--project=iphone --project=ipad", shard: 1, of: 1 }
           # The same again under Safari's rule about the focus, which WebKit on Linux does not have (e2e/editor-test.ts, safariFocus).
-          - { name: safari, projects: "--project=safari", shard: 1, of: 4, focus: safari }
-          - { name: safari, projects: "--project=safari", shard: 2, of: 4, focus: safari }
-          - { name: safari, projects: "--project=safari", shard: 3, of: 4, focus: safari }
-          - { name: safari, projects: "--project=safari", shard: 4, of: 4, focus: safari }
+          - { name: safari, projects: "--project=safari", shard: 1, of: 6, focus: safari }
+          - { name: safari, projects: "--project=safari", shard: 2, of: 6, focus: safari }
+          - { name: safari, projects: "--project=safari", shard: 3, of: 6, focus: safari }
+          - { name: safari, projects: "--project=safari", shard: 4, of: 6, focus: safari }
+          - { name: safari, projects: "--project=safari", shard: 5, of: 6, focus: safari }
+          - { name: safari, projects: "--project=safari", shard: 6, of: 6, focus: safari }
           - { name: iphone-ipad, projects: "--project=iphone --project=ipad", shard: 1, of: 1, focus: safari }
     env:
       E2E_WEBKIT: "1"
@@ -58,8 +69,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps webkit
-      # It stops itself after 38 minutes, inside the job's 45, so a slow run still writes its report and its summary.
-      - run: npx playwright test ${{ matrix.projects }} --shard=${{ matrix.shard }}/${{ matrix.of }} --reporter=list,github,html,json --global-timeout=2280000
+      # It stops itself after 45 minutes, inside the job's 52, so a slow run still writes its report and its summary.
+      - run: npx playwright test ${{ matrix.projects }} --shard=${{ matrix.shard }}/${{ matrix.of }} --reporter=list,github,html,json --global-timeout=2700000
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/webkit.json
           PLAYWRIGHT_HTML_OPEN: never

@@ -12,6 +12,7 @@ import { ENTITLEMENTS } from "@/lib/entitlements";
 import { offeredIn } from "@/lib/exhbt/formats";
 import { signedFileUrl } from "@/lib/files";
 import { canCreateExhbt, canPublish, getPlan } from "@/lib/plan";
+import { portfolioKind } from "@/lib/portfolio-kind-server";
 import { portfolioHref } from "@/lib/portfolio-links";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
@@ -45,6 +46,8 @@ export default async function NewExhbtPage({ searchParams }: { searchParams: Pro
   const view = addExhbtView(q);
   const user = await getCurrentUser();
   if (!user) {
+    // Portfolio first, the plain chooser's sign-in comes back to the portfolio, where adding one starts.
+    if (view === "choose" && !q.into && (await portfolioKind(false)) === "page") redirect("/login?next=/portfolio");
     const back = q.into ? `${ADD_EXHBT}?into=${q.into}` : view === "draft" ? DRAFT_WITH_AI : view === "blank" ? BUILD_IT_YOURSELF : ADD_EXHBT;
     redirect(`/login?next=${encodeURIComponent(back)}`);
   }
@@ -54,7 +57,8 @@ export default async function NewExhbtPage({ searchParams }: { searchParams: Pro
   const store = getStore();
   const [plan, exhbts] = await Promise.all([getPlan(user.id), store.listExhbts(user.id)]);
   const room = canCreateExhbt(plan, exhbts);
-  if (!room.ok) return <NoRoom reason={room.reason} upgradeTo={room.upgradeTo} />;
+  const portfolioFirst = (await portfolioKind(await isAdmin(user))) === "page";
+  if (!room.ok) return <NoRoom reason={room.reason} upgradeTo={room.upgradeTo} portfolioFirst={portfolioFirst} />;
 
   // The layouts this person's editor offers (decided as the edit page decides it), and whether an AI draft is left.
   const [offered, draft] = await Promise.all([editorKind(await isAdmin(user)).then(offeredIn), draftVerdict(user.id)]);
@@ -66,7 +70,7 @@ export default async function NewExhbtPage({ searchParams }: { searchParams: Pro
   const where: Where = ENTITLEMENTS[plan].publicPortfolio
     ? { live: true, liveBase: profile.username ? portfolioHref(profile.username, host) : null }
     : { live: false, reason: publish.ok ? "" : publish.reason };
-  return <Chooser draft={draft} offered={offered} where={where} />;
+  return <Chooser draft={draft} offered={offered} where={where} portfolioFirst={portfolioFirst} />;
 }
 
 /**

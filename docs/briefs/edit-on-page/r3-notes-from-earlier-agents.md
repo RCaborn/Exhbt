@@ -318,6 +318,7 @@ How Safari differs, as found here:
 - When a navigation starts, WebKit stops the loads of the page being left while that page is still alive.
   - A lazy chunk then fails with `ChunkLoadError`, the editor's crash fallback fired, and its `location.replace` to the classic editor beat the person's own navigation.
   - `components/exhbt-editor/again.ts` asks for a chunk again (twice, after 0.5s and 1.5s) before the fallback. Use it for any new lazy import in the editor.
+  - The two retries alone were not enough (WebKit run of 27 Nov 2026): they are over in two seconds, a leave can take longer (a slow connection, or next dev building the next page), and the retries failed too. A failure while the page is being left (`beforeunload` in the last minute, `leaving.ts`) is not counted; the chunk is asked for again each second until the page goes. `e2e/editor-classic.spec.ts` makes any browser cut a chunk off that way.
 - Safari has no `requestIdleCallback`. `fields/idle.ts` then starts the formatted fields' editors 50ms apart, so a page's fields go live over a second or two, later than on Chromium. A test that needs live editors waits for them (`waitLive`).
 - Tiptap picks the Mac key map by the user agent ("Mac" and a touch screen), and ProseMirror by `navigator.platform`. Under an iPhone user agent on a Linux host there is no key for "select all". `chooseAll` in `e2e/page-editor.ts` selects through the page instead.
 - A toolbar's placement lands a frame later than on Chromium. A test reads `toolbarClashes` with `expect.poll`.

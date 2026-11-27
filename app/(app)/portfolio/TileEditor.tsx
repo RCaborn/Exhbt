@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
-import { countWords, TILE_LIMITS, TILE_NAMES, type TileKind, type Tiles } from "@/lib/portfolio-layout";
+import { countWords, lineWords, TILE_LIMITS, TILE_NAMES, type TileKind, type Tiles } from "@/lib/portfolio-layout";
 import type { TileProblems } from "@/lib/portfolio-customise";
 
 /**
@@ -63,7 +63,7 @@ function Lines({ kind, value, onChange, problems, ready }: Props<"education" | "
       {lines.map((l, i) => (
         <div key={i} className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
-            <Field id={`${kind}-line-${i}`} label={`Line ${i + 1}`} {...wordsCount(l, TILE_LIMITS.lineWords)}>
+            <Field id={`${kind}-line-${i}`} label={`Line ${i + 1}`} count={`${lineWords(l)} of ${TILE_LIMITS.lineWords} words`} over={lineWords(l) > TILE_LIMITS.lineWords}>
               <input
                 id={`${kind}-line-${i}`}
                 value={l}

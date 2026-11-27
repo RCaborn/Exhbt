@@ -121,6 +121,7 @@ Phase 2 (portfolios, the exhbt editor, uploads and AI drafts, paid plans) is on 
 | **Stripe** (checkout, billing portal, webhook) | Secrets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`. Price ids `STRIPE_PRICE_PREMIUM`, `STRIPE_PRICE_MAX` in `wrangler.jsonc` `vars` (not secret) | Billing page can't take payments. The e2e suite sets test values in `playwright.config.ts` |
 | **Supabase Storage** | Buckets `sources` and `evidence`, both private, created by `supabase/migrations/20261114000000_phase2_schema.sql`. Uses the Supabase keys above | Uploads go to an in-memory stand-in (`/dev/upload`, `/dev/files`) |
 | **The editor switch** | `EXHBT_EDITOR`, a runtime variable set in the Cloudflare dashboard, never in `wrangler.jsonc` or `next.config.ts`: `page` or `classic`, for everyone | `DEFAULT_EDITOR` in `lib/editor-kind.ts` decides: the new editor, `page` (below, "The editor switch") |
+| **The portfolio switch** | `EXHBT_PORTFOLIO`, a runtime variable set in the Cloudflare dashboard, never in `wrangler.jsonc` or `next.config.ts`: `page` or `steps`, for everyone | `DEFAULT_PORTFOLIO` in `lib/portfolio-kind.ts` decides: `steps`, today's step builder and nav (below, "The portfolio switch") |
 
 `/api/health` reports these under `phase2`: each Stripe setting (present or not, never the value), whether the Stripe key and both price ids work, and whether both buckets exist and are private. None of it changes the overall `ok` yet. Fold it in when payments are meant to be live.
 
@@ -131,6 +132,7 @@ Development pages for Phase 2 (all 404 in production and when Supabase is connec
 - **`/dev/plan?plan=max&next=/exhbts`**: puts the signed-in dev user on a plan without Stripe.
 - **`/dev/upload/<id>`** and **`/dev/files/<id>`**: the in-memory stand-in for Storage. Uploads PUT to the first; portfolio pages read from the second. Files are gone when the server restarts.
 - **`/dev/editor?kind=page`**: stands in for `EXHBT_EDITOR` in this browser alone. `kind=classic` and `kind=default` (the variable not set) are the other settings, and an empty `kind=` clears it.
+- **`/dev/portfolio-kind?kind=page`**: stands in for `EXHBT_PORTFOLIO` in this browser alone, then opens `/portfolio`. `kind=steps` and `kind=default` are the other settings.
 - **`/dev/admin?role=admin`**: makes the signed-in dev user an admin (`role=user` takes it back), for `/admin` and the admin's own editor switch.
 
 ### The editor switch
@@ -163,10 +165,35 @@ Where Phase 2 lives:
 | Which editor a person gets | `lib/editor-kind.ts` (the rule and `DEFAULT_EDITOR`), `lib/editor-kind-server.ts`, `app/api/exhbts/editor/route.ts` (an admin's own choice) |
 | Adding an exhbt: the two ways to start and the layouts | `app/(app)/exhbts/new/` (`Chooser.tsx`, `LayoutGallery.tsx`), `lib/add-exhbt.ts` |
 | Uploads and AI drafts | `app/(app)/exhbts/new/` (`DraftForm.tsx`, at `?start=draft`), `lib/uploads.ts`, `lib/files.ts`, `lib/ai/exhbt-draft.ts`, `lib/exhbt/verify.ts` |
-| The portfolio builder (profile, look, projects, address) | `app/(app)/portfolio/` (decision 0016) |
+| The portfolio builder at `steps` (profile, look, projects, address) | `app/(app)/portfolio/` (decision 0016); its state and saving are also what the editor below uses |
+| The portfolio editor at `page` (the page itself, edited where it sits) | `components/portfolio-editor/` (decision 0031): `runtime.ts` (state, saving, Undo, sheets), `adapter.tsx` (what the page's slots draw), `bar/`, `sheets/`, `sections/`, `tiles/`, `phone/`, `css/` |
+| Which structure a person gets, the nav, where sign-in lands | `lib/portfolio-kind.ts` (the rule and `DEFAULT_PORTFOLIO`), `lib/portfolio-kind-server.ts`, `lib/landing.ts`, `components/site/app-nav.ts`, `app/api/portfolio/editor/route.ts` (an admin's own choice) |
 | Portfolio pages | `app/(portfolio)/` (hosts: decision 0001; the subdomain routing is being built separately) |
 | Billing | `app/(app)/account/billing/`, `lib/stripe.ts`, `app/api/stripe/webhook/route.ts` |
 | Which plan someone is on | `lib/plan.ts` (`getPlan`), rules in `lib/plan-rules.ts` |
+
+### The portfolio switch
+
+One switch carries the one-page portfolio editor and the new structure together (decision 0031), so both reach people on the same day and one change takes both back. It is `DEFAULT_PORTFOLIO` in `lib/portfolio-kind.ts`, and it is `"steps"` today, so the live site is still the step builder. `EXHBT_PORTFOLIO` (`page` or `steps`) on the Worker overrides it for everyone with no deploy; anything else, or nothing, leaves the constant to decide. `SHIPPED_DEFAULT` at the top of `e2e/portfolio-switch.spec.ts` pins the constant: change both in one commit. `/api/health` reports what an ordinary person gets, as `portfolio`.
+
+What each setting means:
+
+| | `steps` (today) | `page` |
+|---|---|---|
+| `/portfolio` | The step builder (You, Your look, Your projects, Publish) | The page itself, edited where it sits (`components/portfolio-editor/`) |
+| Signed-in nav | Roadmaps, Your exhbts, Portfolio | Your portfolio, Roadmaps |
+| After sign-in | `/roadmap` for log-in, `/account` for sign-up and password | `/portfolio` for all three, unless `next` says otherwise |
+| `/exhbts` | The list | Redirects to `/portfolio`, query kept |
+| `/exhbts/new` | The chooser | "Add an exhbt to your portfolio", with "Your portfolio" as the way back |
+| Exhbt editor's way back | The exhbts list | Your portfolio, and a first publish returns there |
+| Job links and the team | A section of the step builder, and a panel on the exhbts list | Opened from the editor's bar |
+
+Visitors' pages are the same at both settings.
+
+- **An admin's own switch.** An admin sees "Try the new portfolio" on the step builder; it is remembered in their browser (a cookie, honoured only while the signed-in person is an admin, checked on every request). In the editor's menu, "Use the step builder" is for this visit (`?builder=steps`, also where the editor's crash fallback reloads to), and an admin also gets "Go back to the step builder for good" for this browser.
+- **In development.** `/dev/portfolio-kind?kind=page` stands in for `EXHBT_PORTFOLIO` in this browser alone (`kind=steps`, or `kind=default` for the variable not set). Then sign in as the dev user and open `/portfolio`; `/dev/portfolio?username=amara&plan=premium&count=2` makes a portfolio with exhbts to arrange.
+- **Switching it on.** Set `EXHBT_PORTFOLIO=page` on the Worker and nothing else; to make it the default, change the constant and `SHIPPED_DEFAULT` together. The checklist Rory and Alex use first is `docs/briefs/portfolio-first/trial-checklist.md`. Back to today's app for everyone: set `EXHBT_PORTFOLIO` to `steps`.
+- **The first-run strip** can be hidden with its "Hide this", kept in a first-party cookie, `exhbt_strip_hidden`, named in the cookie policy.
 
 ## Known limits and decisions
 

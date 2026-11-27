@@ -14,6 +14,7 @@ import { slugify, uniqueSlug } from "@/lib/exhbt/slug";
 import { startingDoc } from "@/lib/exhbt/sections";
 import { canCreateExhbt, canPublish, getPlan } from "@/lib/plan";
 import { takenSlugs } from "@/lib/slugs";
+import { portfolioKind } from "@/lib/portfolio-kind-server";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
 import { deleteExhbtWithFiles } from "@/lib/uploads";
@@ -87,6 +88,7 @@ export async function createFromScratch(form: FormData) {
     await store.deleteExhbt(id, user.id);
     redirect("/exhbts?full=1");
   }
+  revalidatePath("/portfolio");
   redirect(`/exhbts/${id}/edit`);
 }
 
@@ -128,9 +130,11 @@ export async function createFromIdea(roadmapId: string, ideaId: string) {
   const idea = (await store.listProjectIdeas(roadmapId)).find((i) => i.id === ideaId);
   if (!idea) redirect(back);
   // Refused: the Projects page shows the reason and a link to billing.
-  if (!canCreateExhbt(await getPlan(user.id), await store.listExhbts(user.id)).ok) redirect(back);
+  const before = await store.listExhbts(user.id);
+  if (!canCreateExhbt(await getPlan(user.id), before).ok) redirect(back);
   const id = await store.createExhbt(user.id, docFromIdea(idea));
-  redirect(`/exhbts/${id}/edit`);
+  revalidatePath("/portfolio");
+  redirect(await ideaLanding(user, id, before.length === 0));
 }
 
 /** "Build this as an exhbt" on the saved list: the same prefill, from the saved copy. */
@@ -143,9 +147,21 @@ export async function createFromSavedIdea(savedId: string) {
   const idea = await store.getSavedIdea(savedId, user.id);
   if (!idea) redirect(back);
   // Refused: the saved page shows the reason and a link to billing.
-  if (!canCreateExhbt(await getPlan(user.id), await store.listExhbts(user.id)).ok) redirect(back);
+  const before = await store.listExhbts(user.id);
+  if (!canCreateExhbt(await getPlan(user.id), before).ok) redirect(back);
   const id = await store.createExhbt(user.id, docFromIdea(idea));
-  redirect(`/exhbts/${id}/edit`);
+  revalidatePath("/portfolio");
+  redirect(await ideaLanding(user, id, before.length === 0));
+}
+
+/**
+ * Where an exhbt made from an idea opens. Portfolio first (decision 0031), a person's first exhbt lands on
+ * the portfolio with its tile marked, so they see where it lives; anyone with exhbts already goes straight
+ * to the editor, as at the other setting.
+ */
+async function ideaLanding(user: SessionUser, id: string, first: boolean): Promise<string> {
+  if (first && (await portfolioKind(await isAdmin(user))) === "page") return `/portfolio?at=${encodeURIComponent(id)}`;
+  return `/exhbts/${id}/edit`;
 }
 
 /** Moves an exhbt one place up (-1) or down (1) in the portfolio order. */
@@ -166,6 +182,7 @@ export async function deleteExhbt(id: string) {
   // Its files too, records and stored objects (lib/uploads.ts).
   await deleteExhbtWithFiles(user.id, id);
   revalidatePath("/exhbts");
+  revalidatePath("/portfolio");
   redirect("/exhbts");
 }
 
@@ -212,6 +229,7 @@ export async function publishExhbt(id: string, raw: unknown, confirmed: boolean)
   const slug = me.slug ?? uniqueSlug(slugify(doc.title), await takenSlugs(user.id, { exceptExhbtId: id }));
   if (!(await store.publishExhbt(id, user.id, slug))) return { ok: false, reasons: ["This exhbt isn't yours to publish, or it changed while it was being published. Reload the page and try again."] };
   revalidatePath("/exhbts");
+  revalidatePath("/portfolio");
   revalidatePath(`/exhbts/${id}/edit`);
   revalidatePath(`/p/${profile.username}`, "layout");
   // When it went live, as the public page dates its checks: the editor draws the same date (components/exhbt-editor/visitor-parts.tsx).
@@ -225,6 +243,7 @@ export async function unpublishExhbt(id: string) {
   await store.unpublishExhbt(id, user.id);
   const { username } = await store.getPortfolioProfile(user.id);
   revalidatePath("/exhbts");
+  revalidatePath("/portfolio");
   if (username) revalidatePath(`/p/${username}`, "layout");
   redirect(`/exhbts/${id}/edit`);
 }

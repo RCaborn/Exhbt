@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { publishExhbt, unpublishExhbt } from "@/app/(app)/exhbts/[id]/actions";
 import { confirmNumber, unverifiedOf } from "@/components/editor/model";
 import { ConfirmAction } from "@/components/editor/ConfirmAction";
@@ -57,10 +58,15 @@ function PublishBody() {
   const first = issues.all[0];
 
   const showMe = useShowMe();
+  const router = useRouter();
+  // Portfolio first (decision 0031): the way back is to this exhbt's tile on the portfolio.
+  const portfolioAt = `/portfolio?at=${encodeURIComponent(env.id)}`;
 
   async function publish() {
     issues.setTried(true);
     setBusy(true);
+    // Set when a first publish leaves for the portfolio: Publish stays busy until the page goes.
+    let leaving = false;
     setResult(null);
     try {
       await save.settled();
@@ -71,12 +77,19 @@ function PublishBody() {
         noteSaved(sent);
         files.markPublished(sent);
         setLive(env.id, "published", r.slug, r.publishedAt);
+        // Portfolio first: a first publish returns to the portfolio, where the tile has turned Live and the
+        // note gives its link. Publishing changes to a live exhbt stays here, with the live panel.
+        if (env.portfolioFirst && !published) {
+          leaving = true;
+          router.push(portfolioAt);
+          return;
+        }
         setResult({ ok: true, slug: r.slug, changed: published });
       } else setResult({ ok: false, lines: r.reasons });
     } catch {
       setResult({ ok: false, lines: ["Couldn't reach the server. Try again in a moment."] });
     } finally {
-      setBusy(false);
+      if (!leaving) setBusy(false);
     }
   }
 
@@ -90,8 +103,17 @@ function PublishBody() {
   if (!env.canGoLive) {
     return (
       <div className="xe-sheet-stack">
-        <p className="text-graphite">This exhbt is a preview only: nobody else can see it.</p>
+        <p className="text-graphite">
+          {env.portfolioFirst ? "This exhbt is on your portfolio as a draft only you can see." : "This exhbt is a preview only: nobody else can see it."}
+        </p>
         {env.planBlock && <UpgradePrompt reason={env.planBlock.reason} upgradeTo={env.planBlock.upgradeTo} />}
+        {env.portfolioFirst && (
+          <div>
+            <Button href={portfolioAt} size="sm">
+              Back to your portfolio
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
@@ -113,7 +135,7 @@ function PublishBody() {
             </Button>
             <CopyLink href={justUrl} />
             {base && <SeeYourPortfolio liveBase={base} />}
-            <Button href="/exhbts">Back to your exhbts</Button>
+            {env.portfolioFirst ? <Button href={portfolioAt}>Back to your portfolio</Button> : <Button href="/exhbts">Back to your exhbts</Button>}
           </div>
         </div>
       ) : (

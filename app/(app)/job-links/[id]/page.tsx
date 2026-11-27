@@ -5,12 +5,14 @@ import { ArrowDown, ArrowLeft, ArrowUp } from "lucide-react";
 import { ConfirmAction } from "@/components/editor/ConfirmAction";
 import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
+import { isAdmin } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { EXHBTS_PER_JOB_LINK, PLAN_NAMES } from "@/lib/entitlements";
 import { portfolioUrl } from "@/lib/hosts";
 import { pickableExhbts } from "@/lib/job-links";
 import { INTRO_MAX_CHARS, INTRO_WORDS } from "@/lib/jobs/rank";
 import { getPlan, limitsFor } from "@/lib/plan";
+import { portfolioKind } from "@/lib/portfolio-kind-server";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
 import {
@@ -46,6 +48,8 @@ export default async function JobLinkEditPage({ params, searchParams }: Props) {
   const link = await store.getJobLink(id);
   if (!link || link.userId !== user.id) notFound();
   const [plan, live, profile] = await Promise.all([getPlan(user.id), pickableExhbts(user.id), store.getPortfolioProfile(user.id)]);
+  // Portfolio first (decision 0031): job links are a menu in the portfolio's bar.
+  const backHref = (await portfolioKind(await isAdmin(user))) === "page" ? "/portfolio?open=job-links" : "/portfolio#job-links";
   const canEdit = limitsFor(plan).jobLinks;
   const byId = new Map(live.map((e) => [e.id, e]));
   const title = (exhbtId: string) => byId.get(exhbtId)?.published?.title ?? "An exhbt that is no longer live";
@@ -56,7 +60,7 @@ export default async function JobLinkEditPage({ params, searchParams }: Props) {
   return (
     <div className="bg-mist">
       <div className="mx-auto max-w-3xl px-4 pt-10 pb-16 sm:px-8 lg:pt-14">
-        <Link href="/portfolio#job-links" className="inline-flex items-center gap-1.5 text-sm font-semibold hover:text-graphite">
+        <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm font-semibold hover:text-graphite">
           <ArrowLeft aria-hidden size={15} strokeWidth={2.25} /> Job links
         </Link>
         <div className="mt-3 flex flex-wrap items-center gap-3">

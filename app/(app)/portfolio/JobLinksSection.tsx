@@ -1,13 +1,21 @@
 import Link from "next/link";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { Text } from "@astryxdesign/core/Text";
+import { UpgradePrompt } from "@/components/site/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { portfolioUrl } from "@/lib/hosts";
 import { pickableExhbts } from "@/lib/job-links";
 import { canMakeJobLinks, getPlan, limitsFor } from "@/lib/plan";
-import { getStore } from "@/lib/store";
+import { getStore, type JobLink } from "@/lib/store";
 import { UpgradeNote } from "../job-links/UpgradeNote";
 
-/** Per-job links, as a section of the portfolio page rather than their own item in the header. */
-export async function JobLinksSection({ userId }: { userId: string }) {
+/**
+ * Per-job links, as a section of the portfolio page rather than their own item in the header.
+ * `compact` is the one-page editor's Job links menu (decision 0031, "What is edited where"): a list for
+ * a menu, in Astryx, with no section round it. The step builder keeps the full section.
+ */
+export async function JobLinksSection({ userId, compact = false }: { userId: string; compact?: boolean }) {
   const store = getStore();
   const [plan, links, profile, live] = await Promise.all([
     getPlan(userId),
@@ -18,6 +26,8 @@ export async function JobLinksSection({ userId }: { userId: string }) {
   const e = limitsFor(plan);
   const active = links.filter((l) => l.status === "live").length;
   const room = canMakeJobLinks(plan, active);
+
+  if (compact) return <CompactJobLinks limits={e} links={links} active={active} username={profile.username} hasLive={live.length > 0} room={room} />;
 
   return (
     <section id="job-links" aria-labelledby="job-links-title" className="border-t border-line bg-mist">
@@ -87,5 +97,99 @@ export async function JobLinksSection({ userId }: { userId: string }) {
         )}
       </div>
     </section>
+  );
+}
+
+/** What a job link is, in a line: the menu's first words, so a stranger knows what the list is for. */
+const WHAT = "A job link is a version of your portfolio for one job: the exhbts that fit it, and a line to the employer.";
+
+/**
+ * The editor's Job links menu: what a job link is, then each link (its name, its address, Live or Off,
+ * its views and Edit), New job link and the live links left. With nothing published, why nothing can be
+ * made yet. Below the plan that has them, the upgrade line only.
+ */
+function CompactJobLinks({
+  limits,
+  links,
+  active,
+  username,
+  hasLive,
+  room,
+}: {
+  limits: ReturnType<typeof limitsFor>;
+  links: JobLink[];
+  active: number;
+  username: string | null;
+  hasLive: boolean;
+  room: ReturnType<typeof canMakeJobLinks>;
+}) {
+  if (!limits.jobLinks) {
+    return (
+      <div className="pe-joblinks" data-job-links="upgrade">
+        <Text type="body" color="secondary">
+          {WHAT}
+        </Text>
+        <UpgradePrompt reason={room.ok ? "" : room.reason} upgradeTo={room.ok ? undefined : room.upgradeTo} primary={false} />
+      </div>
+    );
+  }
+  const left = Math.max(0, limits.jobLinksActive - active);
+  return (
+    <div className="pe-joblinks" data-job-links={links.length ? "list" : "empty"}>
+      <Text type="body" color="secondary">
+        {WHAT}
+      </Text>
+      {links.length > 0 && (
+        <List density="compact" hasDividers edge="flush">
+          {links.map((l) => {
+            const name = [l.company, l.roleTitle].filter(Boolean).join(" · ");
+            return (
+              <ListItem
+                key={l.id}
+                align="first-line"
+                label={<span className="pe-joblink-name">{name}</span>}
+                description={
+                  <span className="pe-joblink-meta">
+                    {username && <span className="pe-joblink-url">{portfolioUrl(username, l.slug)}</span>}
+                    <span>{l.viewCount === 1 ? "1 view" : `${l.viewCount.toLocaleString("en-GB")} views`}</span>
+                  </span>
+                }
+                startContent={
+                  <span className="pe-joblink-state">
+                    <StatusDot variant={l.status === "live" ? "success" : "neutral"} label={l.status === "live" ? "Live" : "Off"} />
+                    <Text type="supporting" weight="semibold">
+                      {l.status === "live" ? "Live" : "Off"}
+                    </Text>
+                  </span>
+                }
+                endContent={
+                  <Button href={`/job-links/${l.id}`} size="sm" label={`Edit ${name}`}>
+                    Edit
+                  </Button>
+                }
+              />
+            );
+          })}
+        </List>
+      )}
+      {!hasLive ? (
+        <p role="status" className="pe-joblinks-note">
+          Publish an exhbt first: a job link shows your live exhbts.
+        </p>
+      ) : room.ok ? (
+        <div className="pe-joblinks-foot">
+          <Button href="/job-links/new" size="sm">
+            New job link
+          </Button>
+          <Text type="supporting" color="secondary">
+            {`${left} of ${limits.jobLinksActive} live links left`}
+          </Text>
+        </div>
+      ) : (
+        <p role="status" className="pe-joblinks-note">
+          {room.reason}
+        </p>
+      )}
+    </div>
   );
 }

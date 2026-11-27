@@ -14,7 +14,8 @@ import { StandInPage } from "./StandIn";
  * the page. Until the chunk has loaded (and on the server) the gate draws the loading view, which is
  * exactly what the editor's first view draws (StandIn.tsx), so the fields come alive in place.
  *
- * If the editor throws while it draws, or its chunk fails to load (asked for three times: again.ts),
+ * If the editor throws while it draws, or its chunk fails to load (asked for three times, and a failure
+ * while the person is leaving the page is not counted: again.ts),
  * the boundary logs the error, says so, waits for flushPending() (three seconds at most; the browser
  * copy was already written) and reloads the page with ?editor=classic. It reloads rather than swapping editors in place: the
  * page's props are from when it was opened, and an editor mounted on them could save over newer work.

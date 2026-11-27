@@ -69,10 +69,17 @@ const chars = (max: number, what: string) =>
     .transform(oneLine)
     .refine((s) => s.length <= max, `Keep ${what} to ${max} characters or fewer.`);
 
+/**
+ * The words a line's limit counts: its words without the year at its end ("BSc Geography, Leeds, 2026"
+ * counts 3), so a line holds `TILE_LIMITS.lineWords` words as a person sees them, and its year besides.
+ */
+export const lineWords = (line: string) => countWords(splitYear(line).label);
+
 const LineSchema = z
   .string()
   .transform(oneLine)
-  .refine((s) => countWords(s) <= TILE_LIMITS.lineWords && s.length <= TILE_LIMITS.lineChars, `Keep each line to ${TILE_LIMITS.lineWords} words or fewer.`);
+  .refine((s) => lineWords(s) <= TILE_LIMITS.lineWords, `Keep each line to ${TILE_LIMITS.lineWords} words or fewer, not counting the year.`)
+  .refine((s) => s.length <= TILE_LIMITS.lineChars, `Keep each line to ${TILE_LIMITS.lineChars} characters or fewer.`);
 const LinesSchema = z
   .array(LineSchema)
   .max(TILE_LIMITS.lines, `Use up to ${TILE_LIMITS.lines} lines.`)
