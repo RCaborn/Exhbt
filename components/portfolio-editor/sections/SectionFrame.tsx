@@ -55,7 +55,6 @@ type Grip = Pick<ReturnType<typeof useSortable>, "attributes" | "listeners" | "s
  */
 function SortableSection({ sectionKey, index, count, children }: SectionFrameProps): ReactNode {
   const reduced = useReducedMotion();
-  const frame = useRef<HTMLDivElement | null>(null);
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: sectionKey,
     transition: reduced ? null : { duration: MOVE_MS, easing: EASE },
@@ -63,16 +62,13 @@ function SortableSection({ sectionKey, index, count, children }: SectionFramePro
   });
   return (
     <div
-      ref={(el) => {
-        frame.current = el;
-        setNodeRef(el);
-      }}
+      ref={setNodeRef}
       className="pe-frame pe-sec"
       data-section-frame={sectionKey}
       data-dragging={isDragging ? "true" : undefined}
       style={{ transform: Dnd.Translate.toString(transform), transition: transition ?? undefined }}
     >
-      <Frame sectionKey={sectionKey} index={index} count={count} frame={frame} attributes={attributes} listeners={listeners} setActivatorNodeRef={setActivatorNodeRef}>
+      <Frame sectionKey={sectionKey} index={index} count={count} attributes={attributes} listeners={listeners} setActivatorNodeRef={setActivatorNodeRef}>
         {children}
       </Frame>
     </div>
@@ -84,9 +80,9 @@ const SORTABLE = { roleDescription: "draggable section" };
 /** The frame, as the adapter draws it (E's adapter.tsx). */
 export { SortableSection as SectionFrame };
 
-type FrameProps = SectionFrameProps & Grip & { frame: RefObject<HTMLDivElement | null> };
+type FrameProps = SectionFrameProps & Grip;
 
-const Frame = memo(function SectionFrame({ sectionKey, index, count, children, frame, attributes, listeners, setActivatorNodeRef }: FrameProps): ReactNode {
+const Frame = memo(function SectionFrame({ sectionKey, index, count, children, attributes, listeners, setActivatorNodeRef }: FrameProps): ReactNode {
   const api = usePortfolioApi();
   const rt = useRuntime();
   const phone = usePhone();
@@ -95,6 +91,13 @@ const Frame = memo(function SectionFrame({ sectionKey, index, count, children, f
   const blocked = usePortfolioState((s) => removeBlocked(s.arrangement.sections, sectionKey));
   const body = useRef<HTMLDivElement | null>(null);
   const tools = useRef<HTMLDivElement | null>(null);
+  // The frame's node is the shell's (SortableSection): found through the body, whose ref is set before this
+  // frame's layout effects run, which the shell's own ref is not on the first one.
+  const frame = useRef<RefObject<HTMLElement | null>>({
+    get current() {
+      return body.current?.parentElement ?? null;
+    },
+  }).current;
   const spot = useSpot(frame, () => (frame.current && body.current && tools.current ? placeSection(frame.current, body.current, tools.current) : null), [sectionKey, index, count, phone]);
 
   const name = sectionName(sectionKey);
