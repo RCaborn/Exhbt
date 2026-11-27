@@ -93,7 +93,7 @@ export function PageEditor(props: PageEditorProps) {
   const [ready, setReady] = useState(false);
   // An iPhone zooms in on a field under 16px, and the page's own type is mostly under it (phone/noZoom.ts).
   useNoZoomOnFocus();
-  // A press in the editor never leaves the focus on the frame round it (#main, AppShell's main region): focus.ts.
+  // No press on the page ends with the focus on the frame round the editor (#main, AppShell's main region): focus.ts.
   const root = useRef<HTMLDivElement>(null);
   useFrameLetsGo(root);
   useEffect(() => {

@@ -9,9 +9,11 @@ import { useEffect, type RefObject } from "react";
  * to the nearest of them. Before the frame both left the focus on nothing, the body, and the editor was written for
  * that: the focus going nowhere left a menu open, and a focus on nothing let Undo or Escape take it.
  *
- * So the editor reads an element round it as nowhere (`focusNowhere`), and a press inside it never leaves the focus
+ * So the editor reads an element round it as nowhere (`focusNowhere`), and no press on the page ends with the focus
  * on the frame (`useFrameLetsGo`), whichever element the frame has: code drawn in the editor that still reads nowhere
- * as the body (the classic editor's BlockTools, in a toolbar's More actions) then sees what it saw before.
+ * as the body (the classic editor's BlockTools, in a toolbar's More actions) then sees what it saw before. While the
+ * press is held the frame does have the focus, so what reads the focus then (a menu's blur, a panel's focusin) asks
+ * `focusNowhere`.
  */
 
 /** Whether the focus at `el` (where it is, or where it is going) is nowhere for `part`: no element, the body, or an element round `part`. */
@@ -21,40 +23,31 @@ export function focusNowhere(el: EventTarget | null | undefined, part: Node | nu
 }
 
 /**
- * A press that starts inside `root` and puts the focus on an element round it (the frame) has that element let the
- * focus go, so it is on nothing, as the same press left it before the frame. In the focus event itself, before the
- * press's click is handled (Undo reads where the focus is then). Only for a press inside the editor: the skip link,
- * from the keyboard, still lands on #main; but a press inside the editor lets go of the frame that the skip link
- * focused, as the browser gives the focus no new event when the press would put it where it already is.
+ * A press on the page that ends with the focus on an element round `root` (the frame) has that element let the focus
+ * go, so it is on nothing, as the same press left it before the frame. Any press: one on #main outside the editor
+ * (the team strip above it) leaves the focus there just as one on the editor's margin does. Once the skip link has
+ * put the focus on #main, a press ends there too and lets go of it; the skip link itself, from the keyboard, makes no
+ * press, so it still lands on #main.
+ *
+ * At the press's release, in capture, so before its click is handled (Undo reads where the focus is then), and not
+ * while the browser is still handling the press: undoing its move of the focus there (in the focus event, or before
+ * it, at mousedown) makes Chromium drop the rest of the press, the start of a selection, and a drag across the page's
+ * words or a double-click on one selected nothing. A touch's mousedown, which moves the focus, comes after its
+ * pointerup, so the release that counts is mouseup's; a drag the browser takes over (selected words, a picture) ends
+ * with dragend instead.
  */
 export function useFrameLetsGo(root: RefObject<HTMLElement | null>) {
   useEffect(() => {
-    let pressed = false;
-    const frameHolds = (el: Element | null): el is HTMLElement => {
+    const letGo = () => {
       const r = root.current;
-      return Boolean(r && el instanceof HTMLElement && el !== r && el.contains(r));
-    };
-    const onDown = (e: MouseEvent) => {
-      pressed = Boolean(root.current && e.target instanceof Node && root.current.contains(e.target));
       const a = document.activeElement;
-      if (pressed && frameHolds(a)) a.blur();
+      if (r && a instanceof HTMLElement && a !== r && a.contains(r)) a.blur();
     };
-    // The first focus after the press is the press's own; whatever happens to the focus after that is not.
-    const onFocus = (e: FocusEvent) => {
-      if (!pressed) return;
-      pressed = false;
-      if (frameHolds(e.target as Element | null)) (e.target as HTMLElement).blur();
-    };
-    const onUp = () => {
-      pressed = false;
-    };
-    document.addEventListener("mousedown", onDown, true);
-    document.addEventListener("focusin", onFocus, true);
-    document.addEventListener("mouseup", onUp, true);
+    document.addEventListener("mouseup", letGo, true);
+    document.addEventListener("dragend", letGo, true);
     return () => {
-      document.removeEventListener("mousedown", onDown, true);
-      document.removeEventListener("focusin", onFocus, true);
-      document.removeEventListener("mouseup", onUp, true);
+      document.removeEventListener("mouseup", letGo, true);
+      document.removeEventListener("dragend", letGo, true);
     };
   }, [root]);
 }
