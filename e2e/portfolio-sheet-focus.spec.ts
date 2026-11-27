@@ -1,6 +1,6 @@
 import { devices, type Locator, type Page } from "@playwright/test";
 import { FULL } from "./fixtures/portfolio-pages";
-import { READY, expect, fresh, openEditor, setKind, test, waitReady } from "./portfolio-editor";
+import { READY, expect, fresh, openEditor, safariFocus, setKind, test, uiNow, waitReady } from "./portfolio-editor";
 
 /*
  * Where the focus goes when a sheet or a popover of the one-page portfolio editor closes (decision 0031, "The
@@ -9,12 +9,18 @@ import { READY, expect, fresh, openEditor, setKind, test, waitReady } from "./po
  * the photo sheet, with the sheet's own close button too), and the focus must be on the opener again; for a choice
  * in the bar's menu, which has gone with the menu, on the menu's button.
  *
- * Run it under Safari's rule about the focus as well (E2E_FOCUS=safari, e2e/editor-test.ts): there a press gives a
- * button no focus, and the focus goes to the nearest thing round it that takes one, the page's main region (#main,
- * app/(app)/layout.tsx). A sheet hands the focus back to whatever had it when it opened, so an opener that does not
- * take the focus itself sends a keyboard back to the top of the page. The editor's `open(sheet, trigger)` gives it
- * to the opener (components/portfolio-editor/runtime-core.ts). Nothing here asks `pressFocuses`: under either rule
- * the focus must come back.
+ * Every case runs twice: as the browser has it, and under Safari's rule about the focus, which the second half gives
+ * the page itself (safariFocus, e2e/editor-test.ts), so an ordinary Chromium run, CI's included, checks what Safari
+ * does. There a press gives a button no focus, and the focus goes to the nearest thing round it that takes one, the
+ * page's main region (#main, app/(app)/layout.tsx). A sheet hands the focus back to whatever had it when it opened, so
+ * an opener that does not take the focus itself sends a keyboard back to the top of the page. The editor's
+ * `open(sheet, trigger)` gives it to the opener (components/portfolio-editor/runtime-core.ts), and the bar's popover
+ * buttons take it as they are pressed (bar/hooks.ts, usePopoverOpener). Nothing here asks `pressFocuses`: under
+ * either rule the focus must come back. (E2E_FOCUS=safari puts both halves under the rule.)
+ *
+ * Under a finger at a wide window (an iPad in landscape, or the touch project's phone at 1440), Astryx's Popover keeps
+ * a second copy of its content while it shrinks back into its button, so what is open, and then closed, is counted by
+ * the copies that can be seen.
  *
  * The Team notice's Review (TeamSheet.tsx) opens the Team sheet the same way, but only while someone has asked to
  * join one of the person's exhbts, which no fixture holds: e2e/phase2-teammates.spec.ts makes such a request.
@@ -79,11 +85,12 @@ async function pressAndClose(page: Page, o: Opener, how: "Escape" | "the close b
   await opener.scrollIntoViewIfNeeded();
   await press(opener, finger);
   if (o.choice) await press(choice(page, o.choice), finger);
-  const open = o.open(page);
-  await expect(open).toBeVisible();
+  const shown = o.open(page).filter({ visible: true });
+  await expect(shown.first()).toBeVisible();
   if (how === "Escape") await page.keyboard.press("Escape");
-  else await press(open.getByRole("button", { name: "Close", exact: true }).first(), finger);
-  await expect(open).toBeHidden();
+  else await press(shown.first().getByRole("button", { name: "Close", exact: true }).first(), finger);
+  await expect(shown, `${o.name}, closed with ${how}: no copy of it is left to see`).toHaveCount(0);
+  await expect.poll(async () => (await uiNow(page)).sheet, { message: `${o.name}, closed with ${how}: the editor has nothing open` }).toBe(null);
   await expectFocusOn(page, o.choice ? more(page) : opener, `${o.name}, closed with ${how}`);
 }
 
@@ -91,87 +98,101 @@ const SHARE: Opener = { name: "Share", opener: (p) => toolbar(p).getByRole("butt
 const PHOTO: Opener = { name: "Change your photo", opener: photoButton, open: (p) => sheet(p, "photo"), closeButton: true };
 const TEAM: Opener = { name: "Team projects, in the menu", opener: more, choice: "Team projects", open: (p) => sheet(p, "team") };
 
-test.describe("At 1440, with a mouse", () => {
-  const openers: Opener[] = [
-    SHARE,
-    PHOTO,
-    TEAM,
-    { name: "Look", opener: (p) => toolbar(p).getByRole("button", { name: "Look", exact: true }), open: (p) => p.locator("[data-look-menu]") },
-    { name: "Job links", opener: (p) => toolbar(p).getByRole("button", { name: "Job links", exact: true }), open: (p) => p.locator("[data-job-links-menu]") },
-    { name: "Your links", opener: linksButton, open: (p) => p.locator("[data-links-panel]") },
-  ];
-  for (const o of openers) {
-    test(`${o.name}: the focus comes back to it`, async ({ page }) => {
-      await page.setViewportSize({ width: 1440, height: 900 });
-      await openEditor(page, fresh(FULL, `fo-${o.name}`));
-      await pressAndClose(page, o, "Escape");
-      if (o.closeButton) await pressAndClose(page, o, "the close button");
-    });
-  }
-
-  test("Claim your address, before there is one: the focus comes back to it", async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await newPerson(page, "claim");
-    const claim: Opener = { name: "Claim your address", opener: (p) => toolbar(p).getByRole("button", { name: "Claim your address", exact: true }), open: (p) => sheet(p, "address"), closeButton: true };
-    await pressAndClose(page, claim, "Escape");
-    await pressAndClose(page, claim, "the close button");
-  });
-
-  test("the visitor's page: its Claim your address gets the focus back", async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await newPerson(page, "visitor-claim");
-    await toolbar(page).getByRole("button", { name: "See as a visitor", exact: true }).click();
-    const claim: Opener = { name: "the visitor's Claim your address", opener: (p) => p.locator('[data-not-online="address"]').getByRole("button", { name: "Claim your address", exact: true }), open: (p) => sheet(p, "address") };
-    await pressAndClose(page, claim, "Escape");
-  });
-
-  test("the first-run strip: A photo and Pick a look give the focus back to the strip's own button", async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await newPerson(page, "strip");
-    const todo = (id: string) => (p: Page) => p.locator(`${READY} [data-first-run="wide"] [data-todo="${id}"]`).getByRole("button");
-    await pressAndClose(page, { name: "the strip's A photo", opener: todo("photo"), open: (p) => sheet(p, "photo") }, "Escape");
-    await pressAndClose(page, { name: "the strip's Pick a look", opener: todo("look"), open: (p) => p.locator("[data-look-menu]") }, "Escape");
-  });
-});
-
-test.describe("At 700, where the bar folds into its menu", () => {
-  const openers: Opener[] = [
-    SHARE,
-    TEAM,
-    { name: "Look, in the menu", opener: more, choice: "Look", open: (p) => sheet(p, "look") },
-    { name: "Job links, in the menu", opener: more, choice: "Job links", open: (p) => sheet(p, "job-links") },
-  ];
-  for (const o of openers) {
-    test(`${o.name}: the focus comes back`, async ({ page }) => {
-      await page.setViewportSize({ width: 700, height: 900 });
-      await openEditor(page, fresh(FULL, `fo7-${o.name}`));
-      await pressAndClose(page, o, "Escape");
-      if (o.closeButton) await pressAndClose(page, o, "the close button");
-    });
-  }
-});
-
 // Playwright's Pixel 7 (a touch screen, 412 wide, a coarse pointer), in this project's browser.
 const { defaultBrowserType: _browser, ...PHONE } = devices["Pixel 7"];
 void _browser;
 
-test.describe("On a phone, with a finger", () => {
-  test.use(PHONE);
-  const openers: Opener[] = [
-    SHARE,
-    PHOTO,
-    TEAM,
-    { name: "Look, in the menu", opener: more, choice: "Look", open: (p) => sheet(p, "look") },
-    { name: "Job links, in the menu", opener: more, choice: "Job links", open: (p) => sheet(p, "job-links") },
-    { name: "Reorder sections, in the menu", opener: more, choice: "Reorder sections", open: (p) => sheet(p, "reorder") },
-    { name: "About me's More", opener: (p) => p.locator(`${READY} [data-section-frame="about"] > [data-pe-tools] [data-act="more"]`), open: (p) => p.getByRole("dialog", { name: "About me", exact: true }) },
-    { name: "Your links", opener: linksButton, open: (p) => p.getByRole("dialog", { name: "Your links" }) },
-  ];
-  for (const o of openers) {
-    test(`${o.name}: the focus comes back`, async ({ page }) => {
-      await openEditor(page, fresh(FULL, `foph-${o.name}`));
-      await pressAndClose(page, o, "Escape", true);
-      if (o.closeButton) await pressAndClose(page, o, "the close button", true);
+/** Every case: each opener the fixtures reach, at 1440 with a mouse, at 700 where the bar folds into its menu, and on a phone with a finger. */
+function everyOpener() {
+  test.describe("At 1440, with a mouse", () => {
+    const openers: Opener[] = [
+      SHARE,
+      PHOTO,
+      TEAM,
+      { name: "Look", opener: (p) => toolbar(p).getByRole("button", { name: "Look", exact: true }), open: (p) => p.locator("[data-look-menu]") },
+      { name: "Job links", opener: (p) => toolbar(p).getByRole("button", { name: "Job links", exact: true }), open: (p) => p.locator("[data-job-links-menu]") },
+      { name: "Your links", opener: linksButton, open: (p) => p.locator("[data-links-panel]") },
+    ];
+    for (const o of openers) {
+      test(`${o.name}: the focus comes back to it`, async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await openEditor(page, fresh(FULL, `fo-${o.name}`));
+        await pressAndClose(page, o, "Escape");
+        if (o.closeButton) await pressAndClose(page, o, "the close button");
+      });
+    }
+
+    test("Claim your address, before there is one: the focus comes back to it", async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await newPerson(page, "claim");
+      const claim: Opener = { name: "Claim your address", opener: (p) => toolbar(p).getByRole("button", { name: "Claim your address", exact: true }), open: (p) => sheet(p, "address"), closeButton: true };
+      await pressAndClose(page, claim, "Escape");
+      await pressAndClose(page, claim, "the close button");
     });
-  }
+
+    test("the visitor's page: its Claim your address gets the focus back", async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await newPerson(page, "visitor-claim");
+      await toolbar(page).getByRole("button", { name: "See as a visitor", exact: true }).click();
+      const claim: Opener = { name: "the visitor's Claim your address", opener: (p) => p.locator('[data-not-online="address"]').getByRole("button", { name: "Claim your address", exact: true }), open: (p) => sheet(p, "address") };
+      await pressAndClose(page, claim, "Escape");
+    });
+
+    test("the first-run strip: A photo and Pick a look give the focus back to the strip's own button", async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await newPerson(page, "strip");
+      const todo = (id: string) => (p: Page) => p.locator(`${READY} [data-first-run="wide"] [data-todo="${id}"]`).getByRole("button");
+      await pressAndClose(page, { name: "the strip's A photo", opener: todo("photo"), open: (p) => sheet(p, "photo") }, "Escape");
+      await pressAndClose(page, { name: "the strip's Pick a look", opener: todo("look"), open: (p) => p.locator("[data-look-menu]") }, "Escape");
+    });
+  });
+
+  test.describe("At 700, where the bar folds into its menu", () => {
+    const openers: Opener[] = [
+      SHARE,
+      TEAM,
+      { name: "Look, in the menu", opener: more, choice: "Look", open: (p) => sheet(p, "look") },
+      { name: "Job links, in the menu", opener: more, choice: "Job links", open: (p) => sheet(p, "job-links") },
+    ];
+    for (const o of openers) {
+      test(`${o.name}: the focus comes back`, async ({ page }) => {
+        await page.setViewportSize({ width: 700, height: 900 });
+        await openEditor(page, fresh(FULL, `fo7-${o.name}`));
+        await pressAndClose(page, o, "Escape");
+        if (o.closeButton) await pressAndClose(page, o, "the close button");
+      });
+    }
+  });
+
+  test.describe("On a phone, with a finger", () => {
+    test.use(PHONE);
+    const openers: Opener[] = [
+      SHARE,
+      PHOTO,
+      TEAM,
+      { name: "Look, in the menu", opener: more, choice: "Look", open: (p) => sheet(p, "look") },
+      { name: "Job links, in the menu", opener: more, choice: "Job links", open: (p) => sheet(p, "job-links") },
+      { name: "Reorder sections, in the menu", opener: more, choice: "Reorder sections", open: (p) => sheet(p, "reorder") },
+      { name: "About me's More", opener: (p) => p.locator(`${READY} [data-section-frame="about"] > [data-pe-tools] [data-act="more"]`), open: (p) => p.getByRole("dialog", { name: "About me", exact: true }) },
+      { name: "Your links", opener: linksButton, open: (p) => p.getByRole("dialog", { name: "Your links" }) },
+    ];
+    for (const o of openers) {
+      test(`${o.name}: the focus comes back`, async ({ page }) => {
+        await openEditor(page, fresh(FULL, `foph-${o.name}`));
+        await pressAndClose(page, o, "Escape", true);
+        if (o.closeButton) await pressAndClose(page, o, "the close button", true);
+      });
+    }
+  });
+}
+
+test.describe("As the browser has it", () => {
+  everyOpener();
+});
+
+test.describe("Under Safari's rule about the focus, given by the test", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(safariFocus);
+  });
+  everyOpener();
 });
