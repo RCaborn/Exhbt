@@ -476,4 +476,9 @@
       width: auto;
     }
   }
+
+  /* The first-draft notice: under the bar, in the flow, not sticky; it leaves with its close button. */
+  .xe-first-draft {
+    border-bottom: 1px solid var(--color-line);
+  }
 }

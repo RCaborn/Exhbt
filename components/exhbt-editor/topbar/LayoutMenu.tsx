@@ -8,6 +8,7 @@ import { FORMAT_RULES, formatOf, OFFERED_FORMATS, type Format } from "@/lib/exhb
 import { layoutNotes } from "@/lib/exhbt/sections";
 import { useEnv, useUi } from "../context";
 import { useDoc, useStore } from "../store";
+import { FIRST_DRAFT_TITLE, FIRST_DRAFT_WORDS } from "./FirstDraftNotice";
 import { Popover } from "./Popover";
 
 /*
@@ -213,7 +214,7 @@ function LayoutPanel(): ReactNode {
   );
 }
 
-/** Once, right after an AI draft: says the one line aloud and takes the draft's notes off the address, so a reload does not say it again. */
+/** Once, right after an AI draft: says the notice and the one line aloud and takes the draft's notes off the address, so a reload does not say it again. */
 export function useDraftedLine(): void {
   const { drafted } = useEnv();
   const ui = useUi();
@@ -222,8 +223,9 @@ export function useDraftedLine(): void {
   useEffect(() => {
     if (!drafted || done.current) return;
     done.current = true;
-    const line = [layoutSentence(drafted.format, drafted.reason), figureSentence(store.get(), drafted.figure)].filter(Boolean).join(" ");
-    if (line) ui.say(line);
+    // The notice under the bar (FirstDraftNotice.tsx) is not a live region: its words are said here, once, before the layout line.
+    const line = [FIRST_DRAFT_TITLE, FIRST_DRAFT_WORDS, layoutSentence(drafted.format, drafted.reason), figureSentence(store.get(), drafted.figure)].filter(Boolean).join(" ");
+    ui.say(line);
     const url = new URL(window.location.href);
     if (["drafted", "why", "fig"].some((k) => url.searchParams.has(k))) {
       for (const k of ["drafted", "why", "fig"]) url.searchParams.delete(k);

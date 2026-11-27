@@ -101,6 +101,35 @@ test.describe("the top bar", () => {
     await expect(page.locator("[data-drafted]")).toHaveCount(0);
   });
 
+  test("right after an AI draft one notice says what to do next; closing it puts the focus back on the bar; a reload does not bring it back", async ({ page }) => {
+    await openDoc(page, freshName("tbnotice"), openBankingDoc, { query: "?drafted=case-study" });
+    const notice = page.locator("[data-first-draft]");
+    await expect(notice).toBeVisible();
+    await expect(notice).toContainText("Here's your first draft.");
+    await expect(notice).toContainText("We wrote it from your files and nothing else. Click any part to change it, check each number, then press Review and publish.");
+    // Chrome: under the bar and outside the page.
+    expect(await notice.evaluate((el) => !!el.closest("article"))).toBe(false);
+    // Its words are not in a live region of their own (they are said once, with the layout line).
+    expect(await notice.evaluate((el) => !!el.closest("[aria-live], [role=status], [role=alert]"))).toBe(false);
+    expect(await notice.evaluate((el) => [...el.querySelectorAll("[aria-live], [role=status], [role=alert]")].map((n) => n.textContent?.trim()).filter(Boolean))).toEqual([]);
+    // The layout line is not drawn on the page: it stays in the Layout menu and is read out.
+    await expect(page.locator("[data-said]")).toContainText("Laid out as Case study.");
+    await expect(page.locator(`${READY} article`).getByText("Laid out as Case study.")).toHaveCount(0);
+    await notice.getByRole("button", { name: /dismiss|close/i }).click();
+    await expect(notice).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest("[data-topbar]"))).toBe(true);
+    await page.reload();
+    await waitReady(page);
+    await expect(page.locator("[data-first-draft]")).toHaveCount(0);
+  });
+
+  test("an exhbt opened from the list, or started with Write it myself, shows no notice", async ({ page }) => {
+    await openDoc(page, freshName("tbnonotice"), openBankingDoc);
+    await expect(page.locator("[data-first-draft]")).toHaveCount(0);
+    await openNew(page, freshName("tbnonotice2"));
+    await expect(page.locator("[data-first-draft]")).toHaveCount(0);
+  });
+
   test("Undo is named for what it undoes, aria-disabled with nothing to undo, and gives the focus a place to go", async ({ page }) => {
     await openDoc(page, freshName("tbundo"), openBankingDoc);
     const undo = bar(page).getByRole("button", { name: /^Undo/ });
