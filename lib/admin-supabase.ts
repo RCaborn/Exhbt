@@ -7,6 +7,7 @@ import {
   type AdminAccountDetail,
   type AdminAccountRow,
   type AdminAccountsPage,
+  type AdminPublishNumbers,
   type AdminRowMap,
   type AdminRows,
   type AdminTable,
@@ -51,6 +52,18 @@ export function sbIsAdmin(db: SupabaseClient, userId: string): Promise<boolean> 
     seen.set(userId, p);
   }
   return p;
+}
+
+/** N1 and N2 from exhbts.published_at (set on a publish and kept when an exhbt is unpublished), over every account. */
+export async function sbPublishNumbers(db: SupabaseClient): Promise<AdminPublishNumbers> {
+  const accounts = await db.from("profiles").select("id", { count: "exact", head: true });
+  if (accounts.error) throw new Error(accounts.error.message);
+  type R = { user_id: string | null };
+  const r = await readAll<R>((a, b) => db.from("exhbts").select("user_id").not("published_at", "is", null).order("id").range(a, b));
+  const per = new Map<string, number>();
+  for (const e of r.rows) if (e.user_id) per.set(e.user_id, (per.get(e.user_id) ?? 0) + 1);
+  const counts = [...per.values()];
+  return { accounts: accounts.count ?? 0, first: counts.filter((c) => c >= 1).length, second: counts.filter((c) => c >= 2).length, partial: r.truncated };
 }
 
 export async function sbAdminRows<T extends AdminTable>(db: SupabaseClient, table: T, since: string | null): Promise<AdminRows<T>> {

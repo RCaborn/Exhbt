@@ -16,7 +16,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
   await requireAdmin();
   const range = parseRange((await searchParams).range);
   const o = await adminOverview(range);
-  const partial = ([o.accounts, o.roadmaps, o.ideas, o.exhbts, o.ai, o.subscriptions, o.referrals, o.waitlist, o.leads, o.jobLinks, o.teammates, o.files, o.matches, o.pageViews] as Section<unknown>[]).some((s) => s.ok && s.partial);
+  const partial = ([o.accounts, o.roadmaps, o.ideas, o.exhbts, o.publishNumbers, o.ai, o.subscriptions, o.referrals, o.waitlist, o.leads, o.jobLinks, o.teammates, o.files, o.matches, o.pageViews] as Section<unknown>[]).some((s) => s.ok && s.partial);
   const label = RANGE_LABEL[range].toLowerCase();
 
   return (
@@ -50,6 +50,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
         <Roadmaps o={o} />
         <Ideas o={o} />
         <Exhbts o={o} />
+        <PublishNumbers o={o} />
         <Ai o={o} />
         <AiFailures o={o} />
         <Subscriptions o={o} />
@@ -184,6 +185,23 @@ function Exhbts({ o }: { o: Overview }) {
               ]}
             />
           </>
+        )}
+      </Part>
+    </Panel>
+  );
+}
+
+function PublishNumbers({ o }: { o: Overview }) {
+  return (
+    <Panel id="publish-numbers" title="First and second exhbt" note="All time. An account is a sign-up. It counts once it has published, and taking an exhbt down later does not undo that; a draft never published does not count.">
+      <Part s={o.publishNumbers}>
+        {(p) => (
+          <Stats
+            items={[
+              { id: "n1", label: "Published a first exhbt (N1)", value: `${num(p.first)} of ${num(p.accounts)} accounts (${pct(p.first, p.accounts)})` },
+              { id: "n2", label: "Published a second exhbt (N2)", value: `${num(p.second)} of ${num(p.accounts)} accounts (${pct(p.second, p.accounts)})` },
+            ]}
+          />
         )}
       </Part>
     </Panel>

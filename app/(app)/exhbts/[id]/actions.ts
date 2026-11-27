@@ -6,7 +6,8 @@ import { unverifiedOf } from "@/components/editor/model";
 import { canView } from "@/lib/access";
 import { BUILD_IT_YOURSELF, LAYOUT_REFUSED } from "@/lib/add-exhbt";
 import { isAdmin } from "@/lib/admin";
-import { getCurrentUser, type SessionUser } from "@/lib/auth";
+import { getCurrentUser, siteOrigin, type SessionUser } from "@/lib/auth";
+import { runInBackground } from "@/lib/background";
 import { editorKind } from "@/lib/editor-kind-server";
 import { emptyDoc, ExhbtDocSchema, LIMITS, text, validateForPublish, withoutStrayLinks, type ExhbtDoc } from "@/lib/exhbt/blocks";
 import { formatOf, isFormat, LAYOUT_NOT_OFFERED, mayCarryFormat, offeredIn } from "@/lib/exhbt/formats";
@@ -15,6 +16,7 @@ import { startingDoc } from "@/lib/exhbt/sections";
 import { canCreateExhbt, canPublish, getPlan } from "@/lib/plan";
 import { takenSlugs } from "@/lib/slugs";
 import { portfolioKind } from "@/lib/portfolio-kind-server";
+import { afterPublish } from "@/lib/publish-follow-up";
 import { isPhase2Enabled } from "@/lib/site";
 import { getStore } from "@/lib/store";
 import { deleteExhbtWithFiles } from "@/lib/uploads";
@@ -234,6 +236,12 @@ export async function publishExhbt(id: string, raw: unknown, confirmed: boolean)
   revalidatePath(`/p/${profile.username}`, "layout");
   // When it went live, as the public page dates its checks: the editor draws the same date (components/exhbt-editor/visitor-parts.tsx).
   const publishedAt = (await store.getExhbt(id))?.publishedAt ?? null;
+  // The event and the first-publish email run after the response: neither can fail or slow the publish.
+  try {
+    runInBackground(afterPublish({ userId: user.id, email: user.email, exhbtId: id, slug, username: profile.username!, plan, before: all, origin: await siteOrigin() }));
+  } catch (e) {
+    console.error("publish follow-up not started", (e as Error).message);
+  }
   return { ok: true, slug, publishedAt };
 }
 
