@@ -130,11 +130,6 @@ test("a section move draws the two sections that changed places, and no tile, ca
 });
 
 test("a section move draws the frames of the two sections that changed places, and no other section's frame", async ({ page }) => {
-  // FAULT (F, components/portfolio-editor/sections/SectionFrame.tsx), reported 27 Nov: on one move (About and
-  // Experience swap), all six SectionFrames draw, in two commits each (12 renders), though only those two slots
-  // draw. Each frame reads something every move changes (the whole sections list, or the drag board's context).
-  // This test turns green when it is fixed; then take this line out.
-  test.fail();
   await openCounted(page, "smoothframes");
   await reset(page);
   await changeWith(page, { moveSection: { from: 2, to: 3 } }, "moved About me");

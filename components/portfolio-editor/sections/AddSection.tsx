@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { EXTRA_SECTIONS, SECTION_HINTS, SECTION_KEYS, type SectionKey } from "@/lib/portfolio-layout";
 import { usePortfolioApi, usePortfolioData, usePortfolioState } from "../runtime";
-import { addSection } from "./arrange";
+import { addSection, withSectionWords } from "./arrange";
 import { sectionName, W } from "./words";
 
 /*
@@ -34,6 +34,8 @@ export function AddSection({ inFlow = false }: { inFlow?: boolean }): ReactNode 
   const allOn = SECTION_KEYS.every((k) => sections.includes(k));
 
   const add = (key: SectionKey) => {
+    // Its empty words first, with no Undo step, so Undo of the add keeps what is typed into it (arrange.ts).
+    api.change((s) => withSectionWords(s, key));
     api.change((s) => addSection(s, key), W.added(sectionName(key)));
     api.say(W.saidAdded(sectionName(key)));
     const path = FIRST_FIELD[key];

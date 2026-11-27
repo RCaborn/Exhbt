@@ -117,8 +117,8 @@ export function ItemMore({ name, actions }: { name: string; actions: ItemAction[
     const ownKey = own ? keyOf(own) : null;
     setMine(false);
     api.close();
-    a.run();
-    if (UNDOABLE.has(a.id)) offerUndo();
+    if (UNDOABLE.has(a.id)) offerUndo(a.run);
+    else a.run();
     if (a.id === "open") return;
     afterAll(() => {
       const target = next ? next() : ownKey ? document.querySelector<HTMLElement>(`${ownKey} [data-act="more"]`) : button.current;

@@ -23,11 +23,17 @@ let shown: { label: string; dismiss(): void; stop(): void } | null = null;
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** Offers Undo for the change just made, if it made an Undo step. Call it after the change. */
-export function useOfferUndo(): () => void {
+/**
+ * Runs `act` and offers Undo for it: only when it changed the page (a star on an exhbt already starred,
+ * a drop where it was, change nothing, and must not offer Undo for the step before) and made an Undo step.
+ */
+export function useOfferUndo(): (act: () => void) => void {
   const rt = useRuntime();
   const toast = useToast();
-  return () => {
+  return (act) => {
+    const was = rt.state.get();
+    act();
+    if (rt.state.get() === was) return;
     const label = rt.undo.get().label;
     // One at a time: the last one goes before a new one shows (not by Astryx's uniqueID, whose namesake
     // keeps the first toast's id, so the new one's dismiss would not reach it).

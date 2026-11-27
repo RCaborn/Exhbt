@@ -170,7 +170,7 @@ test.describe("A section's More", () => {
     expect(await undoLabel(page)).toBe("moved About me");
   });
 
-  test("the last section's Remove is dimmed with its reason, and does nothing", async ({ page }) => {
+  test("More of my work's Remove is dimmed with its reason, and does nothing; so is the last section's", async ({ page }) => {
     await openEditor(page, withLayout("ph-lone", ["work"]));
     const s = await openMore(
       page,
@@ -184,13 +184,13 @@ test.describe("A section's More", () => {
       exact: true,
     });
     await expect(remove).toHaveAttribute("aria-disabled", "true");
-    await expect(remove).toHaveAccessibleDescription("Your portfolio keeps at least one section.");
-    await expect(s.getByText("Your portfolio keeps at least one section.")).toBeVisible();
+    await expect(remove).toHaveAccessibleDescription("Your portfolio always shows your work.");
+    await expect(s.getByText("Your portfolio always shows your work.")).toBeVisible();
     // Off, but still focusable, so its reason is read out with it.
     await remove.focus();
     await expect(remove).toBeFocused();
     await remove.click({ force: true });
-    await expect(said(page)).toHaveText("Your portfolio keeps at least one section.");
+    await expect(said(page)).toHaveText("Your portfolio always shows your work.");
     expect(await sections(page)).toEqual(["work"]);
     expect(await undoLabel(page)).toBe(null);
     await page.keyboard.press("Escape");
@@ -200,6 +200,10 @@ test.describe("A section's More", () => {
         name: "More for More of my work",
       }),
     ).toBeFocused();
+    // A layout from before the work always stayed, with one section left: that one stays too.
+    await openEditor(page, withLayout("ph-lone-contact", ["contact"]));
+    const s2 = await openMore(page, tools(page, "contact").getByRole("button", { name: "More for Get in touch" }), "Get in touch");
+    await expect(s2.getByRole("button", { name: "Remove Get in touch", exact: true })).toHaveAccessibleDescription("Your portfolio keeps at least one section.");
   });
 
   test("the band's More holds its exhbt's star, Hide and Open, each with Undo", async ({ page }) => {
@@ -279,6 +283,32 @@ test.describe("A tile's More", () => {
     await undoToast(page, `put ${name} in the band`).click();
     await expect.poll(async () => (await stateNow(page)).arrangement.featured).toBe(featured);
     await waitSaved(page);
+  });
+});
+
+test.describe("Undo only for a change", () => {
+  test("a star on an exhbt already in the band changes nothing, and offers no Undo", async ({ page }) => {
+    // The band is off the page, so the starred exhbt is one of the work's tiles, with its star.
+    await openEditor(page, withLayout("ph-starred", ["work", "about", "contact"]));
+    const ids = await workIds(page);
+    await call(page, "setAt", "arrangement.featured", ids[0]);
+    // A move first, then a tap elsewhere: its Undo goes; Undo still names the move.
+    let more = tileTools(page, ids[1]!).locator('[data-act="more"]');
+    let name = (await more.getAttribute("aria-label"))!.replace(/^More for /, "");
+    let s = await openMore(page, more, name);
+    await s.getByRole("button", { name: "Move down", exact: true }).click();
+    await expect(undoToast(page, `moved ${name}`)).toBeVisible();
+    await page.locator(`${READY} [data-section="about"]`).tap({ position: { x: 4, y: 4 } });
+    await expect(page.locator(".astryx-toast").filter({ visible: true })).toHaveCount(0);
+    // The star on the one already starred.
+    more = tileTools(page, ids[0]!).locator('[data-act="more"]');
+    name = (await more.getAttribute("aria-label"))!.replace(/^More for /, "");
+    s = await openMore(page, more, name);
+    await s.getByRole("button", { name: `Put ${name} in the band`, exact: true }).click();
+    await page.waitForTimeout(400);
+    await expect(page.locator(".astryx-toast").filter({ visible: true })).toHaveCount(0);
+    expect((await stateNow(page)).arrangement.featured).toBe(ids[0]);
+    expect(await undoLabel(page)).toMatch(/^moved /);
   });
 });
 
