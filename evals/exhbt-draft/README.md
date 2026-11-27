@@ -16,7 +16,7 @@ Each run reads every fixture the way the upload page does, calls the app's real 
   - `07-results-only.csv` and `07-results-only.notes.txt`: a three-row results sheet plus a one-paragraph note (the note goes in the notes box). Thin material on purpose.
   - `08-rambling-report.txt`: a long, rambling placement report (about 3,800 words) with the results buried.
   - `src/`: the text behind the PDF and Word fixtures. `build.ts` turns it into the binary files.
-- `marks.ts`: the layout mark, and which publish issues only the person can clear. Pure, and tested in `e2e/layouts-new.spec.ts`.
+- `marks.ts`: the layout mark, what a draft is marked on (`draftIssues`), and which of those only the person can clear. Pure, and tested in `e2e/layouts-new.spec.ts`.
 - `RUBRIC.md`: the eight criteria (C1 to C8), scored 0 to 2.
 - `runs/`: run output. Ignored by git apart from `.gitkeep`.
 - `../../scripts/eval-drafts.ts`: the runner.
@@ -85,7 +85,7 @@ This rewrites the PDF and Word files (byte for byte the same if nothing changed)
 The code checks run on every draft:
 
 - **Words**: `wordCount` from `lib/exhbt/blocks.ts`, every word on the page except image alt text. The limit is 200 and the editor aims for 150.
-- **Publish issues**: what `validateForPublish` would block on (a flowchart box over its word limit, too few findings and so on).
+- **Publish issues**: what `validateForPublish` would block on (a flowchart box over its word limit, too many findings and so on), and what the page's layout usually has and the draft lacks (`suggestionsFor`: its results, an aim, fewer than three boxes). To a person the second kind is a suggestion that never stops publishing (decision 0032); a draft is still marked on it.
 - **Over the AI's targets**: a part longer than the AI is asked to write it in that layout (`overTargets` in `lib/ai/draft-targets.ts`: the summary, the context line, each finding, the quote, what I'd do next, the aim, the conclusion and the pull quote). People have no such limit, only the page's 200 words (decision 0030), so these don't stop publishing; they are listed in the notes and cost C2.
 - **Unverified numbers**: the editor's number check, exactly as `app/api/exhbts/draft/route.ts` runs it: numbers in the draft that aren't in the material (`unverifiedNumbers`), plus numbers whose source quote isn't in the material.
 - **Key facts**: how many of the answer key's facts the draft mentions, and which are missing.
@@ -109,7 +109,7 @@ With `--model-judge`, Haiku (`AI_MODEL`, the only model the app uses) reads `RUB
 | OK | drafts scored / drafts attempted. A failed attempt (timeout, API error, no output, wrong model) is listed with its reason and left out of the scores, never counted as a zero. |
 | Layout | the layout chosen, with "WRONG" and the one expected where the answer key names another. |
 | Words | `wordCount` of the draft. |
-| Publish issues | how many things would block publishing, without what only the person can clear. |
+| Publish issues | how many things would block publishing or are missing for the layout, without what only the person can clear. |
 | Unverified numbers | numbers the editor would flag. Anything above 0 fails C1. |
 | Key facts | answer-key facts covered / total. |
 | Banned / soft | hard tone hits / soft ones. |

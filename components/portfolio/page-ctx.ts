@@ -38,6 +38,31 @@ export type RichSlot = {
   className: string;
   /** The context line: bold is drawn as the highlight and the one button says Highlight. */
   highlight?: boolean;
+  /**
+   * The words are stored as a plain string at `path`, with their bold and italic as runs beside it at `${path}Runs`
+   * (decision 0032: a quote's and a pull quote's words, a link's description). `value` is the two read together
+   * (richOf). The field takes bold and italic, and no links.
+   */
+  beside?: boolean;
+  /** The page sets these words between quotation marks (a quote, a pull quote): the field draws the marks round its words itself. */
+  quoted?: boolean;
+};
+
+/**
+ * A part's title, typed in place (decision 0032): a section's heading, the flowchart's, or the heading over a
+ * list of links. The adapter renders the heading element itself (`Sub`, with `id` and `className`, as the page
+ * draws it) with the field in it, and reads the stored title from the doc by `path`.
+ */
+export type TitleSlot = {
+  /** Where the title is stored: "sections.N.title", "flowTitle" or "refsTitle". */
+  path: FieldPath;
+  /** The layout's own heading, which shows until the person types a title of their own. "" where the layout draws none (a case study's flowchart). */
+  fallback: string;
+  /** The field's accessible name: "Findings: title". */
+  label: string;
+  Sub: Sub;
+  id: string;
+  className: string;
 };
 
 /** One page item. Every value is a string, a number or a boolean, so the frame can be memoised. */
@@ -83,6 +108,7 @@ export type ShellTools = { block: "header" | "gap" | "skills" };
 export type EditAdapter = {
   text(o: TextSlot): ReactNode;
   rich(o: RichSlot): ReactNode;
+  title(o: TitleSlot): ReactNode;
   item(o: ItemSlot): ReactNode;
   insert(o: InsertSlot): ReactNode;
   extra(o: ExtraSlot): ReactNode;

@@ -1,4 +1,4 @@
-import { FLOW_ID, formatLimits, isContent, type ContentSection, type ExhbtDoc, type RichText } from "../../lib/exhbt/blocks";
+import { besideOf, FLOW_ID, formatLimits, isContent, type ContentSection, type ExhbtDoc, type RichText } from "../../lib/exhbt/blocks";
 import { formatOf, FORMAT_RULES, type Format } from "../../lib/exhbt/formats";
 import { applyTemplate, insertBlock, insertImage, moveItem, pageItems, removeItem, type BlockKind } from "../../lib/exhbt/layouts";
 import { sectionLabel } from "../../lib/exhbt/sections";
@@ -25,6 +25,14 @@ export type EditorStore = {
 
   /** Typing: sets the value at a field path. Never an undo entry. */
   setAt(path: FieldPath, value: string | RichText): void;
+  /**
+   * Typing in a field stored as a plain string with its formatting beside it (decision 0032: a quote's and a pull
+   * quote's words, a link's description): the plain words at `path` and their runs at `${path}Runs`, in one
+   * change, the runs taken away when none of them is formatted. Never an undo entry.
+   */
+  setBeside(path: FieldPath, runs: RichText): void;
+  /** Takes the key at a field path away (a title put back to the layout's own, decision 0032). Never an undo entry. */
+  unsetAt(path: FieldPath): void;
   /** A change inside one section that is not typing (a graph's numbers, a tick, before or after). With `undo`, it is one undo entry with that name, holding the before and after of the fields `fn` changed and nothing else. */
   patch(id: string, fn: (s: ContentSection) => ContentSection, undo?: string): void;
   /** A change outside the sections (the work, the card's summary, a skill, a confirmed number, an AI rewrite). With `undo`, one entry holding the before and after of the sections' fields and the top-level keys `fn` changed, and nothing else. */
@@ -89,9 +97,11 @@ const SHELL_KEYS = ["title", "gap", "context", "whereWhen", "myRole", "skills", 
 /**
  * Changes whenever structureKey(doc) could (the layout, flowOff, each section's id and kind, an
  * image's stage), and when a picture's size changes, since a grid tile's shape is drawn by the row.
+ * And when the flowchart goes from no boxes to some, or back: with none it has a row of its own and
+ * the rows round it are a visitor's (LayoutMain.tsx). Typing in a box, or a second box, changes nothing here.
  */
 function layoutSig(d: ExhbtDoc): string {
-  return JSON.stringify([d.format ?? "", d.flowOff === true, d.sections.map((s) => (s.kind === "image" ? [s.id, s.kind, s.stage ?? "", s.w ?? 0, s.h ?? 0] : [s.id, s.kind]))]);
+  return JSON.stringify([d.format ?? "", d.flowOff === true, d.flow.length === 0, d.sections.map((s) => (s.kind === "image" ? [s.id, s.kind, s.stage ?? "", s.w ?? 0, s.h ?? 0] : [s.id, s.kind]))]);
 }
 
 /** `obj` with `value` at `keys`, every object on the way copied and nothing else. The same object when the value is already there. */
@@ -115,6 +125,9 @@ function setIn(obj: unknown, keys: string[], value: unknown): unknown {
 }
 
 const sameValue = (a: unknown, b: unknown) => a === b || (typeof a === "object" && typeof b === "object" && JSON.stringify(a) === JSON.stringify(b));
+
+/** Whatever sits at these keys: ["sections", "3", "text"] is doc.sections[3].text; [] is the doc itself. */
+const valueAt = (root: unknown, keys: string[]): unknown => keys.reduce<unknown>((v, k) => (v && typeof v === "object" ? (v as Record<string, unknown>)[k] : undefined), root);
 
 let keySeq = 0;
 const newKey = () => `box-${++keySeq}`;
@@ -146,7 +159,7 @@ export function createStore(initial: ExhbtDoc, opts: { onChange?: (doc: ExhbtDoc
     ver++;
     syncKeys();
     // The shell changes only when one of its fields or the page's structure does.
-    const nextSig = prev.sections === next.sections && prev.format === next.format && prev.flowOff === next.flowOff ? sig : layoutSig(next);
+    const nextSig = prev.sections === next.sections && prev.format === next.format && prev.flowOff === next.flowOff && (prev.flow.length === 0) === (next.flow.length === 0) ? sig : layoutSig(next);
     if (redrawShell || nextSig !== sig || SHELL_KEYS.some((k) => prev[k] !== next[k])) shellDoc = next;
     sig = nextSig;
     if (entry) push(entry);
@@ -200,6 +213,30 @@ export function createStore(initial: ExhbtDoc, opts: { onChange?: (doc: ExhbtDoc
       const cur = keysOf.reduce<unknown>((v, k) => (v && typeof v === "object" ? (v as Record<string, unknown>)[k] : undefined), doc);
       if (sameValue(cur, value)) return;
       commit(setIn(doc, keysOf, value) as ExhbtDoc);
+    },
+
+    setBeside(path, runs) {
+      const keysOf = path.split(".");
+      const key = keysOf.pop()!;
+      const holder = valueAt(doc, keysOf);
+      if (!holder || typeof holder !== "object" || Array.isArray(holder)) return;
+      const cur = holder as Record<string, unknown>;
+      const { words, runs: kept } = besideOf(runs);
+      if (cur[key] === words && sameValue(cur[`${key}Runs`], kept)) return;
+      const next: Record<string, unknown> = { ...cur, [key]: words };
+      if (kept) next[`${key}Runs`] = kept;
+      else delete next[`${key}Runs`];
+      commit(setIn(doc, keysOf, next) as ExhbtDoc);
+    },
+
+    unsetAt(path) {
+      const keysOf = path.split(".");
+      const key = keysOf.pop()!;
+      const holder = valueAt(doc, keysOf);
+      if (!holder || typeof holder !== "object" || Array.isArray(holder) || !(key in holder)) return;
+      const next = { ...(holder as Record<string, unknown>) };
+      delete next[key];
+      commit(setIn(doc, keysOf, next) as ExhbtDoc);
     },
 
     patch(id, fn, undo) {

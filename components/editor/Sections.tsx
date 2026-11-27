@@ -609,7 +609,7 @@ function SectionBody({
           <div className="grid gap-4 sm:grid-cols-2">
             <TextInput
               id={`${pid}-name`}
-              label="Who said it"
+              label="Who said it (optional)"
               value={s.name}
               max={LIMITS.quote.nameChars}
               onChange={(name) => patch<"quote">(s.id, (x) => ({ ...x, name }))}
@@ -825,7 +825,7 @@ function AddSection({ doc, onAdd, onAddImage, imageBusy }: { doc: ExhbtDoc; onAd
     <div ref={wrap}>
       {missing.length > 0 && (
         <div className="mb-4 rounded-[16px] border border-line bg-surface p-4" data-layout-todo>
-          <p className="font-semibold">To finish this layout</p>
+          <p className="font-semibold">Suggestions for this layout</p>
           <ul className="mt-2 space-y-2">
             {missing.map((m) => (
               <li key={m.text} className="flex flex-wrap items-center justify-between gap-2 text-sm">

@@ -18,7 +18,11 @@ import { arrangedCase, arrangedGallery, arrangedResearch, caseMissingImage, gall
  * What it draws, slot by slot:
  *  - text and rich: the words in a <span data-slot data-path data-label> with `display: contents`
  *    (rich in a <div> with the paragraph's classes when it is given them); an empty field shows its
- *    placeholder in --xp-muted and carries data-empty;
+ *    placeholder in --xp-muted and carries data-empty; a field the page sets between quotation marks
+ *    (`quoted`: a quote, a pull quote) draws the marks round its words, as the editor's field does;
+ *  - title (decision 0032): the heading's own element, marked, with the layout's heading or the doc's
+ *    own title in it; where the layout draws no heading (a case study's flowchart) a marked, empty
+ *    element that takes no room, as the editor's way in there takes none;
  *  - item: <div data-slot="item" data-id data-as> with the row's classes, round ItemView;
  *  - insert, list, tools, the flowchart's tools and "+", and an "above" or "over" extra: marked,
  *    empty elements that take no room (`hidden`); the flowchart's list returns its <ol> inside a
@@ -120,9 +124,10 @@ export function standIn(doc: ExhbtDoc, base: Omit<PageCtx, "edit">, evidenceUrl:
       </span>
     ),
     rich: (o) => {
+      const words = hasWords(o.value) ? <RichText value={o.value} highlight={o.highlight} /> : null;
       const field = (
-        <span data-slot="rich" data-path={o.path} data-label={o.label} data-empty={hasWords(o.value) ? undefined : ""} style={{ display: "contents" }}>
-          {hasWords(o.value) ? <RichText value={o.value} highlight={o.highlight} /> : <span style={muted}>{o.placeholder}</span>}
+        <span data-slot="rich" data-path={o.path} data-label={o.label} data-empty={words ? undefined : ""} style={{ display: "contents" }}>
+          {o.quoted ? words ? <>“{words}”</> : <span style={muted}>“{o.placeholder}”</span> : (words ?? <span style={muted}>{o.placeholder}</span>)}
         </span>
       );
       return o.className ? (
@@ -131,6 +136,17 @@ export function standIn(doc: ExhbtDoc, base: Omit<PageCtx, "edit">, evidenceUrl:
         </div>
       ) : (
         field
+      );
+    },
+    title: (o) => {
+      const stored = o.path.split(".").reduce<unknown>((at, k) => (at && typeof at === "object" ? (at as Record<string, unknown>)[k] : undefined), doc);
+      const own = typeof stored === "string" ? stored : undefined;
+      if (!o.fallback && own === undefined) return <span data-slot="title" data-path={o.path} data-label={o.label} hidden />;
+      const value = (own ?? o.fallback).trim();
+      return (
+        <o.Sub id={o.id} className={o.className} data-slot="title" data-path={o.path} data-label={o.label} data-empty={value ? undefined : ""}>
+          {value || <span style={muted}>Add a title</span>}
+        </o.Sub>
       );
     },
     item: (o) => {

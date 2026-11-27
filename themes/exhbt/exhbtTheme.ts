@@ -17,6 +17,16 @@ const GRAPHITE = "#3E4044";
 const SLATE = "#6F7278";
 const LINE = "#E5E6E8";
 const MIST = "#F6F7F8";
+
+/** The site's heading scale for Astryx's Heading, h1 to h3 (app/globals.css): set in the tokens, and again under the touch rule. */
+const HEADINGS = {
+  "--text-heading-1-size": "3rem",
+  "--text-heading-1-leading": "1.05",
+  "--text-heading-2-size": "2rem",
+  "--text-heading-2-leading": "1.1",
+  "--text-heading-3-size": "1.375rem",
+  "--text-heading-3-leading": "1.15",
+};
 const WASH = "#E3FCF0";
 const ERROR = "#C92324";
 const WHITE = "#FFFFFF";
@@ -56,6 +66,19 @@ export const exhbtTheme = defineTheme({
     "--size-element-sm": "36px",
     "--size-element-md": "44px",
     "--size-element-lg": "48px",
+    // Astryx's Heading takes the site's one heading scale (h1 to h3 in app/globals.css: 48, 32 and 22px),
+    // so a page built from <Heading> reads the same as a page of plain headings. Phones step down below.
+    ...HEADINGS,
+  },
+  adaptations: {
+    rules: [
+      // The base theme's touch rule (a coarse pointer, under 1024px) sets the type scale again, headings with it: on
+      // an iPad in portrait <Heading> drew 26, 22 and 19px with loose leadings, where the site's h1 to h3 are 48, 32
+      // and 22px. The site's own heading scale is set again under the same condition, so it holds there too.
+      { when: { pointer: "coarse", width: { below: "lg" } }, value: { tokens: HEADINGS } },
+      // The same step the site's headings take below 640px: h1 to 36px and h2 to 28px. After the touch rule, so a phone takes it.
+      { when: { width: { below: "sm" } }, value: { tokens: { "--text-heading-1-size": "2.25rem", "--text-heading-2-size": "1.75rem" } } },
+    ],
   },
   components: {
     button: {
@@ -65,6 +88,12 @@ export const exhbtTheme = defineTheme({
       "variant:secondary": { backgroundColor: WHITE, color: INK, borderColor: INK, borderWidth: "1.5px", borderStyle: "solid" },
       // For mint and wash bands, where a mint button would disappear.
       "variant:ink": { backgroundColor: INK, color: WHITE },
+    },
+    // The display face's tracking, as the site's h1 to h3 have it.
+    heading: {
+      "level:1": { letterSpacing: "-0.03em" },
+      "level:2": { letterSpacing: "-0.03em" },
+      "level:3": { letterSpacing: "-0.02em" },
     },
   },
 });

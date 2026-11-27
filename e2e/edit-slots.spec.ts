@@ -165,7 +165,8 @@ const PLACEHOLDERS: { name: string; path: RegExp; part: string; kinds?: string[]
   { name: "an image's caption", path: /^sections\.\d+\.caption$/, part: "figcaption" },
   // The role is a part of the quote's line, not an element of its own: the field goes.
   { name: "a quote's role", path: /^sections\.\d+\.role$/, part: "[data-slot]" },
-  { name: "a link's description", path: /^sections\.\d+\.description$/, part: "p, span.block" },
+  // A formatted field since decision 0032 (bold and italic): its box takes the place of the page's <p> or <span>.
+  { name: "a link's description", path: /^sections\.\d+\.description$/, part: "[data-slot-box]" },
   { name: "an aim or a conclusion with no words", path: /^sections\.\d+\.text$/, part: "[data-slot=item]", kinds: ["aim", "conclusion"] },
 ];
 

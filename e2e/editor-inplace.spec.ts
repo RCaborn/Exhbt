@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+import { DRAFT_WITH_AI } from "./add-exhbt";
 import { devices, expect, pressFocuses, test, type Page } from "./editor-test";
 import { emptyDoc, plain, text, type ExhbtDoc, type RichText, type Section } from "../lib/exhbt/blocks";
 import { FORMAT_RULES, formatOf } from "../lib/exhbt/formats";
@@ -8,6 +9,7 @@ import { createFiles } from "../components/exhbt-editor/files";
 import { createStore } from "../components/exhbt-editor/store-core";
 import { undoneWords } from "../components/exhbt-editor/undo";
 import { ORDER_FIXTURES } from "./fixtures/order-docs";
+import { EDIT_ONLY_IN_FLOW } from "./page-editor";
 import {
   allowEditOnly,
   boxes,
@@ -79,7 +81,7 @@ const scan = async (page: Page) => (await new AxeBuilder({ page }).include('[dat
 
 /** Drafts an exhbt with the placeholder AI (so the parts it drafted have "More actions"), opens its editor, and returns its id. */
 async function openDrafted(page: Page, tag: string, notes?: string): Promise<string> {
-  await page.goto(`/auth/dev?email=${freshName(tag)}@example.com&next=/exhbts/new`);
+  await page.goto(`/auth/dev?email=${freshName(tag)}@example.com&next=${encodeURIComponent(DRAFT_WITH_AI)}`);
   await expect(page.getByRole("heading", { level: 1, name: "Draft an exhbt" })).toBeVisible();
   const res = await page.request.post("/api/exhbts/draft", {
     data: { text: "Final-year project on lunch queues. I timed the queue for two weeks, added a second till, and timed it again. Waits fell from 11 to 4 minutes.", notes },
@@ -983,18 +985,23 @@ test.describe("a formatted field's buttons, and an issue on the page", () => {
 
   test("Bold is stored; Link asks for an https address, says when it is not one, and stores it", async ({ page }) => {
     const { id } = await openDoc(page, freshName("buttons"), doc());
+    // The formatted fields' editors have started, so the keys below select in the editor itself.
+    await waitLive(page);
     const f = field(page, "sections.0.items.0");
+    // With a mouse, the buttons for words selected are the ones on the bar that comes to them (decision 0032,
+    // fields/SelectionBar.tsx); the field's own, at the end of its line, are hidden while it is up.
+    const bar = f.locator(".xe-selbar");
     await f.click();
     await expect(f.locator(".ProseMirror")).toBeFocused();
     await page.keyboard.press("End");
     await page.keyboard.press("Shift+Home");
-    await f.getByRole("button", { name: "Bold" }).click();
+    await bar.getByRole("button", { name: "Bold", exact: true }).click();
     await waitSaved(page, id);
     expect(((await readStored(page, id)).working.sections[0] as { items: RichText[] }).items[0]).toEqual([{ t: "Waits fell a lot.", b: true }]);
 
     await page.keyboard.press("End");
     await page.keyboard.press("Shift+Home");
-    await f.getByRole("button", { name: "Link" }).click();
+    await bar.getByRole("button", { name: "Link", exact: true }).click();
     const address = f.getByLabel("Link address (starting https://)");
     await expect(address).toBeFocused();
     await address.fill("http://example.com/log");
@@ -1012,13 +1019,18 @@ test.describe("a formatted field's buttons, and an issue on the page", () => {
     const words = Array.from({ length: 24 }, (_, i) => `word${i + 1}`).join(" ");
     await typeIn(page, "sections.0.items.0", words);
     await expect(field(page, "sections.0.items.0").locator(".ProseMirror")).not.toHaveAttribute("aria-invalid");
-    // An emptied finding is an issue once publishing has been tried.
+    // An emptied finding is no issue, even once publishing has been tried (decision 0032): it is left off the visitor's
+    // page. Until then it was the issue this test marked.
     await typeIn(page, "sections.0.items.1", "");
     await page.evaluate(() => window.__exhbtUi!.setTried(true));
     const pm = field(page, "sections.0.items.1").locator(".ProseMirror");
+    await expect(pm).not.toHaveAttribute("aria-invalid");
+    // A finding with an issue of its own: a link that is not https. The editor's own address prompt refuses one, so it
+    // is put in through the store, as words pasted in or saved by an older build could hold one.
+    await page.evaluate(() => window.__exhbtEditor!.setAt("sections.0.items.1", [{ t: "Sales held.", href: "http://example.com/sales" }]));
     await expect(pm).toHaveAttribute("aria-invalid", "true");
     const note = page.locator(`${READY} #${await pm.getAttribute("aria-describedby")}`);
-    await expect(note).not.toHaveText("");
+    await expect(note).toHaveText("Links must start with https://.");
     const shown = () => note.evaluate((el) => getComputedStyle(el).opacity);
     expect(await shown()).toBe("1");
     const focusedBoxes = await boxes(page, { frames: true });
@@ -1260,4 +1272,57 @@ test("a picture removed and saved: its file goes when the visit ends, as no Undo
   await page.getByRole("link", { name: "Your exhbts" }).first().click();
   await page.waitForURL(/\/exhbts$/);
   await expect.poll(() => fileExists(page, files["image-1"]!)).toBe(false);
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * Release 4, brief Q: the four new samples (decision 0028), made full, in the Exhbt, Classic and Night looks,
+ * at 1440 and on a Pixel 7. The loop in "box for box" above already runs every offered layout in every look; this
+ * block adds what it does not say: that the only parts taken out of the editing page are the two
+ * of EDIT_ONLY_IN_FLOW that are always there, by name, and that a full page has none of the others.
+ * ---------------------------------------------------------------------------------------------- */
+
+const NEW_LAYOUTS = ["build", "essay", "before-after", "event"] as const;
+const THREE_LOOKS = ["exhbt", "classic", "night"];
+const ALWAYS_THERE = EDIT_ONLY_IN_FLOW.filter((e) => e.always).map((e) => e.name);
+
+async function boxForBoxByName(page: Page, f: (typeof NEW_LAYOUTS)[number], look: string) {
+  await openTiming(page, f, { full: true, look });
+  await waitLive(page);
+  await settle(page);
+  // A full page has no placeholder: every entry that is only there while its part is empty is absent.
+  const present = await page.evaluate((entries) => {
+    const root = document.querySelector('[data-editor="page"] article[data-exhbt-page]')!;
+    return entries.filter((e) => root.querySelector(e.selector)).map((e) => e.name);
+  }, EDIT_ONLY_IN_FLOW.filter((e) => !e.always));
+  expect(present, "a full page has none of the placeholders").toEqual([]);
+  const taken = await allowEditOnly(page, "always");
+  // What was taken out is the image descriptions and the Add a skill box, by name, and nothing else.
+  expect(taken.length, "the two always-there entries are on the page").toBeGreaterThan(0);
+  for (const t of taken) expect(ALWAYS_THERE.some((n) => t.startsWith(n)), `"${t}" is one of the entries that are always there`).toBe(true);
+  await settle(page);
+  const editing = await boxes(page);
+  await seeAsVisitor(page, true);
+  await settle(page);
+  expect(differences(await boxes(page), editing)).toEqual([]);
+}
+
+test.describe("release 4's new layouts, box for box, by name", () => {
+  for (const look of THREE_LOOKS) {
+    for (const f of NEW_LAYOUTS) {
+      test(`a full ${FORMAT_RULES[f].name.toLowerCase()} in ${look}, at 1440 wide: only the always-there entries differ`, async ({ page }) => {
+        await boxForBoxByName(page, f, look);
+      });
+    }
+  }
+
+  test.describe("on a Pixel 7", () => {
+    test.use(PIXEL_7);
+    for (const look of THREE_LOOKS) {
+      for (const f of NEW_LAYOUTS) {
+        test(`a full ${FORMAT_RULES[f].name.toLowerCase()} in ${look}: only the always-there entries differ`, async ({ page }) => {
+          await boxForBoxByName(page, f, look);
+        });
+      }
+    }
+  });
 });

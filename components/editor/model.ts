@@ -1,5 +1,5 @@
 import { plain, words, type ExhbtDoc, type Issue } from "@/lib/exhbt/blocks";
-import { flowShown, FORMAT_COPY, formatOf, isShown } from "@/lib/exhbt/formats";
+import { flowShown, FORMAT_COPY, formatOf, isShown, refsHeading } from "@/lib/exhbt/formats";
 import { sectionLabel, sectionWords } from "@/lib/exhbt/sections";
 
 /**
@@ -28,6 +28,9 @@ export function cardOf(path: string): CardKey {
   if (["title", "context", "whereWhen", "myRole", "summary", "skills", "headline"].includes(head)) return "header";
   if (head === "sections") return idx !== undefined && /^\d+$/.test(idx) ? `section-${Number(idx)}` : "sections";
   if (["gap", "flow", "evidence"].includes(head)) return head as CardKey;
+  // A title of the person's own (decision 0032) that is too long: the flowchart's, or the one over a list of links.
+  if (head === "flowTitle") return "flow";
+  if (head === "refsTitle") return "sections";
   return "overall";
 }
 
@@ -48,7 +51,9 @@ const isCount = (path: string) => ["flow", "skills", "sections"].includes(path) 
 
 /**
  * Issues worth showing now. A field that's still empty isn't nagged about until the person
- * tries to publish; anything over a limit shows as soon as it happens.
+ * tries to publish; anything over a limit shows as soon as it happens. Since decision 0032 the only
+ * things a person has to fill in are the title, something besides it (reported at the context line, which
+ * is empty whenever that arises), a picture's description and a link's address, so this is quiet until then.
  */
 export function visibleIssues(doc: ExhbtDoc, issues: Issue[], showAll: boolean): Issue[] {
   if (showAll) return issues;
@@ -100,6 +105,8 @@ export function labelOf(path: string, doc: ExhbtDoc): string {
   const f = formatOf(doc);
   if (head === "title" || head === "gap") return FORMAT_COPY[f][head];
   if (head === "flow") return n !== null ? `${FORMAT_COPY[f].flow}, box ${n + 1}` : FORMAT_COPY[f].flow;
+  if (head === "flowTitle") return `${FORMAT_COPY[f].flow}, title`;
+  if (head === "refsTitle") return `${refsHeading(f)}, title`;
   if (head === "skills" && n !== null) return `Skill ${n + 1}`;
   if (head === "sections" && n !== null) {
     const s = doc.sections[n];
