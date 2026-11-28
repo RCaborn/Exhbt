@@ -17,9 +17,10 @@ import { useRuntime, type Going, type Runtime } from "./runtime";
  *    it was coming lost them. Now they are kept in this browser as the page goes (`pagehide`, below), and otherwise go
  *    as the editor goes, once the next page has come. Nothing is sent at the press: a save sent then is one the
  *    navigation goes ahead of, and Next then asks for the next page a second time (its refresh after a navigation that
- *    went ahead of an action) and shows it only once that second request is answered. A phone's More, Open goes the
- *    same way (`useGoTo`); it used to load the next page afresh, which dropped a save on its way after asking "Leave
- *    site?".
+ *    went ahead of an action) and shows it only once that second request is answered. That is for words waiting at
+ *    the press. A save already on its way then (useBuilder's, sent before it) still makes Next ask twice and wait, as
+ *    it did before any of this (measured on 2500a00's editor and on this one). A phone's More, Open goes the same way
+ *    (`useGoTo`); it used to load the next page afresh, which dropped a save on its way after asking "Leave site?".
  *  - A full page load (an address typed, a reload, the tab closed). The browser drops a save still on its way, and the
  *    one useBuilder starts as the tab is hidden goes with the page. A server action cannot be sent with keepalive or
  *    as a beacon, so as the page goes (`pagehide`) the newest state, unless the server has said it has it, is kept in
