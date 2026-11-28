@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { appNav } from "../components/site/app-nav";
 import { landingAfterSignIn } from "../lib/landing";
-import { buildRoadmap, unlockProjects, waitForResult } from "./helpers";
+import { buildRoadmap, unlockProjects, waitForResult, waitForStepBuilder } from "./helpers";
 
 // Where someone lands after signing in, and the signed-in nav, under each setting of the portfolio switch
 // (decision 0031, "The structure" and "The switch"; lib/portfolio-kind.ts). At "steps", which is what
@@ -209,7 +209,7 @@ test.describe("the in-memory store fills an empty profile from the gate, as Supa
     await answerGate(page, email, "Gate Person", "linkedin.com/in/gate-person");
     await open(page, `/auth/dev?email=${encodeURIComponent(email)}&next=${encodeURIComponent(YOU)}`);
     await expect(page.getByRole("heading", { level: 1, name: "Build your portfolio" })).toBeVisible();
-    await expect(page.locator("[data-ready=true]").first()).toBeAttached();
+    await waitForStepBuilder(page);
     await expect(nameField(page)).toHaveValue("Gate Person");
     await expect(linkedinField(page)).toHaveValue(/linkedin\.com\/in\/gate-person/);
   });
@@ -219,7 +219,7 @@ test.describe("the in-memory store fills an empty profile from the gate, as Supa
     // An account with a profile name of its own, before any gate answer exists.
     await open(page, `/auth/dev?email=${encodeURIComponent(email)}&next=${encodeURIComponent(YOU)}`);
     await expect(page.getByRole("heading", { level: 1, name: "Build your portfolio" })).toBeVisible();
-    await expect(page.locator("[data-ready=true]").first()).toBeAttached();
+    await waitForStepBuilder(page);
     await nameField(page).fill("Sam Taylor");
     await expect(page.getByTestId("save-status")).toHaveText("Saved");
 
@@ -228,7 +228,7 @@ test.describe("the in-memory store fills an empty profile from the gate, as Supa
     await answerGate(page, email, "Gate Person", "linkedin.com/in/gate-person");
     await open(page, `/auth/dev?email=${encodeURIComponent(email)}&next=${encodeURIComponent(YOU)}`);
     await expect(page.getByRole("heading", { level: 1, name: "Build your portfolio" })).toBeVisible();
-    await expect(page.locator("[data-ready=true]").first()).toBeAttached();
+    await waitForStepBuilder(page);
     await expect(nameField(page)).toHaveValue("Sam Taylor");
     await expect(linkedinField(page)).toHaveValue(/linkedin\.com\/in\/gate-person/);
   });

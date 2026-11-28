@@ -11,6 +11,16 @@ export async function waitForBuilder(page: Page) {
   await expect(page.locator("form[data-ready=true]")).toBeAttached();
 }
 
+/**
+ * Waits until the portfolio's step builder (/portfolio at "steps", app/(app)/portfolio/Builder.tsx) has hydrated. Its root
+ * sets data-ready and has no attribute of its own, so it is found as the ready element that holds the builder's heading:
+ * only an element holding that heading can answer for it (the site's phone menu, which set data-ready until f1fa4d3,
+ * does not), and two matches fail the wait instead of passing it.
+ */
+export async function waitForStepBuilder(page: Page) {
+  await expect(page.locator("[data-ready=true]").filter({ has: page.getByRole("heading", { level: 1, name: "Build your portfolio" }) })).toBeAttached();
+}
+
 /** A CV whose top has the details the project-ideas gate can prefill. */
 export const CV_WITH_CONTACT =
   "Amara Okafor\namara.okafor@example.com | linkedin.com/in/amara-okafor\n" +

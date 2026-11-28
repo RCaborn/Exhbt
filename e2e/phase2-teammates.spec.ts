@@ -4,6 +4,7 @@ import { ENTITLEMENTS } from "../lib/entitlements";
 import { TEAMMATES_PER_EXHBT } from "../lib/team-rules";
 import { ADD, DRAFT_WITH_AI, startBlank } from "./add-exhbt";
 import { closeSheet } from "./editor";
+import { READY } from "./page-editor";
 
 // Teammates and private file matching (docs/decisions/0013): invites by email and accepting them,
 // teammates on the public page and the tile, removing and leaving, a teammate's own exhbt from the
@@ -287,7 +288,7 @@ test.describe("The same file on someone else's exhbt", () => {
     await signInAs(page, stranger);
     await startBlank(page);
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
-    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await expect(page.locator(READY)).toBeAttached();
     const completed = page.waitForResponse((r) => /\/api\/files\/[0-9a-f-]{36}\/complete$/.test(r.url()));
     // The work's file is chosen in "The work" sheet, opened from the button in the sidebar.
     await page.getByRole("button", { name: "Add the work" }).click();

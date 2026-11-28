@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { buildRoadmap, uniqueEmail, waitForResult } from "./helpers";
+import { READY } from "./page-editor";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const EDUCATION = "BSc Data Science, University of Example, 2026. Expected 2:1.";
@@ -141,7 +142,7 @@ test.describe("saved ideas", () => {
     // Build the product analyst one as an exhbt: the editor opens prefilled.
     await saved.filter({ hasText: "Product analyst" }).getByRole("button", { name: "Add as an exhbt" }).click();
     await page.waitForURL(/\/exhbts\/[0-9a-f-]{36}\/edit$/);
-    await expect(page.locator("[data-ready=true]")).toBeAttached();
+    await expect(page.locator(READY)).toBeAttached();
     await expect(page.locator("#title")).toHaveValue(titleB);
 
     // Remove the other one.

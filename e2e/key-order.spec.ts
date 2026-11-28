@@ -5,8 +5,9 @@ import { aiVersionOf, blockValue, DRAFT_BLOCKS, graphsAsDrafted, readAiVersion, 
 import { structureKey } from "../lib/exhbt/layouts";
 import { sameRuns } from "../lib/exhbt/richtext-tiptap";
 import { sameJson, stableJson } from "../lib/json";
-import { keepClassic } from "./editor-classic-helpers";
+import { keepClassic, SEL as CLASSIC } from "./editor-classic-helpers";
 import { jsonbOrder, throughRealJsonb } from "./jsonb";
+import { READY } from "./page-editor";
 
 // The live database keeps each exhbt in a jsonb column, which hands an object's keys back in its own
 // order: shortest first, then by their bytes. The in-memory store these tests run on keeps keys as
@@ -285,7 +286,8 @@ test.describe("The editor, with the exhbt stored as the live database stores it"
     const chart = CHARTS[1]!;
     const { id } = await seedFromDatabase(page, [chart], []);
     const offer = page.getByText(/that never reached the server/);
-    const ready = () => expect(page.locator("[data-ready=true]")).toBeAttached();
+    // The root of the editor this test is in, up: no other element that gains data-ready can answer for it.
+    const ready = () => expect(page.locator(editor === "page" ? READY : CLASSIC.ready)).toBeAttached();
     const backupKey = `exhbt-backup:${id}`;
     /** Keeps a copy in this browser as the editor does, dated after the server's copy (a device whose clock runs ahead). */
     const keep = (doc: ExhbtDoc) => page.evaluate(([key, d]) => localStorage.setItem(key, JSON.stringify({ doc: d, at: Date.now() + 60_000 })), [backupKey, doc] as const);

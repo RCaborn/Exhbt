@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { devices, expect, test, type Page } from "@playwright/test";
 import { sampleDocs } from "../lib/exhbt/sample";
 import { countWords, PROFILE_LIMITS, ProfileDraftSchema } from "../lib/portfolio-profile";
+import { waitForStepBuilder } from "./helpers";
 
 // The guided portfolio builder at /portfolio (decision 0016): four steps with a live preview and
 // autosave, the "You" fields on the public page, "Suggest an intro" with the stand-in AI, the owner's
@@ -18,7 +19,7 @@ async function open(page: Page, username: string, plan = "max", count = 2, step 
   expect(res.status(), await res.text()).toBe(307);
   await page.goto(`/auth/dev?email=${encodeURIComponent(`${username}@example.com`)}&next=${encodeURIComponent(`/portfolio?step=${step}`)}`);
   await expect(page.getByRole("heading", { level: 1, name: "Build your portfolio" })).toBeVisible();
-  await expect(page.locator("[data-ready=true]").first()).toBeAttached();
+  await waitForStepBuilder(page);
 }
 
 const status = (page: Page) => page.getByTestId("save-status");
@@ -149,7 +150,7 @@ test.describe("Build your portfolio", () => {
     await expect(page.locator("#you-website-error")).toContainText("https");
     await expect(status(page)).toContainText("Not saved yet");
     await page.reload();
-    await expect(page.locator("[data-ready=true]").first()).toBeAttached();
+    await waitForStepBuilder(page);
     await expect(page.getByLabel(/Headline/)).toHaveValue("Saved without a button");
     await expect(page.getByLabel(/Website/)).toHaveValue("");
   });
@@ -237,7 +238,7 @@ test.describe("Build your portfolio on a phone", () => {
     const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     for (const step of ["you", "look", "projects", "publish"]) {
       await page.goto(`/portfolio?step=${step}`);
-      await expect(page.locator("[data-ready=true]").first()).toBeAttached();
+      await waitForStepBuilder(page);
       expect(await overflow(), step).toBeLessThanOrEqual(0);
     }
     const panel = (await page.locator("section[aria-labelledby=step-heading]").boundingBox())!;

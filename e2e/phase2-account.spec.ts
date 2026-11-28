@@ -5,6 +5,7 @@ import { portfolioHost } from "../lib/hosts";
 import { canClaimUsername } from "../lib/plan-rules";
 import { portfolioHref } from "../lib/portfolio-links";
 import { PROFILE_LIMITS } from "../lib/portfolio-profile";
+import { waitForStepBuilder } from "./helpers";
 
 // The address and the profile, now in the portfolio builder (decision 0016): the username claim
 // with a live check (paid plans only), the "You" fields with their limits, and what each plan says.
@@ -19,7 +20,7 @@ async function signIn(page: Page, email: string, plan = "premium", step = "publi
   await page.goto(`/auth/dev?email=${encodeURIComponent(email)}&next=/exhbts`);
   await page.goto(`/dev/plan?plan=${plan}&next=${encodeURIComponent(`/portfolio?step=${step}`)}`);
   await expect(page.getByRole("heading", { level: 1, name: "Build your portfolio" })).toBeVisible();
-  await expect(page.locator("[data-ready=true]").first()).toBeAttached();
+  await waitForStepBuilder(page);
 }
 
 async function claim(page: Page, name: string) {
