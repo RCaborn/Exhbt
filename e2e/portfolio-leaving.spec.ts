@@ -246,11 +246,12 @@ test.describe("Words typed just before a link inside the app is followed", () =>
     const saves = watchSaves(page);
     // Next's requests for the next page: the first goes through, and any after it (a refresh of the page it lands on) is held.
     const asked = await holdAfterTheFirst(page, isGoingTo(/^\/exhbts\/new$/));
-    const pressedAt = await nextPressTime(page);
     const words = "Typed just before the Add tile, asked for once";
     const facts: Record<string, unknown> = {};
     try {
       await typeIn(page, HEADLINE, words);
+      // Only now: typeIn presses the field, and the timer reads the first press after it is set.
+      const pressedAt = await nextPressTime(page);
       await ADD.follow(page);
       // A shown page that waits for nothing more takes a second or so here; eight is far past it.
       facts.shownWhileASecondRequestWasHeld = await page
@@ -259,6 +260,7 @@ test.describe("Words typed just before a link inside the app is followed", () =>
         .catch(() => false);
       facts.askedFor = asked.count();
       const at = await pressedAt();
+      facts.pressTimed = Number.isFinite(at);
       facts.sentBeforeThePress = saves.filter((s) => s.at < at).length;
       await asked.release();
       await page.waitForURL(ADD.lands, { timeout: 60_000 });
@@ -270,6 +272,7 @@ test.describe("Words typed just before a link inside the app is followed", () =>
       say("the next page, asked for once", facts);
     }
     // What this case is about: the words were waiting at the press. A save already on its way there is another case.
+    expect(facts.pressTimed, "the press on the Add tile was timed").toBe(true);
     expect(facts.sentBeforeThePress, "no save had gone at the press").toBe(0);
     expect(facts.askedFor, "Next asked for the next page once").toBe(1);
     expect(facts.shownWhileASecondRequestWasHeld, "and showed it without waiting for a second request").toBe(true);
