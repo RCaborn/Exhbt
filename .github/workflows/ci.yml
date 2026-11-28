@@ -55,12 +55,14 @@ jobs:
       - run: npx playwright install --with-deps chromium
       # The dev server's heap, sized to this runner, and what the runner has, in the log. next dev gives its server half the
       # machine's memory unless NODE_OPTIONS sets it (next/dist/cli/next-dev.js), and restarts it once its heap passes 80% of
-      # that (next/dist/server/lib/start-server.js), which empties the in-memory store mid-run. In every run of 27 and 28 Nov
-      # 2026 shards 1, 6, 7, 8, 9 and 10 restarted so, and the test under way failed and passed on its retry; in run
-      # 46109184070 shard 7's server died of "heap out of memory" instead, and its last six tests found no server. The heap
-      # grows as routes are first built, not with what the tests store. The server's resident memory runs about 3 GB above
-      # its heap (shard 7, 28 Nov 2026), and Chromium, Playwright and the runner need about 3 GB more, so the heap gets what
-      # is left after 6 GB, and never less than next dev's half.
+      # that (next/dist/server/lib/start-server.js), which empties the in-memory store mid-run. In each of the eight CI runs
+      # read from 27 and 28 Nov 2026, three of them on main, four to six shards' servers restarted so (1, 6, 7, 8, 9 and 10 of
+      # twelve; 1, 5, 6, 7 and 8 of ten), and the test under way failed and passed on its retry. In run 46109184070 shard 7's
+      # server died of "heap out of memory" instead, and its last six tests found no server. The heap grows as routes are
+      # first built, not with what the tests store. At the heap this sets on a 16 GB machine (9943 MB), shard 7 ran to its end
+      # with no restart and a peak of 9.7 GB resident, beside about 1.4 GB for Chromium and Playwright, so the heap gets what
+      # is left after 6 GB, and never less than next dev's half. A large server builds a route slowly, though: late in that
+      # run /job-links/new took 21 s to build, and the test that waited 20 s for it failed once and passed on its retry.
       - run: |
           total=$(awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo)
           heap=$(( total - 6144 > total / 2 ? total - 6144 : total / 2 ))
