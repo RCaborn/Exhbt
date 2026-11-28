@@ -61,6 +61,8 @@ export function createRuntime(initial: BuilderState, host: Host): Runtime {
 
   /** What had the focus when a sheet was opened: where it goes back to. */
   let opener: HTMLElement | null = null;
+  /** The sheet that was closed last, and its opener, until its dialog has closed (`sheetClosed`). */
+  let closing: { sheet: PortfolioSheet; back: HTMLElement | null } | null = null;
   /** What Undo can take back, oldest first. It lasts for the visit. */
   const stack: UndoEntry[] = [];
 
@@ -127,16 +129,44 @@ export function createRuntime(initial: BuilderState, host: Host): Runtime {
   }
 
   function close(): void {
-    if (!ui.get().sheet) return;
+    const sheet = ui.get().sheet;
+    if (!sheet) return;
     ui.set((u) => ({ ...u, sheet: null }));
     const back = opener;
     opener = null;
+    closing = { sheet, back };
     // A sheet gives the focus back itself (it is a dialog). This is for what is not one: a menu or a popover
     // that leaves the focus on the page's body when it goes.
     requestAnimationFrame(() => {
       const a = document.activeElement;
       if (back?.isConnected && !ui.get().sheet && (!a || a === document.body)) back.focus();
     });
+  }
+
+  /**
+   * A sheet's dialog has closed. Astryx's Drawer gives the focus back, as its slide-out ends, to what had it as the
+   * sheet opened. Under a finger the bar's menu is a sheet of its own (EditorBar.tsx), and a choice in it opens its
+   * sheet while the menu's sheet is still sliding away: the choice had the focus and lost it as the menu closed, the
+   * menu's sheet still made the rest of the page inert, so the opener could not take it (`open`), and the new sheet
+   * opened with the focus on the page's body and gives it back there. The menu's sheet, done sliding away under the new
+   * one, could not give it to its button either. So the focus is lost, unless the new sheet is closed before the menu's
+   * has gone (traced: Escape within about 150 ms). Then, and only then (the focus on the body, or on something no
+   * longer on the page), it goes to the sheet's opener. A focus still on what the closed sheet held is the browser's to
+   * move: it takes it off as it next draws the page, so that is waited for, a frame at a time, for ten frames at most.
+   */
+  function sheetClosed(sheet: PortfolioSheet, dialog: HTMLElement): void {
+    if (closing?.sheet !== sheet) return;
+    const { back } = closing;
+    closing = null;
+    if (!back) return;
+    let frames = 0;
+    const settle = () => {
+      if (!back.isConnected || ui.get().sheet) return;
+      const a = document.activeElement;
+      if (!a || a === document.body || !a.isConnected) return takeFocus(back);
+      if (dialog.contains(a) && ++frames <= 10) requestAnimationFrame(settle);
+    };
+    settle();
   }
 
   function jumpTo(path: HomePath): void {
@@ -167,6 +197,7 @@ export function createRuntime(initial: BuilderState, host: Host): Runtime {
     setAt: (path, value) => change((s) => setAtPath(s, path, value)),
     open,
     close,
+    sheetClosed,
     say,
     jumpTo,
     previewLook: (themeId) => ui.set((u) => ({ ...u, previewing: themeId && themeById(themeId) ? themeId : null })),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Drawer, DrawerHeader } from "@astryxdesign/core/Drawer";
 import { Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
 import { usePortfolioApi, usePortfolioUi, type PortfolioSheet } from "../runtime";
@@ -17,7 +17,9 @@ const KEEP_MS = 400;
  * whatever opens a sheet passes itself to `open(name, trigger)` (for a choice in the bar's menu, the
  * menu's button), which gives it the focus first when it lacks it, as a pressed button does everywhere
  * but Safari (runtime-core.ts, takeFocus). Opened with no trigger (a field's "Show me", the address's
- * ?open=), it gives the focus back to whatever had it. Its contents are drawn only while it is open
+ * ?open=), it gives the focus back to whatever had it. When the focus is lost all the same (a choice in
+ * the bar's menu under a finger), the runtime gives it to the opener once the dialog has closed
+ * (runtime-core.ts, sheetClosed). Its contents are drawn only while it is open
  * (and for a moment after, while it slides away).
  *
  * `purpose="form"` for a sheet holding a form a stray press outside must not lose (the address);
@@ -57,9 +59,19 @@ export function Sheet({
   const onOpenChange = (next: boolean) => {
     if (!next && open) api.close();
   };
+  // Its dialog's close, once the slide-out is over and the Drawer has given the focus back: the runtime sees that the
+  // focus landed somewhere (runtime-core.ts, sheetClosed).
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const d = dialog.current;
+    if (!d) return;
+    const closed = () => api.sheetClosed(name, d);
+    d.addEventListener("close", closed);
+    return () => d.removeEventListener("close", closed);
+  }, [api, name]);
   const drawn = open || kept;
   return (
-    <Drawer isOpen={open} onOpenChange={onOpenChange} label={title} purpose={purpose} width={width} experimental={{ isFullWidthOnMobile: true }} data-sheet={name}>
+    <Drawer ref={dialog} isOpen={open} onOpenChange={onOpenChange} label={title} purpose={purpose} width={width} experimental={{ isFullWidthOnMobile: true }} data-sheet={name}>
       <Layout
         header={<DrawerHeader title={title} subtitle={subtitle} onOpenChange={onOpenChange} />}
         content={<LayoutContent>{drawn && children}</LayoutContent>}

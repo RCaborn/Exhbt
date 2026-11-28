@@ -34,6 +34,12 @@ export type PortfolioEditorApi = {
    */
   open(sheet: PortfolioSheet, trigger?: HTMLElement | null): void;
   close(): void;
+  /**
+   * A sheet's dialog has closed and handed the focus back (ui/Sheet.tsx calls it with that dialog). If the focus ends
+   * on the page's body, or on something no longer on the page, it goes back to what opened the sheet; anywhere else it
+   * stays.
+   */
+  sheetClosed(sheet: PortfolioSheet, dialog: HTMLElement): void;
   /** Says something in the polite live region. */
   say(message: string): void;
   /** Scrolls to and focuses the field or anchor with this data-path, opening what it lives in first. */

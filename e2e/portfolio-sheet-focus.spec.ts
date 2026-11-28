@@ -79,8 +79,11 @@ type Opener = {
   before?: (page: Page) => Promise<void>;
 };
 
-/** Presses the opener, closes what it opened (with Escape, or with its close button), and checks where the focus went. */
-async function pressAndClose(page: Page, o: Opener, how: "Escape" | "the close button", finger = false) {
+/**
+ * Presses the opener, closes what it opened (with Escape, or with its close button), and checks where the focus went.
+ * `readMs`: how long the person reads it first (a test presses Escape as soon as it can be seen, a person does not).
+ */
+async function pressAndClose(page: Page, o: Opener, how: "Escape" | "the close button", finger = false, readMs = 0) {
   const opener = o.opener(page);
   await opener.scrollIntoViewIfNeeded();
   await press(opener, finger);
@@ -88,6 +91,7 @@ async function pressAndClose(page: Page, o: Opener, how: "Escape" | "the close b
   // Strict: one press opens one of it, and a second copy on opening fails here.
   const open = o.open(page);
   await expect(open, `${o.name}: one of it is open`).toBeVisible();
+  if (readMs) await page.waitForTimeout(readMs);
   if (how === "Escape") await page.keyboard.press("Escape");
   else await press(open.getByRole("button", { name: "Close", exact: true }).first(), finger);
   // As it closes, a popover under a finger can leave a second copy shrinking back into its button (above): every copy
@@ -186,6 +190,19 @@ function everyOpener() {
         if (o.closeButton) await pressAndClose(page, o, "the close button", true);
       });
     }
+
+    // Under a finger the bar's menu is a sheet of its own (EditorBar.tsx, `presentation="adaptive"`), and a choice in it
+    // opens its sheet while the menu's sheet is still sliding away. The cases above close it the moment it can be seen;
+    // a person reads it first, or closes it with its own button.
+    const choices = openers.filter((o) => o.choice);
+    test("the menu's choices, each sheet read for half a second and closed with Escape: the focus comes back to More", async ({ page }) => {
+      await openEditor(page, fresh(FULL, "foph-read"));
+      for (const o of choices) await pressAndClose(page, o, "Escape", true, 500);
+    });
+    test("the menu's choices, each sheet closed with its own close button: the focus comes back to More", async ({ page }) => {
+      await openEditor(page, fresh(FULL, "foph-closebtn"));
+      for (const o of choices) await pressAndClose(page, o, "the close button", true);
+    });
   });
 }
 
