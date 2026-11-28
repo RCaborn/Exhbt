@@ -13,12 +13,15 @@ export async function waitForBuilder(page: Page) {
 
 /**
  * Waits until the portfolio's step builder (/portfolio at "steps", app/(app)/portfolio/Builder.tsx) has hydrated. Its root
- * sets data-ready and has no attribute of its own, so it is found as the ready element that holds the builder's heading:
- * only an element holding that heading can answer for it (the site's phone menu, which set data-ready until f1fa4d3,
- * does not), and two matches fail the wait instead of passing it.
+ * sets data-ready and has no attribute of its own, so the wait takes a direct child of the layout's #main
+ * (app/(app)/layout.tsx) that has the marker and holds the builder's heading. On this page that is the root alone:
+ * app/(app)/portfolio/page.tsx draws it straight into #main, beside TryNewPortfolio and JobLinksSection, which do not
+ * hold the heading. #main itself, the elements round it, the header and anything inside the root are not direct
+ * children of #main, so the marker on one of them does not satisfy the wait; two matches fail it instead of passing it.
+ * If the page ever puts an element between #main and the root, the wait times out: mend the selector, do not widen it.
  */
 export async function waitForStepBuilder(page: Page) {
-  await expect(page.locator("[data-ready=true]").filter({ has: page.getByRole("heading", { level: 1, name: "Build your portfolio" }) })).toBeAttached();
+  await expect(page.locator("#main > [data-ready=true]").filter({ has: page.getByRole("heading", { level: 1, name: "Build your portfolio" }) })).toBeAttached();
 }
 
 /** A CV whose top has the details the project-ideas gate can prefill. */
