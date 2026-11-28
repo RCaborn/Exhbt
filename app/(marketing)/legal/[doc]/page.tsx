@@ -179,7 +179,7 @@ const DOCS: Record<string, Doc> = {
           <li>Google, if you choose it to sign in: the name and email on that account. Supabase handles the sign-in.</li>
           <li>Cloudflare: hosting and delivery of the website, and Web Analytics, which sets no cookies.</li>
           <li>Anthropic: the AI steps above.</li>
-          <li>Resend: sending sign-in, confirmation and password-reset emails, roadmap emails and teammate invites.</li>
+          <li>Resend: sending sign-in, confirmation and password-reset emails, roadmap emails, teammate invites, and one email with its link when your first exhbt goes live on your portfolio.</li>
           <li>
             Stripe, when you buy a paid plan: payments. You pay on Stripe&rsquo;s own page, so your card details go
             straight to Stripe and never reach us.
