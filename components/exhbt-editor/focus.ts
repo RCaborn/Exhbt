@@ -49,10 +49,10 @@ const inField = (node: Node | null): boolean => {
  * a button keeps it (HTMLButtonElement::canStartSelection is false), unless it is in an input or a textarea. After a
  * press that can start one, as a drag across the page's words or a double-click on one is, it takes a selection in the
  * page's words away, and that is the selection put back here, from where it began and ended before the blur. A
- * selection in a formatted field (contenteditable) is kept after any press from WebKit 625; in WebKit 624 and before, a
- * press that can start a selection takes it away as well. Chromium kept the selection in every case tried when the
- * focus went to nothing (Chromium 153, 27 Nov 2026: the page's words, a formatted field, an input and a textarea), so
- * there nothing is put back.
+ * selection in a formatted field (contenteditable) is kept after any press from WebKit 625; in WebKit 618 to 624 (none
+ * older was read), a press that can start a selection takes it away as well. Chromium kept the selection in every case
+ * tried when the focus went to nothing (Chromium 153, 27 Nov 2026: the page's words, a formatted field, an input and a
+ * textarea), so there nothing is put back.
  *
  * A selection is put back only in the page's words, never with either end in a formatted field: there, putting it
  * back would move the focus into the field (WebKit's FrameSelection::setFocusedElementIfNeeded focuses the editable
