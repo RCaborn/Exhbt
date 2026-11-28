@@ -39,8 +39,8 @@ const ONLY_WEBKIT = /[\\/][a-z-]+\.webkit\.ts$/;
  * drag and open the bar's parts. Every other portfolio spec runs on `desktop` only.
  */
 const PORTFOLIO_PHONE = /[\\/]portfolio-phone\.spec\.ts$/;
-const PORTFOLIO_TOUCH = /[\\/]portfolio-(arrange|phone)\.spec\.ts$/;
-const PORTFOLIO_SAFARI = /[\\/]portfolio-(core|arrange|bar|editor)\.spec\.ts$/;
+const PORTFOLIO_TOUCH = /[\\/]portfolio-(arrange|phone|sheet-focus)\.spec\.ts$/; // and where the focus goes as a sheet closes, by touch
+const PORTFOLIO_SAFARI = /[\\/]portfolio-(core|arrange|bar|editor|sheet-focus|leaving)\.spec\.ts$/; // and the focus and leaving specs: six
 const webkitProjects = [
   { name: "safari", fullyParallel: true, use: { ...devices["Desktop Safari"], viewport: { width: 1440, height: 900 }, ...engine }, testMatch: [/[\\/]editor-[a-z-]+\.spec\.ts$/, /[\\/]your-way\.spec\.ts$/, PORTFOLIO_SAFARI, ONLY_WEBKIT], testIgnore: /editor-(phone|tablet)\.spec\.ts/, grepInvert: LEFT_OUT },
   { name: "iphone", fullyParallel: true, use: { ...devices["iPhone 14"], ...engine }, testMatch: [/editor-(drag|flow|phone|figures)\.spec\.ts/, PORTFOLIO_TOUCH, ONLY_WEBKIT], grepInvert: LEFT_OUT },
