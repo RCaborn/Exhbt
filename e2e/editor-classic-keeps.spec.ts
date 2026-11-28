@@ -46,7 +46,7 @@ async function open(page: Page, tag: string, doc: ExhbtDoc): Promise<{ id: strin
   await expect(page.getByRole("heading", SEL.listHeading)).toBeVisible();
   await page.goto(`/exhbts/${id}/edit?editor=classic`);
   await expect(page.getByRole("heading", SEL.editHeading)).toBeVisible();
-  await expect(page.locator(SEL.ready).first()).toBeAttached();
+  await expect(page.locator(SEL.ready)).toBeAttached();
   // The rich text fields load in their own chunk after the page; the gap card is called Context, The brief and so on by layout.
   await expect(page.locator("[role=textbox]").first()).toBeVisible();
   return { id, username };

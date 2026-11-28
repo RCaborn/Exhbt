@@ -123,6 +123,25 @@ test.describe("a publish: the event and the first email", () => {
     expect((await eventsOf(page, "first_publish_emailed")).length).toBe(1);
   });
 
+  test("n counts an exhbt taken down: a second exhbt published after the first came down has n 2", async ({ page }) => {
+    const user = `pubdown${stamp()}`.toLowerCase();
+    await signInAs(page, user, "premium");
+    await publishNew(page, "Taken down later");
+    await expect.poll(async () => (await eventsOf(page, "exhbt_published")).length).toBe(1);
+
+    // Taken down: it has been published, so it still counts, though nothing of this person's is live now.
+    await openPublishSheet(page);
+    await page.getByRole("button", { name: "Unpublish" }).click();
+    await page.getByRole("button", { name: "Yes, unpublish" }).click();
+    await expect(publishSheet(page).getByRole("button", { name: "Publish", exact: true })).toBeVisible();
+
+    // One exhbt live once this one is, and two that have been published: n is 2.
+    await page.goto("/exhbts");
+    await publishNew(page, "Published after it came down");
+    await expect.poll(async () => (await eventsOf(page, "exhbt_published")).length).toBe(2);
+    expect((await eventsOf(page, "exhbt_published"))[1]!.props).toEqual({ n: 2, republish: false });
+  });
+
   test("Free cannot publish, so nothing is logged and nothing is sent", async ({ page }) => {
     const user = `pubfree${stamp()}`.toLowerCase();
     await signInAs(page, user, "free");

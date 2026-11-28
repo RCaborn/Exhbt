@@ -25,8 +25,13 @@ export const SEL = {
   editHeading: { level: 1 as const, name: "Edit exhbt" },
   editUrl: /\/exhbts\/[0-9a-f-]{36}\/edit$/,
   editUrlId: /\/exhbts\/([0-9a-f-]{36})\/edit$/,
-  /** Set once the editor has hydrated. */
-  ready: "[data-ready=true]",
+  /**
+   * The classic editor's root (components/editor/Editor.tsx, a child of the edit page's data-editor="classic"),
+   * once it has hydrated. Only a direct child of that div can answer, so the marker on #main, on anything else round
+   * the div or in the header cannot. The div's other children could: the "You're in the classic editor" notice and
+   * TryNewEditor (app/(app)/exhbts/[id]/edit/page.tsx), had they the marker.
+   */
+  ready: '[data-editor="classic"] > [data-ready=true]',
   /** Fields by id, label or accessible name. */
   titleField: "#title",
   contextField: { role: "textbox" as const, name: "Context" },
@@ -145,7 +150,7 @@ export async function draftAndOpen(page: Page, tag: string, opts: { waitForForm?
   const { id } = (await res.json()) as { id: string };
   await page.goto(`/exhbts/${id}/edit`);
   await expect(page.getByRole("heading", SEL.editHeading)).toBeVisible();
-  await expect(page.locator(SEL.ready).first()).toBeAttached();
+  await expect(page.locator(SEL.ready)).toBeAttached();
   return id;
 }
 

@@ -23,6 +23,7 @@ import {
 } from "../lib/portfolio-layout";
 import { PORTFOLIO_THEMES, themeAllowance } from "../lib/portfolio-themes";
 import type { ExhbtRecord } from "../lib/store";
+import { waitForStepBuilder } from "./helpers";
 
 // The portfolio customiser (decision 0014), now the Projects and Look steps of the portfolio builder
 // (decision 0016): the layout rules, the steps, and the public at-a-glance page that renders what
@@ -169,7 +170,7 @@ async function openCustomiser(page: Page, username: string, plan: string, count 
   expect(res.status(), await res.text()).toBe(307);
   await page.goto(`/auth/dev?email=${encodeURIComponent(`${username}@example.com`)}&next=${encodeURIComponent(next)}`);
   await expect(page.getByRole("heading", { level: 1, name: "Build your portfolio" })).toBeVisible();
-  await expect(page.locator("[data-ready=true]").first()).toBeAttached();
+  await waitForStepBuilder(page);
 }
 
 const status = (page: Page) => page.getByTestId("save-status");
@@ -403,7 +404,7 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     await expect(page.locator("[data-section=quote]")).toContainText("messy spreadsheet");
 
     await page.goto("/portfolio?step=projects");
-    await page.getByRole("button", { name: "Take A quote off the page" }).click();
+    await page.getByRole("button", { name: "Take A quote off your portfolio" }).click();
     await saved(page);
     await page.goto(`/p/${u}`);
     await expect(page.locator("[data-section=quote]")).toHaveCount(0);
@@ -492,7 +493,7 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     await saved(page);
 
     await page.reload();
-    await expect(page.locator("[data-ready=true]").first()).toBeAttached();
+    await waitForStepBuilder(page);
     const after = await previewOrder(page);
     expect(after).not.toContain(GP);
     expect(after).toHaveLength(3);

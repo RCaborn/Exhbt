@@ -325,7 +325,7 @@ export function StepProjects({
                       <Pencil aria-hidden size={16} strokeWidth={2} />
                     </IconButton>
                   )}
-                  <IconButton label={`Take ${SECTION_NAMES[key]} off the page`} onClick={() => removeSection(key)}>
+                  <IconButton label={`Take ${SECTION_NAMES[key]} off your portfolio`} onClick={() => removeSection(key)}>
                     <X aria-hidden size={16} strokeWidth={2.25} />
                   </IconButton>
                 </div>

@@ -41,7 +41,7 @@ export function StepLook({
   const lock = locks[current.look];
   return (
     <div>
-      <p className="text-graphite">Colours, type and how the page is laid out. Your words and projects stay the same in every look, on your portfolio and on every exhbt.</p>
+      <p className="text-graphite">Colours, type and how your portfolio is laid out. Your words and projects stay the same in every look, on your portfolio and on every exhbt.</p>
       {savedButLocked && (
         <p className="mt-4 text-graphite" data-testid="look-held">
           Your saved look, {savedButLocked}, comes with a plan you&rsquo;re not on now. Your portfolio shows the default until you&rsquo;re back on it, then it returns.

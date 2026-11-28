@@ -35,9 +35,12 @@ export async function afterPublish(opts: {
   let after: ExhbtRecord[];
   try {
     after = await store.listExhbts(userId);
-    // No words from the exhbt, no title and no file names. The exhbt does not record whether it began as a roadmap
-    // idea (createFromIdea only prefills the doc), so there is no `from_idea`.
-    await store.logEvent("exhbt_published", userId, { n: after.filter((e) => e.status === "published").length, republish });
+    // n is how many of the person's exhbts have been published, this one included, counted the way N1 and N2 on the
+    // admin page count them (adminPublishNumbers): an exhbt with published_at set, which taking it down does not clear,
+    // until it is deleted. It is not how many are live now. No words from the exhbt, no title and no file names. The
+    // exhbt does not record whether it began as a roadmap idea (createFromIdea only prefills the doc), so there is no
+    // `from_idea`.
+    await store.logEvent("exhbt_published", userId, { n: after.filter((e) => e.publishedAt).length, republish });
   } catch (e) {
     console.error("publish event failed", (e as Error).message);
     return;
