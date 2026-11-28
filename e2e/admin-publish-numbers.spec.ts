@@ -123,7 +123,7 @@ test.describe("a publish: the event and the first email", () => {
     expect((await eventsOf(page, "first_publish_emailed")).length).toBe(1);
   });
 
-  test("n counts an exhbt taken down, as N1 and N2 do: a second exhbt published after the first came down has n 2", async ({ page }) => {
+  test("n counts an exhbt taken down: a second exhbt published after the first came down has n 2", async ({ page }) => {
     const user = `pubdown${stamp()}`.toLowerCase();
     await signInAs(page, user, "premium");
     await publishNew(page, "Taken down later");
