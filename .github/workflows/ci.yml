@@ -53,7 +53,20 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/12
+      # The dev server's heap, sized to this runner, and what the runner has, in the log. next dev gives its server half the
+      # machine's memory unless NODE_OPTIONS sets it (next/dist/cli/next-dev.js), and restarts it once its heap passes 80% of
+      # that (next/dist/server/lib/start-server.js), which empties the in-memory store mid-run. In every run of 27 and 28 Nov
+      # 2026 shards 1, 6, 7, 8, 9 and 10 restarted so, and the test under way failed and passed on its retry; in run
+      # 46109184070 shard 7's server died of "heap out of memory" instead, and its last six tests found no server. The heap
+      # grows as routes are first built, not with what the tests store. The server's resident memory runs about 3 GB above
+      # its heap (shard 7, 28 Nov 2026), and Chromium, Playwright and the runner need about 3 GB more, so the heap gets what
+      # is left after 6 GB, and never less than next dev's half.
+      - run: |
+          total=$(awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo)
+          heap=$(( total - 6144 > total / 2 ? total - 6144 : total / 2 ))
+          free -m
+          echo "This runner has ${total} MB of memory and $(nproc) CPUs; the dev server's heap may grow to ${heap} MB."
+          NODE_OPTIONS="--max-old-space-size=${heap}" npm run test:e2e -- --shard=${{ matrix.shard }}/12
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
