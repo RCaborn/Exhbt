@@ -37,8 +37,6 @@ const ALLOW = [
   { file: "app/layout.tsx", phrase: "your own portfolio site", why: "frozen: the site's description. Use \"your own portfolio at name.exhbt.co.uk\"", job: "main session" },
   { file: "lib/plan-rules.ts", phrase: "your own link", why: "protected (check:protected): the refusal shown when a publish is refused. Use \"Publishing to your address comes with ...\"", job: "main session" },
   { file: "lib/team.ts", phrase: "your own address", why: "means an email address, not a label", job: "none" },
-  { file: "app/api/exhbts/draft/route.ts", phrase: "draft an exhbt", why: "an API error for the AI draft, where drafting is the action; outside 3a's files", job: "main session" },
-  { file: "app/(app)/portfolio/actions.ts", phrase: "start an exhbt", why: "a sentence in the step builder's AI error; outside 3a's files. Use \"add an exhbt\"", job: "main session" },
 ];
 
 const isComment = (line) => /^\s*(\/\/|\/\*|\*|\{\/\*)/.test(line);

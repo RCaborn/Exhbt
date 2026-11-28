@@ -260,7 +260,7 @@ export async function suggestIntroAction(draft: unknown): Promise<IntroSuggestio
     }).filter((x) => x.title),
   };
   if (!hasIntroFacts(facts)) {
-    return { ok: false, error: "There isn't enough to go on yet. Add a headline, build a roadmap with your CV, or start an exhbt, then try again." };
+    return { ok: false, error: "There isn't enough to go on yet. Add a headline, build a roadmap with your CV, or add an exhbt, then try again." };
   }
   if (await tooManyFailures("portfolio_intro", { userId: user.id })) return { ok: false, error: TOO_MANY_FAILURES };
   let result;

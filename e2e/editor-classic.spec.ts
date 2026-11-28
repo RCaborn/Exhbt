@@ -209,15 +209,19 @@ test.describe("the crash fallback", () => {
     expect(new URL(page.url()).searchParams.get("editor")).toBe("classic");
   });
 
-  // Safari stops a page's loads the moment the person goes somewhere else, and keeps the page until the next one
-  // arrives, which can take far longer than a chunk's three tries (components/exhbt-editor/again.ts). Here any browser
-  // is made to do the same: the next page is held back for eight seconds, and from the moment the person leaves, the
+  // A page being left can lose a chunk that is on its way, and the next page can take far longer than a chunk's three
+  // tries (components/exhbt-editor/again.ts; what was and was not seen is in leaving.ts, "What was seen"). Here any
+  // browser is made to do the same: the next page is held back for eight seconds, and from the moment the person leaves, the
   // formatted fields' chunk fails each time it is asked for. The page that was left opens nothing after it.
-  test("a chunk cut off by leaving the page opens no classic editor, however long the next page takes", async ({ page }) => {
+  test("a chunk cut off by leaving the page opens no classic editor, however long the next page takes, up to a minute", async ({ page }) => {
     const { edit } = await seed(page, "leave");
     const fellBack: string[] = [];
+    const navigated: string[] = [];
     page.on("console", (m) => {
       if (m.type() === "error" && m.text().includes("The new editor failed")) fellBack.push(m.text());
+    });
+    page.on("framenavigated", (f) => {
+      if (f === page.mainFrame()) navigated.push(f.url());
     });
     // In development the chunk is named after its file (components/exhbt-editor/fields/RichEditor.tsx). It is on its
     // way and does not come; once the person has left it fails, and so does every asking after.
@@ -246,6 +250,9 @@ test.describe("the crash fallback", () => {
     await page.goto("/exhbts");
     await expect(page.getByRole("heading", SEL.listHeading)).toBeVisible();
     expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe("/exhbts");
+    // And no navigation during the hold went to the classic editor (?editor=classic): the fallback's redirect is what
+    // interrupted the navigation the person asked for (the WebKit run of 27 Nov 2026).
+    expect(navigated.filter((u) => new URL(u).searchParams.has("editor")), "no navigation to the classic editor").toEqual([]);
     expect(failedAfter, "the chunk was cut off by the leave").toBeGreaterThan(0);
     expect(fellBack).toEqual([]);
   });

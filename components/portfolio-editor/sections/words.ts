@@ -31,12 +31,12 @@ export const W = {
   added: (n: string) => `added ${n}`,
   saidMoved: (n: string, at: number, of: number) => `${n} moved to position ${at} of ${of}.`,
   saidRemoved: (n: string) => `${n} removed. Undo puts it back with its words.`,
-  saidAdded: (n: string) => `${n} added at the end of your page.`,
+  saidAdded: (n: string) => `${n} added at the end of your portfolio.`,
 
   /* ---------- Add a section ---------- */
   addSection: "Add a section",
-  addSectionAllOn: "Every section is on your page",
-  onPageAlready: "Already on your page",
+  addSectionAllOn: "Every section is on your portfolio",
+  onPageAlready: "Already on your portfolio",
   seePlans: "See plans",
 
   /* ---------- Dragging ---------- */
@@ -55,7 +55,7 @@ export const W = {
   starTip: "Show it large at the top, as your best piece of work",
   unstar: (t: string) => `Take ${t} out of the band`,
   hide: (t: string) => `Hide ${t}`,
-  hideTip: "Take it off your page. It keeps its link.",
+  hideTip: "Take it off your portfolio. It keeps its link.",
   show: (t: string) => `Show ${t}`,
   tileMore: (t: string) => `More for ${t}`,
   tileUp: "Move up",
@@ -70,19 +70,19 @@ export const W = {
   showed: (t: string) => `showed ${t}`,
   movedTile: (t: string) => `moved ${t}`,
   saidHid: (t: string) => `${t} hidden. It is in the row under your work, with Show.`,
-  saidShowed: (t: string) => `${t} is back on your page.`,
-  saidStarred: (t: string) => `${t} is in the band at the top of your page.`,
+  saidShowed: (t: string) => `${t} is back on your portfolio.`,
+  saidStarred: (t: string) => `${t} is in the band at the top of your portfolio.`,
   saidUnstarred: (t: string) => `${t} is back with the rest of your work.`,
 
   /* ---------- What only the owner sees ---------- */
   ownerOnly: "Only you can see this",
   overLimit: "Over your plan's limit",
-  overLimitWhy: "It stays live at its link, but your plan shows fewer on your page.",
-  draftWhy: "Finish it and publish it to put it on your page.",
+  overLimitWhy: "It stays live at its link, but your plan shows fewer on your portfolio.",
+  draftWhy: "Finish it and publish it to put it on your portfolio.",
   finish: "Finish and publish",
   openIt: "Open",
   showShort: "Show",
-  hiddenHeading: "Hidden from your page",
+  hiddenHeading: "Hidden from your portfolio",
   hiddenWhy: "Visitors don't see these here. Each one still works at its link.",
 
   /* ---------- Add an exhbt ---------- */

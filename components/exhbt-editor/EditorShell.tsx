@@ -2,7 +2,7 @@
 
 import "./css/core.css";
 import "./css/your-way.css";
-import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { MadeWith } from "@/components/brand/MadeWith";
 import { IMAGE_ACCEPT } from "@/components/editor/media";
@@ -28,6 +28,7 @@ import { createFiles, FilesContext, useFiles, useFilesController, useImageUrls, 
 import { ChartSheet } from "./figures/ChartSheet";
 import { DraftedGraph } from "./figures/DraftedGraph";
 import { FigureSheet } from "./figures/FigureSheet";
+import { focusNowhere, useFrameLetsGo } from "./focus";
 import { PageCtxContext } from "./Frame";
 import { CANVAS, LOOK_GROUND } from "./geometry";
 import { jumpTo } from "./jump";
@@ -92,6 +93,9 @@ export function PageEditor(props: PageEditorProps) {
   const [ready, setReady] = useState(false);
   // An iPhone zooms in on a field under 16px, and the page's own type is mostly under it (phone/noZoom.ts).
   useNoZoomOnFocus();
+  // No press on the page ends with the focus on the frame round the editor (#main, AppShell's main region): focus.ts.
+  const root = useRef<HTMLDivElement>(null);
+  useFrameLetsGo(root);
   useEffect(() => {
     setReady(true);
     // Their chunk is fetched now, so a field clicked first only has to make its editor.
@@ -123,6 +127,7 @@ export function PageEditor(props: PageEditorProps) {
           <DraftToolsContext value={visit.draft}>
             <GrowContext value={grow}>
               <div
+                ref={root}
                 data-editor="page"
                 data-ready={ready ? "true" : undefined}
                 className="xe-editor"
@@ -306,8 +311,9 @@ function UndoKeys(): ReactNode {
       const target = undoneTarget(subject, box);
       if (target) target.focus();
       else if (store.undoLabel()) {
-        // The focus was in what the undo took out: Undo keeps it.
-        if (!document.activeElement || document.activeElement === document.body) document.getElementById("xe-undo")?.focus();
+        // The focus was in what the undo took out, or a press on Undo left it nowhere (Safari's way, focus.ts): Undo keeps it.
+        const undo = document.getElementById("xe-undo");
+        if (focusNowhere(document.activeElement, undo)) undo?.focus();
       } else document.getElementById(HEADING_ID)?.focus();
     });
     return () => {

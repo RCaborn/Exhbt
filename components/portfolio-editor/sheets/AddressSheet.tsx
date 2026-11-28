@@ -92,7 +92,7 @@ function AddressBody(): ReactNode {
             portfolioHost(username)
           )}
         </Heading>
-        {live === 0 && <Banner status="info" title={ADDRESS_WORDS.notFound} description="Add an exhbt and publish it, and your page is online." />}
+        {live === 0 && <Banner status="info" title={ADDRESS_WORDS.notFound} description="Add an exhbt and publish it, and your portfolio is online." />}
         <span className="pe-bar-end">
           {viewHref && <CopyAddress href={viewHref} />}
           <Button size="sm" aria-expanded={changing} aria-controls="pe-address-change" onClick={() => setChanging((c) => !c)}>
@@ -146,12 +146,12 @@ function Checklist(): ReactNode {
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const checks = [
     { done: Boolean(username), text: username ? `Your address is ${portfolioHost(username)}` : "Choose your address" },
-    { done: live > 0, text: live > 0 ? `${plural(live, "exhbt is", "exhbts are")} on your page` : "Add an exhbt and publish it" },
-    { done: plan.isPublic, text: plan.isPublic ? `Your page is public on ${plan.name}` : "Pages go public on a paid plan" },
+    { done: live > 0, text: live > 0 ? `${plural(live, "exhbt is", "exhbts are")} on your portfolio` : "Add an exhbt and publish it" },
+    { done: plan.isPublic, text: plan.isPublic ? `Your portfolio is public on ${plan.name}` : "Your portfolio goes public on a paid plan" },
   ];
   return (
     <section className="pe-sheet-part" aria-labelledby="pe-live-h">
-      <h3 id="pe-live-h">{online ? "Your page is online" : "Before your page goes online"}</h3>
+      <h3 id="pe-live-h">{online ? "Your portfolio is online" : "Before your portfolio goes online"}</h3>
       <ul className="pe-checks" data-testid="publish-checklist">
         {checks.map((c) => (
           <li key={c.text} className="pe-check" data-done={c.done ? "true" : undefined}>

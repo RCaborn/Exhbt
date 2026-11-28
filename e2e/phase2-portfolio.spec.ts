@@ -128,6 +128,7 @@ test.describe("Hosts", () => {
     expect(go("www.exhbt.co.uk", "/portfolio")).toBe(`https://${APP_HOST}/portfolio`);
     expect(go("www.exhbt.co.uk", "/job-links")).toBe(`https://${APP_HOST}/job-links`);
     expect(go("www.exhbt.co.uk", "/job-links/new")).toBe(`https://${APP_HOST}/job-links/new`);
+    expect(go("www.exhbt.co.uk", "/team/accept", "?token=abc")).toBe(`https://${APP_HOST}/team/accept?token=abc`);
     expect(go("www.exhbt.co.uk", "/start")).toBeNull();
   });
 

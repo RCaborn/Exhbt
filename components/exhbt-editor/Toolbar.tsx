@@ -9,6 +9,7 @@ import type { ItemAs } from "@/lib/exhbt/layouts";
 import { useBoard } from "./drag";
 import { mainColumn } from "./drag/engine";
 import { MoreActions } from "./draft-tools";
+import { focusNowhere } from "./focus";
 import { useFrame } from "./Frame";
 import { labelOf } from "./labels";
 import { useDoc, useStoreInternal } from "./store";
@@ -723,7 +724,7 @@ export function Toolbar() {
       // it closes. Not for the same words in a new object (a save that hands the doc back).
       if (openNow.current && JSON.stringify(now) !== JSON.stringify(before)) {
         setOpen(false);
-        if (!document.activeElement || document.activeElement === document.body || tools.contains(document.activeElement)) requestAnimationFrame(() => menu.current?.focus());
+        if (focusNowhere(document.activeElement, tools) || tools.contains(document.activeElement)) requestAnimationFrame(() => menu.current?.focus());
       }
     });
   }, [store, id, kind]);
@@ -747,7 +748,9 @@ export function Toolbar() {
         menu.current?.focus();
       }}
       onBlur={(e) => {
-        if (open && e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node) && !rewriteOpenIn(e.currentTarget)) setOpen(false);
+        // The focus going to something else closes it. Going nowhere does not, nor to the frame round the editor, where Safari
+        // sends a press on one of the menu's own buttons (focus.ts): the menu stays for that press's click.
+        if (open && !focusNowhere(e.relatedTarget, e.currentTarget) && !e.currentTarget.contains(e.relatedTarget as Node) && !rewriteOpenIn(e.currentTarget)) setOpen(false);
       }}
       onClick={(e) => {
         const b = (e.target as HTMLElement).closest("button");

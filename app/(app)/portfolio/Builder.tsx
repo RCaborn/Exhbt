@@ -29,7 +29,7 @@ import { Tick } from "@/components/ui/Tick";
 const TITLES: Record<Step, string> = {
   you: "About you",
   look: "Your look",
-  projects: "Your page",
+  projects: "Your portfolio",
   publish: "Publish and share",
 };
 const INTROS: Record<Step, string> = {

@@ -70,7 +70,7 @@ Useful dev-only pages:
 | Roadmap result screens | `components/roadmap/RoadmapViews.tsx` (`VIEWS` at the top) |
 | AI prompt and output shape | `lib/ai/roadmap.ts`, `lib/ai/schemas.ts` |
 | Generation + email orchestration | `lib/roadmap-service.ts` |
-| Email template | `lib/email/templates/roadmap-ready.ts` (sending: `lib/email/send.ts`) |
+| Email template | `lib/email/templates/roadmap-ready.ts` (sending: `lib/email/send.ts`); the one at a person's first publish is `lib/email/templates/first-exhbt-live.ts`, sent from `lib/publish-follow-up.ts` |
 | Database access | `lib/store.ts` (one interface, Supabase + in-memory implementations) |
 | Database schema | `supabase/migrations/` |
 | Sign-in | `lib/auth.ts`, `app/auth/*` |
@@ -133,6 +133,7 @@ Development pages for Phase 2 (all 404 in production and when Supabase is connec
 - **`/dev/upload/<id>`** and **`/dev/files/<id>`**: the in-memory stand-in for Storage. Uploads PUT to the first; portfolio pages read from the second. Files are gone when the server restarts.
 - **`/dev/editor?kind=page`**: stands in for `EXHBT_EDITOR` in this browser alone. `kind=classic` and `kind=default` (the variable not set) are the other settings, and an empty `kind=` clears it.
 - **`/dev/portfolio-kind?kind=page`**: stands in for `EXHBT_PORTFOLIO` in this browser alone, then opens `/portfolio`. `kind=steps` and `kind=default` are the other settings.
+- **`/dev/measure`**: `?events=<name>` reads the signed-in person's events back, `?seed=<tag>` adds publishers for the admin's N1 and N2, `?gate=<plan>&tag=<tag>` runs the after-publish step for a new person on a plan, `?race=<tag>` runs it twice at once for one person, `?claim=<tag>` makes ten simultaneous first-publish claims (development only, in-memory store).
 - **`/dev/admin?role=admin`**: makes the signed-in dev user an admin (`role=user` takes it back), for `/admin` and the admin's own editor switch.
 
 ### The editor switch

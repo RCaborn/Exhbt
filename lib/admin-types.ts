@@ -28,6 +28,9 @@ export type AdminTable =
 /** Tables that are read whole (totals and plan breakdowns need every row), whatever the date range. */
 export const ALL_TIME_TABLES: AdminTable[] = ["profiles", "subscriptions", "jobLinks", "members", "invites", "files"];
 
+/** N1 and N2: all accounts, and how many have published a first and a second exhbt (Store.adminPublishNumbers). `partial` when a table was too big to read whole. */
+export type AdminPublishNumbers = { accounts: number; first: number; second: number; partial: boolean };
+
 export type AdminRowMap = {
   profiles: { id: string; email: string; createdAt: string; username: string | null; role: string; institutionActive: boolean }[];
   subscriptions: { userId: string; plan: Plan; status: string; subscriptionId: string | null; createdAt: string }[];

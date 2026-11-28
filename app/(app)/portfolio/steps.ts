@@ -7,7 +7,7 @@ import type { ProfileDraft } from "@/lib/portfolio-profile";
 export const STEPS = [
   { id: "you", label: "You" },
   { id: "look", label: "Your look" },
-  { id: "projects", label: "Your page" },
+  { id: "projects", label: "Your portfolio" },
   { id: "publish", label: "Publish" },
 ] as const;
 export type Step = (typeof STEPS)[number]["id"];

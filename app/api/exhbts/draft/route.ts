@@ -43,7 +43,7 @@ const fail = (error: string, status: number, extra: Record<string, unknown> = {}
 export async function POST(req: Request) {
   if (!isPhase2Enabled()) return fail("Not found", 404);
   const user = await getCurrentUser();
-  if (!user) return fail("Sign in to draft an exhbt.", 401);
+  if (!user) return fail("Sign in to add an exhbt.", 401);
 
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return fail("That request wasn't complete. Try again.", 400);

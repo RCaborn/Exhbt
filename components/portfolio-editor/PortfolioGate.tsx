@@ -182,7 +182,7 @@ export function PortfolioGate(props: PortfolioEditorProps) {
                 <Banner
                   status="warning"
                   role="alert"
-                  title="We could not fetch the newest copy of your page"
+                  title="We could not fetch the newest copy of your portfolio"
                   description="Check your connection, then try again. Nothing you saved is lost."
                   endContent={
                     <Button size="sm" onClick={fresh.retry}>

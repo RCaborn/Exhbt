@@ -11,7 +11,9 @@ import { leaving, watchLeaving } from "./leaving";
  * server keeps the page that is being left for longer, and the retries failed too (safari.webkit.ts, in
  * the WebKit run of 27 Nov 2026). So a failure while the page is being left (leaving.ts) is not counted:
  * the chunk is asked for again a second later, for as long as the leave lasts, and the page usually goes
- * first. A chunk that fails with nobody leaving reaches the fallback after its three tries, as before.
+ * first. A chunk that fails with nobody leaving reaches the fallback after its three tries, as before. The leave
+ * holds for up to a minute and a "Stay" press does not end it (leaving.ts), so for that minute a real failure is
+ * retried rather than counted.
  * The retries are also what a phone's connection needs: one dropped request should not cost the editor.
  */
 export function again<T>(load: () => Promise<T>, waits: readonly number[] = [500, 1500]): Promise<T> {

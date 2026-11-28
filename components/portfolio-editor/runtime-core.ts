@@ -173,7 +173,7 @@ export function createRuntime(initial: BuilderState, host: Host): Runtime {
     seeAsVisitor: (on) => {
       if (ui.get().visitor === on) return;
       ui.set((u) => ({ ...u, visitor: on }));
-      say(on ? "This is your page as a visitor sees it." : "Back to editing your page.");
+      say(on ? "This is your portfolio as a visitor sees it." : "Back to editing your portfolio.");
     },
   };
 

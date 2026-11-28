@@ -117,7 +117,7 @@ test.describe("Admin panel", () => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(`seed-${tag}c-3@example.com`);
     await expect(page.locator('[data-stat="detail-roadmaps"]')).toHaveText("3");
     await expect(page.getByText("Read only.")).toBeVisible();
-    await expect(page.locator("main").getByRole("button")).toHaveCount(0);
+    await expect(page.locator("#main").getByRole("button")).toHaveCount(0);
 
     // The first seeded account has the comp Max subscription.
     await page.goto(`/admin/accounts?q=seed-${tag}c-1@example.com`);

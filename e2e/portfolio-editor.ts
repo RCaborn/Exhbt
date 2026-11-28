@@ -339,7 +339,8 @@ export const HOME_BOXES: Record<string, string> = {
   "a section's heading": "[data-section] h2",
   card: "[data-card]",
   "a key figure": "[data-key-figure]",
-  // F's lines toolbar is an absolute, zero-size <div data-pe-lines> inside the <dl>: not a row.
+  // F's lines toolbar is an absolute, zero-size <div data-pe-lines>. It sits after the </dl>, in the [data-lines-box] wrapper
+  // (0031), not inside the <dl>; the :not() keeps the selector right if it is ever put back inside.
   "a row": "[data-section] dl > div:not([data-pe-lines])",
   "the footer": `${HOME} > footer`,
 };

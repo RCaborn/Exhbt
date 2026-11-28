@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { focusNowhere } from "../focus";
 
 /*
  * What the top bar's panels share: a button that opens a panel under it (the layout menu, "Things to fix",
@@ -74,8 +75,10 @@ export function Popover({
     const onPointer = (e: PointerEvent) => {
       if (!root.current?.contains(e.target as Node)) close();
     };
+    // The focus going to something else closes it; not to the frame round the editor, where Safari sends a press on the
+    // button itself (focus.ts): that press's click closes it, and the focus goes back to the button.
     const onFocus = (e: FocusEvent) => {
-      if (!root.current?.contains(e.target as Node)) close();
+      if (!root.current?.contains(e.target as Node) && !focusNowhere(e.target, root.current)) close();
     };
     document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onPointer);

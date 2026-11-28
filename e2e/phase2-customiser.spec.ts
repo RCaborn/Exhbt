@@ -468,7 +468,7 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     const contact = page.locator("[data-testid=preview] [data-section=contact]");
     await expect(contact.getByRole("link", { name: /linkedin/i })).toBeAttached();
 
-    await page.getByLabel("Show it on my page").uncheck();
+    await page.getByLabel("Show it on my portfolio").uncheck();
     // With nothing else to show, Get in touch is empty and visitors won't see it.
     await expect(contact.getByRole("link", { name: /linkedin/i })).toHaveCount(0);
     await saved(page);
@@ -476,8 +476,8 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     await expect(page.getByRole("link", { name: /linkedin/i })).toHaveCount(0);
 
     await page.goto("/portfolio?step=you");
-    await expect(page.getByLabel("Show it on my page")).not.toBeChecked();
-    await page.getByLabel("Show it on my page").check();
+    await expect(page.getByLabel("Show it on my portfolio")).not.toBeChecked();
+    await page.getByLabel("Show it on my portfolio").check();
     await saved(page);
     await page.goto(`/p/${u}`);
     await expect(page.locator("[data-section=contact]").getByRole("link", { name: /linkedin/i })).toBeVisible();

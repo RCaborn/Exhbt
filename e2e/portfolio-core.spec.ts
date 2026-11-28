@@ -58,7 +58,7 @@ test.describe("Which builder a person gets", () => {
     await expect(page).toHaveTitle(/Build your portfolio/);
     // It wins over what only the editor reads, and the step builder still reads its own step.
     await page.goto("/portfolio?builder=steps&open=look&step=projects");
-    await expect(page.locator("nav[aria-label=Steps] a[aria-current=step]")).toHaveText(/Your page/);
+    await expect(page.locator("nav[aria-label=Steps] a[aria-current=step]")).toHaveText(/Your portfolio/);
     // Without it, the editor again.
     await page.goto("/portfolio");
     await waitReady(page);

@@ -25,7 +25,7 @@ import { placeLinks, placeTool, type Spot } from "./place";
  *    step, since it replaces what was there. Its daily limit's words are the action's own.
  *  - "contact": Your links, a grid child of Get in touch (relative while editing), so absolute. A
  *    popover with LinkedIn, GitHub, website and email as the step builder had them, and "Show LinkedIn
- *    on your page". Each field carries its `data-path` (LINK_PATHS), so a problem's "Show me" finds it.
+ *    on your portfolio". Each field carries its `data-path` (LINK_PATHS), so a problem's "Show me" finds it.
  */
 export function PartTools({ where }: { where: "intro" | "contact" }): ReactNode {
   return where === "intro" ? <SuggestIntro /> : <YourLinks />;
@@ -287,7 +287,7 @@ export function LinksPanel(): ReactNode {
           {l.key === "linkedin" && (
             <div data-path="arrangement.header.linkedin" className="pe-links-switch">
               <Switch
-                label="Show LinkedIn on your page"
+                label="Show LinkedIn on your portfolio"
                 size="sm"
                 value={showLinkedin}
                 onChange={(on) => api.change((s) => ({ ...s, arrangement: { ...s.arrangement, header: { ...s.arrangement.header, linkedin: on } } }), on ? "showed LinkedIn" : "hid LinkedIn")}

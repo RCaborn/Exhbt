@@ -6,8 +6,8 @@ import { normaliseDoc, publicDoc, validateForPublish, type ExhbtDoc } from "./ex
 import { fileIdsIn, looksLikeFileId, withoutFiles } from "./exhbt/doc-files";
 import type { Plan } from "./entitlements";
 import { normaliseLayout, type PortfolioLayout } from "./portfolio-layout";
-import { accountPlan, cleanQuery, type AdminAccountDetail, type AdminAccountRow, type AdminAccountsPage, type AdminRows, type AdminTable } from "./admin-types";
-import { sbAdminAccount, sbAdminAccounts, sbAdminRows, sbIsAdmin } from "./admin-supabase";
+import { accountPlan, cleanQuery, type AdminAccountDetail, type AdminPublishNumbers, type AdminAccountRow, type AdminAccountsPage, type AdminRows, type AdminTable } from "./admin-types";
+import { sbAdminAccount, sbAdminAccounts, sbAdminRows, sbIsAdmin, sbPublishNumbers } from "./admin-supabase";
 
 export type RoadmapRecord = {
   id: string;
@@ -245,6 +245,10 @@ export type EventName =
   | "referral_recorded"
   | "referral_credited"
   | "page_view"
+  // A publish: n (how many of the person's exhbts are published once this one is), republish, and nothing from the exhbt (lib/publish-follow-up.ts).
+  | "exhbt_published"
+  // Claimed once per person, before the first-publish email is built (claimEventOnce).
+  | "first_publish_emailed"
   // Failed AI calls (lib/ai-failures.ts, decision 0029): feature, reason, status and tokens, never any text.
   | "exhbt_draft_failed"
   | "exhbt_rewrite_failed"
@@ -444,6 +448,18 @@ export interface Store {
    * overlap is another request's. A failure is reported and leaves the event counted.
    */
   returnEvent(name: EventName, userId: string, claim: string): Promise<void>;
+  /**
+   * Logs an event only if this user has none with this name yet, and returns its claim token (also in the event's
+   * props as `claim`) to the caller that logged it, null to every other. For a thing that must happen once per
+   * person, ever (the first-publish email). At most one caller wins. On Supabase, claims that overlap usually give no winner at all
+   * (see below), which means a missed email, never two.
+   * In memory the check and the write are one step, so exactly one wins. On Supabase it writes its row, reads back,
+   * and wins only if its row is the only one, so of two callers at the same moment the one whose read comes second
+   * sees the other's row, and both can back off, which sends nothing rather than twice. A unique index on
+   * (user_id, name) for this event would make it exactly one (the 23505 branch is ready for it). A failure to reach
+   * the database is null as well: the event is never logged twice, at the price of missing one.
+   */
+  claimEventOnce(name: EventName, userId: string, props?: Record<string, unknown>): Promise<string | null>;
   /** Records an uploaded (or about-to-be-uploaded) file. The id is chosen by the caller, as it is part of the path. */
   createFile(file: StoredFile & { exhbtId?: string | null }): Promise<void>;
   /** Bytes of every file this user has stored, for the plan's storage cap. */
@@ -567,6 +583,12 @@ export interface Store {
   adminAccounts(actorId: string, opts: { q: string; page: number; pageSize: number }): Promise<AdminAccountsPage>;
   /** One account, read-only; null if there is none. */
   adminAccount(actorId: string, userId: string): Promise<AdminAccountDetail | null>;
+  /**
+   * N1 and N2 (decision 0033): of all accounts, how many have published a first exhbt and how many a second. Counted from
+   * exhbts.published_at, not from the exhbt_published event, so it covers everything before the event existed. An exhbt
+   * counts once it has been published, and unpublishing it later does not take it back out; a draft never published does not count.
+   */
+  adminPublishNumbers(actorId: string): Promise<AdminPublishNumbers>;
 }
 
 export const isSupabaseConfigured = () =>
@@ -1278,6 +1300,25 @@ function supabaseStore(): Store {
       const { error } = await db.from("events").delete().eq("name", name).eq("user_id", userId).eq("props->>claim", claim);
       if (error) console.error("event return failed", error.message);
     },
+    async claimEventOnce(name, userId, props = {}) {
+      const claim = crypto.randomUUID();
+      const mine = await db.from("events").insert({ name, user_id: userId, props: { ...props, claim } }).select("id").single();
+      // A unique index on (user_id, name) for this event, if the database gets one, answers 23505 to the loser. Without it the
+      // rule below decides. Ids are handed out before commit, so "lowest id wins" would let two callers both win; "only row
+      // wins" cannot: each reads after its own insert is committed, so whichever commits second sees the first's row.
+      if (mine.error || !mine.data) {
+        if (mine.error?.code !== "23505") console.error("event claim failed", mine.error?.message);
+        return null;
+      }
+      const ownId = (mine.data as { id: number }).id;
+      const rows = await db.from("events").select("id").eq("name", name).eq("user_id", userId).limit(2);
+      const ids = (rows.data as { id: number }[] | null)?.map((r) => r.id);
+      if (!rows.error && ids?.length === 1 && ids[0] === ownId) return claim;
+      if (rows.error) console.error("event claim check failed", rows.error.message);
+      // Someone else's row is there too, or it cannot be told: take ours back and send nothing.
+      await db.from("events").delete().eq("id", ownId);
+      return null;
+    },
     async createFile(f) {
       check(
         await db.from("exhbt_files").insert({
@@ -1694,6 +1735,10 @@ function supabaseStore(): Store {
     async adminAccounts(actorId, opts) {
       if (!(await sbIsAdmin(db, actorId))) throw new Error("forbidden");
       return sbAdminAccounts(db, opts, LIVE_SUBSCRIPTION_STATUSES);
+    },
+    async adminPublishNumbers(actorId) {
+      if (!(await sbIsAdmin(db, actorId))) throw new Error("forbidden");
+      return sbPublishNumbers(db);
     },
     async adminAccount(actorId, userId) {
       if (!(await sbIsAdmin(db, actorId))) throw new Error("forbidden");
@@ -2438,6 +2483,13 @@ function memoryStore(): Store {
       const at = m.events.findIndex((e) => e.name === name && e.userId === userId && e.props.claim === claim);
       if (at >= 0) m.events.splice(at, 1);
     },
+    async claimEventOnce(name, userId, props = {}) {
+      // No await between the check and the push: one JavaScript thread, so two callers cannot both pass the check.
+      if (m.events.some((e) => e.name === name && e.userId === userId)) return null;
+      const claim = crypto.randomUUID();
+      m.events.push({ name, userId, props: { ...props, claim }, at: new Date().toISOString() });
+      return claim;
+    },
     async createFile(f) {
       files().set(f.id, { ...f, exhbtId: f.exhbtId ?? null, sha256: f.sha256 ?? null, createdAt: new Date().toISOString() });
     },
@@ -2723,6 +2775,13 @@ function memoryStore(): Store {
     async adminAccounts(actorId, opts) {
       if (!(m.admins ??= new Set()).has(actorId)) throw new Error("forbidden");
       return memAdminAccounts(m, opts);
+    },
+    async adminPublishNumbers(actorId) {
+      if (!(m.admins ??= new Set()).has(actorId)) throw new Error("forbidden");
+      const perPerson = new Map<string, number>();
+      for (const e of m.exhbts.values()) if (e.publishedAt) perPerson.set(e.userId, (perPerson.get(e.userId) ?? 0) + 1);
+      const counts = [...perPerson.values()];
+      return { accounts: memAccounts(m).length, first: counts.filter((c) => c >= 1).length, second: counts.filter((c) => c >= 2).length, partial: false };
     },
     async adminAccount(actorId, userId) {
       if (!(m.admins ??= new Set()).has(actorId)) throw new Error("forbidden");
