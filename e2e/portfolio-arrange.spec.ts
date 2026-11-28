@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { FULL, fullFixture, type PortfolioFixture } from "./fixtures/portfolio-pages";
 import { finger } from "./page-editor";
 import { W } from "../components/portfolio-editor/sections/words";
-import { HOME, READY, expect, fresh, openEditor, stateNow, test, textbox, typeIn, undoLabel, valueAt, waitReady, waitSaved } from "./portfolio-editor";
+import { HOME, READY, expect, focusedPath, fresh, openEditor, stateNow, test, textbox, typeIn, undoLabel, valueAt, waitReady, waitSaved } from "./portfolio-editor";
 
 // Arranging the page on the page (brief F of docs/briefs/portfolio-first, decision 0031): each
 // section's frame and corner toolbar, dragging and moving sections, adding and removing them; the
@@ -43,10 +43,17 @@ async function mouseDrag(page: Page, from: { x: number; y: number; width: number
   await page.mouse.up();
 }
 
+/** The name of what has the focus, so a check of where it is says where it went. */
+const focused = (page: Page) => page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? document.activeElement?.tagName ?? null);
+
 /** Drags by keyboard from a grip that has the focus: Space, each key, Space, waiting for each to be read out. */
 async function keyDrag(page: Page, keys: string[], end: "Space" | "Escape" = "Space") {
   const live = page.locator("[id^=DndLiveRegion]");
+  // Space goes to what has the focus, and only a grip starts a drag.
+  await expect.poll(() => focused(page)).toMatch(/^Drag /);
   await page.keyboard.press("Space");
+  // Read out: if it is not, the message has what the live regions said instead.
+  await expect.poll(() => live.allTextContents()).toContainEqual(expect.stringContaining("Picked up"));
   await expect(live.filter({ hasText: "Picked up" })).toHaveCount(1);
   for (const key of keys) {
     await page.keyboard.press(key);
@@ -88,6 +95,10 @@ test.describe("Sections", () => {
     await expect(tools(page, "about").getByRole("button", { name: "Move About me down" })).toBeFocused();
     await page.getByRole("button", { name: "Undo: moved About me" }).click();
     expect(await sections(page)).toEqual(before);
+    // Undo puts the focus in the section it moved back, a frame after the press (undoLast, runtime-core.ts). It is
+    // waited for: in WebKit Playwright's click returns without the round trip to the page it makes in Chromium, so
+    // the grip's focus below could come first and lose the focus to it, and Space would go into About me's words.
+    await expect.poll(() => focusedPath(page)).toMatch(/^arrangement\.tiles\.about\./);
 
     // The grip, by keyboard: Space picks up, ArrowDown moves, Space drops.
     const grip = tools(page, "about").getByRole("button", { name: "Drag About me" });
