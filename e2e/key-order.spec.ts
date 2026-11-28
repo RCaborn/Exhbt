@@ -286,7 +286,10 @@ test.describe("The editor, with the exhbt stored as the live database stores it"
     const chart = CHARTS[1]!;
     const { id } = await seedFromDatabase(page, [chart], []);
     const offer = page.getByText(/that never reached the server/);
-    // The root of the editor this test is in, up: no other element that gains data-ready can answer for it.
+    // The root of the editor this test is in, up. Nothing round the editor (#main and out) or in the header can answer
+    // for it: READY takes only the new editor's root itself (data-editor="page" and the marker on one element), and
+    // CLASSIC.ready only a direct child of data-editor="classic", of which the classic editor's root is one (its
+    // comment says which others there are).
     const ready = () => expect(page.locator(editor === "page" ? READY : CLASSIC.ready)).toBeAttached();
     const backupKey = `exhbt-backup:${id}`;
     /** Keeps a copy in this browser as the editor does, dated after the server's copy (a device whose clock runs ahead). */
