@@ -85,11 +85,14 @@ async function pressAndClose(page: Page, o: Opener, how: "Escape" | "the close b
   await opener.scrollIntoViewIfNeeded();
   await press(opener, finger);
   if (o.choice) await press(choice(page, o.choice), finger);
-  const shown = o.open(page).filter({ visible: true });
-  await expect(shown.first()).toBeVisible();
+  // Strict: one press opens one of it, and a second copy on opening fails here.
+  const open = o.open(page);
+  await expect(open, `${o.name}: one of it is open`).toBeVisible();
   if (how === "Escape") await page.keyboard.press("Escape");
-  else await press(shown.first().getByRole("button", { name: "Close", exact: true }).first(), finger);
-  await expect(shown, `${o.name}, closed with ${how}: no copy of it is left to see`).toHaveCount(0);
+  else await press(open.getByRole("button", { name: "Close", exact: true }).first(), finger);
+  // As it closes, a popover under a finger can leave a second copy shrinking back into its button (above): every copy
+  // that can be seen must go.
+  await expect(open.filter({ visible: true }), `${o.name}, closed with ${how}: no copy of it is left to see`).toHaveCount(0);
   await expect.poll(async () => (await uiNow(page)).sheet, { message: `${o.name}, closed with ${how}: the editor has nothing open` }).toBe(null);
   await expectFocusOn(page, o.choice ? more(page) : opener, `${o.name}, closed with ${how}`);
 }
