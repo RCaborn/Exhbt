@@ -7,8 +7,11 @@ import { READY, expect, fresh, openEditor, saveState, setKind, test, textbox, ty
  * leaving.ts). The editor sends the whole state 0.6s after the last key (useBuilder), and a person may follow a link
  * inside that wait, or while a save is on its way. Whichever way they leave, their words must be there when they come
  * back:
- *  - by a link inside the app (a client-side navigation: the page stays, so a save on its way goes on), the words are
- *    sent as the link is pressed, to the editor's own address, and do not wait for the next page to come;
+ *  - by a link inside the app (a client-side navigation: the page stays until the next one has come, so a save on its
+ *    way goes on), the words wait for the next page and go as the editor goes, to the next page's address. They are not
+ *    sent at the press: Next's navigation goes ahead of a save sent then, and Next asks for the next page a second time
+ *    and shows it only once that is answered. A tab closed before the next page comes keeps them, as a full load does;
+ *  - by a link to this same page, which Next fetches afresh, the same, once the page has come again;
  *  - by a full page load (the page goes, and the browser drops whatever it had not sent), what the server had not said
  *    it had is kept in this browser and offered back on the next visit, once.
  * One save at a time: the newest words are what the server keeps.
@@ -24,13 +27,13 @@ test.describe.configure({ timeout: 180_000 });
 const HEADLINE = "profile.headline";
 const NAME = "profile.name";
 
-type Save = { url: string; request: Request; ended?: "answered" | "failed"; status?: number; error?: string };
+type Save = { url: string; request: Request; at: number; ended?: "answered" | "failed"; status?: number; error?: string };
 
-/** Every save this browser sends from now on (a server action: a POST with Next's next-action header), with where it went and how it ended. */
+/** Every save this browser sends from now on (a server action: a POST with Next's next-action header), with where it went, when it was sent (the clock's time) and how it ended. */
 function watchSaves(page: Page): Save[] {
   const saves: Save[] = [];
   page.context().on("request", (r) => {
-    if (r.method() === "POST" && r.headers()["next-action"]) saves.push({ url: new URL(r.url()).pathname, request: r });
+    if (r.method() === "POST" && r.headers()["next-action"]) saves.push({ url: new URL(r.url()).pathname, request: r, at: r.timing().startTime > 0 ? r.timing().startTime : Date.now() });
   });
   page.context().on("response", (res) => {
     const s = saves.find((x) => x.request === res.request());
@@ -91,6 +94,38 @@ async function hold(page: Page, pick: (r: Request) => boolean) {
 const isSave = (r: Request) => r.method() === "POST" && Boolean(r.headers()["next-action"]);
 /** Next's request for the page it is going to (its React Server Components payload). */
 const isNextPage = (path: RegExp) => (r: Request) => r.method() === "GET" && Boolean(r.headers()["rsc"]) && path.test(new URL(r.url()).pathname);
+/** The same, leaving out Next's prefetches: what it asks for as it goes there, or as it asks for the page again. */
+const isGoingTo = (path: RegExp) => (r: Request) => isNextPage(path)(r) && !r.headers()["next-router-prefetch"];
+
+/** Lets the first request `pick` chooses through, and holds every one after it until `release`. */
+async function holdAfterTheFirst(page: Page, pick: (r: Request) => boolean) {
+  const held: Route[] = [];
+  let seen = 0;
+  let open = false;
+  await page.context().route("**/*", (route) => {
+    if (!pick(route.request())) return route.fallback();
+    seen++;
+    if (open || seen === 1) return route.fallback();
+    held.push(route);
+  });
+  return {
+    /** How many `pick` has chosen so far. */
+    count: () => seen,
+    held,
+    release: async () => {
+      open = true;
+      for (const r of held.splice(0)) await r.continue().catch(() => {});
+    },
+  };
+}
+
+/** The clock's time of the next press on the page, read before any of the page's own handlers hear it. */
+async function nextPressTime(page: Page): Promise<() => Promise<number>> {
+  await page.evaluate(() => {
+    window.addEventListener("click", () => void ((window as { __pressedAt?: number }).__pressedAt ??= Date.now()), { capture: true, once: true });
+  });
+  return () => page.evaluate(() => (window as { __pressedAt?: number }).__pressedAt ?? NaN);
+}
 
 /** Asks for each page once, as the person signed in, so a development server has built it before it is measured. */
 async function warm(page: Page, paths: string[]) {
@@ -173,7 +208,7 @@ const ROADMAPS = LINKS[2]!;
 
 test.describe("Words typed just before a link inside the app is followed", () => {
   for (const link of LINKS) {
-    test(`${link.name}: they are sent as it is pressed, to the editor, and are there when the person comes back`, async ({ page }) => {
+    test(`${link.name}: they wait for the next page, go as the editor goes, and are there when the person comes back`, async ({ page }) => {
       const seeded = await openEditor(page, fresh(FULL, `lv-${link.name}`));
       await warm(page, [link.path(seeded)]);
       const saves = watchSaves(page);
@@ -186,6 +221,7 @@ test.describe("Words typed just before a link inside the app is followed", () =>
         facts.sentBeforeTheLink = saves.length;
         await link.follow(page);
         await page.waitForURL(link.lands, { timeout: 60_000 });
+        facts.landedOn = new URL(page.url()).pathname;
         facts.serverHasIt = await serverHasIt(page);
         await settled(saves);
         facts.saves = told(saves);
@@ -195,12 +231,52 @@ test.describe("Words typed just before a link inside the app is followed", () =>
         say(link.name, facts);
       }
       expect(facts.sentBeforeTheLink, "no save had gone when the link was followed").toBe(0);
-      expect(saves[0]?.url, "the words went to the editor's own address, not the next page's").toBe("/portfolio");
+      // Not at the press: a save sent then is one Next's navigation goes ahead of, and Next asks for the next page twice.
+      expect(
+        saves.map((s) => s.url),
+        "one save, sent as the editor went: once the next page had come, to its address",
+      ).toEqual([facts.landedOn]);
       expect(facts.stored).toBe(words);
     });
   }
 
-  test("a next page slow to come: the words are sent at once, not once it has come", async ({ page }) => {
+  test("the next page is asked for once, and shown without waiting for a second request", async ({ page }) => {
+    const seeded = await openEditor(page, fresh(FULL, "lv-once"));
+    await warm(page, [ADD.path(seeded)]);
+    const saves = watchSaves(page);
+    // Next's requests for the next page: the first goes through, and any after it (a refresh of the page it lands on) is held.
+    const asked = await holdAfterTheFirst(page, isGoingTo(/^\/exhbts\/new$/));
+    const pressedAt = await nextPressTime(page);
+    const words = "Typed just before the Add tile, asked for once";
+    const facts: Record<string, unknown> = {};
+    try {
+      await typeIn(page, HEADLINE, words);
+      await ADD.follow(page);
+      // A shown page that waits for nothing more takes a second or so here; eight is far past it.
+      facts.shownWhileASecondRequestWasHeld = await page
+        .waitForURL(ADD.lands, { timeout: 8_000 })
+        .then(() => true)
+        .catch(() => false);
+      facts.askedFor = asked.count();
+      const at = await pressedAt();
+      facts.sentBeforeThePress = saves.filter((s) => s.at < at).length;
+      await asked.release();
+      await page.waitForURL(ADD.lands, { timeout: 60_000 });
+      facts.serverHasIt = await serverHasIt(page);
+      await settled(saves);
+      facts.saves = told(saves);
+      facts.stored = await storedHeadline(page);
+    } finally {
+      say("the next page, asked for once", facts);
+    }
+    // What this case is about: the words were waiting at the press. A save already on its way there is another case.
+    expect(facts.sentBeforeThePress, "no save had gone at the press").toBe(0);
+    expect(facts.askedFor, "Next asked for the next page once").toBe(1);
+    expect(facts.shownWhileASecondRequestWasHeld, "and showed it without waiting for a second request").toBe(true);
+    expect(facts.stored).toBe(words);
+  });
+
+  test("a next page slow to come: the words wait for it, and go as it comes", async ({ page }) => {
     const seeded = await openEditor(page, fresh(FULL, "lv-slow-next"));
     await warm(page, [ADD.path(seeded)]);
     const saves = watchSaves(page);
@@ -223,7 +299,8 @@ test.describe("Words typed just before a link inside the app is followed", () =>
     } finally {
       say("a slow next page", facts);
     }
-    expect(facts.sentWhileItWasComing, "the save went out before the next page came").toEqual([expect.stringMatching(/^POST \/portfolio /)]);
+    expect(facts.sentWhileItWasComing, "nothing went while the next page was coming").toEqual([]);
+    expect(saves.map((s) => s.url), "one save, sent as the editor went, to the next page's address").toEqual(["/exhbts/new"]);
     expect(facts.stored).toBe(words);
   });
 
@@ -400,7 +477,7 @@ test.describe("A save on its way when the person leaves", () => {
     expect(facts.back, "back by the header's link, the editor opens on the newer words, with nothing to offer back").toEqual({ opened: true, shown: "The newer words", offer: null });
   });
 
-  test("words typed while the next page is coming (the save of what was waiting went at the press): they are saved once it has come", async ({ page }) => {
+  test("words typed while the next page is coming, after words that were waiting at the press: the newest go as it comes, and are saved", async ({ page }) => {
     const seeded = await openEditor(page, fresh(FULL, "lv-meanwhile"));
     await warm(page, [ADD.path(seeded)]);
     const saves = watchSaves(page);
@@ -409,10 +486,9 @@ test.describe("A save on its way when the person leaves", () => {
     const facts: Record<string, unknown> = {};
     try {
       await typeIn(page, HEADLINE, "Typed just before the link");
-      // Inside the autosave's wait: the press sends these words, and the navigation goes ahead of that save.
+      // Inside the autosave's wait: these words wait for the next page.
       await ADD.follow(page);
       await expect.poll(() => next.held.length, { timeout: 10_000 }).toBeGreaterThan(0);
-      await expect(saveState(page), "that save has answered").toHaveAttribute("data-save", "saved", { timeout: 20_000 });
       // Still on the editor (the next page has not come): more words, and well past the autosave's wait.
       await typeIn(page, HEADLINE, words);
       await page.waitForTimeout(2_000);
@@ -426,6 +502,8 @@ test.describe("A save on its way when the person leaves", () => {
     } finally {
       say("typed while the next page was coming", facts);
     }
+    expect(facts.sentWhileItWasComing, "nothing went while the next page was coming").toEqual([]);
+    expect(saves.map((s) => s.url), "one save, of the newest words, sent as the editor went").toEqual(["/exhbts/new"]);
     expect(facts.serverHasIt, "the words typed meanwhile went once the next page had come, and landed").toBe(true);
     expect(facts.back, "back by the header's link, the editor opens on them, with nothing to offer back").toEqual({ opened: true, shown: words, offer: null });
   });

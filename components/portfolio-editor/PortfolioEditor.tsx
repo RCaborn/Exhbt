@@ -134,9 +134,9 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
    * navigation is over can be dropped: the end of Next's queue is left at the action the navigation went ahead of, and
    * one added after it is never run (next 15.5's app-router-instance.js, dispatchAction). A save dropped there never
    * leaves the browser and never answers. One that is not dropped runs once the navigation is over. So a save asked for
-   * in that time waits until then (`tracked`) and goes, which costs it nothing, and the gate can wait for every save,
-   * however long it takes, without waiting for one that will never come: it never opens on words that an older save on
-   * its way can still overwrite.
+   * in that time waits until then (`tracked`) and goes, with the newest words, which costs it nothing, and the gate can
+   * wait for every save, however long it takes, without waiting for one that will never come: it never opens on words
+   * that an older save on its way can still overwrite.
    */
   let underWay = false;
   /** The saves asked for while it is under way, each sent when it is over: at once, in that moment, before anything else is asked of Next. */
@@ -190,18 +190,30 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
   /**
    * Sends a state, noted while it is on its way and until it is answered: the gate and the crash fallback wait for it
    * (pending.ts), however long it takes, because a save that has left the browser can still land. One asked for while a
-   * navigation the editor started is under way is sent once that is over (`underWay`). Once the editor has gone nothing
-   * sends again a save that fails, so the newest words are kept for the next visit (again: a stale answer has just kept
-   * the older words it carried); one that lands with the newest words takes back what was kept.
+   * navigation the editor started is under way is sent once that is over (`underWay`), with the newest state in its
+   * place: useBuilder asks for one save at a time, so words typed while the next page was coming would otherwise wait
+   * behind it, for a save that is never sent once the editor has gone (`save`). Not a state the rules refuse, which
+   * useBuilder never sends: then the one it asked for goes. Once the editor has gone nothing sends again a save that
+   * fails, so the newest words are kept for the next visit (again: a stale answer has just kept the older words it
+   * carried); one that lands with the newest words takes back what was kept.
    */
   const tracked = (state: BuilderState): Promise<SaveResult> => {
-    const run = underWay ? new Promise<SaveResult>((done, fail) => waiting.push(() => void send(state).then(done, fail))) : send(state);
+    let sent = state;
+    const run = underWay
+      ? new Promise<SaveResult>((done, fail) =>
+          waiting.push(() => {
+            const newest = rt.state.get();
+            if (newest !== state && !problemOf(newest)) sent = newest;
+            void send(sent).then(done, fail);
+          }),
+        )
+      : send(state);
     noteSending(run);
     void run.then(
       (r) => {
         if (!gone) return;
         if (!r.ok) keepNewest();
-        else if (state === rt.state.get()) forgetUnsaved(owner, state);
+        else if (sent === rt.state.get()) forgetUnsaved(owner, sent);
       },
       () => {
         if (gone) keepNewest();
@@ -216,9 +228,10 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
    * a navigation of its own under way (one the person started there, or Next's), which can drop it, and a save that
    * never answers would keep the gate waiting. Not sent, then: those words were kept in this browser as the editor
    * went (leftBehind), and the next visit offers them back. The save useBuilder sends in the moment the editor goes is
-   * sent.
+   * sent. A state the server has said it has (it went in an older one's place: `tracked`) is not sent again.
    */
   const save = (state: BuilderState): Promise<SaveResult> => {
+    if (state === confirmed) return Promise.resolve({ ok: true });
     if (!closed) return tracked(state);
     keepNewest();
     return Promise.resolve({ ok: false, error: "The editor has closed: these changes were kept in this browser." });
@@ -337,8 +350,8 @@ export function PortfolioEditor({
     return () => window.removeEventListener("beforeunload", asked);
   }, [visit]);
 
-  // A press on a link out of the editor sends what is waiting at once, and a page that goes for good keeps what the
-  // server has not said it has (leaving.ts).
+  // A press on a link out of the editor holds what is waiting until the editor goes, and a page that goes for good keeps
+  // what the server has not said it has (leaving.ts).
   useEffect(() => watchLeaving(rt, visit.owner), [rt, visit]);
 
   return (
