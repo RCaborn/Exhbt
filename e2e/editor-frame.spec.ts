@@ -14,7 +14,8 @@ import { freshName, openSeeded, READY, SAMPLES } from "./page-editor";
  *    skip link puts it). Letting go inside the press, as 4289009 did, made Chromium select nothing.
  *  - A press in #main, then Escape, closes an open rewrite form (it reads only a focus on nothing as nowhere): on the
  *    editor's own margin, and on the band of #main above the editor (the team strip), which 4289009 did not let go of.
- *  - A drag the browser takes over (chosen words carried away) ends with the frame let go too.
+ *  - A drag the browser takes over (chosen words carried away) ends with the frame let go too. Chromium takes it
+ *    over, and there the case checks that it did; elsewhere it notes which event ended the press.
  */
 
 /** Where the focus is: "BODY" for nothing, else the element's tag and id. */
@@ -155,7 +156,7 @@ test.describe("a press in #main, then Escape, closes an open rewrite form", () =
     });
 });
 
-test("a drag the browser takes over, chosen words carried out of the editor, ends with the frame let go", async ({ page }) => {
+test("a drag the browser takes over, chosen words carried out of the editor, ends with the frame let go", async ({ page, browserName }) => {
   await openCaseStudy(page);
   const [w] = await pageWords(page, READY);
   expect(w, "the page's own words in view").toBeTruthy();
@@ -193,4 +194,11 @@ test("a drag the browser takes over, chosen words carried out of the editor, end
   await expect.poll(() => focusName(page), "after the drag the frame has let go").toBe("BODY");
   const ends = await page.evaluate(() => (window as unknown as { __frameEnds: string[] }).__frameEnds);
   test.info().annotations.push({ type: "the press", description: `focus while held: ${held}; events: ${ends.join(", ") || "none"}` });
+  // Chromium takes such a drag over, so there the case holds to the path it is named for: had the browser not taken
+  // the drag (the words no longer draggable), the press would end with mouseup and the let-go above would pass on that.
+  // On WebKit the annotation says which event ended the press.
+  if (browserName === "chromium") {
+    expect(ends, "the browser took the drag over").toEqual(expect.arrayContaining(["dragstart", "dragend"]));
+    expect(ends, "the press did not end with mouseup").not.toContain("mouseup");
+  }
 });
