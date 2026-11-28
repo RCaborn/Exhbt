@@ -60,11 +60,16 @@ function leavesThePage(a: HTMLAnchorElement, e: MouseEvent): boolean {
 }
 
 /**
- * Watches for the person leaving, for the editor's life. The press on a link is heard in the capture phase on the
- * document, before Next's own handler (React's, at the root) starts the navigation.
+ * Watches for the person leaving, for the editor's life. A press on a link is heard on the window, once the page's own
+ * handlers have had it: React's, at the document, where Next's <Link> takes the press over and starts its navigation in
+ * the same breath, so no save can be asked for in between. Only a press Next has taken over (it stops the browser's own
+ * navigation: `defaultPrevented`) holds the saves. A link the browser follows itself loads the next page afresh, which
+ * `pagehide` sees to, and a hold for it could outlast a "Leave site?" answered Stay (PortfolioEditor.tsx, startVisit's
+ * `asked`).
  */
 export function watchLeaving(rt: Runtime, owner: string): () => void {
   const onPress = (e: MouseEvent) => {
+    if (!e.defaultPrevented) return;
     const a = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>("a[href]") : null;
     if (a && leavesThePage(a, e)) leaving(rt);
   };
@@ -73,10 +78,10 @@ export function watchLeaving(rt: Runtime, owner: string): () => void {
     // After the site was updated under this tab the words are kept as that, with its own words on the next visit.
     keepUnsaved(owner, rt.state.get(), rt.save.get().stale ? "stale" : "left");
   };
-  document.addEventListener("click", onPress, true);
+  window.addEventListener("click", onPress);
   window.addEventListener("pagehide", onGone);
   return () => {
-    document.removeEventListener("click", onPress, true);
+    window.removeEventListener("click", onPress);
     window.removeEventListener("pagehide", onGone);
   };
 }

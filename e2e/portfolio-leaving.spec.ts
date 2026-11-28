@@ -508,6 +508,53 @@ test.describe("A save on its way when the person leaves", () => {
     expect(facts.back, "back by the header's link, the editor opens on them, with nothing to offer back").toEqual({ opened: true, shown: words, offer: null });
   });
 
+  test("a reload answered Stay while the next page is coming, with newer words behind a save on its way: they still wait for the next page, and are saved", async ({ page }) => {
+    const seeded = await openEditor(page, fresh(FULL, "lv-stay-reload"));
+    await warm(page, [ADD.path(seeded)]);
+    const saves = watchSaves(page);
+    const dialogs: string[] = [];
+    page.on("dialog", (d) => {
+      dialogs.push(d.type());
+      // Stays on the page.
+      void d.dismiss();
+    });
+    const held = await hold(page, isSave);
+    const next = await hold(page, isNextPage(/^\/exhbts\/new$/));
+    const facts: Record<string, unknown> = {};
+    try {
+      await typeIn(page, HEADLINE, "The older words");
+      await expect.poll(() => held.held.length, { timeout: 5_000 }).toBe(1);
+      await typeIn(page, HEADLINE, "The newer words");
+      // The link, with the next page held: the navigation goes ahead of the save on its way.
+      await ADD.follow(page);
+      await expect.poll(() => next.held.length, { timeout: 10_000 }).toBeGreaterThan(0);
+      // A reload while it is coming (the browser asks first, as a change is waiting), and the person stays.
+      await page.evaluate(() => void setTimeout(() => window.location.reload(), 0));
+      await expect.poll(() => dialogs.length, { timeout: 10_000 }).toBeGreaterThan(0);
+      await page.waitForTimeout(500);
+      facts.dialogs = [...dialogs];
+      facts.stillOn = new URL(page.url()).pathname;
+      // The older save is answered while the navigation is still under way, so the newer one is asked for then.
+      await held.release();
+      await expect.poll(() => saves[0]?.ended, { timeout: 20_000 }).toBeDefined();
+      await page.waitForTimeout(1_000);
+      facts.sentWhileItWasComing = told(saves);
+      await next.release();
+      await page.waitForURL(ADD.lands, { timeout: 60_000 });
+      facts.serverHasIt = await serverHasIt(page);
+      await settled(saves);
+      facts.saves = told(saves);
+      facts.back = await backByTheHeader(page);
+    } finally {
+      say("a reload answered Stay while the next page was coming", facts);
+    }
+    expect(facts.dialogs, "the browser asked before the reload").toEqual(["beforeunload"]);
+    expect(facts.stillOn, "and the person stayed").toBe("/portfolio");
+    expect(facts.sentWhileItWasComing, "the newer save waited while the next page was coming").toEqual([expect.stringMatching(/^POST \/portfolio 200 /)]);
+    expect(facts.serverHasIt, "the newer save went once the next page had come, and landed").toBe(true);
+    expect(facts.back, "back by the header's link, the editor opens on the newer words, with nothing to offer back").toEqual({ opened: true, shown: "The newer words", offer: null });
+  });
+
   test("by a full page load: the words the server did not get are kept in this browser and offered back once", async ({ page }) => {
     await openEditor(page, fresh(FULL, "lv-inflight-load"));
     await warm(page, ["/account"]);

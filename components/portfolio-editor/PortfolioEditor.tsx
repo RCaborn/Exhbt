@@ -107,9 +107,14 @@ type Visit = {
   left(): void;
   /**
    * A navigation the editor started is over and the editor is still on the page: new data for the page has come (a
-   * navigation that came back here), or the page stayed when the browser was asked to leave it.
+   * navigation that came back here).
    */
   stayed(): void;
+  /**
+   * The browser asked "Leave site?" and the page stayed: the navigation is over, unless a save asked for now could still
+   * be dropped (startVisit's `asked`).
+   */
+  asked(): void;
 };
 
 function startVisit(loaded: BuilderState, owner: string): Visit {
@@ -129,24 +134,46 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
 
   /**
    * A navigation the editor started (a press on a link out of the page, a phone's More, Open: leaving.ts), from its
-   * start until it is over: the editor is off the page, or it is still here (`stayed`). Next runs one router action at
-   * a time, and a navigation goes ahead of the one that is running. When it does, an action asked for before the
-   * navigation is over can be dropped: the end of Next's queue is left at the action the navigation went ahead of, and
-   * one added after it is never run (next 15.5's app-router-instance.js, dispatchAction). A save dropped there never
+   * start until it is over: the editor is off the page, or it is still here (`stayed`, `asked`). Next runs one router
+   * action at a time, and a navigation goes ahead of the one that is running. When it does, an action asked for before
+   * the navigation is over can be dropped: the end of Next's queue is left at the action the navigation went ahead of,
+   * and one added after it is never run (next 15.5's app-router-instance.js, dispatchAction). A save dropped there never
    * leaves the browser and never answers. One that is not dropped runs once the navigation is over. So a save asked for
    * in that time waits until then (`tracked`) and goes, with the newest words, which costs it nothing, and the gate can
    * wait for every save, however long it takes, without waiting for one that will never come: it never opens on words
    * that an older save on its way can still overwrite.
    */
   let underWay = false;
+  /**
+   * The navigation under way went ahead of a save of this visit's that Next had not answered: until it is over, a save
+   * asked for can be dropped. Without one the navigation is the last thing in Next's queue, a save asked for runs after
+   * it, and nothing is dropped. (Only this visit's saves are counted, the one kind a person makes all the time: a
+   * sheet's own action, a claim or a photo, on its way at a press is not, and the hold does not wait for it.)
+   */
+  let mayDrop = false;
+  /** This visit's saves that Next has been handed and has not answered. */
+  let onItsWay = 0;
   /** The saves asked for while it is under way, each sent when it is over: at once, in that moment, before anything else is asked of Next. */
   const waiting: (() => void)[] = [];
   function navigating(): void {
     underWay = true;
+    if (onItsWay > 0) mayDrop = true;
   }
   function navigationOver(): void {
     underWay = false;
+    mayDrop = false;
     for (const go of waiting.splice(0)) go();
+  }
+  /**
+   * "Leave site?" was answered Stay. Next asks it when it gives up on a navigation (a page it could not fetch, which it
+   * then loads afresh), and the navigation is over then. A reload asks it too, while the navigation is still under way,
+   * and the two cannot be told apart from here: so the hold ends only when no save can be dropped (`mayDrop`), and
+   * otherwise it lasts until the editor goes or new data comes. Left over: a save on its way at the press, a next page
+   * Next cannot fetch, and Stay. The saves then wait until the person leaves by a link, or the page goes for good
+   * (`pagehide` keeps the words, leaving.ts), and the status says Saving all the while.
+   */
+  function asked(): void {
+    if (!mayDrop) navigationOver();
   }
 
   async function send(state: BuilderState): Promise<SaveResult> {
@@ -169,7 +196,10 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
           ok: false,
           error: "The save was told to fail (?save=fail, development only).",
         };
-      const r = await savePortfolioAction(state);
+      onItsWay++;
+      const r = await savePortfolioAction(state).finally(() => {
+        onItsWay--;
+      });
       if (!r.ok) return { ok: false, error: r.error };
       // The server has it, as of its own clock: noted for the crash fallback and for the gate (pending.ts).
       noteSaved(state, r.savedAt);
@@ -270,6 +300,7 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
     here,
     left: leftBehind,
     stayed: navigationOver,
+    asked,
   };
 }
 
@@ -339,13 +370,14 @@ export function PortfolioEditor({
   }, [visit]);
 
   // A navigation the editor started is over, and the editor is still here (startVisit's `underWay`): new data for the
-  // page has come (the person came back to it before the next page did), or the browser was asked to leave the page
-  // and it stayed. Next turns a navigation whose page it cannot fetch into a full page load, and the browser asks
-  // "Leave site?" when a change is waiting: a person who stays carries on editing, and their saves go again. The
-  // check runs once the question is answered; a page that does go never runs it.
+  // page has come (the person came back to it before the next page did). Or the browser was asked to leave the page
+  // and it stayed: Next turns a navigation whose page it cannot fetch into a full page load, and the browser asks
+  // "Leave site?" when a change is waiting, so a person who stays carries on editing and their saves go again, unless
+  // a reload may be what asked while the navigation is still under way (startVisit's `asked`). The check runs once the
+  // question is answered; a page that does go never runs it.
   useEffect(() => visit.stayed(), [visit, data]);
   useEffect(() => {
-    const asked = () => void setTimeout(visit.stayed, 0);
+    const asked = () => void setTimeout(visit.asked, 0);
     window.addEventListener("beforeunload", asked);
     return () => window.removeEventListener("beforeunload", asked);
   }, [visit]);
