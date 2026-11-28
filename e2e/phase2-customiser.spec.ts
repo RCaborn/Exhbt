@@ -404,7 +404,7 @@ test.describe("Arrange the portfolio (builder, Projects and Look)", () => {
     await expect(page.locator("[data-section=quote]")).toContainText("messy spreadsheet");
 
     await page.goto("/portfolio?step=projects");
-    await page.getByRole("button", { name: "Take A quote off the page" }).click();
+    await page.getByRole("button", { name: "Take A quote off your portfolio" }).click();
     await saved(page);
     await page.goto(`/p/${u}`);
     await expect(page.locator("[data-section=quote]")).toHaveCount(0);
