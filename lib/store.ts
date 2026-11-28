@@ -245,7 +245,8 @@ export type EventName =
   | "referral_recorded"
   | "referral_credited"
   | "page_view"
-  // A publish: n (how many of the person's exhbts are published once this one is), republish, and nothing from the exhbt (lib/publish-follow-up.ts).
+  // A publish: n (how many of the person's exhbts have been published, this one included, counted as N1 and N2 count them:
+  // published_at set, so one taken down still counts), republish, and nothing from the exhbt (lib/publish-follow-up.ts).
   | "exhbt_published"
   // Claimed once per person, before the first-publish email is built (claimEventOnce).
   | "first_publish_emailed"
