@@ -29,6 +29,7 @@ import {
   usePortfolioUi,
   useRuntime,
   type PortfolioEditorApi,
+  type Going,
   type PortfolioUi,
   type Runtime,
   type SaveView,
@@ -118,7 +119,7 @@ type Visit = {
 };
 
 function startVisit(loaded: BuilderState, owner: string): Visit {
-  const host: Host = { change: () => {}, retry: () => {}, navigating: () => navigating() };
+  const host: Host = { change: () => {}, retry: () => {}, navigating: (to) => navigating(to) };
   const rt = createRuntime(loaded, host);
   /** What the server has said it has, for this visit alone (pending.ts's notes are the document's, and a later visit's). */
   let confirmed = loaded;
@@ -155,7 +156,10 @@ function startVisit(loaded: BuilderState, owner: string): Visit {
   let onItsWay = 0;
   /** The saves asked for while it is under way, each sent when it is over: at once, in that moment, before anything else is asked of Next. */
   const waiting: (() => void)[] = [];
-  function navigating(): void {
+  function navigating(to: Going): void {
+    // To this page afresh with nothing on its way, a save asked for runs after Next's navigation and none is dropped,
+    // and the page's new data, which ends a hold, may not come (a page Next has kept): nothing is held.
+    if (to === "again" && onItsWay === 0) return;
     underWay = true;
     if (onItsWay > 0) mayDrop = true;
   }
@@ -370,11 +374,11 @@ export function PortfolioEditor({
   }, [visit]);
 
   // A navigation the editor started is over, and the editor is still here (startVisit's `underWay`): new data for the
-  // page has come (the person came back to it before the next page did). Or the browser was asked to leave the page
-  // and it stayed: Next turns a navigation whose page it cannot fetch into a full page load, and the browser asks
-  // "Leave site?" when a change is waiting, so a person who stays carries on editing and their saves go again, unless
-  // a reload may be what asked while the navigation is still under way (startVisit's `asked`). The check runs once the
-  // question is answered; a page that does go never runs it.
+  // page has come (the person came back to it before the next page did, or a link to this page has fetched it). Or the
+  // browser was asked to leave the page and it stayed: Next turns a navigation whose page it cannot fetch into a full
+  // page load, and the browser asks "Leave site?" when a change is waiting, so a person who stays carries on editing and
+  // their saves go again, unless a reload may be what asked while the navigation is still under way (startVisit's
+  // `asked`). The check runs once the question is answered; a page that does go never runs it.
   useEffect(() => visit.stayed(), [visit, data]);
   useEffect(() => {
     const asked = () => void setTimeout(visit.asked, 0);

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { keepUnsaved } from "./keep";
 import { hasPending } from "./pending";
-import { useRuntime, type Runtime } from "./runtime";
+import { useRuntime, type Going, type Runtime } from "./runtime";
 
 /*
  * Leaving the editor with words it has not sent (decision 0031, "Saving"). useBuilder, the step builder's save hook
@@ -33,30 +33,33 @@ import { useRuntime, type Runtime } from "./runtime";
  *    save however long it takes (one that has left the browser can still land), never for one that will not come, and
  *    never opens on words an older save can still overwrite. Once the editor is off the page what the server has not
  *    said it has is kept in this browser (startVisit's leftBehind).
+ *  - A link to this same page (the header's "Your portfolio" on /portfolio) while a save is on its way. Next asks for
+ *    the page afresh and goes ahead of that save, so the newer save after it was lost the same way: the status said
+ *    Saving, and nothing more was saved until a reload. Such a press holds the saves too, until the page's new data has
+ *    come (Next fetches it: a navigation that went ahead of an action is followed by a refresh). With nothing on its
+ *    way it holds nothing: a save asked for then runs after Next's navigation and is not lost, and a hold could wait
+ *    for new data that never comes (a page Next has kept).
  *
  * Nothing here sends a second save beside useBuilder's: one save at a time, always of the newest state, so an older
  * state never lands after a newer one.
  */
 
 /**
- * The person is being taken to another page of the app: a save asked for from now until the navigation is over waits
- * for it, and then goes with the newest words (PortfolioEditor.tsx, startVisit's `underWay`). Nothing is sent now
- * (above).
+ * Where a press on this link takes the person in this tab: "away", to another page of this site; "again", to this page,
+ * which Next fetches afresh (its path with another query, or the very same address). Null for a change of the hash
+ * alone (Next fetches nothing then: its navigate-reducer's onlyHashChange), a new tab or window, a download, or another
+ * site, which loads that site (`pagehide` sees to it). Either way a save asked for from now until the navigation is
+ * over waits for it, and then goes with the newest words (PortfolioEditor.tsx, startVisit's `underWay`); "again" only
+ * while a save is on its way. Nothing is sent at the press (above).
  */
-function leaving(rt: Runtime): void {
-  rt.navigating();
-}
-
-/**
- * Whether a press on this link takes the person off the editor's page in this tab: a link to another page of this
- * site, not into a new tab or window, nor a download. A link to this page (a hash, another query) leaves the editor
- * where it is, and a link to another site loads that site, which `pagehide` sees to.
- */
-function leavesThePage(a: HTMLAnchorElement, e: MouseEvent): boolean {
-  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return false;
-  if ((a.target && a.target !== "_self") || a.hasAttribute("download")) return false;
-  const to = new URL(a.href, window.location.href);
-  return to.origin === window.location.origin && to.pathname !== window.location.pathname;
+function goingTo(a: HTMLAnchorElement, e: MouseEvent): Going | null {
+  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return null;
+  if ((a.target && a.target !== "_self") || a.hasAttribute("download")) return null;
+  const here = new URL(window.location.href);
+  const to = new URL(a.href, here);
+  if (to.origin !== here.origin) return null;
+  if (to.pathname !== here.pathname) return "away";
+  return to.hash && to.search === here.search ? null : "again";
 }
 
 /**
@@ -71,7 +74,8 @@ export function watchLeaving(rt: Runtime, owner: string): () => void {
   const onPress = (e: MouseEvent) => {
     if (!e.defaultPrevented) return;
     const a = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>("a[href]") : null;
-    if (a && leavesThePage(a, e)) leaving(rt);
+    const going = a ? goingTo(a, e) : null;
+    if (going) rt.navigating(going);
   };
   const onGone = () => {
     if (!hasPending()) return;
@@ -94,7 +98,7 @@ export function useGoTo(): (href: string) => void {
   const router = useRouter();
   const rt = useRuntime();
   return (href) => {
-    leaving(rt);
+    rt.navigating("away");
     router.push(href);
   };
 }

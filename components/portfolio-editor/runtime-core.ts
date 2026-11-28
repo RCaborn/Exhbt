@@ -5,7 +5,7 @@ import type { HomePath } from "@/components/portfolio/home-ctx";
 import { themeById } from "@/lib/portfolio-themes";
 import { LINK_PATHS, setAtPath } from "./paths";
 import { notePending } from "./pending";
-import type { LineDraft, PortfolioEditorApi, PortfolioSheet, PortfolioUi, Runtime, SaveView, UndoView } from "./runtime";
+import type { Going, LineDraft, PortfolioEditorApi, PortfolioSheet, PortfolioUi, Runtime, SaveView, UndoView } from "./runtime";
 import { applyUndo, entryFor, subjectOf, UNDO_LIMIT, type UndoEntry } from "./undo";
 
 /*
@@ -23,7 +23,7 @@ export type Host = {
   /** Sends what is waiting now. */
   retry(): void;
   /** A navigation the editor started is under way (leaving.ts): a save asked for until it is over waits for it. */
-  navigating(): void;
+  navigating(to: Going): void;
 };
 
 /** A field or anything else that takes the keyboard. */
@@ -177,5 +177,5 @@ export function createRuntime(initial: BuilderState, host: Host): Runtime {
     },
   };
 
-  return { state, ui, save, undo, said, lines, api, undoLast, retry: () => host.retry(), navigating: () => host.navigating() };
+  return { state, ui, save, undo, said, lines, api, undoLast, retry: () => host.retry(), navigating: (to) => host.navigating(to) };
 }

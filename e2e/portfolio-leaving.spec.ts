@@ -692,6 +692,82 @@ test.describe("A save on its way when the person leaves", () => {
 
 });
 
+test.describe("A link to this same page (the header's Your portfolio, on /portfolio): Next asks for the page afresh", () => {
+  const yourPortfolio = (page: Page) => page.getByRole("link", { name: "Your portfolio", exact: true }).first();
+
+  test("with a save on its way and newer words waiting: the newer words wait for the page, then go, and what is typed after is saved too", async ({ page }) => {
+    await openEditor(page, fresh(FULL, "lv-same-page"));
+    const saves = watchSaves(page);
+    const held = await hold(page, isSave);
+    const again = await hold(page, isGoingTo(/^\/portfolio$/));
+    const facts: Record<string, unknown> = {};
+    try {
+      await typeIn(page, HEADLINE, "The older words");
+      await expect.poll(() => held.held.length, { timeout: 5_000 }).toBe(1);
+      await typeIn(page, HEADLINE, "The newer words");
+      // The navigation goes ahead of the save on its way.
+      await yourPortfolio(page).click();
+      await expect.poll(() => again.held.length, { timeout: 10_000 }).toBeGreaterThan(0);
+      // The older save is answered while the page is being fetched again, so the newer one is asked for then.
+      await held.release();
+      await expect.poll(() => saves[0]?.ended, { timeout: 20_000 }).toBeDefined();
+      await page.waitForTimeout(1_000);
+      facts.sentWhileItWasComing = told(saves);
+      await again.release();
+      facts.newerSaved = await waitSaved(page)
+        .then(() => true)
+        .catch(() => false);
+      facts.headline = await valueAt(page, HEADLINE);
+      // The person carries on.
+      await typeIn(page, HEADLINE, "Typed after that");
+      facts.laterSaved = await waitSaved(page)
+        .then(() => true)
+        .catch(() => false);
+      await settled(saves);
+      facts.saves = told(saves);
+      facts.stored = await storedHeadline(page);
+      facts.offer = await offerWhy(page);
+    } finally {
+      say("a link to this page, with a save on its way and newer words waiting", facts);
+    }
+    expect(facts.sentWhileItWasComing, "the newer save waited while the page was being fetched again").toEqual([expect.stringMatching(/^POST \/portfolio 200 /)]);
+    expect(facts.newerSaved, "once the page had come, the newer words went and landed").toBe(true);
+    expect(facts.headline, "on the newer words").toBe("The newer words");
+    expect(facts.laterSaved, "and what is typed after is saved").toBe(true);
+    expect(facts.stored).toBe("Typed after that");
+    expect(facts.offer, "with nothing to offer back").toBe(null);
+  });
+
+  test("with words waiting and nothing on its way: they are saved, and so is what is typed after", async ({ page }) => {
+    await openEditor(page, fresh(FULL, "lv-same-calm"));
+    const saves = watchSaves(page);
+    const facts: Record<string, unknown> = {};
+    try {
+      await typeIn(page, HEADLINE, "Typed just before the link to this page");
+      facts.sentBeforeTheLink = saves.length;
+      const came = page.waitForResponse((r) => isGoingTo(/^\/portfolio$/)(r.request()), { timeout: 30_000 });
+      await yourPortfolio(page).click();
+      await came;
+      facts.firstSaved = await waitSaved(page)
+        .then(() => true)
+        .catch(() => false);
+      await typeIn(page, HEADLINE, "Typed after the link to this page");
+      facts.laterSaved = await waitSaved(page)
+        .then(() => true)
+        .catch(() => false);
+      await settled(saves);
+      facts.saves = told(saves);
+      facts.stored = await storedHeadline(page);
+    } finally {
+      say("a link to this page, with words waiting and nothing on its way", facts);
+    }
+    expect(facts.sentBeforeTheLink, "no save had gone when the link was followed").toBe(0);
+    expect(facts.firstSaved, "the words waiting at the press are saved").toBe(true);
+    expect(facts.laterSaved, "and so is what is typed after").toBe(true);
+    expect(facts.stored).toBe("Typed after the link to this page");
+  });
+});
+
 test.describe("A link whose page cannot be fetched", () => {
   test("offline: Next asks for a full page load, the person stays when the browser asks Leave site?, and once the connection is back the editor saves again", async ({ page, context }) => {
     const seeded = await openEditor(page, fresh(FULL, "lv-stay"));
